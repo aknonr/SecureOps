@@ -1,6 +1,6 @@
 # Phase 0 — Discovery and Project Setup
 
-**Duration:** 1–2 weeks
+**Duration:** 2–3 weeks
 **Goal:** Establish baseline, gather approvals, finalize pilot scope. **No application code in this phase.**
 
 ## Pre-Conditions
@@ -65,7 +65,7 @@
 | P0-T23 | Send BeyondTrust + PAM + service account clarification mail | 1 | [x] Sent |
 | P0-T24 | Track responses and update `docs/06-integrations.md` + `docs/05-security-model.md` when answers arrive | 1 | [ ] |
 
-**Total Phase 0 effort:** approximately 45 hours over 1.5–2 weeks.
+**Total Phase 0 effort:** approximately 45 hours over 2–3 weeks.
 
 ## Exit Criteria
 

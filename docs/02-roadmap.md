@@ -6,7 +6,7 @@ The project unfolds in **9 phases** (Phase 0 through Phase 8). Each phase produc
 
 | Phase | Name | Category | Duration | Status |
 |---|---|---|---|---|
-| 0 | Discovery and Project Setup | MVP | 1–2 weeks | Pending |
+| 0 | Discovery and Project Setup | MVP | 2–3 weeks | Pending |
 | 1 | Read-Only Diagnostic MVP | MVP | 4–6 weeks | Pending |
 | 2 | Web UI and Dashboard | MVP | 3–5 weeks | Pending |
 | 3 | Notification and Ticket Enrichment | ROI | 2–4 weeks | Pending |
@@ -16,7 +16,7 @@ The project unfolds in **9 phases** (Phase 0 through Phase 8). Each phase produc
 | 7 | Private AI / RAG PoC | Vision | 6–10 weeks | Pending — separate budget |
 | 8 | Approval-Based Remediation | Future | 6–8 weeks | Pending — future |
 
-MVP = Phase 0–2 (end-to-end value, 8–13 weeks)
+MVP = Phase 0–2 (end-to-end value, 9–14 weeks)
 ROI = Phase 3–6 (operational return, 12–20 additional weeks)
 Vision = Phase 7 (AI capability, separate decision)
 Future = Phase 8 (write operations, future)
@@ -36,7 +36,7 @@ With a single developer at ~16–20 hours per week:
 - Test environment available within 2 weeks of Phase 0.
 - No extended absence of the single developer.
 
-## Phase 0 — Discovery and Project Setup (1–2 weeks)
+## Phase 0 — Discovery and Project Setup (2–3 weeks)
 
 **Goal:** Establish baseline, gather approvals, finalize pilot scope. No code.
 

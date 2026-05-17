@@ -18,7 +18,7 @@ Working hours per quarter (assuming no extended absence): roughly **210–260 ho
 
 | Phase | Estimated hours | Equivalent weeks at 18h/week |
 |---|---|---|
-| 0 — Discovery | 25–40 | 1.5–2 |
+| 0 — Discovery | 45 | 2–3 |
 | 1 — Read-only diagnostic MVP | 110–160 | 6–9 |
 | 2 — Web UI | 70–110 | 4–6 |
 | 3 — Notification + ticket | 50–80 | 3–4 |
@@ -36,7 +36,7 @@ With a single developer at 18h/week:
 
 | Milestone | Realistic target |
 |---|---|
-| Phase 0 done | Within 2 weeks of project start |
+| Phase 0 done | Within 3 weeks of project start |
 | Phase 1 MVP demo to management | 6–8 weeks after Phase 0 |
 | Phase 2 UI in use by pilot operators | +4–6 weeks (~Q4 2026 with 2026 Q3 start) |
 | Phase 3 notifications live | +3–4 weeks |

@@ -15,3 +15,11 @@
 **What was decided:** SecureOps tasarımı Turuncuhat'ı organizasyonel kayıt sistemi olarak ele alacak; entegrasyon yönü tek taraflı varsayılmayacak ve ihtiyaç halinde EVT verisini alma ile EVT kapanış alanlarını geri yazma ihtimali birlikte değerlendirilecektir.
 
 **What was deferred:** Worker'ın hedef sunuculara erişiminde BeyondTrust broker kullanıp kullanmayacağı bugünden bağlanmadı. Nihai karar PAM ekibi, Bilgi Güvenliği ve ekip lideri girdisi geldikten sonra verilecektir.
+
+## 2026-05-17 — Batch 4 ve Batch 5 kapanışı
+
+**What changed:** Batch 4 ile gerçek sistem manzarası repo geneline işlendi: Turuncuhat merkezi workflow sistemi olarak netleştirildi, monthly.thy.com / HPE OpsBridge event-detail katmanı olarak işlendi ve Worker-BeyondTrust erişimi için X / Y / Z senaryoları açık karar olarak belgelendi. Batch 5 ile Phase 0 süre varsayımı yaklaşık 45 saatlik güncel efora uygun biçimde 2–3 hafta olarak yeniden bazlandı.
+
+**What remains open:** Turuncuhat entegrasyon yöntemi hâlâ netleşmedi; webhook mu API-pull mu olacağı ve read-only mi read-write mı ilerleyeceği paydaş yanıtı bekliyor. Worker'ın BeyondTrust ile hangi senaryoda çalışacağı da henüz açık karardır.
+
+**Mail status:** Turuncuhat ve BeyondTrust / PAM soruları taslaklandı; yönetici onayı bekleniyor, henüz gönderilmedi.
