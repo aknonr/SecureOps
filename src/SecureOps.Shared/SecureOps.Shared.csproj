@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SecureOps.Shared
+    DTOs (records), JSON contract definitions, authorization policy name constants,
+    common utilities. May depend on Domain only.
+
+    See: docs/03-architecture.md, .cursor/rules/010-architecture-rules.mdc
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SecureOps.Shared</RootNamespace>
+    <AssemblyName>SecureOps.Shared</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secureops.contoso.local/contracts/notification-message.schema.json",
+  "title": "NotificationMessage",
+  "description": "Generic notification payload produced by the rule engine, consumed by channel-specific notifiers (Teams, Mail). The notifier translates this to its native format (e.g., Adaptive Card).",
+  "type": "object",
+  "required": ["channel", "subject", "body", "severity"],
+  "properties": {
+    "channel": {
+      "type": "string",
+      "description": "Logical channel name. The dispatcher selects the adapter based on this value.",
+      "enum": ["Teams", "Mail", "Ticket"]
+    },
+    "recipients": {
+      "type": "array",
+      "description": "Channel-specific recipient identifiers. For Teams, a channel URL or name; for Mail, email addresses.",
+      "items": { "type": "string" },
+      "minItems": 0
+    },
+    "subject": {
+      "type": "string",
+      "description": "One-line subject. Used as the email subject or Teams card title.",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "body": {
+      "type": "string",
+      "description": "Plain-text or markdown body. Channel-specific rendering applies.",
+      "minLength": 1
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["Info", "Warning", "High", "Critical"]
+    },
+    "relatedAlertId": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "relatedServerName": {
+      "type": ["string", "null"],
+      "maxLength": 255
+    },
+    "actions": {
+      "type": "array",
+      "description": "Optional action links (e.g., 'Open in SecureOps' deep link).",
+      "items": {
+        "type": "object",
+        "required": ["title", "url"],
+        "properties": {
+          "title": { "type": "string", "maxLength": 100 },
+          "url":   { "type": "string", "format": "uri" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "facts": {
+      "type": "array",
+      "description": "Key/value facts rendered in card-style notifications.",
+      "items": {
+        "type": "object",
+        "required": ["title", "value"],
+        "properties": {
+          "title": { "type": "string", "maxLength": 100 },
+          "value": { "type": "string", "maxLength": 500 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

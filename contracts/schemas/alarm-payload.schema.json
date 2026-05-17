@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secureops.contoso.local/contracts/alarm-payload.schema.json",
+  "title": "AlarmPayload",
+  "description": "Payload posted by the monitoring platform to /api/v1/alerts/webhook. The HMAC signature is transported in the X-SecureOps-Signature header, not in this body.",
+  "type": "object",
+  "required": ["externalId", "serverName", "alertType", "severity", "message", "occurredAt"],
+  "properties": {
+    "externalId": {
+      "type": "string",
+      "description": "Unique identifier assigned by the monitoring platform. Used for idempotency.",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "serverName": {
+      "type": "string",
+      "description": "Fully qualified or short name of the target Windows server.",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "alertType": {
+      "type": "string",
+      "description": "Logical alarm category. Drives which diagnostic module runs.",
+      "enum": ["Disk", "Cpu", "Memory", "IisSite", "IisAppPool", "WindowsService", "EventLog", "Other"]
+    },
+    "severity": {
+      "type": "string",
+      "description": "Severity reported by the monitoring platform. The diagnostic engine may infer its own severity later.",
+      "enum": ["Info", "Warning", "High", "Critical"]
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable alarm message from the monitoring platform.",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time the alarm condition was first detected by the monitoring platform (ISO 8601 with timezone)."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Alert-type-specific structured fields. Shape varies by alertType.",
+      "additionalProperties": true
+    },
+    "monitoringSource": {
+      "type": "string",
+      "description": "Optional identifier of the monitoring platform instance (e.g., 'SolarWinds-Prod').",
+      "maxLength": 100
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "externalId": "SW-ALERT-12345",
+      "serverName": "APPSRV-12.contoso.local",
+      "alertType": "Disk",
+      "severity": "High",
+      "message": "Disk D: at 92% on APPSRV-12",
+      "occurredAt": "2026-06-15T14:23:17+03:00",
+      "metadata": {
+        "drive": "D:",
+        "usedPercent": 92,
+        "freeGb": 8
+      },
+      "monitoringSource": "SolarWinds-Prod"
+    }
+  ]
+}

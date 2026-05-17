@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SecureOps.Infrastructure
+    Data access, external integrations, PowerShell execution, Hangfire jobs.
+
+    Depends on: Domain, Shared.
+    Does NOT contain: ASP.NET pipeline, Blazor components.
+
+    See: docs/03-architecture.md, .cursor/rules/010-architecture-rules.mdc
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SecureOps.Infrastructure</RootNamespace>
+    <AssemblyName>SecureOps.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
+    <ProjectReference Include="..\SecureOps.Shared\SecureOps.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Data access -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+
+    <!-- Hangfire -->
+    <PackageReference Include="Hangfire.Core" />
+    <PackageReference Include="Hangfire.SqlServer" />
+
+    <!-- PowerShell / JEA -->
+    <PackageReference Include="System.Management.Automation" />
+
+    <!-- Resilience -->
+    <PackageReference Include="Polly" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" />
+
+    <!-- AD lookup (Phase 2+) -->
+    <PackageReference Include="System.DirectoryServices.AccountManagement" />
+
+    <!-- Options + DI helpers -->
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
+
+</Project>

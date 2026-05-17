@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SecureOps.Tests.Unit
+    xUnit unit tests. Domain logic, application services with mocked infrastructure.
+    No SQL, no PowerShell, no real external systems.
+
+    See: .cursor/rules/090-testing-and-quality-rules.mdc
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SecureOps.Tests.Unit</RootNamespace>
+    <AssemblyName>SecureOps.Tests.Unit</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SecureOps.Domain\SecureOps.Domain.csproj" />
+    <ProjectReference Include="..\..\src\SecureOps.Shared\SecureOps.Shared.csproj" />
+    <ProjectReference Include="..\..\src\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+</Project>

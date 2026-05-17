@@ -1,0 +1,27 @@
+{
+  "schema": "disk-diagnostic-v1",
+  "serverName": "APPSRV-12.contoso.local",
+  "generatedAt": "2026-06-15T11:23:25Z",
+  "durationMs": 4521,
+  "inferredSeverity": "High",
+  "summary": "Drive D: at 98% used. Top space consumers: D:\\Logs (220 GB), D:\\Backup (180 GB). Free space below the 10% policy threshold.",
+  "truncated": false,
+  "warnings": [],
+  "payload": {
+    "flaggedDrive": "D:",
+    "drives": [
+      { "name": "C:", "totalGb": 100, "freeGb": 35, "usedPercent": 65 },
+      { "name": "D:", "totalGb": 500, "freeGb": 8,  "usedPercent": 98 },
+      { "name": "E:", "totalGb": 200, "freeGb": 120, "usedPercent": 40 }
+    ],
+    "topFolders": [
+      { "path": "D:\\Logs",        "sizeGb": 220 },
+      { "path": "D:\\Backup",      "sizeGb": 180 },
+      { "path": "D:\\AppData",     "sizeGb": 50  },
+      { "path": "D:\\Temp",        "sizeGb": 22  }
+    ],
+    "recentlyGrown": [
+      { "path": "D:\\Logs\\app-2026-06-15.log", "sizeMb": 4800, "modifiedAt": "2026-06-15T11:20:00Z" }
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "request": {
+    "useCase": "PastIncidentSummary",
+    "maskedQuery": "Summarize what happened on SRV-A1B2C3 last Tuesday between 14:00 and 16:00 local time.",
+    "actor": "CONTOSO\\jane.doe",
+    "relatedAlertId": null,
+    "timeWindow": {
+      "from": "2026-06-09T11:00:00Z",
+      "to":   "2026-06-09T13:00:00Z"
+    },
+    "topK": 8
+  },
+  "response": {
+    "status": "Ok",
+    "response": "Between 14:00 and 16:00 local time on Tuesday, SRV-A1B2C3 had two related events:\n\n1. A disk warning fired at 14:23 (D: at 92%). The diagnostic identified the application log folder as the top space consumer.\n2. The on-shift operator acknowledged the alarm at 14:27 and resolved it at 14:52 after rotating the application log.\n\nNo other alarms were recorded on this server in the window. See references [1] and [2] for the alarm and diagnostic records, and [3] for the resolution audit entry.",
+    "references": [
+      { "documentId": "alert:8e2f7c8a-1b3d", "documentType": "AuditEntry",       "score": 0.91, "snippet": "AlertReceived for SRV-A1B2C3 (Disk, High) at 11:23 UTC..." },
+      { "documentId": "diag:4521ms-disk",    "documentType": "DiagnosticResult", "score": 0.87, "snippet": "Drive D: at 98% used, top folder D:\\<masked>\\Logs..." },
+      { "documentId": "audit:resolved-1452", "documentType": "AuditEntry",       "score": 0.83, "snippet": "AlertResolved by <user-shift-operator> at 11:52 UTC..." }
+    ],
+    "modelName": "llama3.1:8b-instruct",
+    "modelVersion": "2026.04",
+    "promptTokens": 412,
+    "completionTokens": 178,
+    "durationMs": 3940,
+    "auditId": "ai-audit-7723881",
+    "warnings": []
+  }
+}

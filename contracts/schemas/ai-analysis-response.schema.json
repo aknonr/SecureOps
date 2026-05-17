@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secureops.contoso.local/contracts/ai-analysis-response.schema.json",
+  "title": "AiAnalysisResponse",
+  "description": "Response payload returned by the internal AI service. Phase 7 only. The response is grounded in retrieved context; references identify which context items supported each part of the answer.",
+  "type": "object",
+  "required": ["status", "response", "references", "modelName"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "description": "Outcome status. 'Ok' when grounded answer produced; 'InsufficientContext' when retrieval did not produce enough material; 'ValidationFailed' when the validator rejected the model output; 'Error' for any other failure.",
+      "enum": ["Ok", "InsufficientContext", "ValidationFailed", "Error"]
+    },
+    "response": {
+      "type": "string",
+      "description": "The generated answer (post-validation, still masked - the UI applies unmasking if and only if the requesting user is authorized).",
+      "maxLength": 8000
+    },
+    "references": {
+      "type": "array",
+      "description": "Context items the model was given. Used by the UI to render citations.",
+      "items": {
+        "type": "object",
+        "required": ["documentId", "score"],
+        "properties": {
+          "documentId": { "type": "string", "maxLength": 200 },
+          "documentType": {
+            "type": "string",
+            "enum": ["AuditEntry", "DiagnosticResult", "Runbook", "IncidentSummary"]
+          },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "snippet": { "type": "string", "maxLength": 500 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "modelName": {
+      "type": "string",
+      "description": "Identifier of the self-hosted model used. E.g., 'llama3.1:8b-instruct'.",
+      "maxLength": 100
+    },
+    "modelVersion": {
+      "type": ["string", "null"],
+      "maxLength": 50
+    },
+    "promptTokens": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "completionTokens": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "durationMs": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "auditId": {
+      "type": "string",
+      "description": "Identifier of the audit.AiAuditLog row created for this interaction. Every response is audited."
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 500 },
+      "description": "Non-fatal issues the validator surfaced (e.g., 'response was truncated', 'context coverage low')."
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,16 @@
+{
+  "externalId": "SW-ALERT-12345",
+  "serverName": "APPSRV-12.contoso.local",
+  "alertType": "Disk",
+  "severity": "High",
+  "message": "Disk D: at 92% on APPSRV-12 (free 8 GB, threshold 10%)",
+  "occurredAt": "2026-06-15T14:23:17+03:00",
+  "metadata": {
+    "drive": "D:",
+    "usedPercent": 92,
+    "freeGb": 8,
+    "totalGb": 500,
+    "thresholdPercent": 90
+  },
+  "monitoringSource": "SolarWinds-Prod"
+}

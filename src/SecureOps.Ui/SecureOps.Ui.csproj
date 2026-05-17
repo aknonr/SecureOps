@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    SecureOps.Ui
+    Blazor Server + MudBlazor. Hosted on IIS in-process.
+    Phase 2 deliverable; minimal status page in Phase 1.
+
+    See: docs/03-architecture.md, .cursor/rules/060-ui-rules.mdc
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SecureOps.Ui</RootNamespace>
+    <AssemblyName>SecureOps.Ui</AssemblyName>
+    <UserSecretsId>secureops-ui-dev</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
+    <ProjectReference Include="..\SecureOps.Shared\SecureOps.Shared.csproj" />
+    <ProjectReference Include="..\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Blazor + components -->
+    <PackageReference Include="MudBlazor" />
+
+    <!-- Auth -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
+
+    <!-- Logging -->
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Sinks.MSSqlServer" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+
+    <!-- Resilience for API client calls -->
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" />
+  </ItemGroup>
+
+</Project>

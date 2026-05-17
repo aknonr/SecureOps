@@ -1,0 +1,20 @@
+{
+  "channel": "Teams",
+  "recipients": ["#secureops-alerts-prod"],
+  "subject": "Disk Alert: APPSRV-12 (D: 98% used)",
+  "body": "**Disk alert** on APPSRV-12.\n\nDrive D: at 98% used, 8 GB free.\n\nTop space consumers: D:\\Logs (220 GB), D:\\Backup (180 GB).\n\nDiagnostic completed in 4.5 seconds. Open SecureOps for full detail.",
+  "severity": "High",
+  "relatedAlertId": "8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12",
+  "relatedServerName": "APPSRV-12.contoso.local",
+  "facts": [
+    { "title": "Drive",            "value": "D:" },
+    { "title": "Used",             "value": "98%" },
+    { "title": "Free",             "value": "8 GB" },
+    { "title": "Inferred severity","value": "High" },
+    { "title": "Top folder",       "value": "D:\\Logs (220 GB)" }
+  ],
+  "actions": [
+    { "title": "Open in SecureOps",  "url": "https://secureops.contoso.local/alerts/8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12" },
+    { "title": "Acknowledge",        "url": "https://secureops.contoso.local/alerts/8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12/ack" }
+  ]
+}

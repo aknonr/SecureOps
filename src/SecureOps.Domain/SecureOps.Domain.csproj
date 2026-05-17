@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SecureOps.Domain
+    Pure C# domain model. NO external dependencies allowed.
+    No EF Core, no ASP.NET, no HTTP, no SQL, no PowerShell.
+
+    See: docs/03-architecture.md, .cursor/rules/010-architecture-rules.mdc
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SecureOps.Domain</RootNamespace>
+    <AssemblyName>SecureOps.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Intentionally empty. Domain has no dependencies. -->
+  </ItemGroup>
+
+</Project>

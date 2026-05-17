@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secureops.contoso.local/contracts/audit-event.schema.json",
+  "title": "AuditEvent",
+  "description": "Serialized form of an audit entry. Stored in audit.AuditLog. Append-only.",
+  "type": "object",
+  "required": ["occurredAt", "actor", "action"],
+  "properties": {
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time the audited action occurred (ISO 8601 with timezone). Server-assigned at insert."
+    },
+    "actor": {
+      "type": "string",
+      "description": "Identity that performed the action. Format: 'CONTOSO\\\\jane.doe', 'system:api', or 'system:worker'.",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "action": {
+      "type": "string",
+      "description": "Action code from the canonical list in docs/08-audit-model.md.",
+      "enum": [
+        "AlertReceived",
+        "AlertPersisted",
+        "AlertAssigned",
+        "AlertAcknowledged",
+        "AlertStatusChanged",
+        "AlertResolved",
+        "AlertSuppressed",
+        "AlertViewed",
+        "DiagnosticEnqueued",
+        "DiagnosticStarted",
+        "DiagnosticCompleted",
+        "DiagnosticFailed",
+        "DiagnosticManuallyTriggered",
+        "DiagnosticViewed",
+        "NotificationSent",
+        "NotificationFailed",
+        "AuditQueried",
+        "ConfigurationChanged",
+        "RbacChanged",
+        "SessionStarted",
+        "SessionEnded",
+        "LoginFailed",
+        "AuthorizationDenied",
+        "AiPromptSent",
+        "RemediationRequested",
+        "RemediationApproved",
+        "RemediationExecuted",
+        "RemediationAborted"
+      ]
+    },
+    "alertId": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "Related alert, if applicable."
+    },
+    "serverName": {
+      "type": ["string", "null"],
+      "description": "Related server, if applicable.",
+      "maxLength": 255
+    },
+    "correlationId": {
+      "type": ["string", "null"],
+      "description": "Trace correlation ID (typically Activity.Current.Id).",
+      "maxLength": 100
+    },
+    "sourceIp": {
+      "type": ["string", "null"],
+      "description": "Source IP for actions originating from HTTP requests.",
+      "maxLength": 45
+    },
+    "details": {
+      "type": ["object", "null"],
+      "description": "Action-specific structured detail. Serialized to DetailsJson column. Shape determined by action.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

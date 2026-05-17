@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://secureops.contoso.local/contracts/diagnostic-result.schema.json",
+  "title": "DiagnosticResult",
+  "description": "Envelope for any diagnostic module output. The body inside `payload` is module-specific and identified by `schema`.",
+  "type": "object",
+  "required": ["schema", "serverName", "generatedAt", "inferredSeverity", "payload"],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "description": "Module-specific result schema identifier with version suffix.",
+      "enum": [
+        "disk-diagnostic-v1",
+        "cpu-diagnostic-v1",
+        "memory-diagnostic-v1",
+        "iis-diagnostic-v1",
+        "service-diagnostic-v1",
+        "eventlog-diagnostic-v1"
+      ]
+    },
+    "serverName": {
+      "type": "string",
+      "description": "Target server the diagnostic was executed against.",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time the diagnostic output was produced (ISO 8601 UTC)."
+    },
+    "durationMs": {
+      "type": "integer",
+      "description": "Total wall-clock duration of the diagnostic run in milliseconds.",
+      "minimum": 0
+    },
+    "inferredSeverity": {
+      "type": "string",
+      "description": "Severity inferred by the module from the data. May differ from the monitoring platform's reported severity.",
+      "enum": ["Info", "Warning", "High", "Critical"]
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short, single-paragraph human-readable summary for UI display.",
+      "maxLength": 2000
+    },
+    "truncated": {
+      "type": "boolean",
+      "description": "True if the diagnostic was cut off by timeout or output size limit. Consumers should treat payload as partial.",
+      "default": false
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Non-fatal issues encountered while running (e.g., one folder access denied during enumeration).",
+      "items": { "type": "string" }
+    },
+    "payload": {
+      "type": "object",
+      "description": "Module-specific structured data. Shape determined by the schema field.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    SecureOps.Api
+    ASP.NET Core Web API hosted on IIS in-process.
+
+    Accepts monitoring webhooks, exposes REST endpoints for the UI.
+    Does NOT execute PowerShell directly (jobs enqueue via Hangfire).
+
+    See: docs/03-architecture.md, .cursor/rules/020-backend-dotnet-rules.mdc
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SecureOps.Api</RootNamespace>
+    <AssemblyName>SecureOps.Api</AssemblyName>
+    <UserSecretsId>secureops-api-dev</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
+    <ProjectReference Include="..\SecureOps.Shared\SecureOps.Shared.csproj" />
+    <ProjectReference Include="..\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- OpenAPI / Swagger -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+
+    <!-- Auth -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
+
+    <!-- Hangfire client (enqueue from controllers) -->
+    <PackageReference Include="Hangfire.AspNetCore" />
+
+    <!-- Validation -->
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.AspNetCore" />
+
+    <!-- Logging -->
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Sinks.MSSqlServer" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+  </ItemGroup>
+
+</Project>

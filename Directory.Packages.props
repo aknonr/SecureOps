@@ -1,0 +1,78 @@
+<Project>
+
+  <!--
+    Central NuGet version management. Each .csproj does <PackageReference Include="..." />
+    without a Version. Versions are pinned here.
+
+    These are the planned MVP dependencies. Versions are placeholders and should be
+    updated to the latest stable for .NET 8 at Phase 1 sprint 1.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core / Hosting -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+
+    <!-- Authentication -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="8.0.0" />
+    <PackageVersion Include="System.DirectoryServices.AccountManagement" Version="8.0.0" />
+
+    <!-- EF Core + SQL Server -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+
+    <!-- Dapper for hot-path audit writes -->
+    <PackageVersion Include="Dapper" Version="2.1.28" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="5.2.0" />
+
+    <!-- Hangfire -->
+    <PackageVersion Include="Hangfire.Core" Version="1.8.6" />
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.6" />
+    <PackageVersion Include="Hangfire.SqlServer" Version="1.8.6" />
+
+    <!-- PowerShell / JEA -->
+    <PackageVersion Include="System.Management.Automation" Version="7.4.0" />
+
+    <!-- Validation -->
+    <PackageVersion Include="FluentValidation" Version="11.9.0" />
+    <PackageVersion Include="FluentValidation.AspNetCore" Version="11.3.0" />
+
+    <!-- Logging (Serilog) -->
+    <PackageVersion Include="Serilog" Version="3.1.1" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="8.0.0" />
+    <PackageVersion Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="5.0.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageVersion Include="Serilog.Sinks.MSSqlServer" Version="6.5.1" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="8.0.0" />
+
+    <!-- Resilience -->
+    <PackageVersion Include="Polly" Version="8.3.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Polly" Version="8.0.0" />
+
+    <!-- Blazor UI -->
+    <PackageVersion Include="MudBlazor" Version="6.16.0" />
+
+    <!-- JSON Schema validation (contract tests) -->
+    <PackageVersion Include="JsonSchema.Net" Version="6.0.0" />
+
+    <!-- Testing -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageVersion Include="xunit" Version="2.6.6" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.6" />
+    <PackageVersion Include="FluentAssertions" Version="6.12.0" />
+    <PackageVersion Include="NSubstitute" Version="5.1.0" />
+    <PackageVersion Include="bunit" Version="1.25.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.0" />
+    <PackageVersion Include="Testcontainers.MsSql" Version="3.7.0" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.0" />
+  </ItemGroup>
+
+</Project>

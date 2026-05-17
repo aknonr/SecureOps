@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <!--
+    SecureOps.Worker
+    .NET Worker Service registered as a Windows Service.
+    Hosts the Hangfire job server, executes diagnostic modules via JEA.
+
+    See: docs/03-architecture.md, .cursor/rules/030-worker-service-rules.mdc
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SecureOps.Worker</RootNamespace>
+    <AssemblyName>SecureOps.Worker</AssemblyName>
+    <UserSecretsId>secureops-worker-dev</UserSecretsId>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
+    <ProjectReference Include="..\SecureOps.Shared\SecureOps.Shared.csproj" />
+    <ProjectReference Include="..\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Hosting -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
+
+    <!-- Hangfire server -->
+    <PackageReference Include="Hangfire.Core" />
+    <PackageReference Include="Hangfire.SqlServer" />
+
+    <!-- Logging -->
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Sinks.MSSqlServer" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+  </ItemGroup>
+
+</Project>

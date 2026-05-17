@@ -1,0 +1,46 @@
+<Project>
+
+  <!--
+    Shared build settings for ALL projects (src and tests).
+    Per-project overrides happen in each .csproj.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Quality gates -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Suppress missing XML doc warnings in tests; otherwise enforced -->
+    <NoWarn Condition="'$(IsTestProject)' == 'true'">$(NoWarn);CS1591</NoWarn>
+
+    <!-- Assembly metadata -->
+    <Company>CONTOSO Turkish Technology (placeholder)</Company>
+    <Product>SecureOps Automation and AI Analysis Hub</Product>
+    <Copyright>© CONTOSO. Internal project. Not for distribution.</Copyright>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+
+    <!-- Determinism / reproducible builds -->
+    <Deterministic>true</Deterministic>
+
+    <!-- Disable implicit System.* using clashes  -->
+    <CheckEolTargetFramework>true</CheckEolTargetFramework>
+  </PropertyGroup>
+
+  <!-- Test projects get the IsTestProject marker -->
+  <PropertyGroup Condition="$(MSBuildProjectName.Contains('.Tests.'))">
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

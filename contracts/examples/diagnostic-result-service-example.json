@@ -1,0 +1,26 @@
+{
+  "schema": "service-diagnostic-v1",
+  "serverName": "APPSRV-07.contoso.local",
+  "generatedAt": "2026-06-15T11:35:11Z",
+  "durationMs": 1820,
+  "inferredSeverity": "Critical",
+  "summary": "Service 'ContosoBatchProcessor' is stopped with Automatic startup type. Last stop event recorded at 11:32:48Z (3 minutes ago).",
+  "truncated": false,
+  "warnings": [],
+  "payload": {
+    "service": {
+      "name": "ContosoBatchProcessor",
+      "displayName": "Contoso Batch Processor",
+      "status": "Stopped",
+      "startType": "Automatic",
+      "logOnAs": "CONTOSO\\svc-batch",
+      "dependencies": ["MSMQ", "Netlogon"],
+      "dependentServices": []
+    },
+    "recentEvents": [
+      { "timestamp": "2026-06-15T11:32:48Z", "id": 7034, "level": "Error",       "provider": "Service Control Manager", "message": "The Contoso Batch Processor service terminated unexpectedly." },
+      { "timestamp": "2026-06-15T11:32:50Z", "id": 7031, "level": "Error",       "provider": "Service Control Manager", "message": "Service terminated unexpectedly. No further restart actions will be taken." },
+      { "timestamp": "2026-06-15T11:33:00Z", "id": 7036, "level": "Information", "provider": "Service Control Manager", "message": "The Contoso Batch Processor service entered the stopped state." }
+    ]
+  }
+}
