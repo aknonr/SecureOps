@@ -36,7 +36,7 @@
 | P0-T04 | Schedule Bilgi Güv pre-review meeting | 1 | [ ] |
 | P0-T05 | Schedule Siber Güv pre-review meeting | 1 | [ ] |
 | P0-T06 | Submit PAM service account request | 1 | [ ] |
-| P0-T07 | Discuss webhook with monitoring platform team | 2 | [ ] |
+| P0-T07 | Confirm SolarWinds / OpsBridge source-system details with monitoring platform team | 2 | [ ] |
 | P0-T08 | Request test environment from IT ops | 1 | [ ] |
 | P0-T09 | Network team meeting: WinRM, SQL, webhook firewall rules | 2 | [ ] |
 
@@ -57,7 +57,15 @@
 | P0-T20 | Review Phase 1 backlog `docs/12-mvp-backlog.md` | 2 | [ ] |
 | P0-T21 | Phase 0 retro + Phase 1 go/no-go meeting | 2 | [ ] |
 
-**Total Phase 0 effort:** approximately 42 hours over 1.5–2 weeks.
+### Current Stakeholder Follow-Up
+
+| # | Task | Hours | Status |
+|---|---|---|---|
+| P0-T22 | Send Turuncuhat integration inquiry mail | 1 | [x] Sent |
+| P0-T23 | Send BeyondTrust + PAM + service account clarification mail | 1 | [x] Sent |
+| P0-T24 | Track responses and update `docs/06-integrations.md` + `docs/05-security-model.md` when answers arrive | 1 | [ ] |
+
+**Total Phase 0 effort:** approximately 45 hours over 1.5–2 weeks.
 
 ## Exit Criteria
 
@@ -80,7 +88,8 @@ All of these must be true to declare Phase 0 complete and start Phase 1:
 | Bilgi Güvenliği | Architecture pre-review notes; concerns / requirements | InfoSec lead |
 | Siber Güvenlik | Data flow review; attack surface assessment | CyberSec lead |
 | PAM team | Service account creation acknowledgment | PAM admin |
-| Monitoring platform team | Webhook capability confirmation | Monitoring admin |
+| Monitoring platform team | SolarWinds / OpsBridge source-system clarification | Monitoring admin |
+| Turuncuhat team | Inbound/outbound integration clarification | Turuncuhat owner |
 | Network team | Firewall ticket reference + ETA | Network admin |
 | IT ops | Test environment server name and access | IT ops |
 | Pilot server owners | Written approval for inclusion | Each owner |
@@ -101,6 +110,7 @@ All of these must be true to declare Phase 0 complete and start Phase 1:
 - `docs/stakeholder-meeting-notes/` (new, one file per meeting)
 - `docs/11-feasibility.md` (updated with Phase 0 findings)
 - `docs/05-security-model.md` (updated with InfoSec/CyberSec input)
+- `docs/06-integrations.md` (updated when Turuncuhat integration answers arrive)
 
 ## After Phase 0
 

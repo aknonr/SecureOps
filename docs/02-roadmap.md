@@ -146,7 +146,7 @@ Configurable; see `docs/06-integrations.md` for adapter details.
 ### Exit Criteria
 
 - Notifications delivered within 60 seconds of diagnostic completion.
-- Ticket draft format approved by ticketing system stakeholders.
+- Ticket draft format approved by Turuncuhat stakeholders.
 - Shift report draft accepted by pilot operators.
 
 See `plans/PHASE-3-notification-and-ticket-enrichment.md`.
@@ -251,6 +251,8 @@ See `plans/PHASE-6-rule-based-analysis-and-reporting.md`.
 
 See `plans/PHASE-7-private-ai-rag-poc.md`.
 
+Longer-term assistant and inventory ideas that are intentionally outside active Phase 1-6 scope are captured separately in `docs/16-future-vision.md`.
+
 ## Phase 8 — Approval-Based Remediation (6–8 weeks, future)
 
 **Goal:** Enable approved, audited write operations on target servers.
@@ -298,7 +300,7 @@ See `docs/11-feasibility.md` for the full risk matrix. Top risks:
 | Risk | Mitigation |
 |---|---|
 | Single developer (bus factor 1) | Document-first, mainstream tech, small commits |
-| Monitoring platform team delays | Mock-first; webhook fallback if SWIS API blocked |
+| Turuncuhat / monitoring-chain integration delays | Mock-first; decide inbound contract in Phase 0; retain later SWIS fallback where useful |
 | Stakeholder review delays | Early engagement in Phase 0 |
 | Scope creep into AI | AI gated by explicit pre-conditions |
 | Operator pushback ("surveillance") | "Not surveillance" framing enforced everywhere |

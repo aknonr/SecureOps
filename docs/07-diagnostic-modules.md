@@ -178,7 +178,7 @@ Each module includes a severity inference for the result (separate from the aler
 | Service | Stopped + Automatic startup | Stopped + Manual startup | Recovery attempted | Otherwise |
 | EventLog | Critical events present | Multiple Error events | Multiple Warning events | Otherwise |
 
-Inferred severity drives UI presentation and may differ from the monitoring platform's severity.
+Inferred severity drives UI presentation and may differ from the upstream alarm-source severity or the Turuncuhat EVT severity exposed to SecureOps.
 
 ## Module Configuration
 

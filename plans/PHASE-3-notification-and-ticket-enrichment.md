@@ -8,7 +8,7 @@
 - [ ] Phase 2 complete; UI in use by pilot.
 - [ ] Teams channel(s) created and webhook URLs provisioned.
 - [ ] SMTP relay confirmed.
-- [ ] Ticketing system format agreed with stakeholders.
+- [ ] Turuncuhat ticket / EVT format agreed with stakeholders.
 
 ## Deliverables
 

@@ -13,15 +13,18 @@ Phase 0 + Phase 1 backlog at the work-item level. Use this as the working task l
 | P0-05 | Bilgi Güvenliği pre-review meeting | M | Dev + InfoSec | Meeting notes, action items |
 | P0-06 | Siber Güvenlik pre-review meeting | M | Dev + CyberSec | Meeting notes, action items |
 | P0-07 | PAM service account request | S | Dev + PAM team | Ticket reference |
-| P0-08 | Monitoring platform webhook setup discussion | S | Dev + monitoring team | Confirmation of feasibility |
+| P0-08 | Confirm monitoring-chain / Turuncuhat intake path | S | Dev + monitoring team + Turuncuhat team | Confirmation of feasible inbound model |
 | P0-09 | Test environment request | S | Dev + IT ops | Server provisioned |
 | P0-10 | Network: firewall rules for WinRM, SQL, monitoring webhook | M | Dev + network team | Ticket and confirmation |
 | P0-11 | JEA endpoint PoC on a single test server | L | Dev | Working endpoint + script |
 | P0-12 | Risk matrix finalized | S | Dev | `docs/11-feasibility.md` updated |
 | P0-13 | Phase 1 backlog reviewed and committed | S | Dev | This file |
 | P0-14 | Phase 0 retrospective + Phase 1 go/no-go | S | Dev + management | Decision recorded |
+| P0-15 | Send Turuncuhat integration inquiry mail | S | Dev | Mail thread |
+| P0-16 | Send BeyondTrust + PAM + service account clarification mail | S | Dev | Mail thread |
+| P0-17 | Track replies and update integration / security docs | S | Dev | `docs/06-integrations.md`, `docs/05-security-model.md` |
 
-**Exit criteria:** all P0-01 through P0-14 complete.
+**Exit criteria:** all P0-01 through P0-17 complete.
 
 ## Phase 1 — Read-Only Diagnostic MVP
 
@@ -82,7 +85,7 @@ Phase 0 + Phase 1 backlog at the work-item level. Use this as the working task l
 
 | # | Task | Size | Deliverable |
 |---|---|---|---|
-| P1-34 | Mock monitoring platform client (test fixture) | S | Mock available in test |
+| P1-34 | Mock monitoring-chain clients (`MockTuruncuhatClient`, `MockMonitoringPlatformClient`) | S | Mocks available in test |
 | P1-35 | Mock PowerShell runner with canned outputs | M | Unit tests don't need a server |
 | P1-36 | Unit tests: each diagnostic module | L | Coverage > 80% |
 | P1-37 | Integration test: full webhook → result flow | M | Passes end to end |

@@ -25,12 +25,12 @@ Security is the defining constraint of this project. This document is the canoni
 
 ### Webhook Endpoint
 
-The monitoring platform calls `/api/v1/alerts/webhook`. Authentication:
+If the approved Turuncuhat integration is webhook-based, the approved caller invokes `/api/v1/alerts/webhook`. Authentication:
 
 - **HMAC-SHA256** signature in `X-SecureOps-Signature` header.
 - Shared secret stored in PAM, retrieved at API startup.
 - Timestamp in payload, request rejected if older than 5 minutes (replay protection).
-- Source IP allowlist for the monitoring platform.
+- Source IP allowlist for the approved webhook caller.
 
 ### Service-to-Service
 

@@ -7,12 +7,12 @@
 ## Context
 
 The system integrates with multiple external systems:
-- Monitoring platform (SolarWinds-style)
-- PAM (BeyondTrust-style)
+- Monitoring chain (SolarWinds, monthly.thy.com / HPE OpsBridge, Turuncuhat)
+- PAM (BeyondTrust)
 - Active Directory
 - Microsoft Teams
 - SMTP relay
-- Ticketing system
+- Ticketing / EVT workflow system (Turuncuhat role)
 - Virtualization platform (Phase 5+)
 
 Each integration depends on another team for setup (service accounts, network rules, webhook configuration). Each delay blocks the developer.
@@ -85,6 +85,7 @@ Rejected:
 - Configuration in `appsettings.json` per integration: `"UseMock": true/false`.
 - A startup banner lists which integrations are mocked.
 - A health endpoint reports the same.
+- Turuncuhat gets its own adapter boundary; source-monitoring concerns and operational EVT workflow concerns must not be collapsed into one concrete client just because they are part of the same real-world chain.
 
 ### Mitigations Against Mock Drift
 

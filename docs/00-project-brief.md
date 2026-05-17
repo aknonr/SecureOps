@@ -102,7 +102,7 @@ This manual process has consistent problems:
 
 Phase 1 MVP is successful if:
 
-- Alarms from the monitoring platform reliably trigger diagnostic jobs (>= 99% delivery).
+- Alarms from the approved monitoring workflow reliably trigger diagnostic jobs (>= 99% delivery).
 - Diagnostic jobs complete in under 30 seconds for the standard alarm types.
 - Audit trail is complete: every alarm, job, and operator action is recorded.
 - Pilot operators report the system is useful in a structured post-pilot survey.

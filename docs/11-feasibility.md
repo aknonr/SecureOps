@@ -59,7 +59,7 @@ If any assumption breaks, dates slide accordingly. The schedule is **honest**, n
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
 | R1 | Single developer absence (illness, leave, role change) | Low | Catastrophic | Document-first; mainstream stack; small commits; encourage second developer in Phase 2 |
-| R2 | Monitoring platform team delays webhook setup | Medium | High | Mock-first; webhook fallback to SWIS polling in Phase 6+ |
+| R2 | Turuncuhat / monitoring-chain intake contract remains unresolved | Medium | High | Mock-first; close webhook-vs-API decision in Phase 0; keep SWIS polling as later supplementary fallback |
 | R3 | Bilgi Güvenliği or Siber Güvenlik review delays | Medium | High | Early engagement in Phase 0; pre-share architecture |
 | R4 | PAM service account provisioning delay | Medium | High | Request in Phase 0; mock until provisioned |
 | R5 | Scope creep into AI before foundation is ready | High | Medium | Pre-conditions documented; ADR gate |

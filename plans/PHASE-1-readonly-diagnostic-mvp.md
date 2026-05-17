@@ -19,7 +19,7 @@
 5. Six diagnostic modules: Disk, CPU, Memory, IIS, Service, EventLog.
 6. JEA endpoint deployed on all pilot servers.
 7. PowerShell scripts in `scripts/diagnostic/`.
-8. Mock SolarWinds, PAM adapters for tests.
+8. Mock Turuncuhat / monitoring-chain and PAM adapters for tests.
 9. Unit + integration test suite passing.
 10. Operational runbook (`docs/runbooks/01-04-*.md`).
 11. Management demo + Q&A.
@@ -83,7 +83,7 @@
 
 | # | Task | Estimate | Files |
 |---|---|---|---|
-| P1-T34 | `MockMonitoringPlatformClient` | 2h | `Tests/Mocks/` |
+| P1-T34 | `MockTuruncuhatClient` + `MockMonitoringPlatformClient` | 3h | `Tests/Mocks/` |
 | P1-T35 | `MockPowerShellRunner` with canned outputs | 4h | `Tests/Mocks/` |
 | P1-T36 | Unit tests for each diagnostic module | 8h | `Tests.Unit/Diagnostic/` |
 | P1-T37 | Integration test: webhook → result | 4h | `Tests.Integration/` |
@@ -108,7 +108,7 @@
 - [ ] Webhook delivery 99%+ in pilot testing.
 - [ ] Diagnostic jobs complete in < 30s for standard alarms.
 - [ ] All operations audited (verified by manual inspection of `audit.AuditLog`).
-- [ ] Zero unplanned impact on pilot servers (verified with server owners and monitoring platform).
+- [ ] Zero unplanned impact on pilot servers (verified with server owners and the source monitoring team).
 - [ ] Unit + integration tests pass.
 - [ ] Append-only enforcement verified.
 - [ ] JEA endpoint blocks forbidden cmdlets (security test passes).
@@ -123,7 +123,7 @@
 |---|---|
 | JEA endpoint deployment friction across pilot | Phased rollout; one server first; coordinate with server owners |
 | Hangfire schema conflict with existing DB | Separate schema; standard pattern; tested in test env |
-| Webhook auth issues with monitoring platform | Mock first; coordinate with monitoring team early |
+| Inbound contract uncertainty with Turuncuhat / monitoring chain | Close the Phase 0 decision first; keep webhook contract mock-first until the approved path is known |
 | Diagnostic timeouts on slow servers | Per-module timeout config; partial result on timeout |
 | Service account permission issues | Identified in Phase 0; PAM workflow |
 

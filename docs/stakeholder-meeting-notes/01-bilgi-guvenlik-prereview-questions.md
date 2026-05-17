@@ -20,7 +20,7 @@ Toplantı sonunda aşağıdaki çıktılar alınmış olmalıdır:
 3. Servis hesabı, kimlik doğrulama ve yetkilendirme yaklaşımının uygunluğu.
 4. Audit bütünlüğü, retention ve meta-audit yaklaşımının yeterliliği.
 5. "Audit is not surveillance" çerçevesinin resmi olarak kabul edilip edilmediği.
-6. Webhook güvenliği için HMAC, source IP allowlist ve replay protection modelinin yeterliliği.
+6. Onaylanan inbound model webhook ise HMAC, source IP allowlist ve replay protection modelinin yeterliliği.
 7. Secrets yönetimi ve PAM bağımlılığına ilişkin kabul, çekince veya ek şartlar.
 8. Phase 1 başlamadan önce tamamlanması zorunlu maddelerin açık listesi.
 9. SecureOps kapsamı dışında tutulacak taleplerin netleştirilmesi.
@@ -51,10 +51,10 @@ Bu ön inceleme, `docs/05-security-model.md` içindeki aşağıdaki başlıklar 
 | Alan | Önerilen yaklaşım |
 |---|---|
 | Hedef sunucular üzerindeki işlem modeli | Phase 1-6 boyunca yalnızca read-only tanılama |
-| Uzak PowerShell erişimi | WinRM HTTPS + Kerberos + zorunlu JEA constrained endpoint |
+| Uzak PowerShell erişimi | JEA constrained endpoint zorunlu; Worker privileged-access path'i BeyondTrust / direct WinRM seçenekleri arasında açık karardır |
 | Kullanıcı kimlik doğrulama | Windows Authentication via Active Directory |
 | Yetkilendirme | AD grup tabanlı RBAC: Operator, TeamLead, Admin, Auditor |
-| Webhook güvenliği | HMAC-SHA256 imza, source IP allowlist, 5 dakikalık replay protection |
+| Webhook güvenliği | Turuncuhat entegrasyonu webhook olarak onaylanırsa HMAC-SHA256 imza, source IP allowlist, 5 dakikalık replay protection |
 | Servis hesabı | `CONTOSO\svc-secureops`, PAM tarafından yönetilen parola, hedef sunucularda local admin yok |
 | Audit | Append-only `audit.AuditLog`, UPDATE/DELETE bloklu, minimum 36 ay retention |
 | Audit erişimi | Auditor/Admin erişimi; privileged read işlemleri de audit edilir |
@@ -62,6 +62,8 @@ Bu ön inceleme, `docs/05-security-model.md` içindeki aşağıdaki başlıklar 
 | Ağ sınırları | Internal-only, public ingress yok, public AI çıkışı yok |
 
 Bu modelin dışındaki remediation, write operation, public AI, genel internet çıkışı ve mevcut SolarWinds/PAM/Ansible yapılarını değiştirme talepleri MVP kapsamında değildir.
+
+Not: Worker'ın hedef sunuculara erişiminde BeyondTrust broker mı, direct WinRM + Kerberos + JEA mı, yoksa mevcut direct-JEA modelinin açık kabul ile sürmesi mi kullanılacağı henüz kararlaştırılmamıştır. Bu toplantı direct-JEA modelini önceden onaylanmış varsaymamalıdır.
 
 ## 3. Karar gerektiren başlıklar
 
@@ -71,7 +73,7 @@ Bu modelin dışındaki remediation, write operation, public AI, genel internet 
 | JEA whitelist | Hedef sunucularda fiili komut sınırını belirler | Whitelist yeterli mi, daraltma veya ek kontrol gerekli mi |
 | Servis hesabı | PAM, AD ve hedef sunucu erişim modelinin merkezindedir | Yetki modeli yeterli mi |
 | Kimlik doğrulama ve RBAC | UI/API güvenliğinin temelidir | Windows Auth + AD group mapping yaklaşımı uygun mu |
-| Webhook güvenliği | Monitoring platformundan gelen ilk giriş noktasıdır | HMAC + allowlist + replay protection yeterli mi |
+| Webhook güvenliği | Onaylanan inbound model webhook ise ilk giriş noktasını korur | HMAC + allowlist + replay protection yeterli mi |
 | Audit bütünlüğü ve meta-audit | İç denetim ve olay sonrası ispat için temel gereksinimdir | Append-only model ve audit query audit yaklaşımı yeterli mi |
 | "Not surveillance" çerçevesi | Yönetim taahhüdü ve kullanıcı güveni için zorunludur | Kullanılacak dil ve sınırlar kabul ediliyor mu |
 | Secrets yönetimi | Servis hesabı, HMAC secret ve ileriki faz bağımlılıkları için kritik | PAM ağırlıklı yaklaşım kabul ediliyor mu |
@@ -145,7 +147,7 @@ ConvertTo-Json
 ### 4.5 Webhook giriş noktası güvenliği
 
 **Referans:** `docs/05-security-model.md` → `Authentication`, `Network Boundaries`  
-**Karar sorusu:** Monitoring platformundan gelen webhook için HMAC-SHA256 imza, source IP allowlist ve 5 dakikalık replay protection kombinasyonu MVP için yeterli midir; Phase 1 öncesi zorunlu ek kontrol gerekiyor mu?  
+**Karar sorusu:** Turuncuhat entegrasyonu için webhook modeli seçilirse HMAC-SHA256 imza, source IP allowlist ve 5 dakikalık replay protection kombinasyonu MVP için yeterli midir; Phase 1 öncesi zorunlu ek kontrol gerekiyor mu? API-pull modeli seçilirse hangi eşdeğer kontrol seti gerekir?  
 **Beklenen çıktı:** `Onay / Revizyon gerekli / Reddedildi / Ek kanıt gerekli`
 
 ### 4.6 Audit bütünlüğü ve retention
@@ -191,7 +193,7 @@ ConvertTo-Json
 ### 4.10 Ağ sınırları
 
 **Referans:** `docs/05-security-model.md` → `Network Boundaries`  
-**Karar sorusu:** Internal-only erişim, public ingress olmaması, Worker → target server hattında WinRM HTTPS 5986 + Kerberos + JEA kullanımı ve public AI çıkışının tamamen yasaklanması yaklaşımı MVP için yeterli midir?  
+**Karar sorusu:** Internal-only erişim, public ingress olmaması, her Worker privileged-access senaryosunda JEA'nın zorunlu kalması ve public AI çıkışının tamamen yasaklanması yaklaşımı MVP için yeterli midir? BeyondTrust broker / direct WinRM seçeneklerinden biri seçildiğinde ek ağ veya kontrol şartı var mıdır?  
 **Beklenen çıktı:** `Onay / Revizyon gerekli / Reddedildi / Ek kanıt gerekli`
 
 ### 4.11 Phase 1 öncesi zorunlu koşullar
@@ -265,7 +267,7 @@ Bu matrisin amacı, toplantı sırasında ortaya çıkan talepleri güvenlik de�
 | JEA whitelist'in kabulü | Must comply | Hedef sunucularda fiili komut sınırıdır | Revizyon gerekiyorsa Phase 1 öncesi kapanır |
 | Servis hesabı modeli | Must comply | Erişim temelidir | PAM/AD gereksinimleri kesinleşir |
 | Windows Auth + RBAC yaklaşımı | Must comply | UI/API yetkilendirmesinin temelidir | Ek rol veya separation-of-duty şartı varsa karara bağlanır |
-| Webhook HMAC + allowlist + replay protection | Must comply | İlk giriş noktasını korur | Ek zorunlu kontrol varsa başlangıç ön koşulu olur |
+| Webhook HMAC + allowlist + replay protection | Must comply | Webhook modeli seçilirse ilk giriş noktasını korur | Ek zorunlu kontrol varsa başlangıç ön koşulu olur |
 | Append-only audit ve 36 ay retention | Must comply | Denetim bütünlüğünün temelidir | Eksik varsa Phase 1 öncesi revize edilir |
 | Meta-audit | Must comply | Privileged read izlenebilirliği sağlar | Audit sorgularının da audit edilmesi kesinleşir |
 | Not-surveillance dili | Must comply | Yönetim taahhüdü ve kullanım sınırıdır | Resmi çerçeve korunur |

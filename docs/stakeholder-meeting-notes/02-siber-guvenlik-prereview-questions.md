@@ -16,7 +16,7 @@ Bu toplantının amacı, SecureOps projesinin MVP mimarisini Siber Güvenlik bak
 Toplantı sonunda aşağıdaki çıktılar alınmış olmalıdır:
 
 1. Mevcut tehdit modelinin Siber Güvenlik tarafından yeterli görülüp görülmediği.
-2. Webhook'un MVP'deki tek dış giriş noktası olarak kabul edilip edilmediği.
+2. Turuncuhat entegrasyonunun webhook mu API-pull mu olacağına göre gerçek dış giriş yüzeyinin doğrulanması.
 3. Alarm, tanılama ve audit verisinin geçtiği yolların ve olası sızıntı noktalarının onaylanması.
 4. `CONTOSO\svc-secureops` hesabının ele geçirilmesi senaryosunda tasarımın kabul edilebilir risk seviyesinde olup olmadığının değerlendirilmesi.
 5. Audit log üzerinde tamper veya exfiltration riskine karşı mevcut kontrollerin yeterliliği.
@@ -47,16 +47,16 @@ Bu ön inceleme, `docs/05-security-model.md` içindeki aşağıdaki başlıklar 
 - `Configuration Hardening`
 - `Incident Response`
 
-Siber Güvenlik ön incelemesinde ayrıca veri akışının anlaşılması için `docs/03-architecture.md` içindeki `Data Flow: Receive Alarm → Surface Result` ve `Network Topology` bölümleri yardımcı referans olarak kullanılacaktır.
+Siber Güvenlik ön incelemesinde ayrıca veri akışının anlaşılması için `docs/03-architecture.md` içindeki `Data Flow: Receive EVT → Diagnose → Update Turuncuhat` ve `Network Topology` bölümleri yardımcı referans olarak kullanılacaktır.
 
 İncelenecek MVP modeli şu şekildedir:
 
 | Alan | Önerilen yaklaşım |
 |---|---|
-| Dış giriş noktası | Monitoring platformundan `/api/v1/alerts/webhook` çağrısı |
-| Webhook koruması | HMAC-SHA256 imza, source IP allowlist, 5 dakikalık replay protection |
+| Dış giriş noktası | Turuncuhat webhook'u veya SecureOps'un Turuncuhat API pull'u; nihai model paydaş girdisi bekliyor |
+| Webhook koruması | Webhook modeli seçilirse HMAC-SHA256 imza, source IP allowlist, 5 dakikalık replay protection |
 | Kullanıcı erişimi | Internal-only UI/API, Windows Authentication |
-| Worker erişimi | SQL'e TLS, hedef sunuculara WinRM HTTPS 5986 + Kerberos + JEA |
+| Worker erişimi | SQL'e TLS; hedef sunucu yolu açık karar, tüm senaryolarda JEA zorunlu |
 | Hedef sunucu işlemleri | Phase 1-6 boyunca yalnızca read-only tanılama |
 | Servis hesabı | `CONTOSO\svc-secureops`, PAM yönetimli parola, local admin yok |
 | Audit koruması | Append-only `audit.AuditLog`, UPDATE/DELETE bloklu, ayrı audit write rolü |
@@ -64,14 +64,14 @@ Siber Güvenlik ön incelemesinde ayrıca veri akışının anlaşılması için
 | Phase 7 yaklaşımı | Self-hosted LLM, masking zorunlu, izole subnet, no outbound internet |
 | Olay müdahalesi | Worker kill switch, webhook disable flag, audit preserve, Bilgi Güv + Siber Güv bildirimi |
 
-Bu modelde SecureOps, monitoring platformundan alarm alır; API doğrular, normalleştirir ve job kuyruğa alır; Worker JEA üzerinden read-only tanılama çalıştırır; sonuçlar SQL ve audit kayıtlarına yazılır; UI yalnızca API üzerinden veri okur. MVP'de target server üzerinde write operation yoktur, public ingress yoktur ve mevcut PAM/SolarWinds/Ansible altyapıları değiştirilmez.
+Bu modelde SolarWinds alarmı üretir, monthly.thy.com / HPE OpsBridge event-detail katmanı olur ve Turuncuhat EVT akışını sahiplenir. SecureOps, onaylanan Turuncuhat inbound modeli üzerinden EVT bağlamını alır; API doğrular, normalleştirir ve job kuyruğa alır; Worker zorunlu JEA sınırı içinde read-only tanılama çalıştırır; sonuçlar SQL ve audit kayıtlarına yazılır; UI yalnızca API üzerinden veri okur. MVP'de target server üzerinde write operation yoktur, public ingress yoktur ve mevcut PAM/SolarWinds/Ansible altyapıları değiştirilmez.
 
 ## 3. Karar gerektiren başlıklar
 
 | Karar başlığı | Neden bu toplantıda karara bağlanmalı | İstenen karar |
 |---|---|---|
 | Tehdit modeli | Tasarımın hangi saldırıları ele aldığını ve hangi riskleri kabul ettiğini belirler | Mevcut model yeterli mi |
-| Saldırı yüzeyi | Phase 1'de hangi giriş noktalarının korunacağını kesinleştirir | Webhook tek dış giriş noktası mı |
+| Saldırı yüzeyi | Phase 1'de hangi giriş noktalarının korunacağını kesinleştirir | Onaylanan inbound modelin gerçek saldırı yüzeyi nedir |
 | Veri akışı ve sızıntı yolları | Alarm, log ve tanılama verisinin nerede maruz kalabileceğini belirler | Veri akışı kabul edilebilir mi |
 | Servis hesabı ele geçirilmesi | En kritik kötüye kullanım senaryolarından biridir | Blast radius kabul edilebilir mi |
 | Audit tamper / exfiltration | Güvenlik delilinin güvenilirliğini ve veri kaybı riskini etkiler | Mevcut kontroller yeterli mi |
@@ -92,7 +92,7 @@ Bu modelde SecureOps, monitoring platformundan alarm alır; API doğrular, norma
 ### 4.2 Saldırı yüzeyi ve dış giriş noktaları
 
 **Referans:** `docs/05-security-model.md` → `Authentication`, `Network Boundaries`  
-**Karar sorusu:** MVP için monitoring webhook'un tek dış giriş noktası olduğu, UI/API'nin yalnızca internal network üzerinde tutulduğu ve public ingress bulunmadığı kabul ediliyor mu; aksi durumda ek giriş noktaları veya tehditler ayrıca tanımlanmalı mı?  
+**Karar sorusu:** MVP için Turuncuhat entegrasyonunun webhook mu API-pull mu olacağına göre gerçek dış giriş yüzeyi nedir; UI/API'nin yalnızca internal network üzerinde tutulduğu ve public ingress bulunmadığı kabul ediliyor mu; aksi durumda ek giriş noktaları veya tehditler ayrıca tanımlanmalı mı?  
 **Beklenen çıktı:** `Onay / Revizyon gerekli / Reddedildi / Ek kanıt gerekli`
 
 ### 4.3 Webhook kötüye kullanım senaryosu
@@ -103,8 +103,8 @@ Bu modelde SecureOps, monitoring platformundan alarm alır; API doğrular, norma
 
 ### 4.4 Veri akışı ve sızıntı yolları
 
-**Referans:** `docs/05-security-model.md` → `Network Boundaries`; yardımcı referans: `docs/03-architecture.md` → `Data Flow: Receive Alarm → Surface Result`  
-**Karar sorusu:** Alarm payload, tanılama sonucu ve audit kaydının monitoring platformu → API → SQL/Hangfire → Worker → hedef sunucu → SQL/UI hattındaki hareketi kabul ediliyor mu; Siber Güvenlik açısından Phase 1 öncesi kapatılması gereken ek sızıntı yolu var mı?  
+**Referans:** `docs/05-security-model.md` → `Network Boundaries`; yardımcı referans: `docs/03-architecture.md` → `Data Flow: Receive EVT → Diagnose → Update Turuncuhat`  
+**Karar sorusu:** Alarm payload, tanılama sonucu ve audit kaydının SolarWinds → monthly.thy.com / HPE OpsBridge → Turuncuhat → SecureOps API → SQL/Hangfire → Worker → hedef sunucu → SQL/UI hattındaki hareketi kabul ediliyor mu; Siber Güvenlik açısından Phase 1 öncesi kapatılması gereken ek sızıntı yolu var mı?  
 **Beklenen çıktı:** `Onay / Revizyon gerekli / Reddedildi / Ek kanıt gerekli`
 
 ### 4.5 Servis hesabı ele geçirilmesi senaryosu
@@ -162,9 +162,9 @@ Toplantı sırasında her satır doldurulmalıdır. Karar sonucu boş bırakıla
 | # | Karar maddesi | Önerilen SecureOps yaklaşımı | Siber Güv kararı | Gerekçe / koşul | Aksiyon sahibi | Son tarih |
 |---|---|---|---|---|---|---|
 | 1 | Tehdit modeli | `Threat Model (Summary)` tablosunun Phase 1 minimumu olarak kullanılması |  |  | Siber Güv lead / project owner |  |
-| 2 | Dış giriş noktaları | Monitoring webhook tek dış giriş noktası; UI/API internal-only |  |  | Siber Güv lead / network admin |  |
+| 2 | Dış giriş noktaları | Onaylanan Turuncuhat inbound modeli doğrulanır; UI/API internal-only |  |  | Siber Güv lead / network admin |  |
 | 3 | Webhook kötüye kullanımı | HMAC + allowlist + replay protection |  |  | Siber Güv lead / monitoring admin |  |
-| 4 | Veri akışı | Monitoring → API → SQL/Hangfire → Worker → target server → SQL/UI akışı |  |  | Siber Güv lead / project owner |  |
+| 4 | Veri akışı | SolarWinds → OpsBridge → Turuncuhat → SecureOps API → SQL/Hangfire → Worker → target server → SQL/UI akışı |  |  | Siber Güv lead / project owner |  |
 | 5 | Servis hesabı blast radius | JEA whitelist + local admin yok + PAM yönetimi |  |  | Siber Güv lead / PAM admin |  |
 | 6 | Audit tamper / exfiltration | Append-only audit + ayrı rol + privileged read audit'i |  |  | Siber Güv lead / project owner |  |
 | 7 | Ağ segmentasyonu | Internal-only, no public ingress, kontrollü outbound |  |  | Siber Güv lead / network admin |  |
@@ -197,11 +197,11 @@ Bir karar `Reddedildi` olarak kaydedilirse, kararın gerekçesi yazılı biçimd
 
 ## 7. Toplantı öncesi bağlam özeti
 
-SecureOps, Windows ağırlıklı operasyon ortamında gelen alarmlar için yapılan manuel tanılama adımlarını standartlaştırmak üzere tasarlanmış bir platformdur. Monitoring platformundan gelen alarm doğrulanır, normalize edilir, read-only tanılama işi olarak kuyruğa alınır ve hedef sunucuda JEA constrained endpoint üzerinden çalıştırılır. Sonuçlar SQL Server'da saklanır ve operasyon ekiplerine yapılandırılmış görünürlük sağlanır.
+SecureOps, Windows ağırlıklı operasyon ortamında gelen alarmlar için yapılan manuel tanılama adımlarını standartlaştırmak üzere tasarlanmış bir platformdur. Gerçek akışta SolarWinds alarmı üretir, monthly.thy.com / HPE OpsBridge event-detail katmanıdır, Turuncuhat ise EVT akışının merkezidir. SecureOps, onaylanacak Turuncuhat inbound modeli üzerinden alarm bağlamını alır, normalize eder, read-only tanılama işi olarak kuyruğa alır ve hedef sunucuda JEA constrained endpoint üzerinden çalıştırır. Sonuçlar SQL Server'da saklanır ve operasyon ekiplerine yapılandırılmış görünürlük sağlanır.
 
 MVP sınırı kasıtlı olarak dardır. Phase 1-6 boyunca hedef sunucularda write operation yapılmayacak, tüm uzak PowerShell erişimi JEA üzerinden geçecek, public ingress olmayacak ve public AI kullanılmayacaktır. Bu nedenle Siber Güvenlik ön incelemesinin ana sorusu yalnızca "hangi kontroller var" değil; "hangi saldırı yolları kalıyor, bunlar nasıl tespit edilecek ve bir kompromizasyon halinde blast radius ne kadar sınırlı kalacak" olmalıdır.
 
-Veri akışı monitoring platformu, API, SQL/Hangfire, Worker, hedef sunucular ve UI arasında gerçekleşir. Potansiyel risk alanları; spoofed webhook, compromised service account, audit log'a yetkisiz erişim, yanlış yapılandırılmış outbound erişim, ileride Phase 7 AI katmanında maskeleme boşluğu ve yeterli tespit sinyali olmamasıdır. `docs/05-security-model.md` içindeki `Threat Model (Summary)` ve `Incident Response` bölümleri bu risklere karşı mevcut başlangıç yaklaşımını tanımlar.
+Veri akışı SolarWinds, monthly.thy.com / HPE OpsBridge, Turuncuhat, SecureOps API, SQL/Hangfire, Worker, hedef sunucular ve UI arasında gerçekleşir. Potansiyel risk alanları; seçilen inbound modele bağlı webhook veya API kötüye kullanımı, compromised service account, audit log'a yetkisiz erişim, yanlış yapılandırılmış outbound erişim, ileride Phase 7 AI katmanında maskeleme boşluğu ve yeterli tespit sinyali olmamasıdır. `docs/05-security-model.md` içindeki `Threat Model (Summary)` ve `Incident Response` bölümleri bu risklere karşı mevcut başlangıç yaklaşımını tanımlar.
 
 Bu toplantıdan beklenen, mimarinin genel olarak beğenilip beğenilmediği değil; Phase 1 başlamadan önce Siber Güvenlik açısından hangi saldırı senaryolarının kapatılmış sayılacağı, hangilerinin ek kanıt gerektirdiği, hangi olayların izlenmesi gerektiği ve SIEM aktarımının zorunlu olup olmadığı konusunda yazılı karar çıkmasıdır. Ayrıca Phase 7 AI aşaması henüz başlamayacak olsa da self-hosted LLM, masking ve isolated subnet yaklaşımının ilerideki Siber Güvenlik incelemesi için doğru temel olup olmadığı bu toplantıda kayda geçirilmelidir.
 
@@ -212,7 +212,7 @@ Bu matrisin amacı, toplantı sırasında ortaya çıkan talepleri güvenlik de�
 | Karar maddesi | Varsayılan sınıf | Sınıf tanımı | Toplantıda netleştirilecek sonuç |
 |---|---|---|---|
 | Tehdit modelinin kabulü | Must comply | Tasarımın minimum güvenlik temelidir | Eksik senaryo varsa Phase 1 öncesi modele eklenir |
-| Webhook'un tek dış giriş noktası olduğunun doğrulanması | Must comply | Saldırı yüzeyinin temelidir | Ek giriş noktası varsa risk modeli güncellenir |
+| Onaylanan inbound modelin dış giriş yüzeyinin doğrulanması | Must comply | Saldırı yüzeyinin temelidir | Ek giriş noktası varsa risk modeli güncellenir |
 | Webhook HMAC + allowlist + replay protection | Must comply | Dış tetikleme güvenliğinin temelidir | Ek kontrol gerekiyorsa Phase 1 ön koşulu olur |
 | Veri akışı ve sızıntı yolları | Must comply | Veri nerede açığa çıkabilir sorusunu cevaplar | Kapatılması gereken yol varsa Phase 1 öncesi belirlenir |
 | Servis hesabı blast radius değerlendirmesi | Must comply | Kompromizasyon senaryosunun ana kontrolüdür | Ek containment gerekiyorsa başlangıç ön koşulu olur |
