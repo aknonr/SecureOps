@@ -12,6 +12,12 @@
       "minLength": 1,
       "maxLength": 255
     },
+    "turuncuhatEvtId": {
+      "type": "string",
+      "description": "Optional Turuncuhat EVT identifier when available from the operational workflow.",
+      "minLength": 1,
+      "maxLength": 100
+    },
     "serverName": {
       "type": "string",
       "description": "Fully qualified or short name of the target Windows server.",
@@ -54,6 +60,7 @@
   "examples": [
     {
       "externalId": "SW-ALERT-12345",
+      "turuncuhatEvtId": "EVT-54321",
       "serverName": "APPSRV-12.contoso.local",
       "alertType": "Disk",
       "severity": "High",

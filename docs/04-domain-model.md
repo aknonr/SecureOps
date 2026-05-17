@@ -24,7 +24,8 @@ namespace SecureOps.Domain.Alerting;
 public sealed class Alert
 {
     public Guid Id { get; init; }
-    public required string ExternalId { get; init; }      // monitoring platform ID
+    public required string ExternalId { get; init; }      // upstream monitoring-source ID, e.g., SolarWinds
+    public string? TuruncuhatEvtId { get; init; }         // operational EVT ID, if known
     public required string ServerName { get; init; }
     public Guid? ServerId { get; init; }                  // resolved server FK
     public required AlertType Type { get; init; }
@@ -106,6 +107,7 @@ CREATE INDEX IX_Servers_InPilot ON dbo.Servers(InPilot) WHERE InPilot = 1;
 CREATE TABLE dbo.Alerts (
     Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
     ExternalId      NVARCHAR(255) NOT NULL,
+    TuruncuhatEvtId NVARCHAR(100) NULL,
     ServerName      NVARCHAR(255) NOT NULL,
     ServerId        UNIQUEIDENTIFIER NULL REFERENCES dbo.Servers(Id),
     AlertType       NVARCHAR(50) NOT NULL,
@@ -122,6 +124,10 @@ CREATE TABLE dbo.Alerts (
     INDEX IX_Alerts_Status (Status),
     INDEX IX_Alerts_Type_OccurredAt (AlertType, OccurredAt DESC)
 );
+
+CREATE UNIQUE INDEX UX_Alerts_TuruncuhatEvtId
+ON dbo.Alerts(TuruncuhatEvtId)
+WHERE TuruncuhatEvtId IS NOT NULL;
 ```
 
 ```sql
@@ -310,6 +316,15 @@ Cleanup jobs are Hangfire recurring jobs, scheduled monthly.
 - **`Guid` (NEWID)** for all business entities. Allows generation without round-trip.
 - **`bigint identity`** for audit tables (no need for global uniqueness, simpler indexing).
 - `DateTimeOffset` everywhere (no naive datetime).
+
+### External Alarm Identifiers
+
+`Alert` deliberately carries two external identifiers:
+
+- `ExternalId` is the upstream alarm-source identifier, expected to come from SolarWinds or another monitoring source.
+- `TuruncuhatEvtId` is the Turuncuhat `EVT-XXXXX` identifier when that record exists or is available to SecureOps.
+
+This two-ID model preserves the upstream technical origin while also tracking the operational record used by the organization. In the current workflow, the durable reference operators are most likely to use across acknowledgment, closure, audit, and handover is `TuruncuhatEvtId`, while `ExternalId` remains important for source-system correlation and intake idempotency.
 
 ## Why EF Core (and When Not)
 

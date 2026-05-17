@@ -1,5 +1,6 @@
 {
   "externalId": "SW-ALERT-12345",
+  "turuncuhatEvtId": "EVT-54321",
   "serverName": "APPSRV-12.contoso.local",
   "alertType": "Disk",
   "severity": "High",

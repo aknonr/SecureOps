@@ -154,6 +154,22 @@ To add a cmdlet:
 - Granted: Log on as a service, JEA endpoint access on pilot servers, DB access on the SecureOps database.
 - NOT granted: Local admin on target servers. JEA enforces what it can do.
 
+### Worker Privileged-Access Path — Pending Stakeholder Input
+
+The final Worker-to-target-server access model is **not decided yet**. The decision is pending input from the PAM / BeyondTrust team, Bilgi Güvenliği, and the team lead.
+
+| Scenario | Description | Current status |
+|---|---|---|
+| X | Worker uses a BeyondTrust API or brokered session flow before opening WinRM access to the target server. | Candidate; depends on PAM capability and approval |
+| Y | Worker uses direct WinRM over Kerberos to the JEA endpoint, while BeyondTrust remains the PAM system for human operators. | Candidate; requires explicit stakeholder approval |
+| Z | The currently documented direct-JEA model continues as-is if the PAM team gives explicit acceptance for service-account automation. | Candidate; requires explicit acceptance |
+
+Until that decision is recorded:
+
+- JEA remains mandatory in every scenario.
+- The Worker must not be treated as already approved to bypass BeyondTrust.
+- Architecture and implementation notes referring to direct WinRM + JEA describe the current documented model, not a closed decision.
+
 ## Audit (See `docs/08-audit-model.md` for Detail)
 
 - Append-only `audit.AuditLog` table.

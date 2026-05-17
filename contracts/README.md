@@ -11,7 +11,7 @@ Cross-component data contracts. Authoritative source for the shape of payloads t
 
 | Schema | Purpose | Phase |
 |---|---|---|
-| `alarm-payload.schema.json` | Inbound webhook payload from the monitoring platform | 1 |
+| `alarm-payload.schema.json` | Inbound alarm payload from the monitoring workflow; carries the upstream external ID and optional Turuncuhat EVT ID | 1 |
 | `diagnostic-result.schema.json` | Envelope for any diagnostic module output | 1 |
 | `audit-event.schema.json` | Serialized audit entry shape | 1 |
 | `notification-message.schema.json` | Generic notification payload before channel-specific rendering | 3 |
@@ -38,3 +38,12 @@ Contracts are versioned with a suffix when they evolve in a breaking way (e.g., 
 `SecureOps.Shared` mirrors these schemas as C# `record` types. Contract tests validate that every example file passes schema validation, and that the C# types serialize to schema-conformant JSON.
 
 Validation library: `JsonSchema.Net` (pinned in `Directory.Packages.props`).
+
+## Alarm Identity Convention
+
+Alarm contracts now preserve both workflow identifiers when available:
+
+- `externalId` keeps the upstream monitoring-source identifier, such as the SolarWinds alarm ID.
+- `turuncuhatEvtId` carries the optional Turuncuhat EVT identifier used by the operational workflow.
+
+The EVT ID is expected to become the more stable organizational reference if the final Turuncuhat integration contract confirms it is always available to SecureOps.

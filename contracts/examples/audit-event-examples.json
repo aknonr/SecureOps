@@ -9,8 +9,21 @@
     "sourceIp": "10.4.10.55",
     "details": {
       "externalId": "SW-ALERT-12345",
+      "turuncuhatEvtId": "EVT-54321",
       "alertType": "Disk",
       "severity": "High"
+    }
+  },
+  {
+    "occurredAt": "2026-06-15T11:23:17.900+03:00",
+    "actor": "system:api",
+    "action": "TuruncuhatEvtFetched",
+    "alertId": "8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12",
+    "serverName": "APPSRV-12.contoso.local",
+    "correlationId": "00-f1a2b3c4d5e6f708a9b0c1d2e3f40516-1234567890abcdef-01",
+    "details": {
+      "turuncuhatEvtId": "EVT-54321",
+      "integrationMode": "api-pull"
     }
   },
   {
@@ -64,6 +77,28 @@
     "alertId": "8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12",
     "serverName": "APPSRV-12.contoso.local",
     "details": { "notes": "Investigating log retention." }
+  },
+  {
+    "occurredAt": "2026-06-15T11:40:10.315+03:00",
+    "actor": "system:api",
+    "action": "TuruncuhatActionMarked",
+    "alertId": "8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12",
+    "serverName": "APPSRV-12.contoso.local",
+    "details": {
+      "turuncuhatEvtId": "EVT-54321",
+      "actionTaken": true
+    }
+  },
+  {
+    "occurredAt": "2026-06-15T11:42:31.902+03:00",
+    "actor": "system:api",
+    "action": "TuruncuhatEvtClosed",
+    "alertId": "8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12",
+    "serverName": "APPSRV-12.contoso.local",
+    "details": {
+      "turuncuhatEvtId": "EVT-54321",
+      "status": "Çözüldü"
+    }
   },
   {
     "occurredAt": "2026-06-15T13:02:11.000+03:00",
