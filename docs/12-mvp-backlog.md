@@ -26,6 +26,21 @@ Phase 0 + Phase 1 backlog at the work-item level. Use this as the working task l
 
 **Exit criteria:** all P0-01 through P0-17 complete.
 
+## Phase 1A — Identity Lookup / PAM AD User Lookup
+
+| # | Task | Size | Owner | Deliverable |
+|---|---|---|---|---|
+| P1A-01 | Add ADR and update roadmap/security/integration/audit docs | S | Dev | ADR-0008 + docs updated |
+| P1A-02 | Add identity lookup request/response contracts | S | Dev | DTOs + JSON schema |
+| P1A-03 | Implement config-based username normalization | S | Dev | Wildcard/bulk rejected |
+| P1A-04 | Implement identity lookup service with mock PAM resolver hook | M | Dev | Correlation-ready service |
+| P1A-05 | Implement read-only AD provider | M | Dev | Exact `sAMAccountName` / UPN lookup |
+| P1A-06 | Add `POST /api/v1/identity/lookup` | S | Dev | Swagger/Postman-testable endpoint |
+| P1A-07 | Add audit hooks for every lookup outcome | S | Dev | `IdentityLookup*` audit entries |
+| P1A-08 | Add unit/API tests | M | Dev | Tests passing |
+
+**Exit criteria:** all P1A-01 through P1A-08 complete, TeamLead/Admin access enforced, and no AD/PAM writes introduced.
+
 ## Phase 1 — Read-Only Diagnostic MVP
 
 ### Foundation (Sprint 1, ~1.5 weeks)
@@ -110,6 +125,7 @@ Phase 0 + Phase 1 backlog at the work-item level. Use this as the working task l
 Reaffirm what is **not** in MVP:
 
 - No web UI beyond a minimal status page (Phase 2 builds the real UI).
+- No broad identity search; Phase 1A allows exact account lookup only for TeamLead/Admin.
 - No notification channels (Phase 3).
 - No PAM correlation (Phase 4).
 - No analysis or reports (Phase 6).

@@ -66,6 +66,7 @@ These decisions are final and binding. Do not re-litigate them in code or propos
 | AI strategy | **Self-hosted only**, Phase 7, separate budget | ADR-0005 |
 | Integration approach | **Mock-first**, interface-based, real adapter later | ADR-0004 |
 | Read-only first | MVP performs no write operations | ADR-0002 |
+| Identity lookup | **Phase 1A backend-only exact PAM/AD account lookup**, TeamLead/Admin only, read-only AD provider, no broad search | ADR-0008 |
 | Remediation | Approval-based only, Phase 8 | ADR-0006 |
 | Hosting | IIS on Windows Server, in-process | ADR-0007 |
 | Pilot scale | **10–15 low-criticality Windows servers**, prefer non-production | docs/02-roadmap.md |
@@ -164,6 +165,7 @@ When you receive a user request:
 - Not a replacement for BeyondTrust/PAM session management. We add operational audit on top.
 - Not a remediation tool in MVP. Remediation is Phase 8, approval-based, manually scoped.
 - Not an employee surveillance system. Audit is process-level, not person-performance-level.
+- Not a people search tool. Phase 1A identity lookup is exact-account, purpose-bound, TeamLead/Admin-only, and audited.
 
 ---
 

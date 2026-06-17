@@ -25,6 +25,7 @@
   <ItemGroup>
     <!-- OpenAPI / Swagger -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
 
     <!-- Auth -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />

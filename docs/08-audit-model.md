@@ -37,6 +37,10 @@ The audit subsystem is the project's most important non-functional feature. This
 | Turuncuhat EVT context fetched | API / Worker | `TuruncuhatEvtFetched` |
 | Turuncuhat EVT closed from SecureOps | API / Worker | `TuruncuhatEvtClosed` |
 | Turuncuhat action marker updated | API / Worker | `TuruncuhatActionMarked` |
+| Identity lookup requested | API | `IdentityLookupRequested` |
+| Identity lookup succeeded | API | `IdentityLookupSucceeded` |
+| Identity lookup not found | API | `IdentityLookupNotFound` |
+| Identity lookup failed | API | `IdentityLookupFailed` |
 | Audit query executed | UI/API | `AuditQueried` |
 | Configuration changed (admin) | UI | `ConfigurationChanged` |
 | RBAC mapping changed (admin) | UI | `RbacChanged` |
@@ -102,6 +106,18 @@ Each action defines its own `Details` shape:
 
 // TuruncuhatActionMarked
 { "turuncuhatEvtId": "EVT-54321", "actionTaken": true }
+
+// IdentityLookupRequested
+{ "normalizedAccount": "pam12356", "purpose": "EVT-54321 incident response verification", "turuncuhatEvtId": "EVT-54321" }
+
+// IdentityLookupSucceeded
+{ "normalizedAccount": "pam12356", "matchedAccount": "pam12356", "source": "ActiveDirectory" }
+
+// IdentityLookupNotFound
+{ "normalizedAccount": "pam12356", "source": "ActiveDirectory" }
+
+// IdentityLookupFailed
+{ "normalizedAccount": "pam12356", "source": "ActiveDirectory", "errorCode": "ProviderUnavailable" }
 
 // AuthorizationDenied
 { "endpoint": "/api/v1/audit", "policy": "CanViewAudit" }

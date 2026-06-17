@@ -19,6 +19,7 @@ Working hours per quarter (assuming no extended absence): roughly **210–260 ho
 | Phase | Estimated hours | Equivalent weeks at 18h/week |
 |---|---|---|
 | 0 — Discovery | 45 | 2–3 |
+| 1A — Identity lookup / PAM AD user lookup | 20–30 | 1–2 |
 | 1 — Read-only diagnostic MVP | 110–160 | 6–9 |
 | 2 — Web UI | 70–110 | 4–6 |
 | 3 — Notification + ticket | 50–80 | 3–4 |
@@ -37,7 +38,8 @@ With a single developer at 18h/week:
 | Milestone | Realistic target |
 |---|---|
 | Phase 0 done | Within 3 weeks of project start |
-| Phase 1 MVP demo to management | 6–8 weeks after Phase 0 |
+| Phase 1A identity lookup demo | 1–2 weeks after Phase 0, if not deferred |
+| Phase 1 MVP demo to management | 6–8 weeks after Phase 1A |
 | Phase 2 UI in use by pilot operators | +4–6 weeks (~Q4 2026 with 2026 Q3 start) |
 | Phase 3 notifications live | +3–4 weeks |
 | Phase 4 audit + verification live | +4–6 weeks |
@@ -73,6 +75,7 @@ If any assumption breaks, dates slide accordingly. The schedule is **honest**, n
 | R13 | Test environment unavailable or shared with other projects | Medium | High | Request dedicated in Phase 0; develop on mocks if needed |
 | R14 | Phase 7 AI hardware budget rejected | Medium | Low | Project is valuable without AI; surface this in management communication |
 | R15 | Phase 8 remediation approval gets misused | Low | High | Bounded catalog; ADR-gated extension; meta-audit |
+| R16 | Identity lookup is perceived as people search | Medium | Medium | TeamLead/Admin only; purpose required; exact lookup only; audit every query; no broad search |
 
 ## Bus Factor Mitigations
 
@@ -94,6 +97,7 @@ Specific actions to reduce single-developer risk:
 See `docs/13-definition-of-done.md` for the canonical DoD. Highlights:
 
 - Phase 0: stakeholder approvals, pilot list, baseline measurements.
+- Phase 1A: exact PAM/AD account lookup, TeamLead/Admin authorization, audit coverage.
 - Phase 1: end-to-end alarm → diagnostic → audit flow, tests passing, demo to management.
 - Phase 2: UI deployed, operators using it daily, feedback collected.
 - Phase 3+: see each phase plan.

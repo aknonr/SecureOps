@@ -61,8 +61,8 @@
 
 | # | Task | Hours | Status |
 |---|---|---|---|
-| P0-T22 | Send Turuncuhat integration inquiry mail | 1 | [x] Sent |
-| P0-T23 | Send BeyondTrust + PAM + service account clarification mail | 1 | [x] Sent |
+| P0-T22 | Send Turuncuhat integration inquiry mail | 1 | [ ] Drafted; awaiting manager approval |
+| P0-T23 | Send BeyondTrust + PAM + service account clarification mail | 1 | [ ] Drafted; awaiting manager approval |
 | P0-T24 | Track responses and update `docs/06-integrations.md` + `docs/05-security-model.md` when answers arrive | 1 | [ ] |
 
 **Total Phase 0 effort:** approximately 45 hours over 2–3 weeks.

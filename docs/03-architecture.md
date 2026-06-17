@@ -18,6 +18,7 @@ System architecture for SecureOps. This document is the canonical source for com
 │  - /api/v1/alerts/webhook (HMAC-signed)                               │
 │  - /api/v1/alerts (browse)                                            │
 │  - /api/v1/diagnostic (browse, manual trigger)                        │
+│  - /api/v1/identity/lookup (TeamLead/Admin privileged read)           │
 │  - /api/v1/audit (compliance roles)                                   │
 │                                                                       │
 │  Validates → Normalizes → Persists alert → Enqueues Hangfire job     │
@@ -67,11 +68,13 @@ Responsibilities:
 - Enforce authorization.
 - Normalize alert payloads.
 - Enqueue diagnostic jobs via Hangfire client API.
+- Resolve exact PAM/AD account lookups through the IdentityLookup service (Phase 1A).
 
 Does NOT:
 - Execute PowerShell.
 - Run long operations inline.
 - Render HTML.
+- Perform AD or PAM writes.
 
 ### SecureOps.Worker
 
@@ -209,6 +212,7 @@ Configuration sections:
 - `ConnectionStrings`
 - `SolarWinds`
 - `Pam`
+- `IdentityLookup`
 - `Jea`
 - `Hangfire`
 - `Notifications`
@@ -260,3 +264,4 @@ See `docs/adr/`:
 - ADR-0005 AI/RAG later phase
 - ADR-0006 Approval-based remediation
 - ADR-0007 IIS hosting model
+- ADR-0008 Read-only identity lookup

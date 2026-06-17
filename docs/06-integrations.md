@@ -116,12 +116,31 @@ We do NOT:
 - Initiate or terminate PAM sessions.
 - Bypass PAM for our own access (the Worker uses JEA via WinRM, not via PAM).
 
+### PAM Account Resolver Hook (Phase 1A)
+
+Phase 1A adds a mocked `IPamAccountResolver` hook for identity lookup. The hook exists so later BeyondTrust account metadata or Phase 4 session correlation can enrich a PAM account with an AD account identity.
+
+First release behavior:
+
+- The resolver is mock/direct-pass-through by default.
+- No BeyondTrust API call is required.
+- No PAM write or session operation is allowed.
+- Real BeyondTrust metadata lookup requires stakeholder approval and an ADR/update before it is enabled.
+
 ## Active Directory
 
 - Used at authentication time (Windows Auth).
 - Used at startup to resolve AD group membership for RBAC.
+- Used by Phase 1A IdentityLookup for exact, read-only account resolution.
 - Caching: 5-minute TTL for group membership; configurable.
 - LDAP queries through `System.DirectoryServices.AccountManagement`.
+
+IdentityLookup constraints:
+
+- One exact account per request.
+- Default provider is mock in development; production can enable the read-only AD provider by configuration.
+- The approved lookup attributes are display name, `sAMAccountName`, UPN, mail, department, title, manager display name, enabled state, and locked state.
+- No group membership, SID, distinguished name, phone, address, password metadata, or raw LDAP attributes are returned.
 
 ## Teams Notification (Phase 3+)
 
@@ -224,6 +243,14 @@ Every integration has a config section:
     "BaseUrl": "https://beyondtrust.contoso.local",
     "ServiceAccountFromPam": "secureops/pam-readonly",
     "UseMock": true
+  },
+  "IdentityLookup": {
+    "Provider": "Mock",
+    "StripDomainPrefix": true,
+    "NormalizeToLowerInvariant": true,
+    "EnableUpnLookup": true,
+    "MaxAccountLength": 128,
+    "AllowedAccountPattern": "^[a-zA-Z0-9._@-]+$"
   },
   "Teams": {
     "WebhookUrls": {

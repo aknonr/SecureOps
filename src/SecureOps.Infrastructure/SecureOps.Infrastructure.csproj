@@ -35,6 +35,9 @@
     <!-- PowerShell / JEA -->
     <PackageReference Include="System.Management.Automation" />
 
+    <!-- AD lookup -->
+    <PackageReference Include="System.DirectoryServices" />
+
     <!-- Resilience -->
     <PackageReference Include="Polly" />
     <PackageReference Include="Microsoft.Extensions.Http.Polly" />
@@ -43,6 +46,7 @@
     <PackageReference Include="System.DirectoryServices.AccountManagement" />
 
     <!-- Options + DI helpers -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
 

@@ -11,6 +11,7 @@ Security is the defining constraint of this project. This document is the canoni
 | Webhook spoofing | Medium | Medium | HMAC-signed payloads, source IP allowlist |
 | Audit tampering | High | Low | Append-only triggers, separate DB role for audit writes |
 | Privilege escalation through UI | High | Low | Server-side authorization on every endpoint |
+| Identity lookup misuse as people search | Medium | Medium | TeamLead/Admin only; exact lookup only; purpose required; all lookups audited |
 | Leakage of internal data via AI (Phase 7) | High | Medium | Self-hosted only + mandatory masking |
 | Misuse as employee surveillance | Medium | Medium | UI framing, role separation, audit of audit queries |
 
@@ -48,6 +49,8 @@ If the approved Turuncuhat integration is webhook-based, the approved caller inv
 | Admin | `CONTOSO\SecureOps-Admins` | All TeamLead + configuration changes, rule management, system administration |
 | Auditor | `CONTOSO\SecureOps-Auditors` | Read-only access to all audit data, including AI audit |
 
+Phase 1A identity lookup uses `TeamLeadOrAbove`. Operators do not receive this privileged read in the first release.
+
 Group names are configured in `appsettings.json`; the table `dbo.RbacRoles` maps codes to group names.
 
 ### Policy Names
@@ -65,6 +68,24 @@ public static class Policies
     public const string CanTriggerDiagnostic = "CanTriggerDiagnostic"; // TeamLead OR Admin
 }
 ```
+
+## Identity Lookup (Phase 1A)
+
+IdentityLookup / PamAdUserLookup is a backend-only privileged read for incident response verification.
+
+Allowed:
+- Exact lookup of one PAM account or AD username per request.
+- Config-based normalization such as trimming, optional `DOMAIN\` stripping, and case normalization.
+- Read-only AD lookup by exact `sAMAccountName` and, when UPN-shaped, exact `userPrincipalName`.
+- Returning only display name, account name, UPN, mail, department, title, manager display name, enabled/locked state, and source.
+
+Forbidden:
+- AD writes of any kind: password reset, unlock, enable/disable, group modification, attribute update.
+- PAM writes or session changes.
+- Wildcard, bulk, fuzzy, or directory-browsing search.
+- Returning group membership, SID, distinguished name, phone, address, password metadata, or raw LDAP attributes.
+
+Every lookup requires a purpose/context value and writes audit entries for request and outcome. Audit details must not store returned personal-detail fields beyond the matched account identifier.
 
 ### Enforcement
 
@@ -232,6 +253,7 @@ Naming:
 | Worker → SQL Server | TLS | 1433 | Integrated Auth |
 | Worker → Target Servers | WinRM HTTPS | 5986 | Kerberos + JEA |
 | Worker → Monitoring SWIS (Phase 6+) | HTTPS | 17774 | Service account |
+| API → Active Directory | LDAP/LDAPS or domain APIs | 389/636 or domain default | App pool/service identity, read-only |
 | Worker → Teams webhook (Phase 3+) | HTTPS | 443 | URL secret |
 | Worker → SMTP relay (Phase 3+) | TCP | 25 / 587 | Internal |
 

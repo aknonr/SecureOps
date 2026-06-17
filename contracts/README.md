@@ -14,6 +14,7 @@ Cross-component data contracts. Authoritative source for the shape of payloads t
 | `alarm-payload.schema.json` | Inbound alarm payload from the monitoring workflow; carries the upstream external ID and optional Turuncuhat EVT ID | 1 |
 | `diagnostic-result.schema.json` | Envelope for any diagnostic module output | 1 |
 | `audit-event.schema.json` | Serialized audit entry shape | 1 |
+| `identity-lookup.schema.json` | Phase 1A identity lookup request and response | 1A |
 | `notification-message.schema.json` | Generic notification payload before channel-specific rendering | 3 |
 | `ai-analysis-request.schema.json` | Request to the internal AI service | 7 |
 | `ai-analysis-response.schema.json` | Response from the internal AI service | 7 |
@@ -26,6 +27,7 @@ Cross-component data contracts. Authoritative source for the shape of payloads t
 | `diagnostic-result-disk-example.json` | `diagnostic-result.schema.json` (payload: disk-diagnostic-v1) |
 | `diagnostic-result-service-example.json` | `diagnostic-result.schema.json` (payload: service-diagnostic-v1) |
 | `audit-event-examples.json` | `audit-event.schema.json` (array) |
+| `identity-lookup-example.json` | `identity-lookup.schema.json` |
 | `notification-message-example.json` | `notification-message.schema.json` |
 | `ai-analysis-example.json` | `ai-analysis-request.schema.json` + `ai-analysis-response.schema.json` |
 

@@ -7,6 +7,7 @@ The project unfolds in **9 phases** (Phase 0 through Phase 8). Each phase produc
 | Phase | Name | Category | Duration | Status |
 |---|---|---|---|---|
 | 0 | Discovery and Project Setup | MVP | 2–3 weeks | Pending |
+| 1A | Identity Lookup / PAM AD User Lookup | MVP helper | 1–2 weeks | Pending |
 | 1 | Read-Only Diagnostic MVP | MVP | 4–6 weeks | Pending |
 | 2 | Web UI and Dashboard | MVP | 3–5 weeks | Pending |
 | 3 | Notification and Ticket Enrichment | ROI | 2–4 weeks | Pending |
@@ -16,7 +17,7 @@ The project unfolds in **9 phases** (Phase 0 through Phase 8). Each phase produc
 | 7 | Private AI / RAG PoC | Vision | 6–10 weeks | Pending — separate budget |
 | 8 | Approval-Based Remediation | Future | 6–8 weeks | Pending — future |
 
-MVP = Phase 0–2 (end-to-end value, 9–14 weeks)
+MVP = Phase 0–2, including Phase 1A (end-to-end value, 10–16 weeks)
 ROI = Phase 3–6 (operational return, 12–20 additional weeks)
 Vision = Phase 7 (AI capability, separate decision)
 Future = Phase 8 (write operations, future)
@@ -62,9 +63,42 @@ With a single developer at ~16–20 hours per week:
 
 See `plans/PHASE-0-discovery-and-project-setup.md` for tasks.
 
+## Phase 1A — Identity Lookup / PAM AD User Lookup (1–2 weeks)
+
+**Goal:** Let authorized backend users resolve an exact PAM account or AD username to read-only Active Directory user information for incident response verification. No UI dependency.
+
+### Deliverables
+
+1. Backend endpoint `POST /api/v1/identity/lookup`.
+2. Swagger/Postman-testable request and response contracts.
+3. Config-based username normalization.
+4. Read-only Active Directory provider behind an interface.
+5. Mock PAM account resolver hook for later BeyondTrust metadata or Phase 4 correlation.
+6. Audit logging for every lookup request, success, not-found result, and failure.
+7. Unit tests for normalization, provider behavior, authorization metadata, and audit behavior.
+
+### Non-Goals
+
+- No AD write operations.
+- No password reset, account unlock, or group modification.
+- No broad wildcard or bulk search.
+- No UI dependency.
+- No AI/RAG integration.
+- No Teams integration.
+
+### Exit Criteria
+
+- TeamLead/Admin users can test the endpoint from Swagger/Postman.
+- Operator/Auditor-only users are not authorized.
+- Exact account lookup returns only approved operational fields.
+- Every lookup creates an audit entry without storing returned personal details in audit.
+- Mock PAM resolver remains the default until BeyondTrust access is approved.
+
+See `plans/PHASE-1A-identity-lookup-mvp.md`.
+
 ## Phase 1 — Read-Only Diagnostic MVP (4–6 weeks)
 
-**Goal:** A working read-only diagnostic system processing alarms from a webhook end-to-end.
+**Goal:** A working read-only diagnostic system processing alarms from a webhook end-to-end. Phase 1A identity lookup is already available as a backend helper but is not a diagnostic module.
 
 ### Deliverables
 
@@ -283,7 +317,7 @@ See `plans/PHASE-8-approval-based-remediation.md`.
 ## Dependencies Between Phases
 
 ```
-Phase 0 → Phase 1 → Phase 2 ─┬→ Phase 3
+Phase 0 → Phase 1A → Phase 1 → Phase 2 ─┬→ Phase 3
                               ├→ Phase 4 → Phase 5
                               └→ Phase 6 → Phase 7
                                           → Phase 8

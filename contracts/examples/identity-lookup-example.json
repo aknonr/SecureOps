@@ -1,0 +1,23 @@
+{
+  "request": {
+    "account": "CONTOSO\\pam12356",
+    "purpose": "EVT-54321 incident response verification",
+    "turuncuhatEvtId": "EVT-54321"
+  },
+  "response": {
+    "status": "Found",
+    "normalizedAccount": "pam12356",
+    "source": "ActiveDirectory",
+    "user": {
+      "displayName": "Example Admin",
+      "samAccountName": "pam12356",
+      "userPrincipalName": "pam12356@contoso.local",
+      "mail": "example.admin@contoso.local",
+      "department": "Windows Operations",
+      "title": "Systems Engineer",
+      "managerDisplayName": "Example Manager",
+      "enabled": true,
+      "locked": false
+    }
+  }
+}

@@ -23,3 +23,11 @@
 **What remains open:** Turuncuhat entegrasyon yöntemi hâlâ netleşmedi; webhook mu API-pull mu olacağı ve read-only mi read-write mı ilerleyeceği paydaş yanıtı bekliyor. Worker'ın BeyondTrust ile hangi senaryoda çalışacağı da henüz açık karardır.
 
 **Mail status:** Turuncuhat ve BeyondTrust / PAM soruları taslaklandı; yönetici onayı bekleniyor, henüz gönderilmedi.
+
+## 2026-06-18 — Phase 1A IdentityLookup kararı
+
+**What we decided:** IdentityLookup / PamAdUserLookup, Phase 1'den önce gelen backend-only Phase 1A olarak eklenecektir. Amaç, yetkili TeamLead/Admin kullanıcıların tek bir PAM hesabını veya AD kullanıcı adını incident response verification bağlamında read-only çözebilmesidir.
+
+**Security framing:** Bu özellik kişi arama veya performans izleme aracı değildir. Geniş arama, wildcard, bulk search, AD/PAM write, parola reset, unlock ve grup değişikliği kapsam dışıdır. Her sorgu gerekçe ister ve auditlenir.
+
+**Implementation direction:** İlk sürüm direct read-only AD lookup kullanır. BeyondTrust/PAM metadata çözümleme mock interface olarak hazırlanır; gerçek PAM API kullanımı paydaş onayı ve ayrı karar olmadan etkinleştirilmez.

@@ -18,6 +18,8 @@ Domain model and database schema. The model is intentionally compact for MVP; la
 
 ## Core Entities (Domain Layer)
 
+Phase 1A IdentityLookup does not add a durable identity table. It resolves one exact account through a provider and records only the privileged-read audit trail. The `Users` table remains for authenticated SecureOps users and RBAC-related identity caching.
+
 ```csharp
 namespace SecureOps.Domain.Alerting;
 

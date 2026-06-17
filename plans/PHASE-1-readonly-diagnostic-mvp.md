@@ -6,6 +6,7 @@
 ## Pre-Conditions
 
 - [ ] Phase 0 complete (see `plans/PHASE-0-discovery-and-project-setup.md`).
+- [ ] Phase 1A Identity Lookup complete or explicitly deferred by management.
 - [ ] PAM service account at least requested (preferably provisioned).
 - [ ] Test environment available.
 - [ ] JEA PoC successful on one server.
@@ -23,6 +24,8 @@
 9. Unit + integration test suite passing.
 10. Operational runbook (`docs/runbooks/01-04-*.md`).
 11. Management demo + Q&A.
+
+Note: IdentityLookup / PamAdUserLookup is delivered in Phase 1A. It is backend-only and not counted as one of the six diagnostic modules.
 
 ## Sprint Structure (Approximate)
 

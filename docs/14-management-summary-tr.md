@@ -18,7 +18,7 @@ Mevcut izleme platformundan gelen Windows alarmlarını alıp, kısıtlı bir Po
 |---|---|
 | Proje aşaması | Uygulama öncesi — doküman ve iskelet üretimi tamamlandı |
 | Sunum durumu | Yönetim sunumu yapıldı, "güzel öneri" geri bildirimi alındı |
-| Bir sonraki adım | Faz 0 (keşif ve onaylar), ardından Faz 1 MVP (6–8 hafta) |
+| Bir sonraki adım | Faz 0 (keşif ve onaylar), ardından Faz 1A kimlik sorgulama MVP ve Faz 1 tanılama MVP |
 
 ## Neden Yapıyoruz
 
@@ -35,6 +35,7 @@ Bu sistem:
 - Tekrar eden problemleri otomatik yüzeye çıkarır.
 - Yeni mühendis yetişme süresini 2–3 aya indirir (hedef).
 - Vardiya raporlarını taslak olarak otomatik üretir.
+- PAM/AD hesabı görüldüğünde, yetkili lider/admin kullanıcının ilgili hesabı manuel uğraşmadan doğrulamasını sağlar.
 
 ## Neyi Değildir
 
@@ -42,6 +43,7 @@ Bu sistem:
 - APM aracı **değildir**.
 - İzleme platformunun yerini almaz; üzerine bina edilir.
 - PAM'i değiştirmez; sadece audit korelasyonu için **read-only** entegre eder.
+- AD veya PAM üzerinde kullanıcı/parola/grup değişikliği yapmaz; kimlik sorgulama sadece okuma modundadır.
 - MVP'de **hiçbir yazma işlemi yapmaz**.
 - Yapay zekâ ürünü **değildir**; yapay zekâ Faz 7'de ayrı bir karar/bütçe ile değerlendirilir.
 - **Kişi takibi sistemi değildir.** Audit, kritik alarmlarda operasyonel müdahale doğrulama, SLA ve denetim amaçlıdır.
@@ -51,6 +53,7 @@ Bu sistem:
 | Faz | Konu | Süre |
 |---|---|---|
 | 0 | Keşif, paydaş onayları, pilot listesi | 1–2 hafta |
+| 1A | PAM / AD kullanıcı kimlik sorgulama | 1–2 hafta |
 | 1 | Sadece okuma tanılama MVP | 4–6 hafta |
 | 2 | Web arayüzü + panel | 3–5 hafta |
 | 3 | Bildirim + ticket zenginleştirme | 2–4 hafta |
@@ -102,6 +105,8 @@ Bu sistem:
 | 3 | Güvenlik onay gecikmeleri | Faz 0'da erken paydaş katılımı |
 | 4 | "Kişi takibi" algısı | Çerçeveleme arayüze, rapora, iletişime işlenmiş |
 | 5 | Faz 7 yapay zekâ bütçesi reddi | Proje yapay zekâsız değerli; ayrı karar |
+
+Not: Faz 1A kimlik sorgulama özelliği sadece TeamLead/Admin yetkisinde, tek hesap ve gerekçe ile çalışır. Geniş arama, wildcard, parola sıfırlama, hesap açma/kilidi kaldırma veya grup değişikliği yoktur.
 
 ## Onay İstenenler (Faz 0 için)
 
