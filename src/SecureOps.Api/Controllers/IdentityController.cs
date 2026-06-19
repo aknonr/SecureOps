@@ -10,6 +10,7 @@ using SecureOps.Infrastructure.Identity;
 using SecureOps.Shared.Audit;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
+using SecureOps.Shared.Contracts.Api;
 using SecureOps.Shared.Contracts.Identity;
 
 namespace SecureOps.Api.Controllers;
@@ -137,10 +138,13 @@ public sealed class IdentityController : ControllerBase
             bool auditWritten = await TryWriteValidationRejectedAuditAsync(
                 null,
                 ["Body"],
+                "InvalidRequestBody",
                 correlationId,
                 cancellationToken);
 
-            return auditWritten ? RejectedRequest() : AuditUnavailable();
+            return auditWritten
+                ? Error(StatusCodes.Status400BadRequest, "InvalidRequestBody", "The request body is required.", correlationId)
+                : AuditUnavailable(correlationId);
         }
 
         FluentValidation.Results.ValidationResult validation = await _validator.ValidateAsync(request, cancellationToken);
@@ -154,10 +158,17 @@ public sealed class IdentityController : ControllerBase
             bool auditWritten = await TryWriteValidationRejectedAuditAsync(
                 request,
                 rejectedFields,
+                ResolveValidationErrorCode(rejectedFields),
                 correlationId,
                 cancellationToken);
 
-            return auditWritten ? RejectedRequest() : AuditUnavailable();
+            return auditWritten
+                ? Error(
+                    StatusCodes.Status400BadRequest,
+                    ResolveValidationErrorCode(rejectedFields),
+                    "The identity lookup request was rejected.",
+                    correlationId)
+                : AuditUnavailable(correlationId);
         }
 
         IdentityLookupExecutionContext context = new(
@@ -171,22 +182,23 @@ public sealed class IdentityController : ControllerBase
         {
             IdentityLookupResultStatus.Found => Ok(result.Response),
             IdentityLookupResultStatus.NotFound => NotFound(result.Response),
-            IdentityLookupResultStatus.Invalid => BadRequest(new ProblemDetails
-            {
-                Title = "Identity lookup request was rejected.",
-                Detail = "The request could not be accepted."
-            }),
-            _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
-            {
-                Title = "Identity lookup unavailable.",
-                Detail = "The lookup could not be completed."
-            })
+            IdentityLookupResultStatus.Invalid => Error(
+                StatusCodes.Status400BadRequest,
+                result.ErrorCode ?? "IdentityLookupRejected",
+                result.ErrorMessage ?? "The identity lookup request was rejected.",
+                correlationId),
+            _ => Error(
+                StatusCodes.Status503ServiceUnavailable,
+                result.ErrorCode ?? "IdentityLookupUnavailable",
+                result.ErrorMessage ?? "The lookup could not be completed.",
+                correlationId)
         };
     }
 
     private async Task<bool> TryWriteValidationRejectedAuditAsync(
         IdentityLookupRequest? request,
         IReadOnlyCollection<string> rejectedFields,
+        string errorCode,
         string correlationId,
         CancellationToken cancellationToken)
     {
@@ -205,8 +217,11 @@ public sealed class IdentityController : ControllerBase
                         normalizedAccount = (string?)null,
                         accountProvided = !string.IsNullOrWhiteSpace(request?.Account),
                         accountLength = request?.Account?.Trim().Length,
+                        accountInputHash = AuditAccountHasher.HashAccountInput(request?.Account),
                         purpose = request?.Purpose,
                         turuncuhatEvtId = request?.TuruncuhatEvtId,
+                        resultStatus = "Rejected",
+                        errorCode,
                         rejectedFields
                     }
                 },
@@ -224,24 +239,35 @@ public sealed class IdentityController : ControllerBase
         }
     }
 
-    private static BadRequestObjectResult RejectedRequest()
+    private static ObjectResult Error(int statusCode, string errorCode, string message, string correlationId)
     {
-        return new BadRequestObjectResult(new ProblemDetails
+        return new ObjectResult(new ApiErrorResponse(errorCode, message, correlationId))
         {
-            Title = "Identity lookup request was rejected.",
-            Detail = "The request could not be accepted."
-        });
+            StatusCode = statusCode
+        };
     }
 
-    private static ObjectResult AuditUnavailable()
+    private static ObjectResult AuditUnavailable(string correlationId)
     {
-        return new ObjectResult(new ProblemDetails
+        return Error(
+            StatusCodes.Status503ServiceUnavailable,
+            "AuditUnavailable",
+            "Identity lookup audit is unavailable.",
+            correlationId);
+    }
+
+    private static string ResolveValidationErrorCode(IReadOnlyCollection<string> rejectedFields)
+    {
+        if (rejectedFields.Contains(nameof(IdentityLookupRequest.Purpose), StringComparer.Ordinal))
         {
-            Title = "Identity lookup unavailable.",
-            Detail = "The lookup could not be completed."
-        })
+            return "PurposeRequired";
+        }
+
+        if (rejectedFields.Contains(nameof(IdentityLookupRequest.Account), StringComparer.Ordinal))
         {
-            StatusCode = StatusCodes.Status503ServiceUnavailable
-        };
+            return "EmptyAccount";
+        }
+
+        return "InvalidIdentityLookupRequest";
     }
 }

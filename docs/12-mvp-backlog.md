@@ -26,6 +26,8 @@ Phase 0 + Phase 1 backlog at the work-item level. Use this as the working task l
 
 **Exit criteria:** all P0-01 through P0-17 complete.
 
+Phase 1A current status: P1A-01 through P1A-11 are implemented in the backend and covered by unit/integration tests. P1A-12 remains pending because it requires an approved read-only real AD test account/environment before production readiness can be claimed.
+
 ## Phase 1A — Identity Lookup / PAM AD User Lookup
 
 | # | Task | Size | Owner | Deliverable |
@@ -37,9 +39,13 @@ Phase 0 + Phase 1 backlog at the work-item level. Use this as the working task l
 | P1A-05 | Implement read-only AD provider | M | Dev | Exact `sAMAccountName` / UPN lookup |
 | P1A-06 | Add `POST /api/v1/identity/lookup` | S | Dev | Swagger/Postman-testable endpoint |
 | P1A-07 | Add audit hooks for every lookup outcome | S | Dev | `IdentityLookup*` audit entries |
-| P1A-08 | Add unit/API tests | M | Dev | Tests passing |
+| P1A-08 | Add safe metadata endpoints | S | Dev | `/identity/me`, `/identity/lookup/capabilities`, `/health/audit-store`, `/health/identity-provider` |
+| P1A-09 | Add production hardening controls | M | Dev | Swagger auth, fail-closed audit, provider guard, rate limit |
+| P1A-10 | Add file audit persistence for dev/test | M | Dev | Bounded queue + JSONL file sink outside publish folder |
+| P1A-11 | Add unit/API tests | M | Dev | Tests passing |
+| P1A-12 | Complete real AD smoke test in Test/UAT | S | Dev + AD/Security owner | Approved read-only account verified; no personal data leaked in audit |
 
-**Exit criteria:** all P1A-01 through P1A-08 complete, TeamLead/Admin access enforced, and no AD/PAM writes introduced.
+**Exit criteria:** all P1A-01 through P1A-12 complete, TeamLead/Admin access enforced, Operator/Auditor-only denied, audit fail-closed verified, persistent dev/test audit available, and no AD/PAM writes introduced.
 
 ## Phase 1 — Read-Only Diagnostic MVP
 

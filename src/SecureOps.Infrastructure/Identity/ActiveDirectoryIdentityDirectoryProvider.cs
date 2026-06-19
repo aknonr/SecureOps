@@ -24,22 +24,50 @@ public sealed class ActiveDirectoryIdentityDirectoryProvider : IIdentityDirector
     }
 
     /// <inheritdoc />
-    public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
+    public async Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        IdentityProviderInputGuard.EnsureSafeExactAccount(normalizedAccount, _options);
 
+        var timeout = TimeSpan.FromSeconds(_options.ProviderTimeoutSeconds <= 0 ? 3 : _options.ProviderTimeoutSeconds);
+
+        return await Task
+            .Run(() => FindUserCore(normalizedAccount), cancellationToken)
+            .WaitAsync(timeout, cancellationToken);
+    }
+
+    private DirectoryUserRecord? FindUserCore(string normalizedAccount)
+    {
         using PrincipalContext context = string.IsNullOrWhiteSpace(_options.Container)
             ? new PrincipalContext(ContextType.Domain, _options.DomainName)
             : new PrincipalContext(ContextType.Domain, _options.DomainName, _options.Container);
 
         var user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, normalizedAccount);
-
-        if (user is null && _options.EnableUpnLookup && normalizedAccount.Contains('@', StringComparison.Ordinal))
+        if (user is not null && IsExactSamAccountMatch(user, normalizedAccount))
         {
-            user = UserPrincipal.FindByIdentity(context, IdentityType.UserPrincipalName, normalizedAccount);
+            return MapUser(user);
         }
 
-        return Task.FromResult(user is null ? null : MapUser(user));
+        if (_options.EnableUpnLookup && normalizedAccount.Contains('@', StringComparison.Ordinal))
+        {
+            user = UserPrincipal.FindByIdentity(context, IdentityType.UserPrincipalName, normalizedAccount);
+            if (user is not null && IsExactUpnMatch(user, normalizedAccount))
+            {
+                return MapUser(user);
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsExactSamAccountMatch(UserPrincipal user, string normalizedAccount)
+    {
+        return string.Equals(user.SamAccountName, normalizedAccount, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsExactUpnMatch(UserPrincipal user, string normalizedAccount)
+    {
+        return string.Equals(user.UserPrincipalName, normalizedAccount, StringComparison.OrdinalIgnoreCase);
     }
 
     private static DirectoryUserRecord MapUser(UserPrincipal user)

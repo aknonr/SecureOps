@@ -9,6 +9,7 @@ ASP.NET Core Web API. Hosted on IIS in-process.
 - Enforce authorization (policies in `SecureOps.Shared.Auth.Policies`).
 - Validate and normalize inbound payloads (FluentValidation).
 - Enqueue diagnostic jobs via Hangfire.
+- Expose Phase 1A IdentityLookup endpoints and safe metadata/health endpoints.
 
 ## Does NOT
 
@@ -23,6 +24,6 @@ ASP.NET Core Web API. Hosted on IIS in-process.
 - `SecureOps.Shared`
 - `SecureOps.Infrastructure`
 
-## Phase
+## Current state
 
-Populated incrementally starting Phase 1. `Program.cs` and first controller (Health) in Phase 1 Sprint 1.
+Phase 1A IdentityLookup is implemented here through `IdentityController`, validation, authorization, correlation ID middleware, rate-limit policy, and safe health endpoints. Phase 1 alert webhook and diagnostic orchestration endpoints are still planned.

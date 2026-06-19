@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Options;
+using SecureOps.Shared.Configuration;
+
 namespace SecureOps.Infrastructure.Identity;
 
 /// <summary>
@@ -6,13 +9,58 @@ namespace SecureOps.Infrastructure.Identity;
 public sealed class MockIdentityDirectoryProvider : IIdentityDirectoryProvider
 {
     private readonly IReadOnlyDictionary<string, DirectoryUserRecord> _users;
+    private readonly IdentityLookupOptions _options;
 
     /// <summary>
     /// Initializes a provider with a default sample user.
     /// </summary>
     public MockIdentityDirectoryProvider()
-        : this(new[]
-        {
+        : this(DefaultUsers(), Options.Create(new IdentityLookupOptions()))
+    {
+    }
+
+    /// <summary>
+    /// Initializes a provider with default users and configured options.
+    /// </summary>
+    /// <param name="options">Identity lookup options.</param>
+    public MockIdentityDirectoryProvider(IOptions<IdentityLookupOptions> options)
+        : this(DefaultUsers(), options)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a provider with supplied users.
+    /// </summary>
+    /// <param name="users">Users keyed by their sAMAccountName.</param>
+    public MockIdentityDirectoryProvider(IEnumerable<DirectoryUserRecord> users)
+        : this(users, Options.Create(new IdentityLookupOptions()))
+    {
+    }
+
+    /// <summary>
+    /// Initializes a provider with supplied users and options.
+    /// </summary>
+    /// <param name="users">Users keyed by their sAMAccountName.</param>
+    /// <param name="options">Identity lookup options.</param>
+    public MockIdentityDirectoryProvider(IEnumerable<DirectoryUserRecord> users, IOptions<IdentityLookupOptions> options)
+    {
+        _users = users.ToDictionary(x => x.SamAccountName.ToLowerInvariant(), StringComparer.OrdinalIgnoreCase);
+        _options = options.Value;
+    }
+
+    /// <inheritdoc />
+    public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IdentityProviderInputGuard.EnsureSafeExactAccount(normalizedAccount, _options);
+        _users.TryGetValue(normalizedAccount, out DirectoryUserRecord? user);
+        return Task.FromResult(user);
+    }
+
+    private static IEnumerable<DirectoryUserRecord> DefaultUsers()
+    {
+        return
+        [
             new DirectoryUserRecord(
                 "Example Admin",
                 "pam12356",
@@ -24,24 +72,6 @@ public sealed class MockIdentityDirectoryProvider : IIdentityDirectoryProvider
                 true,
                 false,
                 "Mock")
-        })
-    {
-    }
-
-    /// <summary>
-    /// Initializes a provider with supplied users.
-    /// </summary>
-    /// <param name="users">Users keyed by their sAMAccountName.</param>
-    public MockIdentityDirectoryProvider(IEnumerable<DirectoryUserRecord> users)
-    {
-        _users = users.ToDictionary(x => x.SamAccountName.ToLowerInvariant(), StringComparer.OrdinalIgnoreCase);
-    }
-
-    /// <inheritdoc />
-    public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        _users.TryGetValue(normalizedAccount, out DirectoryUserRecord? user);
-        return Task.FromResult(user);
+        ];
     }
 }

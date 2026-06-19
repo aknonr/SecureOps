@@ -7,6 +7,11 @@
   "oneOf": [
     { "$ref": "#/$defs/request" },
     { "$ref": "#/$defs/response" },
+    { "$ref": "#/$defs/currentIdentityResponse" },
+    { "$ref": "#/$defs/capabilitiesResponse" },
+    { "$ref": "#/$defs/errorResponse" },
+    { "$ref": "#/$defs/auditStoreHealthResponse" },
+    { "$ref": "#/$defs/providerHealthResponse" },
     { "$ref": "#/$defs/exampleExchange" }
   ],
   "$defs": {
@@ -66,6 +71,129 @@
             "locked": { "type": ["boolean", "null"] }
           },
           "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "currentIdentityResponse": {
+      "type": "object",
+      "required": ["isAuthenticated", "canLookupIdentity"],
+      "properties": {
+        "name": {
+          "type": ["string", "null"],
+          "description": "Authenticated principal name when available."
+        },
+        "isAuthenticated": {
+          "type": "boolean"
+        },
+        "canLookupIdentity": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "capabilitiesResponse": {
+      "type": "object",
+      "required": ["maxAccountLength", "supportsUpnLookup", "returnedFields", "rejectedInputClasses", "rateLimitPolicy"],
+      "properties": {
+        "maxAccountLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "supportsUpnLookup": {
+          "type": "boolean"
+        },
+        "returnedFields": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rejectedInputClasses": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rateLimitPolicy": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "errorResponse": {
+      "type": "object",
+      "required": ["errorCode", "message"],
+      "properties": {
+        "errorCode": {
+          "type": "string",
+          "enum": [
+            "InvalidRequestBody",
+            "PurposeRequired",
+            "InvalidIdentityLookupRequest",
+            "EmptyAccount",
+            "AccountTooLong",
+            "BulkLookupRejected",
+            "SearchPatternRejected",
+            "AccountPatternRejected",
+            "AuditUnavailable",
+            "DirectoryProviderTimeout",
+            "ProviderUnavailable",
+            "RateLimitExceeded",
+            "IdentityLookupUnavailable"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "correlationId": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "auditStoreHealthResponse": {
+      "type": "object",
+      "required": ["status", "provider", "persistent", "failClosed", "queueEnabled", "lastErrorCode"],
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["InMemory", "File", "SqlServer"]
+        },
+        "persistent": {
+          "type": "boolean"
+        },
+        "failClosed": {
+          "type": "boolean"
+        },
+        "queueEnabled": {
+          "type": "boolean"
+        },
+        "queueCapacity": {
+          "type": ["integer", "null"]
+        },
+        "queuedCount": {
+          "type": ["integer", "null"]
+        },
+        "lastErrorCode": {
+          "type": ["string", "null"],
+          "description": "Safe machine-readable last audit-store failure code, when known."
+        }
+      },
+      "additionalProperties": false
+    },
+    "providerHealthResponse": {
+      "type": "object",
+      "required": ["status", "provider", "realDirectoryProviderEnabled"],
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["Mock", "ActiveDirectory"]
+        },
+        "realDirectoryProviderEnabled": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

@@ -21,7 +21,9 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.Configure<AuditOptions>(configuration.GetSection(AuditOptions.SectionName));
         services.Configure<IdentityLookupOptions>(configuration.GetSection(IdentityLookupOptions.SectionName));
+        services.AddSingleton<IAuditStoreHealthState, AuditStoreHealthState>();
 
         services.AddSingleton<IIdentityAccountNormalizer, IdentityAccountNormalizer>();
         services.AddScoped<IPamAccountResolver, MockPamAccountResolver>();
@@ -37,16 +39,43 @@ public static class DependencyInjection
             services.AddSingleton<IIdentityDirectoryProvider, MockIdentityDirectoryProvider>();
         }
 
-        string? auditProvider = configuration["Audit:Provider"];
+        string? auditProvider = configuration[$"{AuditOptions.SectionName}:Provider"];
         if (string.Equals(auditProvider, "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
-            services.AddScoped<IAuditWriter, SqlAuditWriter>();
+            services.AddSingleton<IAuditEventSink, SqlAuditWriter>();
+            AddPersistentAuditWriter(services, configuration);
+        }
+        else if (string.Equals(auditProvider, "File", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IAuditEventSink, FileAuditEventSink>();
+            AddPersistentAuditWriter(services, configuration);
         }
         else
         {
-            services.AddSingleton<IAuditWriter, InMemoryAuditWriter>();
+            services.AddSingleton<InMemoryAuditWriter>();
+            services.AddSingleton<IAuditWriter>(sp => sp.GetRequiredService<InMemoryAuditWriter>());
+            services.AddSingleton<IAuditEventSink>(sp => sp.GetRequiredService<InMemoryAuditWriter>());
+            services.AddSingleton<IAuditQueueMetrics, NullAuditQueueMetrics>();
         }
 
+        services.AddSingleton<AuditHealthReporter>();
+
         return services;
+    }
+
+    private static void AddPersistentAuditWriter(IServiceCollection services, IConfiguration configuration)
+    {
+        bool queueEnabled = configuration.GetValue("Audit:Queue:Enabled", true);
+        if (queueEnabled)
+        {
+            services.AddSingleton<AuditQueue>();
+            services.AddSingleton<IAuditQueueMetrics>(sp => sp.GetRequiredService<AuditQueue>());
+            services.AddSingleton<IAuditWriter, QueuedAuditWriter>();
+        }
+        else
+        {
+            services.AddSingleton<IAuditQueueMetrics, NullAuditQueueMetrics>();
+            services.AddSingleton<IAuditWriter, DirectAuditWriter>();
+        }
     }
 }

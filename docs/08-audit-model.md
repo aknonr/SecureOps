@@ -40,7 +40,10 @@ The audit subsystem is the project's most important non-functional feature. This
 | Identity lookup requested | API | `IdentityLookupRequested` |
 | Identity lookup succeeded | API | `IdentityLookupSucceeded` |
 | Identity lookup not found | API | `IdentityLookupNotFound` |
+| Identity lookup rejected before provider access | API | `IdentityLookupRejected` |
 | Identity lookup failed | API | `IdentityLookupFailed` |
+| Identity lookup provider timeout | API | `IdentityLookupProviderTimeout` |
+| Identity lookup authorization denied | API | `IdentityLookupForbidden` |
 | Audit query executed | UI/API | `AuditQueried` |
 | Configuration changed (admin) | UI | `ConfigurationChanged` |
 | RBAC mapping changed (admin) | UI | `RbacChanged` |
@@ -108,22 +111,45 @@ Each action defines its own `Details` shape:
 { "turuncuhatEvtId": "EVT-54321", "actionTaken": true }
 
 // IdentityLookupRequested
-{ "normalizedAccount": "pam12356", "purpose": "EVT-54321 incident response verification", "turuncuhatEvtId": "EVT-54321" }
+{ "normalizedAccount": "sample-admin", "accountInputHash": "<sha256>", "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Requested" }
 
 // IdentityLookupSucceeded
-{ "normalizedAccount": "pam12356", "matchedAccount": "pam12356", "source": "ActiveDirectory" }
+{ "normalizedAccount": "sample-admin", "matchedAccount": "sample-admin", "accountInputHash": "<sha256>", "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Succeeded" }
 
 // IdentityLookupNotFound
-{ "normalizedAccount": "pam12356", "source": "ActiveDirectory" }
+{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "NotFound" }
+
+// IdentityLookupRejected
+{ "normalizedAccount": null, "accountProvided": true, "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Rejected", "rejectedFields": ["Account"] }
 
 // IdentityLookupFailed
-{ "normalizedAccount": "pam12356", "source": "ActiveDirectory", "errorCode": "ProviderUnavailable" }
+{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Failed", "errorCode": "ProviderUnavailable" }
+
+// IdentityLookupProviderTimeout
+{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "ProviderTimeout", "errorCode": "DirectoryProviderTimeout" }
+
+// IdentityLookupForbidden
+{ "endpoint": "/api/v1/identity/lookup", "method": "POST", "statusCode": 403, "resultStatus": "Forbidden" }
 
 // AuthorizationDenied
 { "endpoint": "/api/v1/audit", "policy": "CanViewAudit" }
 ```
 
 Document each shape in `contracts/schemas/audit-event.schema.json`.
+
+Identity lookup audit details must not store returned personal detail fields such as display name, mail, department, title, manager display name, group membership, SID, DN, phone, address, password metadata, or raw LDAP attributes. Store the normalized account, matched account identifier, account input hash/length, purpose/context, correlation ID, source IP, and outcome metadata only. Rejected suspicious input should not store raw account text.
+
+## Audit Persistence Providers
+
+| Provider | Persistence | Environment guidance |
+|---|---|---|
+| `InMemory` | Process memory only | Development only; never Production |
+| `File` | JSONL files | Development/Test/UAT; configurable folder such as `D:\SecureOps\Audit` |
+| `SqlServer` | `audit.AuditLog` table | Production target |
+
+The publish folder is only for application files. File audit writes must go to `Audit:File:Directory`, not the publish directory. Persistent providers use a bounded queue and background worker so request threads do not wait on file IO. When `Audit.FailClosed=true`, failure to accept a required audit event blocks privileged lookup before AD/PAM access.
+
+If a queued persistent write is accepted but the background sink later fails, the audit-store health state becomes `Unhealthy` with a safe code such as `AuditSinkUnavailable`. With fail-closed enabled, later privileged identity lookups are rejected before AD/PAM access until a subsequent audit write succeeds and marks the store healthy again. The Critical technical log entry must contain safe operational data only, such as batch count and exception type, and must not include account input or returned identity fields.
 
 ## Writing Audit
 

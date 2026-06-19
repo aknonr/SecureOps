@@ -30,10 +30,28 @@ public sealed class IdentityAccountNormalizerTests
     }
 
     [Theory]
+    [InlineData("PAM1235", "pam1235")]
+    [InlineData("pam1235", "pam1235")]
+    [InlineData("PAM12356", "pam12356")]
+    [InlineData("DOMAIN\\PAM1235", "pam1235")]
+    [InlineData("pam_aknonr23", "pam_aknonr23")]
+    [InlineData("PAM_AKNONR23", "pam_aknonr23")]
+    public void Normalize_IsDeterministicForSupportedAccountShapes(string input, string expected)
+    {
+        IdentityAccountNormalizer normalizer = CreateNormalizer();
+
+        IdentityAccountNormalizationResult result = normalizer.Normalize(input);
+
+        result.IsValid.Should().BeTrue();
+        result.NormalizedAccount.Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData("pam*")]
     [InlineData("pam12356,pam78900")]
     [InlineData("pam12356 pam78900")]
     [InlineData("(&(objectClass=user))")]
+    [InlineData("CN=Jane Doe,OU=Users,DC=contoso,DC=local")]
     public void Normalize_RejectsSearchOrBulkInput(string account)
     {
         IdentityAccountNormalizer normalizer = CreateNormalizer();

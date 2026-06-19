@@ -62,6 +62,8 @@ The diagram above captures the original generic inbound-monitoring shape. In the
 
 ASP.NET Core 8 Web API. Hosted on IIS in-process.
 
+Current implementation status: Phase 1A IdentityLookup endpoints and safe health metadata endpoints are implemented. Phase 1 alert intake, diagnostic job orchestration, and SQL persistence are still planned.
+
 Responsibilities:
 - Accept monitoring webhooks (HMAC-signed).
 - Provide REST API for the UI and any future internal consumers.
@@ -133,7 +135,14 @@ Contents:
 - DTOs for API contracts (records).
 - JSON schemas (mirrored from `contracts/schemas/`).
 - Authorization policy name constants.
-- Common utilities.
+- Strongly typed configuration options.
+- Common utilities with no infrastructure dependencies.
+
+Does NOT contain:
+- ASP.NET middleware/controllers.
+- EF Core mappings, SQL access, or audit file IO.
+- PowerShell execution or external system clients.
+- Blazor components.
 
 ## Data Flow: Receive EVT → Diagnose → Update Turuncuhat
 
@@ -209,7 +218,7 @@ Hierarchical configuration via `IConfiguration`:
 5. PAM-resolved secrets at startup (service account credentials).
 
 Configuration sections:
-- `ConnectionStrings`
+- `ConnectionStrings` (`SecureOpsDb` for the SQL Server audit/data store when enabled)
 - `SolarWinds`
 - `Pam`
 - `IdentityLookup`
@@ -226,7 +235,7 @@ Each section has a strongly-typed options class in `SecureOps.Shared.Configurati
 - **Serilog** for structured logging in API and Worker.
 - **Sinks:** File (rolling daily), SQL Server (Serilog.Sinks.MSSqlServer), and optionally Application Insights or Seq if added in Phase 6+.
 - **Correlation:** `Activity.Current` traces, propagated to Hangfire jobs and SQL.
-- **Health endpoints:** `/api/v1/health` (liveness) and `/api/v1/health/detailed` (DB, Worker heartbeat, monitoring connection).
+- **Health endpoints:** `/api/v1/health` for liveness, `/api/v1/health/audit-store` for safe audit-store status, and `/api/v1/health/identity-provider` for safe identity-provider configuration status. Detailed DB, Worker heartbeat, and monitoring-chain health are Phase 1+ work.
 
 ## Theming
 

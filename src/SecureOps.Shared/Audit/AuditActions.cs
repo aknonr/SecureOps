@@ -31,6 +31,11 @@ public static class AuditActions
     public const string IdentityLookupFailed = "IdentityLookupFailed";
 
     /// <summary>
+    /// A privileged identity lookup timed out while waiting on the directory provider.
+    /// </summary>
+    public const string IdentityLookupProviderTimeout = "IdentityLookupProviderTimeout";
+
+    /// <summary>
     /// Authorization denied access to the privileged identity lookup endpoint.
     /// </summary>
     public const string IdentityLookupForbidden = "IdentityLookupForbidden";

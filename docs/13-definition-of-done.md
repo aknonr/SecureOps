@@ -128,6 +128,10 @@ MVP is "done" when:
 
 ## Special Considerations
 
+### Phase 1A IdentityLookup
+
+Phase 1A code can be considered implemented when backend endpoint behavior, audit fail-closed behavior, safe metadata endpoints, rate limiting, provider input guards, and tests are complete. It is not production-ready until a real AD smoke test is completed with an approved read-only test account and the security review signs off the app-pool/service identity permission boundary.
+
 ### When a Second Developer Joins
 
 - Pull requests become mandatory (no direct main commits).

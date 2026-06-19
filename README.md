@@ -2,7 +2,7 @@
 
 An enterprise Windows operations platform that receives monitoring alarms, runs read-only diagnostics, captures structured audit data, and surfaces actionable findings to shift engineers.
 
-> **Status:** Pre-implementation. Documentation and scaffolding phase.
+> **Status:** Phase 1A backend IdentityLookup implemented and hardened; Phase 1 read-only diagnostics not started.
 > **Owner:** CONTOSO Turkish Technology (placeholder)
 > **Stack:** .NET 8, Blazor Server, SQL Server, PowerShell Remoting + JEA
 > **MVP timeline:** 6–8 weeks
@@ -33,7 +33,7 @@ Later phases add rule-based analysis, private AI-assisted summarization, and app
 
 ## Getting Started
 
-This repo currently contains documentation, agent rules, and an empty .NET solution scaffold. There is no runnable application code yet. The first runnable artifact will be the Phase 1 read-only diagnostic MVP.
+This repo contains documentation, agent rules, contracts, a .NET solution, Phase 1A IdentityLookup backend code, audit persistence hardening, and unit/integration tests. The Phase 1 read-only diagnostic MVP is still planned and has not been implemented yet.
 
 ### For AI coding agents
 
@@ -57,17 +57,20 @@ This repo currently contains documentation, agent rules, and an empty .NET solut
 | `plans/` | Phase-by-phase implementation plans with task breakdown. |
 | `contracts/` | JSON schemas and example payloads for cross-component contracts. |
 | `.cursor/rules/` | Cursor agent rules. Also useful as reference for any agent. |
-| `src/` | .NET solution. Currently scaffolded only. |
-| `tests/` | Unit and integration test projects. |
-| `scripts/powershell/` | Diagnostic and JEA scripts (Phase 1+). |
-| `sql/` | Schema and migration scripts (Phase 1+). |
+| `src/` | .NET solution: Api, Worker, Ui, Domain, Infrastructure, Shared. Phase 1A code currently lives mainly in Api, Infrastructure, and Shared. |
+| `tests/` | Unit and integration test projects. Current tests cover Phase 1A identity lookup, audit hardening, authorization, validation, correlation, and rate-limit metadata. |
+| `scripts/powershell/` | Empty diagnostic and JEA script folders reserved for Phase 1. |
+| `sql/` | Empty schema and migration folders reserved for Phase 1 SQL work. |
 
 ---
 
 ## Roadmap (High Level)
 
+For current status and detailed durations, `docs/02-roadmap.md` is authoritative.
+
 | Phase | Focus | Duration |
 |---|---|---|
+| 1A | Identity Lookup / PAM AD User Lookup | 1-2 weeks |
 | 0 | Discovery, baseline, stakeholder alignment | 1–2 weeks |
 | 1 | Read-only diagnostic MVP | 4–6 weeks |
 | 2 | Web UI + dashboard | 3–5 weeks |

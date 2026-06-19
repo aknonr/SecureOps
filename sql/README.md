@@ -1,6 +1,6 @@
 # sql/
 
-SQL Server schema and migration scripts. Empty in pre-Phase-1; populated by Phase 1.
+SQL Server schema and migration scripts. The folders exist as Phase 1 placeholders. No production SQL schema or migration scripts are implemented yet.
 
 ## Structure
 

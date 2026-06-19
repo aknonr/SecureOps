@@ -2,7 +2,7 @@
 
 **Project:** Secure Ops Automation & AI Analysis Hub
 **Owner organization placeholder:** CONTOSO Turkish Technology
-**Status:** Pre-implementation. Documentation + scaffolding phase.
+**Status:** Phase 1A backend IdentityLookup implemented and hardened; Phase 1 read-only diagnostic MVP not started.
 **Last updated:** 2026-05
 
 ---
@@ -122,20 +122,20 @@ See `docs/15-system-landscape.md`, `docs/05-security-model.md`, and `docs/06-int
 ├── contracts/                   # data contracts
 │   ├── schemas/                 # JSON Schema files
 │   └── examples/                # sample payloads
-├── src/                         # .NET solution (scaffolded, empty)
+├── src/                         # .NET solution
 │   ├── SecureOps.Api/
 │   ├── SecureOps.Worker/
 │   ├── SecureOps.Domain/
 │   ├── SecureOps.Infrastructure/
 │   ├── SecureOps.Ui/
 │   └── SecureOps.Shared/
-├── tests/                       # test projects (scaffolded, empty)
+├── tests/                       # unit and integration test projects
 │   ├── SecureOps.Tests.Unit/
 │   └── SecureOps.Tests.Integration/
-├── scripts/powershell/          # diagnostic and JEA scripts (later)
+├── scripts/powershell/          # diagnostic and JEA script folders (Phase 1 placeholders)
 │   ├── diagnostic/
 │   └── jea/
-└── sql/                         # database scripts (later)
+└── sql/                         # schema and migration folders (Phase 1 placeholders)
     ├── schema/
     └── migrations/
 ```

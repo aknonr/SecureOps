@@ -4,6 +4,10 @@ External integrations and data access.
 
 ## Namespaces
 
+Current implemented Phase 1A namespaces:
+- `Audit/` contains audit writer abstractions plus InMemory, File, queued, and SQL Server persistence implementations.
+- `Identity/` contains the IdentityLookup service, exact account normalizer, read-only AD provider, provider guard, and mock PAM resolver hook.
+
 - `Data/` — EF Core `SecureOpsDbContext`, entity configurations.
 - `Audit/` — `IAuditWriter` and SQL implementation (Dapper).
 - `PowerShell/` — `IPowerShellRunner` JEA implementation.
@@ -28,6 +32,6 @@ External integrations and data access.
 - `SecureOps.Domain`
 - `SecureOps.Shared`
 
-## Phase
+## Current state
 
-Populated incrementally starting Phase 1.
+Phase 1A audit and identity lookup infrastructure is implemented. Phase 1 diagnostic, alert persistence, EF Core DbContext, Hangfire job classes, and PowerShell/JEA runner implementations are still planned.

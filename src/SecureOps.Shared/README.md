@@ -13,6 +13,6 @@ DTOs, JSON contracts, authorization policy constants, utilities.
 
 - `SecureOps.Domain` only.
 
-## Phase
+## Current state
 
-Populated incrementally during Phase 1.
+Populated during Phase 1A with identity lookup contracts, audit-store health contracts, API error envelopes, authorization policy constants, and strongly typed configuration options. Continue to keep this project free of infrastructure and UI dependencies.

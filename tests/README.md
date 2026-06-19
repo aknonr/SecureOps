@@ -2,6 +2,8 @@
 
 Two test projects mirroring `src/`.
 
+Current coverage is focused on Phase 1A IdentityLookup and audit hardening. Phase 1 diagnostic, SQL schema, Hangfire, and JEA tests are still planned.
+
 ## SecureOps.Tests.Unit
 
 Fast, isolated, no I/O. Mock everything external.

@@ -1,29 +1,57 @@
+using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using SecureOps.Api.Middleware;
 using SecureOps.Api.Security;
+using SecureOps.Api.Services;
 using SecureOps.Api.Validation;
 using SecureOps.Infrastructure;
+using SecureOps.Infrastructure.Audit;
 using SecureOps.Shared.Configuration;
+using SecureOps.Shared.Contracts.Api;
+using SecureOps.Shared.Contracts.Audit;
 using SecureOps.Shared.Contracts.Identity;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+AuditConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate();
 builder.Services.AddSecureOpsAuthorization(builder.Configuration, !builder.Environment.IsDevelopment());
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddRateLimiter(options =>
 {
     int permitLimit = builder.Configuration.GetValue("IdentityLookup:RateLimit:PermitLimit", 10);
     int windowMinutes = builder.Configuration.GetValue("IdentityLookup:RateLimit:WindowMinutes", 1);
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddFixedWindowLimiter(IdentityLookupRateLimits.Lookup, limiterOptions =>
+    options.OnRejected = async (context, cancellationToken) =>
     {
-        limiterOptions.PermitLimit = permitLimit;
-        limiterOptions.Window = TimeSpan.FromMinutes(windowMinutes);
-        limiterOptions.QueueLimit = 0;
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new ApiErrorResponse(
+                "RateLimitExceeded",
+                "Too many identity lookup requests. Try again later.",
+                context.HttpContext.TraceIdentifier),
+            cancellationToken);
+    };
+    options.AddPolicy(IdentityLookupRateLimits.Lookup, httpContext =>
+    {
+        return RateLimitPartition.GetFixedWindowLimiter(
+            IdentityLookupRateLimits.GetPartitionKey(httpContext),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = TimeSpan.FromMinutes(windowMinutes),
+                QueueLimit = 0
+            });
     });
 });
 
@@ -60,6 +88,11 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 builder.Services.AddSecureOpsInfrastructure(builder.Configuration);
+if (builder.Configuration.GetValue("Audit:Queue:Enabled", true)
+    && !string.Equals(builder.Configuration["Audit:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddHostedService<AuditQueueHostedService>();
+}
 
 WebApplication app = builder.Build();
 
@@ -73,16 +106,23 @@ else
     app.MapSwagger().RequireAuthorization();
 }
 
+app.UseForwardedHeaders();
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseAuthentication();
 app.UseMiddleware<AuthorizationDeniedAuditMiddleware>();
 app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
-app.MapGet("/api/v1/health", () => Results.Ok(new { status = "Healthy" }))
+RouteHandlerBuilder healthEndpoint = app.MapGet("/api/v1/health", () => Results.Ok(new { status = "Healthy" }))
     .WithName("Health")
     .WithOpenApi();
-app.MapGet(
+RouteHandlerBuilder auditStoreHealthEndpoint = app.MapGet(
+        "/api/v1/health/audit-store",
+        (AuditHealthReporter reporter) => Results.Ok(reporter.GetHealth()))
+    .WithName("AuditStoreHealth")
+    .WithOpenApi();
+RouteHandlerBuilder identityProviderHealthEndpoint = app.MapGet(
         "/api/v1/health/identity-provider",
         (Microsoft.Extensions.Options.IOptions<IdentityLookupOptions> options) =>
         {
@@ -94,6 +134,13 @@ app.MapGet(
         })
     .WithName("IdentityProviderHealth")
     .WithOpenApi();
+
+if (!app.Environment.IsDevelopment())
+{
+    healthEndpoint.RequireAuthorization();
+    auditStoreHealthEndpoint.RequireAuthorization();
+    identityProviderHealthEndpoint.RequireAuthorization();
+}
 
 app.Run();
 

@@ -133,6 +133,9 @@ Rejected for MVP because:
 ## Implementation Notes
 
 - All projects target `net8.0`.
+- Solution projects are `SecureOps.Api`, `SecureOps.Worker`, `SecureOps.Ui`, `SecureOps.Domain`, `SecureOps.Infrastructure`, and `SecureOps.Shared`.
+- `SecureOps.Shared` is an accepted shared/common layer for cross-process contracts, authorization policy constants, and strongly typed configuration options. It may depend on `SecureOps.Domain` only.
+- `SecureOps.Shared` must not contain ASP.NET pipeline code, EF Core mappings, SQL access, PowerShell execution, file audit IO, external integration clients, or Blazor components.
 - Nullable reference types enabled.
 - TreatWarningsAsErrors enabled.
 - Latest analyzer level.

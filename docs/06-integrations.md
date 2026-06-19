@@ -138,9 +138,26 @@ First release behavior:
 IdentityLookup constraints:
 
 - One exact account per request.
+- Account values are accepted only in the POST body of `/api/v1/identity/lookup`; no URL/query-string account lookup is allowed.
 - Default provider is mock in development; production can enable the read-only AD provider by configuration.
+- Audit write availability is required before provider access; lookup fails closed if audit is unavailable.
+- Provider implementations enforce max length, exact-input validation, and exact-match result verification.
+- Real AD provider calls use a short timeout (`IdentityLookup:ProviderTimeoutSeconds`, default 3 seconds). Provider timeout returns the safe user-facing `DirectoryProviderTimeout` error code and writes `IdentityLookupProviderTimeout`.
+- The lookup POST endpoint is rate-limited.
 - The approved lookup attributes are display name, `sAMAccountName`, UPN, mail, department, title, manager display name, enabled state, and locked state.
 - No group membership, SID, distinguished name, phone, address, password metadata, or raw LDAP attributes are returned.
+
+## Audit Store Integration
+
+Phase 1A supports three audit providers:
+
+| Provider | Use | Notes |
+|---|---|---|
+| `InMemory` | Local development only | Not persistent; forbidden in Production |
+| `File` | Development/Test/UAT | Writes JSONL files to `Audit:File:Directory`, outside the publish folder |
+| `SqlServer` | Production target | Uses `ConnectionStrings:SecureOpsDb`; schema remains the target production architecture |
+
+Persistent providers use a bounded background queue. Request threads do not write audit files directly. If the queue cannot accept an event and fail-closed behavior is active, IdentityLookup returns `AuditUnavailable` and does not query AD. If a queued persistent write is accepted but the background sink later fails, audit health becomes `Unhealthy` with `AuditSinkUnavailable`; subsequent fail-closed lookups are blocked before provider access until audit writes recover.
 
 ## Teams Notification (Phase 3+)
 

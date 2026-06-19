@@ -14,7 +14,7 @@ Cross-component data contracts. Authoritative source for the shape of payloads t
 | `alarm-payload.schema.json` | Inbound alarm payload from the monitoring workflow; carries the upstream external ID and optional Turuncuhat EVT ID | 1 |
 | `diagnostic-result.schema.json` | Envelope for any diagnostic module output | 1 |
 | `audit-event.schema.json` | Serialized audit entry shape | 1 |
-| `identity-lookup.schema.json` | Phase 1A identity lookup request and response | 1A |
+| `identity-lookup.schema.json` | Phase 1A identity lookup request/response, safe metadata, health, and error responses | 1A |
 | `notification-message.schema.json` | Generic notification payload before channel-specific rendering | 3 |
 | `ai-analysis-request.schema.json` | Request to the internal AI service | 7 |
 | `ai-analysis-response.schema.json` | Response from the internal AI service | 7 |
@@ -40,6 +40,29 @@ Contracts are versioned with a suffix when they evolve in a breaking way (e.g., 
 `SecureOps.Shared` mirrors these schemas as C# `record` types. Contract tests validate that every example file passes schema validation, and that the C# types serialize to schema-conformant JSON.
 
 Validation library: `JsonSchema.Net` (pinned in `Directory.Packages.props`).
+
+## Phase 1A IdentityLookup API Contract
+
+Endpoints:
+- `POST /api/v1/identity/lookup` accepts account input in the JSON body only.
+- `GET /api/v1/identity/me` returns current caller metadata.
+- `GET /api/v1/identity/lookup/capabilities` returns lookup limits and returned-field metadata.
+- `GET /api/v1/health/audit-store` returns safe audit-store status.
+- `GET /api/v1/health/identity-provider` returns safe identity-provider status.
+
+No endpoint accepts an account value in a URL path or query string.
+
+Error responses use:
+
+```json
+{ "errorCode": "AuditUnavailable", "message": "Identity lookup audit is unavailable.", "correlationId": "trace-id" }
+```
+
+Known lookup `errorCode` values are `InvalidRequestBody`, `PurposeRequired`, `InvalidIdentityLookupRequest`, `EmptyAccount`, `AccountTooLong`, `BulkLookupRejected`, `SearchPatternRejected`, `AccountPatternRejected`, `AuditUnavailable`, `DirectoryProviderTimeout`, `ProviderUnavailable`, `RateLimitExceeded`, and `IdentityLookupUnavailable`.
+
+`GET /api/v1/health/audit-store` returns safe status only. If a queued persistent audit write fails in the background, the response may show `status: "Unhealthy"` and `lastErrorCode: "AuditSinkUnavailable"`; it must not expose file paths, connection strings, account names, or personal data.
+
+Swagger and examples must use fake values only; do not include real PAM/AD account names, real people, real email addresses, or production EVT IDs.
 
 ## Alarm Identity Convention
 

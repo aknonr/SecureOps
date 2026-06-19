@@ -53,6 +53,33 @@ Phase 1A identity lookup uses `TeamLeadOrAbove`. Operators do not receive this p
 
 Group names are configured in `appsettings.json`; the table `dbo.RbacRoles` maps codes to group names.
 
+### Future Authentication and Role Strategy
+
+MVP authentication remains Windows Authentication. Future production UI options should prefer corporate SSO/OIDC if the organization standardizes it, or Windows Integrated Authentication/Kerberos for intranet IIS if approved. Direct LDAP/AD password login is not the preferred model because it would make SecureOps handle user passwords directly.
+
+AD group mapping remains the authorization boundary. PAM/BeyondTrust may verify privileged sessions or supply metadata later, but it is not the normal application login mechanism.
+
+Future role vocabulary, subject to ADR before implementation:
+
+| Future role | Intended scope |
+|---|---|
+| SuperAdmin | Break-glass platform administration |
+| PlatformAdmin | SecureOps platform configuration and environment operations |
+| AutomationAdmin | Automation catalog and worker execution ownership |
+| Manager | Management reporting and approval visibility |
+| TeamLead | Operational lead functions, including Phase 1A lookup |
+| Operator | Daily alert/diagnostic operation |
+| Auditor | Audit review and evidence export |
+| SecurityReviewer | Security review, audit verification, and data-flow approval |
+
+Initial authorization intent:
+- Identity lookup: `TeamLeadOrAbove` or a future explicitly approved privileged-support role.
+- Audit viewing/export: Auditor, SecurityReviewer, Manager, PlatformAdmin, or Admin-equivalent roles.
+- Configuration changes: PlatformAdmin or SuperAdmin.
+- Future remediation approval: Manager, TeamLead, or other ADR-approved approvers.
+- Future remediation execution: AutomationAdmin/service workflow only.
+- Future AI/RAG access: restricted by role and masking policy; never broadly available by default.
+
 ### Policy Names
 
 Use the constants in `SecureOps.Shared.Auth.Policies`:
@@ -86,6 +113,52 @@ Forbidden:
 - Returning group membership, SID, distinguished name, phone, address, password metadata, or raw LDAP attributes.
 
 Every lookup requires a purpose/context value and writes audit entries for request and outcome. Audit details must not store returned personal-detail fields beyond the matched account identifier.
+
+Production hardening:
+- `POST /api/v1/identity/lookup` is the only endpoint that accepts an account value. The API must not add `GET` lookup routes by account because account values would leak into URLs, browser history, proxy logs, and IIS access logs.
+- Safe metadata endpoints may exist: `GET /api/v1/identity/me`, `GET /api/v1/identity/lookup/capabilities`, `GET /api/v1/health/audit-store`, and `GET /api/v1/health/identity-provider`. These endpoints must not accept account input, file paths, connection strings, or personal AD data.
+- `POST /api/v1/identity/lookup` uses `TeamLeadOrAbove`; Operator-only and Auditor-only users are denied.
+- The lookup POST endpoint is rate-limited by authenticated user + endpoint, not by IP only.
+- If audit writing is unavailable, lookup fails closed and must not query AD or PAM.
+- Provider implementations enforce exact input safety again at provider level: max length, no wildcard/filter/bulk input, and exact-match verification.
+- Returned failures are generic. Detailed provider and audit exceptions are logged internally with correlation ID.
+- `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Correlation-ID` are supported. Load balancer proxy trust must be controlled outside the app or by host configuration.
+
+### Swagger Security Model
+
+- Swagger/OpenAPI declares Windows Integrated Authentication using Negotiate.
+- Development may expose Swagger locally for implementation and Postman testing.
+- Non-development Swagger routes require authentication.
+- Non-development API endpoints require authenticated users by fallback policy unless a route is explicitly exempted.
+- Swagger examples and screenshots must use placeholders only. Do not include real account names, real personal names, real email addresses, or production incident IDs.
+
+### Audit Storage and Folders
+
+Audit logs are not technical application logs.
+
+| Store | Purpose | Example folder |
+|---|---|---|
+| Application publish folder | Application binaries and configuration | IIS site publish path |
+| Technical app logs | Troubleshooting and stack traces | `D:\SecureOps\Logs` |
+| Audit logs | Operational evidence and privileged-read trail | `D:\SecureOps\Audit` |
+
+Development and Test may use `Audit.Provider=File`, but the folder must be configurable and outside the publish directory. Production must not use `InMemory`; production must run `Audit.FailClosed=true`. SQL Server is the target production audit store when the database is available, using `ConnectionStrings:SecureOpsDb`.
+
+Persistent audit providers use a bounded background queue. Request threads enqueue audit events and do not perform file IO. If a queued persistent write later fails, the audit-store health state becomes `Unhealthy` with a safe code such as `AuditSinkUnavailable`; with fail-closed enabled, later identity lookups are blocked before AD/PAM provider access until audit writes recover. The technical log records a Critical event without account names or returned personal detail fields.
+
+IIS app pool identity permissions:
+- Application publish folder: Read and Read & Execute only. Do not grant write permissions to the deployed application directory for audit output.
+- Audit folder, for example `D:\SecureOps\Audit`: create files, write, append, and read as required for audit health verification.
+- Technical log folder, for example `D:\SecureOps\Logs`: create files, write, append, and read as required for troubleshooting.
+- Delete permission is not required for Phase 1A. If a later retention job deletes old files, that permission must be granted only to the retention identity and documented separately.
+- Use a dedicated app pool identity or service account. Do not grant Domain Admin, broad local admin, or unrelated file-system privileges for IdentityLookup.
+
+### Load Balancer and Windows Authentication
+
+- Forward `X-Forwarded-For` to preserve source IP in audit.
+- Forward `X-Forwarded-Proto` when TLS terminates before IIS.
+- Kerberos behind a load balancer requires SPN planning for the service name. NTLM may require connection affinity.
+- IdentityLookup is stateless and does not require sticky sessions by itself; authentication mode or later Blazor Server UI may require it.
 
 ### Enforcement
 

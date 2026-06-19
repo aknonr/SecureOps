@@ -5,7 +5,7 @@ namespace SecureOps.Infrastructure.Audit;
 /// <summary>
 /// In-memory audit writer for development and tests.
 /// </summary>
-public sealed class InMemoryAuditWriter : IAuditWriter
+public sealed class InMemoryAuditWriter : IAuditWriter, IAuditEventSink
 {
     private readonly ConcurrentQueue<AuditEvent> _events = new();
 
@@ -19,6 +19,18 @@ public sealed class InMemoryAuditWriter : IAuditWriter
     {
         cancellationToken.ThrowIfCancellationRequested();
         _events.Enqueue(auditEvent);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task WriteBatchAsync(IReadOnlyCollection<AuditEvent> events, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        foreach (AuditEvent auditEvent in events)
+        {
+            _events.Enqueue(auditEvent);
+        }
+
         return Task.CompletedTask;
     }
 }

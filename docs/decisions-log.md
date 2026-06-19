@@ -31,3 +31,21 @@
 **Security framing:** Bu özellik kişi arama veya performans izleme aracı değildir. Geniş arama, wildcard, bulk search, AD/PAM write, parola reset, unlock ve grup değişikliği kapsam dışıdır. Her sorgu gerekçe ister ve auditlenir.
 
 **Implementation direction:** İlk sürüm direct read-only AD lookup kullanır. BeyondTrust/PAM metadata çözümleme mock interface olarak hazırlanır; gerçek PAM API kullanımı paydaş onayı ve ayrı karar olmadan etkinleştirilmez.
+
+## 2026-06-19 - Repository consistency audit after Phase 1A hardening
+
+**What changed:** Repository memory was synchronized with the current state: Phase 1A backend IdentityLookup and audit hardening are implemented and tested, while Phase 1 read-only diagnostics remain not started. `SecureOps.Shared` is documented as an accepted contracts/config/auth constants layer, not an infrastructure or UI layer.
+
+**What remains open:** Real AD smoke testing with an approved read-only account is still pending. Phase 0 stakeholder replies are also still pending; Turuncuhat and BeyondTrust/PAM inquiry mails remain drafted and awaiting manager approval.
+
+**Scope guard:** No new application feature was added in this audit. AI/RAG, notifications, PAM correlation, remediation, diagnostic modules, JEA scripts, and SQL schema remain later-phase or Phase 1 planned work as documented.
+
+## 2026-06-19 - Phase 1A closure hardening decisions
+
+**What changed:** Phase 1A now uses `ConnectionStrings:SecureOpsDb` as the single SQL audit/data store connection string name. The old `SecureOps` key is not treated as a compatibility alias, so missing production SQL configuration fails clearly when `Audit.Provider=SqlServer`.
+
+**Audit behavior:** File/SQL audit persistence remains queued so request threads do not perform file IO. If a queued persistent write later fails, audit-store health becomes unhealthy with a safe code such as `AuditSinkUnavailable`; with fail-closed enabled, later IdentityLookup calls stop before AD provider access.
+
+**Error taxonomy:** Directory provider timeout is separated from generic provider failure. Timeout returns `DirectoryProviderTimeout` and audits `IdentityLookupProviderTimeout`; generic provider exceptions remain `ProviderUnavailable` / `IdentityLookupFailed`.
+
+**What remains open:** Real AD smoke testing with an approved read-only account is still pending in Test/UAT. Phase 1 diagnostic MVP has not started.

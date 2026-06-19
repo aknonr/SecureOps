@@ -99,6 +99,19 @@ public sealed class IdentityLookupServiceTests
     }
 
     [Fact]
+    public async Task LookupAsync_WhenProviderTimesOut_ReturnsTimeoutAndAuditsProviderTimeout()
+    {
+        InMemoryAuditWriter audit = new();
+        IdentityLookupService service = CreateService(new TimeoutDirectoryProvider(), audit);
+
+        IdentityLookupResult result = await service.LookupAsync(CreateRequest(), CreateContext(), CancellationToken.None);
+
+        result.Status.Should().Be(IdentityLookupResultStatus.Failed);
+        result.ErrorCode.Should().Be("DirectoryProviderTimeout");
+        audit.Events.Select(x => x.Action).Should().Contain(AuditActions.IdentityLookupProviderTimeout);
+    }
+
+    [Fact]
     public async Task LookupAsync_WhenInputInvalid_ReturnsInvalidAndAuditsFailure()
     {
         InMemoryAuditWriter audit = new();
@@ -110,12 +123,82 @@ public sealed class IdentityLookupServiceTests
             CancellationToken.None);
 
         result.Status.Should().Be(IdentityLookupResultStatus.Invalid);
-        audit.Events.Select(x => x.Action).Should().Contain(AuditActions.IdentityLookupFailed);
+        audit.Events.Select(x => x.Action).Should().Contain(AuditActions.IdentityLookupRejected);
+    }
+
+    [Fact]
+    public async Task LookupAsync_WhenRequestAuditUnavailable_DoesNotCallDirectoryProvider()
+    {
+        CountingDirectoryProvider provider = new();
+        IdentityLookupService service = CreateService(provider, new ThrowingAuditWriter());
+
+        IdentityLookupResult result = await service.LookupAsync(CreateRequest(), CreateContext(), CancellationToken.None);
+
+        result.Status.Should().Be(IdentityLookupResultStatus.Failed);
+        result.ErrorCode.Should().Be("AuditUnavailable");
+        provider.Calls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task LookupAsync_WhenSuccessAuditUnavailable_ReturnsNoPersonalDetails()
+    {
+        IdentityLookupService service = CreateService(
+            new MockIdentityDirectoryProvider(new[]
+            {
+                new DirectoryUserRecord(
+                    "Example Admin",
+                    "pam12356",
+                    "pam12356@contoso.local",
+                    "example.admin@contoso.local",
+                    "Windows Operations",
+                    "Systems Engineer",
+                    "Example Manager",
+                    true,
+                    false,
+                    "Mock")
+            }),
+            new FailOnActionAuditWriter(AuditActions.IdentityLookupSucceeded));
+
+        IdentityLookupResult result = await service.LookupAsync(CreateRequest(), CreateContext(), CancellationToken.None);
+
+        result.Status.Should().Be(IdentityLookupResultStatus.Failed);
+        result.ErrorCode.Should().Be("AuditUnavailable");
+        result.Response.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LookupAsync_WhenUserFound_AuditDoesNotStoreReturnedPersonalDetails()
+    {
+        InMemoryAuditWriter audit = new();
+        IdentityLookupService service = CreateService(
+            new MockIdentityDirectoryProvider(new[]
+            {
+                new DirectoryUserRecord(
+                    "Example Admin",
+                    "pam12356",
+                    "pam12356@contoso.local",
+                    "example.admin@contoso.local",
+                    "Windows Operations",
+                    "Systems Engineer",
+                    "Example Manager",
+                    true,
+                    false,
+                    "Mock")
+            }),
+            audit);
+
+        await service.LookupAsync(CreateRequest(), CreateContext(), CancellationToken.None);
+
+        string auditJson = System.Text.Json.JsonSerializer.Serialize(audit.Events);
+        auditJson.Should().NotContain("Example Admin");
+        auditJson.Should().NotContain("example.admin@contoso.local");
+        auditJson.Should().NotContain("Windows Operations");
+        auditJson.Should().NotContain("Example Manager");
     }
 
     private static IdentityLookupService CreateService(
         IIdentityDirectoryProvider provider,
-        InMemoryAuditWriter audit)
+        IAuditWriter audit)
     {
         return new IdentityLookupService(
             new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions())),
@@ -140,6 +223,53 @@ public sealed class IdentityLookupServiceTests
         public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("Directory unavailable.");
+        }
+    }
+
+    private sealed class TimeoutDirectoryProvider : IIdentityDirectoryProvider
+    {
+        public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
+        {
+            throw new TimeoutException("Directory provider timed out.");
+        }
+    }
+
+    private sealed class CountingDirectoryProvider : IIdentityDirectoryProvider
+    {
+        public int Calls { get; private set; }
+
+        public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult<DirectoryUserRecord?>(null);
+        }
+    }
+
+    private sealed class ThrowingAuditWriter : IAuditWriter
+    {
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("Audit unavailable.");
+        }
+    }
+
+    private sealed class FailOnActionAuditWriter : IAuditWriter
+    {
+        private readonly string _action;
+
+        public FailOnActionAuditWriter(string action)
+        {
+            _action = action;
+        }
+
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken)
+        {
+            if (auditEvent.Action == _action)
+            {
+                throw new InvalidOperationException("Audit unavailable.");
+            }
+
+            return Task.CompletedTask;
         }
     }
 }

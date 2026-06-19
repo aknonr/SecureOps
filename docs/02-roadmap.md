@@ -22,6 +22,12 @@ ROI = Phase 3–6 (operational return, 12–20 additional weeks)
 Vision = Phase 7 (AI capability, separate decision)
 Future = Phase 8 (write operations, future)
 
+## Current Status Note
+
+- Phase 0 stakeholder replies are still pending; Turuncuhat and BeyondTrust/PAM inquiry mails are drafted but awaiting manager approval and have not been sent.
+- Phase 1A backend IdentityLookup is implemented and hardened in code with tests. Real AD smoke testing with an approved read-only account is still pending.
+- Phase 1 read-only diagnostic MVP has not started. It must remain read-only and must not absorb Phase 3+ notification, Phase 4 PAM correlation, Phase 7 AI, or Phase 8 remediation scope.
+
 ## Realistic Schedule Outlook
 
 With a single developer at ~16–20 hours per week:
@@ -74,14 +80,19 @@ See `plans/PHASE-0-discovery-and-project-setup.md` for tasks.
 3. Config-based username normalization.
 4. Read-only Active Directory provider behind an interface.
 5. Mock PAM account resolver hook for later BeyondTrust metadata or Phase 4 correlation.
-6. Audit logging for every lookup request, success, not-found result, and failure.
-7. Unit tests for normalization, provider behavior, authorization metadata, and audit behavior.
+6. Safe metadata endpoints: `GET /api/v1/identity/me`, `GET /api/v1/identity/lookup/capabilities`, `GET /api/v1/health/audit-store`, and `GET /api/v1/health/identity-provider`.
+7. Audit logging for every lookup request, success, not-found result, validation rejection, provider failure, and authorization denial.
+8. Fail-closed audit behavior: no AD/PAM provider query if required audit writing is unavailable.
+9. Rate limiting on the lookup POST endpoint.
+10. File audit persistence for Development/Test using a configurable folder outside the publish directory.
+11. Unit tests for normalization, provider behavior, authorization metadata, validation audit, rate-limit metadata, queue behavior, file audit, and audit behavior.
 
 ### Non-Goals
 
 - No AD write operations.
 - No password reset, account unlock, or group modification.
 - No broad wildcard or bulk search.
+- No `GET` lookup by account value.
 - No UI dependency.
 - No AI/RAG integration.
 - No Teams integration.
@@ -92,7 +103,10 @@ See `plans/PHASE-0-discovery-and-project-setup.md` for tasks.
 - Operator/Auditor-only users are not authorized.
 - Exact account lookup returns only approved operational fields.
 - Every lookup creates an audit entry without storing returned personal details in audit.
+- Audit failures prevent lookup from querying AD/PAM.
+- Lookup POST rate limiting is configured and tested.
 - Mock PAM resolver remains the default until BeyondTrust access is approved.
+- Real AD smoke test is completed with an approved read-only account before production readiness is claimed.
 
 See `plans/PHASE-1A-identity-lookup-mvp.md`.
 

@@ -1,6 +1,6 @@
 # scripts/
 
-PowerShell artifacts. Empty in pre-Phase-1; populated by Phase 1.
+PowerShell artifacts. The folders exist as Phase 1 placeholders. No production diagnostic or JEA scripts are implemented yet.
 
 ## Structure
 

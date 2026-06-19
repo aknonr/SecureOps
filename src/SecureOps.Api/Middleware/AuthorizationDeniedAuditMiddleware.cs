@@ -52,7 +52,8 @@ public sealed class AuthorizationDeniedAuditMiddleware
                         {
                             endpoint = context.Request.Path.Value,
                             method = context.Request.Method,
-                            statusCode = context.Response.StatusCode
+                            statusCode = context.Response.StatusCode,
+                            resultStatus = IsIdentityLookupEndpoint(context) ? "Forbidden" : "Denied"
                         }
                     },
                     context.RequestAborted);

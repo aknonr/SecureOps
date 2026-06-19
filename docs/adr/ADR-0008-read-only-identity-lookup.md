@@ -24,11 +24,24 @@ The first implementation:
 - Resolves directly against Active Directory with read-only APIs.
 - Keeps a mock PAM account resolver interface for later BeyondTrust metadata and Phase 4 correlation.
 - Audits every lookup request and outcome.
+- Keeps `POST /api/v1/identity/lookup` as the only endpoint that accepts account input; no account value is accepted in URL paths or query strings.
+- Fails closed when audit writing is unavailable, before provider access.
+- Applies provider-level input validation and exact-match checks in addition to controller/service validation.
+- Applies rate limiting to the lookup POST endpoint.
+- Allows only safe metadata endpoints that do not accept account input or return personal AD data.
+- Allows Development/Test file audit persistence through a bounded background queue, with files written to a configurable audit folder outside the application publish directory.
+- Keeps SQL Server audit as the production target while allowing File audit as a transitional persistent store before the database is available.
+- Uses `ConnectionStrings:SecureOpsDb` for the future SQL audit store.
+- Distinguishes directory timeout from generic provider failure with `DirectoryProviderTimeout` and `IdentityLookupProviderTimeout`.
 
 ## Consequences
 
 - This delivers a small, visible operational win without waiting for Turuncuhat or BeyondTrust API approvals.
 - The feature introduces personal data exposure, so the field set is deliberately limited and access is restricted.
+- Audit availability becomes a hard dependency for lookup, by design.
+- Request threads do not perform file audit IO; they only enqueue bounded audit events.
+- If a background persistent audit sink fails after accepting an event, audit health becomes unhealthy and later fail-closed lookups are blocked before provider access until audit writes recover.
+- Swagger/OpenAPI is authenticated outside Development and uses placeholder-only examples.
 - Real BeyondTrust/PAM API lookup remains deferred until stakeholder approval and API contract details are available.
 - This does not replace Phase 4 PAM session correlation; it prepares a reusable identity-resolution hook for it.
 

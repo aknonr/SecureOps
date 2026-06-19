@@ -46,6 +46,11 @@ public sealed class IdentityLookupOptions
     public int RegexTimeoutMilliseconds { get; set; } = 250;
 
     /// <summary>
+    /// Maximum time to wait for a real identity provider call.
+    /// </summary>
+    public int ProviderTimeoutSeconds { get; set; } = 3;
+
+    /// <summary>
     /// Rate-limit settings for the privileged identity lookup endpoint.
     /// </summary>
     public IdentityLookupRateLimitOptions RateLimit { get; set; } = new();

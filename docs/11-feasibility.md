@@ -75,7 +75,7 @@ If any assumption breaks, dates slide accordingly. The schedule is **honest**, n
 | R13 | Test environment unavailable or shared with other projects | Medium | High | Request dedicated in Phase 0; develop on mocks if needed |
 | R14 | Phase 7 AI hardware budget rejected | Medium | Low | Project is valuable without AI; surface this in management communication |
 | R15 | Phase 8 remediation approval gets misused | Low | High | Bounded catalog; ADR-gated extension; meta-audit |
-| R16 | Identity lookup is perceived as people search | Medium | Medium | TeamLead/Admin only; purpose required; exact lookup only; audit every query; no broad search |
+| R16 | Identity lookup is perceived as people search | Medium | Medium | TeamLead/Admin only; purpose required; exact lookup only; no GET account URLs; rate limit; audit every query; no broad search |
 
 ## Bus Factor Mitigations
 
@@ -97,7 +97,7 @@ Specific actions to reduce single-developer risk:
 See `docs/13-definition-of-done.md` for the canonical DoD. Highlights:
 
 - Phase 0: stakeholder approvals, pilot list, baseline measurements.
-- Phase 1A: exact PAM/AD account lookup, TeamLead/Admin authorization, audit coverage.
+- Phase 1A: exact PAM/AD account lookup, TeamLead/Admin authorization, fail-closed audit coverage, safe metadata endpoints, and no account values in URLs.
 - Phase 1: end-to-end alarm → diagnostic → audit flow, tests passing, demo to management.
 - Phase 2: UI deployed, operators using it daily, feedback collected.
 - Phase 3+: see each phase plan.
