@@ -40,6 +40,16 @@ public static class SecureOpsAuthorization
                 ctx.User.Identity?.IsAuthenticated == true && canViewAuditGroups.Any(ctx.User.IsInRole)));
             options.AddPolicy(Policies.CanTriggerDiagnostic, policy => policy.RequireAssertion(ctx =>
                 ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
+            options.AddPolicy(Policies.CanIdentityLookup, policy => policy.RequireAssertion(ctx =>
+                ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
+            options.AddPolicy(Policies.CanBulkIdentityLookup, policy => policy.RequireAssertion(ctx =>
+                ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
+            options.AddPolicy(Policies.CanTeamView, policy => policy.RequireAssertion(ctx =>
+                ctx.User.Identity?.IsAuthenticated == true && operatorGroups.Any(ctx.User.IsInRole)));
+            options.AddPolicy(Policies.CanAccessAdministration, policy => policy.RequireAssertion(ctx =>
+                ctx.User.Identity?.IsAuthenticated == true && adminGroups.Any(ctx.User.IsInRole)));
+            options.AddPolicy(Policies.CanSystemDiagnostics, policy => policy.RequireAssertion(ctx =>
+                ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
 
             if (requireAuthenticatedFallback)
             {

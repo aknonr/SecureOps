@@ -11,6 +11,8 @@ using SecureOps.Api.Services;
 using SecureOps.Api.Validation;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Audit;
+using SecureOps.Infrastructure.Identity;
+using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
 using SecureOps.Shared.Contracts.Audit;
@@ -19,12 +21,15 @@ using SecureOps.Shared.Contracts.Identity;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 AuditConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
+IdentityLookupConfigurationValidator.Validate(builder.Configuration);
+ReverseProxyConfiguration.Validate(builder.Configuration);
 
 bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
     builder.Environment.EnvironmentName,
     builder.Configuration);
 
 builder.Services.Configure<DemoApiAuthOptions>(builder.Configuration.GetSection(DemoApiAuthOptions.SectionName));
+builder.Services.Configure<SwaggerOptions>(builder.Configuration.GetSection(SwaggerOptions.SectionName));
 
 AuthenticationBuilder authentication = builder.Services.AddAuthentication(options =>
 {
@@ -45,12 +50,7 @@ else
 }
 
 builder.Services.AddSecureOpsAuthorization(builder.Configuration, !builder.Environment.IsDevelopment());
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Clear();
-    options.KnownProxies.Clear();
-});
+builder.Services.Configure<ForwardedHeadersOptions>(options => ReverseProxyConfiguration.Configure(options, builder.Configuration));
 builder.Services.AddRateLimiter(options =>
 {
     int permitLimit = builder.Configuration.GetValue("IdentityLookup:RateLimit:PermitLimit", 10);
@@ -111,6 +111,26 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
+    if (demoAuthEnabled)
+    {
+        options.AddSecurityDefinition("DemoActor", new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Name = builder.Configuration["DemoAuth:HeaderName"] ?? "X-SecureOps-Demo-Actor",
+            Description = "Demo/Test only. Enter an approved demo actor key; no actor is prefilled."
+        });
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "DemoActor" }
+                },
+                Array.Empty<string>()
+            }
+        });
+    }
 });
 builder.Services.AddSecureOpsInfrastructure(builder.Configuration);
 if (builder.Configuration.GetValue("Audit:Queue:Enabled", true)
@@ -121,22 +141,36 @@ if (builder.Configuration.GetValue("Audit:Queue:Enabled", true)
 
 WebApplication app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+SwaggerOptions swaggerOptions = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<SwaggerOptions>>().Value;
+bool swaggerEnabled = swaggerOptions.Enabled;
+bool swaggerUiEnabled = swaggerEnabled && (app.Environment.IsDevelopment() || DemoApiAuthentication.IsAllowedEnvironment(app.Environment.EnvironmentName));
+
+if (swaggerUiEnabled)
 {
-    app.UseSwagger();
     app.UseSwaggerUI();
-}
-else
-{
-    app.MapSwagger().RequireAuthorization();
 }
 
 app.UseForwardedHeaders();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseAuthentication();
+app.UseMiddleware<AccessDeniedProblemDetailsMiddleware>();
 app.UseMiddleware<AuthorizationDeniedAuditMiddleware>();
 app.UseAuthorization();
 app.UseRateLimiter();
+app.UseMiddleware<SafeExceptionHandlingMiddleware>();
+
+if (swaggerEnabled)
+{
+    IEndpointConventionBuilder swaggerEndpoint = app.MapSwagger();
+    if (app.Environment.IsDevelopment() || DemoApiAuthentication.IsAllowedEnvironment(app.Environment.EnvironmentName))
+    {
+        swaggerEndpoint.RequireAuthorization();
+    }
+    else
+    {
+        swaggerEndpoint.RequireAuthorization(Policies.AdminOnly);
+    }
+}
 
 app.MapControllers();
 RouteHandlerBuilder healthEndpoint = app.MapGet("/api/v1/health", () => Results.Ok(new { status = "Healthy" }))

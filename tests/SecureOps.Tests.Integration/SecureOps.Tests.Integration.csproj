@@ -32,6 +32,7 @@
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="System.Text.Json" />
     <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="bunit" />
     <PackageReference Include="JsonSchema.Net" />

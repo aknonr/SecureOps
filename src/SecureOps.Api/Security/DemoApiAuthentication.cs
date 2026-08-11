@@ -51,7 +51,8 @@ public static class DemoApiAuthentication
     public static bool IsAllowedEnvironment(string? environmentName)
     {
         return string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(environmentName, "Demo", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(environmentName, "Demo", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

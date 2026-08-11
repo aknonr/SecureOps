@@ -71,6 +71,7 @@ public sealed class AuthorizationDeniedAuditMiddleware
     private static bool IsIdentityLookupEndpoint(HttpContext context)
     {
         return HttpMethods.IsPost(context.Request.Method)
-            && context.Request.Path.Equals("/api/v1/identity/lookup", StringComparison.OrdinalIgnoreCase);
+            && (context.Request.Path.Equals("/api/v1/identity/lookup", StringComparison.OrdinalIgnoreCase)
+                || context.Request.Path.Equals("/api/v1/identity/bulk-lookup", StringComparison.OrdinalIgnoreCase));
     }
 }

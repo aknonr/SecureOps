@@ -23,6 +23,7 @@ public static class DependencyInjection
     {
         services.Configure<AuditOptions>(configuration.GetSection(AuditOptions.SectionName));
         services.Configure<IdentityLookupOptions>(configuration.GetSection(IdentityLookupOptions.SectionName));
+        services.Configure<PamProviderOptions>(configuration.GetSection(PamProviderOptions.SectionName));
         services.AddSingleton<IAuditStoreHealthState, AuditStoreHealthState>();
 
         services.AddSingleton<IIdentityAccountNormalizer, IdentityAccountNormalizer>();

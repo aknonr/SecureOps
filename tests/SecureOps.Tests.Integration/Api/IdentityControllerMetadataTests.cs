@@ -22,7 +22,7 @@ public sealed class IdentityControllerMetadataTests
     }
 
     [Fact]
-    public void LookupAsync_IsPostEndpointRequiringTeamLeadOrAbove()
+    public void LookupAsync_IsPostEndpointRequiringIdentityLookupCapability()
     {
         MethodInfo? method = typeof(IdentityController).GetMethod(nameof(IdentityController.LookupAsync));
 
@@ -33,7 +33,7 @@ public sealed class IdentityControllerMetadataTests
 
         AuthorizeAttribute? authorize = method!.GetCustomAttribute<AuthorizeAttribute>();
         authorize.Should().NotBeNull();
-        authorize!.Policy.Should().Be(Policies.TeamLeadOrAbove);
+        authorize!.Policy.Should().Be(Policies.CanIdentityLookup);
     }
 
     [Fact]
@@ -45,6 +45,16 @@ public sealed class IdentityControllerMetadataTests
 
         attribute.Should().NotBeNull();
         attribute!.PolicyName.Should().Be(IdentityLookupRateLimits.Lookup);
+    }
+
+    [Fact]
+    public void BulkLookupAsync_IsPostEndpointRequiringBulkCapabilityAndRateLimit()
+    {
+        MethodInfo method = typeof(IdentityController).GetMethod(nameof(IdentityController.BulkLookupAsync))!;
+
+        method.GetCustomAttribute<HttpPostAttribute>()!.Template.Should().Be("bulk-lookup");
+        method.GetCustomAttribute<AuthorizeAttribute>()!.Policy.Should().Be(Policies.CanBulkIdentityLookup);
+        method.GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName.Should().Be(IdentityLookupRateLimits.Lookup);
     }
 
     [Fact]

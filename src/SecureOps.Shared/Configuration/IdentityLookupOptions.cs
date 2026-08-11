@@ -50,6 +50,9 @@ public sealed class IdentityLookupOptions
     /// </summary>
     public int ProviderTimeoutSeconds { get; set; } = 3;
 
+    /// <summary>Maximum accounts accepted by one bulk lookup request.</summary>
+    public int BulkMaxAccounts { get; set; } = 20;
+
     /// <summary>
     /// Rate-limit settings for the privileged identity lookup endpoint.
     /// </summary>

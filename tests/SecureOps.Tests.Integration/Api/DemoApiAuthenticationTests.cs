@@ -18,6 +18,7 @@ public sealed class DemoApiAuthenticationTests
     [InlineData("Demo", true, true)]
     [InlineData("Development", false, false)]
     [InlineData("Demo", false, false)]
+    [InlineData("Test", true, true)]
     [InlineData("Production", true, false)]
     [InlineData("Staging", true, false)]
     public void IsEnabled_RespectsEnvironmentAndExplicitFlag(string environment, bool flag, bool expected)
@@ -83,7 +84,21 @@ public sealed class DemoApiAuthenticationTests
         (await schemes.GetSchemeAsync(DemoApiAuthentication.SchemeName)).Should().BeNull();
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string environment, bool demoAuthEnabled)
+    [Fact]
+    public async Task Demo_WithSwaggerExplicitlyEnabled_ExposesAuthenticatedOpenApiWithDemoActorScheme()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true, swaggerEnabled: true);
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.TeamLeadActor);
+
+        HttpResponseMessage response = await client.GetAsync("/swagger/v1/swagger.json");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        string document = await response.Content.ReadAsStringAsync();
+        document.Should().Contain("DemoActor").And.Contain("X-SecureOps-Demo-Actor");
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(string environment, bool demoAuthEnabled, bool swaggerEnabled = false)
     {
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -94,6 +109,7 @@ public sealed class DemoApiAuthenticationTests
                 builder.UseSetting("Audit:Provider", "InMemory");
                 builder.UseSetting("IdentityLookup:Provider", "Mock");
                 builder.UseSetting("IdentityLookup:RateLimit:PermitLimit", "100");
+                builder.UseSetting("Swagger:Enabled", swaggerEnabled ? "true" : "false");
             });
     }
 }

@@ -40,6 +40,12 @@ public static class AuditActions
     /// </summary>
     public const string IdentityLookupForbidden = "IdentityLookupForbidden";
 
+    /// <summary>A bounded bulk identity lookup was requested.</summary>
+    public const string BulkIdentityLookupRequested = "BulkIdentityLookupRequested";
+
+    /// <summary>A bounded bulk identity lookup completed.</summary>
+    public const string BulkIdentityLookupCompleted = "BulkIdentityLookupCompleted";
+
     /// <summary>
     /// API or UI authorization denied a request.
     /// </summary>

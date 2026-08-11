@@ -9,7 +9,6 @@ using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Shared.Audit;
 using SecureOps.Shared.Configuration;
-using SecureOps.Shared.Contracts.Api;
 using SecureOps.Shared.Contracts.Identity;
 
 namespace SecureOps.Tests.Integration.Api;
@@ -29,8 +28,8 @@ public sealed class IdentityControllerAuditTests
 
         ObjectResult objectResult = result.Result.Should().BeOfType<ObjectResult>().Subject;
         objectResult.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
-        objectResult.Value.Should().BeOfType<ApiErrorResponse>()
-            .Which.ErrorCode.Should().Be("PurposeRequired");
+        objectResult.Value.Should().BeOfType<ProblemDetails>()
+            .Which.Extensions["code"].Should().Be("InvalidIdentityInput");
         service.Calls.Should().Be(0);
         audit.Events.Should().ContainSingle(x => x.Action == AuditActions.IdentityLookupRejected);
     }
