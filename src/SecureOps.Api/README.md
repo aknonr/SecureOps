@@ -29,3 +29,5 @@ ASP.NET Core Web API. Hosted on IIS in-process.
 Phase 1A IdentityLookup is implemented here through `IdentityController`, validation, authorization, correlation ID middleware, rate-limit policy, and safe health endpoints. Phase 1 alert webhook and diagnostic orchestration endpoints are still planned.
 
 Platform foundation implemented: strict configured forwarded-header trust, explicitly enabled authenticated Demo/Test Swagger, safe ProblemDetails, bounded bulk lookup, and capability bootstrap policies. Windows/AD and database access remain runtime-only validation work; no local API test contacts them.
+
+The API release gate verifies Active Directory runtime assemblies in the final publish and ZIP; it does not attempt an AD lookup.
