@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -18,7 +19,31 @@ using SecureOps.Shared.Contracts.Identity;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 AuditConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
-builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate();
+
+bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
+    builder.Environment.EnvironmentName,
+    builder.Configuration);
+
+builder.Services.Configure<DemoApiAuthOptions>(builder.Configuration.GetSection(DemoApiAuthOptions.SectionName));
+
+AuthenticationBuilder authentication = builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = demoAuthEnabled
+        ? DemoApiAuthentication.SchemeName
+        : NegotiateDefaults.AuthenticationScheme;
+});
+
+if (demoAuthEnabled)
+{
+    authentication.AddScheme<AuthenticationSchemeOptions, DemoApiAuthenticationHandler>(
+        DemoApiAuthentication.SchemeName,
+        configureOptions: null);
+}
+else
+{
+    authentication.AddNegotiate();
+}
+
 builder.Services.AddSecureOpsAuthorization(builder.Configuration, !builder.Environment.IsDevelopment());
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
