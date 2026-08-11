@@ -35,3 +35,5 @@ Current implemented Phase 1A namespaces:
 ## Current state
 
 Phase 1A audit and identity lookup infrastructure is implemented. Phase 1 diagnostic, alert persistence, EF Core DbContext, Hangfire job classes, and PowerShell/JEA runner implementations are still planned.
+
+See `Identity/README.md` and `Audit/README.md` for provider selection, local-test boundaries, configuration, and controlled-runtime blockers.

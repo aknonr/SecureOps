@@ -56,3 +56,6 @@ See `.cursor/rules/090-testing-and-quality-rules.mdc`:
 - No hard-coded user paths.
 - No asserting on log message text.
 - Each test isolated (no shared mutable state).
+## Current Test Boundary
+
+All identity, Swagger, authorization, forwarded-header, and SQL schema tests are deterministic and local. They use mocks/fakes or offline file assertions and must not contact corporate AD, PAM, LDAP, SQL Server, IIS, or load balancers. Real provider validation is a separately authorized test-server activity.

@@ -33,6 +33,7 @@ public static class DependencyInjection
         string? identityProvider = configuration[$"{IdentityLookupOptions.SectionName}:Provider"];
         if (string.Equals(identityProvider, "ActiveDirectory", StringComparison.OrdinalIgnoreCase))
         {
+            services.AddSingleton<IActiveDirectoryLookupClient, ActiveDirectoryLookupClient>();
             services.AddScoped<IIdentityDirectoryProvider, ActiveDirectoryIdentityDirectoryProvider>();
         }
         else

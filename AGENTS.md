@@ -13,6 +13,14 @@ This file is the universal entry point for every AI coding agent working on this
 
 **Read this file first. Then read the files it points to. Do not skip steps.**
 
+## Local Development and Ownership
+
+- Read the project README and mandatory context documents before implementation; backend changes update relevant documentation in the same task.
+- Codex owns backend, API, hosting, middleware, security, SQL, and backend tests. Claude owns Razor, CSS, layout, theme, navigation, and visual UI files; Codex does not change them.
+- Never put real corporate identities, PAM accounts, employee details, secrets, or runtime configuration values in source, fixtures, examples, or documentation.
+- Local development cannot validate corporate AD, PAM, LDAP, SQL, IIS, or load-balancer behavior. Use deterministic fakes locally; controlled runtime validation needs explicit authorization.
+- Do not modify Git state, IIS, App Pools, services, bindings, load balancers, databases, or live configuration unless the task explicitly authorizes it. Never hard-code configuration values or secrets.
+
 This file is intentionally short. Detailed rules live in `.cursor/rules/`, `docs/`, and `plans/`. Treat those as the source of truth; this file is just the index.
 
 ---

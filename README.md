@@ -60,7 +60,11 @@ This repo contains documentation, agent rules, contracts, a .NET solution, Phase
 | `src/` | .NET solution: Api, Worker, Ui, Domain, Infrastructure, Shared. Phase 1A code currently lives mainly in Api, Infrastructure, and Shared. |
 | `tests/` | Unit and integration test projects. Current tests cover Phase 1A identity lookup, audit hardening, authorization, validation, correlation, and rate-limit metadata. |
 | `scripts/powershell/` | Empty diagnostic and JEA script folders reserved for Phase 1. |
-| `sql/` | Empty schema and migration folders reserved for Phase 1 SQL work. |
+| `sql/` | Reviewed offline audit/access-control SQL assets; never executed by local tests. |
+
+## Local Identity Lookup Boundary
+
+Basic PAM-style account identifiers are ordinary exact directory-account inputs, handled through the same read-only `sAMAccountName` path as other accounts. Account-owner resolution and vendor PAM integration remain planned. Local development uses fakes only and cannot validate corporate AD, PAM, SQL, IIS, or load-balancer behavior.
 
 ---
 
