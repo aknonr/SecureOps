@@ -89,8 +89,6 @@ public sealed class DemoApiAuthenticationTests
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true, swaggerEnabled: true);
         using HttpClient client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.TeamLeadActor);
-
         HttpResponseMessage response = await client.GetAsync("/swagger/v1/swagger.json");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

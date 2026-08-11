@@ -164,7 +164,9 @@ if (swaggerEnabled)
     IEndpointConventionBuilder swaggerEndpoint = app.MapSwagger();
     if (app.Environment.IsDevelopment() || DemoApiAuthentication.IsAllowedEnvironment(app.Environment.EnvironmentName))
     {
-        swaggerEndpoint.RequireAuthorization();
+        // The document must load before Swagger UI can collect its explicit DemoAuth header.
+        // API operation endpoints remain protected by the fallback authorization policy.
+        swaggerEndpoint.AllowAnonymous();
     }
     else
     {

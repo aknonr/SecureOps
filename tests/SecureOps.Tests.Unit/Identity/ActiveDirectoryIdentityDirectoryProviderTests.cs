@@ -37,7 +37,7 @@ public sealed class ActiveDirectoryIdentityDirectoryProviderTests
     [Fact]
     public async Task FindUserAsync_PropagatesTimeoutAndCancellation()
     {
-        FakeClient client = new() { SamTask = Task.Delay(1000).ContinueWith<DirectoryUserRecord?>(_ => null) };
+        FakeClient client = new() { SamTask = Task.Delay(3000).ContinueWith<DirectoryUserRecord?>(_ => null) };
         await Assert.ThrowsAsync<TimeoutException>(() => Create(client, timeout: 1).FindUserAsync("test.user", CancellationToken.None));
         using CancellationTokenSource cancelled = new(); cancelled.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Create(new FakeClient()).FindUserAsync("test.user", cancelled.Token));
