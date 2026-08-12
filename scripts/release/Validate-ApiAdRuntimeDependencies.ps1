@@ -167,7 +167,7 @@ try
         $identity = [System.Reflection.AssemblyName]::GetAssemblyName($assemblyPath)
         if ($identity.Name -ne $importantAssemblies[$relativePath])
         {
-            throw "Unexpected runtime assembly identity for $relativePath: $($identity.FullName)"
+            throw "Unexpected runtime assembly identity for ${relativePath}: $($identity.FullName)"
         }
     }
 

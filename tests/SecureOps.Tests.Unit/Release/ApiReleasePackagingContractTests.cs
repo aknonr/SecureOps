@@ -19,7 +19,8 @@ public sealed class ApiReleasePackagingContractTests
         validator.Should().Contain("ZIP has duplicate paths")
             .And.Contain("Publish payload is absent from the SHA256 manifest")
             .And.Contain("ZIP SHA256 does not match publish output")
-            .And.Contain("runtimes/win/lib/net8.0/System.DirectoryServices.AccountManagement.dll");
+            .And.Contain("runtimes/win/lib/net8.0/System.DirectoryServices.AccountManagement.dll")
+            .And.NotContain("$relativePath:");
     }
 
     [Fact]
