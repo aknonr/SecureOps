@@ -1,0 +1,50 @@
+﻿@page "/session-expired"
+@model SessionExpiredModel
+@{
+    Layout = "LoginLayout";
+    ViewData["Title"] = "Oturum süresi doldu";
+    string BrandMarkHref = Url.Content("~/brand/secureops-mark.svg") + "#mark";
+}
+
+@*
+    Shown when a session lapses rather than being deliberately ended.
+
+    Separate from /signed-out because the operator's situation is different: they did not choose this,
+    they may have been mid-task, and they need to know whether their work was lost. The return path is
+    preserved so signing in again resumes where they were.
+*@
+
+<main class="so-auth">
+    <section class="so-auth-card" aria-labelledby="expired-heading">
+        <div class="so-auth-brand">
+            <span class="so-auth-mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="26" height="26" role="presentation">
+                    <use href="@BrandMarkHref" />
+                </svg>
+            </span>
+            <span class="so-auth-brand-text">
+                SecureOps
+                <small>Operasyon Platformu</small>
+            </span>
+        </div>
+
+        <div class="so-auth-status so-auth-status--warn" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+            </svg>
+        </div>
+
+        <h1 id="expired-heading" class="so-auth-title">Oturum süresi doldu</h1>
+        <p class="so-auth-lead">
+            Güvenlik nedeniyle oturumunuz sonlandırıldı. Tamamlanmamış işlemleriniz kaydedilmedi;
+            yeniden oturum açtıktan sonra kaldığınız sayfaya döneceksiniz.
+        </p>
+
+        <a class="so-auth-submit so-auth-submit--link" href="@Model.SignInUrl">
+            <span class="so-auth-submit-label">Yeniden oturum aç</span>
+        </a>
+    </section>
+
+    <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
+</main>

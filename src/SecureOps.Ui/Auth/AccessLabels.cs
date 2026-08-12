@@ -1,0 +1,213 @@
+using SecureOps.Shared.Auth;
+
+namespace SecureOps.Ui.Auth;
+
+/// <summary>
+/// A capability presented for humans: what it lets you do, and which area of the product it belongs to.
+/// </summary>
+/// <param name="Capability">Stable capability identifier from the API contract.</param>
+/// <param name="Group">Functional area used to group capabilities in the UI.</param>
+/// <param name="Label">Short Turkish name.</param>
+/// <param name="Description">One sentence describing what the holder can do.</param>
+public sealed record CapabilityDescriptor(
+    string Capability,
+    string Group,
+    string Label,
+    string Description);
+
+/// <summary>
+/// Turkish presentation vocabulary for application roles and capabilities.
+/// </summary>
+/// <remarks>
+/// Role and capability identifiers are contract values and are never translated for comparison — only
+/// for display. Anything not described here still renders, using its raw identifier, so a capability
+/// added by the backend appears in the UI immediately rather than silently vanishing from an access
+/// review.
+/// </remarks>
+public static class AccessLabels
+{
+    /// <summary>Application role identifiers from the API contract.</summary>
+    public static class Roles
+    {
+        /// <summary>Full administrative role.</summary>
+        public const string Admin = "Admin";
+
+        /// <summary>Team lead role.</summary>
+        public const string Lead = "Lead";
+
+        /// <summary>Shift operator role.</summary>
+        public const string Operator = "Operator";
+
+        /// <summary>Role permitted to publish Jira issues.</summary>
+        public const string JiraPublisher = "JiraPublisher";
+
+        /// <summary>Audit reviewer role.</summary>
+        public const string Auditor = "Auditor";
+
+        /// <summary>View-only role.</summary>
+        public const string ReadOnly = "ReadOnly";
+    }
+
+    /// <summary>Capability group names used for grouped display.</summary>
+    public static class Groups
+    {
+        /// <summary>Identity lookup capabilities.</summary>
+        public const string Identity = "Kimlik sorgulama";
+
+        /// <summary>Operational record and Jira workflow capabilities.</summary>
+        public const string OperationalRecords = "Operasyonel kayıt ve Jira";
+
+        /// <summary>Access administration capabilities.</summary>
+        public const string AccessAdministration = "Erişim yönetimi";
+
+        /// <summary>Audit and diagnostics capabilities.</summary>
+        public const string Oversight = "Denetim ve tanılama";
+
+        /// <summary>Anything without a known group.</summary>
+        public const string Other = "Diğer";
+    }
+
+    private static readonly Dictionary<string, string> _roleLabels = new(StringComparer.Ordinal)
+    {
+        [Roles.Admin] = "Platform Yöneticisi",
+        [Roles.Lead] = "Takım Lideri",
+        [Roles.Operator] = "Operatör",
+        [Roles.JiraPublisher] = "Jira Yayınlayıcı",
+        [Roles.Auditor] = "Denetçi",
+        [Roles.ReadOnly] = "Salt Okunur"
+    };
+
+    private static readonly Dictionary<string, string> _roleDescriptions = new(StringComparer.Ordinal)
+    {
+        [Roles.Admin] = "Erişim yönetimi dahil tüm yetkilere sahiptir.",
+        [Roles.Lead] = "Operasyonel akışları yürütür ve ekip taleplerini takip eder.",
+        [Roles.Operator] = "Vardiya işlerini yürütür; kimlik sorgulama ve kayıt akışlarını kullanır.",
+        [Roles.JiraPublisher] = "Operasyonel kayıtlardan Jira kaydı oluşturabilir.",
+        [Roles.Auditor] = "Denetim kanıtlarını görüntüler; operasyonel değişiklik yapmaz.",
+        [Roles.ReadOnly] = "Yalnızca görüntüleme yetkisine sahiptir."
+    };
+
+    private static readonly Dictionary<string, CapabilityDescriptor> _capabilities = new(StringComparer.Ordinal)
+    {
+        [Capabilities.IdentityLookup] = new(
+            Capabilities.IdentityLookup, Groups.Identity,
+            "Kimlik sorgulama",
+            "Tek bir PAM veya AD hesabını inceleme amacıyla sorgulayabilir."),
+
+        [Capabilities.TeamView] = new(
+            Capabilities.TeamView, Groups.Identity,
+            "Ekip görünümü",
+            "Onaylı ekip bilgilerini görüntüleyebilir."),
+
+        [Capabilities.OperationalRecordsView] = new(
+            Capabilities.OperationalRecordsView, Groups.OperationalRecords,
+            "Kayıtları görüntüleme",
+            "Operasyonel kayıt listesini ve kayıt detaylarını görebilir."),
+
+        [Capabilities.OperationalRecordsCreateJiraPreview] = new(
+            Capabilities.OperationalRecordsCreateJiraPreview, Groups.OperationalRecords,
+            "Jira önizleme",
+            "Jira kaydı oluşturmadan önce eşleme önizlemesi üretebilir."),
+
+        [Capabilities.OperationalRecordsCreateJira] = new(
+            Capabilities.OperationalRecordsCreateJira, Groups.OperationalRecords,
+            "Jira kaydı oluşturma",
+            "Operasyonel kayıttan Jira kaydı oluşturabilir."),
+
+        [Capabilities.OperationalRecordsRetry] = new(
+            Capabilities.OperationalRecordsRetry, Groups.OperationalRecords,
+            "İş akışı yeniden deneme",
+            "Yarım kalmış Jira aktarımlarını yeniden deneyebilir."),
+
+        [Capabilities.OperationalRecordsViewDiagnostics] = new(
+            Capabilities.OperationalRecordsViewDiagnostics, Groups.OperationalRecords,
+            "İş akışı tanılama",
+            "Aktarım iş akışının teknik durumunu inceleyebilir."),
+
+        [Capabilities.AccessAdministration] = new(
+            Capabilities.AccessAdministration, Groups.AccessAdministration,
+            "Erişim yönetimi",
+            "Uygulama erişim taleplerini ve rollerini yönetebilir."),
+
+        [Capabilities.AccessApproveRequests] = new(
+            Capabilities.AccessApproveRequests, Groups.AccessAdministration,
+            "Talep onaylama",
+            "Bekleyen erişim taleplerini onaylayabilir veya reddedebilir."),
+
+        [Capabilities.AccessAssignRoles] = new(
+            Capabilities.AccessAssignRoles, Groups.AccessAdministration,
+            "Rol atama",
+            "Kullanıcıların uygulama rollerini değiştirebilir."),
+
+        [Capabilities.AccessManageUsers] = new(
+            Capabilities.AccessManageUsers, Groups.AccessAdministration,
+            "Kullanıcı yönetimi",
+            "Kullanıcı erişimini devre dışı bırakabilir."),
+
+        [Capabilities.AccessViewAudit] = new(
+            Capabilities.AccessViewAudit, Groups.Oversight,
+            "Erişim denetimi",
+            "Erişim kararlarına ait denetim kayıtlarını görüntüleyebilir."),
+
+        [Capabilities.AuditView] = new(
+            Capabilities.AuditView, Groups.Oversight,
+            "Denetim kayıtları",
+            "Operasyonel denetim kanıtlarını görüntüleyebilir."),
+
+        [Capabilities.SystemDiagnostics] = new(
+            Capabilities.SystemDiagnostics, Groups.Oversight,
+            "Sistem tanılama",
+            "Onaylı sistem tanılama bilgilerini görüntüleyebilir.")
+    };
+
+    /// <summary>
+    /// Returns a Turkish label for a role identifier.
+    /// </summary>
+    /// <param name="role">Role identifier.</param>
+    /// <returns>Display label, or the identifier when unknown.</returns>
+    public static string RoleLabel(string role) =>
+        _roleLabels.TryGetValue(role, out string? label) ? label : role;
+
+    /// <summary>
+    /// Returns a Turkish description for a role identifier.
+    /// </summary>
+    /// <param name="role">Role identifier.</param>
+    /// <returns>Description, or <c>null</c> when unknown.</returns>
+    public static string? RoleDescription(string role) =>
+        _roleDescriptions.TryGetValue(role, out string? description) ? description : null;
+
+    /// <summary>
+    /// Returns a descriptor for a capability identifier.
+    /// </summary>
+    /// <param name="capability">Capability identifier.</param>
+    /// <returns>Known descriptor, or a generic one carrying the raw identifier.</returns>
+    public static CapabilityDescriptor Describe(string capability) =>
+        _capabilities.TryGetValue(capability, out CapabilityDescriptor? descriptor)
+            ? descriptor
+            : new CapabilityDescriptor(capability, Groups.Other, capability, "Bu yetki için açıklama tanımlı değil.");
+
+    /// <summary>
+    /// Groups capabilities for display, in a stable functional order.
+    /// </summary>
+    /// <param name="capabilities">Granted capability identifiers.</param>
+    /// <returns>Groups of described capabilities.</returns>
+    public static IReadOnlyList<IGrouping<string, CapabilityDescriptor>> Group(
+        IEnumerable<string> capabilities)
+    {
+        string[] order =
+        [
+            Groups.Identity,
+            Groups.OperationalRecords,
+            Groups.AccessAdministration,
+            Groups.Oversight,
+            Groups.Other
+        ];
+
+        return capabilities
+            .Distinct(StringComparer.Ordinal)
+            .Select(Describe)
+            .GroupBy(descriptor => descriptor.Group)
+            .OrderBy(group => Array.IndexOf(order, group.Key))
+            .ToArray();
+    }
+}

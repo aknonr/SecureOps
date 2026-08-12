@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    Placeholder SecureOps mark: a shield (operational assurance) enclosing a check (verified action).
+    Deliberately generic and locally drawn. No corporate logo, wordmark, or third-party asset.
+
+    Replacing this: see wwwroot/brand/README.md. The symbol id "mark" is referenced by <use> in the
+    app bar and the auth pages, so an approved asset must keep that id to drop in without code edits.
+  -->
+  <defs>
+    <symbol id="mark" viewBox="0 0 32 32">
+      <path d="M16 3 5 7.2v8.1c0 6.4 4.5 11.6 11 13.7 6.5-2.1 11-7.3 11-13.7V7.2L16 3Z"
+            fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linejoin="round" />
+      <path d="m11.4 15.8 3.3 3.3 6.1-6.4"
+            fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round" />
+    </symbol>
+  </defs>
+  <use href="#mark" />
+</svg>

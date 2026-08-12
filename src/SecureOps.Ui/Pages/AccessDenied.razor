@@ -1,0 +1,39 @@
+@page "/access-denied"
+@attribute [AllowAnonymous]
+
+<PageTitle>Erişim reddedildi · SecureOps</PageTitle>
+
+@*
+    Reached when authorization refuses a route. Explains the refusal and offers a way forward instead
+    of dead-ending, so the operator knows whether to request access or simply go back.
+*@
+
+<div class="so-page so-page--narrow">
+    <section class="so-panel so-panel--notice">
+        <span class="so-notice-icon so-notice-icon--blocked" aria-hidden="true">
+            <MudIcon Icon="@Icons.Material.Filled.Block" />
+        </span>
+
+        <h1 class="so-page-title">Bu sayfaya erişemiyorsunuz</h1>
+        <p class="so-panel-text">
+            Bu bölüm için gereken yetki hesabınızda tanımlı değil. Yetkiler kurumsal erişim
+            kayıtlarınızdan gelir ve sunucu tarafında doğrulanır.
+        </p>
+
+        <ul class="so-next-steps">
+            <li>Mevcut yetkilerinizi <strong>Erişimim</strong> sayfasından görebilirsiniz.</li>
+            <li>İhtiyacınız olan yetkiyi platform yöneticinizden talep edebilirsiniz.</li>
+        </ul>
+
+        <div class="so-panel-actions">
+            <MudButton Href="access/me" Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.VerifiedUser">
+                Erişimimi görüntüle
+            </MudButton>
+            <MudButton Href="dashboard" Variant="Variant.Text" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                Genel Bakış'a dön
+            </MudButton>
+        </div>
+    </section>
+</div>

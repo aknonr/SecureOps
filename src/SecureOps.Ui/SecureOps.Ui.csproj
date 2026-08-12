@@ -15,6 +15,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- LocalReturnUrl guards open-redirect and sign-in-loop cases and stays internal to the shell;
+         the unit tests assert that behavior directly. -->
+    <InternalsVisibleTo Include="SecureOps.Tests.Unit" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
     <ProjectReference Include="..\SecureOps.Shared\SecureOps.Shared.csproj" />
     <ProjectReference Include="..\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    Browser tab icon. Standalone (no external references) because a favicon is fetched outside the
+    page context and cannot resolve a <use href> into another file.
+
+    The shield is filled rather than outlined so the mark stays legible at 16 px, where a 2.4 px
+    stroke would close up. Colours are baked in for the same reason: favicons get no CSS.
+
+    prefers-color-scheme is handled inline so the mark keeps contrast in a dark browser chrome.
+  -->
+  <style>
+    .plate { fill: #14233F; }
+    .glyph { fill: none; stroke: #FFFFFF; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+    @media (prefers-color-scheme: dark) {
+      .plate { fill: #E6ECF5; }
+      .glyph { stroke: #0B1322; }
+    }
+  </style>
+  <path class="plate" d="M16 2 4 6.6v8.9c0 7 4.9 12.7 12 15 7.1-2.3 12-8 12-15V6.6L16 2Z" />
+  <path class="glyph" d="m10.8 16.1 3.6 3.6 6.8-7.1" />
+</svg>

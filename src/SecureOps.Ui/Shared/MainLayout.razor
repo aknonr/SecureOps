@@ -1,0 +1,107 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ISignedInUserService Users
+@inject IDemoModeState ShellMode
+@inject NavigationManager Navigation
+
+<MudThemeProvider Theme="@SecureOpsTheme.Theme" IsDarkMode="@_isDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@* Bound by MudHidden: true when the viewport is lg-and-up, where the drawer is docked. *@
+<MudHidden Breakpoint="Breakpoint.LgAndUp" @bind-IsHidden="_isDesktop" />
+
+<MudLayout>
+    <AuthorizeView>
+        <Authorized Context="auth">
+            @{
+                SignedInUser currentUser = Users.Describe(auth.User);
+            }
+
+            <MudAppBar Elevation="0" Dense="true" Class="so-appbar">
+                <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                               Color="Color.Inherit"
+                               Edge="Edge.Start"
+                               OnClick="ToggleDrawer"
+                               aria-label="Gezinme menüsünü aç veya kapat"
+                               title="Menü" />
+
+                <a class="so-brand" href="dashboard">
+                    <span class="so-brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" width="22" height="22" role="presentation">
+                            <use href="brand/secureops-mark.svg#mark" />
+                        </svg>
+                    </span>
+                    <span class="so-brand-name">SecureOps</span>
+                </a>
+
+                <MudSpacer />
+
+                @* Non-production marker: present so nobody mistakes this host for production, but kept
+                   secondary and hidden on narrow widths where space belongs to the account menu. *@
+                @if (ShellMode.ShowEnvironmentMarker)
+                {
+                    <span class="so-env-chip d-none d-md-flex" title="Bu ortam üretim değildir">
+                        @ShellMode.EnvironmentName
+                    </span>
+                }
+
+                <UserMenu User="currentUser"
+                          IsDarkMode="_isDarkMode"
+                          OnToggleTheme="ToggleDarkMode" />
+            </MudAppBar>
+
+            <MudDrawer @bind-Open="_drawerOpen"
+                       Variant="DrawerVariant.Responsive"
+                       Breakpoint="Breakpoint.Lg"
+                       ClipMode="DrawerClipMode.Always"
+                       Elevation="0"
+                       Class="so-drawer">
+                <NavMenu />
+            </MudDrawer>
+
+            <MudMainContent Class="so-main">
+                @Body
+            </MudMainContent>
+        </Authorized>
+
+        <NotAuthorized>
+            @* Unauthenticated routes render without the app shell so a signed-out user never sees
+               navigation for pages they cannot open. *@
+            <MudMainContent Class="so-main so-main--public">
+                @Body
+            </MudMainContent>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode;
+    private bool _isDesktop = true;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private void ToggleDarkMode() => _isDarkMode = !_isDarkMode;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Below lg the drawer is a temporary overlay; close it after navigating so it does not cover
+        // the destination. Docked on desktop, it stays open.
+        if (!_isDesktop && _drawerOpen)
+        {
+            _drawerOpen = false;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

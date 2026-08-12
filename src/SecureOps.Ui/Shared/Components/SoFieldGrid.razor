@@ -1,0 +1,23 @@
+@*
+    Responsive label/value grid built on a description list.
+
+    Uses auto-fit columns so it becomes a single readable column on narrow widths without a breakpoint
+    per page.
+*@
+
+<dl class="so-field-grid" style="@GridStyle">
+    @ChildContent
+</dl>
+
+@code {
+    /// <summary>Field entries, normally <c>SoField</c> components.</summary>
+    [Parameter, EditorRequired]
+    public RenderFragment ChildContent { get; set; } = default!;
+
+    /// <summary>Minimum column width before the grid reflows to fewer columns.</summary>
+    [Parameter]
+    public string MinColumnWidth { get; set; } = "210px";
+
+    private string GridStyle =>
+        $"grid-template-columns:repeat(auto-fit,minmax(min({MinColumnWidth},100%),1fr));";
+}

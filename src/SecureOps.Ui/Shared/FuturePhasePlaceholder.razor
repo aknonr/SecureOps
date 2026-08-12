@@ -1,0 +1,61 @@
+@*
+    Shared page body for capabilities that are intentionally not yet implemented.
+
+    One component serves every future-state route, so no screen fabricates dashboards, metrics, dates,
+    percentages, or charts to look finished. Each instance states three truthful things: where the
+    capability stands, what safety boundary constrains it, and what must happen before it opens.
+*@
+
+<div class="so-page so-page--narrow">
+    <SoPageHeader Title="@Title" Lead="@Description">
+        <Actions>
+            <SoStatusBadge Label="Planlandı"
+                           Tone="SoStatusBadge.BadgeTone.Neutral"
+                           Icon="@Icons.Material.Filled.Schedule" />
+        </Actions>
+    </SoPageHeader>
+
+    <section class="so-panel">
+        <p class="so-panel-text">
+            Bu yetenek, güvenlik ve operasyon kontrolleri tamamlandıktan sonra ayrı bir fazda
+            kullanıma açılacaktır.
+        </p>
+
+        <SoFieldGrid MinColumnWidth="240px">
+            <SoField Label="Mevcut durum" Value="@CurrentStatus" />
+            <SoField Label="Güvenlik sınırı" Value="@SafetyBoundary" />
+            <SoField Label="Sonraki önkoşul" Value="@NextPrerequisite" />
+        </SoFieldGrid>
+
+        <div class="so-panel-actions">
+            <MudButton Href="dashboard"
+                       Variant="Variant.Text"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                Genel Bakış'a dön
+            </MudButton>
+        </div>
+    </section>
+</div>
+
+@code {
+    /// <summary>Capability name shown as the page heading.</summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>One-line description of the future scope.</summary>
+    [Parameter]
+    public string? Description { get; set; }
+
+    /// <summary>Truthful statement of where the capability stands today.</summary>
+    [Parameter, EditorRequired]
+    public string CurrentStatus { get; set; } = string.Empty;
+
+    /// <summary>The safety boundary that constrains the capability.</summary>
+    [Parameter, EditorRequired]
+    public string SafetyBoundary { get; set; } = string.Empty;
+
+    /// <summary>The next prerequisite that must be met before the capability opens.</summary>
+    [Parameter, EditorRequired]
+    public string NextPrerequisite { get; set; } = string.Empty;
+}

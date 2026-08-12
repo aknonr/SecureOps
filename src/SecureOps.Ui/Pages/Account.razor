@@ -1,0 +1,219 @@
+@page "/account"
+@attribute [Authorize]
+@using Microsoft.Extensions.Logging
+@implements IDisposable
+@inject ISignedInUserService Users
+@inject ICurrentAccessProvider AccessProvider
+@inject IIdentityLookupApiClient IdentityClient
+@inject IDemoModeState ShellMode
+@inject ILogger<Account> Logger
+
+<PageTitle>Hesabım · SecureOps</PageTitle>
+
+@*
+    Who you are and how this session was established.
+
+    Kept separate from /access/me, which answers what you may do. Splitting them keeps each page short
+    and gives the account menu two honest destinations instead of one crowded page.
+*@
+
+<div class="so-page so-page--narrow">
+    <SoPageHeader Title="Hesabım"
+                  Lead="Oturum açtığınız hesap ve bu oturuma ait bilgiler." />
+
+    <section class="so-panel">
+        <div class="so-identity-head">
+            <span class="so-avatar so-avatar--xl" aria-hidden="true">@_user.Initials</span>
+            <div>
+                <h2 class="so-identity-name">@_user.DisplayName</h2>
+                <p class="so-identity-account">@_user.AccountName</p>
+            </div>
+        </div>
+
+        <SoFieldGrid>
+            <SoField Label="Görünen ad" Value="@_user.DisplayName" />
+            <SoField Label="Hesap" Value="@_user.AccountName" />
+            <SoField Label="Kimlik doğrulama kaynağı">
+                <SoStatusBadge Label="@AuthSourceLabel"
+                               Tone="SoStatusBadge.BadgeTone.Info"
+                               Title="@_authSourceRaw" />
+            </SoField>
+            <SoField Label="Erişim durumu">
+                @if (_access is null)
+                {
+                    <span class="so-field-empty">Yükleniyor…</span>
+                }
+                else
+                {
+                    <SoStatusBadge Label="@AccessStatusLabel" Tone="@AccessStatusTone" />
+                }
+            </SoField>
+            @* The actor the API attributes audit entries to. Shown so an operator quoting a support
+               reference can confirm the two systems agree on who they are. *@
+            <SoField Label="API'de görünen kimlik" Value="@_apiCallerName" />
+        </SoFieldGrid>
+    </section>
+
+    @* Directory attributes are not exposed by any endpoint the UI may call for the signed-in user.
+       Stating that plainly is better than leaving four blank fields that look like missing data.
+       Tracked in docs/26-ui-backend-contract-gaps.md. *@
+    <section class="so-panel">
+        <h2 class="so-panel-title">Dizin bilgileri</h2>
+        <SoEmptyState Title="Dizin profiliniz henüz kullanılamıyor"
+                      Description="E-posta, departman ve unvan bilgileri kurumsal kimlik sağlayıcısı devreye alındığında bu sayfada görünecek."
+                      Icon="@Icons.Material.Outlined.Badge" />
+    </section>
+
+    <section class="so-panel">
+        <div class="so-panel-head">
+            <h2 class="so-panel-title">Oturum güvenliği</h2>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
+                Yenile
+            </MudButton>
+        </div>
+
+        @if (_access is null)
+        {
+            <div class="so-panel--loading" aria-busy="true">
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                <span>Oturum ilkesi yükleniyor…</span>
+            </div>
+        }
+        else if (!_access.IsResolved)
+        {
+            <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAsync" />
+        }
+        else
+        {
+            @* IsResolved guarantees Access is present; binding the policy once keeps that assertion
+               in one place instead of repeating it on every field below. *@
+            SessionPolicyResponse policy = _access.Access!.SessionPolicy;
+
+            <SoFieldGrid>
+                <SoField Label="Boşta kalma süresi"
+                         Value="@($"{policy.IdleTimeoutMinutes} dakika")" />
+                <SoField Label="Azami oturum süresi"
+                         Value="@($"{policy.AbsoluteLifetimeHours} saat")" />
+                <SoField Label="Her istekte yetki doğrulaması">
+                    <SoStatusBadge Label="@(policy.AccessRevalidatedOnEveryRequest ? "Etkin" : "Kapalı")"
+                                   Tone="@(policy.AccessRevalidatedOnEveryRequest
+                                           ? SoStatusBadge.BadgeTone.Positive
+                                           : SoStatusBadge.BadgeTone.Caution)" />
+                </SoField>
+                <SoField Label="Çerez koruması">
+                    <SoStatusBadge Label="@CookieProtectionLabel(policy)"
+                                   Tone="@(policy is { SecureCookie: true, HttpOnly: true }
+                                           ? SoStatusBadge.BadgeTone.Positive
+                                           : SoStatusBadge.BadgeTone.Caution)" />
+                </SoField>
+            </SoFieldGrid>
+
+            <p class="so-panel-text so-panel-text--sm mt-3">
+                @policy.EnforcementMode
+            </p>
+        }
+
+        <div class="so-panel-actions">
+            <MudButton Href="access/me" Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.VerifiedUser">
+                Erişimimi görüntüle
+            </MudButton>
+            <MudButton Href="auth/sign-out" ForceLoad="true" Variant="Variant.Text" Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.Logout">
+                Oturumu kapat
+            </MudButton>
+        </div>
+    </section>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private SignedInUser _user = new("bilinmiyor", "bilinmiyor", "bilinmiyor");
+    private AccessSnapshot? _access;
+    private string? _apiCallerName;
+
+    private string _authSourceRaw => _access?.Access?.AuthenticationSource ?? _user.AuthenticationSource;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+
+        if (AuthenticationStateTask is not null)
+        {
+            AuthenticationState state = await AuthenticationStateTask;
+            _user = Users.Describe(state.User);
+        }
+
+        _access = await AccessProvider.GetAsync();
+        await LoadApiCallerAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        _access = await AccessProvider.RefreshAsync();
+        await LoadApiCallerAsync();
+    }
+
+    private async Task LoadApiCallerAsync()
+    {
+        try
+        {
+            CurrentIdentityResponse identity = await IdentityClient.GetCurrentIdentityAsync(CancellationToken.None);
+            _apiCallerName = identity.Name;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            // Informational only; the page is complete without it.
+            Logger.LogDebug("Current API identity unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+    }
+
+    private string AuthSourceLabel => _authSourceRaw switch
+    {
+        SignedInUserService.InterimAuthenticationSource => "Geçici oturum (kurumsal kimlik bekleniyor)",
+        "demo-api-bridge" => "Geçici oturum (kurumsal kimlik bekleniyor)",
+        "Negotiate" or "Windows" => "Windows kimlik doğrulaması",
+        _ => _authSourceRaw
+    };
+
+    private string AccessStatusLabel => _access switch
+    {
+        { IsApproved: true } => "Onaylı",
+        { IsPending: true } => "Onay bekliyor",
+        { IsDisabled: true } => "Devre dışı",
+        _ => "Bilinmiyor"
+    };
+
+    private SoStatusBadge.BadgeTone AccessStatusTone => _access switch
+    {
+        { IsApproved: true } => SoStatusBadge.BadgeTone.Positive,
+        { IsPending: true } => SoStatusBadge.BadgeTone.Caution,
+        { IsDisabled: true } => SoStatusBadge.BadgeTone.Critical,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static string CookieProtectionLabel(SessionPolicyResponse policy)
+    {
+        List<string> parts = [];
+
+        if (policy.SecureCookie)
+        {
+            parts.Add("Secure");
+        }
+
+        if (policy.HttpOnly)
+        {
+            parts.Add("HttpOnly");
+        }
+
+        parts.Add($"SameSite={policy.SameSite}");
+        return string.Join(" · ", parts);
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

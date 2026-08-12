@@ -1,0 +1,404 @@
+using SecureOps.Shared.Contracts.Api;
+
+namespace SecureOps.Ui.Services;
+
+/// <summary>
+/// Translates API failures into <see cref="UiProblem"/> values with Turkish operator-facing copy.
+/// </summary>
+/// <remarks>
+/// This is the single place error wording lives, so every screen explains the same backend condition
+/// the same way. Codes come from <see cref="OperationalErrorCodes"/>; the mapping is keyed on the
+/// stable code rather than the HTTP status, because one status covers several distinct operator
+/// situations (a 409 may mean "someone else claimed this" or "the source record changed").
+/// <para>
+/// Unknown codes fall back to a status-derived classification instead of surfacing raw API text, so a
+/// backend code added later degrades to a safe generic message rather than leaking internals.
+/// </para>
+/// </remarks>
+public static class UiProblemFactory
+{
+    private const string RefreshStep = "Kaydı yenileyip güncel durumu görün.";
+    private const string RetryStep = "Birkaç saniye bekleyip tekrar deneyin.";
+    private const string ContactAdminStep = "Sorun sürerse platform yöneticinize başvurun.";
+    private const string ReferenceStep = "Destek talebinde aşağıdaki referans numarasını paylaşın.";
+
+    /// <summary>
+    /// Builds a problem from a parsed API error body.
+    /// </summary>
+    /// <param name="statusCode">HTTP status code of the response.</param>
+    /// <param name="payload">Parsed error body, when the response carried one.</param>
+    /// <returns>Operator-facing problem description.</returns>
+    public static UiProblem FromResponse(int statusCode, ProblemDetailsPayload? payload)
+    {
+        string? code = payload?.EffectiveCode;
+        string? correlationId = payload?.EffectiveCorrelationId;
+        string? stage = payload?.Stage;
+
+        UiProblem mapped = code is null
+            ? FromStatus(statusCode)
+            : FromCode(code, statusCode);
+
+        // The API's own retryable flag wins when present: it reflects server-side knowledge of whether
+        // the durable workflow can safely accept the same command again.
+        bool retryable = payload?.Retryable ?? mapped.Retryable;
+
+        return mapped with
+        {
+            Retryable = retryable,
+            CorrelationId = correlationId,
+            Stage = stage,
+            StatusCode = statusCode
+        };
+    }
+
+    /// <summary>
+    /// Builds a problem for a transport-layer failure where no response was received.
+    /// </summary>
+    /// <returns>Operator-facing problem description.</returns>
+    public static UiProblem NetworkFailure() => new(
+        UiProblemKind.Network,
+        "ApiUnreachable",
+        "Servise ulaşılamıyor",
+        "SecureOps servisine şu anda bağlanılamıyor. Bu genellikle geçici bir ağ veya servis kesintisidir.",
+        [RetryStep, ContactAdminStep],
+        Retryable: true,
+        RequiresRefresh: false,
+        CorrelationId: null,
+        Stage: null,
+        StatusCode: null);
+
+    /// <summary>
+    /// Builds a problem for a client-side timeout.
+    /// </summary>
+    /// <returns>Operator-facing problem description.</returns>
+    public static UiProblem TimedOut() => new(
+        UiProblemKind.Timeout,
+        "RequestTimeout",
+        "İstek zaman aşımına uğradı",
+        "Servis beklenen sürede yanıt vermedi. İşlem tamamlanmamış olabilir.",
+        [RetryStep, "İşlem tekrarlanmadan önce güncel durumu kontrol edin.", ContactAdminStep],
+        Retryable: true,
+        RequiresRefresh: true,
+        CorrelationId: null,
+        Stage: null,
+        StatusCode: null);
+
+    private static UiProblem FromCode(string code, int statusCode) => code switch
+    {
+        // ---- Application access -------------------------------------------------------------
+        OperationalErrorCodes.AccessPending => Build(
+            UiProblemKind.AccessPending, code,
+            "Erişiminiz onay bekliyor",
+            "Kimliğiniz doğrulandı, ancak SecureOps uygulama erişiminiz henüz onaylanmadı.",
+            ["Onay tamamlandığında bu ekranı yenileyin.", "Aciliyet varsa yetkili yöneticinize başvurun."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.AccessDisabled => Build(
+            UiProblemKind.AccessDisabled, code,
+            "Erişiminiz devre dışı",
+            "SecureOps uygulama erişiminiz devre dışı bırakılmış durumda.",
+            ["Erişiminizin yeniden açılması için platform yöneticinize başvurun."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.AccessDenied => Build(
+            UiProblemKind.Forbidden, code,
+            "Bu işlem için yetkiniz yok",
+            "Hesabınız etkin, ancak bu işlem için gereken yetki tanımlı değil.",
+            ["Erişimim sayfasından mevcut yetkilerinizi görebilirsiniz.", "İhtiyacınız varsa yöneticinizden yetki talep edin."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.AccessSelfApprovalDenied => Build(
+            UiProblemKind.Forbidden, code,
+            "Kendi talebinizi onaylayamazsınız",
+            "Görevler ayrılığı gereği bir erişim talebini talep sahibi onaylayamaz.",
+            ["Talebi başka bir yetkili yöneticinin onaylaması gerekir."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.AccessRequestInvalidState => Build(
+            UiProblemKind.Conflict, code,
+            "Talep durumu değişmiş",
+            "Bu erişim talebi artık beklemede değil; başka bir yönetici tarafından sonuçlandırılmış olabilir.",
+            [RefreshStep],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.AccessRecordNotFound => Build(
+            UiProblemKind.NotFound, code,
+            "Kayıt bulunamadı",
+            "İlgili kullanıcı veya erişim talebi bulunamadı.",
+            ["Listeye dönüp güncel kayıtları görüntüleyin."],
+            retryable: false, requiresRefresh: true),
+
+        // ---- Identity lookup ----------------------------------------------------------------
+        OperationalErrorCodes.InvalidIdentityInput => Build(
+            UiProblemKind.Validation, code,
+            "Girilen hesap kabul edilmedi",
+            "Hesap değeri, tek ve tam bir hesap için beklenen biçime uymuyor.",
+            ["Tek bir hesap girin; boşluk, virgül veya joker karakter kullanmayın.", "DOMAIN\\hesap biçimi kabul edilir."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.IdentityNotFound => Build(
+            UiProblemKind.NotFound, code,
+            "Eşleşen kimlik bulunamadı",
+            "Sorgulanan hesap için dizinde tam eşleşen bir kayıt yok.",
+            ["Hesap yazımını kontrol edin.", "Hesap farklı bir alan adında olabilir."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.IdentityProviderUnavailable => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Dizin servisi yanıt vermiyor",
+            "Kimlik sağlayıcısına şu anda ulaşılamıyor. Sorgunuz çalıştırılmadı.",
+            [RetryStep, ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
+        OperationalErrorCodes.IdentityProviderTimeout => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Dizin servisi zaman aşımına uğradı",
+            "Kimlik sağlayıcısı beklenen sürede yanıt vermedi.",
+            [RetryStep, ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
+        OperationalErrorCodes.IdentityProviderBadResponse => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Dizin servisi beklenmeyen yanıt verdi",
+            "Kimlik sağlayıcısından gelen yanıt işlenemedi. Sonuç güvenilir olmadığı için gösterilmiyor.",
+            [RetryStep, ReferenceStep, ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
+        // ---- Cross-cutting ------------------------------------------------------------------
+        OperationalErrorCodes.RateLimitExceeded => Build(
+            UiProblemKind.RateLimited, code,
+            "Çok fazla istek gönderildi",
+            "Kısa sürede izin verilenden fazla istek yapıldı. Bu sınır, dizin ve kaynak sistemleri korumak içindir.",
+            ["Kısa bir süre bekleyip tekrar deneyin."],
+            retryable: true, requiresRefresh: false),
+
+        OperationalErrorCodes.AuditStoreUnavailable => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Denetim kaydı alınamadı",
+            "Denetim kaydı yazılamadığı için işlem güvenli şekilde durduruldu. SecureOps, kayıt altına alınamayan işlemi tamamlamaz.",
+            [RetryStep, ReferenceStep, ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
+        OperationalErrorCodes.InvalidIdempotencyKey => Build(
+            UiProblemKind.Validation, code,
+            "İşlem anahtarı geçersiz",
+            "İşlemin tekrarlanmasını önleyen anahtar kabul edilmedi.",
+            ["Sayfayı yenileyip işlemi yeniden başlatın.", ContactAdminStep],
+            retryable: false, requiresRefresh: true),
+
+        // ---- Operational record source ------------------------------------------------------
+        OperationalErrorCodes.OperationalSourceUnavailable => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Kaynak sistem yanıt vermiyor",
+            "Operasyonel kayıtların alındığı kaynak sisteme ulaşılamıyor. Liste güncellenemedi.",
+            [RetryStep, ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
+        OperationalErrorCodes.OperationalSourceAuthenticationFailed => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Kaynak sistem kimlik doğrulaması başarısız",
+            "SecureOps kaynak sisteme bağlanamadı. Bu bir yapılandırma sorunudur, sizin yetkinizle ilgili değildir.",
+            [ReferenceStep, ContactAdminStep],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.OperationalRecordQueryFailed => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Kayıtlar getirilemedi",
+            "Operasyonel kayıt sorgusu tamamlanamadı.",
+            [RetryStep, ReferenceStep],
+            retryable: true, requiresRefresh: true),
+
+        OperationalErrorCodes.OperationalRecordNotFound => Build(
+            UiProblemKind.NotFound, code,
+            "Operasyonel kayıt bulunamadı",
+            "Bu kayıt artık mevcut değil veya görüntüleme yetkiniz kapsamında değil.",
+            ["Kayıt listesine dönün."],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.OperationalRecordInvalidState => Build(
+            UiProblemKind.Conflict, code,
+            "Kayıt bu işlem için uygun durumda değil",
+            "Kaydın mevcut iş akışı durumu bu işleme izin vermiyor.",
+            [RefreshStep],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.OperationalRecordAlreadyClaimed => Build(
+            UiProblemKind.Conflict, code,
+            "Kayıt başka bir operatörde",
+            "Bu kayıt üzerinde şu anda başka bir operatör çalışıyor. Aynı kaydın iki kez işlenmesini önlemek için işlem durduruldu.",
+            ["Kaydı yenileyip güncel sahiplik durumunu görün.", "Devralmanız gerekiyorsa ilgili operatörle görüşün."],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.OperationalRecordChanged => Build(
+            UiProblemKind.Conflict, code,
+            "Kaynak kayıt değişmiş",
+            "Bu kayıt SecureOps'a alındıktan sonra kaynak sistemde değişti. Ekrandaki bilgi güncel değil.",
+            [RefreshStep, "Güncel içeriği doğruladıktan sonra işlemi tekrarlayın."],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.OperationalRecordNoLongerOpen => Build(
+            UiProblemKind.Conflict, code,
+            "Kaynak kayıt kapanmış",
+            "Kaynak sistemdeki kayıt artık açık değil; kapalı bir kayıt için Jira oluşturulmaz.",
+            [RefreshStep, "Kayıt yeniden açıldıysa işlemi tekrar başlatın."],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.OperationalRecordCloseFailed => Build(
+            UiProblemKind.Conflict, code,
+            "Kaynak kayıt kapatılamadı",
+            "Jira tarafı tamamlandı, ancak kaynak kayıt kapatılamadı. İş akışı yarım kalmış durumda.",
+            ["Mutabakat için işlemi yeniden deneyin.", ReferenceStep, ContactAdminStep],
+            retryable: true, requiresRefresh: true),
+
+        OperationalErrorCodes.OperationalRecordCommentUpdateFailed => Build(
+            UiProblemKind.Conflict, code,
+            "Kaynak kayda not eklenemedi",
+            "Jira tarafı tamamlandı, ancak kaynak kayda açıklama yazılamadı.",
+            ["Mutabakat için işlemi yeniden deneyin.", ReferenceStep],
+            retryable: true, requiresRefresh: true),
+
+        // ---- Requester resolution ------------------------------------------------------------
+        OperationalErrorCodes.RequesterResolutionFailed => Build(
+            UiProblemKind.Conflict, code,
+            "Talep sahibi çözümlenemedi",
+            "Kayıttaki talep sahibi dizinde eşleştirilemedi. Jira kaydı doğru kişiye bağlanamayacağı için işlem durduruldu.",
+            ["Kaynak kayıttaki talep sahibi bilgisini kontrol edin.", ContactAdminStep],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.RequesterResolutionAmbiguous => Build(
+            UiProblemKind.Conflict, code,
+            "Talep sahibi için birden fazla eşleşme var",
+            "Dizinde birden fazla tam eşleşme bulundu. Yanlış kişiye kayıt açılmaması için işlem durduruldu.",
+            ["Talep sahibini kaynak sistemde netleştirin.", ContactAdminStep],
+            retryable: false, requiresRefresh: true),
+
+        // ---- Jira -----------------------------------------------------------------------------
+        OperationalErrorCodes.JiraUnavailable => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Jira yanıt vermiyor",
+            "Jira servisine ulaşılamıyor. Kayıt oluşturulmadı.",
+            [RetryStep, ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
+        OperationalErrorCodes.JiraUnauthorized => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Jira entegrasyon yetkisi reddedildi",
+            "SecureOps'un Jira entegrasyon kimliği kabul edilmedi. Bu bir yapılandırma sorunudur, sizin yetkinizle ilgili değildir.",
+            [ReferenceStep, ContactAdminStep],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.JiraValidationFailed => Build(
+            UiProblemKind.Validation, code,
+            "Jira alanları kabul edilmedi",
+            "Jira, önerilen kayıt alanlarını reddetti. Eşleme ile Jira proje yapılandırması uyuşmuyor olabilir.",
+            ["Önizlemedeki alanları kontrol edin.", ReferenceStep, ContactAdminStep],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.JiraCreateFailed => Build(
+            UiProblemKind.Conflict, code,
+            "Jira kaydı oluşturulamadı",
+            "Jira kaydı oluşturma işlemi tamamlanamadı. Kaydın oluşup oluşmadığı doğrulanmalıdır.",
+            [RefreshStep, "Durum netleşmezse yeniden deneyin; mükerrer kayıt koruması etkindir.", ReferenceStep],
+            retryable: true, requiresRefresh: true),
+
+        OperationalErrorCodes.JiraAlreadyCreated => Build(
+            UiProblemKind.Conflict, code,
+            "Bu kayıt için Jira zaten oluşturulmuş",
+            "Bu operasyonel kayıt ve eşleme için bir Jira kaydı hâlihazırda mevcut. Mükerrer kayıt oluşturulmadı.",
+            [RefreshStep, "Mevcut Jira kaydını inceleyin."],
+            retryable: false, requiresRefresh: true),
+
+        // ---- Durable workflow ------------------------------------------------------------------
+        OperationalErrorCodes.WorkflowConflict => Build(
+            UiProblemKind.Conflict, code,
+            "İş akışı başka bir işlemde",
+            "Bu kayıt üzerinde başka bir iş akışı işlemi sürüyor.",
+            [RefreshStep, RetryStep],
+            retryable: true, requiresRefresh: true),
+
+        OperationalErrorCodes.WorkflowAlreadyCompleted => Build(
+            UiProblemKind.Conflict, code,
+            "İş akışı zaten tamamlanmış",
+            "Bu iş akışı daha önce tamamlandı; tekrar çalıştırılmasına gerek yok.",
+            [RefreshStep],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.WorkflowAlreadyInProgress => Build(
+            UiProblemKind.Conflict, code,
+            "Aynı işlem hâlihazırda çalışıyor",
+            "Aynı kapsamda bir komut zaten yürütülüyor. Mükerrer çalıştırma engellendi.",
+            ["İşlem tamamlanana kadar bekleyin.", RefreshStep],
+            retryable: true, requiresRefresh: true),
+
+        _ => FromStatus(statusCode) with { Code = code }
+    };
+
+    private static UiProblem FromStatus(int statusCode) => statusCode switch
+    {
+        401 => Build(
+            UiProblemKind.SessionExpired, "Unauthenticated",
+            "Oturumunuz sonlanmış",
+            "Güvenlik nedeniyle oturumunuz sonlandırıldı.",
+            ["Yeniden oturum açın; kaldığınız sayfaya döneceksiniz."],
+            retryable: false, requiresRefresh: false),
+
+        403 => Build(
+            UiProblemKind.Forbidden, OperationalErrorCodes.AccessDenied,
+            "Bu işlem için yetkiniz yok",
+            "Bu işlem için gereken yetki hesabınızda tanımlı değil.",
+            ["Erişimim sayfasından mevcut yetkilerinizi görebilirsiniz."],
+            retryable: false, requiresRefresh: false),
+
+        404 => Build(
+            UiProblemKind.NotFound, "NotFound",
+            "Kayıt bulunamadı",
+            "İstenen kayıt bulunamadı veya görüntüleme yetkiniz kapsamında değil.",
+            ["Listeye dönüp güncel kayıtları görüntüleyin."],
+            retryable: false, requiresRefresh: true),
+
+        400 or 422 => Build(
+            UiProblemKind.Validation, "InvalidRequest",
+            "Girilen bilgiler kabul edilmedi",
+            "Gönderilen bilgiler doğrulama kurallarına uymuyor.",
+            ["Alanları kontrol edip tekrar gönderin."],
+            retryable: false, requiresRefresh: false),
+
+        409 => Build(
+            UiProblemKind.Conflict, "Conflict",
+            "Durum değişmiş",
+            "Kaydın durumu siz görüntülerken değişti. İşlem güvenli şekilde durduruldu.",
+            [RefreshStep],
+            retryable: false, requiresRefresh: true),
+
+        429 => Build(
+            UiProblemKind.RateLimited, OperationalErrorCodes.RateLimitExceeded,
+            "Çok fazla istek gönderildi",
+            "Kısa sürede izin verilenden fazla istek yapıldı.",
+            ["Kısa bir süre bekleyip tekrar deneyin."],
+            retryable: true, requiresRefresh: false),
+
+        >= 500 => Build(
+            UiProblemKind.UpstreamUnavailable, "ServiceUnavailable",
+            "Servis şu anda yanıt veremiyor",
+            "İşlem sunucu tarafında tamamlanamadı.",
+            [RetryStep, ReferenceStep, ContactAdminStep],
+            retryable: true, requiresRefresh: true),
+
+        _ => Build(
+            UiProblemKind.Unexpected, "UnexpectedError",
+            "Beklenmeyen bir hata oluştu",
+            "İşlem tamamlanamadı.",
+            [RetryStep, ReferenceStep, ContactAdminStep],
+            retryable: true, requiresRefresh: true)
+    };
+
+    private static UiProblem Build(
+        UiProblemKind kind,
+        string code,
+        string title,
+        string explanation,
+        IReadOnlyList<string> nextSteps,
+        bool retryable,
+        bool requiresRefresh) =>
+        new(kind, code, title, explanation, nextSteps, retryable, requiresRefresh, null, null, null);
+}

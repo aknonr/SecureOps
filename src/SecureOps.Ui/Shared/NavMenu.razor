@@ -1,0 +1,72 @@
+@*
+    Primary navigation, grouped by what the operator is doing rather than by which team built it.
+
+    Entries appear based on capabilities returned by GET /api/v1/access/me, so the menu reflects the
+    server's view of this account instead of the UI's own guess. Hiding an entry only avoids a dead
+    end — the API re-checks every capability on every call.
+
+    Planned capabilities stay listed but visibly inert, because "what is coming next" is part of what
+    this navigation is meant to communicate.
+*@
+
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+
+<MudNavMenu Dense="true" Class="so-nav">
+    <AuthorizeView>
+        <Authorized Context="signedIn">
+            <div class="so-nav-group">Operasyon</div>
+
+            <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.SpaceDashboard">
+                Genel Bakış
+            </MudNavLink>
+
+            @if (Can(Capabilities.IdentityLookup))
+            {
+                <MudNavLink Href="identity-lookup" Icon="@Icons.Material.Filled.ManageSearch">
+                    Kimlik Sorgulama
+                </MudNavLink>
+            }
+
+            @* Operasyonel Kayıtlar (OperationalRecordsView) is added here with the OR -> Jira screens.
+               Entries are introduced alongside their routes so the menu never offers a dead link. *@
+
+            <div class="so-nav-group">Erişim</div>
+
+            <MudNavLink Href="access/me" Icon="@Icons.Material.Filled.VerifiedUser">
+                Erişimim
+            </MudNavLink>
+
+            @* Erişim Talepleri and Kullanıcılar ve Roller are added with the access administration
+               screens, gated on AccessApproveRequests / AccessManageUsers. *@
+
+            <div class="so-nav-group">Sonraki fazlar</div>
+
+            <MudNavLink Href="audit-compliance" Icon="@Icons.Material.Filled.VerifiedUser">
+                Denetim ve Uyum
+                <span class="so-nav-tag">Planlandı</span>
+            </MudNavLink>
+
+            <MudNavLink Href="diagnostics-readonly" Icon="@Icons.Material.Filled.FactCheck">
+                Salt Okunur Tanılama
+                <span class="so-nav-tag">Planlandı</span>
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>
+
+@code {
+    private AccessSnapshot? _snapshot;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _snapshot = await AccessProvider.GetAsync();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    private bool Can(string capability) => _snapshot?.Can(capability) == true;
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

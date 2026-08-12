@@ -1,0 +1,1424 @@
+/* =============================================================================
+   SecureOps operations shell
+
+   This file defines NO colour literals. Every colour is a semantic --so-* token
+   mapped onto the --mud-palette-* variables emitted by Shared/SecureOpsTheme.cs,
+   which is the single source of truth required by docs/20 §7. Both palettes
+   therefore change from one place, and MudBlazor components and custom markup
+   can never drift apart.
+
+   Layout is fluid: spacing, radii, and grid tracks come from tokens, and every
+   multi-column region collapses through auto-fit or a single breakpoint rather
+   than per-page media queries.
+   ========================================================================== */
+
+:root {
+    /* -- surfaces ------------------------------------------------------- */
+    --so-bg: var(--mud-palette-background);
+    --so-bg-sunken: var(--mud-palette-background-grey);
+    --so-surface: var(--mud-palette-surface);
+    --so-appbar: var(--mud-palette-appbar-background);
+    --so-appbar-text: var(--mud-palette-appbar-text);
+    --so-drawer: var(--mud-palette-drawer-background);
+
+    /* -- text ----------------------------------------------------------- */
+    --so-text: var(--mud-palette-text-primary);
+    --so-text-muted: var(--mud-palette-text-secondary);
+    --so-text-faint: var(--mud-palette-text-disabled);
+
+    /* -- lines ---------------------------------------------------------- */
+    --so-border: var(--mud-palette-lines-default);
+    --so-border-soft: var(--mud-palette-divider-light);
+    --so-border-input: var(--mud-palette-lines-inputs);
+
+    /* -- accents -------------------------------------------------------- */
+    --so-accent: var(--mud-palette-primary);
+    --so-accent-strong: var(--mud-palette-primary-darken);
+    --so-accent-soft: var(--mud-palette-primary-lighten);
+    --so-success: var(--mud-palette-success);
+    --so-warning: var(--mud-palette-warning);
+    --so-danger: var(--mud-palette-error);
+    --so-info: var(--mud-palette-info);
+
+    /* Tinted fills derived from the same tokens. color-mix keeps a badge or
+       notice tied to its status colour, so it follows a palette change instead
+       of needing a hand-picked pastel per theme. */
+    --so-tint: 12%;
+    --so-tint-strong: 18%;
+
+    /* -- geometry ------------------------------------------------------- */
+    --so-radius-sm: 6px;
+    --so-radius: 10px;
+    --so-radius-lg: 14px;
+
+    --so-space-1: 4px;
+    --so-space-2: 8px;
+    --so-space-3: 12px;
+    --so-space-4: 16px;
+    --so-space-5: 24px;
+    --so-space-6: 32px;
+
+    --so-page-max: 1180px;
+    --so-page-narrow: 860px;
+
+    --so-shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
+    --so-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+}
+
+/* MudBlazor sets .mud-theme-dark on the provider root when IsDarkMode is on.
+   Shadows need more depth on a dark ground to remain perceptible, and tints need
+   to be stronger because a small colour wash disappears against dark surfaces. */
+.mud-theme-dark {
+    --so-tint: 20%;
+    --so-tint-strong: 28%;
+    --so-shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --so-shadow: 0 4px 16px rgb(0 0 0 / 45%);
+}
+
+/* =============================================================================
+   Base
+   ========================================================================== */
+
+body {
+    background-color: var(--so-bg);
+    color: var(--so-text);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* =============================================================================
+   Application shell
+   ========================================================================== */
+
+.so-appbar {
+    background-color: var(--so-appbar) !important;
+    color: var(--so-appbar-text) !important;
+    /* A hairline instead of a shadow: the app bar and page ground share a tone in
+       dark mode, and a drop shadow there reads as a smudge. */
+    border-bottom: 1px solid color-mix(in srgb, var(--so-appbar-text) 12%, transparent);
+}
+
+.so-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    color: inherit;
+    text-decoration: none;
+    min-width: 0;
+}
+
+.so-brand-mark {
+    display: inline-flex;
+    color: var(--so-appbar-text);
+}
+
+.so-brand-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.so-env-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--so-space-2);
+    margin-right: var(--so-space-3);
+    border: 1px solid color-mix(in srgb, var(--so-appbar-text) 28%, transparent);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--so-appbar-text) 80%, transparent);
+}
+
+.so-drawer {
+    background-color: var(--so-drawer) !important;
+    border-right: 1px solid var(--so-border);
+}
+
+.so-main {
+    background-color: var(--so-bg);
+    min-height: 100vh;
+}
+
+.so-main--public {
+    background-color: var(--so-bg);
+}
+
+/* -- navigation -------------------------------------------------------- */
+
+.so-nav {
+    padding: var(--so-space-2) 0;
+}
+
+.so-nav-group {
+    padding: var(--so-space-4) var(--so-space-4) var(--so-space-1);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--so-text-faint);
+}
+
+.so-nav-tag,
+.so-nav-count {
+    margin-left: auto;
+    padding: 1px var(--so-space-2);
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--so-text-muted) var(--so-tint), transparent);
+    color: var(--so-text-muted);
+}
+
+/* Planned entries stay legible but visibly inert, so the roadmap is readable
+   without inviting clicks that lead nowhere useful. */
+.so-nav .mud-nav-link:has(.so-nav-tag) {
+    opacity: 0.72;
+}
+
+/* -- account menu ------------------------------------------------------ */
+
+.so-user-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    padding: var(--so-space-1) var(--so-space-2);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    max-width: 260px;
+}
+
+.so-user-trigger:hover,
+.so-user-trigger:focus-visible {
+    background: color-mix(in srgb, var(--so-appbar-text) 10%, transparent);
+    border-color: color-mix(in srgb, var(--so-appbar-text) 20%, transparent);
+}
+
+.so-user-trigger-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.so-user-trigger-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.so-user-trigger-meta {
+    font-size: 0.68rem;
+    opacity: 0.75;
+}
+
+.so-user-trigger-caret {
+    opacity: 0.7;
+}
+
+/* Below sm the name is dropped and the avatar alone becomes the target, which
+   keeps the app bar usable at 360px without overlapping the brand. */
+@media (max-width: 599px) {
+    .so-user-trigger-text,
+    .so-user-trigger-caret {
+        display: none;
+    }
+}
+
+.so-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--so-accent) 70%, var(--so-appbar));
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.so-avatar--lg {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+    font-size: 0.85rem;
+}
+
+.so-avatar--xl {
+    width: 56px;
+    height: 56px;
+    flex-basis: 56px;
+    font-size: 1.1rem;
+    background: color-mix(in srgb, var(--so-accent) 85%, var(--so-surface));
+}
+
+.so-user-menu-popover {
+    min-width: 268px;
+}
+
+.so-user-menu-head {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-3);
+    padding: var(--so-space-3) var(--so-space-4);
+}
+
+.so-user-menu-name {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-user-menu-account {
+    margin: 0;
+    font-size: 0.76rem;
+    color: var(--so-text-muted);
+}
+
+.so-user-menu-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    padding: 0 var(--so-space-4) var(--so-space-3);
+}
+
+.so-user-menu-roles {
+    font-size: 0.75rem;
+    color: var(--so-text-muted);
+    align-self: center;
+}
+
+/* =============================================================================
+   Page scaffolding
+   ========================================================================== */
+
+.so-page {
+    width: 100%;
+    max-width: var(--so-page-max);
+    margin: 0 auto;
+    padding: var(--so-space-5) var(--so-space-4) var(--so-space-6);
+}
+
+.so-page--narrow {
+    max-width: var(--so-page-narrow);
+}
+
+.so-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--so-space-3);
+    margin-bottom: var(--so-space-5);
+}
+
+.so-page-header-text {
+    min-width: 0;
+}
+
+.so-page-title {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--so-text);
+}
+
+/* FocusOnNavigate moves focus to the h1 after every navigation so screen-reader users land on the
+   page name. For pointer users that programmatic focus should be invisible; for keyboard users it
+   must stay visible. The browser default draws a hard rectangle that reads as a rendering fault, so
+   the visible case is restyled into a deliberate accent ring rather than removed. */
+[tabindex="-1"]:focus:not(:focus-visible) {
+    outline: none;
+}
+
+[tabindex="-1"]:focus-visible {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 4px;
+    border-radius: var(--so-radius-sm);
+}
+
+.so-page-lead {
+    margin: var(--so-space-2) 0 0;
+    max-width: 68ch;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--so-text-muted);
+}
+
+.so-page-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+}
+
+.so-eyebrow {
+    margin: 0 0 var(--so-space-2);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--so-text-faint);
+}
+
+/* =============================================================================
+   Panels
+   ========================================================================== */
+
+.so-panel {
+    background: var(--so-surface);
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius);
+    padding: var(--so-space-5);
+    box-shadow: var(--so-shadow-sm);
+}
+
+.so-panel + .so-panel {
+    margin-top: var(--so-space-4);
+}
+
+.so-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--so-space-3);
+    margin-bottom: var(--so-space-3);
+}
+
+.so-panel-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-panel-text {
+    margin: var(--so-space-2) 0 0;
+    max-width: 72ch;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--so-text-muted);
+}
+
+.so-panel-text--sm {
+    font-size: 0.8rem;
+}
+
+.so-panel-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    align-items: center;
+}
+
+.so-panel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-4);
+}
+
+.so-panel--loading {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-3);
+    color: var(--so-text-muted);
+    font-size: 0.88rem;
+}
+
+.so-panel--primary {
+    border-color: color-mix(in srgb, var(--so-accent) 32%, var(--so-border));
+}
+
+.so-panel--notice {
+    text-align: left;
+}
+
+.so-panel--blocked {
+    border-color: color-mix(in srgb, var(--so-danger) 34%, var(--so-border));
+}
+
+.so-notice-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: var(--so-space-3);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--so-text-muted) var(--so-tint), transparent);
+    color: var(--so-text-muted);
+}
+
+.so-notice-icon--blocked {
+    background: color-mix(in srgb, var(--so-danger) var(--so-tint), transparent);
+    color: var(--so-danger);
+}
+
+.so-notice-icon--error {
+    background: color-mix(in srgb, var(--so-danger) var(--so-tint), transparent);
+    color: var(--so-danger);
+}
+
+.so-next-steps {
+    margin: var(--so-space-3) 0 0;
+    padding-left: 1.15rem;
+    font-size: 0.86rem;
+    line-height: 1.7;
+    color: var(--so-text-muted);
+}
+
+.so-count {
+    padding: 1px var(--so-space-2);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--so-text-muted) var(--so-tint), transparent);
+    color: var(--so-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.so-timestamp {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--so-text-faint);
+}
+
+.so-code {
+    padding: 1px var(--so-space-2);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+    border: 1px solid var(--so-border-soft);
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
+/* =============================================================================
+   Dashboard
+   ========================================================================== */
+
+.so-dash {
+    display: grid;
+    gap: var(--so-space-4);
+    /* Side column appears only when there is room for both; below that the panels
+       stack in source order, which puts available actions first. */
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+    .so-dash {
+        grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr);
+        align-items: start;
+    }
+
+    /* Two independent columns. The main column and the side rail each stack their own panels, so
+       neither column's height can push the other's panels apart — which is what happens if the
+       panels are direct grid items and one column is taller than the other. */
+    .so-dash-main,
+    .so-dash-side {
+        align-self: start;
+    }
+}
+
+.so-dash-main,
+.so-dash-side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--so-space-4);
+    min-width: 0;
+}
+
+.so-dash-main .so-panel + .so-panel {
+    margin-top: 0;
+}
+
+.so-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+.so-status-text {
+    font-size: 0.85rem;
+    color: var(--so-text-muted);
+}
+
+.so-dash-side .so-panel + .so-panel {
+    margin-top: 0;
+}
+
+.so-task-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--so-space-2);
+}
+
+.so-task {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-3);
+    padding: var(--so-space-3);
+    border: 1px solid var(--so-border-soft);
+    border-radius: var(--so-radius);
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.so-task:hover,
+.so-task:focus-within {
+    border-color: color-mix(in srgb, var(--so-accent) 45%, var(--so-border));
+    background: color-mix(in srgb, var(--so-accent) 5%, transparent);
+}
+
+.so-task-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: var(--so-radius-sm);
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+    color: var(--so-accent);
+}
+
+.so-task-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.so-task-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--so-text);
+    text-decoration: none;
+}
+
+/* Stretched target: the whole row is clickable while the accessible name stays
+   on the link itself. */
+.so-task-title::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+.so-task {
+    position: relative;
+}
+
+.so-task-text {
+    margin: 2px 0 0;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--so-text-muted);
+}
+
+.so-task-chevron {
+    color: var(--so-text-faint);
+    flex: 0 0 auto;
+}
+
+.so-roadmap {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.so-roadmap li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--so-space-2);
+    padding: var(--so-space-2) 0;
+    border-bottom: 1px solid var(--so-border-soft);
+}
+
+.so-roadmap li:last-child {
+    border-bottom: none;
+}
+
+.so-roadmap-name {
+    font-size: 0.85rem;
+    color: var(--so-text);
+}
+
+/* =============================================================================
+   Two-column split (identity lookup)
+   ========================================================================== */
+
+.so-split {
+    display: grid;
+    gap: var(--so-space-4);
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+}
+
+@media (min-width: 1024px) {
+    .so-split {
+        grid-template-columns: minmax(340px, 0.85fr) minmax(0, 1.15fr);
+    }
+}
+
+.so-split .so-panel + .so-panel {
+    margin-top: 0;
+}
+
+.so-lookup-result {
+    min-height: 320px;
+}
+
+.so-result-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--so-space-3);
+    min-height: 240px;
+    color: var(--so-text-muted);
+    font-size: 0.88rem;
+}
+
+.so-result-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    margin-bottom: var(--so-space-4);
+}
+
+.so-reuse-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-2);
+    margin: 0 0 var(--so-space-3);
+    padding: var(--so-space-2) var(--so-space-3);
+    border-radius: var(--so-radius-sm);
+    background: color-mix(in srgb, var(--so-info) var(--so-tint), transparent);
+    color: var(--so-text);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.so-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-5);
+}
+
+.so-input-note {
+    margin: var(--so-space-1) 0 0;
+    font-size: 0.76rem;
+    color: var(--so-text-muted);
+}
+
+.so-disclosure-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-1);
+    padding: var(--so-space-1) 0;
+    border: 0;
+    background: none;
+    color: var(--so-accent);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.so-disclosure-toggle:hover {
+    text-decoration: underline;
+}
+
+.so-disclosure-body {
+    margin-top: var(--so-space-3);
+    padding-left: var(--so-space-3);
+    border-left: 2px solid var(--so-border-soft);
+}
+
+/* =============================================================================
+   Field grid
+   ========================================================================== */
+
+.so-field-grid {
+    display: grid;
+    gap: var(--so-space-4);
+    margin: 0;
+}
+
+.so-field {
+    min-width: 0;
+}
+
+.so-field-label {
+    margin: 0 0 2px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--so-text-faint);
+}
+
+.so-field-value {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--so-text);
+    overflow-wrap: anywhere;
+}
+
+.so-field-empty {
+    color: var(--so-text-faint);
+}
+
+.so-inline-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+}
+
+/* =============================================================================
+   Badges
+   ========================================================================== */
+
+.so-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px var(--so-space-2);
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.73rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.so-badge-icon {
+    font-size: 0.85rem !important;
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
+.so-badge--neutral {
+    background: color-mix(in srgb, var(--so-text-muted) var(--so-tint), transparent);
+    border-color: color-mix(in srgb, var(--so-text-muted) var(--so-tint-strong), transparent);
+    color: var(--so-text-muted);
+}
+
+.so-badge--positive {
+    background: color-mix(in srgb, var(--so-success) var(--so-tint), transparent);
+    border-color: color-mix(in srgb, var(--so-success) var(--so-tint-strong), transparent);
+    color: var(--so-success);
+}
+
+.so-badge--caution {
+    background: color-mix(in srgb, var(--so-warning) var(--so-tint), transparent);
+    border-color: color-mix(in srgb, var(--so-warning) var(--so-tint-strong), transparent);
+    color: var(--so-warning);
+}
+
+.so-badge--critical {
+    background: color-mix(in srgb, var(--so-danger) var(--so-tint), transparent);
+    border-color: color-mix(in srgb, var(--so-danger) var(--so-tint-strong), transparent);
+    color: var(--so-danger);
+}
+
+.so-badge--info {
+    background: color-mix(in srgb, var(--so-info) var(--so-tint), transparent);
+    border-color: color-mix(in srgb, var(--so-info) var(--so-tint-strong), transparent);
+    color: var(--so-info);
+}
+
+/* =============================================================================
+   Problem panel
+   ========================================================================== */
+
+.so-problem {
+    display: flex;
+    gap: var(--so-space-3);
+    padding: var(--so-space-4);
+    border: 1px solid var(--so-border);
+    border-left-width: 3px;
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+}
+
+.so-problem--error {
+    border-left-color: var(--so-danger);
+    background: color-mix(in srgb, var(--so-danger) 6%, var(--so-surface));
+}
+
+.so-problem--warning {
+    border-left-color: var(--so-warning);
+    background: color-mix(in srgb, var(--so-warning) 6%, var(--so-surface));
+}
+
+.so-problem--info {
+    border-left-color: var(--so-info);
+    background: color-mix(in srgb, var(--so-info) 6%, var(--so-surface));
+}
+
+.so-problem--success {
+    border-left-color: var(--so-success);
+    background: color-mix(in srgb, var(--so-success) 6%, var(--so-surface));
+}
+
+.so-problem-icon {
+    flex: 0 0 auto;
+    padding-top: 1px;
+}
+
+.so-problem--error .so-problem-icon { color: var(--so-danger); }
+.so-problem--warning .so-problem-icon { color: var(--so-warning); }
+.so-problem--info .so-problem-icon { color: var(--so-info); }
+.so-problem--success .so-problem-icon { color: var(--so-success); }
+
+.so-problem-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.so-problem-title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-problem-text {
+    margin: var(--so-space-1) 0 0;
+    max-width: 70ch;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--so-text-muted);
+}
+
+.so-problem-steps {
+    margin: var(--so-space-2) 0 0;
+    padding-left: 1.1rem;
+    font-size: 0.83rem;
+    line-height: 1.65;
+    color: var(--so-text-muted);
+}
+
+.so-problem-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-3);
+}
+
+.so-problem-reference {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin: var(--so-space-3) 0 0;
+    font-size: 0.74rem;
+    color: var(--so-text-faint);
+}
+
+.so-problem-reference code {
+    padding: 1px var(--so-space-2);
+    border-radius: var(--so-radius-sm);
+    border: 1px solid var(--so-border-soft);
+    background: var(--so-bg-sunken);
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--so-text-muted);
+    word-break: break-all;
+    /* Selectable in one gesture so it can be pasted into a support ticket. */
+    user-select: all;
+}
+
+/* =============================================================================
+   Empty state
+   ========================================================================== */
+
+.so-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--so-space-2);
+    padding: var(--so-space-6) var(--so-space-4);
+    text-align: center;
+}
+
+.so-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--so-text-muted) 10%, transparent);
+    color: var(--so-text-faint);
+}
+
+.so-empty-title {
+    margin: var(--so-space-1) 0 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-empty-text {
+    margin: 0;
+    max-width: 46ch;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: var(--so-text-muted);
+}
+
+.so-empty-actions {
+    margin-top: var(--so-space-3);
+}
+
+/* =============================================================================
+   Access pages
+   ========================================================================== */
+
+.so-identity-head {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-4);
+    margin-bottom: var(--so-space-5);
+}
+
+.so-identity-name {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-identity-account {
+    margin: 2px 0 0;
+    font-size: 0.85rem;
+    color: var(--so-text-muted);
+}
+
+.so-access-status {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+}
+
+.so-access-status-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--so-text-muted) var(--so-tint), transparent);
+    color: var(--so-text-muted);
+}
+
+.so-access-status--ok .so-access-status-icon {
+    background: color-mix(in srgb, var(--so-success) var(--so-tint), transparent);
+    color: var(--so-success);
+}
+
+.so-access-status--pending .so-access-status-icon {
+    background: color-mix(in srgb, var(--so-warning) var(--so-tint), transparent);
+    color: var(--so-warning);
+}
+
+.so-access-status--blocked .so-access-status-icon {
+    background: color-mix(in srgb, var(--so-danger) var(--so-tint), transparent);
+    color: var(--so-danger);
+}
+
+.so-role-list,
+.so-cap-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.so-role {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-3);
+    padding: var(--so-space-2) 0;
+    border-bottom: 1px solid var(--so-border-soft);
+}
+
+.so-role:last-child {
+    border-bottom: none;
+}
+
+.so-role-text {
+    font-size: 0.83rem;
+    color: var(--so-text-muted);
+}
+
+.so-cap-group + .so-cap-group {
+    margin-top: var(--so-space-4);
+}
+
+.so-cap-group-name {
+    margin: 0 0 var(--so-space-2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--so-text-faint);
+}
+
+.so-cap {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-2);
+    padding: var(--so-space-2) 0;
+}
+
+.so-cap-icon {
+    color: var(--so-success);
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+.so-cap-name {
+    font-size: 0.87rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-cap-text {
+    margin: 1px 0 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--so-text-muted);
+}
+
+/* =============================================================================
+   Authentication pages (server-rendered, no MudBlazor)
+
+   These load without the Blazor circuit, so they cannot read --mud-palette-*.
+   They declare their own light/dark values from the same palette as
+   SecureOpsTheme.cs; keep the two in step when the palette changes.
+   ========================================================================== */
+
+.so-auth-body {
+    --so-auth-bg: #EEF1F6;
+    --so-auth-surface: #FFFFFF;
+    --so-auth-border: #DCE2EC;
+    --so-auth-text: #1A2433;
+    --so-auth-muted: #54607A;
+    --so-auth-accent: #1F3D66;
+    --so-auth-accent-hover: #16294A;
+    --so-auth-on-accent: #FFFFFF;
+    --so-auth-danger: #B3261E;
+    --so-auth-warning: #B5731A;
+    --so-auth-success: #0D7C66;
+
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--so-space-5) var(--so-space-4);
+    background: var(--so-auth-bg);
+    color: var(--so-auth-text);
+    font-family: "Segoe UI", system-ui, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+    .so-auth-body {
+        --so-auth-bg: #0C1421;
+        --so-auth-surface: #141F31;
+        --so-auth-border: #243349;
+        --so-auth-text: #E6ECF5;
+        --so-auth-muted: #A3B2C9;
+        --so-auth-accent: #6E9FD8;
+        --so-auth-accent-hover: #94BCEA;
+        --so-auth-on-accent: #0C1421;
+        --so-auth-danger: #F08A80;
+        --so-auth-warning: #E0B057;
+        --so-auth-success: #4FBFA2;
+    }
+}
+
+.so-auth {
+    width: 100%;
+    max-width: 400px;
+}
+
+.so-auth-card {
+    background: var(--so-auth-surface);
+    border: 1px solid var(--so-auth-border);
+    border-radius: var(--so-radius-lg);
+    padding: var(--so-space-6) var(--so-space-5);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+    text-align: center;
+}
+
+.so-auth-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin-bottom: var(--so-space-5);
+    color: var(--so-auth-accent);
+}
+
+.so-auth-mark {
+    display: inline-flex;
+}
+
+.so-auth-brand-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.2;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--so-auth-text);
+}
+
+.so-auth-brand-text small {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--so-auth-muted);
+}
+
+.so-auth-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    margin-bottom: var(--so-space-3);
+    border-radius: 50%;
+}
+
+.so-auth-status--ok {
+    background: color-mix(in srgb, var(--so-auth-success) 14%, transparent);
+    color: var(--so-auth-success);
+}
+
+.so-auth-status--warn {
+    background: color-mix(in srgb, var(--so-auth-warning) 14%, transparent);
+    color: var(--so-auth-warning);
+}
+
+.so-auth-title {
+    margin: 0 0 var(--so-space-2);
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.so-auth-lead {
+    margin: 0 0 var(--so-space-5);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--so-auth-muted);
+}
+
+.so-auth-form {
+    margin: 0;
+}
+
+.so-auth-submit {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--so-space-2);
+    width: 100%;
+    min-height: 44px;
+    padding: 0 var(--so-space-4);
+    border: 0;
+    border-radius: var(--so-radius);
+    background: var(--so-auth-accent);
+    color: var(--so-auth-on-accent);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.so-auth-submit:hover,
+.so-auth-submit:focus-visible {
+    background: var(--so-auth-accent-hover);
+}
+
+.so-auth-submit-spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid color-mix(in srgb, var(--so-auth-on-accent) 35%, transparent);
+    border-top-color: var(--so-auth-on-accent);
+    border-radius: 50%;
+    animation: so-spin 700ms linear infinite;
+}
+
+/* Shown only while a real sign-in round-trip is in flight. No fake progress. */
+.so-auth-form.is-busy .so-auth-submit-spinner {
+    display: inline-block;
+}
+
+.so-auth-form.is-busy .so-auth-submit {
+    pointer-events: none;
+    opacity: 0.85;
+}
+
+@keyframes so-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .so-auth-submit-spinner {
+        animation-duration: 2s;
+    }
+}
+
+.so-auth-note {
+    margin: var(--so-space-4) 0 0;
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: var(--so-auth-muted);
+}
+
+.so-auth-alert {
+    margin-bottom: var(--so-space-4);
+    padding: var(--so-space-3);
+    border-radius: var(--so-radius-sm);
+    border: 1px solid;
+    font-size: 0.83rem;
+    line-height: 1.55;
+    text-align: left;
+}
+
+.so-auth-alert--error {
+    border-color: color-mix(in srgb, var(--so-auth-danger) 40%, transparent);
+    background: color-mix(in srgb, var(--so-auth-danger) 10%, transparent);
+    color: var(--so-auth-danger);
+}
+
+.so-auth-alert--warning {
+    border-color: color-mix(in srgb, var(--so-auth-warning) 40%, transparent);
+    background: color-mix(in srgb, var(--so-auth-warning) 10%, transparent);
+    color: var(--so-auth-warning);
+}
+
+.so-auth-foot {
+    margin: var(--so-space-4) 0 0;
+    text-align: center;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--so-auth-muted);
+    opacity: 0.8;
+}
+
+/* =============================================================================
+   Blazor circuit failure banner
+   ========================================================================== */
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 2000;
+    padding: var(--so-space-3) var(--so-space-4);
+    background: #B5731A;
+    color: #fff;
+    font-size: 0.85rem;
+    box-shadow: 0 -2px 8px rgb(0 0 0 / 20%);
+}
+
+#blazor-error-ui a {
+    color: #fff;
+    margin-left: var(--so-space-3);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* =============================================================================
+   Responsive refinements
+
+   Only two breakpoints exist in this file (1024px for the two-column regions
+   and these small-width rules); everything else reflows through auto-fit grids
+   and flex-wrap.
+   ========================================================================== */
+
+@media (max-width: 599px) {
+    .so-page {
+        padding: var(--so-space-4) var(--so-space-3) var(--so-space-5);
+    }
+
+    .so-panel {
+        padding: var(--so-space-4);
+        border-radius: var(--so-radius-sm);
+    }
+
+    .so-page-title {
+        font-size: 1.2rem;
+    }
+
+    .so-identity-head {
+        gap: var(--so-space-3);
+    }
+
+    .so-form-actions .mud-button-root,
+    .so-panel-actions .mud-button-root {
+        width: 100%;
+    }
+}
+
+/* MudBlazor renders tables as stacked rows below its Breakpoint; these keep the
+   stacked form readable rather than letting long values force a page-wide scroll. */
+.mud-table-cell {
+    overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

@@ -1,0 +1,39 @@
+@page "/"
+@namespace SecureOps.Ui.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using Microsoft.AspNetCore.Components.Web
+@using SecureOps.Ui
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SecureOps</title>
+    <base href="~/" />
+
+    @* SVG first for modern browsers; the ICO answers older clients and bare /favicon.ico probes. *@
+    <link rel="icon" href="~/brand/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="~/brand/favicon.ico" sizes="32x32" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="application-name" content="SecureOps" />
+
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="~/css/secureops-theme.css" rel="stylesheet" />
+    <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
+</head>
+<body>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
+
+    @* Blazor's built-in circuit failure banner. Reworded from the framework default so a dropped
+       connection reads as a recoverable state rather than an application error. *@
+    <div id="blazor-error-ui">
+        <span>Sunucu bağlantısı kesildi. Sayfayı yenileyerek devam edebilirsiniz.</span>
+        <a href="" class="reload">Yenile</a>
+        <a class="dismiss" aria-label="Kapat">×</a>
+    </div>
+
+    <script src="_framework/blazor.server.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+</body>
+</html>

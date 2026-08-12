@@ -1,0 +1,135 @@
+@*
+    Account menu in the app bar.
+
+    Replaces the previous plain role caption. The trigger shows who is signed in — not what they are
+    allowed to do — because permissions belong to the account page where they can be shown in full and
+    with context.
+*@
+
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+
+<MudMenu AnchorOrigin="Origin.BottomRight"
+         TransformOrigin="Origin.TopRight"
+         Dense="true"
+         PopoverClass="so-user-menu-popover">
+    <ActivatorContent>
+        <button type="button" class="so-user-trigger" title="@User.DisplayName" aria-label="Hesap menüsü">
+            <span class="so-avatar" aria-hidden="true">@User.Initials</span>
+            <span class="so-user-trigger-text">
+                <span class="so-user-trigger-name">@User.DisplayName</span>
+                @if (_statusCaption is not null)
+                {
+                    <span class="so-user-trigger-meta">@_statusCaption</span>
+                }
+            </span>
+            <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" Class="so-user-trigger-caret" />
+        </button>
+    </ActivatorContent>
+
+    <ChildContent>
+        <div class="so-user-menu-head">
+            <span class="so-avatar so-avatar--lg" aria-hidden="true">@User.Initials</span>
+            <div>
+                <p class="so-user-menu-name">@User.DisplayName</p>
+                <p class="so-user-menu-account">@User.AccountName</p>
+            </div>
+        </div>
+
+        @if (_snapshot is not null)
+        {
+            <div class="so-user-menu-status">
+                <SoStatusBadge Label="@AccessStatusLabel"
+                               Tone="@AccessStatusTone"
+                               Icon="@AccessStatusIcon" />
+                @if (_snapshot.IsResolved && _snapshot.Roles.Count > 0)
+                {
+                    <span class="so-user-menu-roles">@RoleSummary</span>
+                }
+            </div>
+        }
+
+        <MudDivider Class="my-1" />
+
+        <MudMenuItem Href="account" Icon="@Icons.Material.Filled.AccountCircle">Hesabım</MudMenuItem>
+        <MudMenuItem Href="access/me" Icon="@Icons.Material.Filled.VerifiedUser">Erişimim</MudMenuItem>
+
+        <MudDivider Class="my-1" />
+
+        <MudMenuItem Icon="@(IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                     OnClick="OnToggleTheme">
+            @(IsDarkMode ? "Aydınlık tema" : "Koyu tema")
+        </MudMenuItem>
+
+        <MudDivider Class="my-1" />
+
+        @* A plain link, not an interactive callback: sign-out must clear the cookie through a real
+           server round-trip, which a circuit-scoped click handler cannot do. *@
+        <MudMenuItem Href="auth/sign-out" ForceLoad="true" Icon="@Icons.Material.Filled.Logout">
+            Oturumu kapat
+        </MudMenuItem>
+    </ChildContent>
+</MudMenu>
+
+@code {
+    /// <summary>Signed-in principal shown in the trigger and menu head.</summary>
+    [Parameter, EditorRequired]
+    public SignedInUser User { get; set; } = default!;
+
+    /// <summary>Whether the dark palette is active.</summary>
+    [Parameter]
+    public bool IsDarkMode { get; set; }
+
+    /// <summary>Invoked when the operator switches theme.</summary>
+    [Parameter]
+    public EventCallback OnToggleTheme { get; set; }
+
+    private AccessSnapshot? _snapshot;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _snapshot = await AccessProvider.GetAsync();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    // Only non-approved states earn a caption under the name; showing "Approved" on every page would
+    // be noise, while pending and disabled are states the operator must not miss.
+    private string? _statusCaption => _snapshot switch
+    {
+        { IsPending: true } => "Onay bekliyor",
+        { IsDisabled: true } => "Devre dışı",
+        { IsResolved: false } => "Erişim doğrulanamadı",
+        _ => null
+    };
+
+    private string AccessStatusLabel => _snapshot switch
+    {
+        { IsApproved: true } => "Erişim onaylı",
+        { IsPending: true } => "Erişim onayı bekleniyor",
+        { IsDisabled: true } => "Erişim devre dışı",
+        _ => "Erişim durumu bilinmiyor"
+    };
+
+    private SoStatusBadge.BadgeTone AccessStatusTone => _snapshot switch
+    {
+        { IsApproved: true } => SoStatusBadge.BadgeTone.Positive,
+        { IsPending: true } => SoStatusBadge.BadgeTone.Caution,
+        { IsDisabled: true } => SoStatusBadge.BadgeTone.Critical,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private string AccessStatusIcon => _snapshot switch
+    {
+        { IsApproved: true } => Icons.Material.Filled.CheckCircle,
+        { IsPending: true } => Icons.Material.Filled.HourglassTop,
+        { IsDisabled: true } => Icons.Material.Filled.NoAccounts,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+
+    private string RoleSummary =>
+        string.Join(", ", _snapshot!.Roles.Select(AccessLabels.RoleLabel));
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

@@ -1,0 +1,35 @@
+@inject NavigationManager Navigation
+
+@*
+    Routes an unauthorized render to the right destination.
+
+    An authenticated user who fails a policy needs an explanation, not a sign-in form; an anonymous
+    user needs sign-in with their destination preserved. Sending both to /login is what made a
+    permission failure look like a session problem.
+*@
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            Navigation.NavigateTo("login", replace: true);
+            return;
+        }
+
+        AuthenticationState authState = await AuthenticationStateTask;
+
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("access-denied", replace: true);
+            return;
+        }
+
+        string relativeUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+        string returnUrl = string.IsNullOrWhiteSpace(relativeUrl) ? "dashboard" : relativeUrl;
+        Navigation.NavigateTo($"login?returnUrl={Uri.EscapeDataString(returnUrl)}", replace: true);
+    }
+}

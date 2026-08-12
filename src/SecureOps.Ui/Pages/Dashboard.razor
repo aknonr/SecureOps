@@ -1,0 +1,296 @@
+@page "/"
+@page "/dashboard"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@inject ICurrentAccessProvider AccessProvider
+@inject ISignedInUserService Users
+@inject IIdentityLookupApiClient IdentityClient
+@inject ILogger<Dashboard> Logger
+
+<PageTitle>Genel Bakış · SecureOps</PageTitle>
+
+@*
+    Answers three questions in order: can I work right now, what can I do, and what is coming.
+
+    The previous board carried six panels, several of which restated the product's scope rather than
+    telling the operator anything actionable. What survived is the access state (which decides whether
+    anything else matters), the capabilities actually granted, and the roadmap — each once.
+*@
+
+<div class="so-page">
+    <SoPageHeader Title="Genel Bakış"
+                  Lead="@_greeting" />
+
+    @if (_snapshot is null)
+    {
+        <div class="so-panel so-panel--loading" aria-busy="true">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            <span>Erişim bilgileriniz yükleniyor…</span>
+        </div>
+    }
+    else if (!_snapshot.IsResolved)
+    {
+        <SoProblemPanel Problem="_snapshot.Problem!" OnRetry="RefreshAsync" />
+    }
+    else if (_snapshot.IsPending)
+    {
+        <section class="so-panel so-panel--notice">
+            <SoStatusBadge Label="Erişim onayı bekleniyor"
+                           Tone="SoStatusBadge.BadgeTone.Caution"
+                           Icon="@Icons.Material.Filled.HourglassTop" />
+            <h2 class="so-panel-title">Erişim talebiniz onay bekliyor</h2>
+            <p class="so-panel-text">
+                Kimliğiniz doğrulandı ve erişim talebiniz kaydedildi. Bir yönetici talebinizi
+                sonuçlandırdığında operasyon ekranları bu sayfada görünür hale gelecek.
+            </p>
+            <div class="so-panel-actions">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
+                    Durumu yenile
+                </MudButton>
+                <MudButton Href="access/me" Variant="Variant.Text" Color="Color.Primary">
+                    Erişim ayrıntıları
+                </MudButton>
+            </div>
+        </section>
+    }
+    else if (_snapshot.IsDisabled)
+    {
+        <section class="so-panel so-panel--notice so-panel--blocked">
+            <SoStatusBadge Label="Erişim devre dışı"
+                           Tone="SoStatusBadge.BadgeTone.Critical"
+                           Icon="@Icons.Material.Filled.NoAccounts" />
+            <h2 class="so-panel-title">Uygulama erişiminiz devre dışı</h2>
+            <p class="so-panel-text">
+                SecureOps operasyon ekranlarını kullanamazsınız. Erişiminizin yeniden açılması için
+                platform yöneticinize başvurun.
+            </p>
+        </section>
+    }
+    else
+    {
+        <div class="so-dash">
+            <div class="so-dash-main">
+                <section class="so-panel so-panel--primary">
+                    <p class="so-eyebrow">Şu an kullanılabilir</p>
+
+                    @if (_available.Count == 0)
+                    {
+                        <SoEmptyState Title="Henüz yetkilendirilmiş bir işlem yok"
+                                      Description="Hesabınız onaylı, ancak bir operasyon yetkisi tanımlanmamış. Yöneticinizden ihtiyacınız olan yetkileri talep edebilirsiniz."
+                                      Icon="@Icons.Material.Outlined.LockPerson">
+                            <Actions>
+                                <MudButton Href="access/me" Variant="Variant.Outlined" Color="Color.Primary">
+                                    Erişimimi görüntüle
+                                </MudButton>
+                            </Actions>
+                        </SoEmptyState>
+                    }
+                    else
+                    {
+                        <ul class="so-task-list">
+                            @foreach (OperatorTask task in _available)
+                            {
+                                <li class="so-task">
+                                    <span class="so-task-icon" aria-hidden="true">
+                                        <MudIcon Icon="@task.Icon" />
+                                    </span>
+                                    <div class="so-task-body">
+                                        <a class="so-task-title" href="@task.Route">@task.Title</a>
+                                        <p class="so-task-text">@task.Description</p>
+                                    </div>
+                                    <MudIcon Icon="@Icons.Material.Filled.ChevronRight"
+                                             Class="so-task-chevron" aria-hidden="true" />
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+
+                <section class="so-panel">
+                    <div class="so-panel-head">
+                        <h2 class="so-panel-title">Sistem durumu</h2>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
+                            Yenile
+                        </MudButton>
+                    </div>
+
+                    @if (_providerHealth is not null)
+                    {
+                        <div class="so-status-row">
+                            <SoStatusBadge Label="Erişilebilir"
+                                           Tone="SoStatusBadge.BadgeTone.Positive"
+                                           Icon="@Icons.Material.Filled.CheckCircle" />
+                            <span class="so-status-text">
+                                Dizin sağlayıcısı yanıt veriyor. Kimlik sorgulama kullanılabilir.
+                            </span>
+                        </div>
+
+                        @if (!_providerHealth.RealDirectoryProviderEnabled)
+                        {
+                            <p class="so-panel-text so-panel-text--sm">
+                                Bu ortamda kurumsal dizin bağlantısı henüz etkin değil; sonuçlar test
+                                sağlayıcısından gelir.
+                            </p>
+                        }
+                    }
+                    else if (_providerProblem is not null)
+                    {
+                        <div class="so-status-row">
+                            <SoStatusBadge Label="Durum bilinmiyor"
+                                           Tone="SoStatusBadge.BadgeTone.Caution"
+                                           Icon="@Icons.Material.Filled.HelpOutline" />
+                            <span class="so-status-text">@_providerProblem.Title</span>
+                        </div>
+                        <p class="so-panel-text so-panel-text--sm">
+                            Sorgu çalıştırabilirsiniz; sorun sürerse ilgili ekrandaki hata mesajı yol gösterir.
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="so-status-row" aria-busy="true">
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                            <span class="so-status-text">Sistem durumu kontrol ediliyor…</span>
+                        </div>
+                    }
+                </section>
+            </div>
+
+            <aside class="so-dash-side">
+                <section class="so-panel">
+                    <p class="so-eyebrow">Erişiminiz</p>
+                    <div class="so-panel-inline">
+                        <SoStatusBadge Label="Onaylı"
+                                       Tone="SoStatusBadge.BadgeTone.Positive"
+                                       Icon="@Icons.Material.Filled.CheckCircle" />
+                        @foreach (string role in _snapshot.Roles)
+                        {
+                            <SoStatusBadge Label="@AccessLabels.RoleLabel(role)"
+                                           Tone="SoStatusBadge.BadgeTone.Info"
+                                           Title="@AccessLabels.RoleDescription(role)" />
+                        }
+                    </div>
+                    <p class="so-panel-text so-panel-text--sm">
+                        @_snapshot.Capabilities.Count yetki tanımlı.
+                    </p>
+                    <MudButton Href="access/me" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small">
+                        Ayrıntılar
+                    </MudButton>
+                </section>
+
+                <section class="so-panel">
+                    <p class="so-eyebrow">Sonraki fazlar</p>
+                    <ul class="so-roadmap">
+                        <li>
+                            <span class="so-roadmap-name">Operasyonel kayıt → Jira</span>
+                            <SoStatusBadge Label="Hazırlanıyor" Tone="SoStatusBadge.BadgeTone.Caution" />
+                        </li>
+                        <li>
+                            <span class="so-roadmap-name">Salt okunur tanılama</span>
+                            <SoStatusBadge Label="Planlandı" Tone="SoStatusBadge.BadgeTone.Neutral" />
+                        </li>
+                        <li>
+                            <span class="so-roadmap-name">Denetim ve uyum görünümü</span>
+                            <SoStatusBadge Label="Planlandı" Tone="SoStatusBadge.BadgeTone.Neutral" />
+                        </li>
+                    </ul>
+                    <p class="so-panel-text so-panel-text--sm">
+                        Kimlik sorguları bugün de API üzerinden kayıt altına alınır.
+                    </p>
+                </section>
+            </aside>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>A capability-gated entry point offered on the dashboard.</summary>
+    /// <param name="Title">Action name.</param>
+    /// <param name="Description">What the action is for.</param>
+    /// <param name="Route">Target route.</param>
+    /// <param name="Icon">Leading icon.</param>
+    private sealed record OperatorTask(string Title, string Description, string Route, string Icon);
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private AccessSnapshot? _snapshot;
+    private string _greeting = "SecureOps operasyon platformu.";
+    private IReadOnlyList<OperatorTask> _available = [];
+
+    private IdentityProviderHealthResponse? _providerHealth;
+    private UiProblem? _providerProblem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+
+        if (AuthenticationStateTask is not null)
+        {
+            AuthenticationState state = await AuthenticationStateTask;
+            SignedInUser user = Users.Describe(state.User);
+            _greeting = $"{user.DisplayName} olarak oturum açtınız.";
+        }
+
+        await LoadAsync(force: false);
+    }
+
+    private Task RefreshAsync() => LoadAsync(force: true);
+
+    private async Task LoadAsync(bool force)
+    {
+        _snapshot = force
+            ? await AccessProvider.RefreshAsync()
+            : await AccessProvider.GetAsync();
+
+        _available = BuildTasks(_snapshot);
+
+        if (_snapshot.IsApproved)
+        {
+            await LoadProviderHealthAsync();
+        }
+    }
+
+    // Answers "can I actually work right now" before the operator discovers a dead directory by
+    // running a query. A failure here is reported as unknown status rather than as a page error: the
+    // lookup screen may still work, and its own error handling is the authority on that.
+    private async Task LoadProviderHealthAsync()
+    {
+        _providerHealth = null;
+        _providerProblem = null;
+
+        try
+        {
+            _providerHealth = await IdentityClient.GetProviderHealthAsync(CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _providerProblem = ex.Problem;
+            Logger.LogDebug("Identity provider health unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+    }
+
+    // Built from granted capabilities rather than a fixed list, so the dashboard shows what this
+    // operator can actually do instead of advertising screens that would refuse them.
+    private static IReadOnlyList<OperatorTask> BuildTasks(AccessSnapshot snapshot)
+    {
+        List<OperatorTask> tasks = [];
+
+        if (snapshot.Can(Capabilities.IdentityLookup))
+        {
+            tasks.Add(new OperatorTask(
+                "PAM / AD kimlik sorgulama",
+                "Tek bir hesabı inceleme amacıyla, kayıt altına alınan bir akışla sorgulayın.",
+                "identity-lookup",
+                Icons.Material.Filled.ManageSearch));
+        }
+
+        return tasks;
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

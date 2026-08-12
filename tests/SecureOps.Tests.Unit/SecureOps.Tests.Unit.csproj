@@ -18,6 +18,9 @@
     <ProjectReference Include="..\..\src\SecureOps.Domain\SecureOps.Domain.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Shared\SecureOps.Shared.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />
+    <!-- UI presentation logic that is pure and worth testing without a browser: error translation,
+         account input mirroring, and lookup result reuse. -->
+    <ProjectReference Include="..\..\src\SecureOps.Ui\SecureOps.Ui.csproj" />
   </ItemGroup>
 
   <ItemGroup>

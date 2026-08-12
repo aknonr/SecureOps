@@ -1,0 +1,88 @@
+﻿@page "/login"
+@model LoginModel
+@{
+    Layout = "LoginLayout";
+    ViewData["Title"] = "Oturum aç";
+
+    // Resolved through Url.Content so the reference survives a non-root IIS path base. A "~/" written
+    // directly into <use href> is not rewritten: tag helpers do not process SVG child elements.
+    string BrandMarkHref = Url.Content("~/brand/secureops-mark.svg") + "#mark";
+}
+
+@*
+    Single-action sign-in.
+
+    Shaped like a redirect-based enterprise sign-in: one primary action that hands off, and a return
+    path that brings the operator back where they were. When an identity provider replaces the interim
+    endpoint, the form action changes and this page does not.
+
+    No role or profile selection appears here. Permissions are resolved by the API after sign-in, so
+    presenting a choice would imply the operator picks their own authority.
+*@
+
+<main class="so-auth">
+    <section class="so-auth-card" aria-labelledby="login-heading">
+        <div class="so-auth-brand">
+            <span class="so-auth-mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="26" height="26" role="presentation">
+                    <use href="@BrandMarkHref" />
+                </svg>
+            </span>
+            <span class="so-auth-brand-text">
+                SecureOps
+                <small>Operasyon Platformu</small>
+            </span>
+        </div>
+
+        <h1 id="login-heading" class="so-auth-title">Oturum açın</h1>
+        <p class="so-auth-lead">
+            Devam etmek için kurumsal hesabınızla kimlik doğrulaması yapın.
+        </p>
+
+        @if (Model.ErrorMessage is not null)
+        {
+            <div class="so-auth-alert so-auth-alert--error" role="alert">@Model.ErrorMessage</div>
+        }
+
+        @if (Model.SignInEnabled)
+        {
+            <form method="post" action="@Url.Content("~/auth/sign-in")" class="so-auth-form" id="so-signin-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+
+                <button type="submit" class="so-auth-submit">
+                    <span class="so-auth-submit-label">Kurumsal hesapla devam et</span>
+                    <span class="so-auth-submit-spinner" aria-hidden="true"></span>
+                </button>
+            </form>
+
+            <p class="so-auth-note">
+                Yetkileriniz oturum açtıktan sonra kurumsal erişim kayıtlarınızdan belirlenir.
+            </p>
+        }
+        else
+        {
+            <div class="so-auth-alert so-auth-alert--warning" role="alert">
+                Bu ortamda oturum açma yapılandırılmamış. Erişim için platform yöneticinize başvurun.
+            </div>
+        }
+    </section>
+
+    <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
+</main>
+
+@if (Model.SignInEnabled)
+{
+    <script>
+        // Marks the form busy for the duration of the real sign-in round-trip. The button is not
+        // disabled, so the antiforgery token still posts; CSS pointer-events prevents a double submit.
+        (function () {
+            var form = document.getElementById('so-signin-form');
+            if (!form) { return; }
+            form.addEventListener('submit', function () {
+                form.classList.add('is-busy');
+                form.setAttribute('aria-busy', 'true');
+            });
+        })();
+    </script>
+}

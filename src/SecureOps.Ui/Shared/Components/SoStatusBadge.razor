@@ -1,0 +1,51 @@
+@*
+    Compact status pill.
+
+    Tone carries meaning, so every badge also carries a text label — colour is never the only signal
+    (see the accessibility rule in .cursor/rules/060-ui-rules.mdc).
+*@
+
+<span class="so-badge so-badge--@Tone.ToString().ToLowerInvariant()" title="@Title">
+    @if (!string.IsNullOrWhiteSpace(Icon))
+    {
+        <MudIcon Icon="@Icon" Size="Size.Small" Class="so-badge-icon" />
+    }
+    @Label
+</span>
+
+@code {
+    /// <summary>Semantic tone of the badge.</summary>
+    public enum BadgeTone
+    {
+        /// <summary>Inactive, planned, or not-applicable state.</summary>
+        Neutral,
+
+        /// <summary>Healthy, approved, or available state.</summary>
+        Positive,
+
+        /// <summary>State needing attention or awaiting someone.</summary>
+        Caution,
+
+        /// <summary>Blocked, failed, or disabled state.</summary>
+        Critical,
+
+        /// <summary>Informational classification with no health meaning.</summary>
+        Info
+    }
+
+    /// <summary>Text shown inside the badge.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Semantic tone.</summary>
+    [Parameter]
+    public BadgeTone Tone { get; set; } = BadgeTone.Neutral;
+
+    /// <summary>Optional leading icon.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Optional tooltip expanding on the label.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+}

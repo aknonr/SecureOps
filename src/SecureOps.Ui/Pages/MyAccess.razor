@@ -1,0 +1,185 @@
+@page "/access/me"
+@attribute [Authorize]
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+
+<PageTitle>Erişimim · SecureOps</PageTitle>
+
+@*
+    What this account may do, in the operator's language.
+
+    Capabilities are grouped by functional area rather than listed as raw identifiers, because the
+    question an operator actually has is "can I do X", not "do I hold OperationalRecords.CreateJira".
+    The identifier is still shown as a tooltip so it can be quoted in an access request.
+*@
+
+<div class="so-page so-page--narrow">
+    <SoPageHeader Title="Erişimim"
+                  Lead="SecureOps üzerindeki durumunuz, rolleriniz ve yetkileriniz.">
+        <Actions>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <div class="so-panel so-panel--loading" aria-busy="true">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            <span>Erişim bilgileriniz yükleniyor…</span>
+        </div>
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAsync" />
+    }
+    else
+    {
+        <section class="so-panel">
+            <div class="so-access-status so-access-status--@StatusModifier">
+                <span class="so-access-status-icon" aria-hidden="true">
+                    <MudIcon Icon="@StatusIcon" />
+                </span>
+                <div>
+                    <h2 class="so-panel-title">@StatusTitle</h2>
+                    <p class="so-panel-text">@StatusDescription</p>
+                </div>
+            </div>
+
+            @if (_access.IsPending && _access.Access!.PendingRequestId is { } requestId)
+            {
+                <SoFieldGrid MinColumnWidth="260px">
+                    <SoField Label="Talep numarası">
+                        <code class="so-code">@requestId</code>
+                    </SoField>
+                </SoFieldGrid>
+                <p class="so-panel-text so-panel-text--sm">
+                    Yöneticinize başvururken bu numarayı paylaşabilirsiniz.
+                </p>
+            }
+        </section>
+
+        <section class="so-panel">
+            <h2 class="so-panel-title">Rolleriniz</h2>
+
+            @if (_access.Roles.Count == 0)
+            {
+                <SoEmptyState Title="Tanımlı rol yok"
+                              Description="Hesabınıza henüz bir uygulama rolü atanmamış."
+                              Icon="@Icons.Material.Outlined.Badge" />
+            }
+            else
+            {
+                <ul class="so-role-list">
+                    @foreach (string role in _access.Roles)
+                    {
+                        <li class="so-role">
+                            <SoStatusBadge Label="@AccessLabels.RoleLabel(role)"
+                                           Tone="SoStatusBadge.BadgeTone.Info"
+                                           Title="@role" />
+                            @if (AccessLabels.RoleDescription(role) is { } description)
+                            {
+                                <span class="so-role-text">@description</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="so-panel">
+            <div class="so-panel-head">
+                <h2 class="so-panel-title">Yetkileriniz</h2>
+                <span class="so-count">@_access.Capabilities.Count</span>
+            </div>
+
+            @if (_access.Capabilities.Count == 0)
+            {
+                <SoEmptyState Title="Tanımlı yetki yok"
+                              Description="Rolleriniz onaylandığında yetkileriniz burada listelenir."
+                              Icon="@Icons.Material.Outlined.LockPerson" />
+            }
+            else
+            {
+                @foreach (IGrouping<string, CapabilityDescriptor> group in AccessLabels.Group(_access.Capabilities))
+                {
+                    <div class="so-cap-group">
+                        <p class="so-cap-group-name">@group.Key</p>
+                        <ul class="so-cap-list">
+                            @foreach (CapabilityDescriptor capability in group)
+                            {
+                                <li class="so-cap">
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                                             Size="Size.Small" Class="so-cap-icon" aria-hidden="true" />
+                                    <div>
+                                        <span class="so-cap-name" title="@capability.Capability">@capability.Label</span>
+                                        <p class="so-cap-text">@capability.Description</p>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            }
+
+            <p class="so-panel-text so-panel-text--sm mt-3">
+                Yetkiler sunucu tarafında her istekte yeniden doğrulanır. Buradaki liste, sunucunun
+                hesabınız için bildirdiği güncel yetkileri gösterir.
+            </p>
+        </section>
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync();
+    }
+
+    private async Task RefreshAsync() => _access = await AccessProvider.RefreshAsync();
+
+    private string StatusModifier => _access switch
+    {
+        { IsApproved: true } => "ok",
+        { IsPending: true } => "pending",
+        { IsDisabled: true } => "blocked",
+        _ => "unknown"
+    };
+
+    private string StatusIcon => _access switch
+    {
+        { IsApproved: true } => Icons.Material.Filled.VerifiedUser,
+        { IsPending: true } => Icons.Material.Filled.HourglassTop,
+        { IsDisabled: true } => Icons.Material.Filled.NoAccounts,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+
+    private string StatusTitle => _access switch
+    {
+        { IsApproved: true } => "Erişiminiz onaylı",
+        { IsPending: true } => "Erişiminiz onay bekliyor",
+        { IsDisabled: true } => "Erişiminiz devre dışı",
+        _ => "Erişim durumu belirlenemedi"
+    };
+
+    private string StatusDescription => _access switch
+    {
+        { IsApproved: true } =>
+            "SecureOps ekranlarını rolleriniz kapsamında kullanabilirsiniz.",
+        { IsPending: true } =>
+            "Kimliğiniz doğrulandı ve erişim talebiniz oluşturuldu. Bir yönetici talebinizi sonuçlandırana kadar operasyon ekranları kapalıdır.",
+        { IsDisabled: true } =>
+            "Uygulama erişiminiz devre dışı bırakıldı. Yeniden açılması için platform yöneticinize başvurun.",
+        _ =>
+            "Erişim bilgileriniz şu anda okunamadı."
+    };
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

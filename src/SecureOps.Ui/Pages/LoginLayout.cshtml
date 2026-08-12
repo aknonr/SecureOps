@@ -1,0 +1,27 @@
+@*
+    Layout for the server-rendered auth pages (/login, /signed-out, /session-expired).
+
+    Deliberately carries no app bar, drawer, or Blazor circuit: a user who is not signed in should
+    never see navigation for pages they cannot open, and these pages must render even when no circuit
+    can be established.
+*@
+@{
+    Layout = null;
+    string title = ViewData["Title"] as string ?? "Oturum";
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SecureOps · @title</title>
+    <base href="~/" />
+    <link rel="icon" href="~/brand/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="~/brand/favicon.ico" sizes="32x32" />
+    <meta name="color-scheme" content="light dark" />
+    <link href="~/css/secureops-theme.css" rel="stylesheet" />
+</head>
+<body class="so-auth-body">
+    @RenderBody()
+</body>
+</html>

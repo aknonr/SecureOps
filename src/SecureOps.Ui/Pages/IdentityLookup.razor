@@ -1,0 +1,441 @@
+@page "/identity-lookup"
+@attribute [Authorize]
+@using Microsoft.Extensions.Logging
+@implements IDisposable
+@inject IIdentityLookupApiClient IdentityClient
+@inject ICurrentAccessProvider AccessProvider
+@inject NavigationManager Navigation
+@inject ILogger<IdentityLookup> Logger
+
+<PageTitle>Kimlik Sorgulama · SecureOps</PageTitle>
+
+<div class="so-page">
+    <SoPageHeader Title="PAM / AD Kimlik Sorgulama"
+                  Lead="Tek bir hesabı inceleme amacıyla sorgulayın. Her sorgu, amacıyla birlikte kayıt altına alınır." />
+
+    @if (_access is null)
+    {
+        <div class="so-panel so-panel--loading" aria-busy="true">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            <span>Yetkileriniz doğrulanıyor…</span>
+        </div>
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.IdentityLookup))
+    {
+        @* A capability the operator lacks is explained here rather than redirected away, so they learn
+           what is missing and where to ask for it. *@
+        <SoProblemPanel Problem="_noCapabilityProblem">
+            <Actions>
+                <MudButton Href="access/me" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
+                    Erişimimi görüntüle
+                </MudButton>
+            </Actions>
+        </SoProblemPanel>
+    }
+    else
+    {
+        <div class="so-split">
+            <section class="so-panel so-lookup-form">
+                <h2 class="so-panel-title">Sorgu</h2>
+
+                <EditForm Model="_model" OnValidSubmit="@(() => RunLookupAsync(force: false))">
+                    <DataAnnotationsValidator />
+
+                    <MudTextField @bind-Value="_model.Account"
+                                  @bind-Value:after="OnAccountChanged"
+                                  Label="Hesap"
+                                  Placeholder="ornek.kullanici"
+                                  HelperText="@AccountHelperText"
+                                  Error="@(_accountError is not null)"
+                                  ErrorText="@_accountError"
+                                  Required="true"
+                                  Immediate="true"
+                                  MaxLength="@_maxAccountLength"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Person"
+                                  Variant="Variant.Outlined" />
+
+                    @if (_accountAdvisory is not null)
+                    {
+                        <p class="so-input-note">@_accountAdvisory</p>
+                    }
+
+                    <MudTextField @bind-Value="_model.Purpose"
+                                  Label="Sorgu amacı"
+                                  HelperText="İncelemenin nedenini kısaca yazın. Bu bilgi denetim kaydına işlenir."
+                                  Required="true"
+                                  Immediate="true"
+                                  Lines="3"
+                                  MaxLength="500"
+                                  Variant="Variant.Outlined"
+                                  Class="mt-4" />
+
+                    <div class="so-disclosure mt-3">
+                        <button type="button" class="so-disclosure-toggle" @onclick="ToggleEventRefs"
+                                aria-expanded="@_showEventRefs.ToString().ToLowerInvariant()">
+                            <MudIcon Icon="@(_showEventRefs ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                     Size="Size.Small" />
+                            Olay referansları (isteğe bağlı)
+                        </button>
+
+                        @if (_showEventRefs)
+                        {
+                            <div class="so-disclosure-body">
+                                <MudTextField @bind-Value="_model.AlertId"
+                                              Label="Alarm ID"
+                                              HelperText="GUID biçimi. Boş bırakılabilir."
+                                              Error="@(_alertIdError is not null)"
+                                              ErrorText="@_alertIdError"
+                                              Immediate="true"
+                                              Variant="Variant.Outlined" />
+
+                                <MudTextField @bind-Value="_model.TuruncuhatEvtId"
+                                              Label="Turuncuhat Olay ID"
+                                              HelperText="Harf, rakam ve . _ - karakterleri."
+                                              Immediate="true"
+                                              MaxLength="100"
+                                              Variant="Variant.Outlined"
+                                              Class="mt-3" />
+                            </div>
+                        }
+                    </div>
+
+                    <div class="so-form-actions">
+                        <MudButton ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Disabled="@(_loading || _accountError is not null)"
+                                   StartIcon="@Icons.Material.Filled.ManageSearch">
+                            Sorgula
+                        </MudButton>
+
+                        @if (_result is not null)
+                        {
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Primary"
+                                       Disabled="@_loading"
+                                       StartIcon="@Icons.Material.Filled.Refresh"
+                                       OnClick="@(() => RunLookupAsync(force: true))">
+                                Yenile
+                            </MudButton>
+                        }
+                    </div>
+                </EditForm>
+
+                <p class="so-panel-text so-panel-text--sm mt-3">
+                    Toplu, joker veya LDAP filtresi biçimindeki girişler kabul edilmez. Hesap değeri
+                    adres çubuğunda taşınmaz.
+                </p>
+            </section>
+
+            <section class="so-panel so-lookup-result">
+                <div class="so-panel-head">
+                    <h2 class="so-panel-title">Sonuç</h2>
+                    @if (_completedAt is not null && !_loading)
+                    {
+                        <span class="so-timestamp" title="Sonucun alındığı zaman">
+                            @_completedAt.Value.ToLocalTime().ToString("HH:mm:ss")
+                        </span>
+                    }
+                </div>
+
+                @if (_loading)
+                {
+                    <div class="so-result-center" aria-busy="true">
+                        <MudProgressCircular Indeterminate="true" Size="Size.Medium" />
+                        <p>Sorgu çalışıyor…</p>
+                    </div>
+                }
+                else if (_problem is not null)
+                {
+                    <SoProblemPanel Problem="_problem" OnRetry="@(() => RunLookupAsync(force: true))" />
+                }
+                else if (_result is null)
+                {
+                    <SoEmptyState Title="Henüz sorgu çalıştırılmadı"
+                                  Description="Hesap ve sorgu amacı girip Sorgula'ya basın."
+                                  Icon="@Icons.Material.Outlined.PersonSearch" />
+                }
+                else
+                {
+                    @if (_reusedResult)
+                    {
+                        @* Reuse is stated plainly: an operator must never wonder whether what they see
+                           reflects the query they just ran. *@
+                        <p class="so-reuse-note">
+                            <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                            Aynı sorgu az önce çalıştırıldığı için mevcut sonuç gösteriliyor.
+                            Yeniden çalıştırmak için <strong>Yenile</strong>'yi kullanın.
+                        </p>
+                    }
+
+                    <div class="so-result-tags">
+                        <SoStatusBadge Label="Bulundu"
+                                       Tone="SoStatusBadge.BadgeTone.Positive"
+                                       Icon="@Icons.Material.Filled.CheckCircle" />
+                        <SoStatusBadge Label="@($"Kaynak: {_result.Source}")"
+                                       Tone="SoStatusBadge.BadgeTone.Info" />
+                        <SoStatusBadge Label="@($"Normalleştirilmiş: {_result.NormalizedAccount}")"
+                                       Tone="SoStatusBadge.BadgeTone.Neutral"
+                                       Title="Sorgunun sunucuda çalıştırıldığı biçim" />
+                    </div>
+
+                    <SoFieldGrid>
+                        <SoField Label="Görünen ad" Value="@_result.User!.DisplayName" />
+                        <SoField Label="Hesap" Value="@_result.User.SamAccountName" />
+                        <SoField Label="UPN" Value="@_result.User.UserPrincipalName" />
+                        <SoField Label="E-posta" Value="@_result.User.Mail" />
+                        <SoField Label="Departman" Value="@_result.User.Department" />
+                        <SoField Label="Unvan" Value="@_result.User.Title" />
+                        <SoField Label="Yönetici" Value="@_result.User.ManagerDisplayName" />
+                        <SoField Label="Hesap durumu">
+                            <div class="so-inline-badges">
+                                <SoStatusBadge Label="@EnabledText(_result.User.Enabled)"
+                                               Tone="@EnabledTone(_result.User.Enabled)" />
+                                <SoStatusBadge Label="@LockedText(_result.User.Locked)"
+                                               Tone="@LockedTone(_result.User.Locked)" />
+                            </div>
+                        </SoField>
+                    </SoFieldGrid>
+
+                    <p class="so-panel-text so-panel-text--sm mt-3">
+                        Yalnızca onaylı operasyon alanları gösterilir. Dönen kişisel ayrıntılar denetim
+                        kaydında saklanmaz; kayıtta sorguyu kimin, hangi amaçla yaptığı tutulur.
+                    </p>
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly LookupModel _model = new();
+    private readonly IdentityLookupResultCache _cache = new();
+
+    private AccessSnapshot? _access;
+    private bool _loading;
+    private bool _showEventRefs;
+    private bool _reusedResult;
+
+    private IdentityLookupResponse? _result;
+    private UiProblem? _problem;
+    private DateTimeOffset? _completedAt;
+
+    private string? _accountError;
+    private string? _accountAdvisory;
+    private string? _alertIdError;
+
+    // Server-declared limits, replaced by the capabilities endpoint once it answers. Until then the
+    // documented defaults apply, so the form is usable even if that call fails.
+    private int _maxAccountLength = AccountInputRules.DefaultMaxAccountLength;
+    private bool _supportsUpn = true;
+
+    private static readonly UiProblem _noCapabilityProblem = new(
+        UiProblemKind.Forbidden,
+        "AccessDenied",
+        "Kimlik sorgulama yetkiniz yok",
+        "Hesabınız etkin, ancak kimlik sorgulama yetkisi tanımlı değil.",
+        ["Erişimim sayfasından mevcut yetkilerinizi görebilirsiniz.", "İhtiyacınız varsa yöneticinizden bu yetkiyi talep edin."],
+        Retryable: false,
+        RequiresRefresh: false,
+        CorrelationId: null,
+        Stage: null,
+        StatusCode: null);
+
+    private string AccountHelperText =>
+        $"Tek bir hesap. DOMAIN\\hesap biçimi kabul edilir. En fazla {_maxAccountLength} karakter.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync();
+
+        if (_access.Can(Capabilities.IdentityLookup))
+        {
+            await LoadCapabilitiesAsync();
+        }
+    }
+
+    // Validation limits come from the server rather than being hard-coded, so a configuration change
+    // does not silently leave the form stricter or looser than the endpoint it posts to.
+    private async Task LoadCapabilitiesAsync()
+    {
+        try
+        {
+            IdentityLookupCapabilitiesResponse capabilities =
+                await IdentityClient.GetCapabilitiesAsync(CancellationToken.None);
+
+            _maxAccountLength = capabilities.MaxAccountLength;
+            _supportsUpn = capabilities.SupportsUpnLookup;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            // Non-fatal: the form still works on documented defaults, and the server re-validates.
+            Logger.LogWarning(
+                "Identity lookup capabilities unavailable; using defaults. Code: {Code}.",
+                ex.Problem.Code);
+        }
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync();
+
+        if (_access.Can(Capabilities.IdentityLookup))
+        {
+            await LoadCapabilitiesAsync();
+        }
+    }
+
+    private void ToggleEventRefs() => _showEventRefs = !_showEventRefs;
+
+    private void OnAccountChanged()
+    {
+        AccountValidationResult validation =
+            AccountInputRules.Validate(_model.Account, _maxAccountLength, _supportsUpn);
+
+        // Nothing is flagged until there is something to flag: an untouched empty field is not an error.
+        _accountError = string.IsNullOrWhiteSpace(_model.Account) ? null : validation.Message;
+        _accountAdvisory = validation.IsValid ? validation.Advisory : null;
+    }
+
+    private async Task RunLookupAsync(bool force)
+    {
+        AccountValidationResult validation =
+            AccountInputRules.Validate(_model.Account, _maxAccountLength, _supportsUpn);
+
+        if (!validation.IsValid)
+        {
+            _accountError = validation.Message;
+            return;
+        }
+
+        Guid? alertId = null;
+        if (!string.IsNullOrWhiteSpace(_model.AlertId))
+        {
+            if (!Guid.TryParse(_model.AlertId, out Guid parsed))
+            {
+                _alertIdError = "Alarm ID geçerli bir GUID olmalıdır.";
+                _showEventRefs = true;
+                return;
+            }
+
+            alertId = parsed;
+        }
+
+        _alertIdError = null;
+
+        IdentityLookupRequest request = new(
+            _model.Account.Trim(),
+            _model.Purpose.Trim(),
+            alertId,
+            string.IsNullOrWhiteSpace(_model.TuruncuhatEvtId) ? null : _model.TuruncuhatEvtId.Trim());
+
+        if (force)
+        {
+            _cache.Invalidate();
+        }
+        else if (_cache.TryReuse(request, DateTimeOffset.UtcNow, out IdentityLookupResponse? cached))
+        {
+            _result = cached;
+            _problem = null;
+            _reusedResult = true;
+            return;
+        }
+
+        _loading = true;
+        _problem = null;
+        _reusedResult = false;
+
+        try
+        {
+            IdentityLookupResponse response = await IdentityClient.LookupAsync(request, CancellationToken.None);
+
+            _result = response;
+            _completedAt = DateTimeOffset.UtcNow;
+            _cache.Store(request, response, _completedAt.Value);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _result = null;
+            _completedAt = null;
+            _problem = ex.Problem;
+
+            // Only failures are dropped from the cache; a stale success is never shown as current.
+            _cache.Invalidate();
+
+            if (ex.Problem.RequiresSignIn)
+            {
+                Navigation.NavigateTo(SessionExpiredUrl(), forceLoad: true);
+                return;
+            }
+
+            Logger.LogWarning(
+                "Identity lookup failed. Code: {Code}. Status: {Status}. CorrelationId: {CorrelationId}.",
+                ex.Problem.Code,
+                ex.Problem.StatusCode,
+                ex.Problem.CorrelationId);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string SessionExpiredUrl()
+    {
+        string current = Navigation.ToBaseRelativePath(Navigation.Uri);
+        return $"session-expired?returnUrl={Uri.EscapeDataString(current)}";
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    private static string EnabledText(bool? enabled) => enabled switch
+    {
+        true => "Aktif",
+        false => "Pasif",
+        _ => "Aktiflik bilinmiyor"
+    };
+
+    private static SoStatusBadge.BadgeTone EnabledTone(bool? enabled) => enabled switch
+    {
+        true => SoStatusBadge.BadgeTone.Positive,
+        false => SoStatusBadge.BadgeTone.Critical,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static string LockedText(bool? locked) => locked switch
+    {
+        true => "Kilitli",
+        false => "Kilitli değil",
+        _ => "Kilit durumu bilinmiyor"
+    };
+
+    private static SoStatusBadge.BadgeTone LockedTone(bool? locked) => locked switch
+    {
+        true => SoStatusBadge.BadgeTone.Critical,
+        false => SoStatusBadge.BadgeTone.Positive,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+
+    private sealed class LookupModel
+    {
+        [Required(ErrorMessage = "Hesap zorunludur.")]
+        [MaxLength(128)]
+        public string Account { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Sorgu amacı zorunludur.")]
+        [MaxLength(500, ErrorMessage = "Sorgu amacı en fazla 500 karakter olabilir.")]
+        public string Purpose { get; set; } = string.Empty;
+
+        public string? AlertId { get; set; }
+
+        public string? TuruncuhatEvtId { get; set; }
+    }
+}

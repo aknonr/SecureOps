@@ -1,0 +1,49 @@
+@*
+    Route table and the two states a route can fail in.
+
+    NotAuthorized covers both "not signed in" and "signed in without the required policy";
+    RedirectToLogin distinguishes them so the operator lands on sign-in or on an explanation rather
+    than a blank page.
+*@
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    <RedirectToLogin />
+                </NotAuthorized>
+                <Authorizing>
+                    <div class="so-page so-page--narrow">
+                        <div class="so-panel so-panel--loading" aria-busy="true">
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                            <span>Oturumunuz doğrulanıyor…</span>
+                        </div>
+                    </div>
+                </Authorizing>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <div class="so-page so-page--narrow">
+                    <section class="so-panel so-panel--notice">
+                        <span class="so-notice-icon" aria-hidden="true">
+                            <MudIcon Icon="@Icons.Material.Filled.SearchOff" />
+                        </span>
+                        <h1 class="so-page-title">Sayfa bulunamadı</h1>
+                        <p class="so-panel-text">
+                            Aradığınız sayfa taşınmış veya adres hatalı olabilir.
+                        </p>
+                        <div class="so-panel-actions">
+                            <MudButton Href="dashboard" Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                                Genel Bakış'a dön
+                            </MudButton>
+                        </div>
+                    </section>
+                </div>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
