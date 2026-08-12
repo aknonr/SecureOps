@@ -6,4 +6,4 @@ Codex-owned backend identity lookup. `IIdentityLookupService` normalizes, audits
 
 `IPamAccountResolver` remains a Mock-only extension boundary. A real PAM adapter is planned only after an approved contract. Local development has no corporate AD/PAM access and must never contact it. Controlled test-server validation must use the application runtime identity, approved domain/container, DC reachability, exact lookup, timeout, and authorization checks.
 
-API release packaging must pass `scripts/release/Validate-ApiAdRuntimeDependencies.ps1`. It verifies `System.DirectoryServices.AccountManagement.dll` is present in both publish output and ZIP with assembly version `8.0.0.1` or later.
+API release packaging must pass `scripts/release/Validate-ApiAdRuntimeDependencies.ps1`. It verifies the SHA256 manifest, unique ZIP paths, publish-to-ZIP hashes, net8.0 runtime manifests, and the complete `System.DirectoryServices.AccountManagement` dependency runtime closure without contacting a domain controller.
