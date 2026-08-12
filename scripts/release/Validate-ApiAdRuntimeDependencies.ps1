@@ -61,6 +61,26 @@ if ($manifestEntries.Count -eq 0)
     throw 'SHA256 manifest has no payload entries.'
 }
 
+$expectedPublishEntries = @{}
+Get-ChildItem -LiteralPath $PublishDirectory -File -Recurse | Where-Object {
+    $_.Name -ne 'web.config' -and $_.Name -notmatch '^appsettings(\..+)?\.json$'
+} | ForEach-Object {
+    $relativePath = $_.FullName.Substring($PublishDirectory.Length).TrimStart('\') -replace '\\', '/'
+    $expectedPublishEntries[$relativePath] = $_.FullName
+}
+if ($expectedPublishEntries.Count -ne $manifestEntries.Count)
+{
+    throw "Publish payload count $($expectedPublishEntries.Count) differs from SHA256 manifest count $($manifestEntries.Count)."
+}
+
+foreach ($relativePath in $expectedPublishEntries.Keys)
+{
+    if (-not $manifestEntries.ContainsKey($relativePath))
+    {
+        throw "Publish payload is absent from the SHA256 manifest: $relativePath"
+    }
+}
+
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
 try
@@ -123,6 +143,31 @@ try
         if (-not $manifestEntries.ContainsKey($requiredPath))
         {
             throw "Required application artifact is absent from the manifest: $requiredPath"
+        }
+    }
+
+    $importantAssemblies = @{
+        'SecureOps.Api.dll' = 'SecureOps.Api'
+        'SecureOps.Infrastructure.dll' = 'SecureOps.Infrastructure'
+        'System.DirectoryServices.AccountManagement.dll' = 'System.DirectoryServices.AccountManagement'
+        'System.DirectoryServices.dll' = 'System.DirectoryServices'
+        'System.DirectoryServices.Protocols.dll' = 'System.DirectoryServices.Protocols'
+        'runtimes/win/lib/net8.0/System.DirectoryServices.AccountManagement.dll' = 'System.DirectoryServices.AccountManagement'
+        'runtimes/win/lib/net8.0/System.DirectoryServices.dll' = 'System.DirectoryServices'
+        'runtimes/win/lib/net8.0/System.DirectoryServices.Protocols.dll' = 'System.DirectoryServices.Protocols'
+    }
+    foreach ($relativePath in $importantAssemblies.Keys)
+    {
+        if (-not $manifestEntries.ContainsKey($relativePath))
+        {
+            throw "Important runtime assembly is absent from manifest: $relativePath"
+        }
+
+        $assemblyPath = Join-Path $PublishDirectory ($relativePath -replace '/', '\')
+        $identity = [System.Reflection.AssemblyName]::GetAssemblyName($assemblyPath)
+        if ($identity.Name -ne $importantAssemblies[$relativePath])
+        {
+            throw "Unexpected runtime assembly identity for $relativePath: $($identity.FullName)"
         }
     }
 
