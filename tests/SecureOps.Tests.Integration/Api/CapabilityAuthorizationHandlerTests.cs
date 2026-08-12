@@ -8,6 +8,7 @@ using SecureOps.Api.Security;
 using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Audit;
+using SecureOps.Shared.Audit;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
@@ -17,12 +18,43 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class CapabilityAuthorizationHandlerTests
 {
     [Fact]
+    public async Task FirstUnknownUser_BecomesPendingWithOneAccessRequest()
+    {
+        Fixture fixture = new();
+        ClaimsPrincipal principal = Principal("CONTOSO\\new.user");
+
+        AccessServiceResult<EnsureAccessUserResult> first = await fixture.Service.GetCurrentAsync(principal, Fixture.UserContext, CancellationToken.None);
+        AccessServiceResult<EnsureAccessUserResult> second = await fixture.Service.GetCurrentAsync(principal, Fixture.UserContext, CancellationToken.None);
+
+        first.IsSuccess.Should().BeTrue();
+        first.Value!.User.Status.Should().Be(AccessStatus.Pending);
+        first.Value.UserCreated.Should().BeTrue();
+        first.Value.RequestCreated.Should().BeTrue();
+        second.Value!.UserCreated.Should().BeFalse();
+        second.Value.RequestCreated.Should().BeFalse();
+        second.Value.PendingRequest!.Id.Should().Be(first.Value.PendingRequest!.Id);
+        (await fixture.Repository.ListRequestsAsync(AccessRequestStatus.Pending, CancellationToken.None)).Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task PendingUser_IsDenied()
     {
         Fixture fixture = new();
         ClaimsPrincipal principal = Principal("CONTOSO\\pending.user");
 
         AuthorizationHandlerContext authorization = await fixture.AuthorizeAsync(principal, Capabilities.IdentityLookup);
+
+        authorization.HasSucceeded.Should().BeFalse();
+        fixture.HttpContext.Items[CapabilityAuthorizationHandler.DenialCodeItem].Should().Be(OperationalErrorCodes.AccessPending);
+    }
+
+    [Fact]
+    public async Task PendingUser_CannotUseProtectedOperationalCapability()
+    {
+        Fixture fixture = new();
+        ClaimsPrincipal principal = Principal("CONTOSO\\pending.operator");
+
+        AuthorizationHandlerContext authorization = await fixture.AuthorizeAsync(principal, Capabilities.OperationalRecordsView);
 
         authorization.HasSucceeded.Should().BeFalse();
         fixture.HttpContext.Items[CapabilityAuthorizationHandler.DenialCodeItem].Should().Be(OperationalErrorCodes.AccessPending);
@@ -71,6 +103,51 @@ public sealed class CapabilityAuthorizationHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.User!.Status.Should().Be(AccessStatus.Approved);
         result.Value.User.Roles.Should().ContainSingle("Operator");
+        result.Value.User.Capabilities.Should().Contain(Capabilities.OperationalRecordsView);
+    }
+
+    [Fact]
+    public async Task ConfiguredBootstrapAdministrator_CanAccessAdministrationAndIsFullyAudited()
+    {
+        const string bootstrapIdentity = "CONTOSO\\bootstrap.admin";
+        Fixture fixture = new([bootstrapIdentity]);
+        ClaimsPrincipal principal = Principal(bootstrapIdentity);
+
+        AuthorizationHandlerContext authorization = await fixture.AuthorizeAsync(principal, Capabilities.AccessManageUsers);
+        ApplicationUser user = (await fixture.Repository.GetUserAsync(bootstrapIdentity, CancellationToken.None))!;
+
+        authorization.HasSucceeded.Should().BeTrue();
+        user.Status.Should().Be(AccessStatus.Approved);
+        user.Roles.Should().ContainSingle("Admin");
+        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.AccessApproved && audit.Actor == "system:configured-bootstrap");
+        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.RoleAssigned && audit.Actor == "system:configured-bootstrap");
+    }
+
+    [Fact]
+    public async Task ReplacingRolesWithTheSameSet_IsIdempotent()
+    {
+        Fixture fixture = new();
+        ClaimsPrincipal principal = Principal("CONTOSO\\role.user");
+        ApplicationUser user = await fixture.ApproveAsync(principal, "Operator");
+
+        AccessServiceResult<AccessMutationResult> first = await fixture.Service.ReplaceRolesAsync(
+            user.Id,
+            ["Lead", "Operator"],
+            "Updated for deterministic role testing.",
+            Fixture.AdminContext,
+            CancellationToken.None);
+        AccessServiceResult<AccessMutationResult> second = await fixture.Service.ReplaceRolesAsync(
+            user.Id,
+            ["operator", "lead", "Lead"],
+            "Repeated deterministic role update.",
+            Fixture.AdminContext,
+            CancellationToken.None);
+
+        first.IsSuccess.Should().BeTrue();
+        second.IsSuccess.Should().BeTrue();
+        second.Value!.AddedRoles.Should().BeEmpty();
+        second.Value.RemovedRoles.Should().BeEmpty();
+        second.Value.User!.Roles.Should().BeEquivalentTo("Lead", "Operator");
     }
 
     [Fact]
@@ -98,11 +175,15 @@ public sealed class CapabilityAuthorizationHandlerTests
         private readonly InMemoryAuditWriter _audit = new();
         private readonly IHttpContextAccessor _accessor;
 
-        public Fixture()
+        public Fixture(string[]? bootstrapAdministrators = null)
         {
             HttpContext = new DefaultHttpContext { TraceIdentifier = "trace-access-test" };
             _accessor = new HttpContextAccessor { HttpContext = HttpContext };
-            IOptions<AccessOptions> options = Options.Create(new AccessOptions { DemoCompatibilityEnabled = false });
+            IOptions<AccessOptions> options = Options.Create(new AccessOptions
+            {
+                DemoCompatibilityEnabled = false,
+                BootstrapAdministrators = bootstrapAdministrators ?? []
+            });
             Service = new ApplicationAccessService(
                 new CorporatePrincipalResolver(options),
                 _repository,
@@ -115,6 +196,8 @@ public sealed class CapabilityAuthorizationHandlerTests
         public static AccessOperationContext UserContext => new("CONTOSO\\request.user", "correlation-user", null);
         public DefaultHttpContext HttpContext { get; }
         public ApplicationAccessService Service { get; }
+        public InMemoryAccessRepository Repository => _repository;
+        public InMemoryAuditWriter Audit => _audit;
 
         public async Task<ApplicationUser> ApproveAsync(ClaimsPrincipal principal, string role)
         {

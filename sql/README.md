@@ -10,15 +10,15 @@ sql/
 └── migrations/ # Versioned migration scripts (V001, V002, ...)
 ```
 
-## First Migrations (Phase 1)
+## Current Reviewed Migrations
 
-| Version | Description |
+| Order | Description |
 |---|---|
-| V001 | Create `dbo.Servers`, `dbo.Alerts`, `dbo.AlertEvents`, indexes |
-| V002 | Create `dbo.DiagnosticJobs`, `dbo.DiagnosticResults`, indexes |
-| V003 | Create `audit` schema, `audit.AuditLog`, append-only trigger |
-| V004 | Create `security.Users`, `security.Roles`, `security.RoleAssignments`, `security.AccessRequests` |
-| V005 | Hangfire schema (managed by Hangfire library) |
+| 001 | Audit and application access schemas, tables, indexes, role seeds, and append-only/self-approval triggers |
+| 002 | Operational Record, Jira correlation, and append-only workflow history |
+| 003 | Access status/authentication fields, claim/freshness metadata, JiraPublisher/Auditor roles, and durable command executions |
+
+The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded. No down scripts or migration-history table exist. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
 
 Current reviewed offline assets additionally include `002-operational-record-jira-workflow.sql`, which creates `ops.OperationalRecords`, `ops.JiraTransfers`, and append-only workflow history.
 
@@ -35,9 +35,7 @@ Current reviewed offline assets additionally include `002-operational-record-jir
 
 ## Migration Tool
 
-EF Core migrations for `dbo.*` (Phase 1 onward).
-
-Hangfire schema is created automatically by `UseSqlServerStorage` at Worker startup; no manual migration needed.
+No application startup migration or EF migration is currently enabled. The reviewed SQLCMD assets are executed only by the approved DBA process.
 
 Audit triggers and append-only enforcement live in `sql/schema/` and are applied as part of the same migration that creates the table.
 

@@ -2,7 +2,8 @@
 param(
     [Parameter(Mandatory = $true)][string]$PublishDirectory,
     [Parameter(Mandatory = $true)][string]$ZipPath,
-    [Parameter(Mandatory = $true)][string]$ManifestPath
+    [Parameter(Mandatory = $true)][string]$ManifestPath,
+    [string[]]$ForbiddenText = @()
 )
 
 Set-StrictMode -Version Latest
@@ -23,6 +24,10 @@ foreach ($path in @($ZipPath, $ManifestPath))
         throw "Refusing to overwrite an existing release artifact: $path"
     }
 }
+
+& (Join-Path $PSScriptRoot 'Test-ApiReleasePayload.ps1') `
+    -PublishDirectory $PublishDirectory `
+    -ForbiddenText $ForbiddenText
 
 $files = @(Get-ChildItem -LiteralPath $PublishDirectory -File -Recurse | Where-Object {
     $_.Name -ne 'web.config' -and $_.Name -notmatch '^appsettings(\..+)?\.json$'

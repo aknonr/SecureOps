@@ -33,4 +33,6 @@ Platform foundation implemented: strict configured forwarded-header trust, expli
 
 The API release gate verifies Active Directory runtime assemblies, dependency-manifest consistency, and publish-to-ZIP hashes; it does not attempt an AD lookup.
 
+The complete TEST deployment configuration, first-admin bootstrap, migration order, runtime permissions, web.config delta, and rollback constraints are documented in `docs/24-api-test-deployment-readiness.md`. The generated OpenAPI snapshot and `docs/contracts/secureops-api-v1-ui-integration.md` are the frontend contract; UI agents must not infer routes or response models.
+
 Operational Record endpoints live under `/api/v1/operational-records`. Controllers are thin and use capability policies; Jira preview performs no external write. External providers remain fake-only until approved contracts exist. See `docs/22-operational-record-jira-workflow.md`.

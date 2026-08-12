@@ -38,3 +38,5 @@ Current implemented Phase 1A namespaces:
 Phase 1A audit and identity lookup infrastructure is implemented. The Operational Record to Jira backend foundation is implemented with fake integrations and optional SQL persistence; real integration adapters and approved classification rules are pending.
 
 See `Identity/README.md`, `Audit/README.md`, and `OperationalRecords/README.md` for provider selection, local-test boundaries, configuration, and controlled-runtime blockers.
+
+SQL-backed Access, Audit, Operational Record, and command idempotency providers share `ConnectionStrings:SecureOpsDb`. They require migrations 001-003 and the object-level runtime grants documented in `docs/24-api-test-deployment-readiness.md`; the application never executes those migrations.

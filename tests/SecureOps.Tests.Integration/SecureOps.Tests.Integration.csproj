@@ -2,10 +2,8 @@
 
   <!--
     SecureOps.Tests.Integration
-    xUnit integration tests. End-to-end flows with real SQL (Testcontainers MSSQL)
-    and Web API host (Microsoft.AspNetCore.Mvc.Testing). PowerShell calls use the
-    MockPowerShellRunner with canned outputs in unit-level integration tests; a
-    separate subset runs against a real pilot server when access is available.
+    xUnit integration tests. Current tests use the in-process Web API host
+    (Microsoft.AspNetCore.Mvc.Testing) and deterministic backend fakes only.
 
     See: .cursor/rules/090-testing-and-quality-rules.mdc
   -->
@@ -21,8 +19,6 @@
     <ProjectReference Include="..\..\src\SecureOps.Shared\SecureOps.Shared.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Api\SecureOps.Api.csproj" />
-    <ProjectReference Include="..\..\src\SecureOps.Worker\SecureOps.Worker.csproj" />
-    <ProjectReference Include="..\..\src\SecureOps.Ui\SecureOps.Ui.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,8 +29,6 @@
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="System.Text.Json" />
-    <PackageReference Include="Testcontainers.MsSql" />
-    <PackageReference Include="bunit" />
     <PackageReference Include="JsonSchema.Net" />
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>

@@ -1,8 +1,10 @@
 # Secure Ops Automation & AI Analysis Hub
 
+Current backend TEST deployment readiness, migrations, bootstrap access, exact runtime configuration, release validation, and rollback are documented in `docs/24-api-test-deployment-readiness.md`. Frontend integrations must consume `docs/contracts/secureops-api-v1.openapi.json` and `docs/contracts/secureops-api-v1-ui-integration.md`.
+
 An enterprise Windows operations platform that receives monitoring alarms, runs read-only diagnostics, captures structured audit data, and surfaces actionable findings to shift engineers.
 
-> **Status:** IdentityLookup works in TEST; provider-neutral access approval and hardened Operational Record/Jira backend are implemented with fake external adapters.
+> **Status:** Backend TEST release controls are implemented; controlled database and application deployment remains pending.
 > **Owner:** CONTOSO Turkish Technology (placeholder)
 > **Stack:** .NET 8, Blazor Server, SQL Server, PowerShell Remoting + JEA
 > **MVP timeline:** 6–8 weeks

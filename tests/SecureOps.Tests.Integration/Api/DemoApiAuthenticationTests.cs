@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Negotiate;
@@ -126,6 +127,18 @@ public sealed class DemoApiAuthenticationTests
     }
 
     [Fact]
+    public async Task Test_OpenApiDocument_MatchesCheckedInUiContractSnapshot()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
+        using HttpClient client = factory.CreateClient();
+
+        string actualJson = await client.GetStringAsync("/swagger/v1/swagger.json");
+        string expectedJson = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "docs", "contracts", "secureops-api-v1.openapi.json"));
+
+        JsonNode.DeepEquals(JsonNode.Parse(actualJson), JsonNode.Parse(expectedJson)).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Test_WithSwaggerDisabled_DoesNotExposeSwaggerRoutes()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: false);
@@ -161,5 +174,16 @@ public sealed class DemoApiAuthenticationTests
                 builder.UseSetting("RateLimiting:IdentityLookup:PermitLimit", "100");
                 builder.UseSetting("Swagger:Enabled", swaggerEnabled ? "true" : "false");
             });
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new DirectoryNotFoundException("Repository root was not found.");
     }
 }

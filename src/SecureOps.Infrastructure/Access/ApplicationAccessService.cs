@@ -56,17 +56,24 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         (string SystemActor, string[] Roles)? bootstrap = ResolveBootstrap(corporatePrincipal);
         if (ensured.User.Status == AccessStatus.Pending && ensured.PendingRequest is not null && bootstrap is not null)
         {
+            const string bootstrapReason = "Controlled authentication bootstrap.";
             AccessMutationResult mutation = await _repository.DecideRequestAsync(
                 ensured.PendingRequest.Id,
                 AccessRequestStatus.Approved,
                 bootstrap.Value.SystemActor,
                 bootstrap.Value.Roles,
-                "Controlled authentication compatibility bootstrap.",
+                bootstrapReason,
                 cancellationToken);
             if (mutation.Disposition == AccessMutationDisposition.Applied)
             {
                 AccessOperationContext bootstrapContext = context with { Actor = bootstrap.Value.SystemActor };
-                if (!await AuditMutationAsync(AuditActions.AccessApproved, mutation, bootstrapContext, "Controlled authentication compatibility bootstrap.", cancellationToken))
+                AccessServiceResult<AccessMutationResult> audited = await MapMutationAsync(
+                    mutation,
+                    AuditActions.AccessApproved,
+                    bootstrapContext,
+                    bootstrapReason,
+                    cancellationToken);
+                if (!audited.IsSuccess)
                 {
                     return AccessServiceResult<EnsureAccessUserResult>.Fail(OperationalErrorCodes.AuditStoreUnavailable);
                 }
@@ -103,7 +110,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessRequestInvalidState);
         }
 
-        AccessMutationResult mutation = await _repository.ReplaceRolesAsync(userId, roles, context.Actor, reason.Trim(), cancellationToken);
+        AccessMutationResult mutation = await _repository.ReplaceRolesAsync(userId, NormalizeRoles(roles), context.Actor, reason.Trim(), cancellationToken);
         return await MapMutationAsync(mutation, null, context, reason.Trim(), cancellationToken);
     }
 
@@ -132,7 +139,8 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessRequestInvalidState);
         }
 
-        AccessMutationResult mutation = await _repository.DecideRequestAsync(requestId, decision, context.Actor, roles, reason.Trim(), cancellationToken);
+        IReadOnlyCollection<string> normalizedRoles = decision == AccessRequestStatus.Approved ? NormalizeRoles(roles) : [];
+        AccessMutationResult mutation = await _repository.DecideRequestAsync(requestId, decision, context.Actor, normalizedRoles, reason.Trim(), cancellationToken);
         return await MapMutationAsync(
             mutation,
             decision == AccessRequestStatus.Approved ? AuditActions.AccessApproved : AuditActions.AccessRejected,
@@ -231,4 +239,8 @@ public sealed class ApplicationAccessService : IApplicationAccessService
     private static bool ValidReason(string? reason) => !string.IsNullOrWhiteSpace(reason) && reason.Trim().Length <= 500;
     private static bool ValidRoles(IReadOnlyCollection<string> roles, bool requireAtLeastOne) =>
         (!requireAtLeastOne || roles.Count > 0) && roles.Count <= 16 && roles.All(AccessRoleCatalog.IsKnownRole);
+    private static string[] NormalizeRoles(IEnumerable<string> roles) => AccessRoleCatalog.RoleCodes
+        .Where(roleCode => roles.Contains(roleCode, StringComparer.OrdinalIgnoreCase))
+        .OrderBy(roleCode => roleCode, StringComparer.Ordinal)
+        .ToArray();
 }

@@ -25,6 +25,18 @@ public static class PlatformSecurityConfigurationValidator
             throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required when Access:RepositoryProvider is SqlServer.");
         }
 
+        if (access.BootstrapAdministrators.Any(string.IsNullOrWhiteSpace)
+            || access.BootstrapAdministrators.Any(identifier => identifier.Trim().Length > 256)
+            || access.BootstrapAdministrators.Distinct(StringComparer.OrdinalIgnoreCase).Count() != access.BootstrapAdministrators.Length)
+        {
+            throw new InvalidOperationException("Access:BootstrapAdministrators must contain unique, non-empty identifiers no longer than 256 characters.");
+        }
+
+        if (access.BootstrapAdministrators.Length > 0 && !access.AutoCreateRequest)
+        {
+            throw new InvalidOperationException("Access:AutoCreateRequest must be true while configured bootstrap administrators are enabled.");
+        }
+
         if (session.IdleTimeoutMinutes is < 1 or > 1440 || session.AbsoluteLifetimeHours is < 1 or > 168
             || session.AbsoluteLifetimeHours * 60 < session.IdleTimeoutMinutes)
         {

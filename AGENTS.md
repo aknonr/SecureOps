@@ -2,7 +2,7 @@
 
 **Project:** Secure Ops Automation & AI Analysis Hub
 **Owner organization placeholder:** CONTOSO Turkish Technology
-**Status:** IdentityLookup works in TEST; provider-neutral access approval, capability authorization, and hardened Operational Record/Jira backend are implemented with fake external adapters.
+**Status:** IdentityLookup works in TEST; provider-neutral access, hardened Operational Record/Jira backend, and TEST release controls are implemented. Controlled TEST deployment remains pending.
 **Last updated:** 2026-08
 
 ---

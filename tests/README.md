@@ -4,6 +4,8 @@ Two test projects mirroring `src/`.
 
 Current coverage includes Phase 1A IdentityLookup, audit hardening, Operational Record/Jira classification and workflow behavior, authorization, SQL contracts, and release packaging. Phase 1 diagnostic, Hangfire, and JEA tests are still planned.
 
+Access lifecycle coverage proves one Pending request per unknown principal, protected-capability denial, configured bootstrap Admin authorization and audit, Admin approval, capability assignment, immediate disable denial, non-admin denial, and idempotent canonical role replacement.
+
 ## SecureOps.Tests.Unit
 
 Fast, isolated, no I/O. Mock everything external.
@@ -22,12 +24,12 @@ Target coverage:
 
 ## SecureOps.Tests.Integration
 
-Slower, broader. Real SQL via Testcontainers, real Web API host via `WebApplicationFactory`.
+Slower, broader. Current coverage uses the in-process Web API host via `WebApplicationFactory` and deterministic backend fakes. No SQL container or UI test dependency is active.
 
 Subfolders:
 - `Api/` — webhook flow, controller routing, authorization.
 - `Worker/` — Hangfire job orchestration.
-- `Sql/` — schema, audit trigger, append-only enforcement.
+- `Sql/` — future authorized SQL integration coverage; current SQL checks are offline contract tests.
 - `Security/` — JEA whitelist enforcement, forbidden-cmdlet rejection.
 - `Performance/` — concurrent webhook load, diagnostic timing.
 - `Mocks/` — mock SolarWinds, PAM, Teams.

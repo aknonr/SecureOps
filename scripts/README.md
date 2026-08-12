@@ -1,6 +1,6 @@
 # scripts/
 
-PowerShell artifacts. The folders exist as Phase 1 placeholders. No production diagnostic or JEA scripts are implemented yet.
+PowerShell artifacts. Production diagnostic and JEA scripts are not implemented yet; current API scripts provide offline release validation and an explicitly invoked read-only TEST smoke check.
 
 ## Structure
 
@@ -19,6 +19,14 @@ scripts/
         ├── SecureOpsDiagnosticRole.psrc
         └── Install-SecureOpsJeaEndpoint.ps1
 ```
+
+## API Release Scripts
+
+- `release/New-ApiDeploymentPackage.ps1` creates and validates a path-preserving deployment ZIP and payload manifest.
+- `release/Test-ApiReleasePayload.ps1` rejects forbidden files and scans for credential-like and caller-supplied personal markers.
+- `release/Validate-ApiAdRuntimeDependencies.ps1` validates hashes, runtime manifests, project consistency, and the AD dependency closure.
+- `powershell/Test-ApiTestSwaggerReadiness.ps1` performs offline TEST Swagger artifact validation.
+- `powershell/Test-ApiTestDeploymentReadOnly.ps1` performs only authenticated GET smoke checks after separately approved deployment.
 
 ## Rules
 
