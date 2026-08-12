@@ -12,6 +12,7 @@ using SecureOps.Api.Validation;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Identity;
+using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
@@ -23,6 +24,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 AuditConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 IdentityLookupConfigurationValidator.Validate(builder.Configuration);
 ReverseProxyConfiguration.Validate(builder.Configuration);
+OperationalRecordConfigurationValidator.Validate(builder.Configuration);
 
 bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
     builder.Environment.EnvironmentName,

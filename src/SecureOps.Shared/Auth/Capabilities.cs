@@ -15,4 +15,14 @@ public static class Capabilities
     public const string AccessAdministration = "AccessAdministration";
     /// <summary>Run or view approved system diagnostics.</summary>
     public const string SystemDiagnostics = "SystemDiagnostics";
+    /// <summary>View operational records.</summary>
+    public const string OperationalRecordsView = "OperationalRecords.View";
+    /// <summary>Create read-only Jira previews.</summary>
+    public const string OperationalRecordsCreateJiraPreview = "OperationalRecords.CreateJiraPreview";
+    /// <summary>Create Jira issues through the durable workflow.</summary>
+    public const string OperationalRecordsCreateJira = "OperationalRecords.CreateJira";
+    /// <summary>Retry failed operational-record workflows.</summary>
+    public const string OperationalRecordsRetry = "OperationalRecords.Retry";
+    /// <summary>View operational-record workflow diagnostics.</summary>
+    public const string OperationalRecordsViewDiagnostics = "OperationalRecords.ViewDiagnostics";
 }

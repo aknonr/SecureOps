@@ -1,0 +1,10 @@
+using SecureOps.Domain.OperationalRecords;
+
+namespace SecureOps.Infrastructure.OperationalRecords;
+
+/// <summary>Builds a safe Jira preview from configured mappings.</summary>
+public interface IJiraIssueDraftService
+{
+    /// <summary>Builds a draft without creating or modifying remote data.</summary>
+    public Task<OperationalRecordResult<JiraIssueDraft>> BuildAsync(OperationalRecord record, CancellationToken cancellationToken);
+}

@@ -21,4 +21,36 @@ public static class OperationalErrorCodes
     public const string AuditStoreUnavailable = "AuditStoreUnavailable";
     /// <summary>The authenticated identity is awaiting access approval.</summary>
     public const string AccessPending = "AccessPending";
+    /// <summary>Operational source authentication failed.</summary>
+    public const string OperationalSourceAuthenticationFailed = "OperationalSourceAuthenticationFailed";
+    /// <summary>Operational source is unavailable.</summary>
+    public const string OperationalSourceUnavailable = "OperationalSourceUnavailable";
+    /// <summary>Operational-record query failed.</summary>
+    public const string OperationalRecordQueryFailed = "OperationalRecordQueryFailed";
+    /// <summary>Operational record was not found.</summary>
+    public const string OperationalRecordNotFound = "OperationalRecordNotFound";
+    /// <summary>Operational record is in an invalid workflow state.</summary>
+    public const string OperationalRecordInvalidState = "OperationalRecordInvalidState";
+    /// <summary>Requester resolution failed.</summary>
+    public const string RequesterResolutionFailed = "RequesterResolutionFailed";
+    /// <summary>Requester resolution returned more than one exact match.</summary>
+    public const string RequesterResolutionAmbiguous = "RequesterResolutionAmbiguous";
+    /// <summary>Jira is unavailable.</summary>
+    public const string JiraUnavailable = "JiraUnavailable";
+    /// <summary>Jira rejected integration authorization.</summary>
+    public const string JiraUnauthorized = "JiraUnauthorized";
+    /// <summary>Jira rejected the proposed issue fields.</summary>
+    public const string JiraValidationFailed = "JiraValidationFailed";
+    /// <summary>Jira issue creation failed.</summary>
+    public const string JiraCreateFailed = "JiraCreateFailed";
+    /// <summary>A Jira issue is already persisted for the record and mapping.</summary>
+    public const string JiraAlreadyCreated = "JiraAlreadyCreated";
+    /// <summary>Operational-record close/update failed.</summary>
+    public const string OperationalRecordCloseFailed = "OperationalRecordCloseFailed";
+    /// <summary>Operational-record comment update failed.</summary>
+    public const string OperationalRecordCommentUpdateFailed = "OperationalRecordCommentUpdateFailed";
+    /// <summary>Another workflow operation owns the record.</summary>
+    public const string WorkflowConflict = "WorkflowConflict";
+    /// <summary>The workflow already completed.</summary>
+    public const string WorkflowAlreadyCompleted = "WorkflowAlreadyCompleted";
 }

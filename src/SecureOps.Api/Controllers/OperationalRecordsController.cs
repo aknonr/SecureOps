@@ -1,0 +1,183 @@
+using System.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SecureOps.Api.Middleware;
+using SecureOps.Domain.OperationalRecords;
+using SecureOps.Infrastructure.OperationalRecords;
+using SecureOps.Shared.Auth;
+using SecureOps.Shared.Contracts.Api;
+using SecureOps.Shared.Contracts.OperationalRecords;
+
+namespace SecureOps.Api.Controllers;
+
+/// <summary>Authorized operational-record query and Jira workflow endpoints.</summary>
+[ApiController]
+[Route("api/v1/operational-records")]
+[Authorize]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+public sealed class OperationalRecordsController : ControllerBase
+{
+    private readonly IOperationalRecordService _recordService;
+    private readonly IJiraTransferService _transferService;
+
+    /// <summary>Initializes the controller.</summary>
+    public OperationalRecordsController(IOperationalRecordService recordService, IJiraTransferService transferService)
+    {
+        _recordService = recordService;
+        _transferService = transferService;
+    }
+
+    /// <summary>Refreshes and returns a bounded list of active operational records.</summary>
+    [HttpGet]
+    [Authorize(Policy = Policies.CanViewOperationalRecords)]
+    [ProducesResponseType(typeof(IReadOnlyList<OperationalRecordResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<IReadOnlyList<OperationalRecordResponse>>> ListAsync(CancellationToken cancellationToken)
+    {
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await _recordService.ListAsync(Context(), cancellationToken);
+        return result.IsSuccess
+            ? Ok(result.Value!.Select(ToResponse).ToArray())
+            : Failure<IReadOnlyList<OperationalRecordResponse>>(result.Failure!);
+    }
+
+    /// <summary>Returns one persisted operational record.</summary>
+    [HttpGet("{id:guid}")]
+    [Authorize(Policy = Policies.CanViewOperationalRecords)]
+    [ProducesResponseType(typeof(OperationalRecordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OperationalRecordResponse>> GetAsync(Guid id, CancellationToken cancellationToken)
+    {
+        OperationalRecordResult<OperationalRecord> result = await _recordService.GetAsync(id, cancellationToken);
+        return result.IsSuccess ? Ok(ToResponse(result.Value!)) : Failure<OperationalRecordResponse>(result.Failure!);
+    }
+
+    /// <summary>Generates a read-only Jira field preview without modifying external systems.</summary>
+    [HttpPost("{id:guid}/jira-preview")]
+    [Authorize(Policy = Policies.CanPreviewJira)]
+    [ProducesResponseType(typeof(JiraPreviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<JiraPreviewResponse>> PreviewAsync(Guid id, CancellationToken cancellationToken)
+    {
+        OperationalRecordResult<JiraIssueDraft> result = await _transferService.PreviewAsync(id, Context(), cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return Failure<JiraPreviewResponse>(result.Failure!);
+        }
+
+        JiraIssueDraft draft = result.Value!;
+        return Ok(new JiraPreviewResponse(
+            draft.OperationalRecordId,
+            draft.OrCode,
+            draft.ProjectKey,
+            draft.IssueType,
+            draft.Summary,
+            draft.Description,
+            draft.RequesterAccountId,
+            draft.MappingVersion,
+            draft.IdempotencyKey,
+            draft.Warnings));
+    }
+
+    /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>
+    [HttpPost("{id:guid}/jira")]
+    [Authorize(Policy = Policies.CanCreateJira)]
+    [ProducesResponseType(typeof(JiraTransferResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<JiraTransferResponse>> CreateAsync(Guid id, CancellationToken cancellationToken)
+    {
+        OperationalRecordCommandContext context = Context();
+        OperationalRecordResult<OperationalRecord> result = await _transferService.CreateAsync(id, context, cancellationToken);
+        return result.IsSuccess ? Ok(ToTransferResponse(result.Value!, context.CorrelationId)) : Failure<JiraTransferResponse>(result.Failure!);
+    }
+
+    /// <summary>Resumes only the safe failed stage of a durable workflow.</summary>
+    [HttpPost("{id:guid}/retry")]
+    [Authorize(Policy = Policies.CanRetryJira)]
+    [ProducesResponseType(typeof(JiraTransferResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<JiraTransferResponse>> RetryAsync(Guid id, CancellationToken cancellationToken)
+    {
+        OperationalRecordCommandContext context = Context();
+        OperationalRecordResult<OperationalRecord> result = await _transferService.RetryAsync(id, context, cancellationToken);
+        return result.IsSuccess ? Ok(ToTransferResponse(result.Value!, context.CorrelationId)) : Failure<JiraTransferResponse>(result.Failure!);
+    }
+
+    private OperationalRecordCommandContext Context()
+    {
+        string correlationId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+        return new OperationalRecordCommandContext(
+            User.Identity?.Name ?? "unknown",
+            correlationId,
+            HttpContext.Connection.RemoteIpAddress?.ToString());
+    }
+
+    private ActionResult<T> Failure<T>(OperationalRecordFailure failure)
+    {
+        int status = failure.Code switch
+        {
+            OperationalErrorCodes.OperationalRecordNotFound => StatusCodes.Status404NotFound,
+            OperationalErrorCodes.OperationalRecordInvalidState or
+            OperationalErrorCodes.RequesterResolutionAmbiguous or
+            OperationalErrorCodes.JiraAlreadyCreated or
+            OperationalErrorCodes.WorkflowConflict or
+            OperationalErrorCodes.WorkflowAlreadyCompleted => StatusCodes.Status409Conflict,
+            OperationalErrorCodes.JiraValidationFailed => StatusCodes.Status422UnprocessableEntity,
+            OperationalErrorCodes.RequesterResolutionFailed => StatusCodes.Status422UnprocessableEntity,
+            _ => StatusCodes.Status503ServiceUnavailable
+        };
+        return OperationalProblemDetails.Create(status, failure.Code, SafeTitle(failure.Code), Context().CorrelationId, failure.Stage, failure.Retryable);
+    }
+
+    private static string SafeTitle(string code) => code switch
+    {
+        OperationalErrorCodes.OperationalRecordNotFound => "Operational record was not found.",
+        OperationalErrorCodes.OperationalRecordInvalidState => "Operational record is not eligible for this operation.",
+        OperationalErrorCodes.RequesterResolutionAmbiguous => "Requester resolution requires review.",
+        OperationalErrorCodes.RequesterResolutionFailed => "Requester could not be resolved safely.",
+        OperationalErrorCodes.JiraAlreadyCreated => "A Jira issue already exists for this workflow.",
+        OperationalErrorCodes.WorkflowAlreadyCompleted => "The workflow is already complete.",
+        OperationalErrorCodes.WorkflowConflict => "The workflow cannot proceed automatically.",
+        _ => "The operational workflow could not be completed."
+    };
+
+    private static OperationalRecordResponse ToResponse(OperationalRecord record) => new(
+        record.Id,
+        record.SourceRecordId,
+        record.OrCode,
+        record.Title,
+        record.Description,
+        record.Requester,
+        record.CreatedAt,
+        record.Environment,
+        record.ServerReference,
+        record.ApplicationReference,
+        record.Classification,
+        record.JiraEligible,
+        record.EligibilityReason,
+        record.WorkflowState,
+        record.JiraIssueKey,
+        record.LastErrorCode,
+        record.CorrelationId,
+        record.RetryCount,
+        record.UpdatedAt);
+
+    private static JiraTransferResponse ToTransferResponse(OperationalRecord record, string correlationId) => new(
+        record.Id,
+        record.OrCode,
+        record.WorkflowState,
+        record.JiraIssueKey,
+        record.MappingVersion ?? string.Empty,
+        record.IdempotencyKey ?? string.Empty,
+        record.RetryCount,
+        correlationId);
+}

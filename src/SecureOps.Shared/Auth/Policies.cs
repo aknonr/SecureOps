@@ -15,6 +15,16 @@ public static class Policies
     public const string CanAccessAdministration = "CanAccessAdministration";
     /// <summary>Capability policy for system diagnostics.</summary>
     public const string CanSystemDiagnostics = "CanSystemDiagnostics";
+    /// <summary>View imported operational records.</summary>
+    public const string CanViewOperationalRecords = "CanViewOperationalRecords";
+    /// <summary>Generate a read-only Jira preview.</summary>
+    public const string CanPreviewJira = "CanPreviewJira";
+    /// <summary>Create one Jira issue through the durable workflow.</summary>
+    public const string CanCreateJira = "CanCreateJira";
+    /// <summary>Retry a failed durable Jira workflow.</summary>
+    public const string CanRetryJira = "CanRetryJira";
+    /// <summary>View operational workflow diagnostics.</summary>
+    public const string CanViewOperationalRecordDiagnostics = "CanViewOperationalRecordDiagnostics";
     /// <summary>
     /// Operator, TeamLead, Admin, or Auditor where explicitly allowed by endpoint logic.
     /// </summary>

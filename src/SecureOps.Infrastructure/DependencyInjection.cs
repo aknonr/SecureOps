@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Identity;
+using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Infrastructure;
@@ -24,6 +25,8 @@ public static class DependencyInjection
         services.Configure<AuditOptions>(configuration.GetSection(AuditOptions.SectionName));
         services.Configure<IdentityLookupOptions>(configuration.GetSection(IdentityLookupOptions.SectionName));
         services.Configure<PamProviderOptions>(configuration.GetSection(PamProviderOptions.SectionName));
+        services.Configure<OperationalRecordsOptions>(configuration.GetSection(OperationalRecordsOptions.SectionName));
+        services.Configure<JiraIntegrationOptions>(configuration.GetSection(JiraIntegrationOptions.SectionName));
         services.AddSingleton<IAuditStoreHealthState, AuditStoreHealthState>();
 
         services.AddSingleton<IIdentityAccountNormalizer, IdentityAccountNormalizer>();
@@ -61,6 +64,23 @@ public static class DependencyInjection
         }
 
         services.AddSingleton<AuditHealthReporter>();
+
+        services.AddSingleton<IOperationalRecordClient, FakeOperationalRecordClient>();
+        services.AddSingleton<IJiraClient, FakeJiraClient>();
+        services.AddSingleton<IRequesterResolver, FakeRequesterResolver>();
+        services.AddSingleton<IOperationalRecordClassifier, ManualReviewOperationalRecordClassifier>();
+        if (string.Equals(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<IOperationalRecordRepository, SqlOperationalRecordRepository>();
+        }
+        else
+        {
+            services.AddSingleton<IOperationalRecordRepository, InMemoryOperationalRecordRepository>();
+        }
+
+        services.AddScoped<IJiraIssueDraftService, JiraIssueDraftService>();
+        services.AddScoped<IOperationalRecordService, OperationalRecordService>();
+        services.AddScoped<IJiraTransferService, JiraTransferService>();
 
         return services;
     }
