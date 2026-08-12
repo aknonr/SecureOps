@@ -120,7 +120,7 @@ public sealed class IdentityController : ControllerBase
     /// <returns>Lookup response.</returns>
     [HttpPost("lookup")]
     [Authorize(Policy = Policies.CanIdentityLookup)]
-    [EnableRateLimiting(IdentityLookupRateLimits.Lookup)]
+    [EnableRateLimiting(ApiRateLimits.IdentityLookup)]
     [ProducesResponseType(typeof(IdentityLookupResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(IdentityLookupResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -196,10 +196,29 @@ public sealed class IdentityController : ControllerBase
         };
     }
 
+    /// <summary>Returns aggregate cache metrics without account labels or identity data.</summary>
+    [HttpGet("lookup/cache-diagnostics")]
+    [Authorize(Policy = Policies.CanSystemDiagnostics)]
+    [ProducesResponseType(typeof(IdentityLookupCacheDiagnosticsResponse), StatusCodes.Status200OK)]
+    public ActionResult<IdentityLookupCacheDiagnosticsResponse> CacheDiagnostics(
+        [FromServices] IdentityReadThroughCache cache)
+    {
+        IdentityLookupCacheMetricsSnapshot snapshot = cache.GetSnapshot();
+        return Ok(new IdentityLookupCacheDiagnosticsResponse(
+            snapshot.CacheHits,
+            snapshot.CacheMisses,
+            snapshot.ProviderCalls,
+            snapshot.CoalescedRequests,
+            snapshot.CachedEntries,
+            snapshot.InflightRequests,
+            _options.Cache.Enabled,
+            _options.Cache.TtlSeconds));
+    }
+
     /// <summary>Looks up a bounded, ordered set of exact identity accounts.</summary>
     [HttpPost("bulk-lookup")]
     [Authorize(Policy = Policies.CanBulkIdentityLookup)]
-    [EnableRateLimiting(IdentityLookupRateLimits.Lookup)]
+    [EnableRateLimiting(ApiRateLimits.BulkIdentityLookup)]
     [ProducesResponseType(typeof(BulkIdentityLookupResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<BulkIdentityLookupResponse>> BulkLookupAsync(
         [FromBody] BulkIdentityLookupRequest? request,

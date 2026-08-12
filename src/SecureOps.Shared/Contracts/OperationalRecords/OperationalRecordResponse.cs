@@ -22,4 +22,8 @@ public sealed record OperationalRecordResponse(
     string? LastErrorCode,
     string? CorrelationId,
     int RetryCount,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool Claimed,
+    DateTimeOffset? ClaimExpiresAt,
+    DateTimeOffset? LastSourceValidationAt,
+    long Version);

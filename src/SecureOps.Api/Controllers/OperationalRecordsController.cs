@@ -1,10 +1,14 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SecureOps.Api.Middleware;
+using SecureOps.Api.Security;
 using SecureOps.Domain.OperationalRecords;
+using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Auth;
+using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
 using SecureOps.Shared.Contracts.OperationalRecords;
 
@@ -20,17 +24,23 @@ public sealed class OperationalRecordsController : ControllerBase
 {
     private readonly IOperationalRecordService _recordService;
     private readonly IJiraTransferService _transferService;
+    private readonly CommandIdempotencyOptions _commandOptions;
 
     /// <summary>Initializes the controller.</summary>
-    public OperationalRecordsController(IOperationalRecordService recordService, IJiraTransferService transferService)
+    public OperationalRecordsController(
+        IOperationalRecordService recordService,
+        IJiraTransferService transferService,
+        Microsoft.Extensions.Options.IOptions<CommandIdempotencyOptions> commandOptions)
     {
         _recordService = recordService;
         _transferService = transferService;
+        _commandOptions = commandOptions.Value;
     }
 
     /// <summary>Refreshes and returns a bounded list of active operational records.</summary>
     [HttpGet]
     [Authorize(Policy = Policies.CanViewOperationalRecords)]
+    [EnableRateLimiting(ApiRateLimits.OperationalRecordRefresh)]
     [ProducesResponseType(typeof(IReadOnlyList<OperationalRecordResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<IReadOnlyList<OperationalRecordResponse>>> ListAsync(CancellationToken cancellationToken)
@@ -55,6 +65,7 @@ public sealed class OperationalRecordsController : ControllerBase
     /// <summary>Generates a read-only Jira field preview without modifying external systems.</summary>
     [HttpPost("{id:guid}/jira-preview")]
     [Authorize(Policy = Policies.CanPreviewJira)]
+    [EnableRateLimiting(ApiRateLimits.JiraPreview)]
     [ProducesResponseType(typeof(JiraPreviewResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -85,14 +96,23 @@ public sealed class OperationalRecordsController : ControllerBase
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>
     [HttpPost("{id:guid}/jira")]
     [Authorize(Policy = Policies.CanCreateJira)]
+    [EnableRateLimiting(ApiRateLimits.JiraCreate)]
     [ProducesResponseType(typeof(JiraTransferResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<JiraTransferResponse>> CreateAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<JiraTransferResponse>> CreateAsync(
+        Guid id,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
     {
-        OperationalRecordCommandContext context = Context();
+        if (!IsValidIdempotencyKey(idempotencyKey))
+        {
+            return Failure<JiraTransferResponse>(new OperationalRecordFailure(OperationalErrorCodes.InvalidIdempotencyKey, "idempotency", false));
+        }
+
+        OperationalRecordCommandContext context = Context(idempotencyKey);
         OperationalRecordResult<OperationalRecord> result = await _transferService.CreateAsync(id, context, cancellationToken);
         return result.IsSuccess ? Ok(ToTransferResponse(result.Value!, context.CorrelationId)) : Failure<JiraTransferResponse>(result.Failure!);
     }
@@ -100,25 +120,35 @@ public sealed class OperationalRecordsController : ControllerBase
     /// <summary>Resumes only the safe failed stage of a durable workflow.</summary>
     [HttpPost("{id:guid}/retry")]
     [Authorize(Policy = Policies.CanRetryJira)]
+    [EnableRateLimiting(ApiRateLimits.WorkflowRetry)]
     [ProducesResponseType(typeof(JiraTransferResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<JiraTransferResponse>> RetryAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<JiraTransferResponse>> RetryAsync(
+        Guid id,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
     {
-        OperationalRecordCommandContext context = Context();
+        if (!IsValidIdempotencyKey(idempotencyKey))
+        {
+            return Failure<JiraTransferResponse>(new OperationalRecordFailure(OperationalErrorCodes.InvalidIdempotencyKey, "idempotency", false));
+        }
+
+        OperationalRecordCommandContext context = Context(idempotencyKey);
         OperationalRecordResult<OperationalRecord> result = await _transferService.RetryAsync(id, context, cancellationToken);
         return result.IsSuccess ? Ok(ToTransferResponse(result.Value!, context.CorrelationId)) : Failure<JiraTransferResponse>(result.Failure!);
     }
 
-    private OperationalRecordCommandContext Context()
+    private OperationalRecordCommandContext Context(string? idempotencyKey = null)
     {
         string correlationId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
         return new OperationalRecordCommandContext(
             User.Identity?.Name ?? "unknown",
             correlationId,
-            HttpContext.Connection.RemoteIpAddress?.ToString());
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            idempotencyKey);
     }
 
     private ActionResult<T> Failure<T>(OperationalRecordFailure failure)
@@ -130,7 +160,12 @@ public sealed class OperationalRecordsController : ControllerBase
             OperationalErrorCodes.RequesterResolutionAmbiguous or
             OperationalErrorCodes.JiraAlreadyCreated or
             OperationalErrorCodes.WorkflowConflict or
-            OperationalErrorCodes.WorkflowAlreadyCompleted => StatusCodes.Status409Conflict,
+            OperationalErrorCodes.WorkflowAlreadyCompleted or
+            OperationalErrorCodes.OperationalRecordAlreadyClaimed or
+            OperationalErrorCodes.OperationalRecordChanged or
+            OperationalErrorCodes.OperationalRecordNoLongerOpen or
+            OperationalErrorCodes.WorkflowAlreadyInProgress => StatusCodes.Status409Conflict,
+            OperationalErrorCodes.InvalidIdempotencyKey => StatusCodes.Status400BadRequest,
             OperationalErrorCodes.JiraValidationFailed => StatusCodes.Status422UnprocessableEntity,
             OperationalErrorCodes.RequesterResolutionFailed => StatusCodes.Status422UnprocessableEntity,
             _ => StatusCodes.Status503ServiceUnavailable
@@ -146,6 +181,11 @@ public sealed class OperationalRecordsController : ControllerBase
         OperationalErrorCodes.RequesterResolutionFailed => "Requester could not be resolved safely.",
         OperationalErrorCodes.JiraAlreadyCreated => "A Jira issue already exists for this workflow.",
         OperationalErrorCodes.WorkflowAlreadyCompleted => "The workflow is already complete.",
+        OperationalErrorCodes.OperationalRecordAlreadyClaimed => "Another actor owns the active workflow claim.",
+        OperationalErrorCodes.OperationalRecordChanged => "The source record changed and must be refreshed.",
+        OperationalErrorCodes.OperationalRecordNoLongerOpen => "The source record is no longer open.",
+        OperationalErrorCodes.WorkflowAlreadyInProgress => "The workflow is already in progress.",
+        OperationalErrorCodes.InvalidIdempotencyKey => "The idempotency key is invalid.",
         OperationalErrorCodes.WorkflowConflict => "The workflow cannot proceed automatically.",
         _ => "The operational workflow could not be completed."
     };
@@ -169,7 +209,15 @@ public sealed class OperationalRecordsController : ControllerBase
         record.LastErrorCode,
         record.CorrelationId,
         record.RetryCount,
-        record.UpdatedAt);
+        record.UpdatedAt,
+        record.ClaimExpiresAt > DateTimeOffset.UtcNow,
+        record.ClaimExpiresAt,
+        record.LastSourceValidationAt,
+        record.Version);
+
+    private bool IsValidIdempotencyKey(string? idempotencyKey) =>
+        string.IsNullOrWhiteSpace(idempotencyKey)
+        || CommandIdempotency.IsValid(idempotencyKey, _commandOptions.MaxKeyLength);
 
     private static JiraTransferResponse ToTransferResponse(OperationalRecord record, string correlationId) => new(
         record.Id,

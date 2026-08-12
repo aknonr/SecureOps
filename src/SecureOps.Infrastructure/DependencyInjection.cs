@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Infrastructure.Audit;
+using SecureOps.Infrastructure.Access;
+using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Configuration;
@@ -27,9 +29,17 @@ public static class DependencyInjection
         services.Configure<PamProviderOptions>(configuration.GetSection(PamProviderOptions.SectionName));
         services.Configure<OperationalRecordsOptions>(configuration.GetSection(OperationalRecordsOptions.SectionName));
         services.Configure<JiraIntegrationOptions>(configuration.GetSection(JiraIntegrationOptions.SectionName));
+        services.Configure<AccessOptions>(configuration.GetSection(AccessOptions.SectionName));
+        services.Configure<SessionSecurityOptions>(configuration.GetSection(SessionSecurityOptions.SectionName));
+        services.Configure<RateLimitingOptions>(configuration.GetSection(RateLimitingOptions.SectionName));
+        services.Configure<CommandIdempotencyOptions>(configuration.GetSection(CommandIdempotencyOptions.SectionName));
         services.AddSingleton<IAuditStoreHealthState, AuditStoreHealthState>();
 
         services.AddSingleton<IIdentityAccountNormalizer, IdentityAccountNormalizer>();
+        services.AddSingleton<TimeProvider>(TimeProvider.System);
+        services.AddSingleton<IIdentityLookupCacheMetrics, IdentityLookupCacheMetrics>();
+        services.AddSingleton<IdentityReadThroughCache>();
+        services.AddSingleton<IIdentityReadThroughCache>(sp => sp.GetRequiredService<IdentityReadThroughCache>());
         services.AddScoped<IPamAccountResolver, MockPamAccountResolver>();
         services.AddScoped<IIdentityLookupService, IdentityLookupService>();
 
@@ -65,6 +75,18 @@ public static class DependencyInjection
 
         services.AddSingleton<AuditHealthReporter>();
 
+        services.AddSingleton<ICorporatePrincipalResolver, CorporatePrincipalResolver>();
+        if (string.Equals(configuration[$"{AccessOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<IAccessRepository, SqlAccessRepository>();
+        }
+        else
+        {
+            services.AddSingleton<IAccessRepository, InMemoryAccessRepository>();
+        }
+
+        services.AddScoped<IApplicationAccessService, ApplicationAccessService>();
+
         services.AddSingleton<IOperationalRecordClient, FakeOperationalRecordClient>();
         services.AddSingleton<IJiraClient, FakeJiraClient>();
         services.AddSingleton<IRequesterResolver, FakeRequesterResolver>();
@@ -72,10 +94,12 @@ public static class DependencyInjection
         if (string.Equals(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IOperationalRecordRepository, SqlOperationalRecordRepository>();
+            services.AddScoped<ICommandIdempotencyStore, SqlCommandIdempotencyStore>();
         }
         else
         {
             services.AddSingleton<IOperationalRecordRepository, InMemoryOperationalRecordRepository>();
+            services.AddSingleton<ICommandIdempotencyStore, InMemoryCommandIdempotencyStore>();
         }
 
         services.AddScoped<IJiraIssueDraftService, JiraIssueDraftService>();

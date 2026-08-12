@@ -23,6 +23,7 @@ Security is the defining constraint of this project. This document is the canoni
 - Service principal: the IIS app pool runs under a domain-joined service account.
 - User identity flows through `HttpContext.User`.
 - No custom token issuance, no JWT in MVP.
+- Authentication establishes only a corporate principal. It does not directly grant an application role or capability.
 
 ### Webhook Endpoint
 
@@ -40,24 +41,26 @@ If the approved Turuncuhat integration is webhook-based, the approved caller inv
 
 ## Authorization (RBAC)
 
-### Roles
+### Application Roles
 
-| Role | AD Group (placeholder) | Permissions |
-|---|---|---|
-| Operator | `CONTOSO\SecureOps-Operators` | View alerts, view diagnostic results, view personal audit, copy ticket text |
-| TeamLead | `CONTOSO\SecureOps-Leads` | All Operator + trigger manual diagnostic, view team audit, manage server tags |
-| Admin | `CONTOSO\SecureOps-Admins` | All TeamLead + configuration changes, rule management, system administration |
-| Auditor | `CONTOSO\SecureOps-Auditors` | Read-only access to all audit data, including AI audit |
+| Role | Permissions |
+|---|---|
+| Operator | View Operational Records and generate read-only Jira previews |
+| Lead | Identity lookup, Operational Record create/retry, diagnostics and team view |
+| Admin | All implemented application capabilities, including access approval and role assignment |
+| JiraPublisher | Operational Record view/preview/create/retry |
+| Auditor | Read-only audit and workflow diagnostics |
+| ReadOnly | Operational Record view only |
 
-Phase 1A identity lookup uses `TeamLeadOrAbove`. Operators do not receive this privileged read in the first release.
+Phase 1A identity lookup requires the `Identity.Lookup` capability. Operators do not receive this privileged read in the first release.
 
-Group names are configured in `appsettings.json`; the table `dbo.RbacRoles` maps codes to group names.
+First-seen authenticated users are `Pending` and receive no operational capability. Administrators approve requests and assign persisted application roles. Disabled status is checked on each capability-protected request. Exact configured bootstrap administrators are an initialization mechanism, not a general AD-group authorization path.
 
 ### Future Authentication and Role Strategy
 
 MVP authentication remains Windows Authentication. Future production UI options should prefer corporate SSO/OIDC if the organization standardizes it, or Windows Integrated Authentication/Kerberos for intranet IIS if approved. Direct LDAP/AD password login is not the preferred model because it would make SecureOps handle user passwords directly.
 
-AD group mapping remains the authorization boundary. PAM/BeyondTrust may verify privileged sessions or supply metadata later, but it is not the normal application login mechanism.
+The persisted SecureOps access record remains the authorization boundary regardless of authentication source. PAM/BeyondTrust may verify privileged sessions or supply metadata later, but it is not the normal application login mechanism. A future OIDC handler must resolve issuer/subject to the same corporate-principal boundary; it must not rewrite application authorization.
 
 Future role vocabulary, subject to ADR before implementation:
 

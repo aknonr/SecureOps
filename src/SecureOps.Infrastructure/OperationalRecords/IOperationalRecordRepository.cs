@@ -13,6 +13,12 @@ public interface IOperationalRecordRepository
     public Task<OperationalRecord> UpsertImportedAsync(OperationalRecordSourceItem sourceItem, string correlationId, CancellationToken cancellationToken);
     /// <summary>Persists deterministic classification.</summary>
     public Task<OperationalRecord> SetClassificationAsync(Guid id, OperationalRecordClassificationResult classification, string correlationId, CancellationToken cancellationToken);
+    /// <summary>Atomically acquires or renews a bounded actor lease.</summary>
+    public Task<WorkflowClaimResult> TryClaimAsync(Guid id, string actor, TimeSpan leaseDuration, string correlationId, CancellationToken cancellationToken);
+    /// <summary>Releases a lease only when held by the actor.</summary>
+    public Task<OperationalRecord?> ReleaseClaimAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken);
+    /// <summary>Persists a successful external-source freshness check.</summary>
+    public Task<OperationalRecord> RecordSourceValidationAsync(Guid id, DateTimeOffset validatedAt, string correlationId, CancellationToken cancellationToken);
     /// <summary>Transitions an eligible record to Previewed.</summary>
     public Task<WorkflowAcquireResult> MarkPreviewedAsync(Guid id, string mappingVersion, string idempotencyKey, string actor, string correlationId, CancellationToken cancellationToken);
     /// <summary>Atomically acquires Jira-create ownership.</summary>
@@ -45,11 +51,18 @@ public enum WorkflowAcquireDisposition
     /// <summary>The workflow already completed.</summary>
     AlreadyCompleted,
     /// <summary>An uncertain Jira outcome requires manual reconciliation.</summary>
-    ReconciliationRequired
+    ReconciliationRequired,
+    /// <summary>Another actor owns an unexpired workflow lease.</summary>
+    AlreadyClaimed,
+    /// <summary>A non-resumable external workflow stage is already active.</summary>
+    InProgress
 }
 
 /// <summary>Result of an atomic repository transition.</summary>
 public sealed record WorkflowAcquireResult(WorkflowAcquireDisposition Disposition, OperationalRecord? Record);
+
+/// <summary>Atomic claim result.</summary>
+public sealed record WorkflowClaimResult(WorkflowAcquireDisposition Disposition, OperationalRecord? Record);
 
 /// <summary>Workflow failure stage persisted by the repository.</summary>
 public enum WorkflowFailureStage

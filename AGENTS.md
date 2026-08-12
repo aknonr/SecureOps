@@ -2,7 +2,7 @@
 
 **Project:** Secure Ops Automation & AI Analysis Hub
 **Owner organization placeholder:** CONTOSO Turkish Technology
-**Status:** Phase 1A IdentityLookup working in TEST; Operational Record to Jira backend foundation implemented with fake external adapters.
+**Status:** IdentityLookup works in TEST; provider-neutral access approval, capability authorization, and hardened Operational Record/Jira backend are implemented with fake external adapters.
 **Last updated:** 2026-08
 
 ---
@@ -39,7 +39,7 @@ Before producing **any** output (code, design, suggestion, file edit), read thes
 8. **`.cursor/rules/050-security-audit-rules.mdc`** — non-negotiable security rules.
 9. The specific phase plan in `plans/` for whichever phase the user references.
 
-For Operational Record/Jira work, also read `docs/22-operational-record-jira-workflow.md` and ADR-0009. Do not enable real source/Jira adapters, add classification rules, or assume remote idempotency without approved contracts.
+For platform access or Operational Record/Jira work, also read `docs/22-operational-record-jira-workflow.md`, `docs/23-platform-access-concurrency-and-release-safety.md`, ADR-0009, and ADR-0010. Do not enable real source/Jira adapters, add classification rules, configure OIDC, or assume remote idempotency without approved contracts.
 
 If the user request touches a specific area, also read the matching rule file (`.cursor/rules/0XX-*.mdc`) and matching doc (`docs/0X-*.md`).
 
@@ -78,12 +78,13 @@ These decisions are final and binding. Do not re-litigate them in code or propos
 | Read-only first | MVP performs no write operations | ADR-0002 |
 | Identity lookup | **Phase 1A backend-only exact PAM/AD account lookup**, TeamLead/Admin only, read-only AD provider, no broad search | ADR-0008 |
 | Operational Record to Jira | **Preview-first, explicit authorized creation, durable SQL idempotency, fake external adapters until approved** | ADR-0009 |
+| Application access | **Authentication source -> corporate principal -> approval status -> application role -> capability** | ADR-0010 |
 | Remediation | Approval-based only, Phase 8 | ADR-0006 |
 | Hosting | IIS on Windows Server, in-process | ADR-0007 |
 | Pilot scale | **10–15 low-criticality Windows servers**, prefer non-production | docs/02-roadmap.md |
 | MVP timeline | **6–8 weeks** end-to-end, then demo + management review | docs/02-roadmap.md |
 | Authentication | Windows Authentication via AD | docs/05-security-model.md |
-| RBAC | AD-group-based: Operator, TeamLead, Admin, Auditor | docs/05-security-model.md |
+| Authorization | Persisted application approval and capability policies; authentication claims do not directly grant access | ADR-0010 |
 | Placeholder names | **CONTOSO** for company, generic names for systems | docs/00-project-brief.md |
 
 ---

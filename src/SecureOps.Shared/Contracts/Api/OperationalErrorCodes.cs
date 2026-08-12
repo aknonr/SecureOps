@@ -21,6 +21,16 @@ public static class OperationalErrorCodes
     public const string AuditStoreUnavailable = "AuditStoreUnavailable";
     /// <summary>The authenticated identity is awaiting access approval.</summary>
     public const string AccessPending = "AccessPending";
+    /// <summary>The authenticated user's application access is disabled.</summary>
+    public const string AccessDisabled = "AccessDisabled";
+    /// <summary>An access request decision is invalid for its current state.</summary>
+    public const string AccessRequestInvalidState = "AccessRequestInvalidState";
+    /// <summary>An access request or application user was not found.</summary>
+    public const string AccessRecordNotFound = "AccessRecordNotFound";
+    /// <summary>The request attempted self-approval.</summary>
+    public const string AccessSelfApprovalDenied = "AccessSelfApprovalDenied";
+    /// <summary>An idempotency key is invalid.</summary>
+    public const string InvalidIdempotencyKey = "InvalidIdempotencyKey";
     /// <summary>Operational source authentication failed.</summary>
     public const string OperationalSourceAuthenticationFailed = "OperationalSourceAuthenticationFailed";
     /// <summary>Operational source is unavailable.</summary>
@@ -53,4 +63,12 @@ public static class OperationalErrorCodes
     public const string WorkflowConflict = "WorkflowConflict";
     /// <summary>The workflow already completed.</summary>
     public const string WorkflowAlreadyCompleted = "WorkflowAlreadyCompleted";
+    /// <summary>Another actor owns the active Operational Record lease.</summary>
+    public const string OperationalRecordAlreadyClaimed = "OperationalRecordAlreadyClaimed";
+    /// <summary>The external Operational Record changed after it was imported.</summary>
+    public const string OperationalRecordChanged = "OperationalRecordChanged";
+    /// <summary>The external Operational Record is no longer open.</summary>
+    public const string OperationalRecordNoLongerOpen = "OperationalRecordNoLongerOpen";
+    /// <summary>A command with the same scope is already executing.</summary>
+    public const string WorkflowAlreadyInProgress = "WorkflowAlreadyInProgress";
 }

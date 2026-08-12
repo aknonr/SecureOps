@@ -37,6 +37,27 @@ public sealed class SqlAssetContractTests
             .And.NotContain("AuthorizationHeader");
     }
 
+    [Fact]
+    public void PlatformHardeningSqlAsset_AddsAccessClaimsAndCommandIdempotency()
+    {
+        string root = FindRepositoryRoot();
+        string sql = File.ReadAllText(Path.Combine(root, "sql", "schema", "003-platform-access-concurrency-hardening.sql"));
+
+        sql.Should().Contain("AuthenticationSource")
+            .And.Contain("AccessStatus")
+            .And.Contain("LastAuthenticatedAt")
+            .And.Contain("SourceConcurrencyToken")
+            .And.Contain("ClaimedBy")
+            .And.Contain("ClaimExpiresAt")
+            .And.Contain("CREATE TABLE ops.CommandExecutions")
+            .And.Contain("ExecutionToken uniqueidentifier")
+            .And.Contain("UQ_CommandExecutions_Scope");
+        sql.Should().Contain("CK_OperationalRecords_Claim")
+            .And.NotContain("Password")
+            .And.NotContain("ApiToken")
+            .And.NotContain("AuthorizationHeader");
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

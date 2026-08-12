@@ -10,4 +10,7 @@ public sealed record OperationalRecordSourceItem(
     DateTimeOffset CreatedAt,
     string? Environment,
     string? ServerReference,
-    string? ApplicationReference);
+    string? ApplicationReference,
+    bool IsOpen = true,
+    string? VersionToken = null,
+    DateTimeOffset? LastModifiedAt = null);

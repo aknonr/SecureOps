@@ -34,7 +34,7 @@ The stack is:
 | Logging | Serilog with structured JSON |
 | PowerShell | `System.Management.Automation` + JEA |
 | Authentication | Windows Authentication via Active Directory |
-| Authorization | AD-group-based via ASP.NET Core authorization policies |
+| Authorization | ASP.NET Core authorization policies; direct AD-group grants superseded by ADR-0010 application capabilities |
 
 Hosting model:
 

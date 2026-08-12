@@ -1,9 +1,11 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using SecureOps.Api.Controllers;
 using SecureOps.Domain.OperationalRecords;
 using SecureOps.Infrastructure.OperationalRecords;
+using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
 using SecureOps.Shared.Contracts.OperationalRecords;
 
@@ -32,7 +34,10 @@ public sealed class OperationalRecordsControllerTests
     private static OperationalRecordsController CreateController(OperationalRecordResult<JiraIssueDraft> previewResult)
     {
         DefaultHttpContext httpContext = new() { TraceIdentifier = "trace-operational-test" };
-        return new OperationalRecordsController(new EmptyRecordService(), new StubTransferService(previewResult))
+        return new OperationalRecordsController(
+            new EmptyRecordService(),
+            new StubTransferService(previewResult),
+            Options.Create(new CommandIdempotencyOptions()))
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };

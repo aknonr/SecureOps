@@ -11,6 +11,13 @@ public sealed class FakeOperationalRecordClient : IOperationalRecordClient
     }
 
     /// <inheritdoc />
+    public Task<OperationalRecordSourceItem?> GetByIdAsync(string sourceRecordId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<OperationalRecordSourceItem?>(null);
+    }
+
+    /// <inheritdoc />
     public Task CloseAsync(string sourceRecordId, string orCode, string jiraIssueKey, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

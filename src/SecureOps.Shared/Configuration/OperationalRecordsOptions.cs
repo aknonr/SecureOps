@@ -14,4 +14,7 @@ public sealed class OperationalRecordsOptions
 
     /// <summary>Maximum active records accepted from one bounded source query.</summary>
     public int MaxImportCount { get; set; } = 100;
+
+    /// <summary>Bounded actor lease duration for Jira create/retry commands.</summary>
+    public int ClaimLeaseSeconds { get; set; } = 120;
 }

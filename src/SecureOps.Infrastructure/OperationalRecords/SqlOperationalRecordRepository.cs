@@ -40,22 +40,30 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
     public async Task<OperationalRecord> UpsertImportedAsync(OperationalRecordSourceItem sourceItem, string correlationId, CancellationToken cancellationToken)
     {
         const string sql = """
-            MERGE ops.OperationalRecords WITH (HOLDLOCK) AS target
-            USING (SELECT @SourceRecordId AS SourceRecordId) AS source
-            ON target.SourceRecordId = source.SourceRecordId
-            WHEN MATCHED THEN UPDATE SET
-                OrCode = @OrCode, Title = @Title, Description = @Description, Requester = @Requester,
-                SourceCreatedAt = @CreatedAt, EnvironmentName = @Environment, ServerReference = @ServerReference,
-                ApplicationReference = @ApplicationReference, CorrelationId = @CorrelationId, UpdatedAt = SYSUTCDATETIME()
-            WHEN NOT MATCHED THEN INSERT
-                (OperationalRecordId, SourceRecordId, OrCode, Title, Description, Requester, SourceCreatedAt,
-                 EnvironmentName, ServerReference, ApplicationReference, Classification, JiraEligible,
-                 EligibilityReason, WorkflowState, CorrelationId, UpdatedAt)
-            VALUES
-                (NEWID(), @SourceRecordId, @OrCode, @Title, @Description, @Requester, @CreatedAt,
-                 @Environment, @ServerReference, @ApplicationReference, 'NeedsManualReview', 0,
-                 'Classification pending.', 'Imported', @CorrelationId, SYSUTCDATETIME())
-            OUTPUT inserted.OperationalRecordId AS Id, $action AS MergeAction;
+            DECLARE @Id uniqueidentifier = (SELECT OperationalRecordId FROM ops.OperationalRecords WITH (UPDLOCK, HOLDLOCK) WHERE SourceRecordId = @SourceRecordId);
+            DECLARE @Action nvarchar(10) = 'UPDATE';
+            IF @Id IS NULL
+            BEGIN
+                SET @Id = NEWID();
+                SET @Action = 'INSERT';
+                INSERT INTO ops.OperationalRecords
+                    (OperationalRecordId, SourceRecordId, OrCode, Title, Description, Requester, SourceCreatedAt,
+                     EnvironmentName, ServerReference, ApplicationReference, SourceConcurrencyToken, LastSourceValidationAt,
+                     Classification, JiraEligible, EligibilityReason, WorkflowState, CorrelationId, UpdatedAt)
+                VALUES
+                    (@Id, @SourceRecordId, @OrCode, @Title, @Description, @Requester, @CreatedAt,
+                     @Environment, @ServerReference, @ApplicationReference, @SourceConcurrencyToken, SYSUTCDATETIME(),
+                     'NeedsManualReview', 0, 'Classification pending.', 'Imported', @CorrelationId, SYSUTCDATETIME());
+            END
+            ELSE
+                UPDATE ops.OperationalRecords SET OrCode = @OrCode, Title = @Title, Description = @Description,
+                    Requester = @Requester, SourceCreatedAt = @CreatedAt, EnvironmentName = @Environment,
+                    ServerReference = @ServerReference, ApplicationReference = @ApplicationReference,
+                    SourceConcurrencyToken = @SourceConcurrencyToken, LastSourceValidationAt = SYSUTCDATETIME(),
+                    CorrelationId = @CorrelationId, UpdatedAt = SYSUTCDATETIME()
+                WHERE OperationalRecordId = @Id
+                  AND WorkflowState NOT IN ('CreatingJira', 'JiraCreated', 'ClosingOperationalRecord', 'OperationalRecordCloseFailed', 'Completed');
+            SELECT @Id AS Id, @Action AS MergeAction;
             """;
 
         await using SqlConnection connection = new(_connectionString);
@@ -72,6 +80,7 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
             sourceItem.Environment,
             sourceItem.ServerReference,
             sourceItem.ApplicationReference,
+            SourceConcurrencyToken = OperationalRecordSourceConcurrency.Create(sourceItem),
             CorrelationId = correlationId
         }, cancellationToken, transaction));
         if (string.Equals(merged.MergeAction, "INSERT", StringComparison.OrdinalIgnoreCase))
@@ -116,6 +125,80 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
         }
 
         await transaction.CommitAsync(cancellationToken);
+        return (await GetAsync(id, cancellationToken))!;
+    }
+
+    /// <inheritdoc />
+    public async Task<WorkflowClaimResult> TryClaimAsync(Guid id, string actor, TimeSpan leaseDuration, string correlationId, CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        OperationalRecordRow? row = await GetForUpdateAsync(connection, transaction, id, cancellationToken);
+        if (row is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new WorkflowClaimResult(WorkflowAcquireDisposition.NotFound, null);
+        }
+
+        OperationalRecord current = Map(row);
+        if (current.WorkflowState == OperationalRecordWorkflowState.Completed)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new WorkflowClaimResult(WorkflowAcquireDisposition.AlreadyCompleted, current);
+        }
+
+        if (current.WorkflowState == OperationalRecordWorkflowState.CreatingJira)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new WorkflowClaimResult(WorkflowAcquireDisposition.InProgress, current);
+        }
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (current.ClaimExpiresAt > now && !string.Equals(current.ClaimedBy, actor, StringComparison.OrdinalIgnoreCase))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new WorkflowClaimResult(WorkflowAcquireDisposition.AlreadyClaimed, current);
+        }
+
+        const string update = """
+            UPDATE ops.OperationalRecords SET ClaimedBy = @Actor, ClaimedAt = SYSUTCDATETIME(),
+                ClaimExpiresAt = @ClaimExpiresAt, CorrelationId = @CorrelationId, UpdatedAt = SYSUTCDATETIME()
+            WHERE OperationalRecordId = @Id;
+            """;
+        await connection.ExecuteAsync(Command(update, new { Id = id, Actor = actor, ClaimExpiresAt = now.Add(leaseDuration), CorrelationId = correlationId }, cancellationToken, transaction));
+        await transaction.CommitAsync(cancellationToken);
+        return new WorkflowClaimResult(WorkflowAcquireDisposition.Acquired, await GetAsync(id, cancellationToken));
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationalRecord?> ReleaseClaimAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            UPDATE ops.OperationalRecords SET ClaimedBy = NULL, ClaimedAt = NULL, ClaimExpiresAt = NULL,
+                CorrelationId = @CorrelationId, UpdatedAt = SYSUTCDATETIME()
+            WHERE OperationalRecordId = @Id AND ClaimedBy = @Actor;
+            """;
+        await using SqlConnection connection = new(_connectionString);
+        await connection.ExecuteAsync(Command(sql, new { Id = id, Actor = actor, CorrelationId = correlationId }, cancellationToken));
+        return await GetAsync(id, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationalRecord> RecordSourceValidationAsync(Guid id, DateTimeOffset validatedAt, string correlationId, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            UPDATE ops.OperationalRecords SET LastSourceValidationAt = @ValidatedAt,
+                CorrelationId = @CorrelationId, UpdatedAt = SYSUTCDATETIME()
+            WHERE OperationalRecordId = @Id;
+            """;
+        await using SqlConnection connection = new(_connectionString);
+        int count = await connection.ExecuteAsync(Command(sql, new { Id = id, ValidatedAt = validatedAt, CorrelationId = correlationId }, cancellationToken));
+        if (count == 0)
+        {
+            throw new KeyNotFoundException("Operational record was not found.");
+        }
+
         return (await GetAsync(id, cancellationToken))!;
     }
 
@@ -168,6 +251,11 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
             if (current.ReconciliationRequired)
             {
                 return new WorkflowAcquireResult(WorkflowAcquireDisposition.ReconciliationRequired, current);
+            }
+
+            if (!ClaimOwnedBy(current, actor))
+            {
+                return new WorkflowAcquireResult(WorkflowAcquireDisposition.AlreadyClaimed, current);
             }
 
             if (current.WorkflowState is OperationalRecordWorkflowState.CreateRequested or OperationalRecordWorkflowState.CreatingJira or OperationalRecordWorkflowState.ClosingOperationalRecord)
@@ -242,9 +330,16 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
                 return new WorkflowAcquireResult(WorkflowAcquireDisposition.InvalidState, current);
             }
 
+            if (!ClaimOwnedBy(current, actor))
+            {
+                return new WorkflowAcquireResult(WorkflowAcquireDisposition.AlreadyClaimed, current);
+            }
+
             if (current.WorkflowState == OperationalRecordWorkflowState.ClosingOperationalRecord)
             {
-                return new WorkflowAcquireResult(WorkflowAcquireDisposition.Conflict, current);
+                return ClaimOwnedBy(current, actor)
+                    ? new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, current)
+                    : new WorkflowAcquireResult(WorkflowAcquireDisposition.Conflict, current);
             }
 
             if (current.WorkflowState is not (OperationalRecordWorkflowState.JiraCreated or OperationalRecordWorkflowState.OperationalRecordCloseFailed))
@@ -447,7 +542,13 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
         IdempotencyKey = row.IdempotencyKey,
         ReconciliationRequired = row.ReconciliationRequired,
         RetryCount = row.RetryCount,
-        UpdatedAt = row.UpdatedAt
+        UpdatedAt = row.UpdatedAt,
+        SourceConcurrencyToken = row.SourceConcurrencyToken,
+        LastSourceValidationAt = row.LastSourceValidationAt,
+        ClaimedBy = row.ClaimedBy,
+        ClaimedAt = row.ClaimedAt,
+        ClaimExpiresAt = row.ClaimExpiresAt,
+        Version = row.Version
     };
 
     private static OperationalRecordWorkflowState ParseState(string value) => Enum.Parse<OperationalRecordWorkflowState>(value, true);
@@ -456,7 +557,8 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
         SELECT r.OperationalRecordId AS Id, r.SourceRecordId, r.OrCode, r.Title, r.Description, r.Requester,
             r.SourceCreatedAt AS CreatedAt, r.EnvironmentName AS Environment, r.ServerReference,
             r.ApplicationReference, r.Classification, r.JiraEligible, r.EligibilityReason, r.WorkflowState,
-            r.LastErrorCode, r.CorrelationId, r.RetryCount, r.UpdatedAt,
+            r.LastErrorCode, r.CorrelationId, r.RetryCount, r.UpdatedAt, r.SourceConcurrencyToken,
+            r.LastSourceValidationAt, r.ClaimedBy, r.ClaimedAt, r.ClaimExpiresAt, CONVERT(bigint, r.RowVersion) AS Version,
             transfer.MappingVersion, transfer.IdempotencyKey, transfer.JiraIssueKey, transfer.ReconciliationRequired
         FROM ops.OperationalRecords r
         LEFT JOIN ops.JiraTransfers transfer ON transfer.OperationalRecordId = r.OperationalRecordId
@@ -486,7 +588,17 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
         public bool ReconciliationRequired { get; init; }
         public int RetryCount { get; init; }
         public DateTimeOffset UpdatedAt { get; init; }
+        public string SourceConcurrencyToken { get; init; } = string.Empty;
+        public DateTimeOffset? LastSourceValidationAt { get; init; }
+        public string? ClaimedBy { get; init; }
+        public DateTimeOffset? ClaimedAt { get; init; }
+        public DateTimeOffset? ClaimExpiresAt { get; init; }
+        public long Version { get; init; }
     }
 
     private sealed record MergeResult(Guid Id, string MergeAction);
+
+    private static bool ClaimOwnedBy(OperationalRecord record, string actor) =>
+        string.Equals(record.ClaimedBy, actor, StringComparison.OrdinalIgnoreCase)
+        && record.ClaimExpiresAt > DateTimeOffset.UtcNow;
 }

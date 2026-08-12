@@ -8,6 +8,13 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<Guid, OperationalRecord> _records = [];
     private readonly Dictionary<string, Guid> _sourceIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly TimeProvider _timeProvider;
+
+    /// <summary>Initializes the local repository with an injectable clock.</summary>
+    public InMemoryOperationalRecordRepository(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<OperationalRecord>> ListAsync(CancellationToken cancellationToken)
@@ -43,10 +50,16 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = _timeProvider.GetUtcNow();
             if (_sourceIds.TryGetValue(sourceItem.SourceRecordId, out Guid existingId))
             {
                 OperationalRecord existing = _records[existingId];
+                if (!string.IsNullOrWhiteSpace(existing.JiraIssueKey)
+                    || existing.WorkflowState is OperationalRecordWorkflowState.CreatingJira or OperationalRecordWorkflowState.ClosingOperationalRecord)
+                {
+                    return existing;
+                }
+
                 OperationalRecord refreshed = existing with
                 {
                     OrCode = sourceItem.OrCode,
@@ -57,8 +70,10 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                     Environment = sourceItem.Environment,
                     ServerReference = sourceItem.ServerReference,
                     ApplicationReference = sourceItem.ApplicationReference,
+                    SourceConcurrencyToken = OperationalRecordSourceConcurrency.Create(sourceItem),
                     CorrelationId = correlationId,
-                    UpdatedAt = now
+                    UpdatedAt = now,
+                    Version = existing.Version + 1
                 };
                 _records[existingId] = refreshed;
                 return refreshed;
@@ -82,6 +97,10 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 WorkflowState = OperationalRecordWorkflowState.Imported,
                 CorrelationId = correlationId,
                 UpdatedAt = now
+                ,
+                SourceConcurrencyToken = OperationalRecordSourceConcurrency.Create(sourceItem),
+                LastSourceValidationAt = now,
+                Version = 1
             };
             _records[imported.Id] = imported;
             _sourceIds[imported.SourceRecordId] = imported.Id;
@@ -114,7 +133,98 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                     ? OperationalRecordWorkflowState.Eligible
                     : OperationalRecordWorkflowState.NeedsManualReview,
                 CorrelationId = correlationId,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
+            };
+            _records[id] = updated;
+            return updated;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<WorkflowClaimResult> TryClaimAsync(Guid id, string actor, TimeSpan leaseDuration, string correlationId, CancellationToken cancellationToken) =>
+        ClaimTransitionAsync(id, cancellationToken, current =>
+        {
+            DateTimeOffset now = _timeProvider.GetUtcNow();
+            if (current.WorkflowState == OperationalRecordWorkflowState.Completed)
+            {
+                return new WorkflowClaimResult(WorkflowAcquireDisposition.AlreadyCompleted, current);
+            }
+
+            if (current.WorkflowState == OperationalRecordWorkflowState.CreatingJira)
+            {
+                return new WorkflowClaimResult(WorkflowAcquireDisposition.InProgress, current);
+            }
+
+            if (current.ClaimExpiresAt > now && !string.Equals(current.ClaimedBy, actor, StringComparison.OrdinalIgnoreCase))
+            {
+                return new WorkflowClaimResult(WorkflowAcquireDisposition.AlreadyClaimed, current);
+            }
+
+            OperationalRecord claimed = current with
+            {
+                ClaimedBy = actor,
+                ClaimedAt = now,
+                ClaimExpiresAt = now.Add(leaseDuration),
+                CorrelationId = correlationId,
+                UpdatedAt = now,
+                Version = current.Version + 1
+            };
+            _records[id] = claimed;
+            return new WorkflowClaimResult(WorkflowAcquireDisposition.Acquired, claimed);
+        });
+
+    /// <inheritdoc />
+    public async Task<OperationalRecord?> ReleaseClaimAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_records.TryGetValue(id, out OperationalRecord? current))
+            {
+                return null;
+            }
+
+            if (!string.Equals(current.ClaimedBy, actor, StringComparison.OrdinalIgnoreCase))
+            {
+                return current;
+            }
+
+            OperationalRecord released = current with
+            {
+                ClaimedBy = null,
+                ClaimedAt = null,
+                ClaimExpiresAt = null,
+                CorrelationId = correlationId,
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
+            };
+            _records[id] = released;
+            return released;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationalRecord> RecordSourceValidationAsync(Guid id, DateTimeOffset validatedAt, string correlationId, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            OperationalRecord current = Required(id);
+            OperationalRecord updated = current with
+            {
+                LastSourceValidationAt = validatedAt,
+                CorrelationId = correlationId,
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
             };
             _records[id] = updated;
             return updated;
@@ -151,7 +261,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 IdempotencyKey = idempotencyKey,
                 LastErrorCode = null,
                 CorrelationId = correlationId,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
             };
             _records[id] = updated;
             return new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, updated);
@@ -176,6 +287,11 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 return new WorkflowAcquireResult(WorkflowAcquireDisposition.ReconciliationRequired, current);
             }
 
+            if (!ClaimOwnedBy(current, actor))
+            {
+                return new WorkflowAcquireResult(WorkflowAcquireDisposition.AlreadyClaimed, current);
+            }
+
             if (current.WorkflowState is OperationalRecordWorkflowState.CreateRequested or OperationalRecordWorkflowState.CreatingJira or OperationalRecordWorkflowState.ClosingOperationalRecord)
             {
                 return new WorkflowAcquireResult(WorkflowAcquireDisposition.Conflict, current);
@@ -198,7 +314,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 IdempotencyKey = idempotencyKey,
                 LastErrorCode = null,
                 CorrelationId = correlationId,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
             };
             _records[id] = updated;
             return new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, updated);
@@ -228,7 +345,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 ReconciliationRequired = false,
                 LastErrorCode = null,
                 CorrelationId = correlationId,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
             };
             _records[id] = updated;
             return updated;
@@ -253,9 +371,16 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 return new WorkflowAcquireResult(WorkflowAcquireDisposition.InvalidState, current);
             }
 
+            if (!ClaimOwnedBy(current, actor))
+            {
+                return new WorkflowAcquireResult(WorkflowAcquireDisposition.AlreadyClaimed, current);
+            }
+
             if (current.WorkflowState == OperationalRecordWorkflowState.ClosingOperationalRecord)
             {
-                return new WorkflowAcquireResult(WorkflowAcquireDisposition.Conflict, current);
+                return ClaimOwnedBy(current, actor)
+                    ? new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, current)
+                    : new WorkflowAcquireResult(WorkflowAcquireDisposition.Conflict, current);
             }
 
             if (current.WorkflowState is not (OperationalRecordWorkflowState.JiraCreated or OperationalRecordWorkflowState.OperationalRecordCloseFailed))
@@ -268,7 +393,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 WorkflowState = OperationalRecordWorkflowState.ClosingOperationalRecord,
                 LastErrorCode = null,
                 CorrelationId = correlationId,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
             };
             _records[id] = updated;
             return new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, updated);
@@ -291,7 +417,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 WorkflowState = OperationalRecordWorkflowState.Completed,
                 LastErrorCode = null,
                 CorrelationId = correlationId,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
             };
             _records[id] = updated;
             return updated;
@@ -317,7 +444,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 LastErrorCode = errorCode,
                 ReconciliationRequired = reconciliationRequired,
                 CorrelationId = correlationId,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
             };
             _records[id] = updated;
             return updated;
@@ -343,7 +471,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
             {
                 RetryCount = current.RetryCount + 1,
                 CorrelationId = correlationId,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = _timeProvider.GetUtcNow(),
+                Version = current.Version + 1
             };
             _records[id] = updated;
             return updated;
@@ -372,6 +501,24 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
         }
     }
 
+    private async Task<WorkflowClaimResult> ClaimTransitionAsync(
+        Guid id,
+        CancellationToken cancellationToken,
+        Func<OperationalRecord, WorkflowClaimResult> transition)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            return _records.TryGetValue(id, out OperationalRecord? current)
+                ? transition(current)
+                : new WorkflowClaimResult(WorkflowAcquireDisposition.NotFound, null);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     private OperationalRecord Required(Guid id) =>
         _records.TryGetValue(id, out OperationalRecord? record)
             ? record
@@ -381,4 +528,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
         record.MappingVersion is null
         || (string.Equals(record.MappingVersion, mappingVersion, StringComparison.Ordinal)
             && string.Equals(record.IdempotencyKey, idempotencyKey, StringComparison.Ordinal));
+
+    private bool ClaimOwnedBy(OperationalRecord record, string actor) =>
+        string.Equals(record.ClaimedBy, actor, StringComparison.OrdinalIgnoreCase)
+        && record.ClaimExpiresAt > _timeProvider.GetUtcNow();
 }

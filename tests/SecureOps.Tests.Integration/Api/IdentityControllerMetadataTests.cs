@@ -54,7 +54,7 @@ public sealed class IdentityControllerMetadataTests
 
         method.GetCustomAttribute<HttpPostAttribute>()!.Template.Should().Be("bulk-lookup");
         method.GetCustomAttribute<AuthorizeAttribute>()!.Policy.Should().Be(Policies.CanBulkIdentityLookup);
-        method.GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName.Should().Be(IdentityLookupRateLimits.Lookup);
+        method.GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName.Should().Be(ApiRateLimits.BulkIdentityLookup);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class IdentityControllerMetadataTests
             .Select(attribute => attribute.Template ?? string.Empty)
             .ToArray();
 
-        getTemplates.Should().BeEquivalentTo("me", "lookup/capabilities");
+        getTemplates.Should().BeEquivalentTo("me", "lookup/capabilities", "lookup/cache-diagnostics");
         getTemplates.Should().NotContain(template => template.Contains("{", StringComparison.Ordinal));
     }
 

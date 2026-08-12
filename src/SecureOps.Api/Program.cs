@@ -1,4 +1,3 @@
-using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Negotiate;
@@ -10,6 +9,7 @@ using SecureOps.Api.Security;
 using SecureOps.Api.Services;
 using SecureOps.Api.Validation;
 using SecureOps.Infrastructure;
+using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
@@ -25,6 +25,7 @@ AuditConfigurationValidator.Validate(builder.Configuration, builder.Environment.
 IdentityLookupConfigurationValidator.Validate(builder.Configuration);
 ReverseProxyConfiguration.Validate(builder.Configuration);
 OperationalRecordConfigurationValidator.Validate(builder.Configuration);
+PlatformSecurityConfigurationValidator.Validate(builder.Configuration);
 
 bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
     builder.Environment.EnvironmentName,
@@ -32,6 +33,7 @@ bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
 
 builder.Services.Configure<DemoApiAuthOptions>(builder.Configuration.GetSection(DemoApiAuthOptions.SectionName));
 builder.Services.Configure<SwaggerOptions>(builder.Configuration.GetSection(SwaggerOptions.SectionName));
+builder.Services.Configure<SessionSecurityOptions>(builder.Configuration.GetSection(SessionSecurityOptions.SectionName));
 
 AuthenticationBuilder authentication = builder.Services.AddAuthentication(options =>
 {
@@ -53,33 +55,32 @@ else
 
 builder.Services.AddSecureOpsAuthorization(builder.Configuration, !builder.Environment.IsDevelopment());
 builder.Services.Configure<ForwardedHeadersOptions>(options => ReverseProxyConfiguration.Configure(options, builder.Configuration));
+RateLimitingOptions configuredRateLimits = builder.Configuration.GetSection(RateLimitingOptions.SectionName).Get<RateLimitingOptions>() ?? new();
 builder.Services.AddRateLimiter(options =>
 {
-    int permitLimit = builder.Configuration.GetValue("IdentityLookup:RateLimit:PermitLimit", 10);
-    int windowMinutes = builder.Configuration.GetValue("IdentityLookup:RateLimit:WindowMinutes", 1);
-
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, cancellationToken) =>
     {
-        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        await context.HttpContext.Response.WriteAsJsonAsync(
-            new ApiErrorResponse(
-                "RateLimitExceeded",
-                "Too many identity lookup requests. Try again later.",
-                context.HttpContext.TraceIdentifier),
+        if (context.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out TimeSpan retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        await OperationalProblemDetails.WriteAsync(
+            context.HttpContext,
+            StatusCodes.Status429TooManyRequests,
+            OperationalErrorCodes.RateLimitExceeded,
+            "The operation rate limit was exceeded.",
+            "rate-limit",
+            true,
             cancellationToken);
     };
-    options.AddPolicy(IdentityLookupRateLimits.Lookup, httpContext =>
-    {
-        return RateLimitPartition.GetFixedWindowLimiter(
-            IdentityLookupRateLimits.GetPartitionKey(httpContext),
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = permitLimit,
-                Window = TimeSpan.FromMinutes(windowMinutes),
-                QueueLimit = 0
-            });
-    });
+    options.AddPolicy(ApiRateLimits.IdentityLookup, context => ApiRateLimits.Partition(context, ApiRateLimits.IdentityLookup, configuredRateLimits.IdentityLookup));
+    options.AddPolicy(ApiRateLimits.BulkIdentityLookup, context => ApiRateLimits.Partition(context, ApiRateLimits.BulkIdentityLookup, configuredRateLimits.BulkIdentityLookup));
+    options.AddPolicy(ApiRateLimits.OperationalRecordRefresh, context => ApiRateLimits.Partition(context, ApiRateLimits.OperationalRecordRefresh, configuredRateLimits.OperationalRecordRefresh));
+    options.AddPolicy(ApiRateLimits.JiraPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraPreview, configuredRateLimits.JiraPreview));
+    options.AddPolicy(ApiRateLimits.JiraCreate, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraCreate, configuredRateLimits.JiraCreate));
+    options.AddPolicy(ApiRateLimits.WorkflowRetry, context => ApiRateLimits.Partition(context, ApiRateLimits.WorkflowRetry, configuredRateLimits.WorkflowRetry));
 });
 
 builder.Services.AddControllers();

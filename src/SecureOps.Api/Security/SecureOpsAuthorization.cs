@@ -20,50 +20,30 @@ public static class SecureOpsAuthorization
         IConfiguration configuration,
         bool requireAuthenticatedFallback)
     {
+        services.AddHttpContextAccessor();
+        services.AddScoped<IAuthorizationHandler, CapabilityAuthorizationHandler>();
         services.AddAuthorization(options =>
         {
-            string[] operatorGroups = GetGroups(configuration, "Operators", "Leads", "Admins");
-            string[] teamLeadGroups = GetGroups(configuration, "Leads", "Admins");
-            string[] adminGroups = GetGroups(configuration, "Admins");
-            string[] auditorGroups = GetGroups(configuration, "Auditors");
-            string[] canViewAuditGroups = GetGroups(configuration, "Auditors", "Admins");
-            string[] operationalRecordViewGroups = GetGroups(configuration, "Operators", "Leads", "Admins", "Auditors");
-            string[] jiraPreviewGroups = GetGroups(configuration, "Operators", "JiraPublishers", "Leads", "Admins");
-            string[] jiraCreateGroups = GetGroups(configuration, "JiraPublishers", "Leads", "Admins");
-            string[] operationalDiagnosticsGroups = GetGroups(configuration, "Auditors", "Leads", "Admins");
-
-            options.AddPolicy(Policies.OperatorOrAbove, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && operatorGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.TeamLeadOrAbove, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.AdminOnly, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && adminGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.AuditorOnly, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && auditorGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanViewAudit, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && canViewAuditGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanTriggerDiagnostic, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanIdentityLookup, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanBulkIdentityLookup, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanTeamView, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && operatorGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanAccessAdministration, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && adminGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanSystemDiagnostics, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && teamLeadGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanViewOperationalRecords, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && operationalRecordViewGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanPreviewJira, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && jiraPreviewGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanCreateJira, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && jiraCreateGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanRetryJira, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && jiraCreateGroups.Any(ctx.User.IsInRole)));
-            options.AddPolicy(Policies.CanViewOperationalRecordDiagnostics, policy => policy.RequireAssertion(ctx =>
-                ctx.User.Identity?.IsAuthenticated == true && operationalDiagnosticsGroups.Any(ctx.User.IsInRole)));
+            AddCapability(options, Policies.OperatorOrAbove, Capabilities.TeamView);
+            AddCapability(options, Policies.TeamLeadOrAbove, Capabilities.IdentityLookup);
+            AddCapability(options, Policies.AdminOnly, Capabilities.AccessManageUsers);
+            AddCapability(options, Policies.AuditorOnly, Capabilities.AccessViewAudit);
+            AddCapability(options, Policies.CanViewAudit, Capabilities.AccessViewAudit);
+            AddCapability(options, Policies.CanTriggerDiagnostic, Capabilities.SystemDiagnostics);
+            AddCapability(options, Policies.CanIdentityLookup, Capabilities.IdentityLookup);
+            AddCapability(options, Policies.CanBulkIdentityLookup, Capabilities.IdentityLookup);
+            AddCapability(options, Policies.CanTeamView, Capabilities.TeamView);
+            AddCapability(options, Policies.CanAccessAdministration, Capabilities.AccessManageUsers);
+            AddCapability(options, Policies.CanSystemDiagnostics, Capabilities.SystemDiagnostics);
+            AddCapability(options, Policies.CanViewOperationalRecords, Capabilities.OperationalRecordsView);
+            AddCapability(options, Policies.CanPreviewJira, Capabilities.OperationalRecordsCreateJiraPreview);
+            AddCapability(options, Policies.CanCreateJira, Capabilities.OperationalRecordsCreateJira);
+            AddCapability(options, Policies.CanRetryJira, Capabilities.OperationalRecordsRetry);
+            AddCapability(options, Policies.CanViewOperationalRecordDiagnostics, Capabilities.OperationalRecordsViewDiagnostics);
+            AddCapability(options, Policies.CanManageUsers, Capabilities.AccessManageUsers);
+            AddCapability(options, Policies.CanApproveAccessRequests, Capabilities.AccessApproveRequests);
+            AddCapability(options, Policies.CanAssignRoles, Capabilities.AccessAssignRoles);
+            AddCapability(options, Policies.CanViewAccessAudit, Capabilities.AccessViewAudit);
 
             if (requireAuthenticatedFallback)
             {
@@ -76,10 +56,6 @@ public static class SecureOpsAuthorization
         return services;
     }
 
-    private static string[] GetGroups(IConfiguration configuration, params string[] roleCodes)
-    {
-        return roleCodes
-            .Select(role => configuration[$"Rbac:{role}Group"] ?? $"CONTOSO\\SecureOps-{role}")
-            .ToArray();
-    }
+    private static void AddCapability(AuthorizationOptions options, string policyName, string capability) =>
+        options.AddPolicy(policyName, policy => policy.RequireAuthenticatedUser().AddRequirements(new CapabilityRequirement(capability)));
 }

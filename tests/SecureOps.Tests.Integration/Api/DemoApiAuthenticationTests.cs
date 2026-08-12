@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Api.Security;
+using SecureOps.Shared.Contracts.Access;
 
 namespace SecureOps.Tests.Integration.Api;
 
@@ -60,6 +61,21 @@ public sealed class DemoApiAuthenticationTests
     }
 
     [Fact]
+    public async Task DemoActor_ReceivesApplicationRoleThroughAccessCompatibilityPath()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+
+        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+
+        access.Should().NotBeNull();
+        access.AccessStatus.Should().Be("Approved");
+        access.Roles.Should().ContainSingle("Admin");
+        access.AuthenticationSource.Should().Be("demo-api-bridge");
+    }
+
+    [Fact]
     public async Task Demo_WithoutDemoActor_IsUnauthorized()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
@@ -96,6 +112,41 @@ public sealed class DemoApiAuthenticationTests
         document.Should().Contain("DemoActor").And.Contain("X-SecureOps-Demo-Actor");
     }
 
+    [Fact]
+    public async Task Test_WithSwaggerExplicitlyEnabled_ExposesSwaggerIndexAndRequiredJsonPath()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
+        using HttpClient client = factory.CreateClient();
+
+        HttpResponseMessage index = await client.GetAsync("/swagger/index.html");
+        HttpResponseMessage document = await client.GetAsync("/swagger/v1/swagger.json");
+
+        index.StatusCode.Should().Be(HttpStatusCode.OK);
+        document.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Test_WithSwaggerDisabled_DoesNotExposeSwaggerRoutes()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: false);
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+
+        (await client.GetAsync("/swagger/index.html")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.GetAsync("/swagger/v1/swagger.json")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Test_WithAnonymousSwaggerDocument_StillProtectsApiOperations()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
+        using HttpClient client = factory.CreateClient();
+
+        (await client.GetAsync("/swagger/v1/swagger.json")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "sample.user", purpose = "Approved operational lookup" })).StatusCode
+            .Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(string environment, bool demoAuthEnabled, bool swaggerEnabled = false)
     {
         return new WebApplicationFactory<Program>()
@@ -104,9 +155,10 @@ public sealed class DemoApiAuthenticationTests
                 builder.UseEnvironment(environment);
                 builder.UseSetting("DemoAuth:Enabled", demoAuthEnabled ? "true" : "false");
                 builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
+                builder.UseSetting("Access:DemoCompatibilityEnabled", "true");
                 builder.UseSetting("Audit:Provider", "InMemory");
                 builder.UseSetting("IdentityLookup:Provider", "Mock");
-                builder.UseSetting("IdentityLookup:RateLimit:PermitLimit", "100");
+                builder.UseSetting("RateLimiting:IdentityLookup:PermitLimit", "100");
                 builder.UseSetting("Swagger:Enabled", swaggerEnabled ? "true" : "false");
             });
     }

@@ -10,7 +10,6 @@ namespace SecureOps.Api.Security;
 /// </summary>
 public sealed class DemoApiAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
-    private readonly IConfiguration _configuration;
     private readonly DemoApiAuthOptions _demoOptions;
     private readonly IHostEnvironment _environment;
 
@@ -22,17 +21,14 @@ public sealed class DemoApiAuthenticationHandler : AuthenticationHandler<Authent
     /// <param name="encoder">URL encoder.</param>
     /// <param name="demoOptions">Demo bridge options.</param>
     /// <param name="environment">Host environment.</param>
-    /// <param name="configuration">Application configuration.</param>
     public DemoApiAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
         IOptions<DemoApiAuthOptions> demoOptions,
-        IHostEnvironment environment,
-        IConfiguration configuration)
+        IHostEnvironment environment)
         : base(options, logger, encoder)
     {
-        _configuration = configuration;
         _demoOptions = demoOptions.Value;
         _environment = environment;
     }
@@ -51,8 +47,8 @@ public sealed class DemoApiAuthenticationHandler : AuthenticationHandler<Authent
         }
 
         string actorKey = values.ToString().Trim();
-        string? roleGroup = ResolveRoleGroup(actorKey);
-        if (roleGroup is null)
+        if (!string.Equals(actorKey, DemoApiAuthentication.PlatformAdminActor, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(actorKey, DemoApiAuthentication.TeamLeadActor, StringComparison.OrdinalIgnoreCase))
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
@@ -60,24 +56,11 @@ public sealed class DemoApiAuthenticationHandler : AuthenticationHandler<Authent
         Claim[] claims =
         [
             new(ClaimTypes.Name, $"demo:{actorKey}"),
-            new(ClaimTypes.Role, roleGroup),
             new("secureops:auth_source", "demo-api-bridge")
         ];
 
         ClaimsIdentity identity = new(claims, DemoApiAuthentication.SchemeName, ClaimTypes.Name, ClaimTypes.Role);
         AuthenticationTicket ticket = new(new ClaimsPrincipal(identity), DemoApiAuthentication.SchemeName);
         return Task.FromResult(AuthenticateResult.Success(ticket));
-    }
-
-    private string? ResolveRoleGroup(string actorKey)
-    {
-        return actorKey.ToLowerInvariant() switch
-        {
-            DemoApiAuthentication.PlatformAdminActor =>
-                _configuration["Rbac:AdminsGroup"] ?? "CONTOSO\\SecureOps-Admins",
-            DemoApiAuthentication.TeamLeadActor =>
-                _configuration["Rbac:LeadsGroup"] ?? "CONTOSO\\SecureOps-Leads",
-            _ => null
-        };
     }
 }

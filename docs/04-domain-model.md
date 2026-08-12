@@ -9,7 +9,7 @@ Domain model and database schema. The model is intentionally compact for MVP; la
 | Alerting | Alarms received and their lifecycle | `Alerts`, `AlertEvents` |
 | Diagnostic | Job orchestration and results | `DiagnosticJobs`, `DiagnosticResults` |
 | Inventory | Pilot server registry | `Servers` |
-| Identity & RBAC | User identity, AD group mapping | `Users`, `RbacRoles` (read-only views over AD) |
+| Application access | Authentication-independent users, approval requests, roles, capabilities | `security.Users`, `security.AccessRequests`, `security.Roles`, `security.RoleAssignments` |
 | Audit | Append-only operational audit | `audit.AuditLog` |
 | Operational Record/Jira | Imported source records and durable transfer state | `ops.OperationalRecords`, `ops.JiraTransfers`, `ops.WorkflowHistory` |
 | Notification | Notification dispatch records | `NotificationLog` |
@@ -21,7 +21,7 @@ Domain model and database schema. The model is intentionally compact for MVP; la
 
 Current implementation note: `SecureOps.Domain` includes the Operational Record/Jira workflow aggregate and fail-closed classification/state enums. Its complete state transitions and persistence contract are documented in `docs/22-operational-record-jira-workflow.md` and `sql/schema/002-operational-record-jira-workflow.sql`.
 
-Phase 1A IdentityLookup does not add a durable identity table. It resolves one exact account through a provider and records only the privileged-read audit trail. The `Users` table remains for authenticated SecureOps users and RBAC-related identity caching.
+Phase 1A IdentityLookup does not persist directory profiles. It resolves one exact account through a short-lived bounded cache and records only the privileged-read audit trail. `security.Users` stores the opaque authenticated corporate principal, authentication source, application access status, and timestamps; roles are separate assignments. Directory lookup responses are never copied into access tables.
 
 ```csharp
 namespace SecureOps.Domain.Alerting;

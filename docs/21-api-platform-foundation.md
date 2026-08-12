@@ -4,13 +4,13 @@
 
 Forwarded headers are disabled by default. To enable them, set `ReverseProxy:ForwardedHeaders:Enabled=true` and supply exact `ReverseProxy:ForwardedHeaders:TrustedProxyIps` values. Invalid or empty enabled configuration stops startup. Direct clients cannot establish forwarded client IP or HTTPS state.
 
-Swagger is disabled by default. Set `Swagger:Enabled=true` only in Development, Demo, or Test. In these browser-test environments the JSON is anonymous so Swagger UI can load its definition; every API operation remains protected and Demo Swagger uses the explicit `X-SecureOps-Demo-Actor` header scheme without a prepopulated actor. Outside those environments, the JSON endpoint requires the configured Admin group and no UI is enabled.
+Swagger is disabled by default. Set `Swagger:Enabled=true` only in Development, Demo, or Test. In these browser-test environments the JSON is anonymous so Swagger UI can load its definition; every API operation remains protected and Demo Swagger uses the explicit `X-SecureOps-Demo-Actor` header scheme without a prepopulated actor. Outside those environments, the JSON endpoint requires the Admin application capability and no UI is enabled.
 
-Exact Demo/Test Swagger keys: `Swagger:Enabled`, `DemoAuth:Enabled`, and optional `DemoAuth:HeaderName`. The default header name is `X-SecureOps-Demo-Actor`.
+Exact Demo/Test Swagger keys: `Swagger:Enabled`, `DemoAuth:Enabled`, `Access:DemoCompatibilityEnabled`, and optional `DemoAuth:HeaderName`. Demo compatibility requires both explicit flags and is restricted to allowed non-production environments. The default header name is `X-SecureOps-Demo-Actor`.
 
 `IdentityLookup:Provider=ActiveDirectory` requires `IdentityLookup:DomainName`, an optional `IdentityLookup:Container`, and a positive timeout. The application pool is currently `ApplicationPoolIdentity`; AD and PAM access must be tested using that runtime identity, not an interactive administrator.
 
-Exact AD runtime keys: mandatory `IdentityLookup:Provider=ActiveDirectory` and `IdentityLookup:DomainName`; optional `IdentityLookup:Container` and `IdentityLookup:EnableUpnLookup`; bounded settings `IdentityLookup:ProviderTimeoutSeconds`, `IdentityLookup:BulkMaxAccounts`, `IdentityLookup:RateLimit:PermitLimit`, and `IdentityLookup:RateLimit:WindowMinutes`.
+Exact AD runtime keys: mandatory `IdentityLookup:Provider=ActiveDirectory` and `IdentityLookup:DomainName`; optional `IdentityLookup:Container` and `IdentityLookup:EnableUpnLookup`; bounded settings `IdentityLookup:ProviderTimeoutSeconds`, `IdentityLookup:BulkMaxAccounts`, `IdentityLookup:Cache:Enabled`, `IdentityLookup:Cache:TtlSeconds`, and `IdentityLookup:Cache:MaxEntries`.
 
 `PamProvider:Provider` is restricted to `Mock`. A real resolver requires an approved API/module/cmdlet, exact lookup parameter and response contract, authentication model, timeout/rate limits, and runtime identity authorization. No arbitrary PowerShell is supported.
 
@@ -22,7 +22,11 @@ Do not run this from local development. Under explicit approval, confirm the app
 
 ## Authorization Migration
 
-Windows Integrated Authentication remains the production target. The configured AD Admin group is the bootstrap administrator path. It can approve pending database access requests and assign application roles. Demo authentication remains limited to explicit Development/Demo configuration. A later OIDC provider should emit the same approved role/capability model.
+Windows Integrated Authentication remains the production target. Authentication is translated to a corporate principal, then persisted application status, roles, and capabilities determine access. Exact `Access:BootstrapAdministrators` values can initialize an Admin; ordinary first-seen users remain pending. Demo authentication remains an explicit Demo/Test compatibility path. Future OIDC supplies only the principal and session handler; approval and capability authorization remain unchanged. See ADR-0010 and `docs/23-platform-access-concurrency-and-release-safety.md`.
+
+Operation limits use `RateLimiting:{IdentityLookup|BulkIdentityLookup|OperationalRecordRefresh|JiraPreview|JiraCreate|WorkflowRetry}:PermitLimit` and `WindowSeconds`. Session policy uses `SessionSecurity:*`; command leases use `CommandIdempotency:*`.
+
+TEST release validation must run `scripts/powershell/Test-ApiTestSwaggerReadiness.ps1` against publish output with explicit expected environment and `SwaggerEnabled=true`. Server-owned `web.config` or environment variables remain deployment inputs and are not inferred from the artifact.
 
 ## Audit SQL
 

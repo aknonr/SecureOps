@@ -1,19 +1,27 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SecureOps.Domain.OperationalRecords;
 using SecureOps.Infrastructure.Audit;
+using SecureOps.Infrastructure.Commands;
 using SecureOps.Shared.Audit;
+using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
 
 namespace SecureOps.Infrastructure.OperationalRecords;
 
-/// <summary>Coordinates idempotent Jira creation and resumable source-record close/update.</summary>
+/// <summary>Coordinates durable, claimed, source-validated Jira workflows.</summary>
 public sealed class JiraTransferService : IJiraTransferService
 {
+    private const string CreateCommand = "OperationalRecords.CreateJira";
+    private const string RetryCommand = "OperationalRecords.Retry";
     private readonly IOperationalRecordRepository _repository;
     private readonly IJiraIssueDraftService _draftService;
     private readonly IJiraClient _jiraClient;
     private readonly IOperationalRecordClient _sourceClient;
+    private readonly ICommandIdempotencyStore _commandStore;
     private readonly IAuditWriter _auditWriter;
+    private readonly OperationalRecordsOptions _operationalOptions;
+    private readonly CommandIdempotencyOptions _commandOptions;
     private readonly ILogger<JiraTransferService> _logger;
 
     /// <summary>Initializes the transfer service.</summary>
@@ -22,14 +30,20 @@ public sealed class JiraTransferService : IJiraTransferService
         IJiraIssueDraftService draftService,
         IJiraClient jiraClient,
         IOperationalRecordClient sourceClient,
+        ICommandIdempotencyStore commandStore,
         IAuditWriter auditWriter,
+        IOptions<OperationalRecordsOptions> operationalOptions,
+        IOptions<CommandIdempotencyOptions> commandOptions,
         ILogger<JiraTransferService> logger)
     {
         _repository = repository;
         _draftService = draftService;
         _jiraClient = jiraClient;
         _sourceClient = sourceClient;
+        _commandStore = commandStore;
         _auditWriter = auditWriter;
+        _operationalOptions = operationalOptions.Value;
+        _commandOptions = commandOptions.Value;
         _logger = logger;
     }
 
@@ -65,7 +79,145 @@ public sealed class JiraTransferService : IJiraTransferService
     }
 
     /// <inheritdoc />
-    public async Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken)
+    public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+        ExecuteCommandAsync(CreateCommand, id, context, ExecuteCreateClaimedAsync, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+        ExecuteCommandAsync(RetryCommand, id, context, ExecuteRetryClaimedAsync, cancellationToken);
+
+    private async Task<OperationalRecordResult<OperationalRecord>> ExecuteCommandAsync(
+        string commandName,
+        Guid id,
+        OperationalRecordCommandContext context,
+        Func<Guid, OperationalRecordCommandContext, CancellationToken, Task<OperationalRecordResult<OperationalRecord>>> operation,
+        CancellationToken cancellationToken)
+    {
+        string targetId = id.ToString("D");
+        string? key = context.IdempotencyKey;
+        if (key is null && string.Equals(commandName, RetryCommand, StringComparison.Ordinal))
+        {
+            OperationalRecord? retryRecord = await _repository.GetAsync(id, cancellationToken);
+            if (retryRecord is null)
+            {
+                return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
+            }
+
+            key = CommandIdempotency.Create(context.Actor, commandName, $"{targetId}:{retryRecord.Version}");
+        }
+
+        key ??= CommandIdempotency.Create(context.Actor, commandName, targetId);
+        if (!CommandIdempotency.IsValid(key, _commandOptions.MaxKeyLength))
+        {
+            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.InvalidIdempotencyKey, "idempotency", false);
+        }
+
+        CommandBeginResult begin = await _commandStore.TryBeginAsync(
+            commandName,
+            targetId,
+            key,
+            context.Actor,
+            TimeSpan.FromSeconds(_commandOptions.ExecutionLeaseSeconds),
+            cancellationToken);
+        if (begin.Disposition == CommandBeginDisposition.Completed)
+        {
+            OperationalRecord? completed = await _repository.GetAsync(id, cancellationToken);
+            return completed is null
+                ? OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false)
+                : OperationalRecordResult<OperationalRecord>.Success(completed);
+        }
+
+        if (begin.Disposition == CommandBeginDisposition.Failed)
+        {
+            return OperationalRecordResult<OperationalRecord>.Fail(begin.ErrorCode ?? OperationalErrorCodes.WorkflowConflict, "idempotency", false);
+        }
+
+        if (begin.Disposition is CommandBeginDisposition.InProgress or CommandBeginDisposition.ActorConflict)
+        {
+            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.WorkflowAlreadyInProgress, "idempotency", true);
+        }
+
+        Guid executionToken = begin.ExecutionToken
+            ?? throw new InvalidOperationException("An acquired command execution must include a fencing token.");
+        OperationalRecordResult<OperationalRecord> result;
+        try
+        {
+            result = await ExecuteClaimedAsync(id, context, operation, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            await _commandStore.FailAsync(commandName, targetId, key, executionToken, OperationalErrorCodes.WorkflowConflict, CancellationToken.None);
+            throw;
+        }
+
+        if (result.IsSuccess)
+        {
+            await _commandStore.CompleteAsync(commandName, targetId, key, executionToken, cancellationToken);
+        }
+        else
+        {
+            await _commandStore.FailAsync(commandName, targetId, key, executionToken, result.Failure!.Code, cancellationToken);
+        }
+
+        return result;
+    }
+
+    private async Task<OperationalRecordResult<OperationalRecord>> ExecuteClaimedAsync(
+        Guid id,
+        OperationalRecordCommandContext context,
+        Func<Guid, OperationalRecordCommandContext, CancellationToken, Task<OperationalRecordResult<OperationalRecord>>> operation,
+        CancellationToken cancellationToken)
+    {
+        WorkflowClaimResult claim = await _repository.TryClaimAsync(
+            id,
+            context.Actor,
+            TimeSpan.FromSeconds(_operationalOptions.ClaimLeaseSeconds),
+            context.CorrelationId,
+            cancellationToken);
+        if (claim.Disposition != WorkflowAcquireDisposition.Acquired)
+        {
+            if (claim.Record is not null)
+            {
+                _ = await TryAuditAsync(AuditActions.OperationalRecordConflict, claim.Record, context, claim.Disposition.ToString(), null, cancellationToken);
+            }
+
+            return new OperationalRecordResult<OperationalRecord>(null, MapClaimFailure(claim.Disposition));
+        }
+
+        if (!await TryAuditAsync(AuditActions.OperationalRecordClaimed, claim.Record!, context, "Claimed", null, cancellationToken))
+        {
+            await _repository.ReleaseClaimAsync(id, context.Actor, context.CorrelationId, CancellationToken.None);
+            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.AuditStoreUnavailable, "audit", true);
+        }
+
+        OperationalRecordResult<OperationalRecord> result;
+        try
+        {
+            result = await operation(id, context, cancellationToken);
+        }
+        finally
+        {
+            OperationalRecord? released = await _repository.ReleaseClaimAsync(id, context.Actor, context.CorrelationId, CancellationToken.None);
+            if (released is not null)
+            {
+                _ = await TryAuditAsync(AuditActions.OperationalRecordClaimReleased, released, context, "Released", null, CancellationToken.None);
+            }
+        }
+
+        if (result.IsSuccess)
+        {
+            OperationalRecord? latest = await _repository.GetAsync(id, cancellationToken);
+            return latest is null ? result : OperationalRecordResult<OperationalRecord>.Success(latest);
+        }
+
+        return result;
+    }
+
+    private async Task<OperationalRecordResult<OperationalRecord>> ExecuteCreateClaimedAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken)
     {
         OperationalRecord? record = await _repository.GetAsync(id, cancellationToken);
         if (record is null)
@@ -79,11 +231,13 @@ public sealed class JiraTransferService : IJiraTransferService
             return new OperationalRecordResult<OperationalRecord>(null, draftResult.Failure);
         }
 
-        return await CreateFromDraftAsync(draftResult.Value!, context, cancellationToken);
+        OperationalRecordResult<OperationalRecord> freshness = await ValidateFreshnessAsync(record, WorkflowFailureStage.JiraCreate, context, cancellationToken);
+        return freshness.IsSuccess
+            ? await CreateFromDraftAsync(draftResult.Value!, context, cancellationToken)
+            : freshness;
     }
 
-    /// <inheritdoc />
-    public async Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken)
+    private async Task<OperationalRecordResult<OperationalRecord>> ExecuteRetryClaimedAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken)
     {
         OperationalRecord? record = await _repository.RecordRetryRequestedAsync(id, context.Actor, context.CorrelationId, cancellationToken);
         if (record is null)
@@ -103,7 +257,7 @@ public sealed class JiraTransferService : IJiraTransferService
 
         if (record.ReconciliationRequired || record.WorkflowState == OperationalRecordWorkflowState.CreatingJira)
         {
-            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.WorkflowConflict, "jira-reconciliation", false);
+            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.WorkflowAlreadyInProgress, "jira-reconciliation", false);
         }
 
         if (!string.IsNullOrWhiteSpace(record.JiraIssueKey))
@@ -117,9 +271,15 @@ public sealed class JiraTransferService : IJiraTransferService
         }
 
         OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, cancellationToken);
-        return draftResult.IsSuccess
+        if (!draftResult.IsSuccess)
+        {
+            return new OperationalRecordResult<OperationalRecord>(null, draftResult.Failure);
+        }
+
+        OperationalRecordResult<OperationalRecord> freshness = await ValidateFreshnessAsync(record, WorkflowFailureStage.JiraCreate, context, cancellationToken);
+        return freshness.IsSuccess
             ? await CreateFromDraftAsync(draftResult.Value!, context, cancellationToken)
-            : new OperationalRecordResult<OperationalRecord>(null, draftResult.Failure);
+            : freshness;
     }
 
     private async Task<OperationalRecordResult<OperationalRecord>> CreateFromDraftAsync(
@@ -181,6 +341,12 @@ public sealed class JiraTransferService : IJiraTransferService
         OperationalRecordCommandContext context,
         CancellationToken cancellationToken)
     {
+        OperationalRecordResult<OperationalRecord> freshness = await ValidateFreshnessAsync(record, WorkflowFailureStage.OperationalRecordClose, context, cancellationToken);
+        if (!freshness.IsSuccess)
+        {
+            return freshness;
+        }
+
         WorkflowAcquireResult acquired = await _repository.TryAcquireCloseAsync(record.Id, context.Actor, context.CorrelationId, cancellationToken);
         if (acquired.Disposition == WorkflowAcquireDisposition.AlreadyCompleted)
         {
@@ -218,6 +384,43 @@ public sealed class JiraTransferService : IJiraTransferService
         _ = await TryAuditAsync(AuditActions.OperationalRecordClosed, completed, context, "Closed", null, cancellationToken);
         _ = await TryAuditAsync(AuditActions.WorkflowCompleted, completed, context, "Completed", null, cancellationToken);
         return OperationalRecordResult<OperationalRecord>.Success(completed);
+    }
+
+    private async Task<OperationalRecordResult<OperationalRecord>> ValidateFreshnessAsync(
+        OperationalRecord record,
+        WorkflowFailureStage failureStage,
+        OperationalRecordCommandContext context,
+        CancellationToken cancellationToken)
+    {
+        OperationalRecordSourceItem? current;
+        try
+        {
+            current = await _sourceClient.GetByIdAsync(record.SourceRecordId, cancellationToken);
+        }
+        catch (ExternalIntegrationException ex)
+        {
+            return OperationalRecordResult<OperationalRecord>.Fail(ex.ErrorCode, "source-validation", ex.Retryable);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Operational-record source validation failed. OperationalRecordId: {OperationalRecordId}. CorrelationId: {CorrelationId}", record.Id, context.CorrelationId);
+            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalSourceUnavailable, "source-validation", true);
+        }
+
+        string? errorCode = current is null || !current.IsOpen
+            ? OperationalErrorCodes.OperationalRecordNoLongerOpen
+            : !string.Equals(OperationalRecordSourceConcurrency.Create(current), record.SourceConcurrencyToken, StringComparison.Ordinal)
+                ? OperationalErrorCodes.OperationalRecordChanged
+                : null;
+        if (errorCode is not null)
+        {
+            OperationalRecord failed = await _repository.RecordFailureAsync(record.Id, failureStage, errorCode, false, context.Actor, context.CorrelationId, cancellationToken);
+            _ = await TryAuditAsync(AuditActions.OperationalRecordSourceChanged, failed, context, "Rejected", errorCode, cancellationToken);
+            return OperationalRecordResult<OperationalRecord>.Fail(errorCode, "source-validation", false);
+        }
+
+        OperationalRecord validated = await _repository.RecordSourceValidationAsync(record.Id, DateTimeOffset.UtcNow, context.CorrelationId, cancellationToken);
+        return OperationalRecordResult<OperationalRecord>.Success(validated);
     }
 
     private async Task<OperationalRecordResult<OperationalRecord>> RecordJiraFailureAsync(
@@ -281,12 +484,22 @@ public sealed class JiraTransferService : IJiraTransferService
         }
     }
 
+    private static OperationalRecordFailure MapClaimFailure(WorkflowAcquireDisposition disposition) => disposition switch
+    {
+        WorkflowAcquireDisposition.NotFound => new(OperationalErrorCodes.OperationalRecordNotFound, "repository", false),
+        WorkflowAcquireDisposition.AlreadyCompleted => new(OperationalErrorCodes.WorkflowAlreadyCompleted, "workflow", false),
+        WorkflowAcquireDisposition.AlreadyClaimed => new(OperationalErrorCodes.OperationalRecordAlreadyClaimed, "claim", true),
+        WorkflowAcquireDisposition.InProgress or WorkflowAcquireDisposition.Conflict => new(OperationalErrorCodes.WorkflowAlreadyInProgress, "claim", true),
+        _ => new(OperationalErrorCodes.WorkflowConflict, "claim", false)
+    };
+
     private static OperationalRecordFailure? MapAcquireFailure(WorkflowAcquireDisposition disposition) => disposition switch
     {
         WorkflowAcquireDisposition.Acquired => null,
         WorkflowAcquireDisposition.NotFound => new(OperationalErrorCodes.OperationalRecordNotFound, "repository", false),
         WorkflowAcquireDisposition.InvalidState => new(OperationalErrorCodes.OperationalRecordInvalidState, "workflow", false),
-        WorkflowAcquireDisposition.Conflict => new(OperationalErrorCodes.WorkflowConflict, "workflow", true),
+        WorkflowAcquireDisposition.Conflict or WorkflowAcquireDisposition.InProgress => new(OperationalErrorCodes.WorkflowAlreadyInProgress, "workflow", true),
+        WorkflowAcquireDisposition.AlreadyClaimed => new(OperationalErrorCodes.OperationalRecordAlreadyClaimed, "claim", true),
         WorkflowAcquireDisposition.JiraAlreadyCreated => new(OperationalErrorCodes.JiraAlreadyCreated, "jira-create", false),
         WorkflowAcquireDisposition.AlreadyCompleted => new(OperationalErrorCodes.WorkflowAlreadyCompleted, "workflow", false),
         WorkflowAcquireDisposition.ReconciliationRequired => new(OperationalErrorCodes.WorkflowConflict, "jira-reconciliation", false),

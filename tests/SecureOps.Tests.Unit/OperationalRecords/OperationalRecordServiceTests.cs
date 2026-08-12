@@ -37,6 +37,8 @@ public sealed class OperationalRecordServiceTests
     private sealed class SourceClient(IReadOnlyList<OperationalRecordSourceItem> records) : IOperationalRecordClient
     {
         public Task<IReadOnlyList<OperationalRecordSourceItem>> GetActiveAsync(int maximumCount, CancellationToken cancellationToken) => Task.FromResult(records);
+        public Task<OperationalRecordSourceItem?> GetByIdAsync(string sourceRecordId, CancellationToken cancellationToken) =>
+            Task.FromResult(records.SingleOrDefault(record => string.Equals(record.SourceRecordId, sourceRecordId, StringComparison.OrdinalIgnoreCase)));
         public Task CloseAsync(string sourceRecordId, string orCode, string jiraIssueKey, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

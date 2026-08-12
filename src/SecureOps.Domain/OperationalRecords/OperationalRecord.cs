@@ -47,4 +47,16 @@ public sealed record OperationalRecord
     public int RetryCount { get; init; }
     /// <summary>Last persisted update time.</summary>
     public required DateTimeOffset UpdatedAt { get; init; }
+    /// <summary>Opaque source version or deterministic source-state fingerprint.</summary>
+    public required string SourceConcurrencyToken { get; init; }
+    /// <summary>Last time the external source was revalidated.</summary>
+    public DateTimeOffset? LastSourceValidationAt { get; init; }
+    /// <summary>Actor currently holding the bounded workflow lease.</summary>
+    public string? ClaimedBy { get; init; }
+    /// <summary>Time the current workflow lease was acquired.</summary>
+    public DateTimeOffset? ClaimedAt { get; init; }
+    /// <summary>Expiration of the current workflow lease.</summary>
+    public DateTimeOffset? ClaimExpiresAt { get; init; }
+    /// <summary>Persistence concurrency version.</summary>
+    public long Version { get; init; }
 }

@@ -30,7 +30,10 @@ public static class OperationalProblemDetails
         string correlationId = Activity.Current?.Id ?? context.TraceIdentifier;
         ObjectResult result = Create(status, code, title, correlationId, stage, retryable);
         context.Response.StatusCode = status;
-        context.Response.ContentType = "application/problem+json";
-        return context.Response.WriteAsJsonAsync((ProblemDetails)result.Value!, cancellationToken);
+        return context.Response.WriteAsJsonAsync(
+            (ProblemDetails)result.Value!,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web),
+            "application/problem+json",
+            cancellationToken);
     }
 }

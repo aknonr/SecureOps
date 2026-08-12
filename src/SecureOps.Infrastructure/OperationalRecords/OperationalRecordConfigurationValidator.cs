@@ -28,6 +28,11 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("OperationalRecords:MaxImportCount must be between 1 and 500.");
         }
 
+        if (operational.ClaimLeaseSeconds is < 30 or > 900)
+        {
+            throw new InvalidOperationException("OperationalRecords:ClaimLeaseSeconds must be between 30 and 900.");
+        }
+
         if (string.Equals(operational.RepositoryProvider, "SqlServer", StringComparison.OrdinalIgnoreCase)
             && string.IsNullOrWhiteSpace(configuration.GetConnectionString(Audit.AuditConnectionStrings.SecureOpsDb)))
         {

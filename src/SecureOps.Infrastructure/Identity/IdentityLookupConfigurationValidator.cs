@@ -28,6 +28,11 @@ public static class IdentityLookupConfigurationValidator
             throw new InvalidOperationException("IdentityLookup:ProviderTimeoutSeconds must be positive and BulkMaxAccounts must be between 1 and 20.");
         }
 
+        if (identity.Cache.TtlSeconds is < 1 or > 300 || identity.Cache.MaxEntries is < 1 or > 5000)
+        {
+            throw new InvalidOperationException("IdentityLookup:Cache TTL and capacity are outside safe bounds.");
+        }
+
         PamProviderOptions pam = new();
         configuration.GetSection(PamProviderOptions.SectionName).Bind(pam);
         if (!string.Equals(pam.Provider, "Mock", StringComparison.OrdinalIgnoreCase) || pam.TimeoutSeconds <= 0)

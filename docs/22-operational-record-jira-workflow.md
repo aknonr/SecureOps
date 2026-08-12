@@ -29,9 +29,11 @@ No legacy Operational Record/Jira PowerShell script exists in this repository. T
 
 Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. No approved classification rules exist, so the implemented classifier always selects `NeedsManualReview`. No endpoint automatically promotes a record to `Eligible`.
 
-## Idempotency and Retry
+## Claims, Idempotency, Freshness, and Retry
 
-The idempotency key is SHA256 over source-record identity plus mapping version. SQL permits exactly one transfer row per Operational Record and also enforces unique source IDs, idempotency keys, and Jira issue keys. Once preview fixes a mapping version for a record, a different mapping/version pair fails with `WorkflowConflict`. Serializable transactions with update locks acquire create/close stages.
+The transfer key is SHA256 over source-record identity plus mapping version. Create/retry also uses the caller `Idempotency-Key` or a deterministic actor/command/target fallback in `ops.CommandExecutions`. SQL permits exactly one transfer row per Operational Record and enforces unique source IDs, transfer keys, command scopes, and Jira issue keys. Once preview fixes a mapping version for a record, a different mapping/version pair fails with `WorkflowConflict`.
+
+Before create/retry, the API atomically acquires a bounded actor claim (`ClaimedBy`, `ClaimedAt`, `ClaimExpiresAt`). Another actor receives `OperationalRecordAlreadyClaimed`; active transition states receive `WorkflowAlreadyInProgress`. Expiry permits recovery after an abandoned client. Immediately before Jira create and again before source close, the source record is re-fetched and checked for existence, open state, and matching explicit version token or deterministic source-state hash. Changed/closed source data aborts before the external write.
 
 The Jira key is committed before the source close/update starts. A close failure therefore retries only the source stage. Concurrent, repeated, or completed create requests cannot call Jira twice. If a Jira call has an uncertain outcome, `ReconciliationRequired` blocks automatic retry. If the process stops while `CreatingJira` has no persisted key, retry also fails closed for manual reconciliation because remote Jira idempotency has not been proven.
 
@@ -47,7 +49,7 @@ The Jira key is committed before the source close/update starts. A close failure
 
 ## Authorization
 
-Bootstrap policies map existing configured groups without replacing future database-backed access approval:
+Persisted application roles map to server-side capabilities:
 
 - `CanViewOperationalRecords`: Operator, Lead, Admin, Auditor
 - `CanPreviewJira`: Operator, JiraPublisher, Lead, Admin
@@ -61,7 +63,7 @@ Import, classification, preview, create request/result, source-close request/res
 
 ## Persistence and DBA Review
 
-`sql/schema/002-operational-record-jira-workflow.sql` is offline-only. It creates `ops.OperationalRecords`, `ops.JiraTransfers`, and append-only `ops.OperationalRecordWorkflowHistory`. The application does not run migrations. DBA approval and execution are required before selecting `SqlServer`.
+`sql/schema/002-operational-record-jira-workflow.sql` creates the base workflow tables. Offline migration 003 adds source/claim metadata and `ops.CommandExecutions`. The application does not run migrations. DBA approval and execution of migrations 001-003 are required before selecting `SqlServer`.
 
 Minimum runtime permissions are `SELECT`, `INSERT`, and `UPDATE` on these three `ops` tables; no `DELETE`, DDL, schema-owner, or migration permission is required. Audit-store permissions remain separate.
 
@@ -72,6 +74,9 @@ Non-secret keys:
 - `OperationalRecords:SourceProvider` (`Fake` only now)
 - `OperationalRecords:RepositoryProvider` (`InMemory` or `SqlServer`)
 - `OperationalRecords:MaxImportCount` (1-500)
+- `OperationalRecords:ClaimLeaseSeconds` (30-900)
+- `CommandIdempotency:ExecutionLeaseSeconds` (30-900)
+- `CommandIdempotency:MaxKeyLength` (32-256)
 - `Jira:Provider` (`Fake` only now)
 - `Jira:ProjectKey`
 - `Jira:IssueType`

@@ -204,6 +204,10 @@ public sealed class IdentityLookupServiceTests
             new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions())),
             new MockPamAccountResolver(),
             provider,
+            new IdentityReadThroughCache(
+                Options.Create(new IdentityLookupOptions { Cache = new IdentityLookupCacheOptions { Enabled = false } }),
+                new IdentityLookupCacheMetrics(),
+                TimeProvider.System),
             audit,
             NullLogger<IdentityLookupService>.Instance);
     }

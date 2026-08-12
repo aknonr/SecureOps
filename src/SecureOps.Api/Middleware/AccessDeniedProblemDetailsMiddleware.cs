@@ -1,3 +1,6 @@
+using SecureOps.Api.Security;
+using SecureOps.Shared.Contracts.Api;
+
 namespace SecureOps.Api.Middleware;
 
 /// <summary>Normalizes authentication and authorization denials to safe operational errors.</summary>
@@ -18,8 +21,11 @@ public sealed class AccessDeniedProblemDetailsMiddleware
         if (!context.Response.HasStarted && context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             int status = context.Response.StatusCode;
+            string code = context.Items.TryGetValue(CapabilityAuthorizationHandler.DenialCodeItem, out object? value)
+                ? value as string ?? OperationalErrorCodes.AccessDenied
+                : OperationalErrorCodes.AccessDenied;
             context.Response.Clear();
-            await OperationalProblemDetails.WriteAsync(context, status, "AccessDenied", "Access is denied.", "authorization", false, context.RequestAborted);
+            await OperationalProblemDetails.WriteAsync(context, status, code, "Access is denied.", "authorization", false, context.RequestAborted);
         }
     }
 }

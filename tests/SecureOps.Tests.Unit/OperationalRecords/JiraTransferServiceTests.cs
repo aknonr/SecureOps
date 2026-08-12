@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SecureOps.Domain.OperationalRecords;
 using SecureOps.Infrastructure.Audit;
+using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Audit;
 using SecureOps.Shared.Configuration;
@@ -24,13 +25,29 @@ public sealed class JiraTransferServiceTests
 
         OperationalRecord firstRecord = first.Value!;
         firstRecord.WorkflowState.Should().Be(OperationalRecordWorkflowState.Completed);
-        second.Failure!.Code.Should().Be(OperationalErrorCodes.WorkflowAlreadyCompleted);
+        second.IsSuccess.Should().BeTrue();
+        second.Value!.JiraIssueKey.Should().Be(firstRecord.JiraIssueKey);
         fixture.Jira.Calls.Should().Be(1);
         fixture.Audit.Events.Select(item => item.Action).Should().Contain([
             AuditActions.JiraCreateRequested,
             AuditActions.JiraCreated,
             AuditActions.OperationalRecordCloseRequested,
             AuditActions.WorkflowCompleted]);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RepeatedExplicitKey_ReplaysCompletedResult()
+    {
+        TestFixture fixture = await TestFixture.CreateAsync();
+        OperationalRecordCommandContext context = _context with { IdempotencyKey = "browser-command-key-000001" };
+
+        OperationalRecordResult<OperationalRecord> first = await fixture.Service.CreateAsync(fixture.RecordId, context, CancellationToken.None);
+        OperationalRecordResult<OperationalRecord> replay = await fixture.Service.CreateAsync(fixture.RecordId, context, CancellationToken.None);
+
+        first.IsSuccess.Should().BeTrue();
+        replay.IsSuccess.Should().BeTrue();
+        replay.Value!.JiraIssueKey.Should().Be(first.Value!.JiraIssueKey);
+        fixture.Jira.Calls.Should().Be(1);
     }
 
     [Fact]
@@ -46,7 +63,7 @@ public sealed class JiraTransferServiceTests
         OperationalRecordResult<OperationalRecord> first = await firstTask;
 
         first.IsSuccess.Should().BeTrue();
-        second.Failure!.Code.Should().Be(OperationalErrorCodes.WorkflowConflict);
+        second.Failure!.Code.Should().Be(OperationalErrorCodes.WorkflowAlreadyInProgress);
         jira.Calls.Should().Be(1);
     }
 
@@ -75,6 +92,7 @@ public sealed class JiraTransferServiceTests
         TestFixture fixture = await TestFixture.CreateAsync();
         OperationalRecord record = (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!;
         string idempotencyKey = OperationalRecordIdempotency.Create(record.SourceRecordId, "mapping-v1");
+        _ = await fixture.Repository.TryClaimAsync(record.Id, _context.Actor, TimeSpan.FromMinutes(2), _context.CorrelationId, CancellationToken.None);
         _ = await fixture.Repository.TryAcquireCreateAsync(record.Id, "mapping-v1", idempotencyKey, _context.Actor, _context.CorrelationId, CancellationToken.None);
         _ = await fixture.Repository.RecordJiraCreatedAsync(record.Id, "TEST-200", _context.Actor, _context.CorrelationId, CancellationToken.None);
 
@@ -98,8 +116,50 @@ public sealed class JiraTransferServiceTests
 
         first.Failure!.Code.Should().Be(OperationalErrorCodes.JiraUnavailable);
         first.Failure.Retryable.Should().BeFalse();
-        retry.Failure!.Code.Should().Be(OperationalErrorCodes.WorkflowConflict);
+        retry.Failure!.Code.Should().Be(OperationalErrorCodes.WorkflowAlreadyInProgress);
         jira.Calls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenSourceChangedExternally_AbortsBeforeJira()
+    {
+        CountingSourceClient source = new();
+        TestFixture fixture = await TestFixture.CreateAsync(source: source);
+        source.ChangeExternally();
+
+        OperationalRecordResult<OperationalRecord> result = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        result.Failure!.Code.Should().Be(OperationalErrorCodes.OperationalRecordChanged);
+        fixture.Jira.Calls.Should().Be(0);
+        fixture.Audit.Events.Select(item => item.Action).Should().Contain(AuditActions.OperationalRecordSourceChanged);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenSourceClosedExternally_AbortsBeforeJira()
+    {
+        CountingSourceClient source = new();
+        TestFixture fixture = await TestFixture.CreateAsync(source: source);
+        source.CloseExternally();
+
+        OperationalRecordResult<OperationalRecord> result = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        result.Failure!.Code.Should().Be(OperationalErrorCodes.OperationalRecordNoLongerOpen);
+        fixture.Jira.Calls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task CreateAsync_SameExplicitKeyFromDifferentActor_IsRejected()
+    {
+        const string key = "browser-command-key-000001";
+        TestFixture fixture = await TestFixture.CreateAsync();
+        OperationalRecordCommandContext firstContext = _context with { IdempotencyKey = key };
+        OperationalRecordCommandContext secondContext = new("test:other", "correlation-other", null, key);
+
+        _ = await fixture.Service.CreateAsync(fixture.RecordId, firstContext, CancellationToken.None);
+        OperationalRecordResult<OperationalRecord> second = await fixture.Service.CreateAsync(fixture.RecordId, secondContext, CancellationToken.None);
+
+        second.Failure!.Code.Should().Be(OperationalErrorCodes.WorkflowAlreadyInProgress);
+        fixture.Jira.Calls.Should().Be(1);
     }
 
     [Fact]
@@ -172,7 +232,16 @@ public sealed class JiraTransferServiceTests
                     MappingVersion = "mapping-v1",
                     UnresolvedRequesterPolicy = "Block"
                 }));
-            JiraTransferService service = new(repository, draftService, jira, source, audit, NullLogger<JiraTransferService>.Instance);
+            JiraTransferService service = new(
+                repository,
+                draftService,
+                jira,
+                source,
+                new InMemoryCommandIdempotencyStore(TimeProvider.System),
+                audit,
+                Options.Create(new OperationalRecordsOptions()),
+                Options.Create(new CommandIdempotencyOptions()),
+                NullLogger<JiraTransferService>.Instance);
             OperationalRecordResult<JiraIssueDraft> preview = await service.PreviewAsync(record.Id, _context, CancellationToken.None);
             preview.IsSuccess.Should().BeTrue();
             return new TestFixture(repository, jira, source, audit, service, record.Id);
@@ -215,10 +284,18 @@ public sealed class JiraTransferServiceTests
     private sealed class CountingSourceClient(int failCloseCount = 0) : IOperationalRecordClient
     {
         private int _remainingFailures = failCloseCount;
+        private OperationalRecordSourceItem _current = TestRecord.SourceItem();
         public int CloseCalls { get; private set; }
 
         public Task<IReadOnlyList<OperationalRecordSourceItem>> GetActiveAsync(int maximumCount, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<OperationalRecordSourceItem>>(Array.Empty<OperationalRecordSourceItem>());
+
+        public Task<OperationalRecordSourceItem?> GetByIdAsync(string sourceRecordId, CancellationToken cancellationToken) =>
+            Task.FromResult<OperationalRecordSourceItem?>(string.Equals(_current.SourceRecordId, sourceRecordId, StringComparison.OrdinalIgnoreCase) ? _current : null);
+
+        public void ChangeExternally() => _current = _current with { Description = "Externally changed description." };
+
+        public void CloseExternally() => _current = _current with { IsOpen = false };
 
         public Task CloseAsync(string sourceRecordId, string orCode, string jiraIssueKey, CancellationToken cancellationToken)
         {

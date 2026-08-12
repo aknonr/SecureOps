@@ -25,6 +25,14 @@ public static class Policies
     public const string CanRetryJira = "CanRetryJira";
     /// <summary>View operational workflow diagnostics.</summary>
     public const string CanViewOperationalRecordDiagnostics = "CanViewOperationalRecordDiagnostics";
+    /// <summary>Manage application users.</summary>
+    public const string CanManageUsers = "CanManageUsers";
+    /// <summary>Approve or reject application access requests.</summary>
+    public const string CanApproveAccessRequests = "CanApproveAccessRequests";
+    /// <summary>Assign application roles.</summary>
+    public const string CanAssignRoles = "CanAssignRoles";
+    /// <summary>View access-control audit evidence.</summary>
+    public const string CanViewAccessAudit = "CanViewAccessAudit";
     /// <summary>
     /// Operator, TeamLead, Admin, or Auditor where explicitly allowed by endpoint logic.
     /// </summary>
