@@ -2,7 +2,7 @@
 
 Two test projects mirroring `src/`.
 
-Current coverage is focused on Phase 1A IdentityLookup and audit hardening. Phase 1 diagnostic, SQL schema, Hangfire, and JEA tests are still planned.
+Current coverage includes Phase 1A IdentityLookup, audit hardening, Operational Record/Jira classification and workflow behavior, authorization, SQL contracts, and release packaging. Phase 1 diagnostic, Hangfire, and JEA tests are still planned.
 
 ## SecureOps.Tests.Unit
 
@@ -61,3 +61,5 @@ See `.cursor/rules/090-testing-and-quality-rules.mdc`:
 All identity, Swagger, authorization, forwarded-header, and SQL schema tests are deterministic and local. They use mocks/fakes or offline file assertions and must not contact corporate AD, PAM, LDAP, SQL Server, IIS, or load balancers. Real provider validation is a separately authorized test-server activity.
 
 Release validation additionally checks the published Active Directory dependency closure, manifest hashes, and ZIP paths without contacting a domain controller.
+
+Operational Record/Jira tests use deterministic fakes. They cover manual-review fallback, exact requester resolution, preview, audit, repeated/concurrent create requests, unknown Jira outcomes, persisted Jira plus source-close failure, retry, cancellation, ProblemDetails, authorization, and offline SQL uniqueness. They never contact live Jira, the Operational Record source, SQL Server, AD, IIS, or PowerShell.

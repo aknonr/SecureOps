@@ -274,3 +274,4 @@ See `docs/adr/`:
 - ADR-0006 Approval-based remediation
 - ADR-0007 IIS hosting model
 - ADR-0008 Read-only identity lookup
+- ADR-0009 Durable Operational Record to Jira workflow

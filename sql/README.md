@@ -1,6 +1,6 @@
 # sql/
 
-SQL Server schema and migration scripts. `schema/001-audit-and-access-control.sql` is a reviewed offline contract; it is not executed by the application, tests, or deployment process.
+SQL Server schema and migration scripts. Files under `schema/` are reviewed offline contracts; they are not executed by the application, tests, or deployment process.
 
 ## Structure
 
@@ -20,6 +20,8 @@ sql/
 | V004 | Create `security.Users`, `security.Roles`, `security.RoleAssignments`, `security.AccessRequests` |
 | V005 | Hangfire schema (managed by Hangfire library) |
 
+Current reviewed offline assets additionally include `002-operational-record-jira-workflow.sql`, which creates `ops.OperationalRecords`, `ops.JiraTransfers`, and append-only workflow history.
+
 ## Phase 3+
 
 | Phase | Tables added |
@@ -38,6 +40,8 @@ EF Core migrations for `dbo.*` (Phase 1 onward).
 Hangfire schema is created automatically by `UseSqlServerStorage` at Worker startup; no manual migration needed.
 
 Audit triggers and append-only enforcement live in `sql/schema/` and are applied as part of the same migration that creates the table.
+
+The Operational Record/Jira workflow uses `schema/002-operational-record-jira-workflow.sql`. DBA review must confirm schema ownership, backup/retention, and runtime grants. The service requires only `SELECT`, `INSERT`, and `UPDATE` on the `ops` tables; it does not require `DELETE`, DDL, or migration permissions.
 
 ## Test Harness
 

@@ -2,8 +2,8 @@
 
 **Project:** Secure Ops Automation & AI Analysis Hub
 **Owner organization placeholder:** CONTOSO Turkish Technology
-**Status:** Phase 1A backend IdentityLookup implemented and hardened; Phase 1 read-only diagnostic MVP not started.
-**Last updated:** 2026-05
+**Status:** Phase 1A IdentityLookup working in TEST; Operational Record to Jira backend foundation implemented with fake external adapters.
+**Last updated:** 2026-08
 
 ---
 
@@ -38,6 +38,8 @@ Before producing **any** output (code, design, suggestion, file edit), read thes
 7. **`.cursor/rules/000-project-context.mdc`** — authoritative project decisions.
 8. **`.cursor/rules/050-security-audit-rules.mdc`** — non-negotiable security rules.
 9. The specific phase plan in `plans/` for whichever phase the user references.
+
+For Operational Record/Jira work, also read `docs/22-operational-record-jira-workflow.md` and ADR-0009. Do not enable real source/Jira adapters, add classification rules, or assume remote idempotency without approved contracts.
 
 If the user request touches a specific area, also read the matching rule file (`.cursor/rules/0XX-*.mdc`) and matching doc (`docs/0X-*.md`).
 
@@ -75,6 +77,7 @@ These decisions are final and binding. Do not re-litigate them in code or propos
 | Integration approach | **Mock-first**, interface-based, real adapter later | ADR-0004 |
 | Read-only first | MVP performs no write operations | ADR-0002 |
 | Identity lookup | **Phase 1A backend-only exact PAM/AD account lookup**, TeamLead/Admin only, read-only AD provider, no broad search | ADR-0008 |
+| Operational Record to Jira | **Preview-first, explicit authorized creation, durable SQL idempotency, fake external adapters until approved** | ADR-0009 |
 | Remediation | Approval-based only, Phase 8 | ADR-0006 |
 | Hosting | IIS on Windows Server, in-process | ADR-0007 |
 | Pilot scale | **10–15 low-criticality Windows servers**, prefer non-production | docs/02-roadmap.md |

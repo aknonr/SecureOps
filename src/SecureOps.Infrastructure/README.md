@@ -7,6 +7,7 @@ External integrations and data access.
 Current implemented Phase 1A namespaces:
 - `Audit/` contains audit writer abstractions plus InMemory, File, queued, and SQL Server persistence implementations.
 - `Identity/` contains the IdentityLookup service, exact account normalizer, read-only AD provider, provider guard, and mock PAM resolver hook.
+- `OperationalRecords/` contains source/Jira/requester boundaries, fail-closed classification, preview and transfer services, durable repositories, and fake local adapters.
 
 - `Data/` — EF Core `SecureOpsDbContext`, entity configurations.
 - `Audit/` — `IAuditWriter` and SQL implementation (Dapper).
@@ -34,6 +35,6 @@ Current implemented Phase 1A namespaces:
 
 ## Current state
 
-Phase 1A audit and identity lookup infrastructure is implemented. Phase 1 diagnostic, alert persistence, EF Core DbContext, Hangfire job classes, and PowerShell/JEA runner implementations are still planned.
+Phase 1A audit and identity lookup infrastructure is implemented. The Operational Record to Jira backend foundation is implemented with fake integrations and optional SQL persistence; real integration adapters and approved classification rules are pending.
 
-See `Identity/README.md` and `Audit/README.md` for provider selection, local-test boundaries, configuration, and controlled-runtime blockers.
+See `Identity/README.md`, `Audit/README.md`, and `OperationalRecords/README.md` for provider selection, local-test boundaries, configuration, and controlled-runtime blockers.

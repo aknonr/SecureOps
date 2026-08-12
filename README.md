@@ -2,7 +2,7 @@
 
 An enterprise Windows operations platform that receives monitoring alarms, runs read-only diagnostics, captures structured audit data, and surfaces actionable findings to shift engineers.
 
-> **Status:** Phase 1A backend IdentityLookup implemented and hardened; Phase 1 read-only diagnostics not started.
+> **Status:** Phase 1A IdentityLookup working in TEST; Operational Record to Jira backend foundation implemented with fake external adapters.
 > **Owner:** CONTOSO Turkish Technology (placeholder)
 > **Stack:** .NET 8, Blazor Server, SQL Server, PowerShell Remoting + JEA
 > **MVP timeline:** 6–8 weeks
@@ -33,7 +33,7 @@ Later phases add rule-based analysis, private AI-assisted summarization, and app
 
 ## Getting Started
 
-This repo contains documentation, agent rules, contracts, a .NET solution, Phase 1A IdentityLookup backend code, audit persistence hardening, and unit/integration tests. The Phase 1 read-only diagnostic MVP is still planned and has not been implemented yet.
+This repo contains documentation, agent rules, a .NET solution, working Phase 1A IdentityLookup backend code, audit persistence hardening, and the durable Operational Record to Jira backend foundation. Real Operational Record/Jira adapters and approved classification rules remain deferred; local tests use fakes only.
 
 ### For AI coding agents
 

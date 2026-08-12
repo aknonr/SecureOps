@@ -294,6 +294,10 @@ Every integration has a config section:
 - **Smoke tests** against real integrations: separate test project, runs only in environments with real systems available.
 - **Contract tests**: validate JSON payloads against `contracts/schemas/*.schema.json`.
 
+## Operational Record and Jira Backend Foundation
+
+The backend replacement for the legacy operator-driven workflow is documented in `docs/22-operational-record-jira-workflow.md`. It uses `IOperationalRecordClient`, `IRequesterResolver`, and `IJiraClient` boundaries; local/default implementations are fakes. No PowerShell is launched, no browser credential is collected, and no real source/Jira write is enabled. Jira preview is read-only; create and retry require explicit capability authorization and durable SQL idempotency before a real adapter can be approved.
+
 ## Reference
 
 - `contracts/schemas/` — JSON schemas for all payloads
