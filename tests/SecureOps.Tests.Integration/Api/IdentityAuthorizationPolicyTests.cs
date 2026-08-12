@@ -43,6 +43,23 @@ public sealed class IdentityAuthorizationPolicyTests
         result.Succeeded.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(Policies.CanViewOperationalRecords, "CONTOSO\\SecureOps-Operators", true)]
+    [InlineData(Policies.CanPreviewJira, "CONTOSO\\SecureOps-Operators", true)]
+    [InlineData(Policies.CanCreateJira, "CONTOSO\\SecureOps-Operators", false)]
+    [InlineData(Policies.CanCreateJira, "CONTOSO\\SecureOps-JiraPublishers", true)]
+    [InlineData(Policies.CanRetryJira, "CONTOSO\\SecureOps-Leads", true)]
+    [InlineData(Policies.CanViewOperationalRecordDiagnostics, "CONTOSO\\SecureOps-Auditors", true)]
+    public async Task OperationalRecordPolicies_MapBootstrapGroups(string policy, string group, bool expected)
+    {
+        await using ServiceProvider provider = BuildServices();
+        IAuthorizationService authorization = provider.GetRequiredService<IAuthorizationService>();
+
+        AuthorizationResult result = await authorization.AuthorizeAsync(CreateUser(group), null, policy);
+
+        result.Succeeded.Should().Be(expected);
+    }
+
     private static ServiceProvider BuildServices()
     {
         IConfiguration configuration = new ConfigurationBuilder()
@@ -51,7 +68,8 @@ public sealed class IdentityAuthorizationPolicyTests
                 ["Rbac:OperatorsGroup"] = "CONTOSO\\SecureOps-Operators",
                 ["Rbac:LeadsGroup"] = "CONTOSO\\SecureOps-Leads",
                 ["Rbac:AdminsGroup"] = "CONTOSO\\SecureOps-Admins",
-                ["Rbac:AuditorsGroup"] = "CONTOSO\\SecureOps-Auditors"
+                ["Rbac:AuditorsGroup"] = "CONTOSO\\SecureOps-Auditors",
+                ["Rbac:JiraPublishersGroup"] = "CONTOSO\\SecureOps-JiraPublishers"
             })
             .Build();
 

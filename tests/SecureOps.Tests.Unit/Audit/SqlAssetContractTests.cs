@@ -18,6 +18,25 @@ public sealed class SqlAssetContractTests
         sql.Should().NotContain("Password").And.NotContain("ConnectionString");
     }
 
+    [Fact]
+    public void OperationalRecordSqlAsset_EnforcesDurableIdempotencyAndHistory()
+    {
+        string root = FindRepositoryRoot();
+        string sql = File.ReadAllText(Path.Combine(root, "sql", "schema", "002-operational-record-jira-workflow.sql"));
+
+        sql.Should().Contain("CREATE TABLE ops.OperationalRecords")
+            .And.Contain("CREATE TABLE ops.JiraTransfers")
+            .And.Contain("CREATE TABLE ops.OperationalRecordWorkflowHistory");
+        sql.Should().Contain("UQ_OperationalRecords_SourceRecordId")
+            .And.Contain("UQ_JiraTransfers_OperationalRecord")
+            .And.Contain("UQ_JiraTransfers_IdempotencyKey")
+            .And.Contain("UX_JiraTransfers_JiraIssueKey");
+        sql.Should().Contain("TR_OperationalRecordWorkflowHistory_AppendOnly")
+            .And.NotContain("Password")
+            .And.NotContain("ApiToken")
+            .And.NotContain("AuthorizationHeader");
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
