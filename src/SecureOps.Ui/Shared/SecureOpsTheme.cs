@@ -12,6 +12,16 @@ namespace SecureOps.Ui.Shared;
 /// requirement in <c>docs/20-ui-visual-design-contract.md</c> §7 and means a palette change here
 /// reaches custom CSS and MudBlazor components together.
 /// <para>
+/// <b>Identity: red, white, dark navy, neutral.</b> Navy is the structural colour (app bar, drawer,
+/// headings, primary actions), white and the neutral greys carry content, and red is the brand
+/// accent. Red is deliberately confined to the <i>chrome</i> — the rule beneath the app bar, the
+/// rule above the sign-in card, and the application icon — and never appears inside page content.
+/// That is what keeps it compatible with red's other job in an operations tool: inside the content
+/// area, red means a problem and nothing else, so a status colour can never be mistaken for
+/// decoration. The alternative, red as the primary action colour, was rejected for exactly that
+/// collision.
+/// </para>
+/// <para>
 /// <b>Dark palette.</b> Built as a ladder of elevation steps rather than one flat surface colour:
 /// background → surface → raised surface each lighten slightly, so panels separate by luminance
 /// instead of by borders. Pure black and pure white are avoided at both ends — the darkest ground is
@@ -38,7 +48,13 @@ public static class SecureOpsTheme
             PrimaryDarken = "#16294A",
             PrimaryLighten = "#33598C",
             Secondary = "#46566E",
-            Tertiary = "#1F3D66",
+
+            // Brand red. The Tertiary slot carries the identity colour so the single-source rule
+            // holds: CSS reads it as --so-brand via --mud-palette-tertiary. No MudBlazor component
+            // uses Color.Tertiary, so this slot has no other meaning. See the class remarks for why
+            // red is confined to the chrome.
+            Tertiary = "#B81D2B",
+
             Info = "#2E5A86",
             Success = "#0D7C66",
             Warning = "#B5731A",
@@ -73,7 +89,11 @@ public static class SecureOpsTheme
             PrimaryDarken = "#4F7FB8",
             PrimaryLighten = "#94BCEA",
             Secondary = "#8797AE",
-            Tertiary = "#94BCEA",
+
+            // Brand red, lifted from the light palette's #B81D2B: a deep crimson turns muddy and
+            // loses its edge against a near-black navy ground.
+            Tertiary = "#E05263",
+
             Info = "#6E9FD8",
 
             // Status colours desaturated and lightened so they stay distinguishable without glowing.

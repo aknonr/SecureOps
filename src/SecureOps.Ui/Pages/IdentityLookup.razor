@@ -15,10 +15,7 @@
 
     @if (_access is null)
     {
-        <div class="so-panel so-panel--loading" aria-busy="true">
-            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-            <span>Yetkileriniz doğrulanıyor…</span>
-        </div>
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
     }
     else if (!_access.IsResolved)
     {
@@ -145,10 +142,7 @@
 
                 @if (_loading)
                 {
-                    <div class="so-result-center" aria-busy="true">
-                        <MudProgressCircular Indeterminate="true" Size="Size.Medium" />
-                        <p>Sorgu çalışıyor…</p>
-                    </div>
+                    <SoLoading Message="Sorgu çalışıyor…" Variant="SoLoading.LoadingVariant.Block" />
                 }
                 else if (_problem is not null)
                 {

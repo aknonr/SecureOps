@@ -26,10 +26,7 @@
 
     @if (_access is null)
     {
-        <div class="so-panel so-panel--loading" aria-busy="true">
-            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-            <span>Erişim bilgileriniz yükleniyor…</span>
-        </div>
+        <SoLoading Message="Erişim bilgileriniz yükleniyor…" />
     }
     else if (!_access.IsResolved)
     {

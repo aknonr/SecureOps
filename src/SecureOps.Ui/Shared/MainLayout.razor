@@ -3,8 +3,9 @@
 @inject ISignedInUserService Users
 @inject IDemoModeState ShellMode
 @inject NavigationManager Navigation
+@inject IJSRuntime Js
 
-<MudThemeProvider Theme="@SecureOpsTheme.Theme" IsDarkMode="@_isDarkMode" />
+<MudThemeProvider @ref="_themeProvider" Theme="@SecureOpsTheme.Theme" IsDarkMode="@_isDarkMode" />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
@@ -76,6 +77,7 @@
 </MudLayout>
 
 @code {
+    private MudThemeProvider _themeProvider = null!;
     private bool _drawerOpen = true;
     private bool _isDarkMode;
     private bool _isDesktop = true;
@@ -85,9 +87,46 @@
         Navigation.LocationChanged += OnLocationChanged;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        // Start from the operating system's preference. The project forbids localStorage, so a
+        // manual choice cannot outlive the circuit; without this an operator on a dark desktop
+        // would get a white flash and have to re-toggle on every sign-in and every reconnect.
+        // The toggle in the account menu still overrides it for the rest of the session.
+        _isDarkMode = await _themeProvider.GetSystemPreference();
+        await SyncThemeClassAsync();
+        StateHasChanged();
+    }
+
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
-    private void ToggleDarkMode() => _isDarkMode = !_isDarkMode;
+    private async Task ToggleDarkMode()
+    {
+        _isDarkMode = !_isDarkMode;
+        await SyncThemeClassAsync();
+    }
+
+    /// <summary>
+    /// Mirrors the active palette onto the document element as <c>so-dark</c>.
+    /// </summary>
+    /// <remarks>
+    /// MudBlazor 6.16 signals dark mode only by rewriting the <c>--mud-palette-*</c> values on
+    /// <c>:root</c>; it adds no class, and CSS cannot branch on a variable's value. Custom rules that
+    /// must differ by more than a colour — tint strength and shadow depth, which both need to be
+    /// stronger on a dark ground — therefore have nothing to hook onto. This supplies that hook.
+    /// <para>
+    /// It goes on the document element rather than on <c>MudLayout</c> because MudBlazor renders
+    /// popovers into a container at the end of <c>body</c>, outside the layout tree; a class further
+    /// down would leave the account menu on light-mode tints.
+    /// </para>
+    /// </remarks>
+    private ValueTask SyncThemeClassAsync() =>
+        Js.InvokeVoidAsync("document.documentElement.classList.toggle", "so-dark", _isDarkMode);
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {

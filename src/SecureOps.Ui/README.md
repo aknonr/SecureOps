@@ -51,9 +51,22 @@ wwwroot/css/     secureops-theme.css — semantic tokens only, no colour literal
 
 ### Shared components
 
-`SoPageHeader`, `SoProblemPanel`, `SoEmptyState`, `SoStatusBadge`, `SoFieldGrid` + `SoField`, plus
-the `.so-panel` CSS class. Use these rather than new one-off markup, so states look the same
-everywhere.
+`SoPageHeader`, `SoProblemPanel`, `SoEmptyState`, `SoStatusBadge`, `SoLoading`, `SoFieldGrid` +
+`SoField`, plus the `.so-panel` CSS class. Use these rather than new one-off markup, so states look
+the same everywhere.
+
+The four state components map to distinct situations, and mixing them trains operators to misread
+the real ones:
+
+| Situation | Component |
+|---|---|
+| Waiting on the server | `SoLoading` (`Inline` for a region, `Block` for a whole panel) |
+| Nothing to show, and that is normal | `SoEmptyState` |
+| The call failed | `SoProblemPanel` |
+| Steady-state condition worth labelling | `SoStatusBadge` |
+
+`SoLoading` is always indeterminate: no call this UI makes reports progress, and a percentage would
+have to be invented.
 
 ## Routes
 
@@ -96,6 +109,15 @@ wording to `UiProblemFactory`, not to a page.
 `Shared/SecureOpsTheme.cs` is the single source of truth for colour, radius, and typography.
 `secureops-theme.css` contains **no colour literals** — it maps `--mud-palette-*` onto semantic
 `--so-*` tokens. Change colour there, not in CSS.
+
+Navy is structural, white and neutrals carry content, and **brand red (`--so-brand`) is chrome-only**
+— the app bar rule, the sign-in card rule, the app icon. Never style page content with it: inside the
+content area red means a problem, and that meaning has to stay unambiguous.
+
+Dark mode starts from the OS preference and is mirrored onto `<html>` as **`.so-dark`** by
+`MainLayout`. Write dark overrides against `:root.so-dark`. **`.mud-theme-dark` does not exist in
+MudBlazor 6.16** — rules targeting it compile fine and silently never apply. See
+`docs/25-ui-enterprise-shell.md` §6.
 
 Exception: the three server-rendered auth pages load without a Blazor circuit and cannot read
 `--mud-palette-*`, so `.so-auth-body` declares its own light/dark values. Keep them in step with the

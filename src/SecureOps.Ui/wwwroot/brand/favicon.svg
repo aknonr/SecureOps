@@ -1,21 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <!--
-    Browser tab icon. Standalone (no external references) because a favicon is fetched outside the
+    Application icon. Standalone (no external references) because a favicon is fetched outside the
     page context and cannot resolve a <use href> into another file.
 
-    The shield is filled rather than outlined so the mark stays legible at 16 px, where a 2.4 px
-    stroke would close up. Colours are baked in for the same reason: favicons get no CSS.
+    Red plate, white glyph. Red is the brand colour and appears nowhere in page content, so using it
+    here costs nothing operationally and makes the tab identifiable at a glance among a row of
+    internal tools. A rounded square rather than a bare shield: at 16 px a filled plate holds its
+    shape, while an outlined mark closes up into a blob.
 
-    prefers-color-scheme is handled inline so the mark keeps contrast in a dark browser chrome.
+    Colours are baked in — favicons receive no CSS — and no prefers-color-scheme swap is needed,
+    because red on white keeps contrast against both light and dark browser chrome.
   -->
-  <style>
-    .plate { fill: #14233F; }
-    .glyph { fill: none; stroke: #FFFFFF; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-    @media (prefers-color-scheme: dark) {
-      .plate { fill: #E6ECF5; }
-      .glyph { stroke: #0B1322; }
-    }
-  </style>
-  <path class="plate" d="M16 2 4 6.6v8.9c0 7 4.9 12.7 12 15 7.1-2.3 12-8 12-15V6.6L16 2Z" />
-  <path class="glyph" d="m10.8 16.1 3.6 3.6 6.8-7.1" />
+  <rect width="32" height="32" rx="7" fill="#B81D2B" />
+  <path d="M16 6.4 8.6 9.3v6.1c0 4.4 3 8 7.4 9.4 4.4-1.4 7.4-5 7.4-9.4V9.3L16 6.4Z"
+        fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linejoin="round" />
+  <path d="m12.9 15.7 2.4 2.4 4.4-4.7"
+        fill="none" stroke="#FFFFFF" stroke-width="2.1"
+        stroke-linecap="round" stroke-linejoin="round" />
 </svg>

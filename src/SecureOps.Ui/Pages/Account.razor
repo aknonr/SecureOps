@@ -75,10 +75,7 @@
 
         @if (_access is null)
         {
-            <div class="so-panel--loading" aria-busy="true">
-                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-                <span>Oturum ilkesi yükleniyor…</span>
-            </div>
+            <SoLoading Message="Oturum ilkesi yükleniyor…" Bare="true" />
         }
         else if (!_access.IsResolved)
         {

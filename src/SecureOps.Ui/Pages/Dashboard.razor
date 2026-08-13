@@ -24,10 +24,7 @@
 
     @if (_snapshot is null)
     {
-        <div class="so-panel so-panel--loading" aria-busy="true">
-            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-            <span>Erişim bilgileriniz yükleniyor…</span>
-        </div>
+        <SoLoading Message="Erişim bilgileriniz yükleniyor…" />
     }
     else if (!_snapshot.IsResolved)
     {
@@ -150,10 +147,7 @@
                     }
                     else
                     {
-                        <div class="so-status-row" aria-busy="true">
-                            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-                            <span class="so-status-text">Sistem durumu kontrol ediliyor…</span>
-                        </div>
+                        <SoLoading Message="Sistem durumu kontrol ediliyor…" Bare="true" />
                     }
                 </section>
             </div>

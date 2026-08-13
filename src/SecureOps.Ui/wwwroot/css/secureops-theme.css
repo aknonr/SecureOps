@@ -31,6 +31,13 @@
     --so-border-soft: var(--mud-palette-divider-light);
     --so-border-input: var(--mud-palette-lines-inputs);
 
+    /* -- brand ---------------------------------------------------------- */
+    /* Identity red. Used only in chrome (the app bar rule, the sign-in card rule,
+       the application icon) so that inside the content area red keeps its single
+       operational meaning: something is wrong. Never style content with this. */
+    --so-brand: var(--mud-palette-tertiary);
+    --so-brand-rule: 2px;
+
     /* -- accents -------------------------------------------------------- */
     --so-accent: var(--mud-palette-primary);
     --so-accent-strong: var(--mud-palette-primary-darken);
@@ -65,10 +72,17 @@
     --so-shadow: 0 2px 8px rgb(0 0 0 / 8%);
 }
 
-/* MudBlazor sets .mud-theme-dark on the provider root when IsDarkMode is on.
-   Shadows need more depth on a dark ground to remain perceptible, and tints need
-   to be stronger because a small colour wash disappears against dark surfaces. */
-.mud-theme-dark {
+/* Dark-mode overrides for the things a palette swap cannot express.
+
+   MudBlazor 6.16 signals dark mode only by rewriting --mud-palette-* on :root — it
+   adds no class — and CSS cannot branch on a variable's value. Shared/MainLayout.razor
+   therefore mirrors the active palette onto <html> as .so-dark so these rules have
+   something to hook onto. Do not use .mud-theme-dark: that class is never emitted, and
+   rules written against it silently do nothing.
+
+   Shadows need more depth on a dark ground to stay perceptible, and tints need to be
+   stronger because a small colour wash disappears against a dark surface. */
+:root.so-dark {
     --so-tint: 20%;
     --so-tint-strong: 28%;
     --so-shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
@@ -103,9 +117,10 @@ body {
 .so-appbar {
     background-color: var(--so-appbar) !important;
     color: var(--so-appbar-text) !important;
-    /* A hairline instead of a shadow: the app bar and page ground share a tone in
-       dark mode, and a drop shadow there reads as a smudge. */
-    border-bottom: 1px solid color-mix(in srgb, var(--so-appbar-text) 12%, transparent);
+    /* The brand rule doubles as the app bar's edge. A drop shadow is avoided because
+       the app bar and the page ground share a tone in dark mode, where a shadow reads
+       as a smudge. This 2px red line is the single brand gesture in the whole shell. */
+    border-bottom: var(--so-brand-rule) solid var(--so-brand);
 }
 
 .so-brand {
@@ -444,12 +459,24 @@ body {
     margin-top: var(--so-space-4);
 }
 
-.so-panel--loading {
+/* Shared/Components/SoLoading.razor. Muted rather than accented: a pending region
+   is not an event, and a coloured spinner pulls the eye away from content that has
+   already resolved. */
+.so-loading {
     display: flex;
     align-items: center;
     gap: var(--so-space-3);
     color: var(--so-text-muted);
     font-size: 0.88rem;
+}
+
+/* The whole panel is pending. min-height reserves roughly the height the resolved
+   content will occupy, so the page does not jump when it arrives. */
+.so-loading--block {
+    flex-direction: column;
+    justify-content: center;
+    min-height: 240px;
+    text-align: center;
 }
 
 .so-panel--primary {
@@ -694,17 +721,6 @@ body {
 
 .so-lookup-result {
     min-height: 320px;
-}
-
-.so-result-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--so-space-3);
-    min-height: 240px;
-    color: var(--so-text-muted);
-    font-size: 0.88rem;
 }
 
 .so-result-tags {
@@ -1143,6 +1159,7 @@ body {
     --so-auth-accent: #1F3D66;
     --so-auth-accent-hover: #16294A;
     --so-auth-on-accent: #FFFFFF;
+    --so-auth-brand: #B81D2B;
     --so-auth-danger: #B3261E;
     --so-auth-warning: #B5731A;
     --so-auth-success: #0D7C66;
@@ -1169,6 +1186,7 @@ body {
         --so-auth-accent: #6E9FD8;
         --so-auth-accent-hover: #94BCEA;
         --so-auth-on-accent: #0C1421;
+        --so-auth-brand: #E05263;
         --so-auth-danger: #F08A80;
         --so-auth-warning: #E0B057;
         --so-auth-success: #4FBFA2;
@@ -1183,6 +1201,10 @@ body {
 .so-auth-card {
     background: var(--so-auth-surface);
     border: 1px solid var(--so-auth-border);
+    /* Same brand gesture as the app bar rule, so the signed-out and signed-in shells
+       read as one product. Auth pages render without a Blazor circuit and cannot see
+       --mud-palette-*, hence the literal token above. */
+    border-top: 2px solid var(--so-auth-brand);
     border-radius: var(--so-radius-lg);
     padding: var(--so-space-6) var(--so-space-5);
     box-shadow: 0 1px 3px rgb(0 0 0 / 8%);

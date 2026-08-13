@@ -9,8 +9,13 @@ is a corporate logo, wordmark, or third-party asset, and per `docs/20-ui-visual-
 | File | Used by | Notes |
 |---|---|---|
 | `secureops-mark.svg` | App bar, `/login`, `/signed-out`, `/session-expired` | Referenced by `<use href="brand/secureops-mark.svg#mark">`. Inherits `currentColor`, so it follows the theme. |
-| `favicon.svg` | Browser tab (modern browsers) | Standalone with baked-in colours and its own `prefers-color-scheme` rule. Favicons receive no CSS and cannot resolve cross-file `<use>`. |
-| `favicon.ico` | Browser tab (fallback), `/favicon.ico` probes | 32×32 PNG inside an ICO container. |
+| `favicon.svg` | Browser tab (modern browsers) | Standalone with baked-in colours. Favicons receive no CSS and cannot resolve cross-file `<use>`. |
+| `favicon.ico` | Browser tab (fallback), `/favicon.ico` probes | 16/32/48 px PNG payloads in one ICO container. |
+
+The application icon is a **red plate with a white glyph** — the brand red, which appears nowhere in
+page content, so the tab is identifiable among a row of internal tools without competing with any
+operational status colour. The 16 px entry drops the shield outline and keeps only the check: at that
+size a 2 px stroke closes into a blob, and the plate already carries the identity.
 
 ## Replacing with approved corporate assets
 
@@ -29,6 +34,14 @@ Until then, keep the placeholders minimal so replacement stays a file swap rathe
 
 ## Theme colours
 
-The placeholder mark uses the shell's dark navy `#14233F`, which is `AppbarBackground` in
-`Shared/SecureOpsTheme.cs`. That file is the single source of truth for colour; if the palette
-changes, update the baked colours in `favicon.svg` and regenerate `favicon.ico` to match.
+`Shared/SecureOpsTheme.cs` is the single source of truth for colour. The brand red lives in its
+`Tertiary` slot (`#B81D2B` light, `#E05263` dark) and reaches CSS as `--so-brand`; the shell's dark
+navy is `AppbarBackground` (`#14233F`).
+
+The icon files cannot read those variables, so `#B81D2B` is baked into `favicon.svg` and into the
+generator that produces `favicon.ico`. **If the palette changes, update `favicon.svg` by hand and
+regenerate the ICO** — nothing does this automatically, and it is not part of the build:
+
+```powershell
+powershell -File src/SecureOps.Ui/build/make-favicon.ps1
+```
