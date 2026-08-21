@@ -25,16 +25,19 @@ public sealed class OperationalRecordsController : ControllerBase
     private readonly IOperationalRecordService _recordService;
     private readonly IJiraTransferService _transferService;
     private readonly CommandIdempotencyOptions _commandOptions;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>Initializes the controller.</summary>
     public OperationalRecordsController(
         IOperationalRecordService recordService,
         IJiraTransferService transferService,
-        Microsoft.Extensions.Options.IOptions<CommandIdempotencyOptions> commandOptions)
+        Microsoft.Extensions.Options.IOptions<CommandIdempotencyOptions> commandOptions,
+        TimeProvider timeProvider)
     {
         _recordService = recordService;
         _transferService = transferService;
         _commandOptions = commandOptions.Value;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Refreshes and returns a bounded list of active operational records.</summary>
@@ -190,7 +193,7 @@ public sealed class OperationalRecordsController : ControllerBase
         _ => "The operational workflow could not be completed."
     };
 
-    private static OperationalRecordResponse ToResponse(OperationalRecord record) => new(
+    private OperationalRecordResponse ToResponse(OperationalRecord record) => new(
         record.Id,
         record.SourceRecordId,
         record.OrCode,
@@ -210,10 +213,23 @@ public sealed class OperationalRecordsController : ControllerBase
         record.CorrelationId,
         record.RetryCount,
         record.UpdatedAt,
-        record.ClaimExpiresAt > DateTimeOffset.UtcNow,
+        record.ClaimExpiresAt > _timeProvider.GetUtcNow(),
+        record.ClaimedBy,
+        record.ClaimedAt,
         record.ClaimExpiresAt,
         record.LastSourceValidationAt,
-        record.Version);
+        record.Version,
+        record.ReconciliationRequired,
+        IsRetryEligible(record),
+        !string.IsNullOrWhiteSpace(record.JiraIssueKey));
+
+    private static bool IsRetryEligible(OperationalRecord record) =>
+        !record.ReconciliationRequired
+        && (record.WorkflowState == OperationalRecordWorkflowState.JiraCreateFailed
+            || (!string.IsNullOrWhiteSpace(record.JiraIssueKey)
+                && record.WorkflowState is OperationalRecordWorkflowState.JiraCreated
+                    or OperationalRecordWorkflowState.ClosingOperationalRecord
+                    or OperationalRecordWorkflowState.OperationalRecordCloseFailed));
 
     private bool IsValidIdempotencyKey(string? idempotencyKey) =>
         string.IsNullOrWhiteSpace(idempotencyKey)

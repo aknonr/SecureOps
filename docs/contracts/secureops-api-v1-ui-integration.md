@@ -35,7 +35,7 @@ After rejection, `accessStatus` remains `Pending`, `pendingRequestId` is null, a
 
 ## Operational Records
 
-`GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded fake/approved source response and is rate-limited.
+`GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `OperationalRecords:SourceProvider=Fake` is an explicit Development/Demo/Test-only synthetic workflow harness; `Disabled` is the production-style fail-closed setting until an approved source adapter exists.
 
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
@@ -46,3 +46,5 @@ After rejection, `accessStatus` remains `Pending`, `pendingRequestId` is null, a
 | `POST /api/v1/operational-records/{id}/retry` | `OperationalRecords.Retry` | optional `Idempotency-Key` header | resumed `JiraTransferResponse` | `WorkflowAlreadyCompleted`, conflict/freshness/Jira/source-close codes |
 
 The UI must refresh authoritative record state after 409, 422, or command completion. It must not infer claim ownership, retry safety, Jira success, or source-close success from local state. Preserve and show the returned correlation ID for support diagnostics without exposing raw external responses.
+
+`OperationalRecordResponse.claimed` means the stored claim expiry is later than server time. `claimedBy`, `claimedAt`, and `claimExpiresAt` are the authoritative lease metadata; an expired lease can retain historical owner/timestamps while `claimed=false`. `version` changes with persisted workflow mutations. `reconciliationRequired=true` means an unknown Jira-create outcome blocks automatic retry. `jiraExists=true` means a trusted Jira key is persisted. `retryEligible=true` means the current durable state is one the retry endpoint can safely resume; it is always false while reconciliation is required.

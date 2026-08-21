@@ -6,8 +6,8 @@ public sealed class OperationalRecordsOptions
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "OperationalRecords";
 
-    /// <summary>Source provider. Only Fake is implemented until an approved source contract exists.</summary>
-    public string SourceProvider { get; set; } = "Fake";
+    /// <summary>Source provider: Disabled, or Fake in an explicitly allowed non-production environment.</summary>
+    public string SourceProvider { get; set; } = "Disabled";
 
     /// <summary>Repository provider: InMemory for local tests or SqlServer for durable runtime state.</summary>
     public string RepositoryProvider { get; set; } = "InMemory";

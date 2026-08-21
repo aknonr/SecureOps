@@ -13,6 +13,8 @@ namespace SecureOps.Tests.Integration.Api;
 
 public sealed class OperationalRecordsControllerTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 8, 21, 10, 0, 0, TimeSpan.Zero);
+
     [Fact]
     public async Task PreviewAsync_WhenRequesterIsAmbiguous_ReturnsSafeProblemDetails()
     {
@@ -31,17 +33,135 @@ public sealed class OperationalRecordsControllerTests
         problem.Extensions.Should().NotContainKey("exception").And.NotContainKey("response");
     }
 
+    [Fact]
+    public async Task GetAsync_WithNoClaim_ProjectsUnclaimedState()
+    {
+        OperationalRecord record = Record();
+        OperationalRecordsController controller = CreateController(record);
+
+        OperationalRecordResponse response = await GetResponseAsync(controller, record.Id);
+
+        response.Claimed.Should().BeFalse();
+        response.ClaimedBy.Should().BeNull();
+        response.ClaimedAt.Should().BeNull();
+        response.ClaimExpiresAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetAsync_WithActiveChangedClaim_ProjectsLatestOwnerAndLease()
+    {
+        OperationalRecord record = Record() with
+        {
+            ClaimedBy = "operator-b",
+            ClaimedAt = Now.AddMinutes(-1),
+            ClaimExpiresAt = Now.AddMinutes(1),
+            Version = 7
+        };
+        OperationalRecordsController controller = CreateController(record);
+
+        OperationalRecordResponse response = await GetResponseAsync(controller, record.Id);
+
+        response.Claimed.Should().BeTrue();
+        response.ClaimedBy.Should().Be("operator-b");
+        response.ClaimedAt.Should().Be(Now.AddMinutes(-1));
+        response.ClaimExpiresAt.Should().Be(Now.AddMinutes(1));
+        response.Version.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task GetAsync_WithExpiredClaim_PreservesOwnerMetadataButMarksClaimInactive()
+    {
+        OperationalRecord record = Record() with
+        {
+            ClaimedBy = "operator-a",
+            ClaimedAt = Now.AddMinutes(-3),
+            ClaimExpiresAt = Now.AddSeconds(-1)
+        };
+        OperationalRecordsController controller = CreateController(record);
+
+        OperationalRecordResponse response = await GetResponseAsync(controller, record.Id);
+
+        response.Claimed.Should().BeFalse();
+        response.ClaimedBy.Should().Be("operator-a");
+        response.ClaimExpiresAt.Should().Be(Now.AddSeconds(-1));
+    }
+
+    [Theory]
+    [InlineData(OperationalRecordWorkflowState.JiraCreateFailed, null, false, true, false)]
+    [InlineData(OperationalRecordWorkflowState.JiraCreateFailed, null, true, false, false)]
+    [InlineData(OperationalRecordWorkflowState.OperationalRecordCloseFailed, "FAKE-1", false, true, true)]
+    [InlineData(OperationalRecordWorkflowState.ClosingOperationalRecord, "FAKE-1", false, true, true)]
+    [InlineData(OperationalRecordWorkflowState.Completed, "FAKE-1", false, false, true)]
+    public async Task GetAsync_ProjectsAuthoritativeRetryReconciliationAndJiraState(
+        OperationalRecordWorkflowState state,
+        string? jiraIssueKey,
+        bool reconciliationRequired,
+        bool retryEligible,
+        bool jiraExists)
+    {
+        OperationalRecord record = Record() with
+        {
+            WorkflowState = state,
+            JiraIssueKey = jiraIssueKey,
+            ReconciliationRequired = reconciliationRequired
+        };
+        OperationalRecordsController controller = CreateController(record);
+
+        OperationalRecordResponse response = await GetResponseAsync(controller, record.Id);
+
+        response.ReconciliationRequired.Should().Be(reconciliationRequired);
+        response.RetryEligible.Should().Be(retryEligible);
+        response.JiraExists.Should().Be(jiraExists);
+    }
+
     private static OperationalRecordsController CreateController(OperationalRecordResult<JiraIssueDraft> previewResult)
     {
         DefaultHttpContext httpContext = new() { TraceIdentifier = "trace-operational-test" };
         return new OperationalRecordsController(
             new EmptyRecordService(),
             new StubTransferService(previewResult),
-            Options.Create(new CommandIdempotencyOptions()))
+            Options.Create(new CommandIdempotencyOptions()),
+            new FixedTimeProvider(Now))
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };
     }
+
+    private static OperationalRecordsController CreateController(OperationalRecord record)
+    {
+        DefaultHttpContext httpContext = new() { TraceIdentifier = "trace-operational-test" };
+        return new OperationalRecordsController(
+            new StubRecordService(record),
+            new StubTransferService(OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.WorkflowConflict, "test", false)),
+            Options.Create(new CommandIdempotencyOptions()),
+            new FixedTimeProvider(Now))
+        {
+            ControllerContext = new ControllerContext { HttpContext = httpContext }
+        };
+    }
+
+    private static async Task<OperationalRecordResponse> GetResponseAsync(OperationalRecordsController controller, Guid id)
+    {
+        ActionResult<OperationalRecordResponse> result = await controller.GetAsync(id, CancellationToken.None);
+        return result.Result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<OperationalRecordResponse>().Subject;
+    }
+
+    private static OperationalRecord Record() => new()
+    {
+        Id = Guid.NewGuid(),
+        SourceRecordId = "synthetic-source",
+        OrCode = "SYN-OR-TEST",
+        Title = "Synthetic record",
+        Description = "Synthetic description.",
+        CreatedAt = Now.AddDays(-1),
+        Classification = OperationalRecordClassification.OperationalSupport,
+        JiraEligible = true,
+        EligibilityReason = "Synthetic test rule.",
+        WorkflowState = OperationalRecordWorkflowState.Eligible,
+        UpdatedAt = Now,
+        SourceConcurrencyToken = "synthetic-token",
+        Version = 1
+    };
 
     private sealed class EmptyRecordService : IOperationalRecordService
     {
@@ -52,10 +172,27 @@ public sealed class OperationalRecordsControllerTests
             Task.FromResult(OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false));
     }
 
+    private sealed class StubRecordService(OperationalRecord record) : IOperationalRecordService
+    {
+        public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> ListAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success([record]));
+
+        public Task<OperationalRecordResult<OperationalRecord>> GetAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(id == record.Id
+                ? OperationalRecordResult<OperationalRecord>.Success(record)
+                : OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false));
+    }
+
     private sealed class StubTransferService(OperationalRecordResult<JiraIssueDraft> previewResult) : IJiraTransferService
     {
         public Task<OperationalRecordResult<JiraIssueDraft>> PreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => Task.FromResult(previewResult);
         public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }
