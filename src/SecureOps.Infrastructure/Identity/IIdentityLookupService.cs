@@ -8,6 +8,11 @@ namespace SecureOps.Infrastructure.Identity;
 public interface IIdentityLookupService
 {
     /// <summary>
+    /// Gets whether the active directory provider currently supports exact UPN lookup.
+    /// </summary>
+    public bool SupportsUpnLookup { get; }
+
+    /// <summary>
     /// Looks up one exact account.
     /// </summary>
     /// <param name="request">Lookup request.</param>

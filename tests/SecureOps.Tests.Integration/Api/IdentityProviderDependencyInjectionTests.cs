@@ -86,7 +86,39 @@ public sealed class IdentityProviderDependencyInjectionTests
     }
 
     [Fact]
-    public async Task Lookup_WithUnknownExactAccount_ReturnsLegitimateNotFound()
+    public async Task Capabilities_WithMockProvider_AdvertisesWorkingExactUpnLookup()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Demo", enableUpnLookup: true);
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
+
+        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(
+            "/api/v1/identity/lookup/capabilities");
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/v1/identity/lookup",
+            new { account = "pam12356@contoso.local", purpose = "Approved operational lookup" });
+
+        capabilities!.SupportsUpnLookup.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        IdentityLookupResponse? result = await response.Content.ReadFromJsonAsync<IdentityLookupResponse>();
+        result!.User!.SamAccountName.Should().Be("pam12356");
+    }
+
+    [Fact]
+    public async Task Capabilities_WithMockProviderAndUpnDisabled_DoesNotAdvertiseUpnLookup()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Demo", enableUpnLookup: false);
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
+
+        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(
+            "/api/v1/identity/lookup/capabilities");
+
+        capabilities!.SupportsUpnLookup.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Lookup_WithUnknownExactUpn_ReturnsLegitimateNotFound()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo");
         using HttpClient client = factory.CreateClient();
@@ -94,14 +126,35 @@ public sealed class IdentityProviderDependencyInjectionTests
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
             "/api/v1/identity/lookup",
-            new { account = "missing.account", purpose = "Approved operational lookup" });
+            new { account = "missing.account@contoso.local", purpose = "Approved operational lookup" });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync());
         problem!["code"]!.GetValue<string>().Should().Be(OperationalErrorCodes.IdentityNotFound);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string environment)
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Capabilities_WithActiveDirectoryProvider_ReportsEffectiveUpnSetting(bool enableUpnLookup)
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory(
+            "Demo",
+            identityProvider: "ActiveDirectory",
+            enableUpnLookup: enableUpnLookup);
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
+
+        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(
+            "/api/v1/identity/lookup/capabilities");
+
+        capabilities!.SupportsUpnLookup.Should().Be(enableUpnLookup);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(
+        string environment,
+        string identityProvider = "Mock",
+        bool enableUpnLookup = true)
     {
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -111,7 +164,9 @@ public sealed class IdentityProviderDependencyInjectionTests
                 builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
                 builder.UseSetting("Access:DemoCompatibilityEnabled", "true");
                 builder.UseSetting("Audit:Provider", "InMemory");
-                builder.UseSetting("IdentityLookup:Provider", "Mock");
+                builder.UseSetting("IdentityLookup:Provider", identityProvider);
+                builder.UseSetting("IdentityLookup:DomainName", "example.invalid");
+                builder.UseSetting("IdentityLookup:EnableUpnLookup", enableUpnLookup ? "true" : "false");
                 builder.UseSetting("RateLimiting:IdentityLookup:PermitLimit", "100");
             });
     }

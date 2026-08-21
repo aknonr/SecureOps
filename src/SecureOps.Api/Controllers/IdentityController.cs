@@ -106,7 +106,7 @@ public sealed class IdentityController : ControllerBase
     {
         return Ok(new IdentityLookupCapabilitiesResponse(
             _options.MaxAccountLength,
-            _options.EnableUpnLookup,
+            _identityLookupService.SupportsUpnLookup,
             _returnedFields,
             _rejectedInputClasses,
             IdentityLookupRateLimits.Lookup));

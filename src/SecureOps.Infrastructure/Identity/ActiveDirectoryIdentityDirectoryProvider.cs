@@ -25,6 +25,9 @@ public sealed class ActiveDirectoryIdentityDirectoryProvider : IIdentityDirector
     }
 
     /// <inheritdoc />
+    public bool SupportsUpnLookup => _options.EnableUpnLookup;
+
+    /// <inheritdoc />
     public async Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -33,7 +36,7 @@ public sealed class ActiveDirectoryIdentityDirectoryProvider : IIdentityDirector
         var timeout = TimeSpan.FromSeconds(_options.ProviderTimeoutSeconds <= 0 ? 3 : _options.ProviderTimeoutSeconds);
 
         DirectoryUserRecord? user = await _client.FindBySamAccountNameAsync(normalizedAccount, cancellationToken).WaitAsync(timeout, cancellationToken);
-        return user ?? (_options.EnableUpnLookup && normalizedAccount.Contains('@', StringComparison.Ordinal)
+        return user ?? (SupportsUpnLookup && normalizedAccount.Contains('@', StringComparison.Ordinal)
             ? await _client.FindByUserPrincipalNameAsync(normalizedAccount, cancellationToken).WaitAsync(timeout, cancellationToken)
             : null);
     }

@@ -8,7 +8,8 @@ namespace SecureOps.Infrastructure.Identity;
 /// </summary>
 public sealed class MockIdentityDirectoryProvider : IIdentityDirectoryProvider
 {
-    private readonly IReadOnlyDictionary<string, DirectoryUserRecord> _users;
+    private readonly IReadOnlyDictionary<string, DirectoryUserRecord> _usersBySamAccountName;
+    private readonly IReadOnlyDictionary<string, DirectoryUserRecord> _usersByUpn;
     private readonly IdentityLookupOptions _options;
 
     /// <summary>
@@ -44,16 +45,32 @@ public sealed class MockIdentityDirectoryProvider : IIdentityDirectoryProvider
     /// <param name="options">Identity lookup options.</param>
     public MockIdentityDirectoryProvider(IEnumerable<DirectoryUserRecord> users, IOptions<IdentityLookupOptions> options)
     {
-        _users = users.ToDictionary(x => x.SamAccountName.ToLowerInvariant(), StringComparer.OrdinalIgnoreCase);
+        DirectoryUserRecord[] configuredUsers = users.ToArray();
+        _usersBySamAccountName = configuredUsers.ToDictionary(
+            user => user.SamAccountName,
+            StringComparer.OrdinalIgnoreCase);
+        _usersByUpn = configuredUsers
+            .Where(user => !string.IsNullOrWhiteSpace(user.UserPrincipalName))
+            .ToDictionary(
+                user => user.UserPrincipalName!,
+                StringComparer.OrdinalIgnoreCase);
         _options = options.Value;
     }
+
+    /// <inheritdoc />
+    public bool SupportsUpnLookup => _options.EnableUpnLookup;
 
     /// <inheritdoc />
     public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         IdentityProviderInputGuard.EnsureSafeExactAccount(normalizedAccount, _options);
-        _users.TryGetValue(normalizedAccount, out DirectoryUserRecord? user);
+        _usersBySamAccountName.TryGetValue(normalizedAccount, out DirectoryUserRecord? user);
+        if (user is null && SupportsUpnLookup && normalizedAccount.Contains('@', StringComparison.Ordinal))
+        {
+            _usersByUpn.TryGetValue(normalizedAccount, out user);
+        }
+
         return Task.FromResult(user);
     }
 

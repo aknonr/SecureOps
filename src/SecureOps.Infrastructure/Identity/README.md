@@ -2,7 +2,9 @@
 
 Codex-owned backend identity lookup. `IIdentityLookupService` normalizes, audits, and coordinates `IPamAccountResolver` and `IIdentityDirectoryProvider`. `ActiveDirectoryIdentityDirectoryProvider` is the implemented read-only exact-account provider; `IActiveDirectoryLookupClient` isolates `PrincipalContext` transport so local tests use fakes only.
 
-`IdentityLookup:Provider=Mock` is the default. `ActiveDirectory` requires `IdentityLookup:DomainName`; `Container` is optional. sAMAccountName is queried exactly first, including PAM-style identifiers such as `pam000001`; UPN fallback is optional. No shell, PowerShell, wildcard, owner heuristic, or vendor-specific PAM behavior is used.
+`IdentityLookup:Provider=Mock` is the default. `ActiveDirectory` requires `IdentityLookup:DomainName`; `Container` is optional. sAMAccountName is queried exactly first, including PAM-style identifiers such as `pam000001`; UPN fallback is optional. The mock indexes its deterministic seed identities by exact sAMAccountName and, when `EnableUpnLookup=true`, exact UPN. No shell, PowerShell, wildcard, owner heuristic, or vendor-specific PAM behavior is used.
+
+`GET /api/v1/identity/lookup/capabilities` reports the active provider's effective UPN behavior. `supportsUpnLookup` is not configuration intent alone: it is true only when the selected provider can perform exact UPN lookup and that behavior is enabled.
 
 Infrastructure DI activates the default mock provider through an explicit options-aware factory. Constructors that accept a supplied user set are test seams only; runtime DI must not infer mock seed data from `IEnumerable<DirectoryUserRecord>`. The Active Directory provider and transport each have one public constructor and are selected only by `IdentityLookup:Provider=ActiveDirectory`.
 
