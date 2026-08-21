@@ -16,6 +16,8 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-7 — Capabilities advertised UPN lookup the provider could not serve | ✅ **Resolved** by backend `704c32ba` |
 | G-8 — No way to list users, or to read one user's access | Open (new) |
 | G-9 — `AccessRequestInvalidState` conflates validation with concurrency | Open (new) |
+| G-10 — Rejection is not durable; rejected users re-enter the queue | Open (new) |
+| `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
 
@@ -193,8 +195,8 @@ of the implicit flow, stated so the trade-off is a decision rather than an overs
   which the shell does on every page load — creates a pending request. The queue therefore fills
   with anyone who opened the application, not only those who deliberately asked. The UI cannot
   distinguish the two.
-- **A rejected user cannot re-apply through the UI.** After a rejection there is no action that
-  creates a fresh request; the user would have to be handled out of band.
+- ~~A rejected user cannot re-apply through the UI.~~ **Corrected 2026-08-21:** the opposite is
+  true, and it is worse. See G-10.
 
 **Suggested (backend-owned):** if `POST /api/v1/access/requests` is added, accept a requester-supplied
 reason and return the created request. That closes this and the first half of G-2's approval problem
@@ -335,6 +337,83 @@ and can be presented as "another administrator changed this; the list has been r
 are unit-tested against the catalog so they cannot silently drift from the server's.
 
 This is a workaround, not a fix: it depends on the UI's copy of the rules staying in step.
+
+---
+
+## G-10 — Rejection is not durable: a rejected user re-enters the queue on next page load
+
+**Raised:** 2026-08-21, reading the access repositories to settle the self-approval question below.
+**Not a UI issue** — recorded here because the UI surfaced it and cannot correct it.
+
+**Severity:** High. An approver's rejection does not hold.
+
+Deciding a request sets the *request* to `Rejected` but returns the **user** to `AccessStatus.Pending`:
+
+```csharp
+// InMemoryAccessRepository.DecideRequestAsync
+user = user with { Status = decision == AccessRequestStatus.Approved
+    ? AccessStatus.Approved
+    : AccessStatus.Pending, Roles = nextRoles };
+```
+
+`SqlAccessRepository.DecideRequestAsync` writes the same value. Then, on that user's next request:
+
+```csharp
+// EnsureUserAsync
+if (createRequest && pending is null && _users[userId].Status == AccessStatus.Pending)
+{
+    // creates a brand-new pending request
+}
+```
+
+The rejected user has no *pending* request (theirs is `Rejected`) and is still `Pending`, so a fresh
+request is created. `/access/me` is called on every page load, so **rejection survives only until the
+rejected person next opens the application.**
+
+Consequences:
+
+- The pending queue cannot be durably cleared. A rejected user reappears indefinitely.
+- An approver reviewing the queue sees a new request with no decision history attached, and nothing
+  indicates this identity was already refused. Combined with G-2 — where the subject is an opaque
+  principal string — an approver can readily approve someone a colleague rejected an hour earlier.
+- There is no terminal state for "refused". `AccessStatus` has `Pending`, `Approved`, `Disabled`;
+  none of them means rejected.
+
+**Suggested (backend-owned):** either leave a rejected user in a state that does not re-trigger
+auto-creation (a `Rejected`/`Denied` `AccessStatus`, or suppressing auto-creation when the most
+recent decided request was a rejection), or make rejection set `Disabled` if that is the intended
+equivalent. This is a state-model decision, not a UI one.
+
+**UI meanwhile:** nothing to do. The queue renders what the API returns. The UI cannot distinguish a
+first-time request from a re-created one, because `AccessRequestResponse` carries no prior-decision
+history.
+
+---
+
+## AccessSelfApprovalDenied — verified, working as designed
+
+**Resolved 2026-08-21 by reading both repository implementations.** Recorded here because the earlier
+observation was reported as inconclusive and should not be chased as a defect.
+
+Earlier, approving the acting administrator's own request returned `AccessRequestInvalidState` rather
+than `AccessSelfApprovalDenied`. The precedence explains it — both `InMemoryAccessRepository` and
+`SqlAccessRepository` check in this order:
+
+1. request or user missing → `NotFound`
+2. **`request.Status != Pending` → `InvalidState`**
+3. approving one's own request → `SelfApprovalDenied`
+
+The request used in that test was the administrator's own bootstrap request, already `Approved`, so
+it stopped at (2). For a genuinely **pending** request owned by the acting administrator, (3) is
+reached and `AccessSelfApprovalDenied` is returned.
+
+The ordering is also defensible on its own terms: an already-decided request cannot be self-approved
+either, and lifecycle state is the more fundamental objection.
+
+Note for whoever tests this: the scenario cannot be reproduced through the demo API surface, because
+the only way to become an approved administrator (bootstrap or demo compatibility) also decides that
+administrator's own request immediately. It needs a service- or repository-level test that creates a
+pending request for an already-approved administrator.
 
 ---
 
