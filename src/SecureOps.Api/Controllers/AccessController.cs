@@ -52,6 +52,7 @@ public sealed class AccessController : ControllerBase
         }
 
         EnsureAccessUserResult current = result.Value!;
+        AccessIdentityProfile? profile = await _accessService.GetProfileAsync(current.User, cancellationToken);
         return Ok(new CurrentAccessResponse(
             current.User.Id,
             current.User.Status.ToString(),
@@ -66,7 +67,10 @@ public sealed class AccessController : ControllerBase
                 _sessionOptions.HttpOnly,
                 _sessionOptions.SameSite,
                 _sessionOptions.RevalidateAccessOnEveryRequest,
-                "Authentication-provider managed; application access revalidated per request")));
+                "Authentication-provider managed; application access revalidated per request"),
+            ToResponse(profile),
+            current.LatestRequest is null ? null : ToResponse(current.LatestRequest, profile),
+            current.User.Version));
     }
 
     /// <summary>Lists pending or decided access requests for authorized administrators.</summary>
@@ -77,13 +81,36 @@ public sealed class AccessController : ControllerBase
     {
         if (!TryParseStatus(status, out AccessRequestStatus? parsed))
         {
-            return Failure<IReadOnlyList<AccessRequestResponse>>(OperationalErrorCodes.AccessRequestInvalidState);
+            return Failure<IReadOnlyList<AccessRequestResponse>>(OperationalErrorCodes.AccessValidationFailed);
         }
 
-        AccessServiceResult<IReadOnlyList<ApplicationAccessRequest>> result = await _accessService.ListRequestsAsync(parsed, Context(), cancellationToken);
+        AccessServiceResult<IReadOnlyList<AccessRequestReadModel>> result = await _accessService.ListRequestsAsync(parsed, Context(), cancellationToken);
+        return result.IsSuccess
+            ? Ok(result.Value!.Select(item => ToResponse(item.Request, item.Profile)).ToArray())
+            : Failure<IReadOnlyList<AccessRequestResponse>>(result.ErrorCode!);
+    }
+
+    /// <summary>Lists authoritative access-user state for authorized administrators.</summary>
+    [HttpGet("users")]
+    [Authorize(Policy = Policies.CanManageUsers)]
+    [ProducesResponseType(typeof(IReadOnlyList<AccessUserResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<AccessUserResponse>>> UsersAsync(CancellationToken cancellationToken)
+    {
+        AccessServiceResult<IReadOnlyList<AccessUserReadModel>> result = await _accessService.ListUsersAsync(Context(), cancellationToken);
         return result.IsSuccess
             ? Ok(result.Value!.Select(ToResponse).ToArray())
-            : Failure<IReadOnlyList<AccessRequestResponse>>(result.ErrorCode!);
+            : Failure<IReadOnlyList<AccessUserResponse>>(result.ErrorCode!);
+    }
+
+    /// <summary>Returns one authoritative access-user record and request history.</summary>
+    [HttpGet("users/{id:guid}")]
+    [Authorize(Policy = Policies.CanManageUsers)]
+    [ProducesResponseType(typeof(AccessUserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AccessUserResponse>> UserAsync(Guid id, CancellationToken cancellationToken)
+    {
+        AccessServiceResult<AccessUserReadModel> result = await _accessService.GetUserAsync(id, Context(), cancellationToken);
+        return result.IsSuccess ? Ok(ToResponse(result.Value!)) : Failure<AccessUserResponse>(result.ErrorCode!);
     }
 
     /// <summary>Approves one pending request and assigns reviewed roles.</summary>
@@ -93,7 +120,7 @@ public sealed class AccessController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AccessRequestResponse>> ApproveAsync(Guid id, [FromBody] AccessDecisionRequest request, CancellationToken cancellationToken)
     {
-        AccessServiceResult<AccessMutationResult> result = await _accessService.ApproveAsync(id, request.Roles ?? [], request.Reason, Context(), cancellationToken);
+        AccessServiceResult<AccessMutationResult> result = await _accessService.ApproveAsync(id, request.Roles ?? [], request.Reason, request.ExpectedVersion, Context(), cancellationToken);
         return MutationResponse(result);
     }
 
@@ -104,7 +131,7 @@ public sealed class AccessController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AccessRequestResponse>> RejectAsync(Guid id, [FromBody] AccessDecisionRequest request, CancellationToken cancellationToken)
     {
-        AccessServiceResult<AccessMutationResult> result = await _accessService.RejectAsync(id, request.Reason, Context(), cancellationToken);
+        AccessServiceResult<AccessMutationResult> result = await _accessService.RejectAsync(id, request.Reason, request.ExpectedVersion, Context(), cancellationToken);
         return MutationResponse(result);
     }
 
@@ -115,7 +142,7 @@ public sealed class AccessController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<CurrentAccessResponse>> ReplaceRolesAsync(Guid id, [FromBody] AssignRolesRequest request, CancellationToken cancellationToken)
     {
-        AccessServiceResult<AccessMutationResult> result = await _accessService.ReplaceRolesAsync(id, request.Roles, request.Reason, Context(), cancellationToken);
+        AccessServiceResult<AccessMutationResult> result = await _accessService.ReplaceRolesAsync(id, request.Roles, request.Reason, request.ExpectedVersion, Context(), cancellationToken);
         if (!result.IsSuccess)
         {
             return Failure<CurrentAccessResponse>(result.ErrorCode!);
@@ -132,7 +159,7 @@ public sealed class AccessController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<CurrentAccessResponse>> DisableAsync(Guid id, [FromBody] DisableAccessRequest request, CancellationToken cancellationToken)
     {
-        AccessServiceResult<AccessMutationResult> result = await _accessService.DisableAsync(id, request.Reason, Context(), cancellationToken);
+        AccessServiceResult<AccessMutationResult> result = await _accessService.DisableAsync(id, request.Reason, request.ExpectedVersion, Context(), cancellationToken);
         return result.IsSuccess ? Ok(ToCurrent(result.Value!.User!)) : Failure<CurrentAccessResponse>(result.ErrorCode!);
     }
 
@@ -170,13 +197,18 @@ public sealed class AccessController : ControllerBase
 
     private ActionResult<T> Failure<T>(string code)
     {
-        int status = code switch
+        (int Status, string Stage, bool Retryable) details = code switch
         {
-            OperationalErrorCodes.AccessRecordNotFound => StatusCodes.Status404NotFound,
-            OperationalErrorCodes.AuditStoreUnavailable => StatusCodes.Status503ServiceUnavailable,
-            _ => StatusCodes.Status409Conflict
+            OperationalErrorCodes.AccessValidationFailed => (StatusCodes.Status400BadRequest, "validation", false),
+            OperationalErrorCodes.AccessRecordNotFound => (StatusCodes.Status404NotFound, "access", false),
+            OperationalErrorCodes.AccessSelfApprovalDenied => (StatusCodes.Status403Forbidden, "authorization", false),
+            OperationalErrorCodes.AccessRequestAlreadyDecided => (StatusCodes.Status409Conflict, "lifecycle", false),
+            OperationalErrorCodes.AccessUserInvalidState => (StatusCodes.Status409Conflict, "lifecycle", false),
+            OperationalErrorCodes.AccessConcurrencyConflict => (StatusCodes.Status409Conflict, "concurrency", true),
+            OperationalErrorCodes.AuditStoreUnavailable => (StatusCodes.Status503ServiceUnavailable, "audit", true),
+            _ => (StatusCodes.Status409Conflict, "access", false)
         };
-        return OperationalProblemDetails.Create(status, code, "The access operation could not be completed.", CorrelationId(), "access", false);
+        return OperationalProblemDetails.Create(details.Status, code, "The access operation could not be completed.", CorrelationId(), details.Stage, details.Retryable);
     }
 
     private CurrentAccessResponse ToCurrent(ApplicationUser user) => new(
@@ -186,9 +218,39 @@ public sealed class AccessController : ControllerBase
         user.Capabilities,
         null,
         user.AuthenticationSource,
-        new SessionPolicyResponse(_sessionOptions.IdleTimeoutMinutes, _sessionOptions.AbsoluteLifetimeHours, _sessionOptions.SecureCookie, _sessionOptions.HttpOnly, _sessionOptions.SameSite, _sessionOptions.RevalidateAccessOnEveryRequest, "Authentication-provider managed; application access revalidated per request"));
+        new SessionPolicyResponse(_sessionOptions.IdleTimeoutMinutes, _sessionOptions.AbsoluteLifetimeHours, _sessionOptions.SecureCookie, _sessionOptions.HttpOnly, _sessionOptions.SameSite, _sessionOptions.RevalidateAccessOnEveryRequest, "Authentication-provider managed; application access revalidated per request"),
+        Version: user.Version);
 
-    private static AccessRequestResponse ToResponse(ApplicationAccessRequest request) => new(request.Id, request.UserId, request.CorporateIdentity, request.Status.ToString(), request.RequestedAt, request.DecidedAt, request.DecisionReason);
+    private static AccessRequestResponse ToResponse(ApplicationAccessRequest request, AccessIdentityProfile? profile = null) => new(
+        request.Id,
+        request.UserId,
+        request.CorporateIdentity,
+        request.Status.ToString(),
+        request.RequestedAt,
+        request.DecidedAt,
+        request.DecisionReason,
+        request.DecidedByCorporateIdentity,
+        request.Version,
+        ToResponse(profile));
+
+    private static AccessIdentityProfileResponse? ToResponse(AccessIdentityProfile? profile) => profile is null
+        ? null
+        : new AccessIdentityProfileResponse(profile.DisplayName, profile.Account, profile.Email, profile.Department, profile.Title);
+
+    private static AccessUserResponse ToResponse(AccessUserReadModel model) => new(
+        model.User.Id,
+        model.User.CorporateIdentity,
+        ToResponse(model.Profile),
+        model.User.Status.ToString(),
+        model.User.Roles,
+        model.User.Capabilities,
+        model.LatestRequest is null ? null : ToResponse(model.LatestRequest, model.Profile),
+        model.RequestHistory.Select(request => ToResponse(request, model.Profile)).ToArray(),
+        model.User.Version,
+        model.User.AuthenticationSource,
+        model.User.FirstAuthenticatedAt,
+        model.User.LastAuthenticatedAt,
+        model.User.DisabledAt);
 
     private static bool TryParseStatus(string? status, out AccessRequestStatus? result)
     {
@@ -198,7 +260,7 @@ public sealed class AccessController : ControllerBase
             return true;
         }
 
-        bool parsed = Enum.TryParse(status, true, out AccessRequestStatus value);
+        bool parsed = Enum.TryParse(status, true, out AccessRequestStatus value) && Enum.IsDefined(value);
         result = parsed ? value : null;
         return parsed;
     }

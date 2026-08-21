@@ -14,6 +14,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
 {
     private readonly ICorporatePrincipalResolver _principalResolver;
     private readonly IAccessRepository _repository;
+    private readonly IAccessIdentityProfileResolver _profileResolver;
     private readonly IAuditWriter _auditWriter;
     private readonly AccessOptions _options;
     private readonly ILogger<ApplicationAccessService> _logger;
@@ -22,12 +23,14 @@ public sealed class ApplicationAccessService : IApplicationAccessService
     public ApplicationAccessService(
         ICorporatePrincipalResolver principalResolver,
         IAccessRepository repository,
+        IAccessIdentityProfileResolver profileResolver,
         IAuditWriter auditWriter,
         IOptions<AccessOptions> options,
         ILogger<ApplicationAccessService> logger)
     {
         _principalResolver = principalResolver;
         _repository = repository;
+        _profileResolver = profileResolver;
         _auditWriter = auditWriter;
         _options = options.Value;
         _logger = logger;
@@ -60,6 +63,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             AccessMutationResult mutation = await _repository.DecideRequestAsync(
                 ensured.PendingRequest.Id,
                 AccessRequestStatus.Approved,
+                ensured.PendingRequest.Version,
                 bootstrap.Value.SystemActor,
                 bootstrap.Value.Roles,
                 bootstrapReason,
@@ -86,43 +90,105 @@ public sealed class ApplicationAccessService : IApplicationAccessService
     }
 
     /// <inheritdoc />
-    public async Task<AccessServiceResult<IReadOnlyList<ApplicationAccessRequest>>> ListRequestsAsync(AccessRequestStatus? status, AccessOperationContext context, CancellationToken cancellationToken)
+    public Task<AccessIdentityProfile?> GetProfileAsync(ApplicationUser user, CancellationToken cancellationToken) =>
+        _profileResolver.ResolveAsync(user.CorporateIdentity, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<AccessServiceResult<IReadOnlyList<AccessRequestReadModel>>> ListRequestsAsync(AccessRequestStatus? status, AccessOperationContext context, CancellationToken cancellationToken)
     {
+        if (!await TryAuditAsync(AuditActions.AccessRequestsViewed, context, null, null, null, null, cancellationToken))
+        {
+            return AccessServiceResult<IReadOnlyList<AccessRequestReadModel>>.Fail(OperationalErrorCodes.AuditStoreUnavailable);
+        }
+
         IReadOnlyList<ApplicationAccessRequest> requests = await _repository.ListRequestsAsync(status, cancellationToken);
-        return await TryAuditAsync(AuditActions.AccessRequestsViewed, context, null, null, null, null, cancellationToken)
-            ? AccessServiceResult<IReadOnlyList<ApplicationAccessRequest>>.Success(requests)
-            : AccessServiceResult<IReadOnlyList<ApplicationAccessRequest>>.Fail(OperationalErrorCodes.AuditStoreUnavailable);
+        List<AccessRequestReadModel> results = new(requests.Count);
+        Dictionary<string, AccessIdentityProfile?> profiles = new(StringComparer.OrdinalIgnoreCase);
+        foreach (ApplicationAccessRequest request in requests)
+        {
+            if (!profiles.TryGetValue(request.CorporateIdentity, out AccessIdentityProfile? profile))
+            {
+                profile = await _profileResolver.ResolveAsync(request.CorporateIdentity, cancellationToken);
+                profiles[request.CorporateIdentity] = profile;
+            }
+
+            results.Add(new AccessRequestReadModel(request, profile));
+        }
+
+        return AccessServiceResult<IReadOnlyList<AccessRequestReadModel>>.Success(results);
     }
 
     /// <inheritdoc />
-    public Task<AccessServiceResult<AccessMutationResult>> ApproveAsync(Guid requestId, IReadOnlyCollection<string> roles, string reason, AccessOperationContext context, CancellationToken cancellationToken) =>
-        DecideAsync(requestId, AccessRequestStatus.Approved, roles, reason, context, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<AccessServiceResult<AccessMutationResult>> RejectAsync(Guid requestId, string reason, AccessOperationContext context, CancellationToken cancellationToken) =>
-        DecideAsync(requestId, AccessRequestStatus.Rejected, [], reason, context, cancellationToken);
-
-    /// <inheritdoc />
-    public async Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, string reason, AccessOperationContext context, CancellationToken cancellationToken)
+    public async Task<AccessServiceResult<IReadOnlyList<AccessUserReadModel>>> ListUsersAsync(AccessOperationContext context, CancellationToken cancellationToken)
     {
-        if (!ValidReason(reason) || !ValidRoles(roles, requireAtLeastOne: true))
+        if (!await TryAuditAsync(AuditActions.AccessUsersViewed, context, null, null, null, null, cancellationToken))
         {
-            return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessRequestInvalidState);
+            return AccessServiceResult<IReadOnlyList<AccessUserReadModel>>.Fail(OperationalErrorCodes.AuditStoreUnavailable);
         }
 
-        AccessMutationResult mutation = await _repository.ReplaceRolesAsync(userId, NormalizeRoles(roles), context.Actor, reason.Trim(), cancellationToken);
+        IReadOnlyList<ApplicationUser> users = await _repository.ListUsersAsync(cancellationToken);
+        IReadOnlyList<ApplicationAccessRequest> requests = await _repository.ListRequestsAsync(status: null, cancellationToken);
+        List<AccessUserReadModel> results = new(users.Count);
+        foreach (ApplicationUser user in users)
+        {
+            AccessIdentityProfile? profile = await _profileResolver.ResolveAsync(user.CorporateIdentity, cancellationToken);
+            results.Add(new AccessUserReadModel(
+                user,
+                profile,
+                requests.Where(request => request.UserId == user.Id).OrderByDescending(request => request.RequestedAt).ToArray()));
+        }
+
+        return AccessServiceResult<IReadOnlyList<AccessUserReadModel>>.Success(results);
+    }
+
+    /// <inheritdoc />
+    public async Task<AccessServiceResult<AccessUserReadModel>> GetUserAsync(Guid userId, AccessOperationContext context, CancellationToken cancellationToken)
+    {
+        if (!await TryAuditAsync(AuditActions.AccessUserViewed, context, userId, null, null, null, cancellationToken))
+        {
+            return AccessServiceResult<AccessUserReadModel>.Fail(OperationalErrorCodes.AuditStoreUnavailable);
+        }
+
+        ApplicationUser? user = await _repository.GetUserAsync(userId, cancellationToken);
+        if (user is null)
+        {
+            return AccessServiceResult<AccessUserReadModel>.Fail(OperationalErrorCodes.AccessRecordNotFound);
+        }
+
+        AccessIdentityProfile? profile = await _profileResolver.ResolveAsync(user.CorporateIdentity, cancellationToken);
+        IReadOnlyList<ApplicationAccessRequest> requests = await _repository.ListRequestsForUserAsync(userId, cancellationToken);
+        return AccessServiceResult<AccessUserReadModel>.Success(new AccessUserReadModel(user, profile, requests));
+    }
+
+    /// <inheritdoc />
+    public Task<AccessServiceResult<AccessMutationResult>> ApproveAsync(Guid requestId, IReadOnlyCollection<string> roles, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken) =>
+        DecideAsync(requestId, AccessRequestStatus.Approved, roles, reason, expectedVersion, context, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<AccessServiceResult<AccessMutationResult>> RejectAsync(Guid requestId, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken) =>
+        DecideAsync(requestId, AccessRequestStatus.Rejected, [], reason, expectedVersion, context, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken)
+    {
+        if (!ValidReason(reason) || !ValidRoles(roles, requireAtLeastOne: true) || expectedVersion <= 0)
+        {
+            return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessValidationFailed);
+        }
+
+        AccessMutationResult mutation = await _repository.ReplaceRolesAsync(userId, NormalizeRoles(roles), expectedVersion, context.Actor, reason.Trim(), cancellationToken);
         return await MapMutationAsync(mutation, null, context, reason.Trim(), cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<AccessServiceResult<AccessMutationResult>> DisableAsync(Guid userId, string reason, AccessOperationContext context, CancellationToken cancellationToken)
+    public async Task<AccessServiceResult<AccessMutationResult>> DisableAsync(Guid userId, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken)
     {
-        if (!ValidReason(reason))
+        if (!ValidReason(reason) || expectedVersion <= 0)
         {
-            return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessRequestInvalidState);
+            return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessValidationFailed);
         }
 
-        AccessMutationResult mutation = await _repository.DisableUserAsync(userId, context.Actor, reason.Trim(), cancellationToken);
+        AccessMutationResult mutation = await _repository.DisableUserAsync(userId, expectedVersion, context.Actor, reason.Trim(), cancellationToken);
         return await MapMutationAsync(mutation, AuditActions.AccessDisabled, context, reason.Trim(), cancellationToken);
     }
 
@@ -131,16 +197,17 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         AccessRequestStatus decision,
         IReadOnlyCollection<string> roles,
         string reason,
+        long expectedVersion,
         AccessOperationContext context,
         CancellationToken cancellationToken)
     {
-        if (!ValidReason(reason) || (decision == AccessRequestStatus.Approved && !ValidRoles(roles, requireAtLeastOne: true)))
+        if (!ValidReason(reason) || expectedVersion <= 0 || (decision == AccessRequestStatus.Approved && !ValidRoles(roles, requireAtLeastOne: true)))
         {
-            return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessRequestInvalidState);
+            return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessValidationFailed);
         }
 
         IReadOnlyCollection<string> normalizedRoles = decision == AccessRequestStatus.Approved ? NormalizeRoles(roles) : [];
-        AccessMutationResult mutation = await _repository.DecideRequestAsync(requestId, decision, context.Actor, normalizedRoles, reason.Trim(), cancellationToken);
+        AccessMutationResult mutation = await _repository.DecideRequestAsync(requestId, decision, expectedVersion, context.Actor, normalizedRoles, reason.Trim(), cancellationToken);
         return await MapMutationAsync(
             mutation,
             decision == AccessRequestStatus.Approved ? AuditActions.AccessApproved : AuditActions.AccessRejected,
@@ -160,8 +227,11 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         {
             AccessMutationDisposition.Applied => null,
             AccessMutationDisposition.NotFound => OperationalErrorCodes.AccessRecordNotFound,
+            AccessMutationDisposition.RequestAlreadyDecided => OperationalErrorCodes.AccessRequestAlreadyDecided,
+            AccessMutationDisposition.ConcurrencyConflict => OperationalErrorCodes.AccessConcurrencyConflict,
+            AccessMutationDisposition.UserInvalidState => OperationalErrorCodes.AccessUserInvalidState,
             AccessMutationDisposition.SelfApprovalDenied => OperationalErrorCodes.AccessSelfApprovalDenied,
-            _ => OperationalErrorCodes.AccessRequestInvalidState
+            _ => throw new InvalidOperationException($"Unknown access mutation disposition: {mutation.Disposition}.")
         };
         if (error is not null)
         {

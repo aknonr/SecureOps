@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Api.Security;
@@ -160,7 +161,74 @@ public sealed class DemoApiAuthenticationTests
             .Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string environment, bool demoAuthEnabled, bool swaggerEnabled = false)
+    [Fact]
+    public async Task AccessUsers_RequiresManageUsersCapability()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
+        using HttpClient anonymous = factory.CreateClient();
+        using HttpClient lead = factory.CreateClient();
+        lead.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.TeamLeadActor);
+        using HttpClient admin = factory.CreateClient();
+        admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+
+        (await anonymous.GetAsync("/api/v1/access/users")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        HttpResponseMessage forbidden = await lead.GetAsync("/api/v1/access/users");
+        await AssertProblemAsync(forbidden, HttpStatusCode.Forbidden, "AccessDenied", "authorization", retryable: false);
+        (await admin.GetAsync("/api/v1/access/users")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task AccessMutations_ReturnDistinctValidationConcurrencyAndLifecycleProblems()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory(
+            "Demo",
+            demoAuthEnabled: true,
+            demoCompatibilityEnabled: false,
+            bootstrapAdministrator: "demo:platform-admin");
+        using HttpClient subject = factory.CreateClient();
+        subject.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.TeamLeadActor);
+        CurrentAccessResponse pending = (await subject.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        using HttpClient admin = factory.CreateClient();
+        admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+        _ = await admin.GetAsync("/api/v1/access/me");
+
+        HttpResponseMessage validation = await admin.PostAsJsonAsync(
+            $"/api/v1/access/requests/{pending.LatestRequest!.Id}/approve",
+            new AccessDecisionRequest("Approved for test.", ["Lead"], ExpectedVersion: 0));
+        HttpResponseMessage concurrency = await admin.PostAsJsonAsync(
+            $"/api/v1/access/requests/{pending.LatestRequest.Id}/approve",
+            new AccessDecisionRequest("Approved for test.", ["Lead"], pending.LatestRequest.Version + 1));
+        HttpResponseMessage approved = await admin.PostAsJsonAsync(
+            $"/api/v1/access/requests/{pending.LatestRequest.Id}/approve",
+            new AccessDecisionRequest("Approved for test.", ["Lead"], pending.LatestRequest.Version));
+        HttpResponseMessage lifecycle = await admin.PostAsJsonAsync(
+            $"/api/v1/access/requests/{pending.LatestRequest.Id}/reject",
+            new AccessDecisionRequest("Rejected too late.", null, pending.LatestRequest.Version));
+
+        await AssertProblemAsync(validation, HttpStatusCode.BadRequest, "AccessValidationFailed", "validation", retryable: false);
+        await AssertProblemAsync(concurrency, HttpStatusCode.Conflict, "AccessConcurrencyConflict", "concurrency", retryable: true);
+        approved.StatusCode.Should().Be(HttpStatusCode.OK);
+        await AssertProblemAsync(lifecycle, HttpStatusCode.Conflict, "AccessRequestAlreadyDecided", "lifecycle", retryable: false);
+    }
+
+    [Fact]
+    public async Task AccessRequestFilter_RejectsUndefinedNumericStatusAsValidation()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
+        using HttpClient admin = factory.CreateClient();
+        admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/access/requests?status=99");
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, "AccessValidationFailed", "validation", retryable: false);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(
+        string environment,
+        bool demoAuthEnabled,
+        bool swaggerEnabled = false,
+        bool demoCompatibilityEnabled = true,
+        string? bootstrapAdministrator = null)
     {
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -168,12 +236,26 @@ public sealed class DemoApiAuthenticationTests
                 builder.UseEnvironment(environment);
                 builder.UseSetting("DemoAuth:Enabled", demoAuthEnabled ? "true" : "false");
                 builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
-                builder.UseSetting("Access:DemoCompatibilityEnabled", "true");
+                builder.UseSetting("Access:DemoCompatibilityEnabled", demoCompatibilityEnabled ? "true" : "false");
+                if (bootstrapAdministrator is not null)
+                {
+                    builder.UseSetting("Access:BootstrapAdministrators:0", bootstrapAdministrator);
+                }
                 builder.UseSetting("Audit:Provider", "InMemory");
                 builder.UseSetting("IdentityLookup:Provider", "Mock");
                 builder.UseSetting("RateLimiting:IdentityLookup:PermitLimit", "100");
                 builder.UseSetting("Swagger:Enabled", swaggerEnabled ? "true" : "false");
             });
+    }
+
+    private static async Task AssertProblemAsync(HttpResponseMessage response, HttpStatusCode status, string code, string stage, bool retryable)
+    {
+        response.StatusCode.Should().Be(status);
+        ProblemDetails problem = (await response.Content.ReadFromJsonAsync<ProblemDetails>())!;
+        problem.Extensions["code"]!.ToString().Should().Be(code);
+        problem.Extensions["stage"]!.ToString().Should().Be(stage);
+        bool.Parse(problem.Extensions["retryable"]!.ToString()!).Should().Be(retryable);
+        problem.Extensions["correlationId"].Should().NotBeNull();
     }
 
     private static string FindRepositoryRoot()

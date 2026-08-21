@@ -2,21 +2,25 @@
 
 Claude-owned UI work must consume `docs/contracts/secureops-api-v1.openapi.json` and this companion contract. Do not invent routes, request fields, status codes, role checks, or workflow states. Every endpoint requires authentication unless explicitly noted; capability failures return 403 ProblemDetails.
 
-ProblemDetails includes safe `code`, `stage`, `retryable`, `correlationId`, and `traceId` extensions. Important shared codes include `AccessPending`, `AccessDisabled`, `AccessDenied`, `RateLimitExceeded`, and `AuditStoreUnavailable`.
+ProblemDetails includes safe `code`, `stage`, `retryable`, `correlationId`, and `traceId` extensions. Access mutations distinguish `AccessValidationFailed` (400/validation), `AccessRequestAlreadyDecided` and `AccessUserInvalidState` (409/lifecycle), `AccessConcurrencyConflict` (409/concurrency/retryable), and `AccessSelfApprovalDenied` (403/authorization). Policy denials remain 403.
 
 ## Access
 
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
-| `GET /api/v1/access/me` | Authenticated | none | `CurrentAccessResponse` with status, roles, capabilities, pending request ID, auth source, session policy | 401, `AuditStoreUnavailable` |
-| `GET /api/v1/access/requests?status=Pending` | `Access.ApproveRequests` | optional `Pending`, `Approved`, or `Rejected` query | `AccessRequestResponse[]` | `AccessRequestInvalidState` |
-| `POST /api/v1/access/requests/{id}/approve` | `Access.ApproveRequests` | `{ "reason": "...", "roles": ["Operator"] }` | decided `AccessRequestResponse` | `AccessRecordNotFound`, `AccessSelfApprovalDenied`, `AccessRequestInvalidState` |
-| `POST /api/v1/access/requests/{id}/reject` | `Access.ApproveRequests` | `{ "reason": "...", "roles": null }` | decided `AccessRequestResponse` | same access decision codes |
-| `PUT /api/v1/access/users/{id}/roles` | `Access.AssignRoles` | `{ "roles": ["Lead"], "reason": "..." }` | `CurrentAccessResponse` | `AccessRecordNotFound`, `AccessRequestInvalidState` |
-| `POST /api/v1/access/users/{id}/disable` | `Access.ManageUsers` | `{ "reason": "..." }` | disabled `CurrentAccessResponse` | `AccessRecordNotFound`, `AccessRequestInvalidState` |
+| `GET /api/v1/access/me` | Authenticated | none | status, roles, capabilities, nullable exact profile, latest request, pending request ID, user version, auth source, session policy | 401, `AuditStoreUnavailable` |
+| `GET /api/v1/access/requests?status=Pending` | `Access.ApproveRequests` | optional `Pending`, `Approved`, or `Rejected` query | enriched `AccessRequestResponse[]` with decision actor/version | `AccessValidationFailed` |
+| `GET /api/v1/access/users` | `Access.ManageUsers` | none | authoritative `AccessUserResponse[]` | 403, `AuditStoreUnavailable` |
+| `GET /api/v1/access/users/{id}` | `Access.ManageUsers` | route GUID | `AccessUserResponse` with roles, capabilities, latest request, history, profile, version | `AccessRecordNotFound` |
+| `POST /api/v1/access/requests/{id}/approve` | `Access.ApproveRequests` | `{ "reason": "...", "roles": ["Operator"], "expectedVersion": 1 }` | decided `AccessRequestResponse` | validation, not found, already decided, concurrency, self-approval codes |
+| `POST /api/v1/access/requests/{id}/reject` | `Access.ApproveRequests` | `{ "reason": "...", "roles": null, "expectedVersion": 1 }` | decided `AccessRequestResponse` | same decision codes |
+| `PUT /api/v1/access/users/{id}/roles` | `Access.AssignRoles` | `{ "roles": ["Lead"], "reason": "...", "expectedVersion": 2 }` | `CurrentAccessResponse` | validation, not found, user state, concurrency codes |
+| `POST /api/v1/access/users/{id}/disable` | `Access.ManageUsers` | `{ "reason": "...", "expectedVersion": 2 }` | disabled `CurrentAccessResponse` | validation, not found, user state, concurrency codes |
 | `POST /api/v1/access/logout` | Authenticated | none | `LogoutResponse`; provider-managed logout intent only | `AuditStoreUnavailable` |
 
 Role codes are `Admin`, `Lead`, `Operator`, `JiraPublisher`, `Auditor`, and `ReadOnly`. Render behavior from returned capabilities, but treat server authorization as authoritative.
+
+After rejection, `accessStatus` remains `Pending`, `pendingRequestId` is null, and `latestRequest.status` is `Rejected`. Ordinary access never creates a replacement. There is no reapplication route. Profile fields are nullable provider results; the UI must not derive display data. Role PUT is replace semantics: read the current user and submit its latest `version`, then refresh after any conflict.
 
 ## Identity
 

@@ -21,7 +21,7 @@ public sealed class InMemoryAccessRepository : IAccessRepository
             if (!_userIds.TryGetValue(principal.Identifier, out Guid userId))
             {
                 userId = Guid.NewGuid();
-                _users[userId] = new StoredUser(userId, principal.Identifier, principal.AuthenticationSource, AccessStatus.Pending, now, now, null, []);
+                _users[userId] = new StoredUser(userId, principal.Identifier, principal.AuthenticationSource, AccessStatus.Pending, now, now, null, 1, []);
                 _userIds[principal.Identifier] = userId;
                 userCreated = true;
             }
@@ -30,16 +30,19 @@ public sealed class InMemoryAccessRepository : IAccessRepository
                 _users[userId] = _users[userId] with { LastAuthenticatedAt = now };
             }
 
-            StoredRequest? pending = _requests.Values.FirstOrDefault(request => request.UserId == userId && request.Status == AccessRequestStatus.Pending);
+            StoredRequest? latest = _requests.Values
+                .Where(request => request.UserId == userId)
+                .OrderByDescending(request => request.RequestedAt)
+                .FirstOrDefault();
             bool requestCreated = false;
-            if (createRequest && pending is null && _users[userId].Status == AccessStatus.Pending)
+            if (createRequest && latest is null && _users[userId].Status == AccessStatus.Pending)
             {
-                pending = new StoredRequest(Guid.NewGuid(), userId, AccessRequestStatus.Pending, now, null, null);
-                _requests[pending.Id] = pending;
+                latest = new StoredRequest(Guid.NewGuid(), userId, AccessRequestStatus.Pending, now, null, null, null, 1);
+                _requests[latest.Id] = latest;
                 requestCreated = true;
             }
 
-            return new EnsureAccessUserResult(ToUser(_users[userId]), pending is null ? null : ToRequest(pending), userCreated, requestCreated);
+            return new EnsureAccessUserResult(ToUser(_users[userId]), latest is null ? null : ToRequest(latest), userCreated, requestCreated);
         }
         finally
         {
@@ -54,6 +57,11 @@ public sealed class InMemoryAccessRepository : IAccessRepository
     /// <inheritdoc />
     public Task<ApplicationUser?> GetUserAsync(string corporateIdentity, CancellationToken cancellationToken) => ReadAsync(cancellationToken, () =>
         _userIds.TryGetValue(corporateIdentity, out Guid userId) ? ToUser(_users[userId]) : null);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<ApplicationUser>> ListUsersAsync(CancellationToken cancellationToken) => ReadAsync<IReadOnlyList<ApplicationUser>>(
+        cancellationToken,
+        () => _users.Values.OrderBy(user => user.CorporateIdentity, StringComparer.OrdinalIgnoreCase).Select(ToUser).ToArray());
 
     /// <inheritdoc />
     public Task<ApplicationAccessRequest?> GetPendingRequestAsync(Guid userId, CancellationToken cancellationToken) => ReadAsync(cancellationToken, () =>
@@ -72,7 +80,16 @@ public sealed class InMemoryAccessRepository : IAccessRepository
             .ToArray());
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<ApplicationAccessRequest>> ListRequestsForUserAsync(Guid userId, CancellationToken cancellationToken) => ReadAsync<IReadOnlyList<ApplicationAccessRequest>>(
+        cancellationToken,
+        () => _requests.Values
+            .Where(request => request.UserId == userId)
+            .OrderByDescending(request => request.RequestedAt)
+            .Select(ToRequest)
+            .ToArray());
+
+    /// <inheritdoc />
+    public async Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, long expectedVersion, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -84,7 +101,12 @@ public sealed class InMemoryAccessRepository : IAccessRepository
 
             if (request.Status != AccessRequestStatus.Pending || decision == AccessRequestStatus.Pending)
             {
-                return Invalid(user, request);
+                return Conflict(AccessMutationDisposition.RequestAlreadyDecided, user, request);
+            }
+
+            if (request.Version != expectedVersion)
+            {
+                return Conflict(AccessMutationDisposition.ConcurrencyConflict, user, request);
             }
 
             if (decision == AccessRequestStatus.Approved && string.Equals(user.CorporateIdentity, actor, StringComparison.OrdinalIgnoreCase))
@@ -95,8 +117,8 @@ public sealed class InMemoryAccessRepository : IAccessRepository
             string[] previousRoles = user.Roles.ToArray();
             string[] nextRoles = decision == AccessRequestStatus.Approved ? NormalizeRoles(roles) : [];
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            user = user with { Status = decision == AccessRequestStatus.Approved ? AccessStatus.Approved : AccessStatus.Pending, Roles = nextRoles };
-            request = request with { Status = decision, DecidedAt = now, DecisionReason = reason };
+            user = user with { Status = decision == AccessRequestStatus.Approved ? AccessStatus.Approved : AccessStatus.Pending, Roles = nextRoles, Version = user.Version + 1 };
+            request = request with { Status = decision, DecidedAt = now, DecisionReason = reason, DecidedByCorporateIdentity = actor, Version = request.Version + 1 };
             _users[user.Id] = user;
             _requests[request.Id] = request;
             return Applied(user, request, previousRoles, nextRoles);
@@ -108,7 +130,7 @@ public sealed class InMemoryAccessRepository : IAccessRepository
     }
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, string actor, string reason, CancellationToken cancellationToken)
+    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, string reason, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -120,12 +142,17 @@ public sealed class InMemoryAccessRepository : IAccessRepository
 
             if (user.Status != AccessStatus.Approved)
             {
-                return Invalid(user, null);
+                return Conflict(AccessMutationDisposition.UserInvalidState, user, null);
+            }
+
+            if (user.Version != expectedVersion)
+            {
+                return Conflict(AccessMutationDisposition.ConcurrencyConflict, user, null);
             }
 
             string[] previousRoles = user.Roles.ToArray();
             string[] nextRoles = NormalizeRoles(roles);
-            user = user with { Roles = nextRoles };
+            user = user with { Roles = nextRoles, Version = user.Version + 1 };
             _users[userId] = user;
             return Applied(user, null, previousRoles, nextRoles);
         }
@@ -136,7 +163,7 @@ public sealed class InMemoryAccessRepository : IAccessRepository
     }
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> DisableUserAsync(Guid userId, string actor, string reason, CancellationToken cancellationToken)
+    public async Task<AccessMutationResult> DisableUserAsync(Guid userId, long expectedVersion, string actor, string reason, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -148,11 +175,16 @@ public sealed class InMemoryAccessRepository : IAccessRepository
 
             if (user.Status == AccessStatus.Disabled)
             {
-                return Invalid(user, null);
+                return Conflict(AccessMutationDisposition.UserInvalidState, user, null);
+            }
+
+            if (user.Version != expectedVersion)
+            {
+                return Conflict(AccessMutationDisposition.ConcurrencyConflict, user, null);
             }
 
             string[] previousRoles = user.Roles.ToArray();
-            user = user with { Status = AccessStatus.Disabled, DisabledAt = DateTimeOffset.UtcNow, Roles = [] };
+            user = user with { Status = AccessStatus.Disabled, DisabledAt = DateTimeOffset.UtcNow, Roles = [], Version = user.Version + 1 };
             _users[userId] = user;
             return Applied(user, null, previousRoles, []);
         }
@@ -183,18 +215,19 @@ public sealed class InMemoryAccessRepository : IAccessRepository
         user.FirstAuthenticatedAt,
         user.LastAuthenticatedAt,
         user.DisabledAt,
+        user.Version,
         user.Roles,
         AccessRoleCatalog.GetCapabilities(user.Roles));
 
     private ApplicationAccessRequest ToRequest(StoredRequest request)
     {
         StoredUser user = _users[request.UserId];
-        return new ApplicationAccessRequest(request.Id, request.UserId, user.CorporateIdentity, request.Status, request.RequestedAt, request.DecidedAt, request.DecisionReason);
+        return new ApplicationAccessRequest(request.Id, request.UserId, user.CorporateIdentity, request.Status, request.RequestedAt, request.DecidedAt, request.DecisionReason, request.DecidedByCorporateIdentity, request.Version);
     }
 
     private static string[] NormalizeRoles(IEnumerable<string> roles) => roles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(role => role, StringComparer.OrdinalIgnoreCase).ToArray();
     private static AccessMutationResult Missing() => new(AccessMutationDisposition.NotFound, null, null, [], []);
-    private AccessMutationResult Invalid(StoredUser user, StoredRequest? request) => new(AccessMutationDisposition.InvalidState, ToUser(user), request is null ? null : ToRequest(request), [], []);
+    private AccessMutationResult Conflict(AccessMutationDisposition disposition, StoredUser user, StoredRequest? request) => new(disposition, ToUser(user), request is null ? null : ToRequest(request), [], []);
     private AccessMutationResult Applied(StoredUser user, StoredRequest? request, IEnumerable<string> previous, IEnumerable<string> next) => new(
         AccessMutationDisposition.Applied,
         ToUser(user),
@@ -202,6 +235,6 @@ public sealed class InMemoryAccessRepository : IAccessRepository
         next.Except(previous, StringComparer.OrdinalIgnoreCase).ToArray(),
         previous.Except(next, StringComparer.OrdinalIgnoreCase).ToArray());
 
-    private sealed record StoredUser(Guid Id, string CorporateIdentity, string AuthenticationSource, AccessStatus Status, DateTimeOffset FirstAuthenticatedAt, DateTimeOffset LastAuthenticatedAt, DateTimeOffset? DisabledAt, IReadOnlyList<string> Roles);
-    private sealed record StoredRequest(Guid Id, Guid UserId, AccessRequestStatus Status, DateTimeOffset RequestedAt, DateTimeOffset? DecidedAt, string? DecisionReason);
+    private sealed record StoredUser(Guid Id, string CorporateIdentity, string AuthenticationSource, AccessStatus Status, DateTimeOffset FirstAuthenticatedAt, DateTimeOffset LastAuthenticatedAt, DateTimeOffset? DisabledAt, long Version, IReadOnlyList<string> Roles);
+    private sealed record StoredRequest(Guid Id, Guid UserId, AccessRequestStatus Status, DateTimeOffset RequestedAt, DateTimeOffset? DecidedAt, string? DecisionReason, string? DecidedByCorporateIdentity, long Version);
 }
