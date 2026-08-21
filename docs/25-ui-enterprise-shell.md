@@ -58,7 +58,9 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/identity-lookup` | PAM / AD lookup | Authenticated + `Identity.Lookup` |
 | `/account` | Signed-in identity and session security | Authenticated |
 | `/access/me` | Erişimim: status, roles, grouped capabilities | Authenticated |
-| `/access/requests` | Erişim Yönetimi: request queue, decisions, role assignment | Authenticated + `Access.ApproveRequests` |
+| `/access/requests` | Erişim Talepleri: decision queue | Authenticated + `Access.ApproveRequests` |
+| `/access/users` | Kullanıcılar: user list grouped by access state | Authenticated + `Access.ManageUsers` |
+| `/access/users/{id}` | User detail, role editor, disable, request history | Authenticated + `Access.ManageUsers` |
 | `/audit-compliance`, `/diagnostics-readonly` | Truthful future-phase placeholders | Authenticated |
 
 Interim endpoints `POST /auth/sign-in` and `GET /auth/sign-out` replace the former `/demo-auth/*`

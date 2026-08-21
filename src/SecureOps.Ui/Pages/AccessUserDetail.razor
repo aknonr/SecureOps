@@ -1,0 +1,504 @@
+@page "/access/users/{UserId:guid}"
+@attribute [Authorize]
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+@inject IAccessAdminApiClient AccessAdmin
+@inject IDialogService Dialogs
+@inject NavigationManager Navigation
+
+<PageTitle>Kullanıcı erişimi · SecureOps</PageTitle>
+
+@*
+    One user's authoritative access record, from GET /api/v1/access/users/{id}.
+
+    This page is the reason role administration is safe now. It reads the current role set and the
+    record version before offering an editor, seeds the editor from that read, and submits the
+    version back as expectedVersion. Nothing here guesses.
+
+    On AccessConcurrencyConflict the record is re-read and the administrator is left looking at the
+    new state. The failed action is deliberately not re-sent: the version it carried is stale by
+    definition, so an automatic retry would either fail again or, worse, succeed against a record
+    the administrator never saw.
+*@
+
+<div class="so-page">
+    <SoPageHeader Title="@HeaderTitle" Lead="@HeaderLead">
+        <Actions>
+            <MudButton Variant="Variant.Text" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Href="access/users">
+                Kullanıcılar
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@(_busy || _loading)"
+                       OnClick="() => LoadAsync(clearAction: true)">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.AccessManageUsers))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Kullanıcı yönetimi için <code class="so-code">@Capabilities.AccessManageUsers</code>
+                yetkisi gerekir.
+            </p>
+        </section>
+    }
+    else if (_loading && _user is null)
+    {
+        <SoLoading Message="Kullanıcı kaydı yükleniyor…" />
+    }
+    else if (_user is null)
+    {
+        @if (_loadProblem is not null)
+        {
+            <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: true)" />
+        }
+        else
+        {
+            <SoEmptyState Title="Kullanıcı bulunamadı"
+                          Description="Bu kayıt kaldırılmış olabilir."
+                          Icon="@Icons.Material.Outlined.PersonOff" />
+        }
+    }
+    else
+    {
+        @if (_result is not null)
+        {
+            <section class="so-panel so-panel--result" role="status">
+                <span class="so-notice-icon so-notice-icon--ok" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" />
+                </span>
+                <div class="so-result-body">
+                    <h2 class="so-panel-title">@_result</h2>
+                    <p class="so-panel-text">
+                        Aşağıdaki bilgiler işlemden sonra sunucudan yeniden okundu.
+                    </p>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                               aria-label="Kapat" OnClick="() => _result = null" />
+            </section>
+        }
+
+        @if (_actionProblem is not null)
+        {
+            @* Held separately from the load problem: a conflict is followed by a re-read, and a
+               single field would let that re-read clear the very message explaining it. *@
+            @* The API marks a concurrency conflict retryable, and it is — but only after a fresh
+               read. This handler reloads; it never re-sends the failed write, whose version is stale
+               by definition. The label says what the button actually does. *@
+            <SoProblemPanel Problem="_actionProblem"
+                            OnRetry="() => LoadAsync(clearAction: true)"
+                            RetryLabel="Güncel durumu yükle" />
+        }
+
+        @if (_loadProblem is not null)
+        {
+            <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: true)" />
+        }
+
+        <div class="so-detail-grid">
+            <section class="so-panel">
+                <div class="so-user-head">
+                    <span class="so-avatar so-avatar--lg" aria-hidden="true">
+                        @AccessIdentityDisplay.Initials(_user.Profile, _user.CorporateIdentity)
+                    </span>
+                    <div class="so-user-head-text">
+                        <h2 class="so-panel-title">
+                            @AccessIdentityDisplay.Name(_user.Profile, _user.CorporateIdentity)
+                        </h2>
+                        @if (AccessIdentityDisplay.HasName(_user.Profile))
+                        {
+                            <p class="so-panel-text so-panel-text--sm">@_user.CorporateIdentity</p>
+                        }
+                    </div>
+                    <SoStatusBadge Label="@AccessUserView.StatusLabel(_user)"
+                                   Tone="@AccessUserView.StatusTone(_user)"
+                                   Icon="@AccessUserView.StatusIcon(_user)" />
+                </div>
+
+                @* G-10: a refused user stays AccessStatus.Pending forever, so the rejection has to be
+                   stated outright or the account reads as an open request. *@
+                @if (AccessUserView.IsRejected(_user))
+                {
+                    <div class="so-panel-note so-panel-note--critical">
+                        <MudIcon Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" />
+                        <span>
+                            Bu kullanıcının son erişim talebi <strong>reddedildi</strong>. Hesap
+                            teknik olarak "onay bekliyor" durumunda kalır, ancak <strong>bekleyen bir
+                            talep yoktur</strong>: kullanıcı uygulamayı yeniden açtığında yeni talep
+                            oluşmaz ve kendi başına yeniden başvuramaz.
+                        </span>
+                    </div>
+                }
+
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="Erişim durumu">@AccessLabels.StatusLabel(_user.AccessStatus)</SoField>
+                    <SoField Label="Kayıt sürümü">
+                        <code class="so-code">@_user.Version</code>
+                    </SoField>
+                    <SoField Label="İlk oturum">
+                        @_user.FirstAuthenticatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </SoField>
+                    <SoField Label="Son oturum">
+                        @_user.LastAuthenticatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </SoField>
+                    @if (_user.DisabledAt is { } disabledAt)
+                    {
+                        <SoField Label="Kapatılma">
+                            @disabledAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        </SoField>
+                    }
+                    <SoField Label="Kimlik doğrulama kaynağı">@_user.AuthenticationSource</SoField>
+                </SoFieldGrid>
+            </section>
+
+            <section class="so-panel">
+                <h2 class="so-panel-title">Dizin profili</h2>
+
+                @* Nullable enrichment. Absent is the normal case, not an error, and it is said in
+                   words rather than left as blank fields that look like a loading failure. *@
+                @if (!AccessIdentityDisplay.HasAny(_user.Profile))
+                {
+                    <SoEmptyState Title="Profil bilgisi yok"
+                                  Description="Dizin sağlayıcısı bu kullanıcı için ad, e-posta veya departman döndürmedi. Yalnızca kurumsal kimlik gösterilebiliyor."
+                                  Icon="@Icons.Material.Outlined.Badge" />
+                }
+                else
+                {
+                    <SoFieldGrid MinColumnWidth="220px">
+                        @if (_user.Profile!.DisplayName is { Length: > 0 } displayName)
+                        {
+                            <SoField Label="Görünen ad">@displayName</SoField>
+                        }
+                        @if (_user.Profile.Account is { Length: > 0 } account)
+                        {
+                            <SoField Label="Hesap">@account</SoField>
+                        }
+                        @if (_user.Profile.Email is { Length: > 0 } email)
+                        {
+                            <SoField Label="E-posta">@email</SoField>
+                        }
+                        @if (_user.Profile.Department is { Length: > 0 } department)
+                        {
+                            <SoField Label="Departman">@department</SoField>
+                        }
+                        @if (_user.Profile.Title is { Length: > 0 } title)
+                        {
+                            <SoField Label="Unvan">@title</SoField>
+                        }
+                    </SoFieldGrid>
+                }
+            </section>
+
+            <section class="so-panel">
+                <h2 class="so-panel-title">Roller</h2>
+
+                @if (_user.Roles.Count == 0)
+                {
+                    <p class="so-field-empty">Atanmış rol yok.</p>
+                }
+                else
+                {
+                    <span class="so-chip-row">
+                        @foreach (string role in _user.Roles)
+                        {
+                            <span class="so-chip" title="@role">@AccessLabels.RoleLabel(role)</span>
+                        }
+                    </span>
+                }
+
+                <h3 class="so-subhead">Geçerli yetkiler (@_user.Capabilities.Count)</h3>
+                @* Backend-derived. Never computed from the role names above. *@
+                @if (_user.Capabilities.Count == 0)
+                {
+                    <p class="so-field-empty">Tanımlı yetki yok.</p>
+                }
+                else
+                {
+                    <span class="so-chip-row">
+                        @foreach (string capability in _user.Capabilities)
+                        {
+                            <span class="so-chip so-chip--quiet" title="@capability">
+                                @AccessLabels.Describe(capability).Label
+                            </span>
+                        }
+                    </span>
+                }
+
+                <div class="so-panel-actions so-panel-actions--wrap">
+                    @if (_access.Can(Capabilities.AccessAssignRoles))
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.ManageAccounts"
+                                   Disabled="@(_busy || !AccessUserView.IsApproved(_user))"
+                                   OnClick="ReplaceRolesAsync">
+                            Rolleri değiştir
+                        </MudButton>
+                    }
+
+                    @if (_access.Can(Capabilities.AccessManageUsers))
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.Block"
+                                   Disabled="@(_busy || AccessUserView.IsDisabled(_user))"
+                                   OnClick="DisableAsync">
+                            Erişimi kapat
+                        </MudButton>
+                    }
+                </div>
+
+                @* The API rejects role assignment on anyone who is not Approved, so the reason the
+                   button is disabled is stated rather than left to be discovered by clicking. *@
+                @if (!AccessUserView.IsApproved(_user) && _access.Can(Capabilities.AccessAssignRoles))
+                {
+                    <p class="so-panel-text so-panel-text--sm">
+                        Rol ataması yalnızca onaylı kullanıcılar için yapılabilir.
+                    </p>
+                }
+
+                @if (_busy)
+                {
+                    <SoLoading Message="İşlem uygulanıyor…" Bare="true" />
+                }
+            </section>
+
+            <section class="so-panel">
+                <h2 class="so-panel-title">Erişim talebi geçmişi</h2>
+
+                @if (_user.RequestHistory.Count == 0)
+                {
+                    <SoEmptyState Title="Kayıt yok"
+                                  Description="Bu kullanıcı için erişim talebi bulunmuyor."
+                                  Icon="@Icons.Material.Outlined.History" />
+                }
+                else
+                {
+                    <ol class="so-history">
+                        @foreach (AccessRequestResponse request in _user.RequestHistory)
+                        {
+                            <li class="so-history-item">
+                                <span class="so-history-mark so-history-mark--@HistoryModifier(request)"
+                                      aria-hidden="true"></span>
+                                <div class="so-history-body">
+                                    <div class="so-history-head">
+                                        <SoStatusBadge Label="@AccessLabels.RequestStatusLabel(request.Status)"
+                                                       Tone="@RequestTone(request.Status)" />
+                                        <span class="so-history-time">
+                                            @request.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                        </span>
+                                    </div>
+                                    @if (request.DecidedAt is { } decidedAt)
+                                    {
+                                        <p class="so-history-line">
+                                            Karar: @decidedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                            @if (!string.IsNullOrWhiteSpace(request.DecidedByCorporateIdentity))
+                                            {
+                                                <span> · @request.DecidedByCorporateIdentity</span>
+                                            }
+                                        </p>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(request.DecisionReason))
+                                    {
+                                        <p class="so-history-reason">@request.DecisionReason</p>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>User whose access record is shown.</summary>
+    [Parameter]
+    public Guid UserId { get; set; }
+
+    private AccessSnapshot? _access;
+    private AccessUserResponse? _user;
+    private UiProblem? _loadProblem;
+    private UiProblem? _actionProblem;
+    private string? _result;
+    private bool _loading;
+    private bool _busy;
+
+    private string HeaderTitle => _user is null
+        ? "Kullanıcı erişimi"
+        : AccessIdentityDisplay.Name(_user.Profile, _user.CorporateIdentity);
+
+    private string HeaderLead => _user is null
+        ? "Kullanıcının erişim durumu, rolleri ve yetkileri."
+        : "Erişim durumu, roller, geçerli yetkiler ve talep geçmişi.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.AccessManageUsers))
+        {
+            await LoadAsync(clearAction: true);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Navigating between two user detail routes reuses the component, so the record has to be
+        // re-read rather than left showing the previous user.
+        if (_user is not null && _user.UserId != UserId)
+        {
+            await LoadAsync(clearAction: true);
+        }
+    }
+
+    private async Task LoadAsync(bool clearAction)
+    {
+        _loading = true;
+        _loadProblem = null;
+
+        if (clearAction)
+        {
+            _actionProblem = null;
+            _result = null;
+        }
+
+        StateHasChanged();
+
+        try
+        {
+            _user = await AccessAdmin.GetUserAsync(UserId, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _loadProblem = ex.Problem;
+            _user = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task ReplaceRolesAsync() => RunAsync(
+        AccessActionDialog.AccessAction.ReplaceRoles,
+        async confirmed =>
+        {
+            await AccessAdmin.ReplaceRolesAsync(
+                UserId, confirmed.Roles, confirmed.Reason, _user!.Version, CancellationToken.None);
+
+            return "Roller güncellendi";
+        });
+
+    private Task DisableAsync() => RunAsync(
+        AccessActionDialog.AccessAction.Disable,
+        async confirmed =>
+        {
+            await AccessAdmin.DisableAsync(
+                UserId, confirmed.Reason, _user!.Version, CancellationToken.None);
+
+            return "Erişim kapatıldı";
+        });
+
+    private async Task RunAsync(
+        AccessActionDialog.AccessAction action,
+        Func<AccessActionDialog.Result, Task<string>> execute)
+    {
+        if (_busy || _user is null)
+        {
+            return;
+        }
+
+        DialogParameters parameters = new()
+        {
+            { nameof(AccessActionDialog.Action), action },
+            {
+                nameof(AccessActionDialog.SubjectLabel),
+                AccessIdentityDisplay.Name(_user.Profile, _user.CorporateIdentity)
+            },
+            // Seeded from the record just read, so the administrator edits the real set rather than
+            // a guess. This is what makes replace semantics safe.
+            { nameof(AccessActionDialog.InitialRoles), _user.Roles }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<AccessActionDialog>(
+            title: string.Empty,
+            parameters,
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        DialogResult? outcome = await dialog.Result;
+
+        if (outcome is null || outcome.Canceled || outcome.Data is not AccessActionDialog.Result confirmed)
+        {
+            return;
+        }
+
+        // Set before the first await: the action buttons bind Disabled to this, so a second click
+        // finds them already disabled.
+        _busy = true;
+        _actionProblem = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            _result = await execute(confirmed);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        // Always re-read, success or failure. On a conflict this is the whole remedy: the version
+        // that was submitted is stale, so the administrator must see the current record before
+        // deciding whether the action is still wanted. Nothing is re-sent automatically.
+        await LoadAsync(clearAction: false);
+
+        // The administrator may have changed their own authority.
+        await AccessProvider.RefreshAsync(CancellationToken.None);
+    }
+
+    private static SoStatusBadge.BadgeTone RequestTone(string status) => status switch
+    {
+        AccessRequestStatuses.Approved => SoStatusBadge.BadgeTone.Positive,
+        AccessRequestStatuses.Rejected => SoStatusBadge.BadgeTone.Critical,
+        AccessRequestStatuses.Pending => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static string HistoryModifier(AccessRequestResponse request) => request.Status switch
+    {
+        AccessRequestStatuses.Approved => "ok",
+        AccessRequestStatuses.Rejected => "no",
+        _ => "wait"
+    };
+
+    private async Task RefreshAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        StateHasChanged();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

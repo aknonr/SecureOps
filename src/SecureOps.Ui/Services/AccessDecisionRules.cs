@@ -7,19 +7,17 @@ namespace SecureOps.Ui.Services;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This exists for a specific reason. The API returns <c>AccessRequestInvalidState</c> (409) for
-/// several unrelated situations: a blank reason, an empty role set, an unknown role code, a request
-/// another administrator has already decided, disabling an already-disabled user, and assigning
-/// roles to a disabled user. The first three are the operator mistyping something; the rest are the
-/// world having moved on. They need opposite responses — fix the form, versus reload and look again
-/// — and the response body cannot tell them apart. Tracked as G-9 in
-/// <c>docs/26-ui-backend-contract-gaps.md</c>.
+/// Client-side validation here is a <b>courtesy, not a safety mechanism</b>. It saves a round trip
+/// and puts the message next to the field, and that is all it is for.
 /// </para>
 /// <para>
-/// Validating here removes the input cases before a request is ever sent, which leaves a 409 from
-/// the server meaning, in practice, a genuine state conflict. That is what lets the conflict UX say
-/// "someone else changed this" without risking that it was really a typo. If the API later splits
-/// the code, this can relax to a courtesy check.
+/// It used to be load-bearing. Before backend commit <c>78183dd</c> the API answered a blank reason,
+/// an empty role set, and "another administrator already decided this" with one shared
+/// <c>AccessRequestInvalidState</c> code, so the UI could only treat a 409 as a conflict by first
+/// making sure no input case could produce one. That was a workaround (G-9). The API now returns
+/// <c>AccessValidationFailed</c>, <c>AccessRequestAlreadyDecided</c>,
+/// <c>AccessConcurrencyConflict</c>, and <c>AccessUserInvalidState</c> as distinct codes, so the
+/// inference is gone and these rules no longer carry the distinction.
 /// </para>
 /// <para>
 /// As with <see cref="AccountInputRules"/>, this is never stricter than the server: if the server

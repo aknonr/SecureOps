@@ -162,19 +162,22 @@
             "Kullanıcı uygulamaya erişebilecek ve seçtiğiniz rollerin yetkilerini kazanacak. "
             + "Bu karar denetim kaydına işlenir ve talep yeniden karara açılamaz.",
         AccessAction.Reject =>
-            "Talep reddedilecek ve kullanıcı uygulamaya erişemeyecek. Bu karar denetim kaydına "
-            + "işlenir ve talep yeniden karara açılamaz.",
+            "Talep reddedilecek ve kullanıcı uygulamaya erişemeyecek. Karar kalıcıdır: kullanıcı "
+            + "uygulamayı yeniden açtığında yeni bir talep oluşmaz ve kendi başına yeniden "
+            + "başvuramaz. Bu karar denetim kaydına işlenir.",
         AccessAction.ReplaceRoles =>
             "Kullanıcının rolleri seçtiğiniz kümeyle değiştirilecek. Bu bir ekleme değil, "
-            + "değiştirme işlemidir: seçmediğiniz roller kaldırılır.",
+            + "değiştirme işlemidir: işaretini kaldırdığınız roller kullanıcıdan alınır.",
         _ =>
             "Kullanıcının uygulama erişimi kapatılacak; tüm rolleri ve yetkileri kaldırılır. "
-            + "Yeniden erişim için yeni bir talep gerekir."
+            + "Kullanıcı kendi başına yeniden başvuramaz; erişimin geri verilmesi şu anda "
+            + "uygulama dışında ele alınmalıdır."
     };
 
     private string RoleNote => Action == AccessAction.Approve
         ? "Kullanıcının başlangıç rollerini seçin."
-        : "Kullanıcının sahip olacağı rollerin tamamını seçin.";
+        : "Aşağıdaki seçim kullanıcının sunucudaki güncel rolleridir. Kalmasını istediğiniz "
+          + "rolleri işaretli bırakın; işareti kaldırdıklarınız kaldırılır.";
 
     private string ActionIcon => Action switch
     {

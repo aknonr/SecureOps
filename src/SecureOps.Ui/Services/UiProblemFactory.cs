@@ -107,6 +107,41 @@ public static class UiProblemFactory
             ["Erişimim sayfasından mevcut yetkilerinizi görebilirsiniz.", "İhtiyacınız varsa yöneticinizden yetki talep edin."],
             retryable: false, requiresRefresh: false),
 
+        OperationalErrorCodes.AccessValidationFailed => Build(
+            UiProblemKind.Validation, code,
+            "Girilen bilgiler kabul edilmedi",
+            "Gerekçe veya seçilen roller sunucunun beklediği biçimde değil.",
+            ["Gerekçenin boş olmadığından ve en az bir geçerli rol seçtiğinizden emin olun.",
+             "Bilgileri düzeltip işlemi yeniden gönderin."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.AccessRequestAlreadyDecided => Build(
+            UiProblemKind.Conflict, code,
+            "Talep zaten sonuçlandırılmış",
+            "Bu erişim talebi başka bir yönetici tarafından onaylanmış veya reddedilmiş. Kararlar geri alınamaz.",
+            ["Listeyi yenileyip talebin güncel durumunu görün.",
+             "Farklı bir karar gerekiyorsa kullanıcının erişimini kullanıcı ayrıntısından yönetin."],
+            retryable: false, requiresRefresh: true),
+
+        // Marked retryable by the API, and that is accurate — but only after re-reading. Re-sending
+        // the same expectedVersion would fail identically, so the UI must reload authoritative state
+        // and make the administrator look at it before acting again.
+        OperationalErrorCodes.AccessConcurrencyConflict => Build(
+            UiProblemKind.Conflict, code,
+            "Kayıt siz bakarken değişti",
+            "Başka bir yönetici bu kaydı siz işlem yaparken güncelledi. Değişikliğiniz uygulanmadı.",
+            ["Güncel durum yeniden yüklendi; gözden geçirin.",
+             "İşlem hâlâ gerekliyse güncel bilgilerle yeniden uygulayın."],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.AccessUserInvalidState => Build(
+            UiProblemKind.Conflict, code,
+            "Kullanıcının durumu bu işleme uygun değil",
+            "Rol ataması yalnızca onaylı kullanıcılar için yapılabilir; kapatılmış veya henüz onaylanmamış bir hesapta uygulanamaz.",
+            ["Kullanıcının güncel durumunu ayrıntı sayfasından kontrol edin.",
+             "Onay bekleyen bir kullanıcı için önce erişim talebini onaylayın."],
+            retryable: false, requiresRefresh: true),
+
         OperationalErrorCodes.AccessSelfApprovalDenied => Build(
             UiProblemKind.Forbidden, code,
             "Kendi talebinizi onaylayamazsınız",

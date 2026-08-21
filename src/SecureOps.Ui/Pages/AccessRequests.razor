@@ -5,24 +5,25 @@
 @inject IAccessAdminApiClient AccessAdmin
 @inject IDialogService Dialogs
 
-<PageTitle>Erişim Yönetimi · SecureOps</PageTitle>
+<PageTitle>Erişim Talepleri · SecureOps</PageTitle>
 
 @*
-    Access administration workspace.
+    The access-request decision queue.
 
-    Scope is set by what the contract actually offers. There is no endpoint that lists application
-    users or reads one user's access record, so an administrator reaches a user only through their
-    access request. That is why this is a request queue with a detail panel rather than a user
-    directory — a "Kullanıcılar" page would be a list this UI cannot populate. See G-8.
+    Scope is deliberately narrow: this page decides requests, and nothing else. Role assignment and
+    disabling live on the user detail page, because those mutations are guarded by the *user's*
+    version while approve and reject are guarded by the *request's*. Offering them here would mean
+    holding two versions for two different records on one screen, and submitting the wrong one
+    produces a conflict that looks like someone else edited the record.
 
-    The same constraint shapes the role editor: the current role set of a user cannot be read back,
-    only written. The panel therefore states what is known and what is not, instead of preselecting
-    a guess that would silently wipe roles on save.
+    Requests carry nullable profile enrichment. Where the directory resolves a name it is shown with
+    the principal identifier beneath; where it does not, the identifier stands alone rather than
+    being padded with placeholders.
 *@
 
 <div class="so-page">
-    <SoPageHeader Title="Erişim Yönetimi"
-                  Lead="Uygulama erişim talepleri, rol atamaları ve hesap durumu.">
+    <SoPageHeader Title="Erişim Talepleri"
+                  Lead="Karar bekleyen ve sonuçlanmış uygulama erişim talepleri.">
         <Actions>
             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Refresh"
@@ -48,7 +49,7 @@
         <section class="so-panel so-panel--blocked">
             <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
             <p class="so-panel-text">
-                Erişim yönetimi için <code class="so-code">@Capabilities.AccessApproveRequests</code>
+                Erişim taleplerini görüntülemek için <code class="so-code">@Capabilities.AccessApproveRequests</code>
                 yetkisi gerekir. Hesabınızda tanımlı yetkileri
                 <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
             </p>
@@ -145,7 +146,9 @@
                marked the failure retryable, so a conflict shows none — correct, because re-sending
                would not help. The list behind this panel has already been reloaded, so what the
                administrator sees underneath is current server state, not the state they acted on. *@
-            <SoProblemPanel Problem="_actionProblem" OnRetry="() => ReloadAsync(announce: false)" />
+            <SoProblemPanel Problem="_actionProblem"
+                            OnRetry="() => ReloadAsync(announce: false)"
+                            RetryLabel="Listeyi yenile" />
         }
 
         @if (_listProblem is not null)
@@ -183,7 +186,13 @@
                                         disabled="@_busy"
                                         @onclick="() => Select(request)">
                                     <span class="so-request-identity">
-                                        <span class="so-request-name">@request.CorporateIdentity</span>
+                                        <span class="so-request-name">
+                                            @AccessIdentityDisplay.Name(request.Profile, request.CorporateIdentity)
+                                        </span>
+                                        @if (AccessIdentityDisplay.HasName(request.Profile))
+                                        {
+                                            <span class="so-request-meta">@request.CorporateIdentity</span>
+                                        }
                                         <span class="so-request-meta">
                                             Talep: @request.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
                                         </span>
@@ -206,7 +215,13 @@
                 }
                 else
                 {
-                    <h2 class="so-panel-title">@_selected.CorporateIdentity</h2>
+                    <h2 class="so-panel-title">
+                        @AccessIdentityDisplay.Name(_selected.Profile, _selected.CorporateIdentity)
+                    </h2>
+                    @if (AccessIdentityDisplay.HasName(_selected.Profile))
+                    {
+                        <p class="so-panel-text so-panel-text--sm">@_selected.CorporateIdentity</p>
+                    }
 
                     <SoFieldGrid MinColumnWidth="220px">
                         <SoField Label="Talep durumu">
@@ -232,17 +247,35 @@
                         <SoField Label="Karar gerekçesi">@_selected.DecisionReason</SoField>
                     }
 
-                    @* The contract exposes no directory profile for another user and no way to read
-                       their current roles. Saying so is better than four blank fields that look like
-                       a loading failure. G-2 and G-8. *@
-                    <p class="so-panel-note">
-                        <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" />
-                        <span>
-                            Bu kullanıcının adı, e-postası ve departmanı API tarafından
-                            sağlanmadığı için gösterilemiyor. Geçerli rolleri de yalnızca bir
-                            değişiklik uygulandıktan sonra okunabiliyor.
-                        </span>
-                    </p>
+                    @* Enrichment is nullable and frequently absent. Absence is stated in words
+                       rather than rendered as blank fields that read as a loading failure. *@
+                    @if (AccessIdentityDisplay.HasAny(_selected.Profile))
+                    {
+                        <SoFieldGrid MinColumnWidth="220px">
+                            @if (_selected.Profile!.Email is { Length: > 0 } email)
+                            {
+                                <SoField Label="E-posta">@email</SoField>
+                            }
+                            @if (_selected.Profile.Department is { Length: > 0 } department)
+                            {
+                                <SoField Label="Departman">@department</SoField>
+                            }
+                            @if (_selected.Profile.Title is { Length: > 0 } title)
+                            {
+                                <SoField Label="Unvan">@title</SoField>
+                            }
+                        </SoFieldGrid>
+                    }
+                    else
+                    {
+                        <p class="so-panel-note">
+                            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" />
+                            <span>
+                                Dizin sağlayıcısı bu kullanıcı için ad, e-posta veya departman
+                                döndürmedi. Yalnızca kurumsal kimlik gösterilebiliyor.
+                            </span>
+                        </p>
+                    }
 
                     <div class="so-panel-actions so-panel-actions--wrap">
                         @if (IsPending(_selected))
@@ -261,23 +294,14 @@
                             </MudButton>
                         }
 
-                        @if (_access.Can(Capabilities.AccessAssignRoles))
-                        {
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.ManageAccounts"
-                                       Disabled="@_busy"
-                                       OnClick="() => RunAsync(AccessActionDialog.AccessAction.ReplaceRoles)">
-                                Rolleri değiştir
-                            </MudButton>
-                        }
-
+                        @* Role assignment and disabling are guarded by the user's version, not the
+                           request's, so they belong on the record that supplies it. *@
                         @if (_access.Can(Capabilities.AccessManageUsers))
                         {
-                            <MudButton Variant="Variant.Text" Color="Color.Error"
-                                       StartIcon="@Icons.Material.Filled.Block"
-                                       Disabled="@_busy"
-                                       OnClick="() => RunAsync(AccessActionDialog.AccessAction.Disable)">
-                                Erişimi kapat
+                            <MudButton Variant="Variant.Text" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PersonSearch"
+                                       Href="@($"access/users/{_selected.UserId}")">
+                                Kullanıcı kaydını aç
                             </MudButton>
                         }
                     </div>
@@ -439,24 +463,17 @@
 
         try
         {
-            _result = action switch
-            {
-                AccessActionDialog.AccessAction.Approve => Describe(
+            // Only the two request decisions live here; both are guarded by the request version
+            // this row was read with.
+            _result = action == AccessActionDialog.AccessAction.Approve
+                ? Describe(
                     "Talep onaylandı",
-                    await AccessAdmin.ApproveAsync(target.Id, confirmed.Reason, confirmed.Roles, CancellationToken.None)),
-                AccessActionDialog.AccessAction.Reject => Describe(
+                    await AccessAdmin.ApproveAsync(
+                        target.Id, confirmed.Reason, confirmed.Roles, target.Version, CancellationToken.None))
+                : Describe(
                     "Talep reddedildi",
-                    await AccessAdmin.RejectAsync(target.Id, confirmed.Reason, CancellationToken.None)),
-                AccessActionDialog.AccessAction.ReplaceRoles => new ActionResult(
-                    "Roller güncellendi",
-                    $"{target.CorporateIdentity} için roller değiştirildi.",
-                    await AccessAdmin.ReplaceRolesAsync(
-                        target.UserId, confirmed.Roles, confirmed.Reason, CancellationToken.None)),
-                _ => new ActionResult(
-                    "Erişim kapatıldı",
-                    $"{target.CorporateIdentity} artık uygulamaya erişemiyor.",
-                    await AccessAdmin.DisableAsync(target.UserId, confirmed.Reason, CancellationToken.None))
-            };
+                    await AccessAdmin.RejectAsync(
+                        target.Id, confirmed.Reason, target.Version, CancellationToken.None));
         }
         catch (SecureOpsApiException ex)
         {

@@ -1,0 +1,255 @@
+@page "/access/users"
+@attribute [Authorize]
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+@inject IAccessAdminApiClient AccessAdmin
+
+<PageTitle>Kullanıcılar · SecureOps</PageTitle>
+
+@*
+    Authoritative user list from GET /api/v1/access/users.
+
+    Grouping is client-side because the endpoint takes no query parameters: it returns the whole set
+    and the UI groups it. Stated here so nobody later assumes a server-side filter exists.
+
+    The pending users are split into two groups, and that split is the point of this screen. A
+    refused user keeps AccessStatus.Pending — the API has no Rejected user status — so status alone
+    shows a closed decision as an open one. See AccessUserView.
+*@
+
+<div class="so-page">
+    <SoPageHeader Title="Kullanıcılar"
+                  Lead="SecureOps kullanıcılarının erişim durumu, rolleri ve yetkileri.">
+        <Actions>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_loading"
+                       OnClick="LoadAsync">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.AccessManageUsers))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Kullanıcı yönetimi için <code class="so-code">@Capabilities.AccessManageUsers</code>
+                yetkisi gerekir. Hesabınızda tanımlı yetkileri
+                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+        </section>
+    }
+    else
+    {
+        <section class="so-panel so-panel--tabs">
+            <div class="so-tabs" role="tablist" aria-label="Kullanıcı durumu">
+                @foreach (UserGroup group in _groups)
+                {
+                    UserGroup captured = group;
+                    <button type="button"
+                            role="tab"
+                            class="so-tab @(group == _group ? "so-tab--active" : null)"
+                            aria-selected="@(group == _group)"
+                            @onclick="() => _group = captured">
+                        @GroupLabel(group)
+                        <span class="so-tab-count">@Count(group)</span>
+                    </button>
+                }
+            </div>
+        </section>
+
+        @if (_problem is not null)
+        {
+            <SoProblemPanel Problem="_problem" OnRetry="LoadAsync" />
+        }
+
+        <section class="so-panel">
+            @if (_loading)
+            {
+                <SoLoading Message="Kullanıcılar yükleniyor…" Bare="true" />
+            }
+            else if (_users is null)
+            {
+                <SoEmptyState Title="Liste yüklenemedi"
+                              Description="Yenile ile yeniden deneyebilirsiniz."
+                              Icon="@Icons.Material.Outlined.CloudOff" />
+            }
+            else if (Filtered.Count == 0)
+            {
+                <SoEmptyState Title="@EmptyTitle" Description="@EmptyDescription"
+                              Icon="@Icons.Material.Outlined.Group" />
+            }
+            else
+            {
+                <ul class="so-user-list">
+                    @foreach (AccessUserResponse user in Filtered)
+                    {
+                        <li>
+                            <a class="so-user-row" href="@($"access/users/{user.UserId}")">
+                                <span class="so-avatar" aria-hidden="true">
+                                    @AccessIdentityDisplay.Initials(user.Profile, user.CorporateIdentity)
+                                </span>
+
+                                <span class="so-user-row-identity">
+                                    <span class="so-user-row-name">
+                                        @AccessIdentityDisplay.Name(user.Profile, user.CorporateIdentity)
+                                    </span>
+                                    @* Shown only when a real name resolved; otherwise the name above
+                                       already is the identifier and repeating it reads as a fault. *@
+                                    @if (AccessIdentityDisplay.HasName(user.Profile))
+                                    {
+                                        <span class="so-user-row-meta">@user.CorporateIdentity</span>
+                                    }
+                                    @if (user.Roles.Count > 0)
+                                    {
+                                        <span class="so-user-row-meta">
+                                            @string.Join(", ", user.Roles.Select(AccessLabels.RoleLabel))
+                                        </span>
+                                    }
+                                </span>
+
+                                <span class="so-user-row-status">
+                                    <SoStatusBadge Label="@AccessUserView.StatusLabel(user)"
+                                                   Tone="@AccessUserView.StatusTone(user)"
+                                                   Icon="@AccessUserView.StatusIcon(user)" />
+                                    <MudIcon Icon="@Icons.Material.Filled.ChevronRight"
+                                             Size="Size.Small"
+                                             Class="so-user-row-caret" />
+                                </span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    /// <summary>The groups an administrator actually works in.</summary>
+    private enum UserGroup
+    {
+        /// <summary>A decision is genuinely outstanding.</summary>
+        AwaitingDecision,
+
+        /// <summary>Approved for application use.</summary>
+        Approved,
+
+        /// <summary>Refused; still Pending at the user level, but closed.</summary>
+        Rejected,
+
+        /// <summary>Access switched off.</summary>
+        Disabled
+    }
+
+    private static readonly UserGroup[] _groups =
+    [
+        UserGroup.AwaitingDecision,
+        UserGroup.Approved,
+        UserGroup.Rejected,
+        UserGroup.Disabled
+    ];
+
+    private AccessSnapshot? _access;
+    private IReadOnlyList<AccessUserResponse>? _users;
+    private UiProblem? _problem;
+    private UserGroup _group = UserGroup.AwaitingDecision;
+    private bool _loading;
+
+    private IReadOnlyList<AccessUserResponse> Filtered =>
+        _users is null ? [] : _users.Where(user => GroupOf(user) == _group).ToArray();
+
+    private int Count(UserGroup group) =>
+        _users is null ? 0 : _users.Count(user => GroupOf(user) == group);
+
+    private static UserGroup GroupOf(AccessUserResponse user)
+    {
+        if (AccessUserView.IsDisabled(user))
+        {
+            return UserGroup.Disabled;
+        }
+
+        if (AccessUserView.IsApproved(user))
+        {
+            return UserGroup.Approved;
+        }
+
+        return AccessUserView.IsRejected(user) ? UserGroup.Rejected : UserGroup.AwaitingDecision;
+    }
+
+    private static string GroupLabel(UserGroup group) => group switch
+    {
+        UserGroup.Approved => "Onaylı",
+        UserGroup.AwaitingDecision => "Onay bekleyen",
+        UserGroup.Rejected => "Reddedilmiş",
+        _ => "Kapatılmış"
+    };
+
+    private string EmptyTitle => _group switch
+    {
+        UserGroup.Approved => "Onaylı kullanıcı yok",
+        UserGroup.AwaitingDecision => "Onay bekleyen kullanıcı yok",
+        UserGroup.Rejected => "Reddedilmiş kullanıcı yok",
+        _ => "Kapatılmış kullanıcı yok"
+    };
+
+    private string EmptyDescription => _group switch
+    {
+        UserGroup.AwaitingDecision => "Karar bekleyen erişim talebi bulunmuyor.",
+        UserGroup.Rejected => "Talebi reddedilmiş kullanıcı bulunmuyor.",
+        _ => "Bu durumda kayıtlı kullanıcı bulunmuyor."
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.AccessManageUsers))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _users = await AccessAdmin.GetUsersAsync(CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            _users = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        StateHasChanged();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

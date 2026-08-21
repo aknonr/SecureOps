@@ -55,6 +55,32 @@ public sealed record AccessSnapshot(
     public bool IsDisabled =>
         string.Equals(Status, AccessStatuses.Disabled, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The caller's most recent access request, or <c>null</c> when the API reported none.
+    /// </summary>
+    public AccessRequestResponse? LatestRequest => Access?.LatestRequest;
+
+    /// <summary>
+    /// Whether the caller's most recent request was refused.
+    /// </summary>
+    /// <remarks>
+    /// A refused user keeps <c>AccessStatus.Pending</c> — there is no Rejected user status — so
+    /// status alone cannot tell "waiting for a decision" from "already refused". Only the latest
+    /// request separates them, and the difference matters: one is worth waiting for, the other is
+    /// not, and the API creates no replacement request.
+    /// </remarks>
+    public bool IsRejected =>
+        IsPending
+        && string.Equals(LatestRequest?.Status, AccessRequestStatuses.Rejected, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether the caller is genuinely awaiting a decision, as opposed to having been refused.
+    /// </summary>
+    public bool IsAwaitingDecision => IsPending && !IsRejected;
+
+    /// <summary>Nullable directory enrichment; <c>null</c> when the provider could not resolve it.</summary>
+    public AccessIdentityProfileResponse? Profile => Access?.Profile;
+
     /// <summary>Granted application roles, empty when unresolved.</summary>
     public IReadOnlyList<string> Roles => Access?.Roles ?? [];
 
@@ -79,4 +105,24 @@ public sealed record AccessSnapshot(
     /// <param name="capabilities">Capability identifiers.</param>
     /// <returns><c>true</c> when any capability is granted.</returns>
     public bool CanAny(params string[] capabilities) => capabilities.Any(Can);
+}
+
+/// <summary>
+/// Access-request decision statuses returned by the API.
+/// </summary>
+/// <remarks>
+/// Deliberately distinct from <see cref="AccessStatuses"/>. A <i>request</i> is Approved or
+/// Rejected; a <i>user</i> is Approved or Disabled. The vocabularies overlap on "Approved" and mean
+/// different things, and conflating them is what makes a rejected request read as a live one.
+/// </remarks>
+public static class AccessRequestStatuses
+{
+    /// <summary>Awaiting an administrator's decision.</summary>
+    public const string Pending = "Pending";
+
+    /// <summary>Granted.</summary>
+    public const string Approved = "Approved";
+
+    /// <summary>Refused. Terminal — the API creates no replacement.</summary>
+    public const string Rejected = "Rejected";
 }

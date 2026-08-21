@@ -40,14 +40,18 @@
             @if (Can(Capabilities.AccessApproveRequests))
             {
                 <MudNavLink Href="access/requests" Icon="@Icons.Material.Filled.AdminPanelSettings">
-                    Erişim Yönetimi
+                    Erişim Talepleri
                 </MudNavLink>
             }
 
-            @* There is no "Kullanıcılar ve Roller" entry: the contract exposes no endpoint that
-               lists application users, so the page would have nothing to populate a directory with.
-               Role assignment and disabling live inside Erişim Yönetimi, reached through a user's
-               access request. See G-8 in docs/26-ui-backend-contract-gaps.md. *@
+            @* Gated on ManageUsers rather than ApproveRequests: the users read model is a
+               different capability, and an approver without it would get a blocked page. *@
+            @if (Can(Capabilities.AccessManageUsers))
+            {
+                <MudNavLink Href="access/users" Icon="@Icons.Material.Filled.Group">
+                    Kullanıcılar
+                </MudNavLink>
+            }
 
             <div class="so-nav-group">Sonraki fazlar</div>
 

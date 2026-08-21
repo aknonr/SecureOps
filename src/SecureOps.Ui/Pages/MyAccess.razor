@@ -45,7 +45,7 @@
                 </div>
             </div>
 
-            @if (_access.IsPending && _access.Access!.PendingRequestId is { } requestId)
+            @if (_access.IsAwaitingDecision && _access.Access!.PendingRequestId is { } requestId)
             {
                 <SoFieldGrid MinColumnWidth="260px">
                     <SoField Label="Talep numarası">
@@ -143,6 +143,8 @@
     private string StatusModifier => _access switch
     {
         { IsApproved: true } => "ok",
+        // Ordered before IsPending on purpose: a refused user is still Pending.
+        { IsRejected: true } => "blocked",
         { IsPending: true } => "pending",
         { IsDisabled: true } => "blocked",
         _ => "unknown"
@@ -151,6 +153,7 @@
     private string StatusIcon => _access switch
     {
         { IsApproved: true } => Icons.Material.Filled.VerifiedUser,
+        { IsRejected: true } => Icons.Material.Filled.Cancel,
         { IsPending: true } => Icons.Material.Filled.HourglassTop,
         { IsDisabled: true } => Icons.Material.Filled.NoAccounts,
         _ => Icons.Material.Filled.HelpOutline
@@ -159,6 +162,7 @@
     private string StatusTitle => _access switch
     {
         { IsApproved: true } => "Erişiminiz onaylı",
+        { IsRejected: true } => "Erişim talebiniz reddedildi",
         { IsPending: true } => "Erişiminiz onay bekliyor",
         { IsDisabled: true } => "Erişiminiz devre dışı",
         _ => "Erişim durumu belirlenemedi"
@@ -168,6 +172,8 @@
     {
         { IsApproved: true } =>
             "SecureOps ekranlarını rolleriniz kapsamında kullanabilirsiniz.",
+        { IsRejected: true } =>
+            "Bir yönetici erişim talebinizi reddetti. Bekleyen bir talebiniz yok ve uygulamayı yeniden açmanız yeni bir talep oluşturmaz. Erişim gerekiyorsa yöneticinizle görüşün.",
         { IsPending: true } =>
             "Kimliğiniz doğrulandı ve erişim talebiniz oluşturuldu. Bir yönetici talebinizi sonuçlandırana kadar operasyon ekranları kapalıdır.",
         { IsDisabled: true } =>

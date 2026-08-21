@@ -43,7 +43,9 @@ wwwroot/css/     secureops-theme.css — semantic tokens only, no colour literal
 | Type | Role |
 |---|---|
 | `ICurrentAccessProvider` | Circuit-scoped `/access/me`, resolved once, 60s reuse, `Changed` event |
-| `IAccessAdminApiClient` | The five access administration calls; no user-list method, because none exists |
+| `IAccessAdminApiClient` | The access administration calls; every mutation requires an `expectedVersion` |
+| `AccessUserView` | Combines user status and latest request into one presented state |
+| `AccessIdentityDisplay` | Nullable profile → display name, with principal fallback |
 | `AccessDecisionRules` | Client mirror of the server's reason/role rules — see below |
 | `UiProblemFactory` | Translates every API failure into an operator-facing `UiProblem` |
 | `ApiResponseReader` | Shared success/failure handling for all API clients |
@@ -83,7 +85,9 @@ have to be invented.
 | `/identity-lookup` | PAM / AD lookup | `Identity.Lookup` |
 | `/account` | Identity and session security | authenticated |
 | `/access/me` | Status, roles, grouped capabilities | authenticated |
-| `/access/requests` | Access administration workspace | `Access.ApproveRequests` |
+| `/access/requests` | Access-request decision queue | `Access.ApproveRequests` |
+| `/access/users` | User list, grouped by access state | `Access.ManageUsers` |
+| `/access/users/{id}` | User detail, role editor, disable | `Access.ManageUsers` |
 | `/audit-compliance`, `/diagnostics-readonly` | Future-phase placeholders | authenticated |
 
 Interim auth endpoints: `POST /auth/sign-in`, `GET /auth/sign-out`. They establish identity only.
@@ -93,27 +97,43 @@ When an identity provider is approved they become a challenge/callback pair and 
 
 ## Access administration
 
-`/access/requests` is a **request queue with a detail panel**, not a user directory. That shape is
-forced by the contract: no endpoint lists application users or reads one user's access record, so a
-user is reachable only through their access request. Do not add a "Kullanıcılar" page until
-`GET /access/users` exists (G-8).
+Three screens, each gated on its own capability, because the API gates them separately: the request
+queue needs `Access.ApproveRequests` while the user read model needs `Access.ManageUsers`. An
+approver without `ManageUsers` sees the queue and no user list.
 
-Three rules this screen follows, each of which is easy to break by accident:
+### Rules that are easy to break by accident
 
 1. **Never show a capability the UI computed.** Role *descriptions* in the picker are written
-   guidance. Effective capabilities are rendered only from the `CurrentAccessResponse` the API
-   returned after a write. `AccessRoleCatalog` is read for role *codes* only.
-2. **Role assignment is a replace.** `PUT .../roles` removes anything omitted, and the current set
-   cannot be read first. The dialog says so; it must not preselect a guess.
-3. **A failed write still reloads the list.** A conflict means the page is stale, which is exactly
-   when refreshing matters. The action's problem and the list's problem are therefore separate
-   fields — a single one let the reload wipe the conflict before it rendered, and the operator saw
-   a silent no-op.
+   guidance, labelled as such. Effective capabilities are rendered only from what the API returned.
+   `AccessRoleCatalog` is read for role *codes* only, so the picker cannot offer an invalid one.
+2. **Read before you replace.** `PUT .../roles` removes anything omitted. The editor is seeded from
+   `GET /access/users/{id}` and submits that record's `version`. Never preselect a guess.
+3. **Know which version guards what.** Approve and reject check the **request's** version; roles and
+   disable check the **user's**. They advance independently, and using one where the other is
+   expected produces a conflict that looks like someone else edited the record.
+4. **A failed write still re-reads.** A conflict means the screen is stale — exactly when refreshing
+   matters. The action's problem and the load's problem are separate fields; sharing one let the
+   re-read wipe the conflict before it rendered, and the operator saw a silent no-op.
+5. **Never auto-retry a conflict.** `AccessConcurrencyConflict` arrives `retryable: true`, which
+   means re-attemptable *after a fresh read* — the submitted version is stale by definition. The
+   retry action reloads and is labelled accordingly; the failed write is never re-issued.
 
-`AccessDecisionRules` mirrors the server's input rules and blocks submission client-side. This is
-load-bearing, not cosmetic: the API returns `AccessRequestInvalidState` for both bad input *and*
-"another administrator already decided this" (G-9). Removing the input cases before they reach the
-wire is what lets a 409 be presented as a genuine conflict.
+### Rejected is not pending
+
+There is **no `Rejected` user status.** A refused user keeps `AccessStatus.Pending` forever, and only
+`latestRequest.status` distinguishes them. Reading status alone shows a closed decision as an open
+task, and an administrator would re-approve someone a colleague turned down.
+
+Use `AccessUserView` (admin screens) or `AccessSnapshot.IsRejected` / `IsAwaitingDecision` (the
+signed-in user). Both are tested. There is no "request again" action anywhere: the API creates no
+replacement request and offers no reapplication route.
+
+### Profile enrichment is nullable
+
+Every field of `AccessIdentityProfileResponse` is nullable and the object itself can be `null` — the
+demo bridge resolves nothing, so absent is the common case. Fall back to the principal identifier via
+`AccessIdentityDisplay`, and say enrichment is unavailable. Never render an invented name, a blank
+identity field, or an em dash placeholder.
 
 ## Error handling
 

@@ -20,26 +20,25 @@ public sealed class AccessAdminApiClient : IAccessAdminApiClient
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<AccessRequestResponse>> GetRequestsAsync(
+    public Task<IReadOnlyList<AccessUserResponse>> GetUsersAsync(CancellationToken cancellationToken) =>
+        GetAsync<IReadOnlyList<AccessUserResponse>>("api/v1/access/users", cancellationToken);
+
+    /// <inheritdoc />
+    public Task<AccessUserResponse> GetUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        GetAsync<AccessUserResponse>($"api/v1/access/users/{userId}", cancellationToken);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<AccessRequestResponse>> GetRequestsAsync(
         string? status,
         CancellationToken cancellationToken)
     {
-        // The status value is a fixed set chosen by the UI, never free text, so it needs no escaping
-        // beyond this. An unrecognised value is rejected by the API as AccessRequestInvalidState.
+        // The status value is a fixed set chosen by the UI, never free text. An unrecognised value
+        // is rejected by the API as AccessValidationFailed.
         string route = string.IsNullOrWhiteSpace(status)
             ? "api/v1/access/requests"
             : $"api/v1/access/requests?status={Uri.EscapeDataString(status)}";
 
-        HttpResponseMessage response = await SendAsync(
-            () => _httpClient.GetAsync(route, cancellationToken),
-            cancellationToken);
-
-        using (response)
-        {
-            return await ApiResponseReader.ReadOrThrowAsync<IReadOnlyList<AccessRequestResponse>>(
-                response,
-                cancellationToken);
-        }
+        return GetAsync<IReadOnlyList<AccessRequestResponse>>(route, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -47,28 +46,35 @@ public sealed class AccessAdminApiClient : IAccessAdminApiClient
         Guid requestId,
         string reason,
         IReadOnlyList<string> roles,
+        long expectedVersion,
         CancellationToken cancellationToken) =>
-        DecideAsync(requestId, "approve", new AccessDecisionRequest(reason, roles), cancellationToken);
+        DecideAsync(requestId, "approve", new AccessDecisionRequest(reason, roles, expectedVersion), cancellationToken);
 
     /// <inheritdoc />
     public Task<AccessRequestResponse> RejectAsync(
         Guid requestId,
         string reason,
+        long expectedVersion,
         CancellationToken cancellationToken) =>
         // Roles are meaningless for a rejection; the contract models that as null rather than empty.
-        DecideAsync(requestId, "reject", new AccessDecisionRequest(reason, Roles: null), cancellationToken);
+        DecideAsync(
+            requestId,
+            "reject",
+            new AccessDecisionRequest(reason, Roles: null, expectedVersion),
+            cancellationToken);
 
     /// <inheritdoc />
     public async Task<CurrentAccessResponse> ReplaceRolesAsync(
         Guid userId,
         IReadOnlyList<string> roles,
         string reason,
+        long expectedVersion,
         CancellationToken cancellationToken)
     {
         HttpResponseMessage response = await SendAsync(
             () => _httpClient.PutAsJsonAsync(
                 $"api/v1/access/users/{userId}/roles",
-                new AssignRolesRequest(roles, reason),
+                new AssignRolesRequest(roles, reason, expectedVersion),
                 cancellationToken),
             cancellationToken);
 
@@ -82,18 +88,31 @@ public sealed class AccessAdminApiClient : IAccessAdminApiClient
     public async Task<CurrentAccessResponse> DisableAsync(
         Guid userId,
         string reason,
+        long expectedVersion,
         CancellationToken cancellationToken)
     {
         HttpResponseMessage response = await SendAsync(
             () => _httpClient.PostAsJsonAsync(
                 $"api/v1/access/users/{userId}/disable",
-                new DisableAccessRequest(reason),
+                new DisableAccessRequest(reason, expectedVersion),
                 cancellationToken),
             cancellationToken);
 
         using (response)
         {
             return await ApiResponseReader.ReadOrThrowAsync<CurrentAccessResponse>(response, cancellationToken);
+        }
+    }
+
+    private async Task<T> GetAsync<T>(string route, CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response = await SendAsync(
+            () => _httpClient.GetAsync(route, cancellationToken),
+            cancellationToken);
+
+        using (response)
+        {
+            return await ApiResponseReader.ReadOrThrowAsync<T>(response, cancellationToken);
         }
     }
 

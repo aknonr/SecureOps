@@ -8,15 +8,15 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | Gap | Status |
 |---|---|
 | G-1 — Mock directory resolves empty | ✅ **Resolved** by backend `4adab66c` |
-| G-2 — No directory profile for the signed-in user | Open |
+| G-2 — No directory profile | ✅ **Resolved** by backend `78183dd` |
 | G-3 — Lookup capabilities omit the account pattern | Open |
 | G-4 — Session expiry indistinguishable from never-signed-in | Open |
 | G-5 — Demo access bootstrap needs an undocumented setting | Open |
 | G-6 — No access-request creation endpoint | Open |
 | G-7 — Capabilities advertised UPN lookup the provider could not serve | ✅ **Resolved** by backend `704c32ba` |
-| G-8 — No way to list users, or to read one user's access | Open (new) |
-| G-9 — `AccessRequestInvalidState` conflates validation with concurrency | Open (new) |
-| G-10 — Rejection is not durable; rejected users re-enter the queue | Open (new) |
+| G-8 — No way to list users, or to read one user's access | ✅ **Resolved** by backend `78183dd` |
+| G-9 — `AccessRequestInvalidState` conflates validation with concurrency | ✅ **Resolved** by backend `78183dd` |
+| G-10 — Rejection is not durable | ✅ **Resolved** by backend `78183dd` |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -70,55 +70,34 @@ stub, is now confirmed against the real API.
 
 ---
 
-## G-2 — No directory profile for the signed-in user
+## G-2 — No directory profile — ✅ RESOLVED
 
-**UI need:** `/account` was asked to show display name, e-mail, department, and title.
+**Resolved by backend commit `78183dd`.** `AccessIdentityProfileResponse` (nullable
+`DisplayName`, `Account`, `Email`, `Department`, `Title`) now hangs off `CurrentAccessResponse`,
+`AccessUserResponse`, and `AccessRequestResponse`, so the same model serves the signed-in user and
+the administrator looking at someone else. No second identity system was introduced.
 
-**Today:** `GET /api/v1/identity/me` returns only `(Name, IsAuthenticated, CanLookupIdentity)`.
-`GET /api/v1/access/me` adds status, roles, capabilities, auth source, and session policy. Neither
-returns directory attributes for the caller.
+**Verified from the UI side:** the demo bridge resolves nothing, so `profile` comes back `null` for
+both demo actors — which made the absent path the default case and easy to check. The UI falls back
+to the principal identifier and states in words that enrichment is unavailable. It never renders a
+blank field, an em dash, or an invented name. `AccessIdentityDisplayTests` pins that.
 
-Using `POST /api/v1/identity/lookup` for this would be wrong: it is a privileged, audited,
-rate-limited lookup requiring `Identity.Lookup`, and a user viewing their own profile should not
-consume it or need that capability.
+**What it was.** `GET /identity/me` returned only `(Name, IsAuthenticated, CanLookupIdentity)` and
+`/access/me` added no directory attributes, so `/account` had nothing to show. Administration made it
+worse: `AccessRequestResponse` identified a subject only by `CorporateIdentity` — a raw principal
+string like `demo:team-lead` — so an approver granting `Admin` saw an identifier rather than a
+person. That was security-relevant, not cosmetic: approving the wrong account is the mistake the
+screen exists to prevent.
 
-**Suggested:** extend `CurrentIdentityResponse` with `DisplayName`, `Mail`, `Department`, and `Title`
-(nullable, populated from the authenticated principal or a self-scoped directory read), or add
-`GET /api/v1/identity/me/profile`.
+Using `POST /identity/lookup` to fill the gap would have been wrong — it is privileged, audited, and
+rate-limited, and someone viewing their own profile should neither consume it nor need
+`Identity.Lookup`. The delivered fix avoids that.
 
-**UI meanwhile:** `/account` shows a clearly labelled "Dizin profiliniz henüz kullanılamıyor" panel
-rather than four blank fields. `DisplayName` falls back to the account name; no placeholder person is
-invented.
-
-### Extension: the same gap now blocks access administration
-
-Access administration (UI milestone 2A) needs directory attributes for **another** user, which is a
-strictly larger ask than the caller's own profile. `AccessRequestResponse` identifies a subject only
-by `CorporateIdentity` — a raw principal string such as `demo:team-lead` or, in production, an OIDC
-subject or `DOMAIN\account`.
-
-An approver deciding whether to grant `Admin` sees an opaque identifier, not a person. That is a
-security-relevant weakness, not only a cosmetic one: approving the wrong account is exactly the
-mistake this screen exists to prevent.
-
-| Field | Screen | Required? | Why the current contract is insufficient |
-|---|---|---|---|
-| `DisplayName` | `/access/requests` list + detail; confirmation dialog | **Required** | The approver must be able to tell *who* they are granting authority to. `CorporateIdentity` is a principal string, not a name. |
-| `Mail` | detail | Optional | Lets the approver verify out of band before deciding. |
-| `Department` | detail | Optional | Supports "does this person's team need this role" without a second system. |
-| `Title` | detail | Optional | Same. |
-| `Manager` | detail | Optional | Approval policy often follows the reporting line. |
-
-**Suggested:** add a nullable `DisplayName` (at minimum) to `AccessRequestResponse`, or expose the
-directory attributes through the `GET /access/users/{id}` read model proposed in G-8. Resolving it
-per request at decision time would also work, provided it does not consume the audited
-`Identity.Lookup` path.
-
-**UI meanwhile:** the detail panel shows `CorporateIdentity` and the user id, and states in plain
-language that name, e-mail, and department are not provided by the API. The confirmation dialog
-names the same identifier, so an approver is never shown a fabricated person.
-
----
+**The rule the UI keeps, now that enrichment exists.** Every field is nullable and the whole object
+can be `null`. Absent means absent: the UI falls back to the principal identifier and says
+enrichment is unavailable. It never renders a placeholder name, a blank identity field, or an em dash
+standing in for an e-mail — on a screen that grants authority, a fabricated person is a safety
+problem.
 
 ## G-3 — Lookup capabilities do not expose the account pattern
 
@@ -251,11 +230,20 @@ with the normalized UPN shown. The UI performs no wildcard, prefix, or fuzzy mat
 
 ---
 
-## G-8 — No way to list application users, or to read one user's access
+## G-8 — No way to list application users, or to read one user's access — ✅ RESOLVED
 
 **Raised:** building the access administration screens (UI milestone 2A), 2026-08-21.
+**Resolved by backend commit `78183dd`** — `GET /api/v1/access/users` and
+`GET /api/v1/access/users/{id}`, both behind `Access.ManageUsers`, returning `AccessUserResponse`
+with status, assigned roles, backend-derived capabilities, profile, latest request, full request
+history, and a `version`.
 
-**Severity:** High for administration. It is the single constraint that shapes what that screen can be.
+**Verified from the UI side:** the role editor is now seeded from `GET /access/users/{id}` and
+submits that record's `version` as `expectedVersion`. Confirmed live that opening the editor for a
+user holding Lead + JiraPublisher preselects exactly those two, so the replace semantics no longer
+risk silently stripping roles. Disabled users are listed as their own group.
+
+**Severity when open:** High for administration. It was the single constraint that shaped the screen.
 
 **UI need:** an administrator asked for "approved users", "disabled users", and "user access
 details" needs to enumerate users and read one user's current status, roles, and capabilities.
@@ -293,11 +281,28 @@ roles and capabilities are knowable.
 
 ---
 
-## G-9 — `AccessRequestInvalidState` conflates validation with concurrency
+## G-9 — `AccessRequestInvalidState` conflated validation with concurrency — ✅ RESOLVED
 
 **Raised:** building the access administration screens (UI milestone 2A), 2026-08-21.
+**Resolved by backend commit `78183dd`.** Five stable codes now separate what one code used to
+carry, and every mutation takes an `expectedVersion`:
 
-**Severity:** Medium. Correct behaviour is achievable, but only by working around the ambiguity.
+| Code | HTTP | `retryable` | UI presentation |
+|---|---|---|---|
+| `AccessValidationFailed` | 400 | false | validation — fix the form |
+| `AccessRequestAlreadyDecided` | 409 | false | lifecycle — someone already decided it |
+| `AccessConcurrencyConflict` | 409 | **true** | stale — reload and look before acting |
+| `AccessUserInvalidState` | 409 | false | user lifecycle — wrong state for this action |
+| `AccessSelfApprovalDenied` | 403 | false | forbidden — separation of duties |
+
+All five verified live against the Demo API.
+
+Note on `AccessConcurrencyConflict`: `retryable: true` is accurate but means *re-attemptable after a
+fresh read*, not *re-send this request*. The submitted version is stale by definition. The UI
+therefore wires that action to a reload and labels the button "Güncel durumu yükle" rather than
+"Tekrar dene" — the failed write is never automatically re-issued.
+
+**Severity when open:** Medium. Correct behaviour was achievable, but only by working around the ambiguity.
 
 **UI need:** requirement 6 asks for distinct UX for a validation error and a concurrency conflict.
 They call for opposite responses — *fix what you typed* versus *reload, the world moved on* — so the
@@ -340,12 +345,38 @@ This is a workaround, not a fix: it depends on the UI's copy of the rules stayin
 
 ---
 
-## G-10 — Rejection is not durable: a rejected user re-enters the queue on next page load
+## G-10 — Rejection was not durable — ✅ RESOLVED
 
 **Raised:** 2026-08-21, reading the access repositories to settle the self-approval question below.
-**Not a UI issue** — recorded here because the UI surfaced it and cannot correct it.
+**Resolved by backend commit `78183dd`.** A rejected request stays `Rejected`, the user stays
+non-authorized `Pending`, `pendingRequestId` is `null`, and revisiting the application no longer
+creates a replacement. Reapplication is deliberately unsupported until an approved policy exists.
 
-**Severity:** High. An approver's rejection does not hold.
+**Verified from the UI side:** rejected, then called `/access/me` twice more as that user —
+`pendingRequestId` stayed `null` and the pending queue stayed empty.
+
+### The distinction the UI must carry
+
+This is the part that matters for anyone touching these screens. **There is no `Rejected` user
+status.** A refused user keeps `AccessStatus.Pending` indefinitely, and only `latestRequest.status`
+says otherwise:
+
+| | Refused user | Genuinely waiting |
+|---|---|---|
+| `accessStatus` | `Pending` | `Pending` |
+| `pendingRequestId` | `null` | set |
+| `latestRequest.status` | `Rejected` | `Pending` |
+
+Reading `accessStatus` alone shows a closed decision as an open task, and an administrator working
+the queue would re-approve someone a colleague turned down. `AccessUserView` and
+`AccessSnapshot.IsRejected` encode the combination; `AccessUserViewTests` pins it, including that a
+rejection is toned Critical rather than sharing the pending Caution tone.
+
+Confirmed on screen: with one rejected user the list reads **"Onay bekleyen 0 · Reddedilmiş 1"**, the
+detail states the request was refused and that no pending request exists, and no "request again"
+action is offered anywhere.
+
+**Severity when open:** High. An approver's rejection did not hold.
 
 Deciding a request sets the *request* to `Rejected` but returns the **user** to `AccessStatus.Pending`:
 
