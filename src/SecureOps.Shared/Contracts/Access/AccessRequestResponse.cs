@@ -8,4 +8,7 @@ public sealed record AccessRequestResponse(
     string Status,
     DateTimeOffset RequestedAt,
     DateTimeOffset? DecidedAt,
-    string? DecisionReason);
+    string? DecisionReason,
+    string? DecidedByCorporateIdentity = null,
+    long Version = 0,
+    AccessIdentityProfileResponse? Profile = null);

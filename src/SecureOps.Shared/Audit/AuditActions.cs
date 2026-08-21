@@ -79,6 +79,10 @@ public static class AuditActions
     public const string AccessRequested = "AccessRequested";
     /// <summary>An authorized administrator viewed access requests.</summary>
     public const string AccessRequestsViewed = "AccessRequestsViewed";
+    /// <summary>An authorized administrator viewed the access-user collection.</summary>
+    public const string AccessUsersViewed = "AccessUsersViewed";
+    /// <summary>An authorized administrator viewed one access-user record.</summary>
+    public const string AccessUserViewed = "AccessUserViewed";
     /// <summary>An authorized administrator approved application access.</summary>
     public const string AccessApproved = "AccessApproved";
     /// <summary>An authorized administrator rejected application access.</summary>

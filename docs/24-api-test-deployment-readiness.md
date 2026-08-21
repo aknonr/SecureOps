@@ -11,8 +11,9 @@ Run the SQLCMD-mode entrypoints in exact order through the approved DBA process:
 | 1 | `sql/migrations/001-audit-and-access-control.sql` | `audit` and `security` schemas; audit, user, role, assignment, request, and request-history objects | No. All `CREATE` statements and role seed inserts are unconditional. |
 | 2 | `sql/migrations/002-operational-record-jira-workflow.sql` | `ops` schema; Operational Record, Jira transfer, and workflow-history objects | No. Only schema creation is guarded. |
 | 3 | `sql/migrations/003-platform-access-concurrency-hardening.sql` | access status/authentication columns, two roles, source freshness/claim fields, command execution state | Partially. Columns and the command table are guarded; fixed role IDs, constraint-name checks, and prerequisite tables can still fail. |
+| 4 | `sql/migrations/004-access-read-model-and-versioning.sql` | explicit access-user and access-request mutation versions | Yes for column presence; prerequisite access tables must exist. |
 
-The `:r` directives require SQLCMD mode and resolve files under `sql/schema`. Migration 003 requires successful 001 and 002. None assumes empty tables, but 001 and 002 require the target object names to be absent. Existing rows are supported by defaults in 003; adding non-null columns can lock populated tables while SQL Server backfills defaults.
+The `:r` directives require SQLCMD mode and resolve files under `sql/schema`. Migrations 003 and 004 require successful 001 and 002. None assumes empty tables, but 001 and 002 require the target object names to be absent. Existing rows are supported by defaults in 003 and 004; adding non-null columns can lock populated tables while SQL Server backfills defaults.
 
 There are no down migrations, migration-history table, encompassing transaction, or automatic rollback. A failure after a `GO` can leave a partially applied database. Before execution, the DBA must inventory schemas, tables, indexes, triggers, constraints, and seeded `RoleId`/`RoleCode` values, take an approved backup or recovery point, and stop on any collision. Do not re-run a failed batch without a DBA-authored corrective plan.
 
@@ -42,7 +43,7 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED, TEST-ONLY | `Swagger__Enabled` | `true` |
 | REQUIRED, TEST-ONLY | `DemoAuth__Enabled` | `true` for current compatibility; `false` for Windows-auth bootstrap validation |
 | REQUIRED, TEST-ONLY | `DemoAuth__HeaderName` | `X-SecureOps-Demo-Actor` |
-| REQUIRED | `Access__RepositoryProvider` | `SqlServer` after migrations 001-003 |
+| REQUIRED | `Access__RepositoryProvider` | `SqlServer` after migrations 001-004 |
 | REQUIRED | `Access__AutoCreateRequest` | `true` |
 | REQUIRED, TEST-ONLY | `Access__DemoCompatibilityEnabled` | same enablement decision as `DemoAuth__Enabled` |
 | CONDITIONAL REQUIRED | `Access__BootstrapAdministrators__0` | `<DOMAIN\\approved-bootstrap-account>` when validating first Windows Admin against an empty database |

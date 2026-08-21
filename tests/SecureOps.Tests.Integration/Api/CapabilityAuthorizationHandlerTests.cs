@@ -78,7 +78,7 @@ public sealed class CapabilityAuthorizationHandlerTests
         Fixture fixture = new();
         ClaimsPrincipal principal = Principal("CONTOSO\\disabled.user");
         ApplicationUser user = await fixture.ApproveAsync(principal, "Lead");
-        _ = await fixture.Service.DisableAsync(user.Id, "Approved access revocation test.", Fixture.AdminContext, CancellationToken.None);
+        _ = await fixture.Service.DisableAsync(user.Id, "Approved access revocation test.", user.Version, Fixture.AdminContext, CancellationToken.None);
 
         AuthorizationHandlerContext authorization = await fixture.AuthorizeAsync(principal, Capabilities.IdentityLookup);
 
@@ -97,6 +97,7 @@ public sealed class CapabilityAuthorizationHandlerTests
             current.Value!.PendingRequest!.Id,
             ["Operator"],
             "Approved for the bounded operations role.",
+            current.Value.PendingRequest.Version,
             Fixture.AdminContext,
             CancellationToken.None);
 
@@ -134,12 +135,14 @@ public sealed class CapabilityAuthorizationHandlerTests
             user.Id,
             ["Lead", "Operator"],
             "Updated for deterministic role testing.",
+            user.Version,
             Fixture.AdminContext,
             CancellationToken.None);
         AccessServiceResult<AccessMutationResult> second = await fixture.Service.ReplaceRolesAsync(
             user.Id,
             ["operator", "lead", "Lead"],
             "Repeated deterministic role update.",
+            first.Value!.User!.Version,
             Fixture.AdminContext,
             CancellationToken.None);
 
@@ -163,11 +166,132 @@ public sealed class CapabilityAuthorizationHandlerTests
         fixture.HttpContext.Items[CapabilityAuthorizationHandler.DenialCodeItem].Should().Be(OperationalErrorCodes.AccessDenied);
     }
 
+    [Fact]
+    public async Task RejectedRequest_RemainsDurableWhenUserReturns()
+    {
+        Fixture fixture = new();
+        ClaimsPrincipal principal = Principal("CONTOSO\\rejected.user");
+        AccessServiceResult<EnsureAccessUserResult> first = await fixture.Service.GetCurrentAsync(principal, Fixture.UserContext, CancellationToken.None);
+
+        AccessServiceResult<AccessMutationResult> rejected = await fixture.Service.RejectAsync(
+            first.Value!.PendingRequest!.Id,
+            "Rejected after access review.",
+            first.Value.PendingRequest.Version,
+            Fixture.AdminContext,
+            CancellationToken.None);
+        AccessServiceResult<EnsureAccessUserResult> returned = await fixture.Service.GetCurrentAsync(principal, Fixture.UserContext, CancellationToken.None);
+
+        rejected.IsSuccess.Should().BeTrue();
+        returned.Value!.User.Status.Should().Be(AccessStatus.Pending);
+        returned.Value.PendingRequest.Should().BeNull();
+        returned.Value.LatestRequest!.Status.Should().Be(AccessRequestStatus.Rejected);
+        returned.Value.RequestCreated.Should().BeFalse();
+        (await fixture.Repository.ListRequestsForUserAsync(returned.Value.User.Id, CancellationToken.None))
+            .Should().ContainSingle(request => request.Status == AccessRequestStatus.Rejected);
+        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.AccessRejected);
+    }
+
+    [Fact]
+    public async Task PendingSelfApproval_ReturnsDedicatedDenial()
+    {
+        const string identity = "CONTOSO\\self.admin";
+        Fixture fixture = new();
+        AccessServiceResult<EnsureAccessUserResult> current = await fixture.Service.GetCurrentAsync(Principal(identity), Fixture.UserContext, CancellationToken.None);
+
+        AccessServiceResult<AccessMutationResult> result = await fixture.Service.ApproveAsync(
+            current.Value!.PendingRequest!.Id,
+            ["Admin"],
+            "Attempted self approval.",
+            current.Value.PendingRequest.Version,
+            new AccessOperationContext(identity, "self-correlation", null),
+            CancellationToken.None);
+
+        result.ErrorCode.Should().Be(OperationalErrorCodes.AccessSelfApprovalDenied);
+    }
+
+    [Fact]
+    public async Task Mutations_DistinguishValidationLifecycleAndConcurrency()
+    {
+        Fixture fixture = new();
+        AccessServiceResult<EnsureAccessUserResult> current = await fixture.Service.GetCurrentAsync(Principal("CONTOSO\\conflict.user"), Fixture.UserContext, CancellationToken.None);
+        ApplicationAccessRequest request = current.Value!.PendingRequest!;
+
+        (await fixture.Service.ApproveAsync(request.Id, [], "Valid reason.", request.Version, Fixture.AdminContext, CancellationToken.None))
+            .ErrorCode.Should().Be(OperationalErrorCodes.AccessValidationFailed);
+        (await fixture.Service.ApproveAsync(request.Id, ["Operator"], "Valid reason.", request.Version + 1, Fixture.AdminContext, CancellationToken.None))
+            .ErrorCode.Should().Be(OperationalErrorCodes.AccessConcurrencyConflict);
+        _ = await fixture.Service.RejectAsync(request.Id, "Rejected once.", request.Version, Fixture.AdminContext, CancellationToken.None);
+        (await fixture.Service.RejectAsync(request.Id, "Rejected twice.", request.Version, Fixture.AdminContext, CancellationToken.None))
+            .ErrorCode.Should().Be(OperationalErrorCodes.AccessRequestAlreadyDecided);
+    }
+
+    [Fact]
+    public async Task AdministrativeReadModel_ReturnsProviderProfileRolesCapabilitiesAndHistory()
+    {
+        const string identity = "CONTOSO\\profile.user";
+        Fixture fixture = new(profileResolver: new FixedProfileResolver(identity));
+        ApplicationUser approved = await fixture.ApproveAsync(Principal(identity), "Lead");
+
+        AccessServiceResult<AccessUserReadModel> result = await fixture.Service.GetUserAsync(approved.Id, Fixture.AdminContext, CancellationToken.None);
+
+        result.Value!.Profile!.DisplayName.Should().Be("Resolved User");
+        result.Value.User.Roles.Should().ContainSingle("Lead");
+        result.Value.User.Capabilities.Should().BeEquivalentTo(AccessRoleCatalog.GetCapabilities(["Lead"]));
+        result.Value.RequestHistory.Should().ContainSingle(request => request.Status == AccessRequestStatus.Approved);
+        result.Value.User.Version.Should().BeGreaterThan(1);
+        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.AccessUserViewed);
+    }
+
+    [Fact]
+    public async Task MissingProfileEnrichment_RemainsNullAndDoesNotFabricateValues()
+    {
+        Fixture fixture = new();
+        ApplicationUser approved = await fixture.ApproveAsync(Principal("CONTOSO\\no.profile"), "Operator");
+
+        AccessServiceResult<AccessUserReadModel> result = await fixture.Service.GetUserAsync(approved.Id, Fixture.AdminContext, CancellationToken.None);
+
+        result.Value!.Profile.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AdministrativeList_DistinguishesApprovedDisabledAndRejectedPendingState()
+    {
+        Fixture fixture = new();
+        ApplicationUser approved = await fixture.ApproveAsync(Principal("CONTOSO\\approved.list"), "Operator");
+        ApplicationUser disabledSource = await fixture.ApproveAsync(Principal("CONTOSO\\disabled.list"), "Lead");
+        _ = await fixture.Service.DisableAsync(disabledSource.Id, "Disabled for list-state test.", disabledSource.Version, Fixture.AdminContext, CancellationToken.None);
+        AccessServiceResult<EnsureAccessUserResult> rejectedSource = await fixture.Service.GetCurrentAsync(Principal("CONTOSO\\rejected.list"), Fixture.UserContext, CancellationToken.None);
+        _ = await fixture.Service.RejectAsync(
+            rejectedSource.Value!.PendingRequest!.Id,
+            "Rejected for list-state test.",
+            rejectedSource.Value.PendingRequest.Version,
+            Fixture.AdminContext,
+            CancellationToken.None);
+
+        AccessServiceResult<IReadOnlyList<AccessUserReadModel>> result = await fixture.Service.ListUsersAsync(Fixture.AdminContext, CancellationToken.None);
+
+        IReadOnlyList<AccessUserReadModel> users = result.Value!;
+        users.Single(user => user.User.Id == approved.Id).User.Status.Should().Be(AccessStatus.Approved);
+        users.Single(user => user.User.Id == disabledSource.Id).User.Status.Should().Be(AccessStatus.Disabled);
+        AccessUserReadModel rejected = users.Single(user => user.User.Id == rejectedSource.Value.User.Id);
+        rejected.User.Status.Should().Be(AccessStatus.Pending);
+        rejected.LatestRequest!.Status.Should().Be(AccessRequestStatus.Rejected);
+        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.AccessUsersViewed);
+    }
+
     private static ClaimsPrincipal Principal(string name) => new(new ClaimsIdentity(
         [new Claim(ClaimTypes.Name, name)],
         "Negotiate",
         ClaimTypes.Name,
         ClaimTypes.Role));
+
+    private sealed class FixedProfileResolver(string identity) : IAccessIdentityProfileResolver
+    {
+        public Task<AccessIdentityProfile?> ResolveAsync(string corporateIdentity, CancellationToken cancellationToken) =>
+            Task.FromResult(string.Equals(identity, corporateIdentity, StringComparison.OrdinalIgnoreCase)
+                ? new AccessIdentityProfile("Resolved User", "profile.user", "resolved.user@contoso.invalid", "Operations", "Engineer")
+                : null);
+    }
 
     private sealed class Fixture
     {
@@ -175,7 +299,7 @@ public sealed class CapabilityAuthorizationHandlerTests
         private readonly InMemoryAuditWriter _audit = new();
         private readonly IHttpContextAccessor _accessor;
 
-        public Fixture(string[]? bootstrapAdministrators = null)
+        public Fixture(string[]? bootstrapAdministrators = null, IAccessIdentityProfileResolver? profileResolver = null)
         {
             HttpContext = new DefaultHttpContext { TraceIdentifier = "trace-access-test" };
             _accessor = new HttpContextAccessor { HttpContext = HttpContext };
@@ -187,6 +311,7 @@ public sealed class CapabilityAuthorizationHandlerTests
             Service = new ApplicationAccessService(
                 new CorporatePrincipalResolver(options),
                 _repository,
+                profileResolver ?? new NullProfileResolver(),
                 _audit,
                 options,
                 NullLogger<ApplicationAccessService>.Instance);
@@ -206,6 +331,7 @@ public sealed class CapabilityAuthorizationHandlerTests
                 current.Value!.PendingRequest!.Id,
                 [role],
                 "Approved for deterministic authorization testing.",
+                current.Value.PendingRequest.Version,
                 AdminContext,
                 CancellationToken.None);
             return approved.Value!.User!;
@@ -220,5 +346,12 @@ public sealed class CapabilityAuthorizationHandlerTests
             await handler.HandleAsync(context);
             return context;
         }
+
+        private sealed class NullProfileResolver : IAccessIdentityProfileResolver
+        {
+            public Task<AccessIdentityProfile?> ResolveAsync(string corporateIdentity, CancellationToken cancellationToken) =>
+                Task.FromResult<AccessIdentityProfile?>(null);
+        }
+
     }
 }

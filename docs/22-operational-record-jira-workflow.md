@@ -63,7 +63,7 @@ Import, classification, preview, create request/result, source-close request/res
 
 ## Persistence and DBA Review
 
-`sql/schema/002-operational-record-jira-workflow.sql` creates the base workflow tables. Offline migration 003 adds source/claim metadata and `ops.CommandExecutions`. The application does not run migrations. DBA approval and execution of migrations 001-003 are required before selecting `SqlServer`.
+`sql/schema/002-operational-record-jira-workflow.sql` creates the base workflow tables. Offline migration 003 adds source/claim metadata and `ops.CommandExecutions`; migration 004 adds access mutation versions. The application does not run migrations. DBA approval and execution of migrations 001-004 are required before selecting `SqlServer`.
 
 Minimum runtime permissions are `SELECT`, `INSERT`, and `UPDATE` on these three `ops` tables; no `DELETE`, DDL, schema-owner, or migration permission is required. Audit-store permissions remain separate.
 

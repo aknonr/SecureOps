@@ -8,4 +8,6 @@ public sealed record ApplicationAccessRequest(
     AccessRequestStatus Status,
     DateTimeOffset RequestedAt,
     DateTimeOffset? DecidedAt,
-    string? DecisionReason);
+    string? DecisionReason,
+    string? DecidedByCorporateIdentity,
+    long Version);

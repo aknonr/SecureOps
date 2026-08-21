@@ -25,6 +25,14 @@ public static class OperationalErrorCodes
     public const string AccessDisabled = "AccessDisabled";
     /// <summary>An access request decision is invalid for its current state.</summary>
     public const string AccessRequestInvalidState = "AccessRequestInvalidState";
+    /// <summary>Access input failed deterministic validation.</summary>
+    public const string AccessValidationFailed = "AccessValidationFailed";
+    /// <summary>An access request already has a terminal decision.</summary>
+    public const string AccessRequestAlreadyDecided = "AccessRequestAlreadyDecided";
+    /// <summary>An access mutation used a stale version.</summary>
+    public const string AccessConcurrencyConflict = "AccessConcurrencyConflict";
+    /// <summary>An application user cannot accept the requested lifecycle transition.</summary>
+    public const string AccessUserInvalidState = "AccessUserInvalidState";
     /// <summary>An access request or application user was not found.</summary>
     public const string AccessRecordNotFound = "AccessRecordNotFound";
     /// <summary>The request attempted self-approval.</summary>

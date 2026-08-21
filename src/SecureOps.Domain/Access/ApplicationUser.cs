@@ -9,5 +9,6 @@ public sealed record ApplicationUser(
     DateTimeOffset FirstAuthenticatedAt,
     DateTimeOffset LastAuthenticatedAt,
     DateTimeOffset? DisabledAt,
+    long Version,
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> Capabilities);

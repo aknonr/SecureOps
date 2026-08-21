@@ -4,6 +4,12 @@
 
 Negotiate authenticates the current corporate principal. `ICorporatePrincipalResolver` translates authentication data into a provider-neutral identifier; `IApplicationAccessService` then resolves `Pending`, `Approved`, or `Disabled` status, roles, and capabilities. New users are pending. `GET /api/v1/access/me` is available to authenticated users so a future UI can show that state. Approval, rejection, role replacement, and disable endpoints require explicit access capabilities.
 
+Rejection is terminal for the current request. The user remains non-authorized `Pending`; `/access/me` exposes the latest request as `Rejected`, with no pending request ID, and does not create another request. Reapplication is intentionally unsupported until an explicit business policy defines initiation, cooling-off/reset, and authorization. Administrators retain the complete request history through the access-user read model.
+
+`GET /api/v1/access/users` and `GET /api/v1/access/users/{id}` require `Access.ManageUsers`. They return authoritative status, assigned roles, backend-derived capabilities, latest request/history, and mutation versions. Safe profile enrichment (`DisplayName`, account, email, department, title) uses the existing exact account normalizer and configured identity provider. Missing, invalid, not-found, or unavailable enrichment returns `null`; directory values are never inferred from the principal.
+
+Request decisions require the request `version`; role replacement and disable require the user `version`. Versions change only on access mutations, not on `LastAuthenticatedAt` updates. Stale versions return retryable `AccessConcurrencyConflict`; validation, already-decided requests, invalid user lifecycle, and self-approval use separate stable codes.
+
 The first Admin is an exact principal supplied through `Access:BootstrapAdministrators`; its automatic approval uses a system actor and audits both approval and role assignment. An empty database without that configured principal or the explicit Demo/Test compatibility bootstrap is a lockout condition. Remove the configured bootstrap after redundant persisted Admin assignments exist. Full deployment details are in `docs/24-api-test-deployment-readiness.md`.
 
 `SessionSecurity` records policy for the current Negotiate and future OIDC boundary: `IdleTimeoutMinutes`, `AbsoluteLifetimeHours`, `SecureCookie`, `HttpOnly`, `SameSite`, and `RevalidateAccessOnEveryRequest`. Negotiate currently has no application-issued cookie or application logout token. Logout is provider-managed and audited. Future OIDC must enforce the configured idle/absolute limits, Secure and HttpOnly cookies, an approved SameSite mode, provider logout, and access-status revalidation. Secure cookie policy must not be weakened.
@@ -32,4 +38,4 @@ TEST requires `ASPNETCORE_ENVIRONMENT=Test` or `Demo`, `Swagger__Enabled=true`, 
 
 ## Persistence
 
-The application never runs SQL migrations. DBA review/execution of migrations 001-003 is required before selecting SQL access or Operational Record persistence. Runtime needs `SELECT`, `INSERT`, and `UPDATE` on the required `security`, `ops`, and `audit` tables; no DDL or DELETE permission is required.
+The application never runs SQL migrations. DBA review/execution of migrations 001-004 is required before selecting SQL access or Operational Record persistence. Migration 004 adds only `security.Users.AccessVersion` and `security.AccessRequests.Version`. Runtime needs `SELECT`, `INSERT`, and `UPDATE` on the required `security`, `ops`, and `audit` tables; no DDL or DELETE permission is required.

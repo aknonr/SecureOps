@@ -58,6 +58,20 @@ public sealed class SqlAssetContractTests
             .And.NotContain("AuthorizationHeader");
     }
 
+    [Fact]
+    public void AccessReadModelSqlAsset_AddsExplicitMutationVersionsOnly()
+    {
+        string root = FindRepositoryRoot();
+        string sql = File.ReadAllText(Path.Combine(root, "sql", "schema", "004-access-read-model-and-versioning.sql"));
+
+        sql.Should().Contain("security.Users")
+            .And.Contain("AccessVersion bigint NOT NULL")
+            .And.Contain("security.AccessRequests")
+            .And.Contain("Version bigint NOT NULL")
+            .And.NotContain("Password")
+            .And.NotContain("ConnectionString");
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

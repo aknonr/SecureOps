@@ -17,8 +17,9 @@ sql/
 | 001 | Audit and application access schemas, tables, indexes, role seeds, and append-only/self-approval triggers |
 | 002 | Operational Record, Jira correlation, and append-only workflow history |
 | 003 | Access status/authentication fields, claim/freshness metadata, JiraPublisher/Auditor roles, and durable command executions |
+| 004 | Explicit access-user and access-request mutation versions for stale-write rejection |
 
-The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded. No down scripts or migration-history table exist. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
+The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded; 004 guards both added columns. No down scripts or migration-history table exists. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
 
 Current reviewed offline assets additionally include `002-operational-record-jira-workflow.sql`, which creates `ops.OperationalRecords`, `ops.JiraTransfers`, and append-only workflow history.
 

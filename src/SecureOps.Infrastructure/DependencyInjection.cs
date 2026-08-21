@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddSingleton<AuditHealthReporter>();
 
         services.AddSingleton<ICorporatePrincipalResolver, CorporatePrincipalResolver>();
+        services.AddScoped<IAccessIdentityProfileResolver, AccessIdentityProfileResolver>();
         if (string.Equals(configuration[$"{AccessOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IAccessRepository, SqlAccessRepository>();

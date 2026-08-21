@@ -8,4 +8,7 @@ public sealed record CurrentAccessResponse(
     IReadOnlyList<string> Capabilities,
     Guid? PendingRequestId,
     string AuthenticationSource,
-    SessionPolicyResponse SessionPolicy);
+    SessionPolicyResponse SessionPolicy,
+    AccessIdentityProfileResponse? Profile = null,
+    AccessRequestResponse? LatestRequest = null,
+    long Version = 0);
