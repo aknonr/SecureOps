@@ -37,6 +37,8 @@ Before create/retry, the API atomically acquires a bounded actor claim (`Claimed
 
 The Jira key is committed before the source close/update starts. A close failure therefore retries only the source stage. Concurrent, repeated, or completed create requests cannot call Jira twice. If a Jira call has an uncertain outcome, `ReconciliationRequired` blocks automatic retry. If the process stops while `CreatingJira` has no persisted key, retry also fails closed for manual reconciliation because remote Jira idempotency has not been proven.
 
+A source refresh may update bounded source fields, but classification is reapplied only while the workflow remains in `Imported`, `Classified`, `NeedsManualReview`, or `Eligible`. Refresh cannot regress `Previewed`, create/close transition states, failures, completion, or reconciliation-required state.
+
 ## Security Boundaries
 
 - Browser users never provide integration credentials.
@@ -94,5 +96,7 @@ Future integration authentication must use approved server-side enterprise ident
 Before enabling a real adapter: review source and Jira contracts, approve field mappings/classification rules, apply SQL through DBA process, configure capability groups, validate service-account permissions, and prove a deterministic Jira reconciliation mechanism. TEST must exercise preview, one create, partial source-close failure, retry, concurrent submission, audit evidence, and correlation IDs with synthetic/non-sensitive records.
 
 The synthetic source exposes fixed non-corporate records for a stable eligible flow plus stale, closed, and missing revalidation outcomes. Claim ownership, transfer completion, and reconciliation are durable workflow transitions exercised against those records rather than fabricated source fields. A real source adapter still requires approved base URL and authentication, bounded list/detail schemas, exact requester fields, status mapping, version/ETag semantics, close/update contract, error/retry semantics, and ownership approval.
+
+Automated integration tests replace `IJiraClient` only inside the test host with private scripted or coordinated doubles. These produce synthetic success, safe retryable failure, unknown outcome, and overlap barriers without sleeps or external I/O. No failure-injection setting, route, header, or production service is added. `FakeJiraClient` remains the configured Fake/Test Jira provider and every `FAKE-*` key is synthetic, not evidence of a real Jira issue.
 
 Release packaging must use `scripts/release/New-ApiDeploymentPackage.ps1`; it preserves runtime directories and validates every packaged relative path and SHA256 against the publish tree.

@@ -119,7 +119,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
         try
         {
             OperationalRecord current = Required(id);
-            if (current.JiraIssueKey is not null)
+            if (!CanApplyClassification(current))
             {
                 return current;
             }
@@ -528,6 +528,14 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
         record.MappingVersion is null
         || (string.Equals(record.MappingVersion, mappingVersion, StringComparison.Ordinal)
             && string.Equals(record.IdempotencyKey, idempotencyKey, StringComparison.Ordinal));
+
+    private static bool CanApplyClassification(OperationalRecord record) =>
+        string.IsNullOrWhiteSpace(record.JiraIssueKey)
+        && !record.ReconciliationRequired
+        && record.WorkflowState is OperationalRecordWorkflowState.Imported
+            or OperationalRecordWorkflowState.Classified
+            or OperationalRecordWorkflowState.NeedsManualReview
+            or OperationalRecordWorkflowState.Eligible;
 
     private bool ClaimOwnedBy(OperationalRecord record, string actor) =>
         string.Equals(record.ClaimedBy, actor, StringComparison.OrdinalIgnoreCase)

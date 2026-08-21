@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 
 namespace SecureOps.Infrastructure.OperationalRecords;
 
-/// <summary>Deterministic in-process Jira fake used only for local development and tests.</summary>
+/// <summary>Deterministic in-process Fake/Test Jira provider that returns synthetic Jira keys.</summary>
 public sealed class FakeJiraClient : IJiraClient
 {
     private readonly ConcurrentDictionary<string, string> _issues = new(StringComparer.Ordinal);

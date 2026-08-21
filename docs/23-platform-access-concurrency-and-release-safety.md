@@ -26,6 +26,8 @@ Jira create/retry accepts optional `Idempotency-Key`; absent keys use a determin
 
 Immediately before Jira create and source close, `IOperationalRecordClient.GetByIdAsync` must return an existing open record whose explicit version token, or deterministic bounded-state hash, matches the imported token. Without native source ETag/conditional update support, a small check-to-write race remains and must be resolved by the future adapter contract.
 
+Source refresh and classification are not allowed to overwrite a workflow state that has advanced beyond initial classification. Unknown Jira outcomes remain `JiraCreateFailed` with `ReconciliationRequired=true`; command replay, a new create key, and retry cannot invoke Jira again. Test-host-only barriers verify that a second actor cannot overwrite an active claim or its version while the first operation is in progress.
+
 Identity exact reads use an optional bounded in-process TTL cache and single-flight provider call keyed only by normalized exact account. Exceptions are not cached. Aggregate hit/miss/provider/coalesced counters contain no account labels. Authorization is evaluated before cache access.
 
 Named fixed-window rate policies partition by authenticated actor plus operation: identity lookup, bulk lookup, Operational Record refresh, Jira preview, Jira create, and retry. Rejection is safe RFC ProblemDetails with correlation data. Rate limiting does not replace idempotency.

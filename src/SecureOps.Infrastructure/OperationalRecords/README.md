@@ -6,4 +6,6 @@ Default providers are `OperationalRecords:SourceProvider=Disabled`, `Operational
 
 The production-style classifier intentionally returns `NeedsManualReview`; approved business rules and a manual-classification contract are deferred. The synthetic source has an exact synthetic-only classifier and requester mapping solely to exercise preview/create/close safely. Requester resolution remains exact. The Jira key is persisted before source close, and unknown Jira outcomes block automatic recreation.
 
+Source refresh cannot reclassify a workflow after it advances beyond initial classification states. Automated failure and concurrency scenarios replace `IJiraClient` only inside the integration-test host; runtime providers expose no failure-injection controls. `FakeJiraClient` returns synthetic `FAKE-*` keys only.
+
 See `docs/22-operational-record-jira-workflow.md` for configuration, state transitions, authorization, DBA prerequisites, and TEST validation.

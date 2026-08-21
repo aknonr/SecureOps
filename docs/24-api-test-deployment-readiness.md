@@ -69,6 +69,8 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED, TEST-ONLY | `Jira__Provider` | `Fake` until an approved Jira adapter exists |
 | REQUIRED | `Jira__ProjectKey` / `Jira__IssueType` / `Jira__MappingVersion` | `<approved TEST project key>` / `<approved issue type>` / `<reviewed mapping version>` |
 | REQUIRED | `Jira__UnresolvedRequesterPolicy` / `Jira__SummaryMaxLength` | `Block` / `255` |
+
+`Fake` source records and `FAKE-*` Jira keys are synthetic TEST evidence only. Jira failure/unknown-outcome/concurrency injection exists solely as private automated-test host replacements and has no deployable configuration key, HTTP control, or production activation path.
 | REQUIRED | `Audit__Provider` / `Audit__FailClosed` / `Audit__RequirePersistentStoreInProduction` | `SqlServer` / `true` / `true` |
 | REQUIRED | `Audit__Queue__Enabled` / `Audit__Queue__Capacity` / `Audit__Queue__FullBehavior` / `Audit__FlushIntervalSeconds` | `true` / `1000` / `FailClosed` / `1` |
 | REQUIRED | `ConnectionStrings__SecureOpsDb` | `Server=tcp:secureops-mssql-test.thynet.thy.com,3406;Database=SecureOps;Integrated Security=True;Encrypt=True;TrustServerCertificate=False;Application Name=SecureOps.Api;Connect Timeout=15` |

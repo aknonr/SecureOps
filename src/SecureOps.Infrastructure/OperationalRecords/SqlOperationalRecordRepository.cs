@@ -100,7 +100,8 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         OperationalRecordRow row = await GetForUpdateAsync(connection, transaction, id, cancellationToken)
             ?? throw new KeyNotFoundException("Operational record was not found.");
-        if (string.IsNullOrWhiteSpace(row.JiraIssueKey))
+        OperationalRecord current = Map(row);
+        if (CanApplyClassification(current))
         {
             OperationalRecordWorkflowState finalState = classification.JiraEligible
                 ? OperationalRecordWorkflowState.Eligible
@@ -552,6 +553,14 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
     };
 
     private static OperationalRecordWorkflowState ParseState(string value) => Enum.Parse<OperationalRecordWorkflowState>(value, true);
+
+    private static bool CanApplyClassification(OperationalRecord record) =>
+        string.IsNullOrWhiteSpace(record.JiraIssueKey)
+        && !record.ReconciliationRequired
+        && record.WorkflowState is OperationalRecordWorkflowState.Imported
+            or OperationalRecordWorkflowState.Classified
+            or OperationalRecordWorkflowState.NeedsManualReview
+            or OperationalRecordWorkflowState.Eligible;
 
     private const string ReadSql = """
         SELECT r.OperationalRecordId AS Id, r.SourceRecordId, r.OrCode, r.Title, r.Description, r.Requester,

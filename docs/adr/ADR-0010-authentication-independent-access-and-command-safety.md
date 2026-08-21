@@ -21,6 +21,8 @@ Authorized administrators can list and read backend-owned access-user projection
 
 Command endpoints use a durable idempotency execution record plus a bounded actor claim. Operational Record workflows re-fetch and compare the strongest source version immediately before Jira creation and source close. SQL constraints remain the final duplicate barrier.
 
+Source refresh may update bounded source data but cannot reapply classification after the workflow advances beyond initial classification states. Unknown Jira outcomes remain reconciliation-blocked across reads, command replay, and new command keys. Deterministic failure and overlap verification uses test-host-only `IJiraClient` replacements; no runtime failure-injection contract exists.
+
 ## Consequences
 
 - AD group claims no longer grant application capabilities directly.
