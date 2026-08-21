@@ -42,43 +42,79 @@ public static class OperationalRecordView
     /// <param name="BlockedReason">Why no action is offered, or <c>null</c> when one is.</param>
     public sealed record Actions(bool Preview, bool Create, bool Retry, string? BlockedReason);
 
+    /// <summary>Shown when the workflow stalled but the server does not permit resuming it.</summary>
+    private const string RetryBlocked =
+        "Sunucu bu kayıt için yeniden denemeye izin vermiyor.";
+
     /// <summary>Ownership as the contract represents it.</summary>
     public enum Ownership
     {
-        /// <summary>No live claim.</summary>
+        /// <summary>No live claim, and no record of a previous one.</summary>
         Available,
 
-        /// <summary>A live claim exists. The contract does not say whose — see G-11.</summary>
-        Held,
+        /// <summary>A live claim held by the signed-in operator.</summary>
+        Mine,
 
-        /// <summary>A claim existed and its lease has run out.</summary>
-        Expired
+        /// <summary>A live claim held by somebody else.</summary>
+        Other,
+
+        /// <summary>
+        /// No live claim, but the record still carries who held the last one.
+        /// </summary>
+        /// <remarks>
+        /// This is metadata about the past, not current ownership. It is a distinct state so that
+        /// a lapsed claim can be shown as history without ever reading as "someone owns this".
+        /// </remarks>
+        Lapsed
     }
 
     /// <summary>
-    /// Resolves ownership from the claim flag and lease expiry.
+    /// Resolves ownership from the authoritative claim fields.
     /// </summary>
     /// <param name="record">Authoritative record.</param>
     /// <param name="now">Current time, supplied so this stays testable.</param>
+    /// <param name="currentActor">
+    /// The signed-in operator as the <i>API</i> names them — <c>GET /identity/me</c>'s <c>name</c>,
+    /// not the browser cookie's. The two differ (the API sees <c>demo:platform-admin</c> where the
+    /// cookie says <c>platform-admin</c>), and comparing the wrong one would report every record as
+    /// someone else's.
+    /// </param>
     /// <returns>The ownership state the UI should present.</returns>
     /// <remarks>
-    /// <b>"Claimed by me" cannot be determined.</b> <c>OperationalRecordResponse</c> exposes
-    /// <c>Claimed</c> as a bare boolean; the owning actor lives on the domain entity but is not
-    /// projected (G-11). The UI therefore never claims a record is the current operator's, and
-    /// treats any live claim as possibly another operator's. That is the safe direction to be wrong
-    /// in: it warns before an action that might collide, rather than implying exclusivity nobody
-    /// promised.
+    /// <b><c>Claimed</c> is the only signal that a claim is live.</b> An expired claim may keep its
+    /// <c>ClaimedBy</c> metadata while <c>Claimed</c> is <c>false</c>, so deciding ownership from
+    /// <c>ClaimedBy</c> alone would show a long-lapsed claim as active and stop operators working a
+    /// record nobody holds. The flag is therefore checked first, and <c>ClaimedBy</c> only
+    /// distinguishes <i>whose</i> live claim it is.
     /// </remarks>
-    public static Ownership OwnershipOf(OperationalRecordResponse record, DateTimeOffset now)
+    public static Ownership OwnershipOf(
+        OperationalRecordResponse record,
+        DateTimeOffset now,
+        string? currentActor)
     {
         if (!record.Claimed)
         {
-            return Ownership.Available;
+            // Not owned. ClaimedBy may still be populated; that is history, not ownership.
+            return string.IsNullOrWhiteSpace(record.ClaimedBy) ? Ownership.Available : Ownership.Lapsed;
         }
 
-        return record.ClaimExpiresAt is { } expires && expires <= now
-            ? Ownership.Expired
-            : Ownership.Held;
+        // Defensive: a live flag whose lease has visibly run out is treated as lapsed rather than
+        // as somebody's, so a stuck flag cannot block the queue indefinitely.
+        if (record.ClaimExpiresAt is { } expires && expires <= now)
+        {
+            return Ownership.Lapsed;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentActor) || string.IsNullOrWhiteSpace(record.ClaimedBy))
+        {
+            // Live claim, owner unknown to us. Assume it is not ours: warning before a possible
+            // collision is the safe direction to be wrong in.
+            return Ownership.Other;
+        }
+
+        return string.Equals(record.ClaimedBy, currentActor, StringComparison.OrdinalIgnoreCase)
+            ? Ownership.Mine
+            : Ownership.Other;
     }
 
     /// <summary>Turkish label for a workflow state.</summary>
@@ -171,7 +207,7 @@ public static class OperationalRecordView
     /// <param name="record">Authoritative record.</param>
     /// <returns><c>true</c> when an issue key is persisted.</returns>
     public static bool HasJira(OperationalRecordResponse record) =>
-        !string.IsNullOrWhiteSpace(record.JiraIssueKey);
+        record.JiraExists || !string.IsNullOrWhiteSpace(record.JiraIssueKey);
 
     /// <summary>
     /// Whether the outcome of a Jira create attempt is unknown.
@@ -179,13 +215,14 @@ public static class OperationalRecordView
     /// <param name="record">Authoritative record.</param>
     /// <returns><c>true</c> while an attempt is unresolved.</returns>
     /// <remarks>
-    /// The record carries no explicit <c>ReconciliationRequired</c> flag (G-12); the closest
-    /// authoritative signal a read gives is the <c>CreatingJira</c> stage with no issue key. The
-    /// definitive answer arrives as <c>WorkflowConflict</c> with <c>stage: "jira-reconciliation"</c>
-    /// when an action is attempted.
+    /// Reads the authoritative <c>ReconciliationRequired</c> flag. The <c>CreatingJira</c> stage
+    /// without an issue key is kept as a secondary signal: it is the same situation mid-flight, and
+    /// treating it as resolved merely because the flag has not been set yet would offer actions
+    /// during the window the flag exists to close.
     /// </remarks>
     public static bool OutcomeUnknown(OperationalRecordResponse record) =>
-        record.WorkflowState == OperationalRecordWorkflowState.CreatingJira && !HasJira(record);
+        record.ReconciliationRequired
+        || (record.WorkflowState == OperationalRecordWorkflowState.CreatingJira && !HasJira(record));
 
     /// <summary>
     /// Resolves what the workflow currently permits.
@@ -200,11 +237,23 @@ public static class OperationalRecordView
         }
 
         // Checked before any per-state rule, and deliberately not folded into them. An existing
-        // issue key is the single fact that makes creating unsafe, and it must hold even if a
-        // record turns up in a stage that would otherwise permit it — a partially rolled-back
-        // retry, a source re-import, or a state added later. Leaving this to each case means one
-        // missed case is a duplicate Jira issue. A unit test asserts it across every state.
+        // issue makes creating unsafe, and that must hold even if a record turns up in a stage
+        // that would otherwise permit it — a partially rolled-back retry, a source re-import, or a
+        // state added later. Leaving this to each case means one missed case is a duplicate Jira
+        // issue. A unit test asserts it across every state.
         bool hasJira = HasJira(record);
+
+        // Reconciliation outranks the state machine. While the outcome of a create is unresolved,
+        // neither creating nor resuming is safe, whatever stage the record reports.
+        if (record.ReconciliationRequired)
+        {
+            return new Actions(
+                false,
+                false,
+                // Only if the server explicitly says so — never inferred.
+                record.RetryEligible,
+                record.RetryEligible ? null : "Önceki denemenin sonucu doğrulanmalı.");
+        }
 
         return record.WorkflowState switch
         {
@@ -214,15 +263,15 @@ public static class OperationalRecordView
 
             // A Jira issue exists. Only the source side is outstanding, and only retry may touch it.
             OperationalRecordWorkflowState.OperationalRecordCloseFailed =>
-                new Actions(false, false, true, null),
+                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : RetryBlocked),
             OperationalRecordWorkflowState.JiraCreated =>
-                new Actions(false, false, true, null),
+                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : RetryBlocked),
             OperationalRecordWorkflowState.ClosingOperationalRecord =>
                 new Actions(false, false, false, "Kaynak kapatma aşaması sürüyor."),
 
             // Failed before any trusted key was stored, so resuming is the safe move — not a new create.
             OperationalRecordWorkflowState.JiraCreateFailed =>
-                new Actions(false, false, true, null),
+                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : RetryBlocked),
 
             // Unknown outcome. Deliberately offers nothing: see StateDetail.
             OperationalRecordWorkflowState.CreatingJira =>
@@ -232,7 +281,7 @@ public static class OperationalRecordView
 
             OperationalRecordWorkflowState.Eligible or OperationalRecordWorkflowState.Previewed =>
                 hasJira
-                    ? new Actions(false, false, true, "Bu kayıt için zaten bir Jira kaydı var.")
+                    ? new Actions(false, false, record.RetryEligible, "Bu kayıt için zaten bir Jira kaydı var.")
                     : new Actions(true, true, false, null),
 
             OperationalRecordWorkflowState.NeedsManualReview =>
@@ -249,7 +298,8 @@ public static class OperationalRecordView
     /// <param name="record">Authoritative record.</param>
     /// <returns><c>true</c> when the record is stuck or its outcome is unresolved.</returns>
     public static bool NeedsAttention(OperationalRecordResponse record) =>
-        record.WorkflowState is OperationalRecordWorkflowState.JiraCreateFailed
+        record.ReconciliationRequired
+        || record.WorkflowState is OperationalRecordWorkflowState.JiraCreateFailed
             or OperationalRecordWorkflowState.OperationalRecordCloseFailed
             or OperationalRecordWorkflowState.CreatingJira
             or OperationalRecordWorkflowState.NeedsManualReview;

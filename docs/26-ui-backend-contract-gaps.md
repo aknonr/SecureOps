@@ -17,9 +17,9 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-8 — No way to list users, or to read one user's access | ✅ **Resolved** by backend `78183dd` |
 | G-9 — `AccessRequestInvalidState` conflates validation with concurrency | ✅ **Resolved** by backend `78183dd` |
 | G-10 — Rejection is not durable | ✅ **Resolved** by backend `78183dd` |
-| G-11 — Claim owner is not exposed | Open (new) |
-| G-12 — `ReconciliationRequired` is not exposed | Open (new) |
-| G-13 — No source provider yields records | Open (new) |
+| G-11 — Claim owner is not exposed | ✅ **Resolved** by backend `989030c3` |
+| G-12 — `ReconciliationRequired` is not exposed | ✅ **Resolved** by backend `989030c3` |
+| G-13 — No source provider yields records | ✅ **Resolved** by backend `989030c3` |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -451,14 +451,34 @@ pending request for an already-approved administrator.
 
 ---
 
-## G-11 — The claim owner is not exposed, so "claimed by me" cannot be shown
+## G-11 — The claim owner is not exposed — ✅ RESOLVED
 
 **Raised:** building the Operational Record → Jira screens (UI milestone 2B), 2026-08-21.
+**Resolved by backend commit `989030c3`** — `claimedBy` and `claimedAt` are now projected, with
+`claimed` remaining the authoritative liveness flag.
 
-**Severity:** Medium. The workflow is multi-operator by design, and ownership is the thing operators
-most need to see.
+**The trap the contract warns about, and how the UI handles it:** an expired claim may keep its
+`claimedBy` while `claimed` is `false`. Deciding ownership from `claimedBy` alone would show a
+long-lapsed claim as active and stop operators working a record nobody holds. `claimed` is therefore
+checked first and `claimedBy` only distinguishes *whose* live claim it is, giving four states:
 
-**UI need:** distinguish *unclaimed*, *claimed by me*, and *claimed by another operator*. The first
+| `claimed` | `claimedBy` | Presented as |
+|---|---|---|
+| `false` | absent | Serbest — available |
+| `false` | present | Önceki kilit sona erdi — history only, explicitly *not* owned |
+| `true` | current actor | Sizde — claimed by me |
+| `true` | someone else, or unknown | Başka operatörde — being processed by another operator |
+
+Comparison is against `GET /identity/me`'s `name`, not the browser cookie: the API records the actor
+as `demo:platform-admin` where the session says `platform-admin`, and comparing the cookie would
+report every record as another operator's. If that call fails, the UI never reports a claim as the
+current operator's — the safe fallback. Eight unit tests pin these, including the expired-with-owner
+case and case-insensitive comparison.
+
+**Severity when open:** Medium. The workflow is multi-operator by design, and ownership is the thing
+operators most need to see.
+
+**Original need:** distinguish *unclaimed*, *claimed by me*, and *claimed by another operator*. The first
 and third differ in whether acting is safe; the first and second differ in whether the operator
 already owns the work.
 
@@ -482,12 +502,27 @@ before an action that might collide, rather than implying an exclusivity nobody 
 
 ---
 
-## G-12 — `ReconciliationRequired` is not exposed on the record
+## G-12 — `ReconciliationRequired` is not exposed — ✅ RESOLVED
 
 **Raised:** building the Operational Record → Jira screens (UI milestone 2B), 2026-08-21.
 
-**Severity:** Medium. The state is reachable and correctly enforced; it just cannot be seen until
-someone acts.
+**Resolved by backend commit `989030c3`** — `reconciliationRequired`, `retryEligible`, and
+`jiraExists` are now projected, so all three can be shown before an operator tries anything.
+
+The UI now:
+
+- flags reconciliation in the **list** with its own badge, and in the detail with a prominent amber
+  panel — no command attempt required;
+- treats `reconciliationRequired` as outranking the state machine: create is blocked in *every*
+  state while it is set, asserted by a test across the whole enum;
+- offers retry **only** when `retryEligible` is true, and says so plainly when it is not — retry is
+  never inferred from a stage or an HTTP status;
+- states whether a Jira issue exists inside the reconciliation panel, because that is the first
+  thing to check by hand;
+- uses `jiraExists` as authoritative for duplicate safety, so a missing key cannot re-enable create.
+
+**Severity when open:** Medium. The state was reachable and correctly enforced; it just could not be
+seen until someone acted.
 
 **UI need:** show, in the list and on the record, that a Jira create outcome is unresolved and manual
 reconciliation is required — before an operator tries something.
@@ -507,11 +542,18 @@ dedicated presentation rather than to the generic conflict message. Both paths a
 
 ---
 
-## G-13 — No source provider yields operational records (blocks TEST)
+## G-13 — No source provider yields operational records — ✅ RESOLVED
 
 **Raised:** building the Operational Record → Jira screens (UI milestone 2B), 2026-08-21.
 
-**Severity:** High for TEST readiness. The entire OR → Jira workflow is currently unexercisable in
+**Resolved by backend commit `989030c3`** — `OperationalRecords:SourceProvider` is now honoured
+(`Fake` in Development/Demo/Test only, `Disabled` otherwise, unimplemented providers failing closed),
+and the fake source ships four deliberate fixtures: eligible, stale, closed, and missing.
+
+Synthetic end-to-end verification is now genuinely possible and was performed — see the readiness
+note below.
+
+**Severity when open:** High for TEST readiness. The entire OR → Jira workflow was unexercisable in
 any environment.
 
 Two findings:
@@ -541,6 +583,32 @@ against a contract-shaped local stub serving the committed DTO shapes and Proble
 `docs/25-ui-enterprise-shell.md` §11.
 
 ---
+
+## Readiness: synthetic ≠ real Turuncu Hat
+
+**Synthetic OR → Jira end-to-end readiness is not real Turuncu Hat integration readiness.** The
+distinction matters for release planning, so it is stated here rather than left implied.
+
+What synthetic verification does establish: the UI drives the real SecureOps workflow correctly, and
+the workflow's own state machine, idempotency, source revalidation and duplicate protection behave as
+documented. Verified against the real API with `OperationalRecords__SourceProvider=Fake`: preview
+advanced a record to `Previewed`; create produced a real Jira key through the fake client and reached
+`Completed`; a repeat create returned the *same* key rather than a second issue; the stale fixture was
+rejected with `OperationalRecordChanged` and the closed and missing fixtures with
+`OperationalRecordNoLongerOpen`, none of them creating a Jira issue.
+
+What it does **not** establish:
+
+- **No real source.** There is still no Turuncu Hat provider. `Fake` is a fixture set, not a
+  connector, and it is refused outside Development, Demo, and Test.
+- **No real Jira.** `FakeJiraClient` always succeeds and is idempotent by key. Genuine Jira failure
+  modes — timeouts, auth rejection, field validation, and above all an *unknown* outcome — cannot
+  occur against it. Reconciliation and retry-blocked were verified by rendering, not by a real
+  provider producing them.
+- **No live claim contention.** With fast fake providers, commands complete before a read can observe
+  a live claim, so "claimed by another operator" was verified from authoritative fields and unit
+  tests rather than by two operators colliding in practice.
+- **No SQL repository.** Verification ran on the in-memory repository; migration 004 was not executed.
 
 ## Note: enums cross the wire as numbers
 

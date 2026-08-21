@@ -228,22 +228,26 @@ Rules specific to this screen:
 Red stays reserved for genuinely critical conditions. Stale, claimed, pending, and reconciliation
 states use warning or informational tones.
 
-## 11. Verifying states the Demo backend cannot produce
+## 11. Verification, and what it proves
 
-`FakeOperationalRecordClient` returns an empty source list and is registered unconditionally, so no
-operational record can exist in any environment (G-13) and the workflow cannot be exercised
-end-to-end against the real API.
+Two layers, and they prove different things.
 
-State rendering was therefore verified against a **contract-shaped local stub** serving the committed
-DTO shapes and stable ProblemDetails codes — the same technique used for the identity-lookup found
-state in milestone 1. The stub implements no business rule; each record id simply selects which
-documented response comes back. Forty checks covering list, detail, preview, create, claimed-by-
-another, stale source, already transferred, retry allowed, retry blocked, reconciliation required,
-provider unavailable, rate limited, forbidden, double-submit prevention, and both themes at three
-widths.
+**Synthetic end-to-end, against the real API** with `OperationalRecords__SourceProvider=Fake`
+(Development, Demo, and Test only). Every transition is produced by the real SecureOps workflow, not
+by UI state: preview advances the record, create yields a real Jira key and reaches `Completed`, a
+repeat create returns the same key rather than a second issue, and the stale, closed, and missing
+fixtures are each rejected by the backend with their own code and create no Jira issue. Thirty checks.
 
-This verifies **presentation**, not backend behaviour. Genuine end-to-end verification needs G-13
-resolved.
+**Contract-shaped stub**, for the states the fake providers cannot produce — reconciliation required,
+retry blocked, live claim contention, rate limiting, Jira provider failure. Forty checks. This proves
+**presentation only**, and the report says so rather than letting a green tick imply more.
+
+Provider selection is never a user-facing setting. When the source is `Disabled`, the list renders the
+ordinary service-unavailable experience with its correlation reference and never names the provider
+or its configuration. Synthetic records are identifiable by their own `SYN-` source codes rather than
+by any UI label claiming they are real.
+
+**Synthetic readiness is not Turuncu Hat readiness.** See `docs/26-ui-backend-contract-gaps.md`.
 
 ## 12. Out of scope for this milestone
 

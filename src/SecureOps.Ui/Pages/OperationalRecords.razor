@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject ICurrentAccessProvider AccessProvider
 @inject IOperationalRecordApiClient Records
+@inject IIdentityLookupApiClient Identity
 
 <PageTitle>Operasyonel Kayıtlar · SecureOps</PageTitle>
 
@@ -142,15 +143,25 @@
                                         </span>
                                     }
 
-                                    @{
+@{
                                         OperationalRecordView.Ownership owner =
-                                            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow);
+                                            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow, _actor);
                                     }
-                                    @if (owner is not OperationalRecordView.Ownership.Available)
+                                    @* A lapsed claim is history, not ownership, so it earns no badge
+                                       in a list an operator scans for what is blocked. *@
+                                    @if (owner is OperationalRecordView.Ownership.Mine
+                                            or OperationalRecordView.Ownership.Other)
                                     {
                                         <SoStatusBadge Label="@OwnerLabel(owner)"
                                                        Tone="@OwnerTone(owner)"
                                                        Icon="@Icons.Material.Filled.Lock" />
+                                    }
+
+                                    @if (record.ReconciliationRequired)
+                                    {
+                                        <SoStatusBadge Label="Doğrulama gerekiyor"
+                                                       Tone="SoStatusBadge.BadgeTone.Caution"
+                                                       Icon="@Icons.Material.Filled.HelpOutline" />
                                     }
                                 </span>
                             </a>
@@ -197,6 +208,7 @@
     private UiProblem? _problem;
     private RecordGroup _group = RecordGroup.NeedsAttention;
     private bool _loading;
+    private string? _actor;
 
     private IReadOnlyList<OperationalRecordResponse> Filtered =>
         _records is null ? [] : _records.Where(r => GroupOf(r) == _group).ToArray();
@@ -230,16 +242,22 @@
         _ => "Tamamlanan"
     };
 
-    private static string OwnerLabel(OperationalRecordView.Ownership owner) => owner switch
+private static string OwnerLabel(OperationalRecordView.Ownership owner) => owner switch
     {
-        OperationalRecordView.Ownership.Expired => "Kilit süresi doldu",
-        _ => "Başka operatörde olabilir"
+        OperationalRecordView.Ownership.Mine => "Sizde",
+        OperationalRecordView.Ownership.Other => "Başka operatörde",
+        OperationalRecordView.Ownership.Lapsed => "Önceki kilit sona erdi",
+        _ => "Serbest"
     };
 
-    private static SoStatusBadge.BadgeTone OwnerTone(OperationalRecordView.Ownership owner) =>
-        owner == OperationalRecordView.Ownership.Expired
-            ? SoStatusBadge.BadgeTone.Neutral
-            : SoStatusBadge.BadgeTone.Caution;
+    // "Mine" is informational; only somebody else's claim is a caution, because that is the one
+    // that will stop an action.
+    private static SoStatusBadge.BadgeTone OwnerTone(OperationalRecordView.Ownership owner) => owner switch
+    {
+        OperationalRecordView.Ownership.Other => SoStatusBadge.BadgeTone.Caution,
+        OperationalRecordView.Ownership.Mine => SoStatusBadge.BadgeTone.Info,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -248,7 +266,31 @@
 
         if (_access.Can(Capabilities.OperationalRecordsView))
         {
+            await ResolveActorAsync();
             await LoadAsync();
+        }
+    }
+
+    /// <summary>
+    /// Reads the operator's identity <i>as the API names it</i>, for comparison against
+    /// <c>claimedBy</c>.
+    /// </summary>
+    /// <remarks>
+    /// The cookie principal is not usable here: the API records the actor as
+    /// <c>demo:platform-admin</c> where the browser session says <c>platform-admin</c>, so
+    /// comparing the cookie name would report every record as another operator's. A failure is
+    /// swallowed — without an actor the UI simply cannot claim any record is the current
+    /// operator's, which is the safe fallback rather than a reason to fail the page.
+    /// </remarks>
+    private async Task ResolveActorAsync()
+    {
+        try
+        {
+            _actor = (await Identity.GetCurrentIdentityAsync(CancellationToken.None)).Name;
+        }
+        catch (SecureOpsApiException)
+        {
+            _actor = null;
         }
     }
 

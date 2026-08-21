@@ -148,7 +148,7 @@ Three things are kept apart and must not be merged into one "status":
 | Concept | Source |
 |---|---|
 | Workflow stage | `WorkflowState` |
-| Ownership | `Claimed` + `ClaimExpiresAt` (owner unknown — G-11) |
+| Ownership | `Claimed` (liveness) + `ClaimedBy` / `ClaimedAt` (who) |
 | Source freshness | `LastSourceValidationAt`, `Version` |
 
 Two states are deliberately **not** toned as errors:
@@ -162,6 +162,14 @@ Two states are deliberately **not** toned as errors:
 **Idempotency belongs to the backend.** The UI sends no `Idempotency-Key`. The contract makes it
 optional and the API then derives a deterministic key from actor, command, and record — which is
 already the desired behaviour, and generating one here would be a second competing policy.
+
+**`claimed` decides liveness; `claimedBy` only decides whose.** An expired claim may keep its
+`claimedBy` while `claimed` is false — reading the owner alone would show a lapsed claim as active
+and block a record nobody holds. Compare against `GET /identity/me`'s `name`, never the cookie
+principal: the API sees `demo:platform-admin` where the session says `platform-admin`.
+
+**`reconciliationRequired` outranks the state machine.** While it is set, create is blocked in every
+state and retry is offered only if `retryEligible` is also true.
 
 **Never auto-retry.** Retry is offered when authoritative record state says a stage is resumable, not
 because a call failed. `WorkflowConflict` at `stage: "jira-reconciliation"` is mapped to a dedicated

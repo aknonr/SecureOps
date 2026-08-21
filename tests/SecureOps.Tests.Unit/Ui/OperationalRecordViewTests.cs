@@ -16,12 +16,18 @@ namespace SecureOps.Tests.Unit.Ui;
 /// </remarks>
 public sealed class OperationalRecordViewTests
 {
+    private const string Me = "demo:platform-admin";
+    private const string Other = "demo:team-lead";
+
     private static OperationalRecordResponse Record(
         OperationalRecordWorkflowState state,
         string? jiraKey = null,
         bool eligible = true,
         bool claimed = false,
-        DateTimeOffset? claimExpires = null) => new(
+        DateTimeOffset? claimExpires = null,
+        string? claimedBy = null,
+        bool reconciliationRequired = false,
+        bool retryEligible = true) => new(
         Id: Guid.NewGuid(),
         SourceRecordId: "SRC-1",
         OrCode: "OR-1",
@@ -42,9 +48,14 @@ public sealed class OperationalRecordViewTests
         RetryCount: 0,
         UpdatedAt: DateTimeOffset.UtcNow,
         Claimed: claimed,
+        ClaimedBy: claimedBy,
+        ClaimedAt: claimedBy is null ? null : DateTimeOffset.UtcNow.AddMinutes(-5),
         ClaimExpiresAt: claimExpires,
         LastSourceValidationAt: DateTimeOffset.UtcNow.AddMinutes(-1),
-        Version: 3);
+        Version: 3,
+        ReconciliationRequired: reconciliationRequired,
+        RetryEligible: retryEligible,
+        JiraExists: jiraKey is not null);
 
     // ---------------------------------------------------------------- duplicate safety
 
@@ -182,50 +193,163 @@ public sealed class OperationalRecordViewTests
     // ---------------------------------------------------------------- ownership
 
     [Fact]
-    public void NoClaim_ReadsAsAvailable()
+    public void NoClaim_AndNoHistory_ReadsAsAvailable()
     {
         Assert.Equal(
             OperationalRecordView.Ownership.Available,
-            OperationalRecordView.OwnershipOf(Record(OperationalRecordWorkflowState.Eligible), DateTimeOffset.UtcNow));
+            OperationalRecordView.OwnershipOf(
+                Record(OperationalRecordWorkflowState.Eligible), DateTimeOffset.UtcNow, Me));
     }
 
     [Fact]
-    public void LiveClaim_ReadsAsHeld()
+    public void LiveClaimByCurrentActor_ReadsAsMine()
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: true,
-            claimExpires: now.AddMinutes(2));
+            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: Me);
 
-        Assert.Equal(OperationalRecordView.Ownership.Held, OperationalRecordView.OwnershipOf(record, now));
+        Assert.Equal(OperationalRecordView.Ownership.Mine, OperationalRecordView.OwnershipOf(record, now, Me));
     }
 
     [Fact]
-    public void LapsedClaim_ReadsAsExpired()
+    public void LiveClaimByAnotherActor_ReadsAsOther()
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: true,
-            claimExpires: now.AddMinutes(-1));
+            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: Other);
 
-        Assert.Equal(OperationalRecordView.Ownership.Expired, OperationalRecordView.OwnershipOf(record, now));
+        Assert.Equal(OperationalRecordView.Ownership.Other, OperationalRecordView.OwnershipOf(record, now, Me));
     }
 
     [Fact]
-    public void ClaimWithoutExpiry_ReadsAsHeld()
+    public void ExpiredClaimRetainingOwner_IsNeverPresentedAsOwned()
     {
-        // Defensive: no expiry means nothing is known to have lapsed, so treat it as live rather
-        // than as free to take.
+        // The case the contract warns about: claimed=false while claimedBy is still populated.
+        // Reading ownership from claimedBy alone would block a record nobody holds.
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: true,
-            claimExpires: null);
+            claimed: false, claimedBy: Me);
+
+        OperationalRecordView.Ownership owner =
+            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow, Me);
+
+        Assert.Equal(OperationalRecordView.Ownership.Lapsed, owner);
+        Assert.NotEqual(OperationalRecordView.Ownership.Mine, owner);
+        Assert.NotEqual(OperationalRecordView.Ownership.Other, owner);
+    }
+
+    [Fact]
+    public void ExpiredClaimRetainingAnotherOwner_IsAlsoLapsed()
+    {
+        OperationalRecordResponse record = Record(
+            OperationalRecordWorkflowState.Eligible,
+            claimed: false, claimedBy: Other);
 
         Assert.Equal(
-            OperationalRecordView.Ownership.Held,
-            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow));
+            OperationalRecordView.Ownership.Lapsed,
+            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow, Me));
+    }
+
+    [Fact]
+    public void LiveFlagWithLapsedLease_ReadsAsLapsed()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationalRecordResponse record = Record(
+            OperationalRecordWorkflowState.Eligible,
+            claimed: true, claimExpires: now.AddMinutes(-1), claimedBy: Other);
+
+        Assert.Equal(OperationalRecordView.Ownership.Lapsed, OperationalRecordView.OwnershipOf(record, now, Me));
+    }
+
+    [Fact]
+    public void UnknownCurrentActor_NeverReportsAClaimAsMine()
+    {
+        // If /identity/me could not be read, the safe answer is "not yours".
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationalRecordResponse record = Record(
+            OperationalRecordWorkflowState.Eligible,
+            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: Me);
+
+        Assert.Equal(OperationalRecordView.Ownership.Other, OperationalRecordView.OwnershipOf(record, now, null));
+    }
+
+    [Fact]
+    public void OwnerComparison_IsCaseInsensitive()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationalRecordResponse record = Record(
+            OperationalRecordWorkflowState.Eligible,
+            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: "DEMO:Platform-Admin");
+
+        Assert.Equal(OperationalRecordView.Ownership.Mine, OperationalRecordView.OwnershipOf(record, now, Me));
+    }
+
+    // ------------------------------------------------- reconciliation and retry eligibility
+
+    [Fact]
+    public void ReconciliationRequired_BlocksCreateInAnyState()
+    {
+        foreach (OperationalRecordWorkflowState state in Enum.GetValues<OperationalRecordWorkflowState>())
+        {
+            OperationalRecordResponse record = Record(state, reconciliationRequired: true);
+
+            Assert.False(
+                OperationalRecordView.ActionsFor(record).Create,
+                $"{state} offered create while reconciliation was required.");
+        }
+    }
+
+    [Fact]
+    public void ReconciliationRequired_OffersRetryOnlyWhenServerAllowsIt()
+    {
+        OperationalRecordResponse allowed = Record(
+            OperationalRecordWorkflowState.CreatingJira, reconciliationRequired: true, retryEligible: true);
+        OperationalRecordResponse blocked = Record(
+            OperationalRecordWorkflowState.CreatingJira, reconciliationRequired: true, retryEligible: false);
+
+        Assert.True(OperationalRecordView.ActionsFor(allowed).Retry);
+        Assert.False(OperationalRecordView.ActionsFor(blocked).Retry);
+        Assert.NotNull(OperationalRecordView.ActionsFor(blocked).BlockedReason);
+    }
+
+    [Fact]
+    public void ReconciliationRequired_IsSurfacedAsUnknownOutcomeAndNeedsAttention()
+    {
+        OperationalRecordResponse record = Record(
+            OperationalRecordWorkflowState.Eligible, reconciliationRequired: true);
+
+        Assert.True(OperationalRecordView.OutcomeUnknown(record));
+        Assert.True(OperationalRecordView.NeedsAttention(record));
+    }
+
+    [Fact]
+    public void RetryIsNeverOfferedWhenTheServerSaysIneligible()
+    {
+        // Retry eligibility is authoritative, not inferred from the stage.
+        foreach (OperationalRecordWorkflowState state in Enum.GetValues<OperationalRecordWorkflowState>())
+        {
+            OperationalRecordResponse record = Record(state, retryEligible: false);
+
+            Assert.False(
+                OperationalRecordView.ActionsFor(record).Retry,
+                $"{state} offered retry while the server reported it ineligible.");
+        }
+    }
+
+    [Fact]
+    public void JiraExists_BlocksCreateEvenWithoutAKey()
+    {
+        // jiraExists is authoritative on its own; a missing key must not re-enable create.
+        OperationalRecordResponse record = Record(OperationalRecordWorkflowState.Eligible) with
+        {
+            JiraExists = true,
+            JiraIssueKey = null
+        };
+
+        Assert.True(OperationalRecordView.HasJira(record));
+        Assert.False(OperationalRecordView.ActionsFor(record).Create);
     }
 
     // ---------------------------------------------------------------- labelling

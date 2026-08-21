@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject ICurrentAccessProvider AccessProvider
 @inject IOperationalRecordApiClient Records
+@inject IIdentityLookupApiClient Identity
 @inject IDialogService Dialogs
 
 <PageTitle>Operasyonel kayıt · SecureOps</PageTitle>
@@ -75,9 +76,8 @@
     else
     {
         OperationalRecordView.Actions actions = OperationalRecordView.ActionsFor(_record);
-        OperationalRecordView.Ownership owner =
-            OperationalRecordView.OwnershipOf(_record, DateTimeOffset.UtcNow);
-        bool held = owner == OperationalRecordView.Ownership.Held;
+OperationalRecordView.Ownership owner =
+            OperationalRecordView.OwnershipOf(_record, DateTimeOffset.UtcNow, _actor);
 
         @if (_result is not null)
         {
@@ -120,10 +120,32 @@
                 </span>
                 <div class="so-result-body">
                     <h2 class="so-panel-title">Jira sonucu doğrulanmalı</h2>
-                    <p class="so-panel-text">
+<p class="so-panel-text">
                         Bu kayıt için bir Jira oluşturma denemesi başlatıldı, ancak sonucu
-                        doğrulanamadı. Jira kaydı oluşmuş olabilir de olmayabilir de. Doğrulama
-                        yapılmadan yeni bir oluşturma denemesi mükerrer Jira kaydı riski taşır.
+                        doğrulanamadı. Doğrulama yapılmadan yeni bir oluşturma denemesi mükerrer
+                        Jira kaydı riski taşır.
+                    </p>
+                    @* Whether an issue exists is the first thing to check by hand, so it is stated
+                       here rather than only in the Jira panel further down. *@
+                    @if (OperationalRecordView.HasJira(_record))
+                    {
+                        <p class="so-panel-text">
+                            Sunucu bu kayıt için bir Jira kaydı bulunduğunu bildiriyor:
+                            <code class="so-code so-code--strong">@_record.JiraIssueKey</code>.
+                            Yeni bir kayıt oluşturulmamalıdır.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="so-panel-text">
+                            Kayıtlı bir Jira anahtarı yok. Jira tarafında bu operasyonel kayda ait
+                            bir kayıt oluşup oluşmadığını elle doğrulayın.
+                        </p>
+                    }
+                    <p class="so-panel-text so-panel-text--sm">
+                        @(_record.RetryEligible
+                            ? "Sunucu bu kayıt için aktarımın sürdürülmesine izin veriyor."
+                            : "Sunucu bu kayıt için yeniden denemeye izin vermiyor.")
                     </p>
                     @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
                     {
@@ -234,42 +256,67 @@
                 }
 
                 <h3 class="so-subhead">Sahiplik</h3>
-                @if (owner == OperationalRecordView.Ownership.Available)
+@switch (owner)
                 {
-                    <p class="so-panel-text">
-                        Bu kayıt üzerinde etkin bir kilit yok.
-                    </p>
+                    case OperationalRecordView.Ownership.Available:
+                        <p class="so-panel-text">Bu kayıt üzerinde etkin bir kilit yok.</p>
+                        break;
+
+                    case OperationalRecordView.Ownership.Mine:
+                        <div class="so-panel-note">
+                            <MudIcon Icon="@Icons.Material.Outlined.LockPerson" Size="Size.Small" />
+                            <span>
+                                Bu kayıt <strong>sizde</strong>. İşlemi siz sürdürebilirsiniz.
+                            </span>
+                        </div>
+                        break;
+
+                    case OperationalRecordView.Ownership.Other:
+                        <div class="so-panel-note so-panel-note--caution">
+                            <MudIcon Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" />
+                            <span>
+                                Bu kayıt şu anda <strong>başka bir operatör tarafından
+                                işleniyor</strong>. Deneyeceğiniz işlemler sunucu tarafından
+                                reddedilir.
+                            </span>
+                        </div>
+                        break;
+
+                    default:
+                        @* Lapsed: metadata about a past claim. Explicitly not ownership — saying
+                           otherwise would stop operators working a record nobody holds. *@
+                        <div class="so-panel-note">
+                            <MudIcon Icon="@Icons.Material.Outlined.LockOpen" Size="Size.Small" />
+                            <span>
+                                Önceki kilit sona erdi; kayıt şu anda <strong>kimsede
+                                değil</strong>. Aşağıdaki bilgi yalnızca geçmiş kayıttır.
+                            </span>
+                        </div>
+                        break;
                 }
-                else
+
+                @if (!string.IsNullOrWhiteSpace(_record.ClaimedBy) || _record.ClaimExpiresAt is not null)
                 {
-                    <div class="so-panel-note @(held ? "so-panel-note--caution" : null)">
-                        <MudIcon Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" />
-                        <span>
-                            @if (held)
-                            {
-                                <text>
-                                    Bu kayıt üzerinde etkin bir kilit var. API kilidin kimde
-                                    olduğunu bildirmediği için bunun sizde mi yoksa başka bir
-                                    operatörde mi olduğu gösterilemiyor; işlem denemeniz kilidi
-                                    başkası tutuyorsa sunucu tarafından reddedilir.
-                                </text>
-                            }
-                            else
-                            {
-                                <text>
-                                    Önceki kilidin süresi doldu. Kayıt yeniden alınabilir durumda.
-                                </text>
-                            }
-                        </span>
-                    </div>
-                    @if (_record.ClaimExpiresAt is { } expires)
-                    {
-                        <SoFieldGrid MinColumnWidth="220px">
+                    <SoFieldGrid MinColumnWidth="220px">
+                        @if (!string.IsNullOrWhiteSpace(_record.ClaimedBy))
+                        {
+                            <SoField Label="@(owner == OperationalRecordView.Ownership.Lapsed ? "Önceki sahip" : "Sahip")">
+                                @_record.ClaimedBy
+                            </SoField>
+                        }
+                        @if (_record.ClaimedAt is { } claimedAt)
+                        {
+                            <SoField Label="Alınma">
+                                @claimedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")
+                            </SoField>
+                        }
+                        @if (_record.ClaimExpiresAt is { } expires)
+                        {
                             <SoField Label="Kilit bitişi">
                                 @expires.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")
                             </SoField>
-                        </SoFieldGrid>
-                    }
+                        }
+                    </SoFieldGrid>
                 }
             </section>
 
@@ -422,6 +469,7 @@
     private UiProblem? _actionProblem;
     private string? _result;
     private string _busyMessage = "İşlem uygulanıyor…";
+    private string? _actor;
     private bool _loading;
     private bool _busy;
 
@@ -436,9 +484,30 @@
         AccessProvider.Changed += OnAccessChanged;
         _access = await AccessProvider.GetAsync(CancellationToken.None);
 
-        if (_access.Can(Capabilities.OperationalRecordsView))
+if (_access.Can(Capabilities.OperationalRecordsView))
         {
+            await ResolveActorAsync();
             await LoadAsync(clearAction: true);
+        }
+    }
+
+    /// <summary>
+    /// Reads the operator's identity as the API names it, for comparison against <c>claimedBy</c>.
+    /// </summary>
+    /// <remarks>
+    /// See the list page: the cookie principal differs from the API's actor string, so comparing it
+    /// would report every claim as somebody else's. Without an actor the UI simply never reports a
+    /// claim as the current operator's.
+    /// </remarks>
+    private async Task ResolveActorAsync()
+    {
+        try
+        {
+            _actor = (await Identity.GetCurrentIdentityAsync(CancellationToken.None)).Name;
+        }
+        catch (SecureOpsApiException)
+        {
+            _actor = null;
         }
     }
 
