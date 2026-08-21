@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Commands;
@@ -51,7 +52,9 @@ public static class DependencyInjection
         }
         else
         {
-            services.AddSingleton<IIdentityDirectoryProvider, MockIdentityDirectoryProvider>();
+            services.AddSingleton<IIdentityDirectoryProvider>(serviceProvider =>
+                new MockIdentityDirectoryProvider(
+                    serviceProvider.GetRequiredService<IOptions<IdentityLookupOptions>>()));
         }
 
         string? auditProvider = configuration[$"{AuditOptions.SectionName}:Provider"];
