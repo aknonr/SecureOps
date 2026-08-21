@@ -1,20 +1,20 @@
 namespace SecureOps.Domain.OperationalRecords;
 
-/// <summary>Classification assigned to an imported operational record.</summary>
+/// <summary>Classification assigned to an imported operational record. Numeric values are frozen by the v1 wire contract.</summary>
 public enum OperationalRecordClassification
 {
     /// <summary>A server-related request.</summary>
-    ServerRequest,
+    ServerRequest = 0,
     /// <summary>An environment-related request.</summary>
-    EnvironmentRequest,
+    EnvironmentRequest = 1,
     /// <summary>A software installation request.</summary>
-    SoftwareInstallation,
+    SoftwareInstallation = 2,
     /// <summary>A configuration request.</summary>
-    ConfigurationRequest,
+    ConfigurationRequest = 3,
     /// <summary>An operational support request.</summary>
-    OperationalSupport,
+    OperationalSupport = 4,
     /// <summary>A record explicitly excluded from Jira.</summary>
-    NotJiraEligible,
+    NotJiraEligible = 5,
     /// <summary>No approved deterministic rule classified the record.</summary>
-    NeedsManualReview
+    NeedsManualReview = 6
 }
