@@ -155,8 +155,13 @@ created as `Pending`, every capability check denies, and the UI correctly shows 
 approval" state — which looks like a broken demo. This is API launch configuration and is tracked as
 G-5 in `docs/26-ui-backend-contract-gaps.md`.
 
-Identity lookup currently returns not-found for every account against the Demo API — a backend DI
-defect tracked as G-1 in the same document. The UI renders that correctly as a not-found state.
+Identity lookup works against the Demo API as of backend commit `4adab66c` (G-1, resolved). The
+seeded mock account `pam12356` returns a full record; unknown accounts still return `404
+IdentityNotFound`.
+
+Note that looking a mock user up **by UPN** still returns not-found even though capabilities reports
+`supportsUpnLookup: true` — tracked as G-7 in `docs/26-ui-backend-contract-gaps.md`. Use the
+sAMAccountName form when testing.
 
 If Chrome shows "Güvenli değil", run `dotnet dev-certs https --trust` once. No certificates are
 committed.

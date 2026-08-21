@@ -5,38 +5,64 @@ API as implemented on `release/api-test-20260812`. The UI made no backend change
 
 Each item states what the UI needs, what exists today, and what the UI does in the meantime.
 
+| Gap | Status |
+|---|---|
+| G-1 — Mock directory resolves empty | ✅ **Resolved** by backend `4adab66c` |
+| G-2 — No directory profile for the signed-in user | Open |
+| G-3 — Lookup capabilities omit the account pattern | Open |
+| G-4 — Session expiry indistinguishable from never-signed-in | Open |
+| G-5 — Demo access bootstrap needs an undocumented setting | Open |
+| G-6 — No access-request creation endpoint | Open |
+| G-7 — Capabilities advertises UPN lookup the mock provider cannot serve | Open (new) |
+
 ---
 
-## G-1 — Mock identity directory resolves to an empty user set (defect)
+## G-1 — Mock identity directory resolves to an empty user set (defect) — ✅ RESOLVED
 
-**Severity:** High. Identity lookup can never return a result in Development, Demo, or Test.
+**Resolved by backend commit `4adab66c5766303045d1a5867ccda2f25ec6ebc1`**
+("fix(identity): make mock provider activation deterministic") on `release/api-test-20260812`,
+merged into `feature/ui-enterprise-shell`.
 
-`SecureOps.Infrastructure/DependencyInjection.cs:54` registers:
+**Severity when open:** High. Identity lookup could never return a result in Development, Demo, or Test.
+
+`SecureOps.Infrastructure/DependencyInjection.cs` registered:
 
 ```csharp
 services.AddSingleton<IIdentityDirectoryProvider, MockIdentityDirectoryProvider>();
 ```
 
-`MockIdentityDirectoryProvider` has three public constructors. .NET's activator selects the greediest
-one it can satisfy, which is:
+`MockIdentityDirectoryProvider` has three public constructors. .NET's activator selected the greediest
+one it could satisfy:
 
 ```csharp
 MockIdentityDirectoryProvider(IEnumerable<DirectoryUserRecord> users, IOptions<IdentityLookupOptions> options)
 ```
 
-`IEnumerable<T>` always resolves in Microsoft DI — to an **empty** sequence when no `DirectoryUserRecord`
-is registered. The seeded `DefaultUsers()` overload is therefore never used, and `_users` is empty.
+`IEnumerable<T>` always resolves in Microsoft DI — to an **empty** sequence when no
+`DirectoryUserRecord` is registered. The seeded `DefaultUsers()` overload was therefore never used.
 
-**Observed:** `POST /api/v1/identity/lookup` with `{"account":"pam12356"}` against the Demo host
-returns `404 IdentityNotFound`, although `pam12356` ("Example Admin") is the documented default mock
-user.
+**The fix** replaces type-based activation with an explicit factory that selects the options-only
+constructor, so the seeded set is used and constructor choice can no longer drift:
 
-**Suggested fix (backend):** register the provider with an explicit factory, e.g.
-`services.AddSingleton<IIdentityDirectoryProvider>(sp => new MockIdentityDirectoryProvider(sp.GetRequiredService<IOptions<IdentityLookupOptions>>()));`
-or register the default `DirectoryUserRecord` set so the greedy constructor receives it.
+```csharp
+services.AddSingleton<IIdentityDirectoryProvider>(serviceProvider =>
+    new MockIdentityDirectoryProvider(
+        serviceProvider.GetRequiredService<IOptions<IdentityLookupOptions>>()));
+```
 
-**UI meanwhile:** nothing to do — the UI renders the 404 correctly as a not-found state with guidance.
-The found-state rendering was verified against a local stub returning the documented contract shape.
+It sits in the `else` branch, so `ActiveDirectoryIdentityDirectoryProvider` is untouched.
+
+**Verified from the UI side** against the running Demo API after the merge:
+
+| Check | Result |
+|---|---|
+| `POST /identity/lookup` `{"account":"pam12356"}` | `200` `Found`, full record, `source: "Mock"` |
+| Unknown account | `404` `IdentityNotFound` with `code`/`correlationId`/`stage`/`retryable` intact |
+| `CONTOSO\pam12356` | `200`, `normalizedAccount: "pam12356"` — prefix stripping unchanged |
+| UI found state, light and dark | All nine directory fields render; no API URL or exception text leaks |
+
+No UI change was required. The found-state rendering, previously verifiable only against a local
+stub, is now confirmed against the real API.
 
 ---
 
@@ -126,6 +152,48 @@ pending request ID for the operator to quote.
 
 ---
 
+## G-7 — Capabilities advertises UPN lookup the mock provider cannot serve
+
+**Raised:** while verifying the G-1 fix, 2026-08-21.
+
+**Severity:** Medium in Development/Demo/Test. Unknown in Production — depends on whether
+`ActiveDirectoryIdentityDirectoryProvider` resolves a UPN, which the UI cannot observe from here.
+
+**UI need:** `GET /identity/lookup/capabilities` returns `supportsUpnLookup`, and the UI uses it to
+decide whether to accept a UPN-shaped account. When it is `true`, the UI stops warning about
+`user@domain` input and forwards it.
+
+**Today:** capabilities reports `"supportsUpnLookup": true`, but looking up a mock user *by their own
+UPN* returns not-found:
+
+```
+POST /api/v1/identity/lookup  {"account":"pam12356@contoso.local"}   →  404 IdentityNotFound
+POST /api/v1/identity/lookup  {"account":"pam12356"}                 →  200 Found
+                                    ("userPrincipalName": "pam12356@contoso.local")
+```
+
+So the flag promises a capability the active provider does not implement. An operator who pastes a
+UPN — the natural thing to copy out of an alert — gets a confusing "not found" for an account that
+demonstrably exists.
+
+This was **not** introduced by `4adab66c`; the fix made it observable by making any lookup succeed
+at all. It is a pre-existing mismatch that G-1 was masking.
+
+**Suggested (backend-owned), one of:**
+
+1. Make `MockIdentityDirectoryProvider` match on `UserPrincipalName` as well as `SamAccountName`, so
+   the mock reflects the contract it advertises; or
+2. Derive `supportsUpnLookup` from the active provider's real capability rather than from
+   configuration, so the flag is honest per environment.
+
+Option 2 is the more durable answer if the AD provider's UPN support differs from the mock's.
+
+**UI meanwhile:** no change. The UI already renders the 404 as a clean not-found state, and
+`AccountInputRules` treats UPN shapes as advisory rather than blocking, so nothing is rejected
+client-side. The wording cannot be improved without knowing which of the two fixes lands.
+
+---
+
 ## Confirmed working as documented
 
 Verified live against the Demo API during this milestone:
@@ -138,3 +206,14 @@ Verified live against the Demo API during this milestone:
   as a response body. The earlier UI client treated 404 as a success body; that was corrected.
 - Role codes `Admin`, `Lead`, `Operator`, `JiraPublisher`, `Auditor`, `ReadOnly` and the capability
   identifiers in `SecureOps.Shared.Auth.Capabilities` match what `/access/me` returns.
+
+Re-verified after merging `4adab66c`:
+
+- `POST /api/v1/identity/lookup` returns `200 Found` for the seeded mock users, and the response
+  shape matches `IdentityLookupResponse` field for field — `displayName`, `samAccountName`,
+  `userPrincipalName`, `mail`, `department`, `title`, `managerDisplayName`, `enabled`, `locked`.
+- `normalizedAccount` still strips a `DOMAIN\` prefix.
+- Genuinely unknown accounts still return `404 IdentityNotFound`, so the fix did not turn the
+  not-found path into a false positive.
+- `GET /identity/lookup/capabilities` is unchanged: `maxAccountLength: 128`, the same nine
+  `returnedFields`, and the same six `rejectedInputClasses`. The UI needed no contract change.
