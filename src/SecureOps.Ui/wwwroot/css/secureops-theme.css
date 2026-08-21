@@ -1991,3 +1991,197 @@ body {
     font-size: 0.82rem;
     line-height: 1.6;
 }
+
+/* =============================================================================
+   Operational Record → Jira
+   (Pages/OperationalRecords.razor, Pages/OperationalRecordDetail.razor)
+   ========================================================================== */
+
+.so-record-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--so-space-1);
+    margin: var(--so-space-3) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.so-record-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--so-space-4);
+    padding: var(--so-space-3);
+    border: 1px solid transparent;
+    border-radius: var(--so-radius-sm);
+    color: inherit;
+    text-decoration: none;
+}
+
+.so-record-row:hover {
+    border-color: color-mix(in srgb, var(--so-accent) 24%, var(--so-border));
+    background: color-mix(in srgb, var(--so-accent) 6%, transparent);
+}
+
+.so-record-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.so-record-head {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+.so-record-code {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--so-text-muted);
+}
+
+/* Warning, not danger: needing attention is a queue signal, not a failure in itself.
+   Red stays for conditions that are actually critical. */
+.so-record-flag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--so-warning) var(--so-tint-strong), transparent);
+    color: var(--so-warning);
+}
+
+.so-record-title {
+    font-weight: 600;
+    font-size: 0.92rem;
+    overflow-wrap: anywhere;
+}
+
+.so-record-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-1);
+    font-size: 0.78rem;
+    color: var(--so-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.so-record-states {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--so-space-2);
+    flex: none;
+    max-width: 60%;
+}
+
+@media (max-width: 599px) {
+    .so-record-row {
+        flex-direction: column;
+    }
+
+    .so-record-states {
+        justify-content: flex-start;
+        max-width: 100%;
+    }
+}
+
+/* -- detail ------------------------------------------------------------ */
+
+.so-state-head {
+    margin-bottom: var(--so-space-3);
+}
+
+/* Source text arrives from an external system and may be long or preformatted.
+   It scrolls inside its own box rather than stretching the panel. */
+.so-source-description,
+.so-preview-body {
+    margin: 0;
+    padding: var(--so-space-3);
+    max-height: 260px;
+    overflow: auto;
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+    font-size: 0.82rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.so-preview-body {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.78rem;
+}
+
+.so-code--strong {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+/* The unknown-outcome panel. Warning rather than error: the operator must stop and
+   check, not conclude that something broke. */
+.so-panel--attention {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+    border-color: color-mix(in srgb, var(--so-warning) 40%, var(--so-border));
+    background: color-mix(in srgb, var(--so-warning) 6%, var(--so-surface));
+}
+
+.so-panel--attention .so-notice-icon {
+    margin-bottom: 0;
+    flex: none;
+}
+
+.so-notice-icon--warn {
+    background: color-mix(in srgb, var(--so-warning) var(--so-tint), transparent);
+    color: var(--so-warning);
+}
+
+.so-panel-note--caution {
+    border-left: 3px solid var(--so-warning);
+    background: color-mix(in srgb, var(--so-warning) var(--so-tint), transparent);
+    color: var(--so-text);
+}
+
+.so-warning-list {
+    margin: var(--so-space-2) 0 0;
+    padding-left: 1.15rem;
+    font-size: 0.82rem;
+    line-height: 1.6;
+}
+
+/* -- create confirmation ------------------------------------------------ */
+
+.so-dialog-subject-meta {
+    font-size: 0.78rem;
+    color: var(--so-text-muted);
+}
+
+.so-dialog-summary-label {
+    margin: var(--so-space-3) 0 var(--so-space-1);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--so-text-muted);
+}
+
+.so-dialog-summary {
+    margin: 0;
+    padding: var(--so-space-2) var(--so-space-3);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+    font-size: 0.86rem;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}

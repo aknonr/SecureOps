@@ -38,6 +38,16 @@ public static class UiProblemFactory
             ? FromStatus(statusCode)
             : FromCode(code, statusCode);
 
+        // WorkflowConflict is returned both for "another workflow step is running" and for
+        // "the outcome of a Jira create is unknown". Only the stage separates them, and they
+        // demand opposite responses — wait and retry, versus stop and reconcile by hand. Getting
+        // this wrong turns a duplicate-issue risk into a retry button.
+        if (string.Equals(code, OperationalErrorCodes.WorkflowConflict, StringComparison.Ordinal)
+            && string.Equals(stage, ReconciliationStage, StringComparison.Ordinal))
+        {
+            mapped = ReconciliationRequired(code!);
+        }
+
         // The API's own retryable flag wins when present: it reflects server-side knowledge of whether
         // the durable workflow can safely accept the same command again.
         bool retryable = payload?.Retryable ?? mapped.Retryable;
@@ -82,6 +92,32 @@ public static class UiProblemFactory
         CorrelationId: null,
         Stage: null,
         StatusCode: null);
+
+    /// <summary>
+    /// ProblemDetails <c>stage</c> the API uses when a Jira create outcome is unresolved.
+    /// </summary>
+    internal const string ReconciliationStage = "jira-reconciliation";
+
+    /// <summary>
+    /// The unknown-outcome state, which must never be presented as an ordinary retryable failure.
+    /// </summary>
+    /// <param name="code">Stable API code, carried through for support.</param>
+    /// <returns>Operator-facing problem description.</returns>
+    /// <remarks>
+    /// Deliberately not <see cref="UiProblemKind.Conflict"/>'s usual wording. A conflict means
+    /// someone else got there first and the operator can look and try again. This means SecureOps
+    /// does not know whether a Jira issue was created, so acting again could produce a duplicate.
+    /// <c>Retryable</c> is false and stays false: the API also reports it false, and the two agree.
+    /// </remarks>
+    private static UiProblem ReconciliationRequired(string code) => Build(
+        UiProblemKind.Conflict, code,
+        "Jira sonucu doğrulanmalı",
+        "Bu kayıt için bir Jira oluşturma denemesi başlatıldı, ancak sonucu doğrulanamadı. "
+        + "Jira kaydı oluşmuş olabilir de olmayabilir de.",
+        ["Jira'da bu operasyonel kayda ait bir kayıt olup olmadığını elle kontrol edin.",
+         "Kayıt oluştuysa Jira anahtarını platform yöneticisine bildirin; oluşmadıysa aktarım yeniden başlatılabilir.",
+         "Doğrulama yapılmadan yeni bir Jira kaydı oluşturmayın; mükerrer kayıt riski vardır."],
+        retryable: false, requiresRefresh: true);
 
     private static UiProblem FromCode(string code, int statusCode) => code switch
     {

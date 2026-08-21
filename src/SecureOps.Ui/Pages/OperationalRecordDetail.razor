@@ -1,0 +1,608 @@
+@page "/operational-records/{RecordId:guid}"
+@attribute [Authorize]
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+@inject IOperationalRecordApiClient Records
+@inject IDialogService Dialogs
+
+<PageTitle>Operasyonel kayıt · SecureOps</PageTitle>
+
+@*
+    One operational record and its Jira transfer.
+
+    Three panels, kept apart on purpose: SOURCE (what came from the source system), WORKFLOW (where
+    SecureOps has got to, and who holds the claim), and JIRA (preview, issue, retry). Flattening
+    these into one "status" is what lets an operator read "failed" on a record whose Jira issue
+    already exists and then create a second one.
+
+    Nothing here decides anything. Action availability comes from authoritative record state via
+    OperationalRecordView; capability comes from /access/me; and after every write the record is
+    re-read rather than patched locally.
+*@
+
+<div class="so-page">
+    <SoPageHeader Title="@HeaderTitle" Lead="@HeaderLead">
+        <Actions>
+            <MudButton Variant="Variant.Text" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Href="operational-records">
+                Kayıtlar
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@(_busy || _loading)"
+                       OnClick="() => LoadAsync(clearAction: true)">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.OperationalRecordsView))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Operasyonel kayıtları görüntülemek için
+                <code class="so-code">@Capabilities.OperationalRecordsView</code> yetkisi gerekir.
+            </p>
+        </section>
+    }
+    else if (_loading && _record is null)
+    {
+        <SoLoading Message="Kayıt yükleniyor…" />
+    }
+    else if (_record is null)
+    {
+        @if (_loadProblem is not null)
+        {
+            <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: true)" />
+        }
+        else
+        {
+            <SoEmptyState Title="Kayıt bulunamadı"
+                          Description="Bu operasyonel kayıt kaldırılmış olabilir."
+                          Icon="@Icons.Material.Outlined.SearchOff" />
+        }
+    }
+    else
+    {
+        OperationalRecordView.Actions actions = OperationalRecordView.ActionsFor(_record);
+        OperationalRecordView.Ownership owner =
+            OperationalRecordView.OwnershipOf(_record, DateTimeOffset.UtcNow);
+        bool held = owner == OperationalRecordView.Ownership.Held;
+
+        @if (_result is not null)
+        {
+            <section class="so-panel so-panel--result" role="status">
+                <span class="so-notice-icon so-notice-icon--ok" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" />
+                </span>
+                <div class="so-result-body">
+                    <h2 class="so-panel-title">@_result</h2>
+                    <p class="so-panel-text">
+                        Aşağıdaki durum işlemden sonra sunucudan yeniden okundu.
+                    </p>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                               aria-label="Kapat" OnClick="() => _result = null" />
+            </section>
+        }
+
+        @if (_actionProblem is not null)
+        {
+            @* Held apart from the load problem: every write is followed by a re-read, and one
+               shared field would let that re-read erase the message explaining what happened. *@
+            <SoProblemPanel Problem="_actionProblem"
+                            OnRetry="() => LoadAsync(clearAction: true)"
+                            RetryLabel="Güncel durumu yükle" />
+        }
+
+        @if (_loadProblem is not null)
+        {
+            <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: true)" />
+        }
+
+        @* The unknown-outcome state gets its own prominent panel rather than a status badge. It is
+           the one condition where the safe move is to stop and check Jira by hand. *@
+        @if (OperationalRecordView.OutcomeUnknown(_record))
+        {
+            <section class="so-panel so-panel--attention">
+                <span class="so-notice-icon so-notice-icon--warn" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.HelpOutline" />
+                </span>
+                <div class="so-result-body">
+                    <h2 class="so-panel-title">Jira sonucu doğrulanmalı</h2>
+                    <p class="so-panel-text">
+                        Bu kayıt için bir Jira oluşturma denemesi başlatıldı, ancak sonucu
+                        doğrulanamadı. Jira kaydı oluşmuş olabilir de olmayabilir de. Doğrulama
+                        yapılmadan yeni bir oluşturma denemesi mükerrer Jira kaydı riski taşır.
+                    </p>
+                    @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
+                    {
+                        <p class="so-problem-reference">
+                            <span>Destek referansı</span>
+                            <code>@_record.CorrelationId</code>
+                        </p>
+                    }
+                </div>
+            </section>
+        }
+
+        <div class="so-detail-grid">
+            @* ---------------------------------------------------------------- SOURCE *@
+            <section class="so-panel">
+                <h2 class="so-panel-title">Kaynak kayıt</h2>
+
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="Kaynak kayıt no">
+                        <code class="so-code">@_record.SourceRecordId</code>
+                    </SoField>
+                    <SoField Label="OR kodu">
+                        <code class="so-code">@_record.OrCode</code>
+                    </SoField>
+                    <SoField Label="Oluşturulma">
+                        @_record.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </SoField>
+                    @if (!string.IsNullOrWhiteSpace(_record.Requester))
+                    {
+                        <SoField Label="Talep eden">@_record.Requester</SoField>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_record.Environment))
+                    {
+                        <SoField Label="Ortam">@_record.Environment</SoField>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_record.ServerReference))
+                    {
+                        <SoField Label="Sunucu">@_record.ServerReference</SoField>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_record.ApplicationReference))
+                    {
+                        <SoField Label="Uygulama">@_record.ApplicationReference</SoField>
+                    }
+                </SoFieldGrid>
+
+                <h3 class="so-subhead">Başlık</h3>
+                <p class="so-panel-text">@_record.Title</p>
+
+                @if (!string.IsNullOrWhiteSpace(_record.Description))
+                {
+                    <h3 class="so-subhead">Açıklama</h3>
+                    <p class="so-source-description">@_record.Description</p>
+                }
+
+                <h3 class="so-subhead">Kaynak tazeliği</h3>
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="Son doğrulama">
+                        @if (_record.LastSourceValidationAt is { } validated)
+                        {
+                            @validated.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        }
+                        else
+                        {
+                            <span class="so-field-empty">Henüz doğrulanmadı</span>
+                        }
+                    </SoField>
+                    <SoField Label="Kayıt sürümü">
+                        <code class="so-code">@_record.Version</code>
+                    </SoField>
+                </SoFieldGrid>
+                <p class="so-panel-text so-panel-text--sm">
+                    Kaynak durumu, hassas geçişlerden hemen önce sunucu tarafında yeniden doğrulanır.
+                </p>
+            </section>
+
+            @* -------------------------------------------------------------- WORKFLOW *@
+            <section class="so-panel">
+                <h2 class="so-panel-title">SecureOps iş akışı</h2>
+
+                <div class="so-state-head">
+                    <SoStatusBadge Label="@OperationalRecordView.StateLabel(_record.WorkflowState)"
+                                   Tone="@OperationalRecordView.StateTone(_record.WorkflowState)"
+                                   Icon="@OperationalRecordView.StateIcon(_record.WorkflowState)" />
+                </div>
+
+                @if (OperationalRecordView.StateDetail(_record.WorkflowState) is { Length: > 0 } detail)
+                {
+                    <p class="so-panel-text">@detail</p>
+                }
+
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="Sınıflandırma">@_record.Classification</SoField>
+                    <SoField Label="Aktarıma uygunluk">
+                        <SoStatusBadge Label="@(_record.JiraEligible ? "Uygun" : "Uygun değil")"
+                                       Tone="@(_record.JiraEligible
+                                                ? SoStatusBadge.BadgeTone.Positive
+                                                : SoStatusBadge.BadgeTone.Neutral)" />
+                    </SoField>
+                    <SoField Label="Son güncelleme">
+                        @_record.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </SoField>
+                    <SoField Label="Deneme sayısı">@_record.RetryCount</SoField>
+                </SoFieldGrid>
+
+                @if (!string.IsNullOrWhiteSpace(_record.EligibilityReason))
+                {
+                    <p class="so-panel-text so-panel-text--sm">@_record.EligibilityReason</p>
+                }
+
+                <h3 class="so-subhead">Sahiplik</h3>
+                @if (owner == OperationalRecordView.Ownership.Available)
+                {
+                    <p class="so-panel-text">
+                        Bu kayıt üzerinde etkin bir kilit yok.
+                    </p>
+                }
+                else
+                {
+                    <div class="so-panel-note @(held ? "so-panel-note--caution" : null)">
+                        <MudIcon Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" />
+                        <span>
+                            @if (held)
+                            {
+                                <text>
+                                    Bu kayıt üzerinde etkin bir kilit var. API kilidin kimde
+                                    olduğunu bildirmediği için bunun sizde mi yoksa başka bir
+                                    operatörde mi olduğu gösterilemiyor; işlem denemeniz kilidi
+                                    başkası tutuyorsa sunucu tarafından reddedilir.
+                                </text>
+                            }
+                            else
+                            {
+                                <text>
+                                    Önceki kilidin süresi doldu. Kayıt yeniden alınabilir durumda.
+                                </text>
+                            }
+                        </span>
+                    </div>
+                    @if (_record.ClaimExpiresAt is { } expires)
+                    {
+                        <SoFieldGrid MinColumnWidth="220px">
+                            <SoField Label="Kilit bitişi">
+                                @expires.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")
+                            </SoField>
+                        </SoFieldGrid>
+                    }
+                }
+            </section>
+
+            @* ------------------------------------------------------------------ JIRA *@
+            <section class="so-panel">
+                <h2 class="so-panel-title">Jira aktarımı</h2>
+
+                @if (OperationalRecordView.HasJira(_record))
+                {
+                    <SoFieldGrid MinColumnWidth="220px">
+                        <SoField Label="Jira kaydı">
+                            <code class="so-code so-code--strong">@_record.JiraIssueKey</code>
+                        </SoField>
+                    </SoFieldGrid>
+                    @* Stated explicitly wherever an issue exists, because this is the fact that
+                       decides whether creating again is safe. *@
+                    <p class="so-panel-text">
+                        Bu kayıt için Jira kaydı oluşturulmuş. Yeni bir Jira kaydı oluşturulmamalıdır.
+                    </p>
+                }
+                else
+                {
+                    <p class="so-field-empty">Henüz Jira kaydı oluşturulmadı.</p>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_record.LastErrorCode))
+                {
+                    <SoFieldGrid MinColumnWidth="220px">
+                        <SoField Label="Son hata kodu">
+                            <code class="so-code">@_record.LastErrorCode</code>
+                        </SoField>
+                    </SoFieldGrid>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
+                {
+                    <p class="so-problem-reference">
+                        <span>Destek referansı</span>
+                        <code>@_record.CorrelationId</code>
+                    </p>
+                }
+
+                @if (_preview is not null)
+                {
+                    <h3 class="so-subhead">Aktarılacak içerik</h3>
+                    @* The backend's mapping, rendered verbatim. No mapping rule is reproduced here. *@
+                    <SoFieldGrid MinColumnWidth="200px">
+                        <SoField Label="Proje">@_preview.ProjectKey</SoField>
+                        <SoField Label="Kayıt tipi">@_preview.IssueType</SoField>
+                        <SoField Label="Eşleme sürümü">@_preview.MappingVersion</SoField>
+                        <SoField Label="Talep eden hesabı">
+                            @if (string.IsNullOrWhiteSpace(_preview.RequesterAccountId))
+                            {
+                                <span class="so-field-empty">Çözümlenemedi</span>
+                            }
+                            else
+                            {
+                                @_preview.RequesterAccountId
+                            }
+                        </SoField>
+                    </SoFieldGrid>
+
+                    <h4 class="so-subhead">Özet</h4>
+                    <p class="so-panel-text">@_preview.Summary</p>
+
+                    <h4 class="so-subhead">Açıklama</h4>
+                    <pre class="so-preview-body">@_preview.Description</pre>
+
+                    @if (_preview.Warnings.Count > 0)
+                    {
+                        <div class="so-panel-note so-panel-note--caution">
+                            <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" />
+                            <span>
+                                <strong>Sunucu uyarıları</strong>
+                                <ul class="so-warning-list">
+                                    @foreach (string warning in _preview.Warnings)
+                                    {
+                                        <li>@warning</li>
+                                    }
+                                </ul>
+                            </span>
+                        </div>
+                    }
+                }
+
+                <div class="so-panel-actions so-panel-actions--wrap">
+                    @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Preview"
+                                   Disabled="@(_busy || !actions.Preview)"
+                                   OnClick="PreviewAsync">
+                            Önizle
+                        </MudButton>
+                    }
+
+                    @if (_access.Can(Capabilities.OperationalRecordsCreateJira))
+                    {
+                        @* Creation requires a preview first: the confirmation must show what will
+                           actually be sent, and only the server can say what that is. *@
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.AddTask"
+                                   Disabled="@(_busy || !actions.Create || _preview is null)"
+                                   OnClick="CreateAsync">
+                            Jira kaydı oluştur
+                        </MudButton>
+                    }
+
+                    @if (_access.Can(Capabilities.OperationalRecordsRetry))
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.RestartAlt"
+                                   Disabled="@(_busy || !actions.Retry)"
+                                   OnClick="RetryAsync">
+                            Aktarımı sürdür
+                        </MudButton>
+                    }
+                </div>
+
+                @if (actions.BlockedReason is { Length: > 0 } blocked)
+                {
+                    <p class="so-panel-text so-panel-text--sm">@blocked</p>
+                }
+                else if (actions.Create && _preview is null
+                         && _access.Can(Capabilities.OperationalRecordsCreateJira))
+                {
+                    <p class="so-panel-text so-panel-text--sm">
+                        Jira kaydı oluşturmadan önce önizleme alın.
+                    </p>
+                }
+
+                @if (_busy)
+                {
+                    <SoLoading Message="@_busyMessage" Bare="true" />
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Record being shown.</summary>
+    [Parameter]
+    public Guid RecordId { get; set; }
+
+    private AccessSnapshot? _access;
+    private OperationalRecordResponse? _record;
+    private JiraPreviewResponse? _preview;
+    private UiProblem? _loadProblem;
+    private UiProblem? _actionProblem;
+    private string? _result;
+    private string _busyMessage = "İşlem uygulanıyor…";
+    private bool _loading;
+    private bool _busy;
+
+    private string HeaderTitle => _record is null ? "Operasyonel kayıt" : _record.OrCode;
+
+    private string HeaderLead => _record is null
+        ? "Kaynak kayıt, iş akışı ve Jira aktarım durumu."
+        : _record.Title;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.OperationalRecordsView))
+        {
+            await LoadAsync(clearAction: true);
+        }
+    }
+
+    private async Task LoadAsync(bool clearAction)
+    {
+        _loading = true;
+        _loadProblem = null;
+
+        if (clearAction)
+        {
+            _actionProblem = null;
+            _result = null;
+        }
+
+        StateHasChanged();
+
+        try
+        {
+            _record = await Records.GetAsync(RecordId, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _loadProblem = ex.Problem;
+            _record = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _busyMessage = "Önizleme hazırlanıyor…";
+        _actionProblem = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            _preview = await Records.PreviewAsync(RecordId, CancellationToken.None);
+            _result = "Önizleme hazırlandı";
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+            // A failed preview must not leave an earlier draft on screen next to a new error.
+            _preview = null;
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        await LoadAsync(clearAction: false);
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_busy || _record is null || _preview is null)
+        {
+            return;
+        }
+
+        DialogParameters parameters = new()
+        {
+            { nameof(JiraCreateDialog.Record), _record },
+            { nameof(JiraCreateDialog.Preview), _preview }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<JiraCreateDialog>(
+            title: string.Empty,
+            parameters,
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        DialogResult? outcome = await dialog.Result;
+
+        if (outcome is null || outcome.Canceled)
+        {
+            return;
+        }
+
+        // Set before the first await: every action button binds Disabled to this, so a second
+        // click finds them already disabled and no second command can be issued.
+        _busy = true;
+        _busyMessage = "Jira kaydı oluşturuluyor. Sonuç doğrulanana kadar sayfadan ayrılmayın…";
+        _actionProblem = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            JiraTransferResponse transfer = await Records.CreateJiraAsync(RecordId, CancellationToken.None);
+
+            // Rendered from what the server returned, never from what was requested. A create can
+            // succeed as far as Jira and still stop at the source-close stage.
+            _result = transfer.WorkflowState switch
+            {
+                OperationalRecordWorkflowState.Completed =>
+                    $"Aktarım tamamlandı · {transfer.JiraIssueKey}",
+                OperationalRecordWorkflowState.OperationalRecordCloseFailed =>
+                    $"Jira kaydı oluşturuldu ({transfer.JiraIssueKey}), kaynak kapatma tamamlanmadı",
+                _ => $"İş akışı durumu: {OperationalRecordView.StateLabel(transfer.WorkflowState)}"
+            };
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+        }
+        finally
+        {
+            _busy = false;
+            // The draft is consumed by the attempt; keeping it would let a stale preview justify a
+            // second create against a record whose state has moved on.
+            _preview = null;
+        }
+
+        await LoadAsync(clearAction: false);
+    }
+
+    private async Task RetryAsync()
+    {
+        if (_busy || _record is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _busyMessage = "Aktarım sürdürülüyor…";
+        _actionProblem = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            JiraTransferResponse transfer = await Records.RetryAsync(RecordId, CancellationToken.None);
+            _result = $"İş akışı durumu: {OperationalRecordView.StateLabel(transfer.WorkflowState)}";
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        await LoadAsync(clearAction: false);
+    }
+
+    private async Task RefreshAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        StateHasChanged();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

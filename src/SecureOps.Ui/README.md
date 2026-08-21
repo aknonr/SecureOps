@@ -88,6 +88,8 @@ have to be invented.
 | `/access/requests` | Access-request decision queue | `Access.ApproveRequests` |
 | `/access/users` | User list, grouped by access state | `Access.ManageUsers` |
 | `/access/users/{id}` | User detail, role editor, disable | `Access.ManageUsers` |
+| `/operational-records` | OR → Jira workspace, grouped by attention | `OperationalRecords.View` |
+| `/operational-records/{id}` | Source, workflow, and Jira transfer | `OperationalRecords.View` |
 | `/audit-compliance`, `/diagnostics-readonly` | Future-phase placeholders | authenticated |
 
 Interim auth endpoints: `POST /auth/sign-in`, `GET /auth/sign-out`. They establish identity only.
@@ -134,6 +136,39 @@ Every field of `AccessIdentityProfileResponse` is nullable and the object itself
 demo bridge resolves nothing, so absent is the common case. Fall back to the principal identifier via
 `AccessIdentityDisplay`, and say enrichment is unavailable. Never render an invented name, a blank
 identity field, or an em dash placeholder.
+
+## Operational Record → Jira
+
+The rule that governs this screen: **an existing Jira issue means create is never offered.**
+`OperationalRecordView.ActionsFor` checks that before any per-state rule, and a unit test asserts it
+across every workflow state — a single missed case is a duplicate Jira issue.
+
+Three things are kept apart and must not be merged into one "status":
+
+| Concept | Source |
+|---|---|
+| Workflow stage | `WorkflowState` |
+| Ownership | `Claimed` + `ClaimExpiresAt` (owner unknown — G-11) |
+| Source freshness | `LastSourceValidationAt`, `Version` |
+
+Two states are deliberately **not** toned as errors:
+
+- `OperationalRecordCloseFailed` — the Jira issue **exists**; only the source close is outstanding.
+  Toned Caution, because painting a partial success as a failure invites someone to "fix" it by
+  creating a second issue.
+- `CreatingJira` with no issue key — the outcome is **unknown**. Gets its own prominent amber panel,
+  offers no action at all, and says plainly that creating again risks a duplicate.
+
+**Idempotency belongs to the backend.** The UI sends no `Idempotency-Key`. The contract makes it
+optional and the API then derives a deterministic key from actor, command, and record — which is
+already the desired behaviour, and generating one here would be a second competing policy.
+
+**Never auto-retry.** Retry is offered when authoritative record state says a stage is resumable, not
+because a call failed. `WorkflowConflict` at `stage: "jira-reconciliation"` is mapped to a dedicated
+non-retryable presentation, never to the generic conflict message.
+
+**No polling.** `GET /operational-records` is a rate-limited source refresh, not a passive read.
+Refresh is a deliberate operator action, plus an automatic re-read after every write.
 
 ## Error handling
 

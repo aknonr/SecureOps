@@ -61,6 +61,8 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/access/requests` | Erişim Talepleri: decision queue | Authenticated + `Access.ApproveRequests` |
 | `/access/users` | Kullanıcılar: user list grouped by access state | Authenticated + `Access.ManageUsers` |
 | `/access/users/{id}` | User detail, role editor, disable, request history | Authenticated + `Access.ManageUsers` |
+| `/operational-records` | Operasyonel Kayıtlar: OR → Jira workspace | Authenticated + `OperationalRecords.View` |
+| `/operational-records/{id}` | Source, workflow, and Jira transfer detail | Authenticated + `OperationalRecords.View` |
 | `/audit-compliance`, `/diagnostics-readonly` | Truthful future-phase placeholders | Authenticated |
 
 Interim endpoints `POST /auth/sign-in` and `GET /auth/sign-out` replace the former `/demo-auth/*`
@@ -203,7 +205,47 @@ answers both malformed input and "already decided by someone else" with the same
 `AccessRequestInvalidState` (G-9). Rejecting the input cases before they reach the wire is what makes
 a returned 409 safe to present as a genuine concurrency conflict.
 
-## 10. Out of scope for this milestone
+## 10. Operational Record → Jira (milestone 2B)
+
+The workspace separates **source record**, **SecureOps workflow**, and **Jira transfer** into three
+panels. Collapsing them into one status is what allows an operator to read "failed" on a record whose
+Jira issue already exists and then create a second one.
+
+Rules specific to this screen:
+
+- **An existing Jira issue key blocks create in every state.** Checked before any per-state rule and
+  asserted across the whole state machine by test.
+- **`OperationalRecordCloseFailed` is a partial success, not a failure.** Jira exists; only the source
+  close is outstanding. Retry may resume it; create is never offered.
+- **`CreatingJira` without an issue key is an unknown outcome.** Prominent amber panel, explicit
+  duplicate-risk warning, correlation id, and no action offered at all.
+- **Idempotency is the backend's.** No `Idempotency-Key` is sent, so the API's deterministic
+  actor+command+record key applies and a repeat after refresh collapses onto the same command.
+- **Retry follows authoritative state, not HTTP status.**
+- **No polling.** The list endpoint is a rate-limited source refresh; refresh is deliberate, plus an
+  automatic re-read after every write.
+
+Red stays reserved for genuinely critical conditions. Stale, claimed, pending, and reconciliation
+states use warning or informational tones.
+
+## 11. Verifying states the Demo backend cannot produce
+
+`FakeOperationalRecordClient` returns an empty source list and is registered unconditionally, so no
+operational record can exist in any environment (G-13) and the workflow cannot be exercised
+end-to-end against the real API.
+
+State rendering was therefore verified against a **contract-shaped local stub** serving the committed
+DTO shapes and stable ProblemDetails codes — the same technique used for the identity-lookup found
+state in milestone 1. The stub implements no business rule; each record id simply selects which
+documented response comes back. Forty checks covering list, detail, preview, create, claimed-by-
+another, stale source, already transferred, retry allowed, retry blocked, reconciliation required,
+provider unavailable, rate limited, forbidden, double-submit prevention, and both themes at three
+widths.
+
+This verifies **presentation**, not backend behaviour. Genuine end-to-end verification needs G-13
+resolved.
+
+## 12. Out of scope for this milestone
 
 The Operational Record → Jira screens are the next milestone. Their navigation entry is deliberately
 absent until the routes exist, so the menu never offers a dead link. Backend gaps are tracked in

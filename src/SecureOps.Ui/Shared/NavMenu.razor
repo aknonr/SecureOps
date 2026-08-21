@@ -28,8 +28,12 @@
                 </MudNavLink>
             }
 
-            @* Operasyonel Kayıtlar (OperationalRecordsView) is added here with the OR -> Jira screens.
-               Entries are introduced alongside their routes so the menu never offers a dead link. *@
+            @if (Can(Capabilities.OperationalRecordsView))
+            {
+                <MudNavLink Href="operational-records" Icon="@Icons.Material.Filled.Assignment">
+                    Operasyonel Kayıtlar
+                </MudNavLink>
+            }
 
             <div class="so-nav-group">Erişim</div>
 

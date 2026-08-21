@@ -1,0 +1,286 @@
+@page "/operational-records"
+@attribute [Authorize]
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+@inject IOperationalRecordApiClient Records
+
+<PageTitle>Operasyonel Kayıtlar · SecureOps</PageTitle>
+
+@*
+    The Operational Record → Jira workspace.
+
+    Two things about this list are easy to get wrong:
+
+    GET /operational-records is a *source refresh*, not a passive read — it imports and classifies
+    from the source and is rate-limited. So there is no polling here, and Yenile is a deliberate
+    action the operator takes, not something the page does on a timer.
+
+    Grouping is by "does this need me", not by workflow order. An operator scanning the list is
+    asking which records are stuck or unresolved, and a stage-ordered list buries those among the
+    completed ones.
+*@
+
+<div class="so-page">
+    <SoPageHeader Title="Operasyonel Kayıtlar"
+                  Lead="Kaynak kayıtların Jira aktarım durumu ve sahiplik bilgisi.">
+        <Actions>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_loading"
+                       OnClick="LoadAsync">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.OperationalRecordsView))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Operasyonel kayıtları görüntülemek için
+                <code class="so-code">@Capabilities.OperationalRecordsView</code> yetkisi gerekir.
+                Hesabınızda tanımlı yetkileri
+                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+        </section>
+    }
+    else
+    {
+        <section class="so-panel so-panel--tabs">
+            <div class="so-tabs" role="tablist" aria-label="Kayıt grubu">
+                @foreach (RecordGroup group in _groups)
+                {
+                    RecordGroup captured = group;
+                    <button type="button"
+                            role="tab"
+                            class="so-tab @(group == _group ? "so-tab--active" : null)"
+                            aria-selected="@(group == _group)"
+                            @onclick="() => _group = captured">
+                        @GroupLabel(group)
+                        <span class="so-tab-count">@Count(group)</span>
+                    </button>
+                }
+            </div>
+        </section>
+
+        @if (_problem is not null)
+        {
+            <SoProblemPanel Problem="_problem" OnRetry="LoadAsync" RetryLabel="Yeniden yükle" />
+        }
+
+        <section class="so-panel">
+            @if (_loading)
+            {
+                <SoLoading Message="Kaynak kayıtlar yenileniyor…" Bare="true" />
+            }
+            else if (_records is null)
+            {
+                <SoEmptyState Title="Liste yüklenemedi"
+                              Description="Yenile ile yeniden deneyebilirsiniz."
+                              Icon="@Icons.Material.Outlined.CloudOff" />
+            }
+            else if (_records.Count == 0)
+            {
+                @* Distinguish "the source returned nothing" from "your filter matched nothing";
+                   they look identical otherwise and send the operator looking in the wrong place. *@
+                <SoEmptyState Title="Kaynak kayıt yok"
+                              Description="Yapılandırılmış kaynak şu anda aktarılacak kayıt döndürmüyor."
+                              Icon="@Icons.Material.Outlined.Inbox" />
+            }
+            else if (Filtered.Count == 0)
+            {
+                <SoEmptyState Title="@($"{GroupLabel(_group)} kayıt yok")"
+                              Description="Diğer grupları görmek için yukarıdaki sekmeleri kullanın."
+                              Icon="@Icons.Material.Outlined.FilterAltOff" />
+            }
+            else
+            {
+                <ul class="so-record-list">
+                    @foreach (OperationalRecordResponse record in Filtered)
+                    {
+                        <li>
+                            <a class="so-record-row" href="@($"operational-records/{record.Id}")">
+                                <span class="so-record-main">
+                                    <span class="so-record-head">
+                                        <code class="so-record-code">@record.OrCode</code>
+                                        @if (OperationalRecordView.NeedsAttention(record))
+                                        {
+                                            <span class="so-record-flag" title="Operatör ilgisi gerekiyor">
+                                                <MudIcon Icon="@Icons.Material.Filled.PriorityHigh" Size="Size.Small" />
+                                            </span>
+                                        }
+                                    </span>
+                                    <span class="so-record-title">@record.Title</span>
+                                    <span class="so-record-meta">
+                                        <span>Kaynak: @record.SourceRecordId</span>
+                                        @if (!string.IsNullOrWhiteSpace(record.Environment))
+                                        {
+                                            <span>· @record.Environment</span>
+                                        }
+                                        <span>· @record.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                                    </span>
+                                </span>
+
+                                <span class="so-record-states">
+                                    <SoStatusBadge Label="@OperationalRecordView.StateLabel(record.WorkflowState)"
+                                                   Tone="@OperationalRecordView.StateTone(record.WorkflowState)"
+                                                   Icon="@OperationalRecordView.StateIcon(record.WorkflowState)" />
+
+                                    @if (OperationalRecordView.HasJira(record))
+                                    {
+                                        <span class="so-chip so-chip--quiet" title="Jira kaydı">
+                                            @record.JiraIssueKey
+                                        </span>
+                                    }
+
+                                    @{
+                                        OperationalRecordView.Ownership owner =
+                                            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow);
+                                    }
+                                    @if (owner is not OperationalRecordView.Ownership.Available)
+                                    {
+                                        <SoStatusBadge Label="@OwnerLabel(owner)"
+                                                       Tone="@OwnerTone(owner)"
+                                                       Icon="@Icons.Material.Filled.Lock" />
+                                    }
+                                </span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <p class="so-panel-text so-panel-text--sm">
+            Bu liste her yenilemede kaynak sistemden içe aktarım yapar ve hız sınırına tabidir;
+            otomatik yenileme yapılmaz.
+        </p>
+    }
+</div>
+
+@code {
+    /// <summary>Grouping that answers "does this need me", rather than workflow order.</summary>
+    private enum RecordGroup
+    {
+        /// <summary>Stuck, failed, or unresolved.</summary>
+        NeedsAttention,
+
+        /// <summary>An action is currently possible.</summary>
+        Actionable,
+
+        /// <summary>In flight or not yet ready.</summary>
+        InProgress,
+
+        /// <summary>Transfer finished.</summary>
+        Completed
+    }
+
+    private static readonly RecordGroup[] _groups =
+    [
+        RecordGroup.NeedsAttention,
+        RecordGroup.Actionable,
+        RecordGroup.InProgress,
+        RecordGroup.Completed
+    ];
+
+    private AccessSnapshot? _access;
+    private IReadOnlyList<OperationalRecordResponse>? _records;
+    private UiProblem? _problem;
+    private RecordGroup _group = RecordGroup.NeedsAttention;
+    private bool _loading;
+
+    private IReadOnlyList<OperationalRecordResponse> Filtered =>
+        _records is null ? [] : _records.Where(r => GroupOf(r) == _group).ToArray();
+
+    private int Count(RecordGroup group) =>
+        _records is null ? 0 : _records.Count(r => GroupOf(r) == group);
+
+    private static RecordGroup GroupOf(OperationalRecordResponse record)
+    {
+        if (OperationalRecordView.NeedsAttention(record))
+        {
+            return RecordGroup.NeedsAttention;
+        }
+
+        if (record.WorkflowState == OperationalRecordWorkflowState.Completed)
+        {
+            return RecordGroup.Completed;
+        }
+
+        OperationalRecordView.Actions actions = OperationalRecordView.ActionsFor(record);
+        return actions.Preview || actions.Create || actions.Retry
+            ? RecordGroup.Actionable
+            : RecordGroup.InProgress;
+    }
+
+    private static string GroupLabel(RecordGroup group) => group switch
+    {
+        RecordGroup.NeedsAttention => "İlgi gerekiyor",
+        RecordGroup.Actionable => "İşlem yapılabilir",
+        RecordGroup.InProgress => "Sürüyor",
+        _ => "Tamamlanan"
+    };
+
+    private static string OwnerLabel(OperationalRecordView.Ownership owner) => owner switch
+    {
+        OperationalRecordView.Ownership.Expired => "Kilit süresi doldu",
+        _ => "Başka operatörde olabilir"
+    };
+
+    private static SoStatusBadge.BadgeTone OwnerTone(OperationalRecordView.Ownership owner) =>
+        owner == OperationalRecordView.Ownership.Expired
+            ? SoStatusBadge.BadgeTone.Neutral
+            : SoStatusBadge.BadgeTone.Caution;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.OperationalRecordsView))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _records = await Records.ListAsync(CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            _records = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        StateHasChanged();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

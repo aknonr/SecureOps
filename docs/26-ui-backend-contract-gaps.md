@@ -17,6 +17,9 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-8 — No way to list users, or to read one user's access | ✅ **Resolved** by backend `78183dd` |
 | G-9 — `AccessRequestInvalidState` conflates validation with concurrency | ✅ **Resolved** by backend `78183dd` |
 | G-10 — Rejection is not durable | ✅ **Resolved** by backend `78183dd` |
+| G-11 — Claim owner is not exposed | Open (new) |
+| G-12 — `ReconciliationRequired` is not exposed | Open (new) |
+| G-13 — No source provider yields records | Open (new) |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -445,6 +448,106 @@ Note for whoever tests this: the scenario cannot be reproduced through the demo 
 the only way to become an approved administrator (bootstrap or demo compatibility) also decides that
 administrator's own request immediately. It needs a service- or repository-level test that creates a
 pending request for an already-approved administrator.
+
+---
+
+## G-11 — The claim owner is not exposed, so "claimed by me" cannot be shown
+
+**Raised:** building the Operational Record → Jira screens (UI milestone 2B), 2026-08-21.
+
+**Severity:** Medium. The workflow is multi-operator by design, and ownership is the thing operators
+most need to see.
+
+**UI need:** distinguish *unclaimed*, *claimed by me*, and *claimed by another operator*. The first
+and third differ in whether acting is safe; the first and second differ in whether the operator
+already owns the work.
+
+**Today:** `OperationalRecordResponse` exposes `Claimed` (bool) and `ClaimExpiresAt`. The owning
+actor exists on the domain entity — `OperationalRecord.ClaimedBy`, alongside `ClaimedAt` — and the
+repositories compare against it (`InMemoryOperationalRecordRepository` and
+`SqlOperationalRecordRepository` both do `ClaimedBy == actor`), but it is not projected into the
+response.
+
+The UI can therefore only learn ownership by attempting an action and receiving
+`OperationalRecordAlreadyClaimed`. Two operators looking at the same record see identical screens.
+
+**Suggested (backend-owned):** add `ClaimedBy` (or a derived `ClaimedByMe` boolean, if exposing the
+actor identity is not wanted) and `ClaimedAt` to `OperationalRecordResponse`. A boolean avoids any
+question about surfacing colleague identity while still answering the operational question.
+
+**UI meanwhile:** a live claim is presented as *"Başka operatörde olabilir"* — may be held by another
+operator — and the detail says outright that the API does not report who holds it. The UI never
+claims a record is the current operator's. That is the safe direction to be wrong in: it warns
+before an action that might collide, rather than implying an exclusivity nobody promised.
+
+---
+
+## G-12 — `ReconciliationRequired` is not exposed on the record
+
+**Raised:** building the Operational Record → Jira screens (UI milestone 2B), 2026-08-21.
+
+**Severity:** Medium. The state is reachable and correctly enforced; it just cannot be seen until
+someone acts.
+
+**UI need:** show, in the list and on the record, that a Jira create outcome is unresolved and manual
+reconciliation is required — before an operator tries something.
+
+**Today:** `OperationalRecord.ReconciliationRequired` exists on the domain entity and gates the
+workflow (`JiraTransferService` returns `WorkflowConflict` with `stage: "jira-reconciliation"`), but
+it is not part of `OperationalRecordResponse`. A read cannot report it.
+
+**Suggested (backend-owned):** add `ReconciliationRequired` to `OperationalRecordResponse`. It is
+already on the entity; this is a projection change.
+
+**UI meanwhile:** the closest authoritative signal a read gives is the `CreatingJira` stage with no
+issue key, and the UI treats that as unknown-outcome: a prominent amber panel, an explicit
+duplicate-risk warning, the correlation id, and **no create or retry action offered**. When an action
+is attempted anyway, `WorkflowConflict` + `stage: "jira-reconciliation"` is mapped to the same
+dedicated presentation rather than to the generic conflict message. Both paths are unit-tested.
+
+---
+
+## G-13 — No source provider yields operational records (blocks TEST)
+
+**Raised:** building the Operational Record → Jira screens (UI milestone 2B), 2026-08-21.
+
+**Severity:** High for TEST readiness. The entire OR → Jira workflow is currently unexercisable in
+any environment.
+
+Two findings:
+
+1. **The configured provider is never read.** `OperationalRecordsOptions.SourceProvider` exists and
+   defaults to `"Fake"`, but `SecureOps.Infrastructure/DependencyInjection.cs` registers
+   `services.AddSingleton<IOperationalRecordClient, FakeOperationalRecordClient>()` unconditionally.
+   Unlike the identity and audit providers, no branch consults the option, so it is dead
+   configuration — setting it has no effect.
+2. **The fake returns nothing.** `FakeOperationalRecordClient.GetActiveAsync` returns
+   `Array.Empty<OperationalRecordSourceItem>()` and `GetByIdAsync` returns `null`.
+
+Confirmed live: `GET /api/v1/operational-records` returns `[]` against the Demo host, and there is no
+route by which a record can be created — import is the only path in.
+
+**Consequence:** no end-to-end verification of preview, create, retry, claim, freshness, or
+reconciliation is possible against the real API, in Demo or Test.
+
+**Suggested (backend-owned):** honour `SourceProvider` in registration, and supply a provider that
+yields bounded sample records for non-production environments (as `MockIdentityDirectoryProvider`
+does for identity). The real source client for TEST is a separate decision.
+
+**UI meanwhile:** the empty list renders as a truthful state — *"Kaynak kayıt yok / Yapılandırılmış
+kaynak şu anda aktarılacak kayıt döndürmüyor"* — distinct from a filter matching nothing and from a
+load failure. State rendering for all fifteen required workflow and failure states was verified
+against a contract-shaped local stub serving the committed DTO shapes and ProblemDetails codes; see
+`docs/25-ui-enterprise-shell.md` §11.
+
+---
+
+## Note: enums cross the wire as numbers
+
+Not a gap, recorded because it caught out a test double and will catch out the next one. The API
+configures no `JsonStringEnumConverter`, so `workflowState` and `classification` serialize as
+**integers**, not names. Any stub, fixture, or client written against these DTOs must match that, and
+adding a member in the middle of either enum would silently change the meaning of existing values.
 
 ---
 

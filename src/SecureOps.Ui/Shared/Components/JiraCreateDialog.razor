@@ -1,0 +1,95 @@
+@*
+    Confirmation for the one irreversible action in this workflow.
+
+    Creating a Jira issue cannot be undone from SecureOps, and a duplicate is expensive to clean up,
+    so the dialog restates enough authoritative context that an operator cannot confirm against the
+    wrong record: the OR code, the source record id, and the exact summary the server intends to
+    send. All of it comes from the record and the server's own preview — nothing is re-derived here.
+
+    Like AccessActionDialog, this captures intent only. The page owns the call and disables its
+    actions before the first await, which is what makes a double submission unexpressible.
+*@
+
+<MudDialog Class="so-dialog">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon so-dialog--grant" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.AddTask" />
+            </span>
+            <span>Jira kaydı oluştur</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="so-dialog-subject">
+            <span class="so-dialog-subject-label">İlgili operasyonel kayıt</span>
+            <span class="so-dialog-subject-value">@Record.OrCode</span>
+            <span class="so-dialog-subject-meta">Kaynak: @Record.SourceRecordId</span>
+        </div>
+
+        <p class="so-dialog-consequence so-dialog--grant">
+            Seçilen kayıt için Jira'da yeni bir kayıt oluşturulacak ve ardından kaynak kaydın
+            kapatılması denenecek. <strong>Bu işlem SecureOps üzerinden geri alınamaz.</strong>
+            Sonuç doğrulanana kadar işlemi tekrarlamayın.
+        </p>
+
+        <fieldset class="so-role-picker">
+            <legend>Aktarılacak içerik</legend>
+
+            <SoFieldGrid MinColumnWidth="180px">
+                <SoField Label="Proje">@Preview.ProjectKey</SoField>
+                <SoField Label="Kayıt tipi">@Preview.IssueType</SoField>
+            </SoFieldGrid>
+
+            <p class="so-dialog-summary-label">Özet</p>
+            <p class="so-dialog-summary">@Preview.Summary</p>
+
+            @if (string.IsNullOrWhiteSpace(Preview.RequesterAccountId))
+            {
+                <p class="so-dialog-error" role="alert">
+                    Talep eden hesabı çözümlenemedi. Sunucu bu durumda kaydı reddedebilir.
+                </p>
+            }
+
+            @if (Preview.Warnings.Count > 0)
+            {
+                <p class="so-role-picker-caveat">
+                    <strong>Sunucu uyarıları:</strong>
+                </p>
+                <ul class="so-warning-list">
+                    @foreach (string warning in Preview.Warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            }
+        </fieldset>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+        <MudButton OnClick="Confirm"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.AddTask">
+            Oluştur
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = null!;
+
+    /// <summary>Authoritative record the operator is acting on.</summary>
+    [Parameter, EditorRequired]
+    public OperationalRecordResponse Record { get; set; } = default!;
+
+    /// <summary>The server's proposed mapping, shown verbatim.</summary>
+    [Parameter, EditorRequired]
+    public JiraPreviewResponse Preview { get; set; } = default!;
+
+    private void Confirm() => Dialog.Close(DialogResult.Ok(true));
+
+    private void Cancel() => Dialog.Cancel();
+}
