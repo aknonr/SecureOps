@@ -91,6 +91,10 @@ builder.Services
     .AddHttpClient<IAccessApiClient, AccessApiClient>(ConfigureApiClient)
     .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
 
+builder.Services
+    .AddHttpClient<IAccessAdminApiClient, AccessAdminApiClient>(ConfigureApiClient)
+    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
+
 WebApplication app = builder.Build();
 
 // Surface the effective API base address once at startup (server-side only).

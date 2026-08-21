@@ -37,8 +37,17 @@
                 Erişimim
             </MudNavLink>
 
-            @* Erişim Talepleri and Kullanıcılar ve Roller are added with the access administration
-               screens, gated on AccessApproveRequests / AccessManageUsers. *@
+            @if (Can(Capabilities.AccessApproveRequests))
+            {
+                <MudNavLink Href="access/requests" Icon="@Icons.Material.Filled.AdminPanelSettings">
+                    Erişim Yönetimi
+                </MudNavLink>
+            }
+
+            @* There is no "Kullanıcılar ve Roller" entry: the contract exposes no endpoint that
+               lists application users, so the page would have nothing to populate a directory with.
+               Role assignment and disabling live inside Erişim Yönetimi, reached through a user's
+               access request. See G-8 in docs/26-ui-backend-contract-gaps.md. *@
 
             <div class="so-nav-group">Sonraki fazlar</div>
 

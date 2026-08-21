@@ -43,6 +43,8 @@ wwwroot/css/     secureops-theme.css — semantic tokens only, no colour literal
 | Type | Role |
 |---|---|
 | `ICurrentAccessProvider` | Circuit-scoped `/access/me`, resolved once, 60s reuse, `Changed` event |
+| `IAccessAdminApiClient` | The five access administration calls; no user-list method, because none exists |
+| `AccessDecisionRules` | Client mirror of the server's reason/role rules — see below |
 | `UiProblemFactory` | Translates every API failure into an operator-facing `UiProblem` |
 | `ApiResponseReader` | Shared success/failure handling for all API clients |
 | `AccountInputRules` | Client mirror of the server's account rules — never stricter |
@@ -81,12 +83,37 @@ have to be invented.
 | `/identity-lookup` | PAM / AD lookup | `Identity.Lookup` |
 | `/account` | Identity and session security | authenticated |
 | `/access/me` | Status, roles, grouped capabilities | authenticated |
+| `/access/requests` | Access administration workspace | `Access.ApproveRequests` |
 | `/audit-compliance`, `/diagnostics-readonly` | Future-phase placeholders | authenticated |
 
 Interim auth endpoints: `POST /auth/sign-in`, `GET /auth/sign-out`. They establish identity only.
 When an identity provider is approved they become a challenge/callback pair and `/login` is unchanged.
 
 **Do not add a nav entry before its route exists** — the menu must never offer a dead link.
+
+## Access administration
+
+`/access/requests` is a **request queue with a detail panel**, not a user directory. That shape is
+forced by the contract: no endpoint lists application users or reads one user's access record, so a
+user is reachable only through their access request. Do not add a "Kullanıcılar" page until
+`GET /access/users` exists (G-8).
+
+Three rules this screen follows, each of which is easy to break by accident:
+
+1. **Never show a capability the UI computed.** Role *descriptions* in the picker are written
+   guidance. Effective capabilities are rendered only from the `CurrentAccessResponse` the API
+   returned after a write. `AccessRoleCatalog` is read for role *codes* only.
+2. **Role assignment is a replace.** `PUT .../roles` removes anything omitted, and the current set
+   cannot be read first. The dialog says so; it must not preselect a guess.
+3. **A failed write still reloads the list.** A conflict means the page is stale, which is exactly
+   when refreshing matters. The action's problem and the list's problem are therefore separate
+   fields — a single one let the reload wipe the conflict before it rendered, and the operator saw
+   a silent no-op.
+
+`AccessDecisionRules` mirrors the server's input rules and blocks submission client-side. This is
+load-bearing, not cosmetic: the API returns `AccessRequestInvalidState` for both bad input *and*
+"another administrator already decided this" (G-9). Removing the input cases before they reach the
+wire is what lets a 409 be presented as a genuine conflict.
 
 ## Error handling
 

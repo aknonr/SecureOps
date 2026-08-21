@@ -177,6 +177,42 @@ public static class AccessLabels
         _roleDescriptions.TryGetValue(role, out string? description) ? description : null;
 
     /// <summary>
+    /// Returns a Turkish label for an application access status.
+    /// </summary>
+    /// <param name="status"><c>Pending</c>, <c>Approved</c>, or <c>Disabled</c>.</param>
+    /// <returns>Display label, or the raw value when unrecognised.</returns>
+    /// <remarks>
+    /// An unrecognised value is shown verbatim rather than mapped to a guess, so a status the API
+    /// adds later is visible to the operator instead of silently reading as something it is not.
+    /// </remarks>
+    public static string StatusLabel(string status) => status switch
+    {
+        "Approved" => "Onaylı",
+        "Pending" => "Onay bekliyor",
+        "Disabled" => "Kapalı",
+        _ => status
+    };
+
+    /// <summary>
+    /// Returns a Turkish label for an access request's decision status.
+    /// </summary>
+    /// <param name="status"><c>Pending</c>, <c>Approved</c>, or <c>Rejected</c>.</param>
+    /// <returns>Display label, or the raw value when unrecognised.</returns>
+    /// <remarks>
+    /// Deliberately separate from <see cref="StatusLabel"/>. A request is approved or
+    /// <i>rejected</i>; a user is approved or <i>disabled</i>. The two vocabularies overlap on
+    /// "Approved" but mean different things, and collapsing them would let a rejected request read
+    /// as a disabled account.
+    /// </remarks>
+    public static string RequestStatusLabel(string status) => status switch
+    {
+        "Approved" => "Onaylandı",
+        "Pending" => "Bekliyor",
+        "Rejected" => "Reddedildi",
+        _ => status
+    };
+
+    /// <summary>
     /// Returns a descriptor for a capability identifier.
     /// </summary>
     /// <param name="capability">Capability identifier.</param>

@@ -14,6 +14,8 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-5 — Demo access bootstrap needs an undocumented setting | Open |
 | G-6 — No access-request creation endpoint | Open |
 | G-7 — Capabilities advertised UPN lookup the provider could not serve | ✅ **Resolved** by backend `704c32ba` |
+| G-8 — No way to list users, or to read one user's access | Open (new) |
+| G-9 — `AccessRequestInvalidState` conflates validation with concurrency | Open (new) |
 
 ---
 
@@ -86,6 +88,34 @@ consume it or need that capability.
 rather than four blank fields. `DisplayName` falls back to the account name; no placeholder person is
 invented.
 
+### Extension: the same gap now blocks access administration
+
+Access administration (UI milestone 2A) needs directory attributes for **another** user, which is a
+strictly larger ask than the caller's own profile. `AccessRequestResponse` identifies a subject only
+by `CorporateIdentity` — a raw principal string such as `demo:team-lead` or, in production, an OIDC
+subject or `DOMAIN\account`.
+
+An approver deciding whether to grant `Admin` sees an opaque identifier, not a person. That is a
+security-relevant weakness, not only a cosmetic one: approving the wrong account is exactly the
+mistake this screen exists to prevent.
+
+| Field | Screen | Required? | Why the current contract is insufficient |
+|---|---|---|---|
+| `DisplayName` | `/access/requests` list + detail; confirmation dialog | **Required** | The approver must be able to tell *who* they are granting authority to. `CorporateIdentity` is a principal string, not a name. |
+| `Mail` | detail | Optional | Lets the approver verify out of band before deciding. |
+| `Department` | detail | Optional | Supports "does this person's team need this role" without a second system. |
+| `Title` | detail | Optional | Same. |
+| `Manager` | detail | Optional | Approval policy often follows the reporting line. |
+
+**Suggested:** add a nullable `DisplayName` (at minimum) to `AccessRequestResponse`, or expose the
+directory attributes through the `GET /access/users/{id}` read model proposed in G-8. Resolving it
+per request at decision time would also work, provided it does not consume the audited
+`Identity.Lookup` path.
+
+**UI meanwhile:** the detail panel shows `CorporateIdentity` and the user id, and states in plain
+language that name, e-mail, and department are not provided by the API. The confirmation dialog
+names the same identifier, so an approver is never shown a fabricated person.
+
 ---
 
 ## G-3 — Lookup capabilities do not expose the account pattern
@@ -150,6 +180,26 @@ a justification for the approver.
 **UI meanwhile:** the pending state explains that the request is already recorded and shows the
 pending request ID for the operator to quote.
 
+### UX limitations this causes
+
+Confirmed while building the administration screens. No endpoint was invented; these are the costs
+of the implicit flow, stated so the trade-off is a decision rather than an oversight:
+
+- **The requester cannot say why.** `AccessRequestResponse.DecisionReason` records the *approver's*
+  reason. There is no field for the requester's justification, so the approver decides on an
+  identifier and a timestamp alone. Combined with G-2, the approval screen shows neither who the
+  person is nor why they asked.
+- **A request is created by merely visiting.** Any authenticated principal calling `/access/me` —
+  which the shell does on every page load — creates a pending request. The queue therefore fills
+  with anyone who opened the application, not only those who deliberately asked. The UI cannot
+  distinguish the two.
+- **A rejected user cannot re-apply through the UI.** After a rejection there is no action that
+  creates a fresh request; the user would have to be handled out of band.
+
+**Suggested (backend-owned):** if `POST /api/v1/access/requests` is added, accept a requester-supplied
+reason and return the created request. That closes this and the first half of G-2's approval problem
+together.
+
 ---
 
 ## G-7 — Capabilities advertised UPN lookup the provider could not serve — ✅ RESOLVED
@@ -196,6 +246,95 @@ rather than prefix-matching, and the wildcard `pam*` is rejected as 400 `Invalid
 **UI:** no change required. `AccountInputRules` already blocks wildcard and LDAP characters
 client-side (submit stays disabled, no request is issued), and the UPN found state renders correctly
 with the normalized UPN shown. The UI performs no wildcard, prefix, or fuzzy matching of its own.
+
+---
+
+## G-8 — No way to list application users, or to read one user's access
+
+**Raised:** building the access administration screens (UI milestone 2A), 2026-08-21.
+
+**Severity:** High for administration. It is the single constraint that shapes what that screen can be.
+
+**UI need:** an administrator asked for "approved users", "disabled users", and "user access
+details" needs to enumerate users and read one user's current status, roles, and capabilities.
+
+**Today:** the access surface is exactly seven endpoints, and none of them reads another user:
+
+| Endpoint | Returns |
+|---|---|
+| `GET /access/me` | **the caller's** access only |
+| `GET /access/requests?status=` | `AccessRequestResponse[]` — id, userId, corporateIdentity, status, timestamps, decision reason |
+| `POST /access/requests/{id}/approve` \| `/reject` | the decided request |
+| `PUT /access/users/{id}/roles` | that user's `CurrentAccessResponse` — **only as the result of a write** |
+| `POST /access/users/{id}/disable` | same |
+
+Three consequences follow, and all three are visible in the shipped UI:
+
+1. **There is no user directory.** Users are discoverable only as the subject of an access request,
+   so there is no `/access/users` route and no "Kullanıcılar ve Roller" nav entry. Adding one would
+   mean inventing an endpoint.
+2. **"Disabled users" cannot be listed at all.** Disabling changes the *user's* `AccessStatus`; the
+   request's status stays `Approved`. Nothing exposes users by access status.
+3. **Roles cannot be read before they are replaced.** `PUT .../roles` is a replace — "Administrative
+   replacement of active application roles" — and omitted roles are removed. An administrator
+   therefore edits a set they cannot see. The dialog states plainly that this is a replace and that
+   current roles are unknown, rather than preselecting a guess that would silently strip roles.
+
+**Suggested (backend-owned):** `GET /api/v1/access/users` with a status filter, and
+`GET /api/v1/access/users/{id}` returning the same `CurrentAccessResponse` shape the write endpoints
+already return. Both are read models over data the service already has, and neither changes an
+existing route.
+
+**UI meanwhile:** the workspace is a request queue with a detail panel. After any write it renders
+the authoritative `CurrentAccessResponse` the API returned, which is the only moment another user's
+roles and capabilities are knowable.
+
+---
+
+## G-9 — `AccessRequestInvalidState` conflates validation with concurrency
+
+**Raised:** building the access administration screens (UI milestone 2A), 2026-08-21.
+
+**Severity:** Medium. Correct behaviour is achievable, but only by working around the ambiguity.
+
+**UI need:** requirement 6 asks for distinct UX for a validation error and a concurrency conflict.
+They call for opposite responses — *fix what you typed* versus *reload, the world moved on* — so the
+UI has to tell them apart.
+
+**Today:** `409 AccessRequestInvalidState` is returned for all of these, with nothing in the body to
+separate them:
+
+| Cause | What it really is |
+|---|---|
+| blank or whitespace `reason` | validation |
+| empty role list on approve | validation |
+| unknown role code | validation |
+| `?status=` value outside the known set | validation |
+| request already decided by another administrator | **concurrency conflict** |
+| disabling an already-disabled user | state conflict |
+| assigning roles to a disabled user | state conflict |
+
+Observed against the Demo API — all seven return byte-identical ProblemDetails apart from the
+correlation id.
+
+Also noted: `AccessSelfApprovalDenied` exists in `OperationalErrorCodes` and the contract lists it
+for approve/reject, but a self-approval attempt in testing returned `AccessRequestInvalidState`. The
+test was inconclusive — the only request belonging to the administrator was already decided, so the
+already-decided check may simply have run first. Flagged for Codex to confirm rather than asserted
+as a defect.
+
+**Suggested (backend-owned):** separate codes for the input cases (for example
+`AccessDecisionInvalidInput`) from the state cases, or add a discriminator to the ProblemDetails
+extensions. A `422` for validation and `409` for state conflicts would also be sufficient.
+
+**UI meanwhile:** `Services/AccessDecisionRules.cs` mirrors the server's input rules — reason
+non-empty and ≤500 characters, one to sixteen roles, all from the server's own
+`AccessRoleCatalog.RoleCodes` — and blocks submission before a request is sent. That removes the
+validation cases from the wire, so a 409 that still arrives is in practice a genuine state conflict
+and can be presented as "another administrator changed this; the list has been refreshed". The rules
+are unit-tested against the catalog so they cannot silently drift from the server's.
+
+This is a workaround, not a fix: it depends on the UI's copy of the rules staying in step.
 
 ---
 

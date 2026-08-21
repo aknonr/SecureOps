@@ -58,6 +58,7 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/identity-lookup` | PAM / AD lookup | Authenticated + `Identity.Lookup` |
 | `/account` | Signed-in identity and session security | Authenticated |
 | `/access/me` | Erişimim: status, roles, grouped capabilities | Authenticated |
+| `/access/requests` | Erişim Yönetimi: request queue, decisions, role assignment | Authenticated + `Access.ApproveRequests` |
 | `/audit-compliance`, `/diagnostics-readonly` | Truthful future-phase placeholders | Authenticated |
 
 Interim endpoints `POST /auth/sign-in` and `GET /auth/sign-out` replace the former `/demo-auth/*`
@@ -171,9 +172,37 @@ scroll on any page at any width in either theme**.
 The stylesheet uses two breakpoints in total (1024px for two-column regions, 599px for compact
 spacing); everything else reflows through auto-fit grids and `flex-wrap`.
 
-## 9. Out of scope for this milestone
+## 9. Access administration (milestone 2A)
 
-Access administration screens (`/access/requests`, `/access/users`) and the Operational Record → Jira
-screens are the next two milestones. Navigation entries for both are deliberately absent until their
-routes exist, so the menu never offers a dead link. Backend gaps are tracked in
+`/access/requests` is a request queue with a detail panel. It is **not** a user directory, and that
+is a contract consequence rather than a design preference: no endpoint lists application users or
+reads one user's access record (G-8), so a user is reachable only as the subject of a request.
+`/access/users` therefore does not exist, and no nav entry points at one.
+
+Rules specific to this screen:
+
+- **Roles are chosen by an administrator, never by the user.** Nothing in the operator-facing UI
+  offers a role choice for oneself.
+- **Assigned roles and effective capabilities are shown separately**, and capabilities are only ever
+  rendered from an API response. Role descriptions in the picker are written guidance, explicitly
+  labelled as such; the UI never computes what a role grants.
+- **Every write is confirmed** through a dialog naming the affected user, the action, and its
+  consequence — including that role assignment is a *replace*, so omitted roles are removed. The
+  dialog captures intent only; the page owns the call and disables all actions before the first
+  await, which is what makes double submission unexpressible.
+- **After any write, authoritative state is re-read.** The result panel renders the returned
+  `CurrentAccessResponse`, not the submitted values, so server-side normalisation is visible.
+- **Conflicts are never swallowed.** A failed write still triggers a list reload, so the action's
+  problem and the list's problem are held in separate fields; sharing one let the reload clear the
+  conflict before it rendered.
+
+Client-side validation (`AccessDecisionRules`) is load-bearing here rather than cosmetic: the API
+answers both malformed input and "already decided by someone else" with the same
+`AccessRequestInvalidState` (G-9). Rejecting the input cases before they reach the wire is what makes
+a returned 409 safe to present as a genuine concurrency conflict.
+
+## 10. Out of scope for this milestone
+
+The Operational Record → Jira screens are the next milestone. Their navigation entry is deliberately
+absent until the routes exist, so the menu never offers a dead link. Backend gaps are tracked in
 `docs/26-ui-backend-contract-gaps.md`.

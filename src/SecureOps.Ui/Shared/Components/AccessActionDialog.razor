@@ -1,0 +1,240 @@
+@*
+    Deliberate confirmation for the four access-administration writes.
+
+    The dialog captures intent only — it performs no I/O. It returns the reason and role set, and the
+    calling page owns the call, the busy state, and the error. That split is what makes double
+    submission impossible to express: the page disables its actions the moment the dialog returns, so
+    there is no window in which a second dialog can be opened.
+
+    Every action states the affected user, what will happen, and what the consequence is for that
+    person, because "Onayla" on its own does not tell an administrator what they are about to change.
+*@
+
+<MudDialog Class="so-dialog">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon @ToneClass" aria-hidden="true">
+                <MudIcon Icon="@ActionIcon" />
+            </span>
+            <span>@Title</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="so-dialog-subject">
+            <span class="so-dialog-subject-label">İlgili kullanıcı</span>
+            <span class="so-dialog-subject-value">@SubjectLabel</span>
+        </div>
+
+        <p class="so-dialog-consequence @ToneClass">@Consequence</p>
+
+        @if (NeedsRoles)
+        {
+            <fieldset class="so-role-picker">
+                <legend>Roller</legend>
+                <p class="so-role-picker-note">@RoleNote</p>
+
+                @foreach (string role in AccessDecisionRules.AssignableRoles)
+                {
+                    <label class="so-role-option">
+                        <MudCheckBox T="bool"
+                                     Value="@_selectedRoles.Contains(role)"
+                                     ValueChanged="@(checkedNow => ToggleRole(role, checkedNow))"
+                                     Dense="true"
+                                     Color="Color.Primary" />
+                        <span class="so-role-option-text">
+                            <span class="so-role-option-name">@AccessLabels.RoleLabel(role)</span>
+                            @if (AccessLabels.RoleDescription(role) is { Length: > 0 } description)
+                            {
+                                <span class="so-role-option-desc">@description</span>
+                            }
+                        </span>
+                    </label>
+                }
+
+                @* Role descriptions above are written guidance, not a computed permission list. The
+                   capabilities a role actually confers are only ever shown from an API response. *@
+                <p class="so-role-picker-caveat">
+                    Yukarıdaki açıklamalar yol göstericidir. Geçerli yetkiler, işlem tamamlandıktan
+                    sonra API'nin döndürdüğü listeden gösterilir.
+                </p>
+
+                @if (_roleError is not null)
+                {
+                    <p class="so-dialog-error" role="alert">@_roleError</p>
+                }
+            </fieldset>
+        }
+
+        <MudTextField @bind-Value="_reason"
+                      Label="Gerekçe"
+                      Variant="Variant.Outlined"
+                      Lines="3"
+                      Immediate="true"
+                      Counter="@AccessDecisionRules.MaxReasonLength"
+                      MaxLength="@AccessDecisionRules.MaxReasonLength"
+                      HelperText="Bu gerekçe denetim kaydına işlenir."
+                      Class="so-dialog-reason" />
+
+        @if (_reasonError is not null)
+        {
+            <p class="so-dialog-error" role="alert">@_reasonError</p>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+        <MudButton OnClick="Confirm"
+                   Variant="Variant.Filled"
+                   Color="@ConfirmColor"
+                   StartIcon="@ActionIcon">
+            @ConfirmLabel
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>The four writes the access contract supports.</summary>
+    public enum AccessAction
+    {
+        /// <summary>Approve a pending request and grant initial roles.</summary>
+        Approve,
+
+        /// <summary>Reject a pending request.</summary>
+        Reject,
+
+        /// <summary>Replace a user's active role set.</summary>
+        ReplaceRoles,
+
+        /// <summary>Disable a user's application access.</summary>
+        Disable
+    }
+
+    /// <summary>What the administrator confirmed.</summary>
+    /// <param name="Reason">Justification for the audit trail.</param>
+    /// <param name="Roles">Selected roles; empty for actions that take none.</param>
+    public sealed record Result(string Reason, IReadOnlyList<string> Roles);
+
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = null!;
+
+    /// <summary>Which write is being confirmed.</summary>
+    [Parameter, EditorRequired]
+    public AccessAction Action { get; set; }
+
+    /// <summary>The affected user, as the API identifies them.</summary>
+    [Parameter, EditorRequired]
+    public string SubjectLabel { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Roles to preselect. Only meaningful where the caller already holds authoritative roles for
+    /// this user from a previous API response.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyList<string>? InitialRoles { get; set; }
+
+    private readonly HashSet<string> _selectedRoles = new(StringComparer.Ordinal);
+    private string _reason = string.Empty;
+    private string? _reasonError;
+    private string? _roleError;
+
+    private bool NeedsRoles => Action is AccessAction.Approve or AccessAction.ReplaceRoles;
+
+    private string Title => Action switch
+    {
+        AccessAction.Approve => "Erişim talebini onayla",
+        AccessAction.Reject => "Erişim talebini reddet",
+        AccessAction.ReplaceRoles => "Rolleri değiştir",
+        _ => "Erişimi kapat"
+    };
+
+    private string ConfirmLabel => Action switch
+    {
+        AccessAction.Approve => "Onayla",
+        AccessAction.Reject => "Reddet",
+        AccessAction.ReplaceRoles => "Rolleri uygula",
+        _ => "Erişimi kapat"
+    };
+
+    private string Consequence => Action switch
+    {
+        AccessAction.Approve =>
+            "Kullanıcı uygulamaya erişebilecek ve seçtiğiniz rollerin yetkilerini kazanacak. "
+            + "Bu karar denetim kaydına işlenir ve talep yeniden karara açılamaz.",
+        AccessAction.Reject =>
+            "Talep reddedilecek ve kullanıcı uygulamaya erişemeyecek. Bu karar denetim kaydına "
+            + "işlenir ve talep yeniden karara açılamaz.",
+        AccessAction.ReplaceRoles =>
+            "Kullanıcının rolleri seçtiğiniz kümeyle değiştirilecek. Bu bir ekleme değil, "
+            + "değiştirme işlemidir: seçmediğiniz roller kaldırılır.",
+        _ =>
+            "Kullanıcının uygulama erişimi kapatılacak; tüm rolleri ve yetkileri kaldırılır. "
+            + "Yeniden erişim için yeni bir talep gerekir."
+    };
+
+    private string RoleNote => Action == AccessAction.Approve
+        ? "Kullanıcının başlangıç rollerini seçin."
+        : "Kullanıcının sahip olacağı rollerin tamamını seçin.";
+
+    private string ActionIcon => Action switch
+    {
+        AccessAction.Approve => Icons.Material.Filled.CheckCircle,
+        AccessAction.Reject => Icons.Material.Filled.Cancel,
+        AccessAction.ReplaceRoles => Icons.Material.Filled.ManageAccounts,
+        _ => Icons.Material.Filled.Block
+    };
+
+    // Approving is the only one of the four that grants authority rather than removing or narrowing
+    // it, so it is the only one styled as a primary action.
+    private Color ConfirmColor => Action == AccessAction.Approve ? Color.Primary : Color.Error;
+
+    private string ToneClass => Action == AccessAction.Approve
+        ? "so-dialog--grant"
+        : "so-dialog--restrict";
+
+    protected override void OnInitialized()
+    {
+        if (InitialRoles is null)
+        {
+            return;
+        }
+
+        foreach (string role in InitialRoles)
+        {
+            _selectedRoles.Add(role);
+        }
+    }
+
+    private void ToggleRole(string role, bool selected)
+    {
+        if (selected)
+        {
+            _selectedRoles.Add(role);
+        }
+        else
+        {
+            _selectedRoles.Remove(role);
+        }
+
+        _roleError = null;
+    }
+
+    private void Confirm()
+    {
+        string[] roles = NeedsRoles
+            ? AccessDecisionRules.AssignableRoles.Where(_selectedRoles.Contains).ToArray()
+            : [];
+
+        _reasonError = AccessDecisionRules.ValidateReason(_reason);
+        _roleError = NeedsRoles ? AccessDecisionRules.ValidateRoles(roles) : null;
+
+        if (_reasonError is not null || _roleError is not null)
+        {
+            return;
+        }
+
+        Dialog.Close(DialogResult.Ok(new Result(_reason.Trim(), roles)));
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

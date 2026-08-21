@@ -1,0 +1,518 @@
+@page "/access/requests"
+@attribute [Authorize]
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+@inject IAccessAdminApiClient AccessAdmin
+@inject IDialogService Dialogs
+
+<PageTitle>Erişim Yönetimi · SecureOps</PageTitle>
+
+@*
+    Access administration workspace.
+
+    Scope is set by what the contract actually offers. There is no endpoint that lists application
+    users or reads one user's access record, so an administrator reaches a user only through their
+    access request. That is why this is a request queue with a detail panel rather than a user
+    directory — a "Kullanıcılar" page would be a list this UI cannot populate. See G-8.
+
+    The same constraint shapes the role editor: the current role set of a user cannot be read back,
+    only written. The panel therefore states what is known and what is not, instead of preselecting
+    a guess that would silently wipe roles on save.
+*@
+
+<div class="so-page">
+    <SoPageHeader Title="Erişim Yönetimi"
+                  Lead="Uygulama erişim talepleri, rol atamaları ve hesap durumu.">
+        <Actions>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@(_busy || _loading)"
+                       OnClick="() => ReloadAsync(announce: true)">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.AccessApproveRequests))
+    {
+        @* Capability-gated in the body rather than by route policy, so the answer is an explanation
+           rather than a redirect to a dead end. The API re-checks regardless. *@
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Erişim yönetimi için <code class="so-code">@Capabilities.AccessApproveRequests</code>
+                yetkisi gerekir. Hesabınızda tanımlı yetkileri
+                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+        </section>
+    }
+    else
+    {
+        <section class="so-panel so-panel--tabs">
+            <div class="so-tabs" role="tablist" aria-label="Talep durumu">
+                @foreach ((string Value, string Label) tab in _tabs)
+                {
+                    <button type="button"
+                            role="tab"
+                            class="so-tab @(tab.Value == _status ? "so-tab--active" : null)"
+                            aria-selected="@(tab.Value == _status)"
+                            disabled="@_busy"
+                            @onclick="() => SelectStatusAsync(tab.Value)">
+                        @tab.Label
+                        @if (tab.Value == _status && _requests is not null)
+                        {
+                            <span class="so-tab-count">@_requests.Count</span>
+                        }
+                    </button>
+                }
+            </div>
+        </section>
+
+        @if (_result is not null)
+        {
+            <section class="so-panel so-panel--result" role="status">
+                <span class="so-notice-icon so-notice-icon--ok" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" />
+                </span>
+                <div class="so-result-body">
+                    <h2 class="so-panel-title">@_result.Title</h2>
+                    <p class="so-panel-text">@_result.Detail</p>
+
+                    @if (_result.Access is { } access)
+                    {
+                        @* Authoritative post-write state. Rendered from the API's response, never
+                           from what was submitted, so a server-side normalisation is visible. *@
+                        <SoFieldGrid MinColumnWidth="240px">
+                            <SoField Label="Durum">
+                                <SoStatusBadge Label="@AccessLabels.StatusLabel(access.AccessStatus)"
+                                               Tone="@ToneForStatus(access.AccessStatus)" />
+                            </SoField>
+                            <SoField Label="Roller">
+                                @if (access.Roles.Count == 0)
+                                {
+                                    <span class="so-field-empty">Rol yok</span>
+                                }
+                                else
+                                {
+                                    <span class="so-chip-row">
+                                        @foreach (string role in access.Roles)
+                                        {
+                                            <span class="so-chip">@AccessLabels.RoleLabel(role)</span>
+                                        }
+                                    </span>
+                                }
+                            </SoField>
+                        </SoFieldGrid>
+
+                        <p class="so-panel-text so-panel-text--sm">
+                            Geçerli yetkiler (@access.Capabilities.Count):
+                        </p>
+                        @if (access.Capabilities.Count == 0)
+                        {
+                            <p class="so-field-empty">Tanımlı yetki yok.</p>
+                        }
+                        else
+                        {
+                            <span class="so-chip-row">
+                                @foreach (string capability in access.Capabilities)
+                                {
+                                    <span class="so-chip so-chip--quiet" title="@capability">
+                                        @AccessLabels.Describe(capability).Label
+                                    </span>
+                                }
+                            </span>
+                        }
+                    }
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Size="Size.Small"
+                               aria-label="Sonucu kapat"
+                               OnClick="() => _result = null" />
+            </section>
+        }
+
+        @if (_actionProblem is not null)
+        {
+            @* The failure of the last write. SoProblemPanel surfaces a retry only when the API
+               marked the failure retryable, so a conflict shows none — correct, because re-sending
+               would not help. The list behind this panel has already been reloaded, so what the
+               administrator sees underneath is current server state, not the state they acted on. *@
+            <SoProblemPanel Problem="_actionProblem" OnRetry="() => ReloadAsync(announce: false)" />
+        }
+
+        @if (_listProblem is not null)
+        {
+            <SoProblemPanel Problem="_listProblem" OnRetry="() => ReloadAsync(announce: false)" />
+        }
+
+        <div class="so-admin-grid">
+            <section class="so-panel so-admin-list">
+                <h2 class="so-panel-title">@CurrentTabLabel</h2>
+
+                @if (_loading)
+                {
+                    <SoLoading Message="Talepler yükleniyor…" Bare="true" />
+                }
+                else if (_requests is null)
+                {
+                    <SoEmptyState Title="Liste yüklenemedi"
+                                  Description="Yenile'yi kullanarak yeniden deneyebilirsiniz."
+                                  Icon="@Icons.Material.Outlined.CloudOff" />
+                }
+                else if (_requests.Count == 0)
+                {
+                    <SoEmptyState Title="@EmptyTitle" Description="@EmptyDescription"
+                                  Icon="@Icons.Material.Outlined.Inbox" />
+                }
+                else
+                {
+                    <ul class="so-request-list">
+                        @foreach (AccessRequestResponse request in _requests)
+                        {
+                            <li>
+                                <button type="button"
+                                        class="so-request-row @(request.Id == _selected?.Id ? "so-request-row--active" : null)"
+                                        disabled="@_busy"
+                                        @onclick="() => Select(request)">
+                                    <span class="so-request-identity">
+                                        <span class="so-request-name">@request.CorporateIdentity</span>
+                                        <span class="so-request-meta">
+                                            Talep: @request.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                        </span>
+                                    </span>
+                                    <SoStatusBadge Label="@AccessLabels.RequestStatusLabel(request.Status)"
+                                                   Tone="@ToneForRequest(request.Status)" />
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="so-panel so-admin-detail">
+                @if (_selected is null)
+                {
+                    <SoEmptyState Title="Talep seçilmedi"
+                                  Description="Ayrıntıları ve işlemleri görmek için listeden bir talep seçin."
+                                  Icon="@Icons.Material.Outlined.TouchApp" />
+                }
+                else
+                {
+                    <h2 class="so-panel-title">@_selected.CorporateIdentity</h2>
+
+                    <SoFieldGrid MinColumnWidth="220px">
+                        <SoField Label="Talep durumu">
+                            <SoStatusBadge Label="@AccessLabels.RequestStatusLabel(_selected.Status)"
+                                           Tone="@ToneForRequest(_selected.Status)" />
+                        </SoField>
+                        <SoField Label="Talep tarihi">
+                            @_selected.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        </SoField>
+                        @if (_selected.DecidedAt is { } decidedAt)
+                        {
+                            <SoField Label="Karar tarihi">
+                                @decidedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            </SoField>
+                        }
+                        <SoField Label="Kullanıcı kimliği">
+                            <code class="so-code">@_selected.UserId</code>
+                        </SoField>
+                    </SoFieldGrid>
+
+                    @if (!string.IsNullOrWhiteSpace(_selected.DecisionReason))
+                    {
+                        <SoField Label="Karar gerekçesi">@_selected.DecisionReason</SoField>
+                    }
+
+                    @* The contract exposes no directory profile for another user and no way to read
+                       their current roles. Saying so is better than four blank fields that look like
+                       a loading failure. G-2 and G-8. *@
+                    <p class="so-panel-note">
+                        <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" />
+                        <span>
+                            Bu kullanıcının adı, e-postası ve departmanı API tarafından
+                            sağlanmadığı için gösterilemiyor. Geçerli rolleri de yalnızca bir
+                            değişiklik uygulandıktan sonra okunabiliyor.
+                        </span>
+                    </p>
+
+                    <div class="so-panel-actions so-panel-actions--wrap">
+                        @if (IsPending(_selected))
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.CheckCircle"
+                                       Disabled="@_busy"
+                                       OnClick="() => RunAsync(AccessActionDialog.AccessAction.Approve)">
+                                Onayla
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       Disabled="@_busy"
+                                       OnClick="() => RunAsync(AccessActionDialog.AccessAction.Reject)">
+                                Reddet
+                            </MudButton>
+                        }
+
+                        @if (_access.Can(Capabilities.AccessAssignRoles))
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.ManageAccounts"
+                                       Disabled="@_busy"
+                                       OnClick="() => RunAsync(AccessActionDialog.AccessAction.ReplaceRoles)">
+                                Rolleri değiştir
+                            </MudButton>
+                        }
+
+                        @if (_access.Can(Capabilities.AccessManageUsers))
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.Block"
+                                       Disabled="@_busy"
+                                       OnClick="() => RunAsync(AccessActionDialog.AccessAction.Disable)">
+                                Erişimi kapat
+                            </MudButton>
+                        }
+                    </div>
+
+                    @if (_busy)
+                    {
+                        <SoLoading Message="İşlem uygulanıyor…" Bare="true" />
+                    }
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private sealed record ActionResult(string Title, string Detail, CurrentAccessResponse? Access);
+
+    private static readonly (string Value, string Label)[] _tabs =
+    [
+        ("Pending", "Bekleyen"),
+        ("Approved", "Onaylanan"),
+        ("Rejected", "Reddedilen")
+    ];
+
+    private AccessSnapshot? _access;
+    private IReadOnlyList<AccessRequestResponse>? _requests;
+    private AccessRequestResponse? _selected;
+
+    // Two separate slots, because the two failures have different lifetimes and must not clear each
+    // other. Every write is followed by a list reload — including a failed one, since a conflict is
+    // exactly when the list is most likely stale — so a single field let the reload wipe the very
+    // conflict it was reloading because of, and the operator saw a silent no-op.
+    private UiProblem? _actionProblem;
+    private UiProblem? _listProblem;
+
+    private ActionResult? _result;
+    private string _status = "Pending";
+    private bool _loading;
+    private bool _busy;
+
+    private string CurrentTabLabel => _tabs.First(tab => tab.Value == _status).Label;
+
+    private string EmptyTitle => _status switch
+    {
+        "Pending" => "Bekleyen talep yok",
+        "Approved" => "Onaylanmış talep yok",
+        _ => "Reddedilmiş talep yok"
+    };
+
+    private string EmptyDescription => _status == "Pending"
+        ? "Karar bekleyen erişim talebi bulunmuyor."
+        : "Bu durumda kayıtlı talep bulunmuyor.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.AccessApproveRequests))
+        {
+            await ReloadAsync(announce: false);
+        }
+    }
+
+    private static bool IsPending(AccessRequestResponse request) =>
+        string.Equals(request.Status, "Pending", StringComparison.OrdinalIgnoreCase);
+
+    private void Select(AccessRequestResponse request)
+    {
+        _selected = request;
+        _result = null;
+        _actionProblem = null;
+    }
+
+    private async Task SelectStatusAsync(string status)
+    {
+        if (_status == status)
+        {
+            return;
+        }
+
+        _status = status;
+        _selected = null;
+        _result = null;
+        await ReloadAsync(announce: false);
+    }
+
+    private async Task ReloadAsync(bool announce)
+    {
+        _loading = true;
+
+        // Only the list's own problem is cleared here. _actionProblem belongs to the write that
+        // just ran and has to survive the reload that follows it.
+        _listProblem = null;
+
+        if (announce)
+        {
+            _result = null;
+            _actionProblem = null;
+        }
+
+        StateHasChanged();
+
+        try
+        {
+            _requests = await AccessAdmin.GetRequestsAsync(_status, CancellationToken.None);
+
+            // Keep the selection pointing at authoritative state: after a write the row's status
+            // has changed, and holding the pre-write copy would let a stale action be offered.
+            _selected = _selected is null
+                ? null
+                : _requests.FirstOrDefault(request => request.Id == _selected.Id);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _listProblem = ex.Problem;
+            _requests = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunAsync(AccessActionDialog.AccessAction action)
+    {
+        if (_busy || _selected is null)
+        {
+            return;
+        }
+
+        AccessRequestResponse target = _selected;
+
+        DialogParameters parameters = new()
+        {
+            { nameof(AccessActionDialog.Action), action },
+            { nameof(AccessActionDialog.SubjectLabel), target.CorporateIdentity }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<AccessActionDialog>(
+            title: string.Empty,
+            parameters,
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        DialogResult? outcome = await dialog.Result;
+
+        if (outcome is null || outcome.Canceled || outcome.Data is not AccessActionDialog.Result confirmed)
+        {
+            return;
+        }
+
+        // Set before the first await: every action button binds Disabled to this, so the second
+        // click of a double-click finds them already disabled.
+        _busy = true;
+        _actionProblem = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            _result = action switch
+            {
+                AccessActionDialog.AccessAction.Approve => Describe(
+                    "Talep onaylandı",
+                    await AccessAdmin.ApproveAsync(target.Id, confirmed.Reason, confirmed.Roles, CancellationToken.None)),
+                AccessActionDialog.AccessAction.Reject => Describe(
+                    "Talep reddedildi",
+                    await AccessAdmin.RejectAsync(target.Id, confirmed.Reason, CancellationToken.None)),
+                AccessActionDialog.AccessAction.ReplaceRoles => new ActionResult(
+                    "Roller güncellendi",
+                    $"{target.CorporateIdentity} için roller değiştirildi.",
+                    await AccessAdmin.ReplaceRolesAsync(
+                        target.UserId, confirmed.Roles, confirmed.Reason, CancellationToken.None)),
+                _ => new ActionResult(
+                    "Erişim kapatıldı",
+                    $"{target.CorporateIdentity} artık uygulamaya erişemiyor.",
+                    await AccessAdmin.DisableAsync(target.UserId, confirmed.Reason, CancellationToken.None))
+            };
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        // Always re-read the list, including after a failure: a conflict means the server state is
+        // not what this page is showing, which is exactly when a refresh matters most.
+        await ReloadAsync(announce: false);
+
+        // The signed-in administrator may have changed their own authority.
+        await AccessProvider.RefreshAsync(CancellationToken.None);
+    }
+
+    private static ActionResult Describe(string title, AccessRequestResponse request) => new(
+        title,
+        $"{request.CorporateIdentity} · karar {request.DecidedAt?.ToLocalTime():dd.MM.yyyy HH:mm}",
+        Access: null);
+
+    private static SoStatusBadge.BadgeTone ToneForRequest(string status) => status switch
+    {
+        "Approved" => SoStatusBadge.BadgeTone.Positive,
+        "Rejected" => SoStatusBadge.BadgeTone.Critical,
+        "Pending" => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static SoStatusBadge.BadgeTone ToneForStatus(string status) => status switch
+    {
+        AccessStatuses.Approved => SoStatusBadge.BadgeTone.Positive,
+        AccessStatuses.Disabled => SoStatusBadge.BadgeTone.Critical,
+        AccessStatuses.Pending => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private async Task RefreshAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        StateHasChanged();
+    }
+
+    private void OnAccessChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            _access = await AccessProvider.GetAsync(CancellationToken.None);
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        AccessProvider.Changed -= OnAccessChanged;
+    }
+}

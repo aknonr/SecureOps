@@ -1444,3 +1444,381 @@ body {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* =============================================================================
+   Access administration  (Pages/AccessRequests.razor)
+
+   Two columns on desktop: the request queue stays visible while its detail is
+   read, because an administrator works down a list rather than through a stack
+   of pages. Below the shared 1024px breakpoint it collapses to one column.
+   ========================================================================== */
+
+.so-admin-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+    gap: var(--so-space-4);
+    align-items: start;
+}
+
+@media (max-width: 1024px) {
+    .so-admin-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.so-admin-list,
+.so-admin-detail {
+    min-width: 0;
+}
+
+/* -- status tabs ------------------------------------------------------- */
+
+.so-panel--tabs {
+    padding: var(--so-space-2);
+}
+
+.so-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-1);
+}
+
+.so-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    padding: var(--so-space-2) var(--so-space-4);
+    border: none;
+    border-radius: var(--so-radius-sm);
+    background: transparent;
+    color: var(--so-text-muted);
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.so-tab:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--so-accent) 8%, transparent);
+    color: var(--so-text);
+}
+
+.so-tab:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.so-tab--active {
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+    color: var(--so-accent);
+}
+
+.so-tab-count {
+    padding: 0 var(--so-space-2);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint-strong), transparent);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* -- request queue ----------------------------------------------------- */
+
+.so-request-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--so-space-1);
+    margin: var(--so-space-3) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.so-request-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--so-space-3);
+    width: 100%;
+    padding: var(--so-space-3);
+    border: 1px solid transparent;
+    border-radius: var(--so-radius-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.so-request-row:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--so-accent) 6%, transparent);
+}
+
+.so-request-row:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+/* The selected row is marked by a left rule as well as a fill: on a dark ground a
+   low-contrast fill alone is easy to lose when scanning. */
+.so-request-row--active {
+    border-color: color-mix(in srgb, var(--so-accent) 34%, var(--so-border));
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+    box-shadow: inset 3px 0 0 var(--so-accent);
+}
+
+.so-request-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.so-request-name {
+    font-weight: 600;
+    font-size: 0.92rem;
+    overflow-wrap: anywhere;
+}
+
+.so-request-meta {
+    font-size: 0.78rem;
+    color: var(--so-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* -- chips ------------------------------------------------------------- */
+
+.so-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+}
+
+.so-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--so-space-3);
+    border: 1px solid color-mix(in srgb, var(--so-accent) 26%, var(--so-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+    color: var(--so-accent);
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
+/* Capabilities are numerous and secondary to roles, so they read as neutral
+   metadata rather than a second set of badges competing with the role chips. */
+.so-chip--quiet {
+    border-color: var(--so-border);
+    background: var(--so-bg-sunken);
+    color: var(--so-text-muted);
+    font-weight: 400;
+}
+
+/* -- contract-limitation note ------------------------------------------ */
+
+.so-panel-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-2);
+    margin: var(--so-space-4) 0 0;
+    padding: var(--so-space-3);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+    color: var(--so-text-muted);
+    font-size: 0.82rem;
+    line-height: 1.6;
+}
+
+.so-panel-actions--wrap {
+    row-gap: var(--so-space-2);
+}
+
+/* -- write result ------------------------------------------------------ */
+
+.so-panel--result {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+    border-color: color-mix(in srgb, var(--so-success) 34%, var(--so-border));
+}
+
+.so-panel--result .so-notice-icon {
+    margin-bottom: 0;
+    flex: none;
+}
+
+.so-notice-icon--ok {
+    background: color-mix(in srgb, var(--so-success) var(--so-tint), transparent);
+    color: var(--so-success);
+}
+
+.so-result-body {
+    flex: 1;
+    min-width: 0;
+}
+
+/* =============================================================================
+   Access action dialog  (Shared/Components/AccessActionDialog.razor)
+   ========================================================================== */
+
+.so-dialog-title {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-3);
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.so-dialog-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+}
+
+.so-dialog-icon.so-dialog--grant {
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+    color: var(--so-accent);
+}
+
+.so-dialog-icon.so-dialog--restrict {
+    background: color-mix(in srgb, var(--so-danger) var(--so-tint), transparent);
+    color: var(--so-danger);
+}
+
+.so-dialog-subject {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--so-space-3);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+}
+
+.so-dialog-subject-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--so-text-muted);
+}
+
+.so-dialog-subject-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+/* The consequence carries a left rule in the action's own colour, so the weight of
+   what is about to happen is legible before the text is read. */
+.so-dialog-consequence {
+    margin: var(--so-space-4) 0 0;
+    padding-left: var(--so-space-3);
+    font-size: 0.88rem;
+    line-height: 1.65;
+}
+
+.so-dialog-consequence.so-dialog--grant {
+    border-left: 3px solid var(--so-accent);
+}
+
+.so-dialog-consequence.so-dialog--restrict {
+    border-left: 3px solid var(--so-danger);
+    color: var(--so-text);
+}
+
+.so-role-picker {
+    margin: var(--so-space-4) 0 0;
+    padding: var(--so-space-3);
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius-sm);
+}
+
+.so-role-picker legend {
+    padding: 0 var(--so-space-2);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--so-text-muted);
+}
+
+.so-role-picker-note {
+    margin: 0 0 var(--so-space-2);
+    font-size: 0.82rem;
+    color: var(--so-text-muted);
+}
+
+.so-role-picker-caveat {
+    margin: var(--so-space-3) 0 0;
+    font-size: 0.76rem;
+    line-height: 1.55;
+    color: var(--so-text-muted);
+}
+
+.so-role-option {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-1);
+    padding: var(--so-space-1) 0;
+    cursor: pointer;
+}
+
+.so-role-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-top: 9px;
+    min-width: 0;
+}
+
+.so-role-option-name {
+    font-size: 0.88rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.so-role-option-desc {
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--so-text-muted);
+}
+
+.so-dialog-reason {
+    margin-top: var(--so-space-4);
+}
+
+.so-dialog-error {
+    margin: var(--so-space-2) 0 0;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--so-danger);
+}
+
+/* The confirmation dialog must never push its own actions off screen: the whole
+   point of the pattern is that Onayla/Vazgeç are reachable. At 1366x768 — the
+   commonest operator laptop — the role list plus consequence plus reason field is
+   taller than the viewport, so the dialog becomes a flex column whose content
+   scrolls while the title and actions stay put. */
+/* Height is capped on the scrolling region directly rather than by making the dialog
+   a flex column. MudBlazor wraps DialogContent and DialogActions in a focus-trap div,
+   and flex-shrink does not propagate through it — the content keeps its natural
+   height and pushes the actions past the dialog's own bottom edge. Constraining the
+   content explicitly is independent of that internal structure.
+
+   The subtraction is the dialog's own top and bottom margin, plus the title and
+   action rows it has to sit between. */
+.so-dialog .mud-dialog-content {
+    max-height: calc(100vh - 2 * var(--so-space-6) - 140px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* A hairline appears under the title and above the actions so the scrolled region
+   reads as bounded rather than as text running off the edge. */
+.so-dialog .mud-dialog-title {
+    border-bottom: 1px solid var(--so-border-soft);
+}
+
+.so-dialog .mud-dialog-actions {
+    border-top: 1px solid var(--so-border-soft);
+}
