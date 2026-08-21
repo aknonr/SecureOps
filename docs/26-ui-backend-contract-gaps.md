@@ -13,7 +13,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-4 — Session expiry indistinguishable from never-signed-in | Open |
 | G-5 — Demo access bootstrap needs an undocumented setting | Open |
 | G-6 — No access-request creation endpoint | Open |
-| G-7 — Capabilities advertises UPN lookup the mock provider cannot serve | Open (new) |
+| G-7 — Capabilities advertised UPN lookup the provider could not serve | ✅ **Resolved** by backend `704c32ba` |
 
 ---
 
@@ -152,45 +152,50 @@ pending request ID for the operator to quote.
 
 ---
 
-## G-7 — Capabilities advertises UPN lookup the mock provider cannot serve
+## G-7 — Capabilities advertised UPN lookup the provider could not serve — ✅ RESOLVED
 
 **Raised:** while verifying the G-1 fix, 2026-08-21.
+**Resolved by backend commit `704c32ba627fb9352556b4138e4f79de27cecc2e`**
+("fix(identity): report effective UPN lookup capability") on `release/api-test-20260812`, merged into
+`feature/ui-enterprise-shell`.
 
-**Severity:** Medium in Development/Demo/Test. Unknown in Production — depends on whether
-`ActiveDirectoryIdentityDirectoryProvider` resolves a UPN, which the UI cannot observe from here.
-
-**UI need:** `GET /identity/lookup/capabilities` returns `supportsUpnLookup`, and the UI uses it to
-decide whether to accept a UPN-shaped account. When it is `true`, the UI stops warning about
-`user@domain` input and forwards it.
-
-**Today:** capabilities reports `"supportsUpnLookup": true`, but looking up a mock user *by their own
-UPN* returns not-found:
+**Severity when open:** Medium. `GET /identity/lookup/capabilities` returned
+`"supportsUpnLookup": true`, but looking a mock user up *by their own UPN* returned not-found:
 
 ```
-POST /api/v1/identity/lookup  {"account":"pam12356@contoso.local"}   →  404 IdentityNotFound
-POST /api/v1/identity/lookup  {"account":"pam12356"}                 →  200 Found
-                                    ("userPrincipalName": "pam12356@contoso.local")
+POST /identity/lookup  {"account":"pam12356@contoso.local"}   →  404 IdentityNotFound
+POST /identity/lookup  {"account":"pam12356"}                 →  200 Found
+                             ("userPrincipalName": "pam12356@contoso.local")
 ```
 
-So the flag promises a capability the active provider does not implement. An operator who pastes a
-UPN — the natural thing to copy out of an alert — gets a confusing "not found" for an account that
-demonstrably exists.
+The UI reads that flag to decide whether to accept a UPN-shaped account, so the contract promised a
+capability the active provider did not implement. An operator pasting a UPN out of an alert — the
+natural thing to do — got "not found" for an account that demonstrably existed.
 
-This was **not** introduced by `4adab66c`; the fix made it observable by making any lookup succeed
-at all. It is a pre-existing mismatch that G-1 was masking.
+Not a regression from `4adab66c`: G-1 was masking it by making every lookup fail.
 
-**Suggested (backend-owned), one of:**
+**The fix** takes the second of the two options raised here — `supportsUpnLookup` now reports the
+**effective capability of the active provider** rather than a configuration flag, and
+`MockIdentityDirectoryProvider` gained exact UPN matching gated on `EnableUpnLookup`.
+`ActiveDirectoryIdentityDirectoryProvider` remains exact sAMAccountName first with an optional exact
+UPN fallback. This is the more durable answer, because the flag now stays honest per environment even
+if the AD provider's UPN support differs from the mock's.
 
-1. Make `MockIdentityDirectoryProvider` match on `UserPrincipalName` as well as `SamAccountName`, so
-   the mock reflects the contract it advertises; or
-2. Derive `supportsUpnLookup` from the active provider's real capability rather than from
-   configuration, so the flag is honest per environment.
+**Verified from the UI side** by running the Demo API in both configurations — the point being that
+the flag must agree with behaviour in *both* directions, not merely be `true`:
 
-Option 2 is the more durable answer if the AD provider's UPN support differs from the mock's.
+| `IdentityLookup:EnableUpnLookup` | `supportsUpnLookup` | UPN lookup | sAMAccountName |
+|---|---|---|---|
+| default (enabled) | `true` | **200 Found**, `normalizedAccount: pam12356@contoso.local` | 200 Found |
+| `false` | `false` | 404 `IdentityNotFound` | 200 Found |
 
-**UI meanwhile:** no change. The UI already renders the 404 as a clean not-found state, and
-`AccountInputRules` treats UPN shapes as advisory rather than blocking, so nothing is rejected
-client-side. The wording cannot be improved without knowing which of the two fixes lands.
+Exact-match semantics are intact in both: `CONTOSO\pam12356` still normalizes to `pam12356` (200),
+a genuinely unknown account still returns 404 `IdentityNotFound`, the partial `pam` returns 404
+rather than prefix-matching, and the wildcard `pam*` is rejected as 400 `InvalidIdentityInput`.
+
+**UI:** no change required. `AccountInputRules` already blocks wildcard and LDAP characters
+client-side (submit stays disabled, no request is issued), and the UPN found state renders correctly
+with the normalized UPN shown. The UI performs no wildcard, prefix, or fuzzy matching of its own.
 
 ---
 

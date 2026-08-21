@@ -159,9 +159,10 @@ Identity lookup works against the Demo API as of backend commit `4adab66c` (G-1,
 seeded mock account `pam12356` returns a full record; unknown accounts still return `404
 IdentityNotFound`.
 
-Note that looking a mock user up **by UPN** still returns not-found even though capabilities reports
-`supportsUpnLookup: true` — tracked as G-7 in `docs/26-ui-backend-contract-gaps.md`. Use the
-sAMAccountName form when testing.
+UPN lookup works as of backend commit `704c32ba` (G-7, resolved). `supportsUpnLookup` now reports the
+active provider's effective capability, so the flag and the endpoint agree: with
+`IdentityLookup:EnableUpnLookup` on, `pam12356@contoso.local` resolves; with it off, the flag reports
+`false` and the UPN returns 404. `AccountInputRules` reads the flag rather than assuming either way.
 
 If Chrome shows "Güvenli değil", run `dotnet dev-certs https --trust` once. No certificates are
 committed.
