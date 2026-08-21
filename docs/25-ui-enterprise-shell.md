@@ -217,8 +217,11 @@ Rules specific to this screen:
   asserted across the whole state machine by test.
 - **`OperationalRecordCloseFailed` is a partial success, not a failure.** Jira exists; only the source
   close is outstanding. Retry may resume it; create is never offered.
-- **`CreatingJira` without an issue key is an unknown outcome.** Prominent amber panel, explicit
-  duplicate-risk warning, correlation id, and no action offered at all.
+- **`reconciliationRequired` marks an unknown outcome.** The workflow contract settles an unknown
+  Jira outcome as `JiraCreateFailed` with `reconciliationRequired = true`, so the flag is the signal
+  rather than any one stage; `CreatingJira` without an issue key is kept as a secondary signal for
+  the window before the flag is set. Prominent amber panel, explicit duplicate-risk warning,
+  correlation id, create blocked in every state, and retry only when `retryEligible` is also true.
 - **Idempotency is the backend's.** No `Idempotency-Key` is sent, so the API's deterministic
   actor+command+record key applies and a repeat after refresh collapses onto the same command.
 - **Retry follows authoritative state, not HTTP status.**

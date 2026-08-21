@@ -612,10 +612,14 @@ What it does **not** establish:
 
 ## Note: enums cross the wire as numbers
 
-Not a gap, recorded because it caught out a test double and will catch out the next one. The API
-configures no `JsonStringEnumConverter`, so `workflowState` and `classification` serialize as
-**integers**, not names. Any stub, fixture, or client written against these DTOs must match that, and
-adding a member in the middle of either enum would silently change the meaning of existing values.
+Not a gap. Recorded here because it caught out a test double, and now **formally frozen by the v1
+contract** in backend `689e757c`: both enums carry explicit numeric assignments, the UI-integration
+contract lists every value, and contract tests pin them. The documented rule is that the values must
+not be renumbered or reordered, and that a string representation would require an explicitly
+versioned API contract rather than a silent change.
+
+The practical consequence is unchanged: any stub, fixture, or client written against these DTOs must
+send integers, not names.
 
 ---
 

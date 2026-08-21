@@ -156,8 +156,11 @@ Two states are deliberately **not** toned as errors:
 - `OperationalRecordCloseFailed` — the Jira issue **exists**; only the source close is outstanding.
   Toned Caution, because painting a partial success as a failure invites someone to "fix" it by
   creating a second issue.
-- `CreatingJira` with no issue key — the outcome is **unknown**. Gets its own prominent amber panel,
-  offers no action at all, and says plainly that creating again risks a duplicate.
+- **`reconciliationRequired` — the outcome is unknown.** Per the workflow contract an unknown Jira
+  outcome settles as `JiraCreateFailed` with `reconciliationRequired = true`; the flag, not the
+  stage, is the signal. `CreatingJira` without an issue key is treated the same way as a secondary
+  signal, covering the window before the flag is set. Either way: a prominent amber panel, create
+  blocked in every state, retry only if `retryEligible`, and an explicit duplicate-risk warning.
 
 **Idempotency belongs to the backend.** The UI sends no `Idempotency-Key`. The contract makes it
 optional and the API then derives a deterministic key from actor, command, and record — which is
