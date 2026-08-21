@@ -43,6 +43,9 @@ public sealed class IdentityLookupService : IIdentityLookupService
     }
 
     /// <inheritdoc />
+    public bool SupportsUpnLookup => _directoryProvider.SupportsUpnLookup;
+
+    /// <inheritdoc />
     public async Task<IdentityLookupResult> LookupAsync(
         IdentityLookupRequest request,
         IdentityLookupExecutionContext context,

@@ -75,6 +75,8 @@ public sealed class IdentityControllerAuditTests
     {
         public int Calls { get; private set; }
 
+        public bool SupportsUpnLookup => false;
+
         public Task<IdentityLookupResult> LookupAsync(
             IdentityLookupRequest request,
             IdentityLookupExecutionContext context,

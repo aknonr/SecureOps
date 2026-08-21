@@ -72,7 +72,7 @@ The future UI calls these Phase 1A endpoints:
 |---|---|---|
 | POST | `/api/v1/identity/lookup` | TeamLead/Admin lookup form submit |
 | GET | `/api/v1/identity/me` | Show current caller capability |
-| GET | `/api/v1/identity/lookup/capabilities` | Render validation limits and allowed fields |
+| GET | `/api/v1/identity/lookup/capabilities` | Render validation limits, allowed fields, and effective provider behavior |
 | GET | `/api/v1/health/audit-store` | Admin/system health page |
 | GET | `/api/v1/health/identity-provider` | Admin/system health page |
 

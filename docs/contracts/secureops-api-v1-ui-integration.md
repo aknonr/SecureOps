@@ -23,7 +23,7 @@ Role codes are `Admin`, `Lead`, `Operator`, `JiraPublisher`, `Auditor`, and `Rea
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
 | `GET /api/v1/identity/me` | Authenticated | none | current caller metadata | 401 |
-| `GET /api/v1/identity/lookup/capabilities` | `Identity.Lookup` | none | validation limits and returned fields | `AccessPending`, `AccessDisabled`, `AccessDenied` |
+| `GET /api/v1/identity/lookup/capabilities` | `Identity.Lookup` | none | validation limits, returned fields, and effective active-provider `supportsUpnLookup` | `AccessPending`, `AccessDisabled`, `AccessDenied` |
 | `POST /api/v1/identity/lookup` | `Identity.Lookup` | `{ "account": "sample.user", "purpose": "Approved operational purpose", "alertId": null, "turuncuhatEvtId": null }` | `IdentityLookupResponse` | `InvalidIdentityInput`, `IdentityNotFound`, `IdentityProviderTimeout`, `IdentityProviderUnavailable`, `AuditStoreUnavailable` |
 | `POST /api/v1/identity/bulk-lookup` | `Identity.Lookup` | same purpose plus `accounts` array, maximum configured count | ordered `BulkIdentityLookupResponse` | `InvalidIdentityInput`, 429 |
 | `GET /api/v1/identity/lookup/cache-diagnostics` | `SystemDiagnostics` | none | aggregate counters without account labels | 403 |

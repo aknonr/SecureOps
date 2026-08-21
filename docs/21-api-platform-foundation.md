@@ -12,6 +12,8 @@ Exact Demo/Test Swagger keys: `Swagger:Enabled`, `DemoAuth:Enabled`, `Access:Dem
 
 Exact AD runtime keys: mandatory `IdentityLookup:Provider=ActiveDirectory` and `IdentityLookup:DomainName`; optional `IdentityLookup:Container` and `IdentityLookup:EnableUpnLookup`; bounded settings `IdentityLookup:ProviderTimeoutSeconds`, `IdentityLookup:BulkMaxAccounts`, `IdentityLookup:Cache:Enabled`, `IdentityLookup:Cache:TtlSeconds`, and `IdentityLookup:Cache:MaxEntries`.
 
+The lookup capabilities endpoint reports effective active-provider behavior. `supportsUpnLookup` reflects both provider support and `IdentityLookup:EnableUpnLookup`; it does not advertise configuration intent that the selected provider cannot execute. Mock and Active Directory providers use exact matching only.
+
 `PamProvider:Provider` is restricted to `Mock`. A real resolver requires an approved API/module/cmdlet, exact lookup parameter and response contract, authentication model, timeout/rate limits, and runtime identity authorization. No arbitrary PowerShell is supported.
 
 Basic PAM-style identifiers are implemented as ordinary exact directory-account input and follow the same sAMAccountName-first path as any other account. This does not resolve the human owner of an account. Owner-resolution rules remain planned until approved directory attributes or a corporate mapping contract are available.

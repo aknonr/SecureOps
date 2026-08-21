@@ -140,6 +140,8 @@ IdentityLookup constraints:
 - One exact account per request.
 - Account values are accepted only in the POST body of `/api/v1/identity/lookup`; no URL/query-string account lookup is allowed.
 - Default provider is mock in development; production can enable the read-only AD provider by configuration.
+- `GET /api/v1/identity/lookup/capabilities` reports effective behavior of the active provider. `supportsUpnLookup` is true only when exact UPN lookup is supported and enabled.
+- The mock provider performs deterministic exact sAMAccountName lookup and optional exact UPN lookup over the same seeded identities. Unknown exact values remain NotFound.
 - Audit write availability is required before provider access; lookup fails closed if audit is unavailable.
 - Provider implementations enforce max length, exact-input validation, and exact-match result verification.
 - Real AD provider calls use a short timeout (`IdentityLookup:ProviderTimeoutSeconds`, default 3 seconds). Provider timeout returns the safe user-facing `DirectoryProviderTimeout` error code and writes `IdentityLookupProviderTimeout`.

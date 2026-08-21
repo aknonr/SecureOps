@@ -26,6 +26,27 @@ public sealed class ActiveDirectoryIdentityDirectoryProviderTests
         result.Should().NotBeNull(); client.UpnInputs.Should().ContainSingle().Which.Should().Be("test.user@example.invalid");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SupportsUpnLookup_ReflectsEffectiveConfiguredBehavior(bool enabled)
+    {
+        ActiveDirectoryIdentityDirectoryProvider provider = Create(new FakeClient(), upn: enabled);
+
+        provider.SupportsUpnLookup.Should().Be(enabled);
+    }
+
+    [Fact]
+    public async Task FindUserAsync_WithUpnDisabled_DoesNotCallUpnTransport()
+    {
+        FakeClient client = new() { UpnResult = Record("test.user") };
+
+        DirectoryUserRecord? result = await Create(client, upn: false).FindUserAsync("test.user@example.invalid", CancellationToken.None);
+
+        result.Should().BeNull();
+        client.UpnInputs.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task FindUserAsync_RejectsUnsafeInputWithoutClientCall()
     {

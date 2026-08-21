@@ -46,6 +46,8 @@ public sealed class BulkIdentityLookupTests
 
     private sealed class StubLookupService : IIdentityLookupService
     {
+        public bool SupportsUpnLookup => false;
+
         public Task<IdentityLookupResult> LookupAsync(IdentityLookupRequest request, IdentityLookupExecutionContext context, CancellationToken cancellationToken)
         {
             return Task.FromResult(request.Account switch

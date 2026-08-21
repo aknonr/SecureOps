@@ -6,6 +6,11 @@ namespace SecureOps.Infrastructure.Identity;
 public interface IIdentityDirectoryProvider
 {
     /// <summary>
+    /// Gets whether this configured provider currently supports exact UPN lookup.
+    /// </summary>
+    public bool SupportsUpnLookup { get; }
+
+    /// <summary>
     /// Looks up a user by exact account value.
     /// </summary>
     /// <param name="normalizedAccount">Normalized account value.</param>
