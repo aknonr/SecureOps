@@ -4,7 +4,7 @@
 
 The backend foundation is implemented for TEST validation. Codex owns API, services, integration boundaries, persistence, SQL, authorization, audit, release packaging, and backend tests. Claude owns all Blazor/Razor/CSS/UI work and does not need to change this module.
 
-Real Operational Record and Jira adapters are intentionally deferred. Local and current default runtime providers are fakes and perform no external network calls.
+Real Operational Record and Jira adapters are intentionally deferred. `OperationalRecords:SourceProvider=Fake` selects a deterministic, no-network Development/Demo/Test harness. Production-style environments default to `Disabled` and fail closed until an approved source adapter exists. Jira remains a no-network fake pending its approved contract.
 
 ## Legacy Workflow Replacement
 
@@ -27,7 +27,7 @@ No legacy Operational Record/Jira PowerShell script exists in this repository. T
 
 `Imported -> Classified -> NeedsManualReview | Eligible -> Previewed -> CreateRequested -> CreatingJira -> JiraCreated -> ClosingOperationalRecord -> Completed`
 
-Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. No approved classification rules exist, so the implemented classifier always selects `NeedsManualReview`. No endpoint automatically promotes a record to `Eligible`.
+Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. No approved real-source classification rules exist, so production-style classification selects `NeedsManualReview`. The explicit synthetic source uses a synthetic-only classifier to make its known records eligible for state-machine verification; it is not a corporate business rule and cannot activate outside Development/Demo/Test.
 
 ## Claims, Idempotency, Freshness, and Retry
 
@@ -71,7 +71,7 @@ Minimum runtime permissions are `SELECT`, `INSERT`, and `UPDATE` on these three 
 
 Non-secret keys:
 
-- `OperationalRecords:SourceProvider` (`Fake` only now)
+- `OperationalRecords:SourceProvider` (`Disabled`, or `Fake` only in Development/Demo/Test)
 - `OperationalRecords:RepositoryProvider` (`InMemory` or `SqlServer`)
 - `OperationalRecords:MaxImportCount` (1-500)
 - `OperationalRecords:ClaimLeaseSeconds` (30-900)
@@ -83,6 +83,8 @@ Non-secret keys:
 - `Jira:MappingVersion`
 - `Jira:UnresolvedRequesterPolicy` (`Block` or `ProceedUnassigned`)
 - `Jira:SummaryMaxLength` (32-255)
+
+Local, Demo, or Test synthetic verification requires both an allowed `ASPNETCORE_ENVIRONMENT` value (`Development`, `Demo`, or `Test`) and `OperationalRecords__SourceProvider=Fake`. Production-style runtime configuration must set `OperationalRecords__SourceProvider=Disabled`; any unimplemented provider name fails startup validation instead of falling back to synthetic data.
 - `ConnectionStrings:SecureOpsDb` when SQL persistence is selected
 
 Future integration authentication must use approved server-side enterprise identity/secret facilities. No credential shape is defined in source.
@@ -90,5 +92,7 @@ Future integration authentication must use approved server-side enterprise ident
 ## TEST Validation
 
 Before enabling a real adapter: review source and Jira contracts, approve field mappings/classification rules, apply SQL through DBA process, configure capability groups, validate service-account permissions, and prove a deterministic Jira reconciliation mechanism. TEST must exercise preview, one create, partial source-close failure, retry, concurrent submission, audit evidence, and correlation IDs with synthetic/non-sensitive records.
+
+The synthetic source exposes fixed non-corporate records for a stable eligible flow plus stale, closed, and missing revalidation outcomes. Claim ownership, transfer completion, and reconciliation are durable workflow transitions exercised against those records rather than fabricated source fields. A real source adapter still requires approved base URL and authentication, bounded list/detail schemas, exact requester fields, status mapping, version/ETag semantics, close/update contract, error/retry semantics, and ownership approval.
 
 Release packaging must use `scripts/release/New-ApiDeploymentPackage.ps1`; it preserves runtime directories and validates every packaged relative path and SHA256 against the publish tree.

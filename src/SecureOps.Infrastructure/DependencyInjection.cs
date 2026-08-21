@@ -91,10 +91,21 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationAccessService, ApplicationAccessService>();
 
-        services.AddSingleton<IOperationalRecordClient, FakeOperationalRecordClient>();
+        string? sourceProvider = configuration[$"{OperationalRecordsOptions.SectionName}:SourceProvider"];
+        if (string.Equals(sourceProvider, "Fake", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IOperationalRecordClient, FakeOperationalRecordClient>();
+            services.AddSingleton<IOperationalRecordClassifier, FakeOperationalRecordClassifier>();
+            services.AddSingleton<IRequesterResolver, FakeRequesterResolver>();
+        }
+        else
+        {
+            services.AddSingleton<IOperationalRecordClient, DisabledOperationalRecordClient>();
+            services.AddSingleton<IOperationalRecordClassifier, ManualReviewOperationalRecordClassifier>();
+            services.AddSingleton<IRequesterResolver, UnresolvedRequesterResolver>();
+        }
+
         services.AddSingleton<IJiraClient, FakeJiraClient>();
-        services.AddSingleton<IRequesterResolver, FakeRequesterResolver>();
-        services.AddSingleton<IOperationalRecordClassifier, ManualReviewOperationalRecordClassifier>();
         if (string.Equals(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IOperationalRecordRepository, SqlOperationalRecordRepository>();

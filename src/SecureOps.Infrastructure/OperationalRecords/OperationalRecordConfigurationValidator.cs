@@ -7,14 +7,22 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 public static class OperationalRecordConfigurationValidator
 {
     /// <summary>Validates supported providers and bounded mapping values.</summary>
-    public static void Validate(IConfiguration configuration)
+    public static void Validate(IConfiguration configuration, string environmentName)
     {
         OperationalRecordsOptions operational = configuration.GetSection(OperationalRecordsOptions.SectionName).Get<OperationalRecordsOptions>() ?? new();
         JiraIntegrationOptions jira = configuration.GetSection(JiraIntegrationOptions.SectionName).Get<JiraIntegrationOptions>() ?? new();
 
-        if (!string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(operational.SourceProvider, "Disabled", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("OperationalRecords:SourceProvider must remain Fake until an approved source adapter is implemented.");
+            throw new InvalidOperationException(
+                $"OperationalRecords:SourceProvider '{operational.SourceProvider}' is not implemented. Use Disabled, or Fake only for Development/Demo/Test.");
+        }
+
+        if (string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase)
+            && !IsSyntheticEnvironment(environmentName))
+        {
+            throw new InvalidOperationException("OperationalRecords:SourceProvider Fake is permitted only in Development, Demo, or Test.");
         }
 
         if (!string.Equals(operational.RepositoryProvider, "InMemory", StringComparison.OrdinalIgnoreCase)
@@ -60,4 +68,9 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("Jira:SummaryMaxLength must be between 32 and 255.");
         }
     }
+
+    private static bool IsSyntheticEnvironment(string environmentName) =>
+        string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(environmentName, "Demo", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase);
 }

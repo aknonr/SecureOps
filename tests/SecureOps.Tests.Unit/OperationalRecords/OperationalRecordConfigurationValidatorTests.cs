@@ -14,9 +14,51 @@ public sealed class OperationalRecordConfigurationValidatorTests
             ["OperationalRecords:SourceProvider"] = "Http"
         });
 
-        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration);
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Test");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*SourceProvider*Fake*");
+        act.Should().Throw<InvalidOperationException>().WithMessage("*SourceProvider*not implemented*");
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Demo")]
+    [InlineData("Test")]
+    public void Validate_WithFakeSourceInSyntheticEnvironment_Succeeds(string environmentName)
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["OperationalRecords:SourceProvider"] = "Fake"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, environmentName);
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_WithFakeSourceInProduction_FailsClearly()
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["OperationalRecords:SourceProvider"] = "Fake"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Production");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Fake*Development, Demo, or Test*");
+    }
+
+    [Fact]
+    public void Validate_WithDisabledSourceInProduction_Succeeds()
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["OperationalRecords:SourceProvider"] = "Disabled"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Production");
+
+        act.Should().NotThrow();
     }
 
     [Fact]
@@ -27,7 +69,7 @@ public sealed class OperationalRecordConfigurationValidatorTests
             ["OperationalRecords:RepositoryProvider"] = "SqlServer"
         });
 
-        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration);
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Test");
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*ConnectionStrings:SecureOpsDb*");
     }
@@ -40,7 +82,7 @@ public sealed class OperationalRecordConfigurationValidatorTests
             ["Jira:UnresolvedRequesterPolicy"] = "Guess"
         });
 
-        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration);
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Test");
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*Block or ProceedUnassigned*");
     }

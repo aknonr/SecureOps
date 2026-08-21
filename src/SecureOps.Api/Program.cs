@@ -24,7 +24,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 AuditConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 IdentityLookupConfigurationValidator.Validate(builder.Configuration);
 ReverseProxyConfiguration.Validate(builder.Configuration);
-OperationalRecordConfigurationValidator.Validate(builder.Configuration);
+OperationalRecordConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 PlatformSecurityConfigurationValidator.Validate(builder.Configuration);
 
 bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(

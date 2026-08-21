@@ -64,7 +64,7 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED | `IdentityLookup__ProviderTimeoutSeconds` / `IdentityLookup__BulkMaxAccounts` | `3` / `20` |
 | REQUIRED | `IdentityLookup__Cache__Enabled` / `IdentityLookup__Cache__TtlSeconds` / `IdentityLookup__Cache__MaxEntries` | `true` / `30` / `500` |
 | REQUIRED, TEST-ONLY | `PamProvider__Provider` / `PamProvider__TimeoutSeconds` | `Mock` / `3` |
-| REQUIRED, TEST-ONLY | `OperationalRecords__SourceProvider` | `Fake` until an approved source adapter exists |
+| REQUIRED, TEST-ONLY | `OperationalRecords__SourceProvider` | `Fake` for deterministic synthetic TEST verification; production-style runtimes must use `Disabled` until an approved source adapter exists |
 | REQUIRED | `OperationalRecords__RepositoryProvider` / `OperationalRecords__MaxImportCount` / `OperationalRecords__ClaimLeaseSeconds` | `SqlServer` / `100` / `120` |
 | REQUIRED, TEST-ONLY | `Jira__Provider` | `Fake` until an approved Jira adapter exists |
 | REQUIRED | `Jira__ProjectKey` / `Jira__IssueType` / `Jira__MappingVersion` | `<approved TEST project key>` / `<approved issue type>` / `<reviewed mapping version>` |

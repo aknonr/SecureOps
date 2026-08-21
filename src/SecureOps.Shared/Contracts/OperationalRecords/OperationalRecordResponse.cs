@@ -24,6 +24,11 @@ public sealed record OperationalRecordResponse(
     int RetryCount,
     DateTimeOffset UpdatedAt,
     bool Claimed,
+    string? ClaimedBy,
+    DateTimeOffset? ClaimedAt,
     DateTimeOffset? ClaimExpiresAt,
     DateTimeOffset? LastSourceValidationAt,
-    long Version);
+    long Version,
+    bool ReconciliationRequired,
+    bool RetryEligible,
+    bool JiraExists);
