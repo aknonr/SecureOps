@@ -36,6 +36,44 @@ public sealed class OperationalRecordWorkflowHostedTests
     }
 
     [Fact]
+    public void EnterpriseProviderConfiguration_SelectsTypedAdaptersWithoutNetworkCalls()
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["OperationalRecords:SourceProvider"] = "TuruncuHat",
+            ["Jira:Provider"] = "Corporate",
+            ["TuruncuHat:BaseUrl"] = "https://source.invalid/",
+            ["Jira:BaseUrl"] = "https://jira.invalid/",
+            ["Audit:Provider"] = "InMemory"
+        }).Build();
+        ServiceCollection registrations = new();
+        registrations.AddLogging();
+        registrations.AddSecureOpsInfrastructure(configuration);
+        using ServiceProvider services = registrations.BuildServiceProvider();
+
+        services.GetRequiredService<IOperationalRecordClient>().Should().BeOfType<TuruncuHatOperationalRecordClient>();
+        services.GetRequiredService<IOperationalRecordClassifier>().Should().BeOfType<TuruncuHatOperationalRecordClassifier>();
+        services.GetRequiredService<IRequesterResolver>().Should().BeOfType<CorporateJiraRequesterResolver>();
+        services.GetRequiredService<IJiraClient>().Should().BeOfType<CorporateJiraClient>();
+    }
+
+    [Fact]
+    public async Task EnterpriseIntegrationHealth_IsAdminOnly_AndContainsNoSecretsOrEndpoints()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+
+        (await lead.GetAsync("/api/v1/health/enterprise-integrations")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/health/enterprise-integrations");
+        string body = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        body.Should().Contain("Configured").And.Contain("Fake");
+        body.Should().NotContain("BaseUrl").And.NotContain("Authorization").And.NotContain("Password");
+    }
+
+    [Fact]
     public async Task FakeSource_ListDetailPreviewCreate_UsesRealWorkflowStateMachine()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
@@ -244,7 +282,7 @@ public sealed class OperationalRecordWorkflowHostedTests
     }
 
     [Fact]
-    public async Task UnsupportedRealSourceProvider_FailsStartup()
+    public async Task TuruncuHatSourceWithoutRequiredRuntimeConfiguration_FailsStartup()
     {
         using WebApplicationFactory<Program> factory = CreateFactory(sourceProvider: "TuruncuHat");
 
@@ -254,7 +292,7 @@ public sealed class OperationalRecordWorkflowHostedTests
             _ = await client.GetAsync("/api/v1/health");
         };
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*SourceProvider*not implemented*");
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*TuruncuHat:BaseUrl*HTTPS*");
     }
 
     [Fact]

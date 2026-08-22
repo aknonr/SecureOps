@@ -15,8 +15,8 @@ public sealed record OperationalRecord
     public required string Description { get; init; }
     /// <summary>Source requester identifier or display value.</summary>
     public string? Requester { get; init; }
-    /// <summary>Source creation time.</summary>
-    public required DateTimeOffset CreatedAt { get; init; }
+    /// <summary>Source creation time when the provider supplies it.</summary>
+    public DateTimeOffset? CreatedAt { get; init; }
     /// <summary>Optional environment reference.</summary>
     public string? Environment { get; init; }
     /// <summary>Optional server reference.</summary>

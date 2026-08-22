@@ -198,6 +198,12 @@ RouteHandlerBuilder identityProviderHealthEndpoint = app.MapGet(
         })
     .WithName("IdentityProviderHealth")
     .WithOpenApi();
+RouteHandlerBuilder enterpriseIntegrationHealthEndpoint = app.MapGet(
+        "/api/v1/health/enterprise-integrations",
+        (EnterpriseIntegrationDiagnostics diagnostics) => Results.Ok(diagnostics.Get()))
+    .WithName("EnterpriseIntegrationHealth")
+    .WithOpenApi()
+    .RequireAuthorization(Policies.AdminOnly);
 
 if (!app.Environment.IsDevelopment())
 {

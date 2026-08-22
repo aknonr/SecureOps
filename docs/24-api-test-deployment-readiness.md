@@ -66,9 +66,9 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED | `IdentityLookup__ProviderTimeoutSeconds` / `IdentityLookup__BulkMaxAccounts` | `3` / `20` |
 | REQUIRED | `IdentityLookup__Cache__Enabled` / `IdentityLookup__Cache__TtlSeconds` / `IdentityLookup__Cache__MaxEntries` | `true` / `30` / `500` |
 | REQUIRED, TEST-ONLY | `PamProvider__Provider` / `PamProvider__TimeoutSeconds` | `Mock` / `3` |
-| REQUIRED, TEST-ONLY | `OperationalRecords__SourceProvider` | `Fake` for deterministic synthetic TEST verification; production-style runtimes must use `Disabled` until an approved source adapter exists |
+| REQUIRED | `OperationalRecords__SourceProvider` | `Fake` for deterministic synthetic TEST, `Disabled` for fail-closed runtime, or contract-gated `TuruncuHat` only after separate approval |
 | REQUIRED | `OperationalRecords__RepositoryProvider` / `OperationalRecords__MaxImportCount` / `OperationalRecords__ClaimLeaseSeconds` | `SqlServer` / `100` / `120` |
-| REQUIRED | `Jira__Provider` | `Disabled` for a production-style real-user pilot; `Fake` only for explicit synthetic TEST evidence |
+| REQUIRED | `Jira__Provider` | `Disabled`, `Fake` only for synthetic TEST evidence, or contract-gated `Corporate` only after separate approval |
 | REQUIRED | `Jira__ProjectKey` / `Jira__IssueType` / `Jira__MappingVersion` | `<approved TEST project key>` / `<approved issue type>` / `<reviewed mapping version>` |
 | REQUIRED | `Jira__UnresolvedRequesterPolicy` / `Jira__SummaryMaxLength` | `Block` / `255` |
 

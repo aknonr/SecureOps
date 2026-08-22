@@ -20,7 +20,7 @@ public static class OperationalRecordSourceConcurrency
             item.Title,
             item.Description,
             item.Requester ?? string.Empty,
-            item.CreatedAt.ToUniversalTime().ToString("O"),
+            item.CreatedAt?.ToUniversalTime().ToString("O") ?? string.Empty,
             item.Environment ?? string.Empty,
             item.ServerReference ?? string.Empty,
             item.ApplicationReference ?? string.Empty,

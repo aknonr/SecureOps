@@ -7,7 +7,7 @@ public sealed record OperationalRecordSourceItem(
     string Title,
     string Description,
     string? Requester,
-    DateTimeOffset CreatedAt,
+    DateTimeOffset? CreatedAt,
     string? Environment,
     string? ServerReference,
     string? ApplicationReference,

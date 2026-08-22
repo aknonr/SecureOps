@@ -298,7 +298,7 @@ Every integration has a config section:
 
 ## Operational Record and Jira Backend Foundation
 
-The backend replacement for the legacy operator-driven workflow is documented in `docs/22-operational-record-jira-workflow.md`. It uses `IOperationalRecordClient`, `IRequesterResolver`, and `IJiraClient` boundaries; local/default implementations are fakes. No PowerShell is launched, no browser credential is collected, and no real source/Jira write is enabled. Jira preview is read-only; create and retry require explicit capability authorization and durable SQL idempotency before a real adapter can be approved.
+The backend replacement for the legacy operator-driven workflow is documented in `docs/22-operational-record-jira-workflow.md`. It uses `IOperationalRecordClient`, `IRequesterResolver`, and `IJiraClient` boundaries. Defaults remain disabled, Fake is synthetic-only, and typed Turuncu Hat/Jira adapters require explicit validated runtime selection. No PowerShell is launched and no browser credential is collected. Real external TEST remains blocked by the sanitized fixture gate in `docs/integrations/turuncu-hat-jira-contract-gaps.md`; Jira create keeps durable SQL idempotency and unknown-outcome reconciliation.
 
 ## Reference
 

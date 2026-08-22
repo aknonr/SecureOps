@@ -35,7 +35,9 @@ After rejection, `accessStatus` remains `Pending`, `pendingRequestId` is null, a
 
 ## Operational Records
 
-`GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `OperationalRecords:SourceProvider=Fake` is an explicit Development/Demo/Test-only synthetic workflow harness; `Disabled` is the production-style fail-closed setting until an approved source adapter exists.
+`GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `Fake` is Development/Demo/Test-only, `Disabled` fails closed, and `TuruncuHat` is a typed real adapter whose external TEST activation remains contract-gated. `createdAt` is nullable because the reviewed legacy projection does not supply a source timestamp.
+
+`GET /api/v1/health/enterprise-integrations` is Admin-only and exposes only provider selection and safe status; it never exposes URLs, credentials, sessions, identities, or remote payloads.
 
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|

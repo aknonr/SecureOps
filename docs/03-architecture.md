@@ -238,7 +238,7 @@ Each section has a strongly-typed options class in `SecureOps.Shared.Configurati
 - **Serilog** for structured logging in API and Worker.
 - **Sinks:** File (rolling daily), SQL Server (Serilog.Sinks.MSSqlServer), and optionally Application Insights or Seq if added in Phase 6+.
 - **Correlation:** `Activity.Current` traces, propagated to Hangfire jobs and SQL.
-- **Health endpoints:** `/api/v1/health` for liveness, `/api/v1/health/audit-store` for safe audit-store status, and `/api/v1/health/identity-provider` for safe identity-provider configuration status. Detailed DB, Worker heartbeat, and monitoring-chain health are Phase 1+ work.
+- **Health endpoints:** `/api/v1/health` for liveness, `/api/v1/health/audit-store` for safe audit-store status, `/api/v1/health/identity-provider` for safe identity-provider configuration status, and Admin-only `/api/v1/health/enterprise-integrations` for safe Turuncu Hat/Jira selection and availability. URLs, identities, credentials, sessions, and remote payloads are excluded.
 
 ## Theming
 

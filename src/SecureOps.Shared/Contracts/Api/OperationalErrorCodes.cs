@@ -65,6 +65,10 @@ public static class OperationalErrorCodes
     public const string JiraAlreadyCreated = "JiraAlreadyCreated";
     /// <summary>Operational-record close/update failed.</summary>
     public const string OperationalRecordCloseFailed = "OperationalRecordCloseFailed";
+    /// <summary>No active source workflow activity matched the reviewed close contract.</summary>
+    public const string OperationalRecordActivityNotFound = "OperationalRecordActivityNotFound";
+    /// <summary>The source workflow activity query was ambiguous or invalid.</summary>
+    public const string OperationalRecordActivityAmbiguous = "OperationalRecordActivityAmbiguous";
     /// <summary>Operational-record comment update failed.</summary>
     public const string OperationalRecordCommentUpdateFailed = "OperationalRecordCommentUpdateFailed";
     /// <summary>Another workflow operation owns the record.</summary>

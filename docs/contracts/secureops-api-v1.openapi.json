@@ -2247,6 +2247,19 @@
           }
         }
       }
+    },
+    "/api/v1/health/enterprise-integrations": {
+      "get": {
+        "tags": [
+          "SecureOps.Api"
+        ],
+        "operationId": "EnterpriseIntegrationHealth",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3013,7 +3026,8 @@
           },
           "createdAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "environment": {
             "type": "string",

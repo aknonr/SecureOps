@@ -51,7 +51,7 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             }
         }
 
-        string summary = $"{record.OrCode}: {record.Title}";
+        string summary = $"{record.OrCode}{_options.SummarySeparator}{record.Title}";
         if (summary.Length > _options.SummaryMaxLength)
         {
             summary = summary[.._options.SummaryMaxLength];
