@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Commands;
+using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Infrastructure.Reporting;
@@ -28,6 +29,7 @@ public static class DependencyInjection
     {
         services.Configure<AuditOptions>(configuration.GetSection(AuditOptions.SectionName));
         services.Configure<IdentityLookupOptions>(configuration.GetSection(IdentityLookupOptions.SectionName));
+        services.Configure<DirectoryExplorerOptions>(configuration.GetSection(DirectoryExplorerOptions.SectionName));
         services.Configure<PamProviderOptions>(configuration.GetSection(PamProviderOptions.SectionName));
         services.Configure<OperationalRecordsOptions>(configuration.GetSection(OperationalRecordsOptions.SectionName));
         services.Configure<JiraIntegrationOptions>(configuration.GetSection(JiraIntegrationOptions.SectionName));
@@ -77,18 +79,25 @@ public static class DependencyInjection
         services.AddSingleton<IIdentityReadThroughCache>(sp => sp.GetRequiredService<IdentityReadThroughCache>());
         services.AddScoped<IPamAccountResolver, MockPamAccountResolver>();
         services.AddScoped<IIdentityLookupService, IdentityLookupService>();
+        services.AddSingleton<DirectoryExactInputNormalizer>();
+        services.AddSingleton<DirectoryContinuationTokenCodec>();
+        services.AddSingleton<DirectoryQueryCache>();
+        services.AddScoped<IDirectoryGroupQueryService, DirectoryGroupQueryService>();
 
         string? identityProvider = configuration[$"{IdentityLookupOptions.SectionName}:Provider"];
         if (string.Equals(identityProvider, "ActiveDirectory", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IActiveDirectoryLookupClient, ActiveDirectoryLookupClient>();
             services.AddScoped<IIdentityDirectoryProvider, ActiveDirectoryIdentityDirectoryProvider>();
+            services.AddSingleton<IActiveDirectoryGroupClient, ActiveDirectoryGroupClient>();
+            services.AddScoped<IDirectoryGroupProvider, ActiveDirectoryDirectoryGroupProvider>();
         }
         else
         {
             services.AddSingleton<IIdentityDirectoryProvider>(serviceProvider =>
                 new MockIdentityDirectoryProvider(
                     serviceProvider.GetRequiredService<IOptions<IdentityLookupOptions>>()));
+            services.AddSingleton<IDirectoryGroupProvider, MockDirectoryGroupProvider>();
         }
 
         string? auditProvider = configuration[$"{AuditOptions.SectionName}:Provider"];

@@ -31,6 +31,7 @@ public sealed class ManagementReportProjector
         long providerUnavailable = Action(actionCounts, AuditActions.IdentityLookupFailed)
             + Action(actionCounts, AuditActions.IdentityLookupProviderTimeout);
         long identityForbidden = Action(actionCounts, AuditActions.IdentityLookupForbidden);
+        long directoryForbidden = Action(actionCounts, AuditActions.DirectoryGroupQueryForbidden);
 
         IdentityLookupMetricsResponse identity = new(
             succeeded + notFound + rejected + providerUnavailable + identityForbidden,
@@ -74,7 +75,7 @@ public sealed class ManagementReportProjector
                 .ToArray());
 
         SecurityQualityMetricsResponse security = new(
-            Action(actionCounts, AuditActions.AuthorizationDenied) + identityForbidden,
+            Action(actionCounts, AuditActions.AuthorizationDenied) + identityForbidden + directoryForbidden,
             Action(actionCounts, AuditActions.OperationalRecordConflict),
             data.ReconciliationRequired,
             providerUnavailable,
@@ -107,6 +108,7 @@ public sealed class ManagementReportProjector
                 item.LastActivityAt,
                 [
                     new NamedCountResponse("IdentityLookup", item.IdentityOperations),
+                    new NamedCountResponse("DirectoryExplorer", item.DirectoryOperations),
                     new NamedCountResponse("Access", item.AccessOperations),
                     new NamedCountResponse("OperationalRecordJira", item.OperationalWorkflowOperations)
                 ])).ToArray());

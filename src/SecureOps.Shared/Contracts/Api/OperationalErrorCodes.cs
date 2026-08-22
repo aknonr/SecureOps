@@ -17,6 +17,16 @@ public static class OperationalErrorCodes
     public const string IdentityProviderTimeout = "IdentityProviderTimeout";
     /// <summary>An identity provider returned an invalid response.</summary>
     public const string IdentityProviderBadResponse = "IdentityProviderBadResponse";
+    /// <summary>An exact directory group was not found.</summary>
+    public const string DirectoryGroupNotFound = "DirectoryGroupNotFound";
+    /// <summary>An exact directory principal was not found.</summary>
+    public const string DirectoryPrincipalNotFound = "DirectoryPrincipalNotFound";
+    /// <summary>A Directory Explorer input was rejected.</summary>
+    public const string DirectoryInvalidInput = "DirectoryInvalidInput";
+    /// <summary>The configured directory provider was unavailable.</summary>
+    public const string DirectoryProviderUnavailable = "DirectoryProviderUnavailable";
+    /// <summary>A bounded directory query exceeded its server-side ceiling.</summary>
+    public const string DirectoryQueryLimitExceeded = "DirectoryQueryLimitExceeded";
     /// <summary>The required audit store is unavailable.</summary>
     public const string AuditStoreUnavailable = "AuditStoreUnavailable";
     /// <summary>The authenticated identity is awaiting access approval.</summary>

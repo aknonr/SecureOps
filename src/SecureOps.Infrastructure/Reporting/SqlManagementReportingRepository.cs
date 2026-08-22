@@ -197,6 +197,7 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             SELECT Actor, COUNT_BIG(*) AS OperationCount,
                 MIN(OccurredAt) AS FirstActivityAt, MAX(OccurredAt) AS LastActivityAt,
                 SUM(CONVERT(bigint, CASE WHEN Action IN @IdentityActions THEN 1 ELSE 0 END)) AS IdentityOperations,
+                SUM(CONVERT(bigint, CASE WHEN Action IN @DirectoryActions THEN 1 ELSE 0 END)) AS DirectoryOperations,
                 SUM(CONVERT(bigint, CASE WHEN Action IN @AccessActions THEN 1 ELSE 0 END)) AS AccessOperations,
                 SUM(CONVERT(bigint, CASE WHEN Action IN @OperationalActions THEN 1 ELSE 0 END)) AS OperationalWorkflowOperations
             FROM reporting.ManagementAuditEvents
@@ -214,6 +215,7 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             ToExclusive = window.ToExclusiveUtc,
             AdoptionActions = ReportingMetricCatalog.AdoptionActions,
             IdentityActions = ReportingMetricCatalog.IdentityTerminalActions,
+            DirectoryActions = ReportingMetricCatalog.DirectoryTerminalActions,
             AccessActions = ReportingMetricCatalog.AccessActivityActions,
             OperationalActions = ReportingMetricCatalog.OperationalWorkflowActions,
             Offset = (page - 1) * pageSize,

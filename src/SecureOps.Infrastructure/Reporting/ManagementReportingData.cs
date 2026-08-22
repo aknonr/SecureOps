@@ -37,6 +37,7 @@ public sealed record OperatorActivityData(
     DateTimeOffset FirstActivityAt,
     DateTimeOffset LastActivityAt,
     long IdentityOperations,
+    long DirectoryOperations,
     long AccessOperations,
     long OperationalWorkflowOperations);
 

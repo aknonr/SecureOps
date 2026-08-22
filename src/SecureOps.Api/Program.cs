@@ -11,6 +11,7 @@ using SecureOps.Api.Validation;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Audit;
+using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Auth;
@@ -23,6 +24,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 AuditConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 IdentityLookupConfigurationValidator.Validate(builder.Configuration);
+DirectoryExplorerConfigurationValidator.Validate(builder.Configuration);
 ReverseProxyConfiguration.Validate(builder.Configuration);
 OperationalRecordConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 PlatformSecurityConfigurationValidator.Validate(builder.Configuration);
@@ -77,6 +79,8 @@ builder.Services.AddRateLimiter(options =>
     };
     options.AddPolicy(ApiRateLimits.IdentityLookup, context => ApiRateLimits.Partition(context, ApiRateLimits.IdentityLookup, configuredRateLimits.IdentityLookup));
     options.AddPolicy(ApiRateLimits.BulkIdentityLookup, context => ApiRateLimits.Partition(context, ApiRateLimits.BulkIdentityLookup, configuredRateLimits.BulkIdentityLookup));
+    options.AddPolicy(ApiRateLimits.DirectoryGroupQuery, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryGroupQuery, configuredRateLimits.DirectoryGroupQuery));
+    options.AddPolicy(ApiRateLimits.DirectoryGroupMembers, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryGroupMembers, configuredRateLimits.DirectoryGroupMembers));
     options.AddPolicy(ApiRateLimits.OperationalRecordRefresh, context => ApiRateLimits.Partition(context, ApiRateLimits.OperationalRecordRefresh, configuredRateLimits.OperationalRecordRefresh));
     options.AddPolicy(ApiRateLimits.JiraPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraPreview, configuredRateLimits.JiraPreview));
     options.AddPolicy(ApiRateLimits.JiraCreate, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraCreate, configuredRateLimits.JiraCreate));

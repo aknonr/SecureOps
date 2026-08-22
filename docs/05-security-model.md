@@ -271,6 +271,8 @@ Until that decision is recorded:
 
 ## Audit (See `docs/08-audit-model.md` for Detail)
 
+Directory Explorer privileged reads require application capabilities `Identity.Groups.View` or `Identity.Groups.Members.View`. They use exact server-controlled queries under the API process identity, reject raw LDAP/filter input, bound page size and provider work, do not recursively expand groups, and audit only safe query metadata rather than membership payloads.
+
 - Append-only `audit.AuditLog` table.
 - UPDATE/DELETE blocked by trigger.
 - Every state-changing operation creates an audit entry.

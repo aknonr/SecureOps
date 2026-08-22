@@ -5,6 +5,8 @@
 
 **Current status:** Backend implementation and hardening are complete in code, with unit/integration coverage. Real AD smoke testing with an approved read-only account remains pending.
 
+The bounded read-only Directory Explorer extension is defined by ADR-0013 and `docs/27-read-only-directory-explorer.md`. It remains exact-input, purpose-bound, capability-protected, non-recursive, and read-only.
+
 ## Critical Framing
 
 This feature helps an authorized lead/admin answer "which approved account is this?" while handling an incident. It is **not** a people search tool and **not** a performance-monitoring feature.

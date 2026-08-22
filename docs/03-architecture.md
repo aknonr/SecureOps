@@ -69,6 +69,7 @@ Responsibilities:
 - Provide REST API for the UI and any future internal consumers.
 - Enforce authorization.
 - Resolve authenticated principals through persisted Pending/Approved/Disabled application access before capabilities are granted.
+- Keep exact identity lookup and the read-only Directory Explorer as separate services/controllers. Directory Explorer exposes only exact direct-group, exact group-metadata, and bounded direct-member queries; it accepts no raw LDAP filters and performs no recursive expansion.
 - Normalize alert payloads.
 - Enqueue diagnostic jobs via Hangfire client API.
 - Resolve exact PAM/AD account lookups through the IdentityLookup service (Phase 1A).

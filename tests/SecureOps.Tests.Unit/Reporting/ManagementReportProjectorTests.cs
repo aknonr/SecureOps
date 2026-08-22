@@ -99,11 +99,29 @@ public sealed class ManagementReportProjectorTests
     }
 
     [Fact]
+    public void Project_ReportsDirectoryExplorerAdoptionWithoutChangingIdentityTotals()
+    {
+        ManagementReportingData data = Data(auditCounts:
+        [
+            Count(AuditActions.DirectoryGroupQueryCompleted, 3),
+            Count(AuditActions.DirectoryGroupQueryRejected, 1),
+            Count(AuditActions.DirectoryGroupQueryFailed, 1),
+            Count(AuditActions.DirectoryGroupQueryForbidden, 2)
+        ]);
+
+        ManagementReportResponse report = new ManagementReportProjector().Project(_window, data);
+
+        report.IdentityLookup.TotalLookups.Should().Be(0);
+        report.PlatformAdoption.OperationsByWorkflow.Single(item => item.Name == "DirectoryExplorer").Count.Should().Be(5);
+        report.SecurityAndQuality.AuthorizationFailures.Should().Be(2);
+    }
+
+    [Fact]
     public void ProjectOperators_PreservesServerPaginationAndDoesNotAddDirectoryProfileData()
     {
         OperatorActivityDataPage data = new(250,
         [
-            new OperatorActivityData("CONTOSO\\operator-a", 12, _window.FromInclusiveUtc, _window.ToExclusiveUtc.AddMinutes(-1), 5, 2, 5)
+            new OperatorActivityData("CONTOSO\\operator-a", 15, _window.FromInclusiveUtc, _window.ToExclusiveUtc.AddMinutes(-1), 5, 3, 2, 5)
         ]);
 
         OperatorActivityPageResponse result = new ManagementReportProjector().ProjectOperators(_window, 2, 100, data);
@@ -112,7 +130,8 @@ public sealed class ManagementReportProjectorTests
         result.Page.Should().Be(2);
         result.Items.Should().ContainSingle();
         result.Items[0].Actor.Should().Be("CONTOSO\\operator-a");
-        result.Items[0].OperationsByWorkflow.Sum(item => item.Count).Should().Be(12);
+        result.Items[0].OperationsByWorkflow.Sum(item => item.Count).Should().Be(15);
+        result.Items[0].OperationsByWorkflow.Single(item => item.Name == "DirectoryExplorer").Count.Should().Be(3);
     }
 
     private static ReportingAuditCount Count(string action, long count, string? detailCode = null) =>

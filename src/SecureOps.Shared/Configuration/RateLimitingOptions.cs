@@ -10,6 +10,10 @@ public sealed class RateLimitingOptions
     public OperationRateLimitOptions IdentityLookup { get; set; } = new(10, 60);
     /// <summary>Identity bulk lookup policy.</summary>
     public OperationRateLimitOptions BulkIdentityLookup { get; set; } = new(4, 60);
+    /// <summary>Directory principal-groups and group-metadata policy.</summary>
+    public OperationRateLimitOptions DirectoryGroupQuery { get; set; } = new(20, 60);
+    /// <summary>Directory direct-member enumeration policy.</summary>
+    public OperationRateLimitOptions DirectoryGroupMembers { get; set; } = new(10, 60);
     /// <summary>Operational-record refresh policy.</summary>
     public OperationRateLimitOptions OperationalRecordRefresh { get; set; } = new(12, 60);
     /// <summary>Jira preview policy.</summary>

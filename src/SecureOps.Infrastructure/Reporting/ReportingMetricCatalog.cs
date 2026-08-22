@@ -16,6 +16,15 @@ public static class ReportingMetricCatalog
         AuditActions.IdentityLookupForbidden
     ];
 
+    /// <summary>Terminal Directory Explorer outcomes; request events are excluded.</summary>
+    public static readonly string[] DirectoryTerminalActions =
+    [
+        AuditActions.DirectoryGroupQueryCompleted,
+        AuditActions.DirectoryGroupQueryRejected,
+        AuditActions.DirectoryGroupQueryFailed,
+        AuditActions.DirectoryGroupQueryForbidden
+    ];
+
     /// <summary>Access lifecycle actions visible in management aggregates.</summary>
     public static readonly string[] AccessActivityActions =
     [
@@ -48,6 +57,7 @@ public static class ReportingMetricCatalog
 
     /// <summary>All actions needed for summary projection.</summary>
     public static readonly string[] SummaryActions = IdentityTerminalActions
+        .Concat(DirectoryTerminalActions)
         .Concat(AccessActivityActions)
         .Concat(OperationalWorkflowActions)
         .Concat([AuditActions.AuthorizationDenied])
@@ -57,6 +67,7 @@ public static class ReportingMetricCatalog
     /// <summary>Actions that represent reviewed business usage for adoption counts.</summary>
     public static readonly string[] AdoptionActions = IdentityTerminalActions
         .Where(action => action != AuditActions.IdentityLookupForbidden)
+        .Concat(DirectoryTerminalActions.Where(action => action != AuditActions.DirectoryGroupQueryForbidden))
         .Concat(AccessActivityActions)
         .Concat(OperationalWorkflowActions)
         .Distinct(StringComparer.Ordinal)
@@ -73,6 +84,11 @@ public static class ReportingMetricCatalog
         if (AccessActivityActions.Contains(action, StringComparer.Ordinal))
         {
             return "Access";
+        }
+
+        if (DirectoryTerminalActions.Contains(action, StringComparer.Ordinal))
+        {
+            return "DirectoryExplorer";
         }
 
         return OperationalWorkflowActions.Contains(action, StringComparer.Ordinal)

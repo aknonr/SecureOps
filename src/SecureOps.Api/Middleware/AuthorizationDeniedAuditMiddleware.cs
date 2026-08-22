@@ -43,9 +43,7 @@ public sealed class AuthorizationDeniedAuditMiddleware
                     new AuditEvent
                     {
                         Actor = context.User.Identity?.Name ?? "anonymous",
-                        Action = IsIdentityLookupEndpoint(context)
-                            ? AuditActions.IdentityLookupForbidden
-                            : AuditActions.AuthorizationDenied,
+                        Action = DeniedAction(context),
                         CorrelationId = correlationId,
                         SourceIp = context.Connection.RemoteIpAddress?.ToString(),
                         Details = new
@@ -53,7 +51,7 @@ public sealed class AuthorizationDeniedAuditMiddleware
                             endpoint = context.Request.Path.Value,
                             method = context.Request.Method,
                             statusCode = context.Response.StatusCode,
-                            resultStatus = IsIdentityLookupEndpoint(context) ? "Forbidden" : "Denied"
+                            resultStatus = IsPrivilegedDirectoryEndpoint(context) ? "Forbidden" : "Denied"
                         }
                     },
                     context.RequestAborted);
@@ -74,4 +72,15 @@ public sealed class AuthorizationDeniedAuditMiddleware
             && (context.Request.Path.Equals("/api/v1/identity/lookup", StringComparison.OrdinalIgnoreCase)
                 || context.Request.Path.Equals("/api/v1/identity/bulk-lookup", StringComparison.OrdinalIgnoreCase));
     }
+
+    private static bool IsDirectoryExplorerEndpoint(HttpContext context) =>
+        HttpMethods.IsPost(context.Request.Method)
+        && context.Request.Path.StartsWithSegments("/api/v1/directory", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPrivilegedDirectoryEndpoint(HttpContext context) =>
+        IsIdentityLookupEndpoint(context) || IsDirectoryExplorerEndpoint(context);
+
+    private static string DeniedAction(HttpContext context) => IsDirectoryExplorerEndpoint(context)
+        ? AuditActions.DirectoryGroupQueryForbidden
+        : IsIdentityLookupEndpoint(context) ? AuditActions.IdentityLookupForbidden : AuditActions.AuthorizationDenied;
 }

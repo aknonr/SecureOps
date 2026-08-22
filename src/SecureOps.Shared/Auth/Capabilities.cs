@@ -7,6 +7,10 @@ public static class Capabilities
     public const string IdentityLookup = "Identity.Lookup";
     /// <summary>Read a bounded set of exact identities.</summary>
     public const string BulkIdentityLookup = IdentityLookup;
+    /// <summary>View exact group metadata and one principal's direct groups.</summary>
+    public const string DirectoryGroupsView = "Identity.Groups.View";
+    /// <summary>View one exact group's direct members.</summary>
+    public const string DirectoryGroupMembersView = "Identity.Groups.Members.View";
     /// <summary>View approved team metadata.</summary>
     public const string TeamView = "TeamView";
     /// <summary>View operational audit evidence.</summary>

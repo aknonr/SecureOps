@@ -44,6 +44,11 @@ The audit subsystem is the project's most important non-functional feature. This
 | Identity lookup failed | API | `IdentityLookupFailed` |
 | Identity lookup provider timeout | API | `IdentityLookupProviderTimeout` |
 | Identity lookup authorization denied | API | `IdentityLookupForbidden` |
+| Directory group query requested | API | `DirectoryGroupQueryRequested` |
+| Directory group query completed or not found | API | `DirectoryGroupQueryCompleted` |
+| Directory group query rejected before provider access | API | `DirectoryGroupQueryRejected` |
+| Directory group provider query failed | API | `DirectoryGroupQueryFailed` |
+| Directory group authorization denied | API | `DirectoryGroupQueryForbidden` |
 | Audit query executed | UI/API | `AuditQueried` |
 | Configuration changed (admin) | UI | `ConfigurationChanged` |
 | RBAC mapping changed (admin) | UI | `RbacChanged` |
@@ -60,6 +65,8 @@ The audit subsystem is the project's most important non-functional feature. This
 | Phase 8 remediation approved | UI | `RemediationApproved` |
 | Phase 8 remediation executed | Worker | `RemediationExecuted` |
 | Phase 8 remediation aborted | UI/Worker | `RemediationAborted` |
+
+Terminal Directory Explorer actions are projected only as aggregate `DirectoryExplorer` adoption and operator-workflow counts. They do not alter exact identity-lookup metrics, and no group/member payload enters reporting.
 
 ### What is NOT Audited
 

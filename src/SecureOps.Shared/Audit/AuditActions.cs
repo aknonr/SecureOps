@@ -46,6 +46,17 @@ public static class AuditActions
     /// <summary>A bounded bulk identity lookup completed.</summary>
     public const string BulkIdentityLookupCompleted = "BulkIdentityLookupCompleted";
 
+    /// <summary>A privileged Directory Explorer query was requested.</summary>
+    public const string DirectoryGroupQueryRequested = "DirectoryGroupQueryRequested";
+    /// <summary>A privileged Directory Explorer query completed or returned not found.</summary>
+    public const string DirectoryGroupQueryCompleted = "DirectoryGroupQueryCompleted";
+    /// <summary>A Directory Explorer query was rejected before provider access.</summary>
+    public const string DirectoryGroupQueryRejected = "DirectoryGroupQueryRejected";
+    /// <summary>A Directory Explorer provider query failed safely.</summary>
+    public const string DirectoryGroupQueryFailed = "DirectoryGroupQueryFailed";
+    /// <summary>Authorization denied a Directory Explorer query.</summary>
+    public const string DirectoryGroupQueryForbidden = "DirectoryGroupQueryForbidden";
+
     /// <summary>
     /// API or UI authorization denied a request.
     /// </summary>
