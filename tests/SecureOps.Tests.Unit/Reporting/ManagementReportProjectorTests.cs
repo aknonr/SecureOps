@@ -117,6 +117,26 @@ public sealed class ManagementReportProjectorTests
     }
 
     [Fact]
+    public void Project_ReportsReliableSessionLifecycleAggregates()
+    {
+        ManagementReportingData data = Data(auditCounts:
+        [
+            Count(AuditActions.ApplicationSessionStarted, 9),
+            Count(AuditActions.ApplicationSessionIdleTimedOut, 2),
+            Count(AuditActions.ApplicationSessionAbsoluteTimedOut, 1),
+            Count(AuditActions.ApplicationSessionLoggedOut, 3),
+            Count(AuditActions.ApplicationSessionRevoked, 1),
+            Count(AuditActions.ApplicationSessionAccessDisabled, 1),
+            Count(AuditActions.ApplicationSessionAccessChanged, 1)
+        ]);
+
+        ManagementReportResponse report = new ManagementReportProjector().Project(_window, data);
+
+        report.SessionGovernance.Should().Be(new SessionGovernanceMetricsResponse(9, 2, 1, 3, 1, 1, 1));
+        report.PlatformAdoption.OperationsByWorkflow.Should().BeEmpty();
+    }
+
+    [Fact]
     public void ProjectOperators_PreservesServerPaginationAndDoesNotAddDirectoryProfileData()
     {
         OperatorActivityDataPage data = new(250,

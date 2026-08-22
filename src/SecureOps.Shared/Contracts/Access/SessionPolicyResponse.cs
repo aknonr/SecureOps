@@ -8,4 +8,8 @@ public sealed record SessionPolicyResponse(
     bool HttpOnly,
     string SameSite,
     bool AccessRevalidatedOnEveryRequest,
-    string EnforcementMode);
+    string EnforcementMode)
+{
+    /// <summary>Minimum interval between persisted activity updates.</summary>
+    public int ActivityPersistenceIntervalMinutes { get; init; }
+}

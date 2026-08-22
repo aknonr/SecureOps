@@ -97,4 +97,14 @@ public static class OperationalErrorCodes
     public const string ReportingValidationFailed = "ReportingValidationFailed";
     /// <summary>The persistent reporting read model is unavailable.</summary>
     public const string ReportingUnavailable = "ReportingUnavailable";
+    /// <summary>The server-side application session expired.</summary>
+    public const string SessionExpired = "SessionExpired";
+    /// <summary>The server-side application session was revoked or invalidated.</summary>
+    public const string SessionRevoked = "SessionRevoked";
+    /// <summary>The application-session record was not found.</summary>
+    public const string SessionNotFound = "SessionNotFound";
+    /// <summary>Application-session input failed validation.</summary>
+    public const string SessionValidationFailed = "SessionValidationFailed";
+    /// <summary>The authoritative application-session store is unavailable.</summary>
+    public const string SessionStoreUnavailable = "SessionStoreUnavailable";
 }

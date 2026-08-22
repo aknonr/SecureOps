@@ -50,16 +50,16 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             SELECT
                 (SELECT COUNT_BIG(DISTINCT Actor) FROM reporting.ManagementAuditEvents
                  WHERE OccurredAt >= DATEADD(day, -1, @ToExclusive) AND OccurredAt < @ToExclusive
-                   AND Action IN @AdoptionActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Daily,
+                   AND Action IN @ActiveUserActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Daily,
                 (SELECT COUNT_BIG(DISTINCT Actor) FROM reporting.ManagementAuditEvents
                  WHERE OccurredAt >= DATEADD(day, -7, @ToExclusive) AND OccurredAt < @ToExclusive
-                   AND Action IN @AdoptionActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Weekly,
+                   AND Action IN @ActiveUserActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Weekly,
                 (SELECT COUNT_BIG(DISTINCT Actor) FROM reporting.ManagementAuditEvents
                  WHERE OccurredAt >= DATEADD(day, -30, @ToExclusive) AND OccurredAt < @ToExclusive
-                   AND Action IN @AdoptionActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Monthly,
+                   AND Action IN @ActiveUserActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Monthly,
                 (SELECT COUNT_BIG(DISTINCT Actor) FROM reporting.ManagementAuditEvents
                  WHERE OccurredAt >= @FromInclusive AND OccurredAt < @ToExclusive
-                   AND Action IN @AdoptionActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS SelectedWindow;
+                   AND Action IN @ActiveUserActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS SelectedWindow;
 
             SELECT COUNT_BIG(*)
             FROM reporting.ManagementOperationalStatus
@@ -140,6 +140,7 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             SummaryActions = ReportingMetricCatalog.SummaryActions,
             IdentityTerminalActions = ReportingMetricCatalog.IdentityTerminalActions,
             AdoptionActions = ReportingMetricCatalog.AdoptionActions,
+            ActiveUserActions = ReportingMetricCatalog.ActiveUserActions,
             SourceChangedAction = AuditActions.OperationalRecordSourceChanged,
             RetryAction = AuditActions.WorkflowRetried,
             CompletedAction = AuditActions.WorkflowCompleted,

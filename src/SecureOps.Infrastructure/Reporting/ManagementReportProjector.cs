@@ -81,11 +81,21 @@ public sealed class ManagementReportProjector
             providerUnavailable,
             RateLimitEvents: null);
 
+        SessionGovernanceMetricsResponse sessions = new(
+            Action(actionCounts, AuditActions.ApplicationSessionStarted),
+            Action(actionCounts, AuditActions.ApplicationSessionIdleTimedOut),
+            Action(actionCounts, AuditActions.ApplicationSessionAbsoluteTimedOut),
+            Action(actionCounts, AuditActions.ApplicationSessionLoggedOut),
+            Action(actionCounts, AuditActions.ApplicationSessionRevoked),
+            Action(actionCounts, AuditActions.ApplicationSessionAccessDisabled),
+            Action(actionCounts, AuditActions.ApplicationSessionAccessChanged));
+
         return new ManagementReportResponse(
             Window(window),
             identity,
             operational,
             adoption,
+            sessions,
             security,
             _limitations);
     }

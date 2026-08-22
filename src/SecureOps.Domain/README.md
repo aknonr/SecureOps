@@ -4,7 +4,7 @@ Pure C# domain model. **No external dependencies.**
 
 ## What goes here
 
-- Entities: `Alert`, `AlertEvent`, `DiagnosticJob`, `DiagnosticResult`, `Server`, `User`, `AuditEvent`, and the Operational Record/Jira workflow aggregate.
+- Entities: `Alert`, `AlertEvent`, `DiagnosticJob`, `DiagnosticResult`, `Server`, `User`, `AuditEvent`, `ApplicationSession`, and the Operational Record/Jira workflow aggregate.
 - Value objects: `AlertSeverity`, `AlertType`, `AlertStatus`, `DiagnosticJobStatus`, `OperationalRecordClassification`, and `OperationalRecordWorkflowState`.
 - Domain events (in-memory, raised by entities; consumed by application services).
 - Domain services that encapsulate pure business rules.

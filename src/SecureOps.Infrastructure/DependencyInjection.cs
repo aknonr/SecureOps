@@ -8,6 +8,7 @@ using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Infrastructure.Reporting;
+using SecureOps.Infrastructure.Sessions;
 using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Infrastructure;
@@ -80,7 +81,6 @@ public static class DependencyInjection
         services.AddScoped<IPamAccountResolver, MockPamAccountResolver>();
         services.AddScoped<IIdentityLookupService, IdentityLookupService>();
         services.AddSingleton<DirectoryExactInputNormalizer>();
-        services.AddSingleton<DirectoryContinuationTokenCodec>();
         services.AddSingleton<DirectoryQueryCache>();
         services.AddScoped<IDirectoryGroupQueryService, DirectoryGroupQueryService>();
 
@@ -133,6 +133,17 @@ public static class DependencyInjection
         }
 
         services.AddScoped<IApplicationAccessService, ApplicationAccessService>();
+        if (string.Equals(configuration[$"{SessionSecurityOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddScoped<IApplicationSessionRepository, SqlApplicationSessionRepository>();
+        }
+        else
+        {
+            services.AddSingleton<IApplicationSessionRepository, InMemoryApplicationSessionRepository>();
+        }
+
+        services.AddScoped<IApplicationSessionService, ApplicationSessionService>();
+        services.AddScoped<ApplicationSessionContext>();
 
         string? sourceProvider = configuration[$"{OperationalRecordsOptions.SectionName}:SourceProvider"];
         if (string.Equals(sourceProvider, "Fake", StringComparison.OrdinalIgnoreCase))

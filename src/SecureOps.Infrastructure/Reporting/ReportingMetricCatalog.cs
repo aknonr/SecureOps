@@ -36,6 +36,18 @@ public static class ReportingMetricCatalog
         AuditActions.RoleRemoved
     ];
 
+    /// <summary>Reliable application-session lifecycle actions.</summary>
+    public static readonly string[] SessionActions =
+    [
+        AuditActions.ApplicationSessionStarted,
+        AuditActions.ApplicationSessionIdleTimedOut,
+        AuditActions.ApplicationSessionAbsoluteTimedOut,
+        AuditActions.ApplicationSessionLoggedOut,
+        AuditActions.ApplicationSessionRevoked,
+        AuditActions.ApplicationSessionAccessDisabled,
+        AuditActions.ApplicationSessionAccessChanged
+    ];
+
     /// <summary>Operational workflow actions counted as backend operations.</summary>
     public static readonly string[] OperationalWorkflowActions =
     [
@@ -59,6 +71,7 @@ public static class ReportingMetricCatalog
     public static readonly string[] SummaryActions = IdentityTerminalActions
         .Concat(DirectoryTerminalActions)
         .Concat(AccessActivityActions)
+        .Concat(SessionActions)
         .Concat(OperationalWorkflowActions)
         .Concat([AuditActions.AuthorizationDenied])
         .Distinct(StringComparer.Ordinal)
@@ -70,6 +83,12 @@ public static class ReportingMetricCatalog
         .Concat(DirectoryTerminalActions.Where(action => action != AuditActions.DirectoryGroupQueryForbidden))
         .Concat(AccessActivityActions)
         .Concat(OperationalWorkflowActions)
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    /// <summary>Actions that reliably prove an authenticated user was active.</summary>
+    public static readonly string[] ActiveUserActions = AdoptionActions
+        .Concat([AuditActions.ApplicationSessionStarted])
         .Distinct(StringComparer.Ordinal)
         .ToArray();
 

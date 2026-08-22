@@ -19,7 +19,7 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
     private readonly IIdentityAccountNormalizer _accountNormalizer;
     private readonly DirectoryExactInputNormalizer _groupNormalizer;
     private readonly IDirectoryGroupProvider _provider;
-    private readonly DirectoryContinuationTokenCodec _tokens;
+    private readonly IDirectoryContinuationTokenCodec _tokens;
     private readonly DirectoryQueryCache _cache;
     private readonly IAuditWriter _auditWriter;
     private readonly DirectoryExplorerOptions _options;
@@ -30,7 +30,7 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
         IIdentityAccountNormalizer accountNormalizer,
         DirectoryExactInputNormalizer groupNormalizer,
         IDirectoryGroupProvider provider,
-        DirectoryContinuationTokenCodec tokens,
+        IDirectoryContinuationTokenCodec tokens,
         DirectoryQueryCache cache,
         IAuditWriter auditWriter,
         IOptions<DirectoryExplorerOptions> options,

@@ -77,12 +77,23 @@ public sealed record SecurityQualityMetricsResponse(
     long ProviderUnavailableEvents,
     long? RateLimitEvents);
 
+/// <summary>Reliable server-side application-session lifecycle aggregates.</summary>
+public sealed record SessionGovernanceMetricsResponse(
+    long Started,
+    long IdleTimedOut,
+    long AbsoluteTimedOut,
+    long LoggedOut,
+    long Revoked,
+    long AccessDisabledTerminations,
+    long AccessChangedTerminations);
+
 /// <summary>Backend-authoritative management report summary.</summary>
 public sealed record ManagementReportResponse(
     ReportingWindowResponse Window,
     IdentityLookupMetricsResponse IdentityLookup,
     OperationalWorkflowMetricsResponse OperationalWorkflow,
     PlatformAdoptionMetricsResponse PlatformAdoption,
+    SessionGovernanceMetricsResponse SessionGovernance,
     SecurityQualityMetricsResponse SecurityAndQuality,
     IReadOnlyList<string> DataLimitations);
 

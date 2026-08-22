@@ -31,23 +31,6 @@ public sealed class DirectorySecurityPrimitiveTests
     }
 
     [Fact]
-    public void ContinuationToken_IsOperationTargetAndExpiryBound()
-    {
-        ManualTimeProvider time = new(new DateTimeOffset(2026, 8, 23, 10, 0, 0, TimeSpan.Zero));
-        DirectoryExplorerOptions options = new() { ContinuationTokenLifetimeSeconds = 30 };
-        DirectoryContinuationTokenCodec codec = new(Options.Create(options), time);
-        string token = codec.Create("members", "ops-read", 25);
-
-        codec.TryRead(token, "members", "ops-read", out int offset).Should().BeTrue();
-        offset.Should().Be(25);
-        codec.TryRead(token, "groups", "ops-read", out _).Should().BeFalse();
-        codec.TryRead(token, "members", "other", out _).Should().BeFalse();
-        codec.TryRead(token + "x", "members", "ops-read", out _).Should().BeFalse();
-        time.Advance(TimeSpan.FromSeconds(31));
-        codec.TryRead(token, "members", "ops-read", out _).Should().BeFalse();
-    }
-
-    [Fact]
     public async Task QueryCache_DoesNotCacheExceptionsAndRefreshBypassesValue()
     {
         DirectoryExplorerOptions options = new() { Cache = new DirectoryExplorerCacheOptions { Enabled = true, TtlSeconds = 30, MaxEntries = 10 } };
@@ -100,10 +83,4 @@ public sealed class DirectorySecurityPrimitiveTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*page sizes*");
     }
 
-    private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
-    {
-        private DateTimeOffset _now = now;
-        public override DateTimeOffset GetUtcNow() => _now;
-        public void Advance(TimeSpan duration) => _now = _now.Add(duration);
-    }
 }

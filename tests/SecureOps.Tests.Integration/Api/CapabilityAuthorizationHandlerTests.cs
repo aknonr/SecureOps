@@ -314,6 +314,7 @@ public sealed class CapabilityAuthorizationHandlerTests
                 profileResolver ?? new NullProfileResolver(),
                 _audit,
                 options,
+                Options.Create(new SessionSecurityOptions()),
                 NullLogger<ApplicationAccessService>.Instance);
         }
 

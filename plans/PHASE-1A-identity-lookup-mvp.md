@@ -7,6 +7,8 @@
 
 The bounded read-only Directory Explorer extension is defined by ADR-0013 and `docs/27-read-only-directory-explorer.md`. It remains exact-input, purpose-bound, capability-protected, non-recursive, and read-only.
 
+Session governance and persistent Data Protection for this backend surface are defined by ADR-0014 and `docs/28-session-governance-data-protection-and-sql-pilot.md`; they do not broaden exact-account or Directory Explorer query behavior.
+
 ## Critical Framing
 
 This feature helps an authorized lead/admin answer "which approved account is this?" while handling an incident. It is **not** a people search tool and **not** a performance-monitoring feature.

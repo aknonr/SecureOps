@@ -7,7 +7,7 @@ namespace SecureOps.Infrastructure.Access;
 public static class PlatformSecurityConfigurationValidator
 {
     /// <summary>Validates bounded secure settings.</summary>
-    public static void Validate(IConfiguration configuration)
+    public static void Validate(IConfiguration configuration, string? environmentName = null)
     {
         AccessOptions access = configuration.GetSection(AccessOptions.SectionName).Get<AccessOptions>() ?? new();
         SessionSecurityOptions session = configuration.GetSection(SessionSecurityOptions.SectionName).Get<SessionSecurityOptions>() ?? new();
@@ -38,9 +38,41 @@ public static class PlatformSecurityConfigurationValidator
         }
 
         if (session.IdleTimeoutMinutes is < 1 or > 1440 || session.AbsoluteLifetimeHours is < 1 or > 168
-            || session.AbsoluteLifetimeHours * 60 < session.IdleTimeoutMinutes)
+            || session.AbsoluteLifetimeHours * 60 < session.IdleTimeoutMinutes
+            || session.ActivityPersistenceIntervalMinutes is < 1 or > 60
+            || session.ActivityPersistenceIntervalMinutes >= session.IdleTimeoutMinutes)
         {
-            throw new InvalidOperationException("SessionSecurity idle and absolute lifetimes are outside safe bounds.");
+            throw new InvalidOperationException("SessionSecurity idle, absolute, or activity-persistence settings are outside safe bounds.");
+        }
+
+        if (!string.Equals(session.RepositoryProvider, "InMemory", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(session.RepositoryProvider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("SessionSecurity:RepositoryProvider must be InMemory or SqlServer.");
+        }
+
+        if (string.Equals(session.RepositoryProvider, "SqlServer", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(configuration.GetConnectionString(Audit.AuditConnectionStrings.SecureOpsDb)))
+        {
+            throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required when SessionSecurity:RepositoryProvider is SqlServer.");
+        }
+
+        if (!string.Equals(session.RepositoryProvider, access.RepositoryProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("SessionSecurity and Access repository providers must match.");
+        }
+
+        if ((string.Equals(environmentName, "Pilot", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(environmentName, "Production", StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(session.RepositoryProvider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Pilot and Production require SessionSecurity:RepositoryProvider SqlServer.");
+        }
+
+        if (!string.Equals(session.CookieName, "__Host-SecureOps.ApplicationSession", StringComparison.Ordinal)
+            || session.MaxAdminPageSize is < 1 or > 500)
+        {
+            throw new InvalidOperationException("SessionSecurity cookie name or administrative page size is outside safe bounds.");
         }
 
         if (!session.SecureCookie || !session.HttpOnly || !session.RevalidateAccessOnEveryRequest)

@@ -144,7 +144,7 @@ public sealed class DirectoryGroupQueryServiceTests
             new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions { EnableUpnLookup = upn })),
             new DirectoryExactInputNormalizer(directory),
             provider,
-            new DirectoryContinuationTokenCodec(directory, TimeProvider.System),
+            new TestContinuationTokenCodec(),
             new DirectoryQueryCache(directory, TimeProvider.System),
             audit,
             directory,
@@ -176,5 +176,25 @@ public sealed class DirectoryGroupQueryServiceTests
     private sealed class ThrowingAuditWriter : IAuditWriter
     {
         public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken) => throw new InvalidOperationException("Synthetic audit failure");
+    }
+
+    private sealed class TestContinuationTokenCodec : IDirectoryContinuationTokenCodec
+    {
+        public string Create(string operation, string normalizedTarget, int offset) => $"{operation}|{normalizedTarget}|{offset}";
+
+        public bool TryRead(string? token, string operation, string normalizedTarget, out int offset)
+        {
+            offset = 0;
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return true;
+            }
+
+            string[] parts = token.Split('|');
+            return parts.Length == 3
+                && parts[0] == operation
+                && parts[1] == normalizedTarget
+                && int.TryParse(parts[2], out offset);
+        }
     }
 }

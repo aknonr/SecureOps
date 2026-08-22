@@ -8,6 +8,7 @@ Current implemented Phase 1A namespaces:
 - `Audit/` contains audit writer abstractions plus InMemory, File, queued, and SQL Server persistence implementations.
 - `Identity/` contains the IdentityLookup service, exact account normalizer, read-only AD provider, provider guard, and mock PAM resolver hook.
 - `OperationalRecords/` contains source/Jira/requester boundaries, fail-closed classification, preview and transfer services, durable repositories, and fake local adapters.
+- `Sessions/` contains provider-neutral lifecycle service plus in-memory and SQL authoritative session repositories.
 
 - `Data/` — EF Core `SecureOpsDbContext`, entity configurations.
 - `Audit/` — `IAuditWriter` and SQL implementation (Dapper).
@@ -39,4 +40,4 @@ Phase 1A audit and identity lookup infrastructure is implemented. The Operationa
 
 See `Identity/README.md`, `Audit/README.md`, and `OperationalRecords/README.md` for provider selection, local-test boundaries, configuration, and controlled-runtime blockers.
 
-SQL-backed Access, Audit, Operational Record, and command idempotency providers share `ConnectionStrings:SecureOpsDb`. They require migrations 001-003 and the object-level runtime grants documented in `docs/24-api-test-deployment-readiness.md`; the application never executes those migrations.
+SQL-backed Access, Audit, Operational Record, command idempotency, reporting, and application-session providers share `ConnectionStrings:SecureOpsDb`. They require the applicable migrations through 007 and the object-level runtime grants documented in `docs/24-api-test-deployment-readiness.md`; the application never executes those migrations.

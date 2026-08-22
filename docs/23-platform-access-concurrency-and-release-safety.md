@@ -12,7 +12,7 @@ Request decisions require the request `version`; role replacement and disable re
 
 The first Admin is an exact principal supplied through `Access:BootstrapAdministrators`; its automatic approval uses a system actor and audits both approval and role assignment. An empty database without that configured principal or the explicit Demo/Test compatibility bootstrap is a lockout condition. Remove the configured bootstrap after redundant persisted Admin assignments exist. Full deployment details are in `docs/24-api-test-deployment-readiness.md`.
 
-`SessionSecurity` records policy for the current Negotiate and future OIDC boundary: `IdleTimeoutMinutes`, `AbsoluteLifetimeHours`, `SecureCookie`, `HttpOnly`, `SameSite`, and `RevalidateAccessOnEveryRequest`. Negotiate currently has no application-issued cookie or application logout token. Logout is provider-managed and audited. Future OIDC must enforce the configured idle/absolute limits, Secure and HttpOnly cookies, an approved SameSite mode, provider logout, and access-status revalidation. Secure cookie policy must not be weakened.
+`SessionSecurity` governs a provider-neutral server-side SecureOps application session: 30-minute idle timeout, 12-hour absolute lifetime, and five-minute persisted-activity throttle by default. Its Secure, HttpOnly, SameSite=Lax cookie contains only a protected opaque handle and is never the corporate authentication or authorization source. Negotiate logout remains browser/host managed, while SecureOps logout ends the application session. OIDC can replace Negotiate without changing this boundary. Current access status and `AccessVersion` are revalidated, so disable/revocation invalidates effective sessions.
 
 OIDC authority, client ID, scopes, redirects, claims, signing, and logout are external inputs. No OIDC handler is enabled. The reserved `Access:OidcIssuerClaimType` and `Access:OidcSubjectClaimType` seam produces an opaque stable principal identifier when an approved handler supplies both claims.
 
@@ -40,4 +40,4 @@ TEST requires `ASPNETCORE_ENVIRONMENT=Test` or `Demo`, `Swagger__Enabled=true`, 
 
 ## Persistence
 
-The application never runs SQL migrations. DBA review/execution of migrations 001-004 is required before selecting SQL access or Operational Record persistence. Migration 004 adds only `security.Users.AccessVersion` and `security.AccessRequests.Version`. Runtime needs `SELECT`, `INSERT`, and `UPDATE` on the required `security`, `ops`, and `audit` tables; no DDL or DELETE permission is required.
+The application never runs SQL migrations. DBA review/execution of migrations 001-007 is required before selecting SQL access, application-session, or Operational Record persistence. Migration 007 adds `security.ApplicationSessions` and a limited reporting view. Runtime needs only the documented object-level `SELECT`, `INSERT`, and `UPDATE` grants; no DDL or DELETE permission is required.

@@ -118,6 +118,22 @@ public static class AuditActions
     public const string IdentityLookupProviderCall = "IdentityLookupProviderCall";
     /// <summary>An authenticated caller requested provider-managed logout.</summary>
     public const string SessionLogoutRequested = "SessionLogoutRequested";
+    /// <summary>A server-side SecureOps application session started.</summary>
+    public const string ApplicationSessionStarted = "ApplicationSessionStarted";
+    /// <summary>An application session reached its idle timeout.</summary>
+    public const string ApplicationSessionIdleTimedOut = "ApplicationSessionIdleTimedOut";
+    /// <summary>An application session reached its absolute timeout.</summary>
+    public const string ApplicationSessionAbsoluteTimedOut = "ApplicationSessionAbsoluteTimedOut";
+    /// <summary>A user ended their SecureOps application session.</summary>
+    public const string ApplicationSessionLoggedOut = "ApplicationSessionLoggedOut";
+    /// <summary>An administrator revoked an application session.</summary>
+    public const string ApplicationSessionRevoked = "ApplicationSessionRevoked";
+    /// <summary>Access disable ended active application sessions.</summary>
+    public const string ApplicationSessionAccessDisabled = "ApplicationSessionAccessDisabled";
+    /// <summary>An access-version change ended active application sessions.</summary>
+    public const string ApplicationSessionAccessChanged = "ApplicationSessionAccessChanged";
+    /// <summary>An administrator viewed active application sessions.</summary>
+    public const string ApplicationSessionsViewed = "ApplicationSessionsViewed";
     /// <summary>A privileged management report was requested.</summary>
     public const string ManagementReportRequested = "ManagementReportRequested";
     /// <summary>A privileged management report was returned.</summary>
