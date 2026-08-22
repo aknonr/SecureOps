@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
 using SecureOps.Ui.Configuration;
+using SecureOps.Ui.Hosting;
 using SecureOps.Ui.Security;
 using SecureOps.Ui.Services;
 
@@ -21,6 +22,14 @@ if (!builder.Environment.IsDevelopment() && !builder.Environment.IsProduction())
 }
 
 builder.Services.Configure<DemoModeOptions>(builder.Configuration.GetSection(DemoModeOptions.SectionName));
+
+// Trusted HTTPS-offload recognition. Validated at startup so a misconfigured trust boundary stops
+// the host rather than silently degrading to cleartext behaviour behind the load balancer.
+builder.Services.AddSingleton<IValidateOptions<HttpsOffloadOptions>, HttpsOffloadOptionsValidator>();
+builder.Services
+    .AddOptions<HttpsOffloadOptions>()
+    .Bind(builder.Configuration.GetSection(HttpsOffloadOptions.SectionName))
+    .ValidateOnStart();
 
 // Canonical SecureOps API base address with startup validation and a safe migration path from the
 // legacy DemoMode:ApiBaseAddress key. Resolution runs at options-build time so the final merged
@@ -123,6 +132,16 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
+
+// Runs immediately after forwarded headers and before anything that reads Request.IsHttps —
+// HTTPS redirection, authentication redirects, secure cookies, and antiforgery. Behind the
+// corporate load balancer TLS terminates upstream and the backend hop is cleartext, so without
+// this the antiforgery system sees a non-SSL request and refuses to issue its Secure cookie.
+//
+// It does not trust X-Forwarded-Proto. The scheme is restored only when the immediate connection
+// matches the whole configured trust boundary: trusted proxy IP, expected host, and expected local
+// port. Disabled by default, and fails closed on any mismatch.
+app.UseMiddleware<HttpsOffloadMiddleware>();
 
 if (!app.Environment.IsDevelopment())
 {

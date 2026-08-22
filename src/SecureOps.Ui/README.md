@@ -181,6 +181,36 @@ non-retryable presentation, never to the generic conflict message.
 **No polling.** `GET /operational-records` is a rate-limited source refresh, not a passive read.
 Refresh is a deliberate operator action, plus an automatic re-read after every write.
 
+## HTTPS offload behind the corporate load balancer
+
+TLS terminates at the F5 and the backend hop to IIS is cleartext HTTP. Antiforgery and the session
+cookie are both `__Host-` prefixed with `SecurePolicy = Always`, so if the application does not see
+the request as HTTPS, rendering `/login` throws and returns 500.
+
+`Hosting/HttpsOffloadMiddleware` restores the external scheme, and runs immediately after
+`UseForwardedHeaders` — before HTTPS redirection, authentication, secure cookies and antiforgery.
+
+It **does not trust `X-Forwarded-Proto`**. The scheme is set to HTTPS only when *all* of these hold:
+
+| Condition | Key |
+|---|---|
+| feature explicitly enabled | `ReverseProxy:HttpsOffload:Enabled` |
+| immediate `RemoteIpAddress` is an exact configured proxy | `ReverseProxy:HttpsOffload:TrustedProxyIps` |
+| `Host` is an exact configured host | `ReverseProxy:HttpsOffload:ExpectedHosts` |
+| `Connection.LocalPort` matches | `ReverseProxy:HttpsOffload:ExpectedLocalPort` |
+
+Any mismatch leaves the request as HTTP. Options are validated at startup, so a half-configured trust
+boundary stops the host rather than degrading silently.
+
+**Trusted proxy IPs are server-owned.** Never widen them in application defaults, never trust a CIDR
+range, and confirm the authoritative LB SNAT/backend source set with the network owners rather than
+inferring it from observed traffic.
+
+Note: `UseForwardedHeaders` is left with framework defaults, which trust loopback only. It is
+therefore inert on the LB path — deliberately, since the offload decision above does not depend on
+forwarded headers. Client IPs in logs will be the LB address until known proxies are configured
+separately.
+
 ## Error handling
 
 All failures flow through one path:

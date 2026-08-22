@@ -22,6 +22,9 @@
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
         </Found>
         <NotFound>
+            @* Report the real outcome. The fallback route answers 200 for every unmatched path, so
+               without this a genuinely unknown URL would return "200 OK" carrying a Not Found page. *@
+            <SoHttpStatus Code="404" />
             <LayoutView Layout="@typeof(MainLayout)">
                 <div class="so-page so-page--narrow">
                     <section class="so-panel so-panel--notice">

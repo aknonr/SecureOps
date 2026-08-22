@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\SecureOps.Shared\SecureOps.Shared.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Api\SecureOps.Api.csproj" />
+    <ProjectReference Include="..\..\src\SecureOps.Ui\SecureOps.Ui.csproj" />
   </ItemGroup>
 
   <ItemGroup>
