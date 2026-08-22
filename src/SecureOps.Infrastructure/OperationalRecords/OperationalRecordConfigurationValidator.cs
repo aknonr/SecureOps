@@ -47,9 +47,16 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required when OperationalRecords:RepositoryProvider is SqlServer.");
         }
 
-        if (!string.Equals(jira.Provider, "Fake", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(jira.Provider, "Disabled", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(jira.Provider, "Fake", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Jira:Provider must remain Fake until an approved server-side Jira adapter is implemented.");
+            throw new InvalidOperationException("Jira:Provider must be Disabled, or Fake only for Development/Demo/Test.");
+        }
+
+        if (string.Equals(jira.Provider, "Fake", StringComparison.OrdinalIgnoreCase)
+            && !IsSyntheticEnvironment(environmentName))
+        {
+            throw new InvalidOperationException("Jira:Provider Fake is permitted only in Development, Demo, or Test.");
         }
 
         if (string.IsNullOrWhiteSpace(jira.ProjectKey) || string.IsNullOrWhiteSpace(jira.IssueType) || string.IsNullOrWhiteSpace(jira.MappingVersion))

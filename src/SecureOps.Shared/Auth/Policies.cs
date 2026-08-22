@@ -33,6 +33,8 @@ public static class Policies
     public const string CanAssignRoles = "CanAssignRoles";
     /// <summary>View access-control audit evidence.</summary>
     public const string CanViewAccessAudit = "CanViewAccessAudit";
+    /// <summary>View backend-authoritative management reports.</summary>
+    public const string CanViewManagementReports = "CanViewManagementReports";
     /// <summary>
     /// Operator, TeamLead, Admin, or Auditor where explicitly allowed by endpoint logic.
     /// </summary>

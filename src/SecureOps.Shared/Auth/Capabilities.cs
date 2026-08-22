@@ -33,4 +33,6 @@ public static class Capabilities
     public const string AccessAssignRoles = "Access.AssignRoles";
     /// <summary>View access-control audit evidence.</summary>
     public const string AccessViewAudit = "Access.ViewAudit";
+    /// <summary>View backend-authoritative aggregate and paginated management reporting.</summary>
+    public const string ManagementReportingView = "Reporting.ManagementView";
 }

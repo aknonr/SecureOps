@@ -44,6 +44,7 @@ public static class SecureOpsAuthorization
             AddCapability(options, Policies.CanApproveAccessRequests, Capabilities.AccessApproveRequests);
             AddCapability(options, Policies.CanAssignRoles, Capabilities.AccessAssignRoles);
             AddCapability(options, Policies.CanViewAccessAudit, Capabilities.AccessViewAudit);
+            AddCapability(options, Policies.CanViewManagementReports, Capabilities.ManagementReportingView);
 
             if (requireAuthenticatedFallback)
             {

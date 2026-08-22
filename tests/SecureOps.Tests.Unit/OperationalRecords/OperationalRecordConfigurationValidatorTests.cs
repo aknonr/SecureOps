@@ -62,6 +62,32 @@ public sealed class OperationalRecordConfigurationValidatorTests
     }
 
     [Fact]
+    public void Validate_WithDisabledJiraInProduction_Succeeds()
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["Jira:Provider"] = "Disabled"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Production");
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_WithFakeJiraInProduction_FailsClearly()
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["Jira:Provider"] = "Fake"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Production");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Jira:Provider Fake*Development, Demo, or Test*");
+    }
+
+    [Fact]
     public void Validate_WithSqlRepositoryWithoutConnectionString_FailsClearly()
     {
         IConfiguration configuration = Configuration(new Dictionary<string, string?>
