@@ -1217,6 +1217,300 @@
         }
       }
     },
+    "/api/v1/reporting/management/summary": {
+      "get": {
+        "tags": [
+          "ManagementReporting"
+        ],
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementReportResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementReportResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reporting/management/operators": {
+      "get": {
+        "tags": [
+          "ManagementReporting"
+        ],
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActivityPageResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActivityPageResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorActivityPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operational-records": {
       "get": {
         "tags": [
@@ -2277,6 +2571,35 @@
         },
         "additionalProperties": false
       },
+      "DurationStatisticsResponse": {
+        "type": "object",
+        "properties": {
+          "definition": {
+            "type": "string",
+            "nullable": true
+          },
+          "sampleCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minimumSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "averageSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maximumSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "IdentityLookupCacheDiagnosticsResponse": {
         "type": "object",
         "properties": {
@@ -2345,6 +2668,47 @@
         },
         "additionalProperties": false
       },
+      "IdentityLookupMetricsResponse": {
+        "type": "object",
+        "properties": {
+          "totalLookups": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "successfulLookups": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notFound": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejectedOrInvalid": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "providerUnavailable": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "authorizationDenied": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uniqueActiveOperators": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdentityLookupTrendPointResponse"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "IdentityLookupRequest": {
         "type": "object",
         "properties": {
@@ -2385,6 +2749,40 @@
           },
           "user": {
             "$ref": "#/components/schemas/IdentityLookupUserDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IdentityLookupTrendPointResponse": {
+        "type": "object",
+        "properties": {
+          "dateUtc": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "succeeded": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notFound": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "providerUnavailable": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "forbidden": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -2527,6 +2925,48 @@
           "authenticationSource": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ManagementReportResponse": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "$ref": "#/components/schemas/ReportingWindowResponse"
+          },
+          "identityLookup": {
+            "$ref": "#/components/schemas/IdentityLookupMetricsResponse"
+          },
+          "operationalWorkflow": {
+            "$ref": "#/components/schemas/OperationalWorkflowMetricsResponse"
+          },
+          "platformAdoption": {
+            "$ref": "#/components/schemas/PlatformAdoptionMetricsResponse"
+          },
+          "securityAndQuality": {
+            "$ref": "#/components/schemas/SecurityQualityMetricsResponse"
+          },
+          "dataLimitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "NamedCountResponse": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -2676,6 +3116,155 @@
         "type": "integer",
         "format": "int32"
       },
+      "OperationalWorkflowMetricsResponse": {
+        "type": "object",
+        "properties": {
+          "recordsImported": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eligible": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "previewed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "jiraCreated": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "completed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sourceChangedPrevented": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "closedOrMissingPrevented": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failures": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reconciliationRequired": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "duplicateCreatePrevented": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retries": {
+            "$ref": "#/components/schemas/RetryOutcomeMetricsResponse"
+          },
+          "durations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DurationStatisticsResponse"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperatorActivityPageResponse": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "$ref": "#/components/schemas/ReportingWindowResponse"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalItems": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorActivityResponse"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperatorActivityResponse": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "string",
+            "nullable": true
+          },
+          "operationCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "firstActivityAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastActivityAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "operationsByWorkflow": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NamedCountResponse"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlatformAdoptionMetricsResponse": {
+        "type": "object",
+        "properties": {
+          "dailyActiveUsers": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "weeklyActiveUsers": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monthlyActiveUsers": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uniqueActiveUsersInWindow": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "operationsByWorkflow": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NamedCountResponse"
+            },
+            "nullable": true
+          },
+          "accessRequestActivity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NamedCountResponse"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -2702,6 +3291,73 @@
           }
         },
         "additionalProperties": { }
+      },
+      "ReportingWindowResponse": {
+        "type": "object",
+        "properties": {
+          "selection": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromInclusiveUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "toExclusiveUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetryOutcomeMetricsResponse": {
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "succeeded": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unresolvedAtWindowEnd": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SecurityQualityMetricsResponse": {
+        "type": "object",
+        "properties": {
+          "authorizationFailures": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "concurrencyConflicts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reconciliationEvents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "providerUnavailableEvents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rateLimitEvents": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "SessionPolicyResponse": {
         "type": "object",

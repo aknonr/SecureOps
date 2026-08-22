@@ -62,7 +62,7 @@ The diagram above captures the original generic inbound-monitoring shape. In the
 
 ASP.NET Core 8 Web API. Hosted on IIS in-process.
 
-Current implementation status: Phase 1A IdentityLookup, provider-neutral access approval/capability authorization, safe health metadata, and the fake-adapter Operational Record/Jira workflow are implemented. Phase 1 alert intake and diagnostic job orchestration remain planned. SQL contracts exist but are never applied by the application.
+Current implementation status: Phase 1A IdentityLookup, provider-neutral access approval/capability authorization, safe health metadata, the fake-adapter Operational Record/Jira workflow, and a SQL-aggregated management reporting read model are implemented. Phase 1 alert intake and diagnostic job orchestration remain planned. SQL contracts exist but are never applied by the application.
 
 Responsibilities:
 - Accept monitoring webhooks (HMAC-signed).
@@ -73,6 +73,7 @@ Responsibilities:
 - Enqueue diagnostic jobs via Hangfire client API.
 - Resolve exact PAM/AD account lookups through the IdentityLookup service (Phase 1A).
 - Enforce durable command idempotency, bounded workflow claims, and external source freshness for Operational Record/Jira commands.
+- Return bounded management aggregates from limited SQL views under a distinct audited reporting capability.
 
 Does NOT:
 - Execute PowerShell.

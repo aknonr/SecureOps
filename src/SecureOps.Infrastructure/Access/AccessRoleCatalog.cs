@@ -23,7 +23,8 @@ public static class AccessRoleCatalog
                 Capabilities.AccessManageUsers,
                 Capabilities.AccessApproveRequests,
                 Capabilities.AccessAssignRoles,
-                Capabilities.AccessViewAudit
+                Capabilities.AccessViewAudit,
+                Capabilities.ManagementReportingView
             ],
             ["Lead"] =
             [
@@ -54,7 +55,8 @@ public static class AccessRoleCatalog
                 Capabilities.AuditView,
                 Capabilities.OperationalRecordsView,
                 Capabilities.OperationalRecordsViewDiagnostics,
-                Capabilities.AccessViewAudit
+                Capabilities.AccessViewAudit,
+                Capabilities.ManagementReportingView
             ],
             ["ReadOnly"] = [Capabilities.OperationalRecordsView]
         };

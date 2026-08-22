@@ -122,6 +122,19 @@ public sealed class JiraTransferService : IJiraTransferService
         if (begin.Disposition == CommandBeginDisposition.Completed)
         {
             OperationalRecord? completed = await _repository.GetAsync(id, cancellationToken);
+            if (completed is not null
+                && string.Equals(commandName, CreateCommand, StringComparison.Ordinal)
+                && !await TryAuditAsync(
+                    AuditActions.JiraDuplicateCreatePrevented,
+                    completed,
+                    context,
+                    "IdempotentReplay",
+                    null,
+                    cancellationToken))
+            {
+                return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.AuditStoreUnavailable, "audit", true);
+            }
+
             return completed is null
                 ? OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false)
                 : OperationalRecordResult<OperationalRecord>.Success(completed);
@@ -182,7 +195,10 @@ public sealed class JiraTransferService : IJiraTransferService
         {
             if (claim.Record is not null)
             {
-                _ = await TryAuditAsync(AuditActions.OperationalRecordConflict, claim.Record, context, claim.Disposition.ToString(), null, cancellationToken);
+                string action = claim.Disposition == WorkflowAcquireDisposition.JiraAlreadyCreated
+                    ? AuditActions.JiraDuplicateCreatePrevented
+                    : AuditActions.OperationalRecordConflict;
+                _ = await TryAuditAsync(action, claim.Record, context, claim.Disposition.ToString(), null, cancellationToken);
             }
 
             return new OperationalRecordResult<OperationalRecord>(null, MapClaimFailure(claim.Disposition));

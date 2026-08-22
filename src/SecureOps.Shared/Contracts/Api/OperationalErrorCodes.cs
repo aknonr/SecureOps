@@ -79,4 +79,8 @@ public static class OperationalErrorCodes
     public const string OperationalRecordNoLongerOpen = "OperationalRecordNoLongerOpen";
     /// <summary>A command with the same scope is already executing.</summary>
     public const string WorkflowAlreadyInProgress = "WorkflowAlreadyInProgress";
+    /// <summary>A reporting window or pagination request is invalid.</summary>
+    public const string ReportingValidationFailed = "ReportingValidationFailed";
+    /// <summary>The persistent reporting read model is unavailable.</summary>
+    public const string ReportingUnavailable = "ReportingUnavailable";
 }

@@ -47,12 +47,14 @@ If the approved Turuncuhat integration is webhook-based, the approved caller inv
 |---|---|
 | Operator | View Operational Records and generate read-only Jira previews |
 | Lead | Identity lookup, Operational Record create/retry, diagnostics and team view |
-| Admin | All implemented application capabilities, including access approval and role assignment |
+| Admin | All implemented application capabilities, including access approval, role assignment, and management reporting |
 | JiraPublisher | Operational Record view/preview/create/retry |
-| Auditor | Read-only audit and workflow diagnostics |
+| Auditor | Read-only audit, workflow diagnostics, and management reporting |
 | ReadOnly | Operational Record view only |
 
 Phase 1A identity lookup requires the `Identity.Lookup` capability. Operators do not receive this privileged read in the first release.
+
+Management summary and paginated operator-activity reporting require the separate `Reporting.ManagementView` capability, assigned only to Admin and Auditor. These privileged reads are themselves audited. Reports expose bounded process evidence and must not rank, compare, or score individuals.
 
 First-seen authenticated users are `Pending` and receive no operational capability. Administrators approve requests and assign persisted application roles. Disabled status is checked on each capability-protected request. Exact configured bootstrap administrators are an initialization mechanism, not a general AD-group authorization path.
 

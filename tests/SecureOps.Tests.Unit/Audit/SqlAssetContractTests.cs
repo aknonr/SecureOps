@@ -72,6 +72,42 @@ public sealed class SqlAssetContractTests
             .And.NotContain("ConnectionString");
     }
 
+    [Fact]
+    public void ManagementReportingSqlAsset_UsesLimitedViewsAndSupportingIndexes()
+    {
+        string root = FindRepositoryRoot();
+        string sql = File.ReadAllText(Path.Combine(root, "sql", "schema", "005-management-reporting-read-model.sql"));
+
+        sql.Should().Contain("CREATE OR ALTER VIEW reporting.ManagementAuditEvents")
+            .And.Contain("CREATE OR ALTER VIEW reporting.ManagementWorkflowEvents")
+            .And.Contain("CREATE OR ALTER VIEW reporting.ManagementOperationalStatus")
+            .And.Contain("IX_AuditLog_ActionOccurredAt")
+            .And.Contain("IX_OperationalRecordWorkflowHistory_StateOccurredAt")
+            .And.Contain("IX_JiraTransfers_ReconciliationUpdatedAt");
+        sql.Should().NotContain("SourceIp")
+            .And.NotContain("Requester")
+            .And.NotContain("Password")
+            .And.NotContain("ConnectionString");
+    }
+
+    [Fact]
+    public void ManagementReportingMigrationAndRepository_UseBoundedServerSideQueries()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "005-management-reporting-read-model.sql"));
+        string repository = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Reporting", "SqlManagementReportingRepository.cs"));
+
+        migration.Should().Contain(":r ..\\schema\\005-management-reporting-read-model.sql");
+        repository.Should().Contain("FROM reporting.ManagementAuditEvents")
+            .And.Contain("FROM reporting.ManagementWorkflowEvents")
+            .And.Contain("FROM reporting.ManagementOperationalStatus")
+            .And.Contain("OccurredAt >= @FromInclusive AND OccurredAt < @ToExclusive")
+            .And.Contain("COUNT_BIG(DISTINCT Actor)")
+            .And.Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY")
+            .And.Contain("commandTimeout: CommandTimeoutSeconds")
+            .And.Contain("cancellationToken: cancellationToken");
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

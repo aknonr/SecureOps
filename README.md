@@ -4,7 +4,7 @@ Current backend TEST deployment readiness, migrations, bootstrap access, exact r
 
 An enterprise Windows operations platform that receives monitoring alarms, runs read-only diagnostics, captures structured audit data, and surfaces actionable findings to shift engineers.
 
-> **Status:** Backend TEST release controls are implemented; controlled database and application deployment remains pending.
+> **Status:** Backend TEST release controls and the management reporting read model are implemented; controlled database and application deployment remains pending.
 > **Owner:** CONTOSO Turkish Technology (placeholder)
 > **Stack:** .NET 8, Blazor Server, SQL Server, PowerShell Remoting + JEA
 > **MVP timeline:** 6–8 weeks
@@ -35,7 +35,7 @@ Later phases add rule-based analysis, private AI-assisted summarization, and app
 
 ## Getting Started
 
-This repo contains documentation, agent rules, a .NET solution, working Phase 1A IdentityLookup backend code, provider-neutral access approval, audit persistence hardening, and the durable Operational Record to Jira backend foundation. Real OIDC, Operational Record/Jira adapters, and approved classification rules remain deferred; local tests use fakes only.
+This repo contains documentation, agent rules, a .NET solution, working Phase 1A IdentityLookup backend code, provider-neutral access approval, audit persistence hardening, the durable Operational Record to Jira backend foundation, and backend-authoritative management reporting. Real OIDC, Operational Record/Jira adapters, and approved classification rules remain deferred; local tests use fakes only.
 
 ### For AI coding agents
 

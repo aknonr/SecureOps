@@ -6,8 +6,8 @@ public sealed class JiraIntegrationOptions
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "Jira";
 
-    /// <summary>Jira provider. Only Fake is implemented until the enterprise contract is approved.</summary>
-    public string Provider { get; set; } = "Fake";
+    /// <summary>Jira provider: Disabled, or Fake only in an explicitly synthetic environment.</summary>
+    public string Provider { get; set; } = "Disabled";
 
     /// <summary>Configured Jira project key used in previews.</summary>
     public string ProjectKey { get; set; } = "TEST";

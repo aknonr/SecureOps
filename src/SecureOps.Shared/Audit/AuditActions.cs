@@ -107,4 +107,12 @@ public static class AuditActions
     public const string IdentityLookupProviderCall = "IdentityLookupProviderCall";
     /// <summary>An authenticated caller requested provider-managed logout.</summary>
     public const string SessionLogoutRequested = "SessionLogoutRequested";
+    /// <summary>A privileged management report was requested.</summary>
+    public const string ManagementReportRequested = "ManagementReportRequested";
+    /// <summary>A privileged management report was returned.</summary>
+    public const string ManagementReportViewed = "ManagementReportViewed";
+    /// <summary>A privileged management report could not be produced.</summary>
+    public const string ManagementReportFailed = "ManagementReportFailed";
+    /// <summary>An idempotent Jira create replay was stopped before external invocation.</summary>
+    public const string JiraDuplicateCreatePrevented = "JiraDuplicateCreatePrevented";
 }

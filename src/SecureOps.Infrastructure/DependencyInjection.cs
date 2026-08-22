@@ -6,6 +6,7 @@ using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
+using SecureOps.Infrastructure.Reporting;
 using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Infrastructure;
@@ -105,7 +106,15 @@ public static class DependencyInjection
             services.AddSingleton<IRequesterResolver, UnresolvedRequesterResolver>();
         }
 
-        services.AddSingleton<IJiraClient, FakeJiraClient>();
+        string? jiraProvider = configuration[$"{JiraIntegrationOptions.SectionName}:Provider"];
+        if (string.Equals(jiraProvider, "Fake", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IJiraClient, FakeJiraClient>();
+        }
+        else
+        {
+            services.AddSingleton<IJiraClient, DisabledJiraClient>();
+        }
         if (string.Equals(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IOperationalRecordRepository, SqlOperationalRecordRepository>();
@@ -120,6 +129,21 @@ public static class DependencyInjection
         services.AddScoped<IJiraIssueDraftService, JiraIssueDraftService>();
         services.AddScoped<IOperationalRecordService, OperationalRecordService>();
         services.AddScoped<IJiraTransferService, JiraTransferService>();
+
+        services.AddSingleton<ReportingWindowResolver>();
+        services.AddSingleton<ManagementReportProjector>();
+        services.AddScoped<IManagementReportingService, ManagementReportingService>();
+        bool authoritativeReporting = string.Equals(auditProvider, "SqlServer", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(configuration[$"{AccessOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase);
+        if (authoritativeReporting)
+        {
+            services.AddScoped<IManagementReportingRepository, SqlManagementReportingRepository>();
+        }
+        else
+        {
+            services.AddSingleton<IManagementReportingRepository, UnavailableManagementReportingRepository>();
+        }
 
         return services;
     }

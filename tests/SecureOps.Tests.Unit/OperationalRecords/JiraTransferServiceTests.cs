@@ -32,7 +32,8 @@ public sealed class JiraTransferServiceTests
             AuditActions.JiraCreateRequested,
             AuditActions.JiraCreated,
             AuditActions.OperationalRecordCloseRequested,
-            AuditActions.WorkflowCompleted]);
+            AuditActions.WorkflowCompleted,
+            AuditActions.JiraDuplicateCreatePrevented]);
     }
 
     [Fact]

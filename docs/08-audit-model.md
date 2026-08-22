@@ -51,6 +51,10 @@ The audit subsystem is the project's most important non-functional feature. This
 | User session ended | UI | `SessionEnded` |
 | Login failed (informational) | UI | `LoginFailed` |
 | Authorization denied | API/UI | `AuthorizationDenied` |
+| Management report requested | API | `ManagementReportRequested` |
+| Management report viewed | API | `ManagementReportViewed` |
+| Management report failed | API | `ManagementReportFailed` |
+| Duplicate Jira create prevented | API | `JiraDuplicateCreatePrevented` |
 | Phase 7 AI prompt sent | AI service | `AiPromptSent` (separate AiAuditLog) |
 | Phase 8 remediation requested | UI | `RemediationRequested` |
 | Phase 8 remediation approved | UI | `RemediationApproved` |
@@ -62,6 +66,8 @@ The audit subsystem is the project's most important non-functional feature. This
 - Routine read of the alert list (covered by session entries).
 - Health check endpoints.
 - UI navigation events that do not access specific records.
+
+Management reporting reads are privileged and therefore audited. The report audit details contain only report type, UTC window, outcome code, and request correlation data; aggregate results and per-operator rows are not copied into `DetailsJson`.
 
 ## Audit Entry Schema
 

@@ -284,6 +284,7 @@ public sealed class OperationalRecordWorkflowHostedTests
             builder.UseSetting("IdentityLookup:Provider", "Mock");
             builder.UseSetting("OperationalRecords:SourceProvider", sourceProvider);
             builder.UseSetting("OperationalRecords:RepositoryProvider", "InMemory");
+            builder.UseSetting("Jira:Provider", "Fake");
             builder.UseSetting("RateLimiting:OperationalRecordRefresh:PermitLimit", "100");
             builder.UseSetting("RateLimiting:JiraPreview:PermitLimit", "100");
             builder.UseSetting("RateLimiting:JiraCreate:PermitLimit", "100");
@@ -329,6 +330,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["OperationalRecords:SourceProvider"] = sourceProvider,
+            ["Jira:Provider"] = sourceProvider == "Fake" ? "Fake" : "Disabled",
             ["Audit:Provider"] = "InMemory"
         }).Build();
         ServiceCollection services = new();
