@@ -9,9 +9,13 @@ namespace SecureOps.Ui.Services;
 /// <remarks>
 /// <para>
 /// Every call is exact-only: one account or one group, never a filter, a wildcard, or an LDAP
-/// expression. Each carries an operational <c>purpose</c> that the API writes to the audit trail, so
-/// these are not free reads — they are recorded, bounded, and rate-limited. The UI therefore loads
-/// each section on demand rather than fetching everything the moment a lookup returns.
+/// expression. Each is recorded, bounded, and rate-limited, so the UI loads each section on demand
+/// rather than fetching everything the moment a lookup returns.
+/// </para>
+/// <para>
+/// <c>purpose</c> is optional on every route here and is passed as <c>null</c> when the operator gave
+/// none. It is context on the audit record, not permission to read: the query is recorded either
+/// way, it never enters the cache or rate-limit identity, and the server re-validates its bounds.
 /// </para>
 /// <para>
 /// Nothing here traverses a graph. Direct groups, transitive groups, and membership paths are all
@@ -25,7 +29,7 @@ public interface IDirectoryApiClient
     /// Reads one bounded page of a principal's <b>direct</b> groups.
     /// </summary>
     /// <param name="account">Exact account.</param>
-    /// <param name="purpose">Operational reason, recorded in the audit trail.</param>
+    /// <param name="purpose">Optional operational context; <c>null</c> when none was given.</param>
     /// <param name="pageSize">Requested page size; the API caps it.</param>
     /// <param name="continuationToken">Opaque token from the previous page, or <c>null</c> to start.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -33,7 +37,7 @@ public interface IDirectoryApiClient
     /// <remarks>The continuation token is opaque and server-protected; never parse or construct one.</remarks>
     public Task<DirectoryGroupPageResponse> GetPrincipalGroupsAsync(
         string account,
-        string purpose,
+        string? purpose,
         int? pageSize,
         string? continuationToken,
         CancellationToken cancellationToken);
@@ -42,7 +46,7 @@ public interface IDirectoryApiClient
     /// Reads a principal's direct and transitive memberships as two separate sets.
     /// </summary>
     /// <param name="account">Exact account.</param>
-    /// <param name="purpose">Operational reason, recorded in the audit trail.</param>
+    /// <param name="purpose">Optional operational context; <c>null</c> when none was given.</param>
     /// <param name="refresh">Bypasses the server-side query cache.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Direct groups, transitive groups, and the traversal bounds that applied.</returns>
@@ -53,7 +57,7 @@ public interface IDirectoryApiClient
     /// </remarks>
     public Task<DirectoryPrincipalMembershipsResponse> GetMembershipsAsync(
         string account,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken);
 
@@ -62,7 +66,7 @@ public interface IDirectoryApiClient
     /// </summary>
     /// <param name="account">Exact account.</param>
     /// <param name="targetGroup">Exact group the caller wants explained.</param>
-    /// <param name="purpose">Operational reason, recorded in the audit trail.</param>
+    /// <param name="purpose">Optional operational context; <c>null</c> when none was given.</param>
     /// <param name="refresh">Bypasses the server-side query cache.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Membership verdict, the proven chains, and traversal bounds.</returns>
@@ -74,7 +78,7 @@ public interface IDirectoryApiClient
     public Task<DirectoryMembershipPathResponse> GetMembershipPathsAsync(
         string account,
         string targetGroup,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken);
 
@@ -82,7 +86,7 @@ public interface IDirectoryApiClient
     /// Reads operational account-health evidence.
     /// </summary>
     /// <param name="account">Exact account.</param>
-    /// <param name="purpose">Operational reason, recorded in the audit trail.</param>
+    /// <param name="purpose">Optional operational context; <c>null</c> when none was given.</param>
     /// <param name="refresh">Bypasses the server-side query cache.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Nullable evidence; every field can legitimately be unknown.</returns>
@@ -93,7 +97,7 @@ public interface IDirectoryApiClient
     /// </remarks>
     public Task<DirectoryAccountHealthResponse> GetAccountHealthAsync(
         string account,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken);
 
@@ -101,7 +105,7 @@ public interface IDirectoryApiClient
     /// Reads bounded SPN and directory account-type evidence.
     /// </summary>
     /// <param name="account">Exact account.</param>
-    /// <param name="purpose">Operational reason, recorded in the audit trail.</param>
+    /// <param name="purpose">Optional operational context; <c>null</c> when none was given.</param>
     /// <param name="refresh">Bypasses the server-side query cache.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>SPNs, counts, truncation state, and non-authoritative account-type evidence.</returns>
@@ -111,7 +115,7 @@ public interface IDirectoryApiClient
     /// </remarks>
     public Task<DirectoryServiceEvidenceResponse> GetServiceEvidenceAsync(
         string account,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken);
 
@@ -119,7 +123,7 @@ public interface IDirectoryApiClient
     /// Reads privileged-group membership evidence for the server-configured group set.
     /// </summary>
     /// <param name="account">Exact account.</param>
-    /// <param name="purpose">Operational reason, recorded in the audit trail.</param>
+    /// <param name="purpose">Optional operational context; <c>null</c> when none was given.</param>
     /// <param name="refresh">Bypasses the server-side query cache.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>One entry per configured group, with direct/transitive state and proven paths.</returns>
@@ -129,7 +133,7 @@ public interface IDirectoryApiClient
     /// </remarks>
     public Task<DirectoryPrivilegedMembershipResponse> GetPrivilegedMembershipsAsync(
         string account,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken);
 
@@ -137,13 +141,13 @@ public interface IDirectoryApiClient
     /// Reads exact group metadata.
     /// </summary>
     /// <param name="group">Exact group identifier.</param>
-    /// <param name="purpose">Operational reason, recorded in the audit trail.</param>
+    /// <param name="purpose">Optional operational context; <c>null</c> when none was given.</param>
     /// <param name="refresh">Bypasses the server-side query cache.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Group metadata including scope, category, manager, and direct member count.</returns>
     public Task<DirectoryGroupDetailResponse> GetGroupAsync(
         string group,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken);
 
@@ -151,7 +155,7 @@ public interface IDirectoryApiClient
     /// Reads one bounded page of a group's <b>direct</b> members.
     /// </summary>
     /// <param name="group">Exact group identifier.</param>
-    /// <param name="purpose">Operational reason, recorded in the audit trail.</param>
+    /// <param name="purpose">Optional operational context; <c>null</c> when none was given.</param>
     /// <param name="pageSize">Requested page size; the API caps it.</param>
     /// <param name="continuationToken">Opaque token from the previous page, or <c>null</c> to start.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -162,7 +166,7 @@ public interface IDirectoryApiClient
     /// </remarks>
     public Task<DirectoryMemberPageResponse> GetGroupMembersAsync(
         string group,
-        string purpose,
+        string? purpose,
         int? pageSize,
         string? continuationToken,
         CancellationToken cancellationToken);

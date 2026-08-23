@@ -2928,6 +2928,18 @@ body {
     color: var(--so-text-faint);
 }
 
+/* An optional input that should not compete with the required one above it. The
+   label and helper drop a step in weight and colour so the field reads as an
+   offer rather than a demand; nothing else about it changes, so it stays exactly
+   as usable for the operators who do want to record a reason. */
+.so-optional-field .mud-input-label {
+    font-weight: 400;
+}
+
+.so-optional-field .mud-input-helper-text {
+    color: var(--so-text-faint);
+}
+
 .so-wrap {
     overflow-wrap: anywhere;
 }

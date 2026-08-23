@@ -24,6 +24,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-15 — Reported limitations are English prose with no code | ✅ **Resolved** by backend `b0e3b7b` |
 | G-16 — Only identity lookup has daily buckets | Open — confirmed out of scope by `b0e3b7b` |
 | G-17 — Zero and "no persisted history" are indistinguishable | ✅ **Resolved** by backend `b0e3b7b` |
+| G-18 — UI integration contract still calls the directory purpose required | Open — documentation only |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -735,6 +736,28 @@ accompanied by the traversal or truncation metadata required to present a bounde
 One backend change required a UI fix rather than a gap entry: `OperationalRecordResponse.createdAt`
 became nullable, because the reviewed legacy Turuncu Hat projection supplies no source timestamp. The
 record detail renders that as "kaynak sistemde tarih yok".
+
+## G-18 — The UI integration contract still calls the directory purpose required
+
+**Endpoint:** `POST /api/v1/directory/*`
+**Severity:** Low — documentation only, no runtime effect
+**Status:** Open
+
+Backend `a607ac4` made `purpose` optional on every read-only Directory Explorer route. `docs/27`,
+`docs/29`, `DirectoryExplorerOptions`, and `DirectoryLookupPurpose` all say so. The UI integration
+contract does not:
+
+> Phase 2 requests are exact-only POST bodies with `account`, **required operational `purpose`**, and
+> optional `refresh`
+
+That line is now wrong, and it is the document a UI author reads first. The DTOs are unambiguous —
+every `Purpose` parameter defaults to `null` — so the UI follows the code and the phase docs.
+
+**What would resolve it.** Correcting that sentence in
+`docs/contracts/secureops-api-v1-ui-integration.md`. Backend-owned, so it is recorded here rather
+than edited.
+
+---
 
 ## Note: enums cross the wire as numbers
 

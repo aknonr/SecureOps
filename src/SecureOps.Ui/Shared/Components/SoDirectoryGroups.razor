@@ -143,9 +143,9 @@ else if (_memberships is not null)
     [Parameter, EditorRequired]
     public string Account { get; set; } = string.Empty;
 
-    /// <summary>Operational purpose recorded with every directory call.</summary>
-    [Parameter, EditorRequired]
-    public string Purpose { get; set; } = string.Empty;
+    /// <summary>Optional operational context; <c>null</c> when the operator gave none.</summary>
+    [Parameter]
+    public string? Purpose { get; set; }
 
     private DirectoryPrincipalMembershipsResponse? _memberships;
     private UiProblem? _problem;

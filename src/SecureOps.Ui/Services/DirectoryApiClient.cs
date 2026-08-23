@@ -26,7 +26,7 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
     /// <inheritdoc />
     public Task<DirectoryGroupPageResponse> GetPrincipalGroupsAsync(
         string account,
-        string purpose,
+        string? purpose,
         int? pageSize,
         string? continuationToken,
         CancellationToken cancellationToken) =>
@@ -38,7 +38,7 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
     /// <inheritdoc />
     public Task<DirectoryPrincipalMembershipsResponse> GetMembershipsAsync(
         string account,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken) =>
         PostAsync<DirectoryPrincipalEnrichmentRequest, DirectoryPrincipalMembershipsResponse>(
@@ -50,7 +50,7 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
     public Task<DirectoryMembershipPathResponse> GetMembershipPathsAsync(
         string account,
         string targetGroup,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken) =>
         PostAsync<DirectoryMembershipPathRequest, DirectoryMembershipPathResponse>(
@@ -61,7 +61,7 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
     /// <inheritdoc />
     public Task<DirectoryAccountHealthResponse> GetAccountHealthAsync(
         string account,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken) =>
         PostAsync<DirectoryPrincipalEnrichmentRequest, DirectoryAccountHealthResponse>(
@@ -72,7 +72,7 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
     /// <inheritdoc />
     public Task<DirectoryServiceEvidenceResponse> GetServiceEvidenceAsync(
         string account,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken) =>
         PostAsync<DirectoryPrincipalEnrichmentRequest, DirectoryServiceEvidenceResponse>(
@@ -83,7 +83,7 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
     /// <inheritdoc />
     public Task<DirectoryPrivilegedMembershipResponse> GetPrivilegedMembershipsAsync(
         string account,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken) =>
         PostAsync<DirectoryPrincipalEnrichmentRequest, DirectoryPrivilegedMembershipResponse>(
@@ -94,7 +94,7 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
     /// <inheritdoc />
     public Task<DirectoryGroupDetailResponse> GetGroupAsync(
         string group,
-        string purpose,
+        string? purpose,
         bool refresh,
         CancellationToken cancellationToken) =>
         PostAsync<DirectoryGroupLookupRequest, DirectoryGroupDetailResponse>(
@@ -105,7 +105,7 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
     /// <inheritdoc />
     public Task<DirectoryMemberPageResponse> GetGroupMembersAsync(
         string group,
-        string purpose,
+        string? purpose,
         int? pageSize,
         string? continuationToken,
         CancellationToken cancellationToken) =>

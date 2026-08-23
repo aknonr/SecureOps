@@ -12,7 +12,7 @@
 
 <div class="so-page so-page--wide">
     <SoPageHeader Title="Kullanıcı Sorgulama"
-                  Lead="Tek bir hesabı inceleme amacıyla sorgulayın. Her sorgu, amacıyla birlikte kayıt altına alınır." />
+                  Lead="Tek bir hesabı tam adıyla sorgulayın. Her sorgu kayıt altına alınır." />
 
     @if (_access is null)
     {
@@ -39,11 +39,11 @@
         @* Once there is a result the split collapses: the group, SPN, and privileged tables need the
            full page width, and in a half-width column their action buttons scroll out of reach. The
            query form stays capped so it does not stretch into a banner. *@
-        <div class="so-split @(_result is not null ? "so-split--result" : null)">
+        <div class="so-split @(_submittedAccount is not null ? "so-split--result" : null)">
             <section class="so-panel so-lookup-form">
                 <h2 class="so-panel-title">Sorgu</h2>
 
-                <EditForm Model="_model" OnValidSubmit="@(() => RunLookupAsync(force: false))">
+                <EditForm Model="_model" OnValidSubmit="@(() => SubmitAsync(force: false))">
                     <DataAnnotationsValidator />
 
                     <MudTextField @bind-Value="_model.Account"
@@ -65,15 +65,21 @@
                         <p class="so-input-note">@_accountAdvisory</p>
                     }
 
+                    @* Optional since backend a607ac4. Deliberately understated: a read-only lookup
+                       does not need a justification, and a field that looks mandatory would keep
+                       operators typing one out of habit. The Genel tab asks for one separately,
+                       because its endpoint still requires it. *@
                     <MudTextField @bind-Value="_model.Purpose"
-                                  Label="Sorgu amacı"
-                                  HelperText="İncelemenin nedenini kısaca yazın. Bu bilgi denetim kaydına işlenir."
-                                  Required="true"
+                                  @bind-Value:after="OnPurposeChanged"
+                                  Label="Açıklama"
+                                  HelperText="Opsiyonel — sorgu amacını belirtmek isterseniz ekleyebilirsiniz."
+                                  Error="@(_purposeError is not null)"
+                                  ErrorText="@_purposeError"
                                   Immediate="true"
-                                  Lines="3"
-                                  MaxLength="500"
+                                  Lines="2"
+                                  MaxLength="@DirectoryPurposeInput.MaxLength"
                                   Variant="Variant.Outlined"
-                                  Class="mt-4" />
+                                  Class="mt-4 so-optional-field" />
 
                     <div class="so-disclosure mt-3">
                         <button type="button" class="so-disclosure-toggle" @onclick="ToggleEventRefs"
@@ -109,18 +115,18 @@
                         <MudButton ButtonType="ButtonType.Submit"
                                    Variant="Variant.Filled"
                                    Color="Color.Primary"
-                                   Disabled="@(_loading || _accountError is not null)"
+                                   Disabled="@(_loading || _accountError is not null || _purposeError is not null)"
                                    StartIcon="@Icons.Material.Filled.ManageSearch">
                             Sorgula
                         </MudButton>
 
-                        @if (_result is not null)
+                        @if (_submittedAccount is not null)
                         {
                             <MudButton Variant="Variant.Text"
                                        Color="Color.Primary"
                                        Disabled="@_loading"
                                        StartIcon="@Icons.Material.Filled.Refresh"
-                                       OnClick="@(() => RunLookupAsync(force: true))">
+                                       OnClick="@(() => SubmitAsync(force: true))">
                                 Yenile
                             </MudButton>
                         }
@@ -148,14 +154,10 @@
                 {
                     <SoLoading Message="Sorgu çalışıyor…" Variant="SoLoading.LoadingVariant.Block" />
                 }
-                else if (_problem is not null)
-                {
-                    <SoProblemPanel Problem="_problem" OnRetry="@(() => RunLookupAsync(force: true))" />
-                }
-                else if (_result is null)
+                else if (_submittedAccount is null)
                 {
                     <SoEmptyState Title="Henüz sorgu çalıştırılmadı"
-                                  Description="Hesap ve sorgu amacı girip Sorgula'ya basın."
+                                  Description="Hesap girip Sorgula'ya basın."
                                   Icon="@Icons.Material.Outlined.PersonSearch" />
                 }
                 else
@@ -172,14 +174,23 @@
                     }
 
                     <div class="so-result-tags">
-                        <SoStatusBadge Label="Bulundu"
-                                       Tone="SoStatusBadge.BadgeTone.Positive"
-                                       Icon="@Icons.Material.Filled.CheckCircle" />
-                        <SoStatusBadge Label="@($"Kaynak: {_result.Source}")"
-                                       Tone="SoStatusBadge.BadgeTone.Info" />
-                        <SoStatusBadge Label="@($"Normalleştirilmiş: {_result.NormalizedAccount}")"
-                                       Tone="SoStatusBadge.BadgeTone.Neutral"
-                                       Title="Sorgunun sunucuda çalıştırıldığı biçim" />
+                        @if (_result is not null)
+                        {
+                            <SoStatusBadge Label="Bulundu"
+                                           Tone="SoStatusBadge.BadgeTone.Positive"
+                                           Icon="@Icons.Material.Filled.CheckCircle" />
+                            <SoStatusBadge Label="@($"Kaynak: {_result.Source}")"
+                                           Tone="SoStatusBadge.BadgeTone.Info" />
+                            <SoStatusBadge Label="@($"Normalleştirilmiş: {_result.NormalizedAccount}")"
+                                           Tone="SoStatusBadge.BadgeTone.Neutral"
+                                           Title="Sorgunun sunucuda çalıştırıldığı biçim" />
+                        }
+                        else
+                        {
+                            <SoStatusBadge Label="@($"Hesap: {_submittedAccount}")"
+                                           Tone="SoStatusBadge.BadgeTone.Neutral"
+                                           Title="Dizin sorguları bu hesap için çalıştırılır" />
+                        }
                     </div>
 
                     @* Sections load only when opened. Each one is a separate audited, bounded,
@@ -199,7 +210,49 @@
                         }
                     </div>
 
-                    @if (_tab == DetailTab.General)
+                    @if (_tab == DetailTab.General && _result is null)
+                    {
+                        @* The only section backed by POST /api/v1/identity/lookup, which still
+                           requires a purpose. The other tabs are /directory/* calls and no longer do,
+                           so the requirement is raised here — where it applies — instead of gating
+                           the whole screen behind it. No default purpose is invented: an audit entry
+                           the operator did not write would be worse than an unfetched panel. *@
+                        <section class="so-panel so-panel--inset so-identity-request">
+                            @if (_problem is not null)
+                            {
+                                <SoProblemPanel Problem="_problem" OnRetry="@(() => RunLookupAsync(force: true))" />
+                            }
+                            else
+                            {
+                                <h3 class="so-panel-title">Kimlik alanları için sorgu amacı gerekir</h3>
+                                <p class="so-panel-text so-panel-text--sm">
+                                    Ad, e-posta, departman ve yönetici bilgileri ayrıcalıklı bir dizin
+                                    okumasıdır ve gerekçesiyle birlikte kayıt altına alınır. Diğer
+                                    sekmeler bu bilgi olmadan da çalışır.
+                                </p>
+                            }
+
+                            <MudTextField @bind-Value="_model.Purpose"
+                                          @bind-Value:after="OnPurposeChanged"
+                                          Label="Sorgu amacı"
+                                          HelperText="Bu bilgi denetim kaydına işlenir."
+                                          Required="true"
+                                          Immediate="true"
+                                          Lines="2"
+                                          MaxLength="500"
+                                          Variant="Variant.Outlined" />
+
+                            <div class="so-panel-actions">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                           Disabled="@(_loading || string.IsNullOrWhiteSpace(_model.Purpose))"
+                                           StartIcon="@Icons.Material.Filled.Badge"
+                                           OnClick="@(() => RunLookupAsync(force: false))">
+                                    Kimlik bilgilerini getir
+                                </MudButton>
+                            </div>
+                        </section>
+                    }
+                    else if (_tab == DetailTab.General && _result is not null)
                     {
                         <SoFieldGrid>
                             <SoField Label="Görünen ad" Value="@_result.User!.DisplayName" />
@@ -304,9 +357,9 @@
     private string DirectoryAccount =>
         !string.IsNullOrWhiteSpace(_result?.NormalizedAccount)
             ? _result!.NormalizedAccount
-            : _model.Account.Trim();
+            : _submittedAccount ?? string.Empty;
 
-    private string DirectoryPurpose => _model.Purpose.Trim();
+    private string? DirectoryPurpose => DirectoryPurposeInput.Normalize(_model.Purpose);
 
     private static string TabLabel(DetailTab tab) => tab switch
     {
@@ -318,6 +371,8 @@
     };
 
     private AccessSnapshot? _access;
+    private string? _submittedAccount;
+    private string? _purposeError;
     private bool _loading;
     private bool _showEventRefs;
     private bool _reusedResult;
@@ -394,6 +449,8 @@
 
     private void ToggleEventRefs() => _showEventRefs = !_showEventRefs;
 
+    private void OnPurposeChanged() => _purposeError = DirectoryPurposeInput.Validate(_model.Purpose);
+
     private void OnAccountChanged()
     {
         AccountValidationResult validation =
@@ -402,6 +459,57 @@
         // Nothing is flagged until there is something to flag: an untouched empty field is not an error.
         _accountError = string.IsNullOrWhiteSpace(_model.Account) ? null : validation.Message;
         _accountAdvisory = validation.IsValid ? validation.Advisory : null;
+    }
+
+    /// <summary>
+    /// Runs the lookup the operator asked for.
+    /// </summary>
+    /// <remarks>
+    /// The account alone opens the screen. The directory tabs query <c>/api/v1/directory/*</c>, which
+    /// accepts an omitted purpose, so they work immediately. The identity lookup runs here only when
+    /// a purpose was supplied, because its endpoint still requires one; otherwise the Genel tab asks
+    /// for it. Nothing is invented to fill the gap — a purpose the operator never wrote would be a
+    /// fabricated audit entry.
+    /// </remarks>
+    private async Task SubmitAsync(bool force)
+    {
+        AccountValidationResult validation =
+            AccountInputRules.Validate(_model.Account, _maxAccountLength, _supportsUpn);
+
+        if (!validation.IsValid)
+        {
+            _accountError = validation.Message;
+            return;
+        }
+
+        _purposeError = DirectoryPurposeInput.Validate(_model.Purpose);
+        if (_purposeError is not null)
+        {
+            return;
+        }
+
+        string account = _model.Account.Trim();
+
+        // A different account invalidates every section, including any identity result already on
+        // screen: the tabs would otherwise describe one principal under another's name.
+        if (!string.Equals(_submittedAccount, account, StringComparison.OrdinalIgnoreCase))
+        {
+            _result = null;
+            _completedAt = null;
+            _problem = null;
+            _tab = DetailTab.General;
+        }
+
+        _submittedAccount = account;
+
+        if (string.IsNullOrWhiteSpace(_model.Purpose))
+        {
+            // No purpose, so no privileged identity read. The directory tabs are already usable.
+            _problem = null;
+            return;
+        }
+
+        await RunLookupAsync(force);
     }
 
     private async Task RunLookupAsync(bool force)
@@ -458,9 +566,6 @@
 
             _result = response;
             _completedAt = DateTimeOffset.UtcNow;
-            // A new principal starts on the identity fields; leaving a detail tab open would show the
-            // previous account's section heading while its evidence reloads underneath.
-            _tab = DetailTab.General;
             _cache.Store(request, response, _completedAt.Value);
         }
         catch (SecureOpsApiException ex)
@@ -534,8 +639,8 @@
         [MaxLength(128)]
         public string Account { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Sorgu amacı zorunludur.")]
-        [MaxLength(500, ErrorMessage = "Sorgu amacı en fazla 500 karakter olabilir.")]
+        // No [Required]: /directory/* accepts an omitted purpose. The Genel tab enforces its own
+        // requirement, because POST /api/v1/identity/lookup still demands one.
         public string Purpose { get; set; } = string.Empty;
 
         public string? AlertId { get; set; }

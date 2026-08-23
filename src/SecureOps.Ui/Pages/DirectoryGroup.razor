@@ -11,9 +11,12 @@
 @*
     Exact group lookup.
 
-    Same discipline as the user screen: one exact group, a recorded purpose, no filter syntax and no
-    wildcard. Metadata and members are separate capabilities and separate calls, so an operator who
-    may see that a group exists does not automatically see who is in it.
+    Same discipline as the user screen: one exact group, no filter syntax and no wildcard. Metadata
+    and members are separate capabilities and separate calls, so an operator who may see that a group
+    exists does not automatically see who is in it.
+
+    The purpose is optional. The query itself is recorded either way; what the operator now chooses is
+    whether to add context to that record, not whether the record exists.
 
     The member table lists direct members only. A nested group appears as a member and links to its
     own lookup rather than being expanded in place — expanding it here would be a client-side graph
@@ -25,7 +28,7 @@
 
 <div class="so-page so-page--wide">
     <SoPageHeader Title="Grup Sorgulama"
-                  Lead="Tek bir grubu tam adıyla sorgulayın. Her sorgu, amacıyla birlikte kayıt altına alınır." />
+                  Lead="Tek bir grubu tam adıyla sorgulayın. Her sorgu kayıt altına alınır." />
 
     @if (_access is null)
     {
@@ -66,21 +69,26 @@
                                   AdornmentIcon="@Icons.Material.Filled.Groups"
                                   Variant="Variant.Outlined" />
 
+                    @* Optional since backend a607ac4. Deliberately understated: a read-only lookup
+                       does not need a justification, and a field that looks mandatory would keep
+                       operators typing one out of habit. *@
                     <MudTextField @bind-Value="_model.Purpose"
-                                  Label="Sorgu amacı"
-                                  HelperText="İncelemenin nedenini kısaca yazın. Bu bilgi denetim kaydına işlenir."
-                                  Required="true"
+                                  @bind-Value:after="OnPurposeChanged"
+                                  Label="Açıklama"
+                                  HelperText="Opsiyonel — sorgu amacını belirtmek isterseniz ekleyebilirsiniz."
+                                  Error="@(_purposeError is not null)"
+                                  ErrorText="@_purposeError"
                                   Immediate="true"
-                                  Lines="3"
-                                  MaxLength="500"
+                                  Lines="2"
+                                  MaxLength="@DirectoryPurposeInput.MaxLength"
                                   Variant="Variant.Outlined"
-                                  Class="mt-4" />
+                                  Class="mt-4 so-optional-field" />
 
                     <div class="so-form-actions">
                         <MudButton ButtonType="ButtonType.Submit"
                                    Variant="Variant.Filled"
                                    Color="Color.Primary"
-                                   Disabled="@_loading"
+                                   Disabled="@(_loading || _purposeError is not null)"
                                    StartIcon="@Icons.Material.Filled.ManageSearch">
                             Sorgula
                         </MudButton>
@@ -116,7 +124,7 @@
                 else if (_group is null)
                 {
                     <SoEmptyState Title="Henüz sorgu çalıştırılmadı"
-                                  Description="Grup adı ve sorgu amacı girip Sorgula'ya basın."
+                                  Description="Grup adını girip Sorgula'ya basın."
                                   Icon="@Icons.Material.Outlined.Groups" />
                 }
                 else
@@ -315,6 +323,12 @@
     private string? _continuationToken;
     private UiProblem? _membersProblem;
     private bool _membersLoading;
+    private string? _purposeError;
+
+    // Sent to every call on this page, so metadata and members are recorded identically.
+    private string? Purpose => DirectoryPurposeInput.Normalize(_model.Purpose);
+
+    private void OnPurposeChanged() => _purposeError = DirectoryPurposeInput.Validate(_model.Purpose);
 
     protected override async Task OnInitializedAsync()
     {
@@ -326,7 +340,8 @@
 
     private async Task LoadGroupAsync(bool refresh)
     {
-        if (string.IsNullOrWhiteSpace(_model.Group) || string.IsNullOrWhiteSpace(_model.Purpose))
+        // Only the group is required now; a blank purpose is a valid query.
+        if (string.IsNullOrWhiteSpace(_model.Group) || _purposeError is not null)
         {
             return;
         }
@@ -338,7 +353,7 @@
         try
         {
             DirectoryGroupDetailResponse response = await Directory.GetGroupAsync(
-                _model.Group.Trim(), _model.Purpose.Trim(), refresh, CancellationToken.None);
+                _model.Group.Trim(), Purpose, refresh, CancellationToken.None);
 
             _group = response.Group;
         }
@@ -383,7 +398,7 @@
         {
             DirectoryMemberPageResponse page = await Directory.GetGroupMembersAsync(
                 _model.Group.Trim(),
-                _model.Purpose.Trim(),
+                Purpose,
                 pageSize: null,
                 continuationToken: _continuationToken,
                 CancellationToken.None);
@@ -452,8 +467,8 @@
         [MaxLength(256)]
         public string Group { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Sorgu amacı zorunludur.")]
-        [MaxLength(500, ErrorMessage = "Sorgu amacı en fazla 500 karakter olabilir.")]
+        // No [Required]: read-only directory queries accept an omitted purpose. Length is checked
+        // by DirectoryPurposeInput against the server bound rather than duplicated here.
         public string Purpose { get; set; } = string.Empty;
     }
 }

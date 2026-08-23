@@ -82,6 +82,56 @@ public sealed class DirectoryApiClientTests
     }
 
     [Fact]
+    public async Task GroupLookup_WithoutAPurpose_SendsNull()
+    {
+        // The delta this proves: a read-only lookup is a valid request with no reason attached.
+        (DirectoryApiClient client, RecordingHandler handler) = Create(GroupDetail());
+
+        await client.GetGroupAsync("GRP-SECOPS", purpose: null, refresh: false, CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.Body!);
+        body.RootElement.GetProperty("purpose").ValueKind.Should().Be(JsonValueKind.Null);
+        body.RootElement.GetProperty("group").GetString().Should().Be("GRP-SECOPS");
+    }
+
+    [Fact]
+    public async Task EnrichmentCall_WithoutAPurpose_SendsNull()
+    {
+        (DirectoryApiClient client, RecordingHandler handler) = Create(Health());
+
+        await client.GetAccountHealthAsync("svc.app", purpose: null, refresh: false, CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.Body!);
+        body.RootElement.GetProperty("purpose").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task PrivilegedMemberships_WithoutAPurpose_StillTargetsItsOwnRoute()
+    {
+        // Privileged analysis is gated by Identity.PrivilegedGroups.View, not by a supplied reason.
+        // Omitting the purpose must not change which endpoint is called or how.
+        (DirectoryApiClient client, RecordingHandler handler) = Create(Privileged());
+
+        await client.GetPrivilegedMembershipsAsync("svc.app", null, false, CancellationToken.None);
+
+        handler.LastUri!.AbsolutePath.Should().Be("/api/v1/directory/principals/privileged-memberships");
+        using var body = JsonDocument.Parse(handler.Body!);
+        body.RootElement.GetProperty("purpose").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task SuppliedPurpose_IsSentExactlyAsGiven()
+    {
+        // The client transmits; trimming is the field's job, and the page normalizes before calling.
+        (DirectoryApiClient client, RecordingHandler handler) = Create(Health());
+
+        await client.GetAccountHealthAsync("svc.app", "Yetki incelemesi", false, CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.Body!);
+        body.RootElement.GetProperty("purpose").GetString().Should().Be("Yetki incelemesi");
+    }
+
+    [Fact]
     public async Task NotFound_IsTranslatedIntoAProblemRatherThanEscaping()
     {
         (DirectoryApiClient client, _) = Create(
@@ -130,6 +180,13 @@ public sealed class DirectoryApiClientTests
 
     private static DirectoryAccountHealthResponse Health() =>
         new(true, false, null, null, null, null, null, null, true);
+
+    private static DirectoryGroupDetailResponse GroupDetail() =>
+        new(new DirectoryGroupDetailDto(
+            null, "SecureOps Operators", "GRP-SECOPS", null, null, "Security", "Global", null, 0));
+
+    private static DirectoryPrivilegedMembershipResponse Privileged() =>
+        new([], Traversal());
 
     private static DirectoryServiceEvidenceResponse ServiceEvidence() =>
         new([], 0, false, null, null, null, null, "User", 0, 0, Traversal());

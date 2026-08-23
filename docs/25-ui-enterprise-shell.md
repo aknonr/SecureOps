@@ -351,11 +351,41 @@ Two exact-only screens, both audited on every call.
 | `/directory/users` (also `/identity-lookup`) | Kullanıcı Sorgulama — one account, then its evidence in tabs |
 | `/directory/groups` | Grup Sorgulama — one group and its direct members |
 
-Every request carries an operational `purpose` that the API writes to the audit trail, so these are
-not free reads. Each tab therefore loads **on first open**, not when the lookup returns: fetching all
-five sections up front would spend an operator's rate-limited quota on evidence they never asked to
-see. Directory calls use the `normalizedAccount` the server resolved, not the typed string, so every
-section describes the same principal the lookup found.
+Both take an exact target and an **optional** description. Neither accepts a filter, a wildcard, or
+LDAP syntax.
+
+Every request is audited and rate-limited, so each tab loads **on first open**, not when the lookup
+returns: fetching all five sections up front would spend an operator's quota on evidence they never
+asked to see. Directory calls use the `normalizedAccount` the server resolved when there is one, and
+the exact account the operator typed otherwise — the endpoints normalize server-side either way.
+
+### The purpose is optional
+
+Since backend `a607ac4`, `purpose` is optional on every read-only `/api/v1/directory/*` route.
+Omitted, null, empty, and whitespace all mean the same thing, and the query is recorded either way —
+what the operator now chooses is whether to add context to that record, not whether the record
+exists. Both screens label the field **Açıklama** with the helper *"Opsiyonel — sorgu amacını
+belirtmek isterseniz ekleyebilirsiniz"*, carry no required marker, and drop a step in label and
+helper weight so the field reads as an offer rather than a demand.
+
+`DirectoryPurposeInput` mirrors the server's `DirectoryLookupPurpose`: blank collapses to `null`
+rather than to an empty string, a supplied value is trimmed **before** its length is measured, the
+bound is 256 characters (`DirectoryExplorer:MaxPurposeLength`), and control characters are refused.
+The server re-validates all of it; this exists so the operator sees the problem beside the field.
+
+Purpose text is not a cache key and not a rate-limit partition — the backend excludes it from both,
+so editing it cannot bypass either. The UI adds no throttling of its own: rate limiting is the
+server's, and a 429 renders through the ordinary `RateLimitExceeded` experience.
+
+**One exception, and it is not a directory route.** The `Genel` tab is backed by
+`POST /api/v1/identity/lookup`, whose contract still requires a purpose. Rather than gate the whole
+screen on that, the requirement is raised inside the tab that has it: the other four tabs work with
+no reason at all, and `Genel` asks for one when the operator wants identity fields. No default is
+invented to fill the gap — a purpose the operator never wrote would be a fabricated audit entry.
+
+Write workflows are untouched. An access decision and a session revocation still require a reason,
+because those are actions taken against someone and the justification is what makes them defensible
+afterwards. Looking something up is not.
 
 Nothing traverses a graph in the browser. Direct groups, nested groups, membership paths, and
 privileged evidence are all computed server-side; recomputing or extending any of it here would
