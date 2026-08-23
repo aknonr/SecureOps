@@ -57,14 +57,15 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         DirectoryQueryExecutionContext context,
         CancellationToken cancellationToken)
     {
-        NormalizedInput? input = Normalize(request.Account, request.Purpose);
+        bool validPurpose = DirectoryLookupPurpose.TryNormalize(request.Purpose, _options.MaxPurposeLength, out string? purpose);
+        NormalizedInput? input = Normalize(request.Account, validPurpose);
         if (input is null)
         {
             return await InvalidAsync<DirectoryPrincipalMembershipsResponse>(
-                MembershipsOperation, request.Account, null, request.Purpose, context, cancellationToken);
+                MembershipsOperation, request.Account, null, purpose, context, cancellationToken);
         }
 
-        if (!await RequestedAsync(MembershipsOperation, input.Value.Account, null, request.Purpose, context, cancellationToken))
+        if (!await RequestedAsync(MembershipsOperation, input.Value.Account, null, purpose, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryPrincipalMembershipsResponse>();
         }
@@ -79,19 +80,19 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
             {
                 return await NotFoundAsync<DirectoryPrincipalMembershipsResponse>(
                     OperationalErrorCodes.DirectoryPrincipalNotFound,
-                    MembershipsOperation, input.Value.Account, null, request.Purpose, stopwatch.Elapsed,
+                    MembershipsOperation, input.Value.Account, null, purpose, stopwatch.Elapsed,
                     QueryMetrics.Empty, context, cancellationToken);
             }
 
             DirectoryPrincipalMembershipsResponse response = Memberships(graph);
-            return await SuccessAsync(response, MembershipsOperation, input.Value.Account, null, request.Purpose,
+            return await SuccessAsync(response, MembershipsOperation, input.Value.Account, null, purpose,
                 stopwatch.Elapsed, Metrics(graph, response.DirectGroups.Count, response.TransitiveGroups.Count,
                     response.DirectGroups.Count + response.TransitiveGroups.Count), context, cancellationToken);
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
             return await ProviderFailureAsync<DirectoryPrincipalMembershipsResponse>(
-                exception, MembershipsOperation, input.Value.Account, null, request.Purpose,
+                exception, MembershipsOperation, input.Value.Account, null, purpose,
                 stopwatch.Elapsed, QueryMetrics.Empty, context, cancellationToken);
         }
     }
@@ -102,15 +103,16 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         DirectoryQueryExecutionContext context,
         CancellationToken cancellationToken)
     {
-        NormalizedInput? input = Normalize(request.Account, request.Purpose);
+        bool validPurpose = DirectoryLookupPurpose.TryNormalize(request.Purpose, _options.MaxPurposeLength, out string? purpose);
+        NormalizedInput? input = Normalize(request.Account, validPurpose);
         DirectoryInputNormalizationResult target = _groupNormalizer.NormalizeGroup(request.TargetGroup);
         if (input is null || !target.IsValid || target.Value is null)
         {
             return await InvalidAsync<DirectoryMembershipPathResponse>(
-                MembershipPathsOperation, request.Account, request.TargetGroup, request.Purpose, context, cancellationToken);
+                MembershipPathsOperation, request.Account, request.TargetGroup, purpose, context, cancellationToken);
         }
 
-        if (!await RequestedAsync(MembershipPathsOperation, input.Value.Account, target.Value, request.Purpose, context, cancellationToken))
+        if (!await RequestedAsync(MembershipPathsOperation, input.Value.Account, target.Value, purpose, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryMembershipPathResponse>();
         }
@@ -132,7 +134,7 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
             {
                 return await NotFoundAsync<DirectoryMembershipPathResponse>(
                     OperationalErrorCodes.DirectoryGroupNotFound,
-                    MembershipPathsOperation, input.Value.Account, target.Value, request.Purpose, stopwatch.Elapsed,
+                    MembershipPathsOperation, input.Value.Account, target.Value, purpose, stopwatch.Elapsed,
                     QueryMetrics.Empty, context, cancellationToken);
             }
 
@@ -140,7 +142,7 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
             {
                 return await NotFoundAsync<DirectoryMembershipPathResponse>(
                     OperationalErrorCodes.DirectoryPrincipalNotFound,
-                    MembershipPathsOperation, input.Value.Account, target.Value, request.Purpose, stopwatch.Elapsed,
+                    MembershipPathsOperation, input.Value.Account, target.Value, purpose, stopwatch.Elapsed,
                     QueryMetrics.Empty, context, cancellationToken);
             }
 
@@ -157,14 +159,14 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
                 paths.Select(path => MapPath(graph, path)).ToArray(),
                 pathsTruncated,
                 MapTraversal(graph.Traversal));
-            return await SuccessAsync(response, MembershipPathsOperation, input.Value.Account, target.Value, request.Purpose,
+            return await SuccessAsync(response, MembershipPathsOperation, input.Value.Account, target.Value, purpose,
                 stopwatch.Elapsed, Metrics(graph, response.IsDirect ? 1 : 0, response.IsMember && !response.IsDirect ? 1 : 0,
                     response.Paths.Count), context, cancellationToken);
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
             return await ProviderFailureAsync<DirectoryMembershipPathResponse>(
-                exception, MembershipPathsOperation, input.Value.Account, target.Value, request.Purpose,
+                exception, MembershipPathsOperation, input.Value.Account, target.Value, purpose,
                 stopwatch.Elapsed, QueryMetrics.Empty, context, cancellationToken);
         }
     }
@@ -175,14 +177,15 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         DirectoryQueryExecutionContext context,
         CancellationToken cancellationToken)
     {
-        NormalizedInput? input = Normalize(request.Account, request.Purpose);
+        bool validPurpose = DirectoryLookupPurpose.TryNormalize(request.Purpose, _options.MaxPurposeLength, out string? purpose);
+        NormalizedInput? input = Normalize(request.Account, validPurpose);
         if (input is null)
         {
             return await InvalidAsync<DirectoryAccountHealthResponse>(
-                AccountHealthOperation, request.Account, null, request.Purpose, context, cancellationToken);
+                AccountHealthOperation, request.Account, null, purpose, context, cancellationToken);
         }
 
-        if (!await RequestedAsync(AccountHealthOperation, input.Value.Account, null, request.Purpose, context, cancellationToken))
+        if (!await RequestedAsync(AccountHealthOperation, input.Value.Account, null, purpose, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryAccountHealthResponse>();
         }
@@ -196,7 +199,7 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
             {
                 return await NotFoundAsync<DirectoryAccountHealthResponse>(
                     OperationalErrorCodes.DirectoryPrincipalNotFound,
-                    AccountHealthOperation, input.Value.Account, null, request.Purpose, stopwatch.Elapsed,
+                    AccountHealthOperation, input.Value.Account, null, purpose, stopwatch.Elapsed,
                     QueryMetrics.Empty, context, cancellationToken);
             }
 
@@ -210,13 +213,13 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
                 principal.MustChangePassword,
                 principal.LastLogonTimestampUtc,
                 true);
-            return await SuccessAsync(response, AccountHealthOperation, input.Value.Account, null, request.Purpose,
+            return await SuccessAsync(response, AccountHealthOperation, input.Value.Account, null, purpose,
                 stopwatch.Elapsed, QueryMetrics.One, context, cancellationToken);
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
             return await ProviderFailureAsync<DirectoryAccountHealthResponse>(
-                exception, AccountHealthOperation, input.Value.Account, null, request.Purpose,
+                exception, AccountHealthOperation, input.Value.Account, null, purpose,
                 stopwatch.Elapsed, QueryMetrics.Empty, context, cancellationToken);
         }
     }
@@ -227,14 +230,15 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         DirectoryQueryExecutionContext context,
         CancellationToken cancellationToken)
     {
-        NormalizedInput? input = Normalize(request.Account, request.Purpose);
+        bool validPurpose = DirectoryLookupPurpose.TryNormalize(request.Purpose, _options.MaxPurposeLength, out string? purpose);
+        NormalizedInput? input = Normalize(request.Account, validPurpose);
         if (input is null)
         {
             return await InvalidAsync<DirectoryServiceEvidenceResponse>(
-                ServiceEvidenceOperation, request.Account, null, request.Purpose, context, cancellationToken);
+                ServiceEvidenceOperation, request.Account, null, purpose, context, cancellationToken);
         }
 
-        if (!await RequestedAsync(ServiceEvidenceOperation, input.Value.Account, null, request.Purpose, context, cancellationToken))
+        if (!await RequestedAsync(ServiceEvidenceOperation, input.Value.Account, null, purpose, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryServiceEvidenceResponse>();
         }
@@ -257,7 +261,7 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
             {
                 return await NotFoundAsync<DirectoryServiceEvidenceResponse>(
                     OperationalErrorCodes.DirectoryPrincipalNotFound,
-                    ServiceEvidenceOperation, input.Value.Account, null, request.Purpose, stopwatch.Elapsed,
+                    ServiceEvidenceOperation, input.Value.Account, null, purpose, stopwatch.Elapsed,
                     QueryMetrics.Empty, context, cancellationToken);
             }
 
@@ -279,14 +283,14 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
                 memberships.DirectGroups.Count,
                 memberships.TransitiveGroups.Count,
                 MapTraversal(graph.Traversal));
-            return await SuccessAsync(response, ServiceEvidenceOperation, input.Value.Account, null, request.Purpose,
+            return await SuccessAsync(response, ServiceEvidenceOperation, input.Value.Account, null, purpose,
                 stopwatch.Elapsed, Metrics(graph, response.DirectGroupCount, response.TransitiveGroupCount, 1),
                 context, cancellationToken);
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
             return await ProviderFailureAsync<DirectoryServiceEvidenceResponse>(
-                exception, ServiceEvidenceOperation, input.Value.Account, null, request.Purpose,
+                exception, ServiceEvidenceOperation, input.Value.Account, null, purpose,
                 stopwatch.Elapsed, QueryMetrics.Empty, context, cancellationToken);
         }
     }
@@ -297,14 +301,15 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         DirectoryQueryExecutionContext context,
         CancellationToken cancellationToken)
     {
-        NormalizedInput? input = Normalize(request.Account, request.Purpose);
+        bool validPurpose = DirectoryLookupPurpose.TryNormalize(request.Purpose, _options.MaxPurposeLength, out string? purpose);
+        NormalizedInput? input = Normalize(request.Account, validPurpose);
         if (input is null)
         {
             return await InvalidAsync<DirectoryPrivilegedMembershipResponse>(
-                PrivilegedMembershipsOperation, request.Account, null, request.Purpose, context, cancellationToken);
+                PrivilegedMembershipsOperation, request.Account, null, purpose, context, cancellationToken);
         }
 
-        if (!await RequestedAsync(PrivilegedMembershipsOperation, input.Value.Account, null, request.Purpose, context, cancellationToken))
+        if (!await RequestedAsync(PrivilegedMembershipsOperation, input.Value.Account, null, purpose, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryPrivilegedMembershipResponse>();
         }
@@ -327,20 +332,20 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
             {
                 return await NotFoundAsync<DirectoryPrivilegedMembershipResponse>(
                     OperationalErrorCodes.DirectoryPrincipalNotFound,
-                    PrivilegedMembershipsOperation, input.Value.Account, null, request.Purpose, stopwatch.Elapsed,
+                    PrivilegedMembershipsOperation, input.Value.Account, null, purpose, stopwatch.Elapsed,
                     QueryMetrics.Empty, context, cancellationToken);
             }
 
             DirectoryPrivilegedMembershipResponse response = new(groups, MapTraversal(graph.Traversal));
             int direct = groups.Count(group => group.Direct);
             int transitive = groups.Count(group => group.Transitive);
-            return await SuccessAsync(response, PrivilegedMembershipsOperation, input.Value.Account, null, request.Purpose,
+            return await SuccessAsync(response, PrivilegedMembershipsOperation, input.Value.Account, null, purpose,
                 stopwatch.Elapsed, Metrics(graph, direct, transitive, groups.Count), context, cancellationToken);
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
             return await ProviderFailureAsync<DirectoryPrivilegedMembershipResponse>(
-                exception, PrivilegedMembershipsOperation, input.Value.Account, null, request.Purpose,
+                exception, PrivilegedMembershipsOperation, input.Value.Account, null, purpose,
                 stopwatch.Elapsed, QueryMetrics.Empty, context, cancellationToken);
         }
     }
@@ -457,17 +462,13 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         }
     }
 
-    private NormalizedInput? Normalize(string? account, string? purpose)
+    private NormalizedInput? Normalize(string? account, bool validPurpose)
     {
         IdentityAccountNormalizationResult normalized = _accountNormalizer.Normalize(account);
-        return normalized.IsValid && normalized.NormalizedAccount is not null && ValidPurpose(purpose)
+        return normalized.IsValid && normalized.NormalizedAccount is not null && validPurpose
             ? new NormalizedInput(normalized.NormalizedAccount)
             : null;
     }
-
-    private bool ValidPurpose(string? purpose) => !string.IsNullOrWhiteSpace(purpose)
-        && purpose.Trim().Length <= _options.MaxPurposeLength
-        && !purpose.Any(char.IsControl);
 
     private int? PasswordAgeDays(DateTimeOffset? passwordLastSet)
     {

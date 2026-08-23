@@ -49,6 +49,7 @@ The audit subsystem is the project's most important non-functional feature. This
 | Directory group query rejected before provider access | API | `DirectoryGroupQueryRejected` |
 | Directory group provider query failed | API | `DirectoryGroupQueryFailed` |
 | Directory group authorization denied | API | `DirectoryGroupQueryForbidden` |
+| Directory query rate limited before provider access | API | `DirectoryGroupQueryRateLimited` |
 | Audit query executed | UI/API | `AuditQueried` |
 | Configuration changed (admin) | UI | `ConfigurationChanged` |
 | RBAC mapping changed (admin) | UI | `RbacChanged` |

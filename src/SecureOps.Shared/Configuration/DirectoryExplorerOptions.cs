@@ -18,7 +18,7 @@ public sealed class DirectoryExplorerOptions
     public int ContinuationTokenLifetimeSeconds { get; set; } = 300;
     /// <summary>Maximum exact group input length.</summary>
     public int MaxGroupInputLength { get; set; } = 256;
-    /// <summary>Maximum required operational-purpose length.</summary>
+    /// <summary>Maximum optional operational-purpose length.</summary>
     public int MaxPurposeLength { get; set; } = 256;
     /// <summary>Total timeout for one recursive membership graph traversal.</summary>
     public int TraversalTimeoutSeconds { get; set; } = 10;

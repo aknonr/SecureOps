@@ -13,11 +13,21 @@ public sealed class DirectorySecurityPrimitiveTests
     [InlineData("(objectClass=*)")]
     [InlineData("CN=Admins,DC=example")]
     [InlineData("group\\name")]
+    [InlineData("member:1.2.840.113556.1.4.1941:=target")]
+    [InlineData("group\0name")]
     public void NormalizeGroup_RejectsWildcardAndRawLdapGrammar(string input)
     {
         DirectoryExactInputNormalizer normalizer = new(Options.Create(new DirectoryExplorerOptions()));
 
         normalizer.NormalizeGroup(input).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void NormalizeGroup_RejectsOversizedExactIdentifier()
+    {
+        DirectoryExactInputNormalizer normalizer = new(Options.Create(new DirectoryExplorerOptions()));
+
+        normalizer.NormalizeGroup(new string('a', 257)).IsValid.Should().BeFalse();
     }
 
     [Fact]
@@ -61,12 +71,50 @@ public sealed class DirectorySecurityPrimitiveTests
             Interlocked.Increment(ref calls); return providerResult.Task;
         }
 
-        Task<int> first = cache.GetOrCreateAsync("same", false, Factory, CancellationToken.None);
-        Task<int> second = cache.GetOrCreateAsync("same", false, Factory, CancellationToken.None);
+        Task<int>[] requests = Enumerable.Range(0, 8)
+            .Select(_ => cache.GetOrCreateAsync("same", false, Factory, CancellationToken.None))
+            .ToArray();
         providerResult.SetResult(42);
 
-        (await Task.WhenAll(first, second)).Should().Equal(42, 42);
+        (await Task.WhenAll(requests)).Should().OnlyContain(value => value == 42);
         calls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task QueryCache_ExpiresAndPartitionsTargetsAndOperations()
+    {
+        ManualTimeProvider time = new();
+        DirectoryExplorerOptions options = new()
+        {
+            Cache = new DirectoryExplorerCacheOptions { Enabled = true, TtlSeconds = 5, MaxEntries = 10 }
+        };
+        DirectoryQueryCache cache = new(Options.Create(options), time);
+        int calls = 0;
+        Task<int> Factory(CancellationToken _) => Task.FromResult(Interlocked.Increment(ref calls));
+
+        int first = await cache.GetOrCreateAsync("Mock|group-metadata|alpha", false, Factory, CancellationToken.None);
+        int cached = await cache.GetOrCreateAsync("Mock|group-metadata|alpha", false, Factory, CancellationToken.None);
+        int otherTarget = await cache.GetOrCreateAsync("Mock|group-metadata|beta", false, Factory, CancellationToken.None);
+        int enrichment = await cache.GetOrCreateAsync("Mock|phase2-principal|alpha|0", false, Factory, CancellationToken.None);
+        time.Advance(TimeSpan.FromSeconds(6));
+        int expired = await cache.GetOrCreateAsync("Mock|group-metadata|alpha", false, Factory, CancellationToken.None);
+
+        cached.Should().Be(first);
+        otherTarget.Should().NotBe(first);
+        enrichment.Should().NotBe(first);
+        expired.Should().NotBe(first);
+        calls.Should().Be(4);
+    }
+
+    [Fact]
+    public void DirectoryRateLimitDefaults_RemainConservativeAndIndependent()
+    {
+        RateLimitingOptions options = new();
+
+        (options.DirectoryGroupQuery.PermitLimit, options.DirectoryGroupQuery.WindowSeconds).Should().Be((20, 60));
+        (options.DirectoryGroupMembers.PermitLimit, options.DirectoryGroupMembers.WindowSeconds).Should().Be((10, 60));
+        (options.DirectoryEnrichment.PermitLimit, options.DirectoryEnrichment.WindowSeconds).Should().Be((6, 60));
+        (options.DirectoryPrivilegedGroups.PermitLimit, options.DirectoryPrivilegedGroups.WindowSeconds).Should().Be((4, 60));
     }
 
     [Fact]
@@ -132,4 +180,10 @@ public sealed class DirectorySecurityPrimitiveTests
         duplicateAct.Should().Throw<InvalidOperationException>().WithMessage("*privileged-group identifiers*");
     }
 
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _utcNow = new(2026, 8, 24, 8, 0, 0, TimeSpan.Zero);
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+        public void Advance(TimeSpan duration) => _utcNow = _utcNow.Add(duration);
+    }
 }

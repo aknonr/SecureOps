@@ -3,14 +3,14 @@ namespace SecureOps.Shared.Contracts.Directory;
 /// <summary>Exact principal enrichment request.</summary>
 public sealed record DirectoryPrincipalEnrichmentRequest(
     string? Account,
-    string? Purpose,
+    string? Purpose = null,
     bool Refresh = false);
 
 /// <summary>Exact principal-to-group membership-path request.</summary>
 public sealed record DirectoryMembershipPathRequest(
     string? Account,
     string? TargetGroup,
-    string? Purpose,
+    string? Purpose = null,
     bool Refresh = false);
 
 /// <summary>One group with explicit membership semantics.</summary>

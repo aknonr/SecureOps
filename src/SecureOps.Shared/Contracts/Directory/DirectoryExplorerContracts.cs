@@ -3,18 +3,18 @@ namespace SecureOps.Shared.Contracts.Directory;
 /// <summary>Exact principal direct-group request.</summary>
 public sealed record DirectoryPrincipalGroupsRequest(
     string? Account,
-    string? Purpose,
+    string? Purpose = null,
     int? PageSize = null,
     string? ContinuationToken = null,
     bool Refresh = false);
 
 /// <summary>Exact group metadata request.</summary>
-public sealed record DirectoryGroupLookupRequest(string? Group, string? Purpose, bool Refresh = false);
+public sealed record DirectoryGroupLookupRequest(string? Group, string? Purpose = null, bool Refresh = false);
 
 /// <summary>Exact group direct-members request.</summary>
 public sealed record DirectoryGroupMembersRequest(
     string? Group,
-    string? Purpose,
+    string? Purpose = null,
     int? PageSize = null,
     string? ContinuationToken = null,
     bool Refresh = false);

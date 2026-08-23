@@ -18,7 +18,9 @@ All operations use POST bodies so directory identifiers do not enter request URL
 - `POST /api/v1/directory/groups/lookup`
 - `POST /api/v1/directory/groups/members`
 
-Principal and member-list responses are bounded pages. `pageSize` defaults to 50 and cannot exceed 100. `continuationToken` is opaque, integrity-protected, target-bound, operation-bound, and expires after a configured interval. Clients repeat the same exact target and purpose with the token. Tokens contain no LDAP cookie or directory identifier. `refresh=true` is accepted only for a first page and bypasses the bounded cache.
+Principal and member-list responses are bounded pages. `pageSize` defaults to 50 and cannot exceed 100. `continuationToken` is opaque, integrity-protected, target-bound, operation-bound, and expires after a configured interval. Clients repeat the same exact target with the token. Tokens contain no LDAP cookie or directory identifier. `refresh=true` is accepted only for a first page and bypasses the bounded cache.
+
+`purpose` is optional on every read-only Directory Explorer request. Null, omitted, empty, and whitespace values mean no purpose. A supplied value is trimmed, limited by `DirectoryExplorer:MaxPurposeLength`, rejected when it contains control characters, and represented in audit only by its hash and length. This does not change future action/write workflows, which may require a change reason.
 
 ## Returned Data
 
@@ -30,17 +32,17 @@ Direct members contain stable SID when available, name, sAMAccountName, distingu
 
 `Identity.Groups.View` protects direct principal groups and group metadata. `Identity.Groups.Members.View` separately protects member enumeration. Authorization is derived from persisted application access and capabilities, never inline role/group-name checks. Admin receives both capabilities; Lead receives group visibility but not member enumeration.
 
-Inputs are exact only. Wildcards, LDAP/filter syntax, raw distinguished names, bulk separators, control characters, and over-limit values are rejected before provider access. The AD provider uses exact AccountManagement identity operations and the IIS process/service identity through the same domain `PrincipalContext` model as exact identity lookup. SecureOps never collects an AD username or password.
+Inputs are exact only. Wildcards, LDAP/filter syntax, raw distinguished names, bulk separators, control characters, and over-limit values are rejected before provider access. The configured backend provider performs reads under the approved runtime process identity through the same domain `PrincipalContext` model as exact identity lookup. SecureOps never collects an end-user AD username or password. Selecting the IIS runtime identity remains an infrastructure decision; this contract does not name or assume one.
 
 ## Reliability
 
 Directory provider calls have configured timeouts and cancellation propagation. Results are deterministically ordered where AccountManagement supplies the complete bounded result. A configured provider result ceiling prevents unbounded server memory and work. Provider exceptions and timeout internals are converted to stable ProblemDetails codes and are never cached.
 
-Conservative in-process caching is keyed by provider, normalized target, operation, offset, and page size. TTL and entry count are bounded. Cache content is never an authorization source and `refresh=true` bypasses it.
+Conservative in-process caching is keyed by provider, normalized target, operation, offset, page size, and enrichment shape where applicable. TTL and entry count are bounded, and concurrent identical misses are coalesced to one provider call. Cache content is never an authorization source and `refresh=true` remains available to bypass it. Optional purpose text is excluded from cache and actor-and-operation rate-limit identities, so changing it cannot bypass protection.
 
 ## Audit
 
-Each query writes append-only request/outcome evidence. Details contain operation, target hash/length, outcome, duration, result count, page size, continuation usage, and correlation metadata. Full groups, members, names, DNs, descriptions, and returned attributes are never copied into audit details. Required request audit fails closed before directory access.
+Each query writes append-only request/outcome evidence. Details contain operation, target hash/length, outcome, duration, provider-result counts, page size, continuation usage, and correlation metadata. Rate-limit rejection has a separate privacy-safe action and records that no provider call occurred. Full groups, members, names, DNs, descriptions, purpose text, and returned attributes are never copied into audit details. Required request audit fails closed before directory access.
 
 ## Configuration
 
@@ -58,6 +60,8 @@ Each query writes append-only request/outcome evidence. Details contain operatio
 - `RateLimiting__DirectoryGroupQuery__WindowSeconds`
 - `RateLimiting__DirectoryGroupMembers__PermitLimit`
 - `RateLimiting__DirectoryGroupMembers__WindowSeconds`
+
+Defaults are actor-and-operation fixed windows: principal-group/group-metadata queries allow 20 requests per 60 seconds, while direct-member queries allow 10 requests per 60 seconds. A rejected request returns the standard `RateLimitExceeded` ProblemDetails contract and does not invoke the directory provider. Changing optional purpose text does not create a new partition.
 
 No new secret or credential key exists.
 

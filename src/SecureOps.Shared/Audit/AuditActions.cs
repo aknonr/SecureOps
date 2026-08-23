@@ -56,6 +56,8 @@ public static class AuditActions
     public const string DirectoryGroupQueryFailed = "DirectoryGroupQueryFailed";
     /// <summary>Authorization denied a Directory Explorer query.</summary>
     public const string DirectoryGroupQueryForbidden = "DirectoryGroupQueryForbidden";
+    /// <summary>A Directory Explorer request was rejected by its actor-and-operation rate limit.</summary>
+    public const string DirectoryGroupQueryRateLimited = "DirectoryGroupQueryRateLimited";
 
     /// <summary>
     /// API or UI authorization denied a request.

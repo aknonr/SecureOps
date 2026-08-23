@@ -63,6 +63,58 @@ public sealed class DirectoryGroupQueryServiceTests
     }
 
     [Fact]
+    public async Task ReadOnlyQueries_AcceptMissingBlankAndTrimmedPurpose()
+    {
+        DirectoryGroupQueryService service = CreateService(CreateMock(), out InMemoryAuditWriter audit);
+
+        DirectoryQueryResult<DirectoryGroupPageResponse> principal = await service.GetPrincipalGroupsAsync(
+            new DirectoryPrincipalGroupsRequest("pam12356"), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryGroupDetailResponse> group = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("ops-read", "   "), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
+            new DirectoryGroupMembersRequest("ops-read", "  optional context  "), Context, CancellationToken.None);
+
+        principal.Status.Should().Be(DirectoryQueryStatus.Success);
+        group.Status.Should().Be(DirectoryQueryStatus.Success);
+        members.Status.Should().Be(DirectoryQueryStatus.Success);
+        string serialized = JsonSerializer.Serialize(audit.Events);
+        serialized.Should().Contain("\"purposeLength\":16");
+        serialized.Should().NotContain("optional context");
+    }
+
+    [Theory]
+    [InlineData("oversized")]
+    [InlineData("control")]
+    public async Task GroupLookup_RejectsUnsafeOptionalPurpose(string inputKind)
+    {
+        CountingProvider provider = new();
+        DirectoryGroupQueryService service = CreateService(provider, new InMemoryAuditWriter());
+        string purpose = inputKind == "oversized" ? new string('x', 257) : "context continuation\n";
+
+        DirectoryQueryResult<DirectoryGroupDetailResponse> result = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("ops-read", purpose), Context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.Invalid);
+        provider.Calls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task OptionalPurpose_DoesNotPartitionTheQueryCache()
+    {
+        CountingProvider provider = new();
+        DirectoryExplorerOptions options = new()
+        {
+            Cache = new DirectoryExplorerCacheOptions { Enabled = true, TtlSeconds = 30, MaxEntries = 10 }
+        };
+        DirectoryGroupQueryService service = CreateService(provider, new InMemoryAuditWriter(), options);
+
+        _ = await service.GetGroupAsync(new DirectoryGroupLookupRequest("ops-read", "first context"), Context, CancellationToken.None);
+        _ = await service.GetGroupAsync(new DirectoryGroupLookupRequest("ops-read", "second context"), Context, CancellationToken.None);
+
+        provider.Calls.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Members_ReturnsDirectTypesAndRejectsPageAboveMaximum()
     {
         DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
@@ -136,9 +188,15 @@ public sealed class DirectoryGroupQueryServiceTests
     private static DirectoryGroupQueryService CreateService(
         IDirectoryGroupProvider provider,
         IAuditWriter audit,
+        bool upn = false) =>
+        CreateService(provider, audit, new DirectoryExplorerOptions { Cache = new DirectoryExplorerCacheOptions { Enabled = false } }, upn);
+
+    private static DirectoryGroupQueryService CreateService(
+        IDirectoryGroupProvider provider,
+        IAuditWriter audit,
+        DirectoryExplorerOptions directoryOptions,
         bool upn = false)
     {
-        DirectoryExplorerOptions directoryOptions = new() { Cache = new DirectoryExplorerCacheOptions { Enabled = false } };
         IOptions<DirectoryExplorerOptions> directory = Options.Create(directoryOptions);
         return new DirectoryGroupQueryService(
             new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions { EnableUpnLookup = upn })),

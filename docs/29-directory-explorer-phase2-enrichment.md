@@ -10,7 +10,7 @@ Phase 2 adds live, provider-backed operational evidence without changing Phase 1
 - `POST /api/v1/directory/principals/service-evidence`
 - `POST /api/v1/directory/principals/privileged-memberships`
 
-All requests require an exact account, an operational purpose, and optional first-call cache refresh. Membership-path requests additionally require one exact target group. Inputs never contain LDAP filters, raw distinguished names, wildcards, partial terms, credentials, or paging cookies.
+All requests require an exact account and allow an optional bounded operational purpose plus optional first-call cache refresh. Missing or whitespace purpose means no purpose; supplied text is trimmed and represented in audit only by hash and length. Membership-path requests additionally require one exact target group. Inputs never contain LDAP filters, raw distinguished names, wildcards, partial terms, credentials, or paging cookies.
 
 ## Membership Semantics
 
@@ -47,7 +47,7 @@ Service evidence exposes bounded, sorted SPNs with total/truncation metadata, `m
 | `RateLimiting__DirectoryPrivilegedGroups__PermitLimit` | `4` |
 | `RateLimiting__DirectoryPrivilegedGroups__WindowSeconds` | `60` |
 
-Existing provider timeout, exact-input, cache TTL/capacity, and provider-result limits still apply. Startup rejects unsafe bounds, duplicate/invalid monitored identifiers, or a monitored list above its maximum.
+Existing provider timeout, exact-input, cache TTL/capacity, single-flight, and provider-result limits still apply. The 6-per-60-second enrichment and 4-per-60-second privileged-analysis defaults remain unchanged. Cache and rate-limit identities exclude optional purpose text. Startup rejects unsafe bounds, duplicate/invalid monitored identifiers, or a monitored list above its maximum.
 
 ## Audit and Reporting
 

@@ -5,7 +5,7 @@
 
 **Current status:** Backend implementation and hardening are complete in code, with unit/integration coverage. Real AD smoke testing with an approved read-only account remains pending.
 
-The bounded read-only Directory Explorer is defined by ADR-0013/ADR-0015 and `docs/27-read-only-directory-explorer.md`/`docs/29-directory-explorer-phase2-enrichment.md`. Phase 1 routes remain direct-only; Phase 2 adds exact-input, purpose-bound, capability-protected, bounded graph enrichment. Both phases remain read-only.
+The bounded read-only Directory Explorer is defined by ADR-0013/ADR-0015 and `docs/27-read-only-directory-explorer.md`/`docs/29-directory-explorer-phase2-enrichment.md`. Phase 1 routes remain direct-only; Phase 2 adds exact-input, capability-protected, bounded graph enrichment with optional operational context. Both phases remain read-only.
 
 Session governance and persistent Data Protection for this backend surface are defined by ADR-0014 and `docs/28-session-governance-data-protection-and-sql-pilot.md`; they do not broaden exact-account or Directory Explorer query behavior.
 
