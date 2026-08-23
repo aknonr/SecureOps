@@ -20,7 +20,7 @@
     presenting a choice would imply the operator picks their own authority.
 *@
 
-<main class="so-auth">
+<div class="so-auth">
     <section class="so-auth-card" aria-labelledby="login-heading">
         <div class="so-auth-brand">
             <span class="so-auth-mark" aria-hidden="true">
@@ -51,13 +51,14 @@
                 <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
 
                 <button type="submit" class="so-auth-submit">
-                    <span class="so-auth-submit-label">Kurumsal hesapla devam et</span>
+                    <span class="so-auth-submit-label">Oturum aç</span>
                     <span class="so-auth-submit-spinner" aria-hidden="true"></span>
                 </button>
             </form>
 
             <p class="so-auth-note">
-                Yetkileriniz oturum açtıktan sonra kurumsal erişim kayıtlarınızdan belirlenir.
+                Kimlik doğrulaması kurumsal sağlayıcı üzerinden yapılır. SecureOps parola sormaz ve
+                saklamaz. Yetkileriniz oturum açtıktan sonra kurumsal erişim kayıtlarınızdan belirlenir.
             </p>
         }
         else
@@ -68,8 +69,11 @@
         }
     </section>
 
-    <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
-</main>
+    @if (Model.ShowEnvironmentMarker)
+    {
+        <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
+    }
+</div>
 
 @if (Model.SignInEnabled)
 {

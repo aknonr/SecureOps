@@ -17,8 +17,11 @@
         <Authorized Context="signedIn">
             <div class="so-nav-group">Operasyon</div>
 
+            @* Same route either way: the dashboard shows the management report to holders of
+               Reporting.ManagementView and the operator board to everyone else. Only the label
+               changes, so the entry matches what the page will actually be. *@
             <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.SpaceDashboard">
-                Genel Bakış
+                @(Can(Capabilities.ManagementReportingView) ? "Yönetim Panosu" : "Genel Bakış")
             </MudNavLink>
 
             @if (Can(Capabilities.IdentityLookup))
@@ -32,6 +35,17 @@
             {
                 <MudNavLink Href="operational-records" Icon="@Icons.Material.Filled.Assignment">
                     Operasyonel Kayıtlar
+                </MudNavLink>
+            }
+
+            @* Cross-user analytics is a separate privilege from doing the work. An operator who can
+               run lookups or move records to Jira has no entry here. *@
+            @if (Can(Capabilities.ManagementReportingView))
+            {
+                <div class="so-nav-group">Raporlama</div>
+
+                <MudNavLink Href="reporting/operators" Icon="@Icons.Material.Filled.QueryStats">
+                    Operatör Raporu
                 </MudNavLink>
             }
 

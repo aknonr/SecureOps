@@ -4,10 +4,19 @@
     Deliberately carries no app bar, drawer, or Blazor circuit: a user who is not signed in should
     never see navigation for pages they cannot open, and these pages must render even when no circuit
     can be established.
+
+    The left panel is an original wireframe route network drawn in SVG — a great-circle grid, a few
+    route arcs, and two swept lines. It is inline rather than an image so it inherits the palette,
+    scales without a second asset request, and can be aria-hidden as the decoration it is. No airline
+    artwork, livery, or logotype is reproduced.
+
+    Below the split breakpoint the panel is removed entirely rather than stacked, because on a phone
+    it would push the actual sign-in action under the fold.
 *@
 @{
     Layout = null;
     string title = ViewData["Title"] as string ?? "Oturum";
+    string canvasMarkHref = Url.Content("~/brand/secureops-mark.svg") + "#mark";
 }
 <!DOCTYPE html>
 <html lang="tr">
@@ -22,6 +31,92 @@
     <link href="~/css/secureops-theme.css" rel="stylesheet" />
 </head>
 <body class="so-auth-body">
-    @RenderBody()
+    <div class="so-auth-shell">
+        <aside class="so-auth-canvas">
+            @* The viewBox is deliberately larger than the drawing so the wireframe sits inside a
+               field of space rather than filling the panel edge to edge. A globe that reaches the
+               margins reads as a splash image; one with room around it reads as a diagram. *@
+            <svg class="so-auth-art" viewBox="-60 -90 940 1200" preserveAspectRatio="xMidYMid slice"
+                 role="presentation" aria-hidden="true" focusable="false">
+                <defs>
+                    <radialGradient id="so-art-glow" cx="50%" cy="42%" r="55%">
+                        <stop offset="0%" stop-color="var(--so-art-glow)" stop-opacity="0.55" />
+                        <stop offset="100%" stop-color="var(--so-art-glow)" stop-opacity="0" />
+                    </radialGradient>
+                </defs>
+
+                <rect x="-60" y="-90" width="940" height="1200" fill="var(--so-art-field)" />
+                <rect x="-60" y="-90" width="940" height="1200" fill="url(#so-art-glow)" />
+
+                @* Two swept lines reading as a wing edge crossing the field. Kept faint: they set
+                   direction, they are not the subject. *@
+                <g fill="none" stroke="var(--so-art-line)" stroke-width="1" opacity="0.28">
+                    <path d="M-90 1130 C 250 880 560 600 900 150" />
+                    <path d="M-90 1200 C 300 950 620 670 900 220" />
+                </g>
+
+                @* Great-circle wireframe: latitude ellipses flattened by perspective, then
+                   longitude ellipses nested inside the same outer circle. *@
+                <g fill="none" stroke="var(--so-art-line)" stroke-width="1" opacity="0.42">
+                    <circle cx="400" cy="430" r="340" />
+                    <ellipse cx="400" cy="210" rx="259" ry="47" />
+                    <ellipse cx="400" cy="320" rx="322" ry="58" />
+                    <ellipse cx="400" cy="430" rx="340" ry="61" />
+                    <ellipse cx="400" cy="540" rx="322" ry="58" />
+                    <ellipse cx="400" cy="650" rx="259" ry="47" />
+                    <ellipse cx="400" cy="430" rx="250" ry="340" />
+                    <ellipse cx="400" cy="430" rx="150" ry="340" />
+                    <ellipse cx="400" cy="430" rx="58" ry="340" />
+                </g>
+
+                @* Routes. One carries the brand accent; the rest stay neutral so the accent means
+                   something. *@
+                <g fill="none" stroke="var(--so-art-route)" stroke-width="1.6" opacity="0.75">
+                    <path d="M200 560 Q 400 180 600 300" />
+                    <path d="M300 250 Q 560 220 640 520" />
+                </g>
+                <path d="M170 380 Q 420 260 610 620" fill="none"
+                      stroke="var(--so-art-accent)" stroke-width="1.8" opacity="0.9" />
+
+                <g fill="var(--so-art-route)">
+                    <circle cx="200" cy="560" r="4" />
+                    <circle cx="600" cy="300" r="4" />
+                    <circle cx="300" cy="250" r="4" />
+                    <circle cx="640" cy="520" r="4" />
+                </g>
+                <g fill="none" stroke="var(--so-art-route)" stroke-width="1" opacity="0.55">
+                    <circle cx="200" cy="560" r="10" />
+                    <circle cx="600" cy="300" r="10" />
+                    <circle cx="300" cy="250" r="10" />
+                    <circle cx="640" cy="520" r="10" />
+                </g>
+
+                <g fill="var(--so-art-accent)">
+                    <circle cx="170" cy="380" r="5" />
+                    <circle cx="610" cy="620" r="5" />
+                </g>
+                <g fill="none" stroke="var(--so-art-accent)" stroke-width="1.2" opacity="0.7">
+                    <circle cx="170" cy="380" r="12" />
+                    <circle cx="610" cy="620" r="12" />
+                </g>
+            </svg>
+
+            <div class="so-auth-canvas-text">
+                <span class="so-auth-canvas-mark" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" width="34" height="34" role="presentation">
+                        <use href="@canvasMarkHref" />
+                    </svg>
+                </span>
+                <p class="so-auth-canvas-title">SecureOps</p>
+                <p class="so-auth-canvas-lead">
+                    Kurumsal Windows operasyonları için kimlik, erişim ve iş akışı platformu.
+                </p>
+            </div>
+        </aside>
+
+        <main class="so-auth-stage">
+            @RenderBody()
+        </main>
+    </div>
 </body>
 </html>

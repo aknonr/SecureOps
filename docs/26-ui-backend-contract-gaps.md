@@ -20,6 +20,10 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-11 — Claim owner is not exposed | ✅ **Resolved** by backend `989030c3` |
 | G-12 — `ReconciliationRequired` is not exposed | ✅ **Resolved** by backend `989030c3` |
 | G-13 — No source provider yields records | ✅ **Resolved** by backend `989030c3` |
+| G-14 — A duration statistic carries no stable key | Open |
+| G-15 — Reported limitations are English prose with no code | Open |
+| G-16 — Only identity lookup has daily buckets | Open |
+| G-17 — Zero and "no persisted history" are indistinguishable | Open |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -609,6 +613,102 @@ What it does **not** establish:
   a live claim, so "claimed by another operator" was verified from authoritative fields and unit
   tests rather than by two operators colliding in practice.
 - **No SQL repository.** Verification ran on the in-memory repository; migration 004 was not executed.
+
+---
+
+## G-14 — A duration statistic carries no stable key
+
+**Endpoint:** `GET /api/v1/reporting/management/summary`
+**Severity:** Low — cosmetic today, silently wrong later
+**Status:** Open
+
+`DurationStatisticsResponse` identifies each interval only by `definition`, an English sentence:
+
+```json
+{ "definition": "Workflow claim to durable Jira issue-key persistence",
+  "sampleCount": 74, "minimumSeconds": 31, "averageSeconds": 264, "maximumSeconds": 3600 }
+```
+
+There is no `name`, no code, and nothing in the contract that fixes the array order — the projector
+happens to emit three entries in a fixed sequence, but that is an implementation detail rather than a
+promise.
+
+**What the UI does.** Matches on the exact sentence to pick a Turkish label, and falls back to
+displaying the server's own text when the sentence is not one of the three it knows. Array position
+is deliberately not used: a reordering would then relabel every row without any error, which is worse
+than an untranslated label.
+
+**What would resolve it.** A stable `name` alongside `definition` — the projector already has one
+internally (`ImportToPreview`, `ClaimToJiraCreated`, `ClaimToCompleted`); it is simply not serialized.
+
+---
+
+## G-15 — Reported limitations are English prose with no code
+
+**Endpoint:** `GET /api/v1/reporting/management/summary`
+**Severity:** Low
+**Status:** Open
+
+`dataLimitations` is a list of English sentences. They are important — they are what stops a manager
+reading an unmeasured zero as a measured one — but they arrive as prose with no identifier, on a
+product whose entire operator-facing surface is Turkish.
+
+**What the UI does.** Renders each sentence through a reviewed translation keyed on the exact server
+text, and shows anything unrecognised verbatim. Failing towards the server's own words is the safe
+direction: an English sentence on a Turkish screen is a blemish, whereas a dropped or reworded
+limitation is a false statement about the data.
+
+**What would resolve it.** A stable code per limitation, so the UI can carry the wording and the
+backend can carry the fact.
+
+---
+
+## G-16 — Only identity lookup has daily buckets
+
+**Endpoint:** `GET /api/v1/reporting/management/summary`
+**Severity:** Medium for the brief, low for correctness
+**Status:** Open — by design in ADR-0011, recorded here because it constrains the dashboard
+
+`identityLookup.trend` is the only time series in the contract. Adoption reports four scalars
+(`dailyActiveUsers`, `weeklyActiveUsers`, `monthlyActiveUsers`, `uniqueActiveUsersInWindow`), and the
+Operational Record workflow reports totals for the window with no per-day breakdown at all.
+
+**What the UI does.** Draws exactly one trend chart, from the one series that exists. Adoption is
+presented as its four reported figures with a note that a per-day series is not available in this
+release, and no workflow trend is drawn. Interpolating a line through numbers the server never
+bucketed would be an invented metric, which ADR-0011 forbids and which nobody could reconcile against
+the audit trail.
+
+**What would resolve it.** Daily buckets for adoption and workflow transitions, in the same shape as
+the identity trend.
+
+---
+
+## G-17 — Zero and "no persisted history" are indistinguishable
+
+**Endpoint:** `GET /api/v1/reporting/management/summary`
+**Severity:** Medium
+**Status:** Open — partially mitigated
+
+Every count in the contract is a non-nullable `long` except `securityAndQuality.rateLimitEvents`.
+A window that predates the reporting read model therefore returns `0` for every metric, which is
+indistinguishable on the wire from a window in which nothing happened. This matters most during the
+pilot, whose SQL history begins part-way through any range a manager is likely to ask for.
+
+**What the UI does, and what it cannot do.**
+
+- When *every* counted metric is zero, the dashboard replaces the figures with "Bu aralıkta kayıtlı
+  kanıt yok" and states explicitly that this may mean the persisted history does not yet cover the
+  range — not that nothing happened.
+- `dataLimitations` is always on the page.
+- A window with *some* activity but partial history still shows zeroes for the unmeasured parts, and
+  the UI cannot mark them, because the contract gives it nothing to distinguish them by. Durations
+  are the exception: `sampleCount: 0` is an explicit "not measured" and renders as such.
+
+**What would resolve it.** Either a `coverageFromUtc` on the response — the earliest instant the read
+model can answer for — or nullable counts for metrics outside that coverage.
+
+---
 
 ## Note: enums cross the wire as numbers
 

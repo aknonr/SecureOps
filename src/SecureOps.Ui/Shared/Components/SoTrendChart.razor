@@ -1,0 +1,157 @@
+@using System.Globalization
+@using SecureOps.Shared.Contracts.Reporting
+
+@*
+    Daily identity-lookup outcomes.
+
+    This is the only true time series in the v1 reporting contract: the backend buckets terminal
+    lookup outcomes by UTC day and sends them as counts. Every other reported figure is a
+    point-in-time aggregate, so no other chart on the dashboard may be drawn as a trend — an
+    interpolated line through numbers the server never bucketed would be an invented metric.
+
+    Drawn with CSS heights rather than SVG so it scales with its container, follows the palette
+    through the same --so-* tokens as everything else, and needs no chart library. Column and
+    segment heights are proportions of the counts below; the exact numbers stay available in the
+    table, which is also what a screen reader gets.
+*@
+
+@if (Points.Count == 0)
+{
+    <p class="so-panel-text so-panel-text--sm">Bu aralık için günlük dağılım yok.</p>
+}
+else
+{
+    <div class="so-chart">
+        <ul class="so-chart-legend">
+            @foreach (Series series in _series)
+            {
+                <li>
+                    <span class="so-chart-key @series.CssClass" aria-hidden="true"></span>
+                    @series.Label
+                </li>
+            }
+        </ul>
+
+        <div class="so-chart-plot" role="img" aria-label="@AriaLabel">
+            @foreach (IdentityLookupTrendPointResponse point in Points)
+            {
+                <div class="so-chart-col" title="@Tooltip(point)">
+                    <div class="so-chart-bar" style="height: @Percent(point.Total, _peak)">
+                        @foreach (Series series in _series)
+                        {
+                            long value = series.Value(point);
+                            if (value > 0)
+                            {
+                                <span class="so-chart-seg @series.CssClass"
+                                      style="height: @Percent(value, point.Total)"></span>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="so-chart-axis" aria-hidden="true">
+            @for (int index = 0; index < Points.Count; index++)
+            {
+                <span class="so-chart-tick">@(ShowTick(index) ? ShortDate(Points[index].DateUtc) : null)</span>
+            }
+        </div>
+
+        <p class="so-chart-note">Günler UTC'ye göre gruplanır. En yüksek gün: @ManagementReportView.Count(_peak) sorgu.</p>
+
+        <details class="so-chart-table">
+            <summary>Günlük değerleri tablo olarak göster</summary>
+            <div class="so-table-scroll">
+                <table class="so-plain-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Gün (UTC)</th>
+                            <th scope="col">Toplam</th>
+                            @foreach (Series series in _series)
+                            {
+                                <th scope="col">@series.Label</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (IdentityLookupTrendPointResponse point in Points)
+                        {
+                            <tr>
+                                <th scope="row">@LongDate(point.DateUtc)</th>
+                                <td>@ManagementReportView.Count(point.Total)</td>
+                                @foreach (Series series in _series)
+                                {
+                                    <td>@ManagementReportView.Count(series.Value(point))</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </div>
+}
+
+@code {
+    private static readonly CultureInfo _tr = CultureInfo.GetCultureInfo("tr-TR");
+
+    /// <summary>How many date labels the axis shows before it starts thinning them.</summary>
+    private const int MaximumTicks = 8;
+
+    private sealed record Series(string Label, string CssClass, Func<IdentityLookupTrendPointResponse, long> Value);
+
+    // Ordered so the stack reads bottom-up from the desirable outcome to the ones worth noticing,
+    // which keeps a bad day visible as a growing band at the top rather than a colour change.
+    private static readonly Series[] _series =
+    [
+        new("Başarılı", "so-chart-seg--success", point => point.Succeeded),
+        new("Bulunamadı", "so-chart-seg--notfound", point => point.NotFound),
+        new("Geçersiz", "so-chart-seg--rejected", point => point.Rejected),
+        new("Sağlayıcı erişilemedi", "so-chart-seg--unavailable", point => point.ProviderUnavailable),
+        new("Yetkisiz", "so-chart-seg--forbidden", point => point.Forbidden)
+    ];
+
+    /// <summary>Daily buckets exactly as the API returned them.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<IdentityLookupTrendPointResponse> Points { get; set; } = [];
+
+    private long _peak;
+
+    protected override void OnParametersSet() =>
+        // Guarded so an all-zero window cannot divide by zero; every column then renders at 0%.
+        _peak = Points.Count == 0 ? 0 : Math.Max(1, Points.Max(point => point.Total));
+
+    private string AriaLabel =>
+        $"Günlük kimlik sorgulama sonuçları, {Points.Count} gün. Ayrıntılı değerler aşağıdaki tabloda.";
+
+    // Thinned rather than rotated: a 30-day window cannot show 30 legible dates at laptop width,
+    // and angled labels cost more height than the chart itself.
+    private bool ShowTick(int index)
+    {
+        if (Points.Count <= MaximumTicks)
+        {
+            return true;
+        }
+
+        int step = (int)Math.Ceiling(Points.Count / (double)MaximumTicks);
+        return index % step == 0 || index == Points.Count - 1;
+    }
+
+    private static string Percent(long value, long total) =>
+        total <= 0
+            ? "0%"
+            : (value * 100d / total).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+
+    private static string ShortDate(DateOnly date) => date.ToString("d MMM", _tr);
+
+    private static string LongDate(DateOnly date) => date.ToString("d MMMM yyyy", _tr);
+
+    private static string Tooltip(IdentityLookupTrendPointResponse point) =>
+        $"{LongDate(point.DateUtc)} · toplam {ManagementReportView.Count(point.Total)}"
+        + $" · başarılı {ManagementReportView.Count(point.Succeeded)}"
+        + $" · bulunamadı {ManagementReportView.Count(point.NotFound)}"
+        + $" · geçersiz {ManagementReportView.Count(point.Rejected)}"
+        + $" · sağlayıcı {ManagementReportView.Count(point.ProviderUnavailable)}"
+        + $" · yetkisiz {ManagementReportView.Count(point.Forbidden)}";
+}

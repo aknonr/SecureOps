@@ -6,21 +6,43 @@
 @inject ICurrentAccessProvider AccessProvider
 @inject ISignedInUserService Users
 @inject IIdentityLookupApiClient IdentityClient
+@inject IManagementReportingApiClient Reporting
 @inject ILogger<Dashboard> Logger
 
-<PageTitle>Genel Bakış · SecureOps</PageTitle>
+<PageTitle>@(_managementView ? "Yönetim Panosu" : "Genel Bakış") · SecureOps</PageTitle>
 
 @*
-    Answers three questions in order: can I work right now, what can I do, and what is coming.
+    Two boards behind one route.
 
-    The previous board carried six panels, several of which restated the product's scope rather than
-    telling the operator anything actionable. What survived is the access state (which decides whether
-    anything else matters), the capabilities actually granted, and the roadmap — each once.
+    An operator sees what they can do right now. A holder of Reporting.ManagementView additionally
+    sees the backend-authoritative management report, which is the visual centre of the product for
+    the people who have to answer for it.
+
+    The split is on the capability the API reports, never on a role name and never on which screens
+    happen to be reachable: being able to run an identity lookup or move a record to Jira says
+    nothing about being entitled to cross-user analytics. Hiding the section is only a courtesy —
+    the reporting endpoints re-check the capability and audit every privileged read.
+
+    Every figure below comes from GET /api/v1/reporting/management/summary. Nothing is computed
+    here. Bar widths and stack heights are proportions of those same counts, which is a way of
+    drawing them, not a new measurement.
 *@
 
-<div class="so-page">
-    <SoPageHeader Title="Genel Bakış"
-                  Lead="@_greeting" />
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="@(_managementView ? "Yönetim Panosu" : "Genel Bakış")"
+                  Lead="@_greeting">
+        <Actions>
+            @if (_managementView)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           Disabled="@_reportLoading"
+                           OnClick="ReloadReportAsync">
+                    Yenile
+                </MudButton>
+            }
+        </Actions>
+    </SoPageHeader>
 
     @if (_snapshot is null)
     {
@@ -64,6 +86,355 @@
                 platform yöneticinize başvurun.
             </p>
         </section>
+    }
+    else if (_managementView)
+    {
+        <SoWindowPicker @bind-Preset="_preset"
+                        Applied="_report?.Window"
+                        Busy="_reportLoading"
+                        OnWindowChanged="LoadReportAsync" />
+
+        @if (_reportProblem is not null)
+        {
+            <SoProblemPanel Problem="_reportProblem" OnRetry="ReloadReportAsync" RetryLabel="Yeniden yükle" />
+        }
+        else if (_report is null)
+        {
+            <SoLoading Message="Rapor hazırlanıyor…" Variant="SoLoading.LoadingVariant.Block" />
+        }
+        else if (!ManagementReportView.HasEvidence(_report))
+        {
+            <SoEmptyState Title="Bu aralıkta kayıtlı kanıt yok"
+                          Description="Seçilen aralık için kalıcı kayıt bulunmuyor. Bu, hiç işlem yapılmadığı anlamına gelebileceği gibi, kalıcı geçmişin bu aralığı henüz kapsamadığı anlamına da gelebilir. Sıfır olarak yorumlamayın."
+                          Icon="@Icons.Material.Outlined.QueryStats" />
+
+            <SoLimitationList Items="_report.DataLimitations" />
+        }
+        else
+        {
+            @* -- executive summary ------------------------------------------------------- *@
+            <section class="so-panel so-panel--primary">
+                <p class="so-eyebrow">Özet</p>
+                <div class="so-exec">
+                    <SoMetric Label="Kimlik sorgusu"
+                              Value="@ManagementReportView.Count(_report.IdentityLookup.TotalLookups)"
+                              Hint="Sonuçlanmış sorgular"
+                              Tone="SoMetric.MetricTone.Lead" />
+                    <SoMetric Label="Etkin operatör"
+                              Value="@ManagementReportView.Count(_report.PlatformAdoption.UniqueActiveUsersInWindow)"
+                              Hint="Aralıkta işlem yapan"
+                              Tone="SoMetric.MetricTone.Lead" />
+                    <SoMetric Label="Jira kaydı oluşturuldu"
+                              Value="@ManagementReportView.Count(_report.OperationalWorkflow.JiraCreated)"
+                              Hint="Aralıkta bu duruma geçen kayıt"
+                              Tone="SoMetric.MetricTone.Lead" />
+                    <SoMetric Label="Tamamlanan iş akışı"
+                              Value="@ManagementReportView.Count(_report.OperationalWorkflow.Completed)"
+                              Hint="Aktarımı biten kayıt"
+                              Tone="SoMetric.MetricTone.Positive" />
+                    <SoMetric Label="Yetkisiz erişim denemesi"
+                              Value="@ManagementReportView.Count(_report.SecurityAndQuality.AuthorizationFailures)"
+                              Hint="Yetki kontrolünde reddedilen"
+                              Tone="@(_report.SecurityAndQuality.AuthorizationFailures > 0
+                                       ? SoMetric.MetricTone.Caution
+                                       : SoMetric.MetricTone.Plain)" />
+                </div>
+            </section>
+
+            @* -- attention areas --------------------------------------------------------- *@
+            <section class="so-panel">
+                <div class="so-panel-head">
+                    <h2 class="so-panel-title">İlgi gerektiren alanlar</h2>
+                </div>
+
+                @if (_attention.Count == 0)
+                {
+                    <div class="so-status-row">
+                        <SoStatusBadge Label="Açık bulgu yok"
+                                       Tone="SoStatusBadge.BadgeTone.Positive"
+                                       Icon="@Icons.Material.Filled.CheckCircle" />
+                        <span class="so-status-text">
+                            Bu aralıkta mutabakat, hata, çakışma veya yetki reddi kaydı bulunmuyor.
+                        </span>
+                    </div>
+                }
+                else
+                {
+                    <ul class="so-attention">
+                        @foreach (ManagementReportView.AttentionItem item in _attention)
+                        {
+                            <li class="so-attention-item @AttentionClass(item.Tone)">
+                                <span class="so-attention-count">@ManagementReportView.Count(item.Count)</span>
+                                <div class="so-attention-body">
+                                    <span class="so-attention-title">@item.Title</span>
+                                    <p class="so-attention-text">@item.Detail</p>
+                                </div>
+                                @if (item.Tone == ManagementReportView.AttentionTone.Urgent
+                                     && _snapshot.Can(Capabilities.OperationalRecordsView))
+                                {
+                                    <MudButton Href="operational-records" Variant="Variant.Text"
+                                               Color="Color.Primary" Size="Size.Small"
+                                               EndIcon="@Icons.Material.Filled.ChevronRight">
+                                        Kayıtlar
+                                    </MudButton>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <div class="so-report-grid">
+                @* -- AD / PAM activity ---------------------------------------------------- *@
+                <section class="so-panel so-panel--span">
+                    <div class="so-panel-head">
+                        <h2 class="so-panel-title">AD / PAM etkinliği</h2>
+                        @if (_snapshot.Can(Capabilities.IdentityLookup))
+                        {
+                            <MudButton Href="identity-lookup" Variant="Variant.Text" Color="Color.Primary"
+                                       Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
+                                Kimlik sorgulama
+                            </MudButton>
+                        }
+                    </div>
+
+                    <div class="so-metrics">
+                        <SoMetric Label="Toplam sorgu"
+                                  Value="@ManagementReportView.Count(_report.IdentityLookup.TotalLookups)"
+                                  Tone="SoMetric.MetricTone.Lead" />
+                        <SoMetric Label="Başarılı"
+                                  Value="@ManagementReportView.Count(_report.IdentityLookup.SuccessfulLookups)"
+                                  Tone="SoMetric.MetricTone.Positive" />
+                        <SoMetric Label="Bulunamadı"
+                                  Value="@ManagementReportView.Count(_report.IdentityLookup.NotFound)" />
+                        <SoMetric Label="Geçersiz / reddedildi"
+                                  Value="@ManagementReportView.Count(_report.IdentityLookup.RejectedOrInvalid)"
+                                  Hint="Biçim kuralına uymayan giriş" />
+                        <SoMetric Label="Sağlayıcı erişilemedi"
+                                  Value="@ManagementReportView.Count(_report.IdentityLookup.ProviderUnavailable)"
+                                  Hint="Hata ve zaman aşımı"
+                                  Tone="@(_report.IdentityLookup.ProviderUnavailable > 0
+                                           ? SoMetric.MetricTone.Caution
+                                           : SoMetric.MetricTone.Plain)" />
+                        <SoMetric Label="Yetkisiz sorgu"
+                                  Value="@ManagementReportView.Count(_report.IdentityLookup.AuthorizationDenied)" />
+                        <SoMetric Label="Benzersiz operatör"
+                                  Value="@ManagementReportView.Count(_report.IdentityLookup.UniqueActiveOperators)"
+                                  Hint="Sorgu çalıştıran kişi sayısı" />
+                    </div>
+
+                    <h3 class="so-subhead">Günlük dağılım</h3>
+                    @if (ManagementReportView.HasTrend(_report))
+                    {
+                        <SoTrendChart Points="_report.IdentityLookup.Trend" />
+                    }
+                    else
+                    {
+                        <p class="so-panel-text so-panel-text--sm">
+                            Bu aralıkta günlük dağılımı oluşturacak sonuçlanmış sorgu yok.
+                        </p>
+                    }
+                </section>
+
+                @* -- operational record to Jira ------------------------------------------- *@
+                <section class="so-panel so-panel--span">
+                    <div class="so-panel-head">
+                        <h2 class="so-panel-title">Operasyonel kayıt → Jira</h2>
+                        @if (_snapshot.Can(Capabilities.OperationalRecordsView))
+                        {
+                            <MudButton Href="operational-records" Variant="Variant.Text" Color="Color.Primary"
+                                       Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
+                                Kayıtlar
+                            </MudButton>
+                        }
+                    </div>
+
+                    <div class="so-metrics">
+                        <SoMetric Label="İçe alındı"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.RecordsImported)" />
+                        <SoMetric Label="Uygun"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.Eligible)" />
+                        <SoMetric Label="Önizlendi"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.Previewed)" />
+                        <SoMetric Label="Jira oluşturuldu"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.JiraCreated)"
+                                  Tone="SoMetric.MetricTone.Lead" />
+                        <SoMetric Label="Tamamlandı"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.Completed)"
+                                  Tone="SoMetric.MetricTone.Positive" />
+                    </div>
+
+                    <h3 class="so-subhead">Durdurulan ve önlenen işlemler</h3>
+                    <div class="so-metrics">
+                        <SoMetric Label="Kaynak değişmiş"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.SourceChangedPrevented)"
+                                  Hint="Aktarım korunarak durduruldu" />
+                        <SoMetric Label="Kaynak kapalı / bulunamadı"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.ClosedOrMissingPrevented)"
+                                  Hint="Aktarım korunarak durduruldu" />
+                        <SoMetric Label="Mükerrer oluşturma önlendi"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.DuplicateCreatePrevented)"
+                                  Hint="Bu sürümden itibaren ölçülüyor" />
+                        <SoMetric Label="Başarısız adım"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.Failures)"
+                                  Tone="@(_report.OperationalWorkflow.Failures > 0
+                                           ? SoMetric.MetricTone.Critical
+                                           : SoMetric.MetricTone.Plain)" />
+                        <SoMetric Label="Mutabakat gerekiyor"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.ReconciliationRequired)"
+                                  Hint="Otomatik yeniden deneme kapalı"
+                                  Tone="@(_report.OperationalWorkflow.ReconciliationRequired > 0
+                                           ? SoMetric.MetricTone.Critical
+                                           : SoMetric.MetricTone.Plain)" />
+                    </div>
+
+                    <h3 class="so-subhead">Yeniden deneme sonuçları</h3>
+                    <div class="so-metrics">
+                        <SoMetric Label="İstendi"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.Retries.Requested)" />
+                        <SoMetric Label="Başarılı"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.Retries.Succeeded)"
+                                  Tone="SoMetric.MetricTone.Positive" />
+                        <SoMetric Label="Başarısız"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.Retries.Failed)" />
+                        <SoMetric Label="Aralık sonunda açık"
+                                  Value="@ManagementReportView.Count(_report.OperationalWorkflow.Retries.UnresolvedAtWindowEnd)"
+                                  Hint="Sonraki aralıkta sonuçlanmış olabilir" />
+                    </div>
+
+                    <h3 class="so-subhead">Ölçülebilen süreler</h3>
+                    <p class="so-panel-text so-panel-text--sm">
+                        Bu süreler iş akışının sistemde geçirdiği toplam süredir; bekleme ve yeniden
+                        denemeleri içerir. Aktif çalışma süresi, kazanılan zaman veya kişisel
+                        performans ölçüsü değildir.
+                    </p>
+
+                    <div class="so-table-scroll">
+                        <table class="so-plain-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Aralık</th>
+                                    <th scope="col">Örnek</th>
+                                    <th scope="col">En kısa</th>
+                                    <th scope="col">Ortalama</th>
+                                    <th scope="col">En uzun</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (ManagementReportView.DurationView duration in ManagementReportView.Durations(_report))
+                                {
+                                    <tr>
+                                        <th scope="row" title="@duration.Definition">@duration.Label</th>
+                                        @if (duration.HasSamples)
+                                        {
+                                            <td>@ManagementReportView.Count(duration.SampleCount)</td>
+                                            <td>@duration.Minimum</td>
+                                            <td>@duration.Average</td>
+                                            <td>@duration.Maximum</td>
+                                        }
+                                        else
+                                        {
+                                            <td colspan="4" class="so-cell-unavailable">
+                                                @ManagementReportView.UnavailableText
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                @* -- adoption -------------------------------------------------------------- *@
+                <section class="so-panel">
+                    <div class="so-panel-head">
+                        <h2 class="so-panel-title">Platform kullanımı</h2>
+                        <MudButton Href="reporting/operators" Variant="Variant.Text" Color="Color.Primary"
+                                   Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
+                            Operatör raporu
+                        </MudButton>
+                    </div>
+
+                    <div class="so-metrics">
+                        <SoMetric Label="Aralıktaki etkin kullanıcı"
+                                  Value="@ManagementReportView.Count(_report.PlatformAdoption.UniqueActiveUsersInWindow)"
+                                  Tone="SoMetric.MetricTone.Lead" />
+                        <SoMetric Label="Günlük etkin"
+                                  Value="@ManagementReportView.Count(_report.PlatformAdoption.DailyActiveUsers)"
+                                  Hint="Son 1 gün" />
+                        <SoMetric Label="Haftalık etkin"
+                                  Value="@ManagementReportView.Count(_report.PlatformAdoption.WeeklyActiveUsers)"
+                                  Hint="Son 7 gün" />
+                        <SoMetric Label="Aylık etkin"
+                                  Value="@ManagementReportView.Count(_report.PlatformAdoption.MonthlyActiveUsers)"
+                                  Hint="Son 30 gün" />
+                    </div>
+
+                    <h3 class="so-subhead">İş akışına göre işlemler</h3>
+                    <SoCountBars Items="_report.PlatformAdoption.OperationsByWorkflow"
+                                 LabelFor="ManagementReportView.WorkflowLabel"
+                                 EmptyText="Bu aralıkta iş akışı işlemi kaydedilmedi." />
+
+                    <h3 class="so-subhead">Erişim etkinliği</h3>
+                    <SoCountBars Items="_report.PlatformAdoption.AccessRequestActivity"
+                                 LabelFor="ManagementReportView.AccessActionLabel"
+                                 EmptyText="Bu aralıkta erişim işlemi kaydedilmedi." />
+
+                    <p class="so-panel-text so-panel-text--sm">
+                        Günlük/haftalık/aylık değerler rapor bitişinde biten hareketli pencerelerdir.
+                        Kullanım için günlük ayrıntı serisi bu sürümde sunulmuyor.
+                    </p>
+                </section>
+
+                @* -- security and quality --------------------------------------------------- *@
+                <section class="so-panel">
+                    <div class="so-panel-head">
+                        <h2 class="so-panel-title">Güvenlik ve kalite</h2>
+                    </div>
+
+                    <div class="so-metrics">
+                        <SoMetric Label="Yetki reddi"
+                                  Value="@ManagementReportView.Count(_report.SecurityAndQuality.AuthorizationFailures)"
+                                  Tone="@(_report.SecurityAndQuality.AuthorizationFailures > 0
+                                           ? SoMetric.MetricTone.Caution
+                                           : SoMetric.MetricTone.Plain)" />
+                        <SoMetric Label="Eşzamanlılık çakışması"
+                                  Value="@ManagementReportView.Count(_report.SecurityAndQuality.ConcurrencyConflicts)" />
+                        <SoMetric Label="Mutabakat olayı"
+                                  Value="@ManagementReportView.Count(_report.SecurityAndQuality.ReconciliationEvents)"
+                                  Tone="@(_report.SecurityAndQuality.ReconciliationEvents > 0
+                                           ? SoMetric.MetricTone.Critical
+                                           : SoMetric.MetricTone.Plain)" />
+                        <SoMetric Label="Sağlayıcı erişilemedi"
+                                  Value="@ManagementReportView.Count(_report.SecurityAndQuality.ProviderUnavailableEvents)" />
+                        <SoMetric Label="Hız sınırı reddi"
+                                  Value="@ManagementReportView.Count(_report.SecurityAndQuality.RateLimitEvents)"
+                                  Available="@(_report.SecurityAndQuality.RateLimitEvents is not null)"
+                                  Hint="Hız sınırı reddi henüz denetim kaydına yazılmıyor" />
+                    </div>
+                </section>
+            </div>
+
+            <SoLimitationList Items="_report.DataLimitations" />
+
+            @if (_available.Count > 0)
+            {
+                <section class="so-panel">
+                    <p class="so-eyebrow">Hızlı erişim</p>
+                    <ul class="so-quick">
+                        @foreach (OperatorTask task in _available)
+                        {
+                            <li>
+                                <a class="so-quick-link" href="@task.Route">
+                                    <MudIcon Icon="@task.Icon" aria-hidden="true" />
+                                    @task.Title
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+        }
     }
     else
     {
@@ -178,10 +549,6 @@
                     <p class="so-eyebrow">Sonraki fazlar</p>
                     <ul class="so-roadmap">
                         <li>
-                            <span class="so-roadmap-name">Operasyonel kayıt → Jira</span>
-                            <SoStatusBadge Label="Hazırlanıyor" Tone="SoStatusBadge.BadgeTone.Caution" />
-                        </li>
-                        <li>
                             <span class="so-roadmap-name">Salt okunur tanılama</span>
                             <SoStatusBadge Label="Planlandı" Tone="SoStatusBadge.BadgeTone.Neutral" />
                         </li>
@@ -217,6 +584,14 @@
     private IdentityProviderHealthResponse? _providerHealth;
     private UiProblem? _providerProblem;
 
+    private bool _managementView;
+    private ReportingWindowPreset _preset = ReportingWindowPreset.Last7Days;
+    private ReportingWindowRequest _window = ReportingWindowSelection.ForPreset(ReportingWindowPreset.Last7Days);
+    private ManagementReportResponse? _report;
+    private IReadOnlyList<ManagementReportView.AttentionItem> _attention = [];
+    private UiProblem? _reportProblem;
+    private bool _reportLoading;
+
     protected override async Task OnInitializedAsync()
     {
         AccessProvider.Changed += OnAccessChanged;
@@ -240,10 +615,49 @@
             : await AccessProvider.GetAsync();
 
         _available = BuildTasks(_snapshot);
+        _managementView = _snapshot.IsApproved && _snapshot.Can(Capabilities.ManagementReportingView);
 
-        if (_snapshot.IsApproved)
+        if (!_snapshot.IsApproved)
+        {
+            return;
+        }
+
+        if (_managementView)
+        {
+            await LoadReportAsync(_window);
+        }
+        else
         {
             await LoadProviderHealthAsync();
+        }
+    }
+
+    private Task ReloadReportAsync() => LoadReportAsync(_window);
+
+    private async Task LoadReportAsync(ReportingWindowRequest window)
+    {
+        _window = window;
+        _reportLoading = true;
+        _reportProblem = null;
+        StateHasChanged();
+
+        try
+        {
+            _report = await Reporting.GetSummaryAsync(window, CancellationToken.None);
+            _attention = ManagementReportView.Attention(_report);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            // The previous report is dropped rather than left on screen under a new window label:
+            // stale figures under a changed date range are worse than no figures at all.
+            _report = null;
+            _attention = [];
+            _reportProblem = ex.Problem;
+            Logger.LogDebug("Management summary unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _reportLoading = false;
         }
     }
 
@@ -281,8 +695,24 @@
                 Icons.Material.Filled.ManageSearch));
         }
 
+        if (snapshot.Can(Capabilities.OperationalRecordsView))
+        {
+            tasks.Add(new OperatorTask(
+                "Operasyonel kayıtlar",
+                "Kaynak kayıtları inceleyin ve uygun olanları Jira'ya aktarın.",
+                "operational-records",
+                Icons.Material.Filled.Assignment));
+        }
+
         return tasks;
     }
+
+    private static string AttentionClass(ManagementReportView.AttentionTone tone) => tone switch
+    {
+        ManagementReportView.AttentionTone.Urgent => "so-attention-item--urgent",
+        ManagementReportView.AttentionTone.Notable => "so-attention-item--notable",
+        _ => "so-attention-item--guarded"
+    };
 
     private void OnAccessChanged() => InvokeAsync(StateHasChanged);
 

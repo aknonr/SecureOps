@@ -1,0 +1,66 @@
+@*
+    One reported figure.
+
+    Unavailable is a first-class state rather than a zero, because the two mean opposite things:
+    zero says the condition did not occur, unavailable says the backend cannot measure it. The
+    caller decides which applies — this component only refuses to render them the same way.
+*@
+
+<div class="so-metric @ToneClass @(Available ? null : "so-metric--unavailable")">
+    <span class="so-metric-label">@Label</span>
+    <span class="so-metric-value">@(Available ? Value : ManagementReportView.UnavailableText)</span>
+    @if (!string.IsNullOrWhiteSpace(Hint))
+    {
+        <span class="so-metric-hint">@Hint</span>
+    }
+</div>
+
+@code {
+    /// <summary>How the figure should read.</summary>
+    public enum MetricTone
+    {
+        /// <summary>An ordinary count with no health meaning.</summary>
+        Plain,
+
+        /// <summary>The headline figure of its group.</summary>
+        Lead,
+
+        /// <summary>A desirable outcome.</summary>
+        Positive,
+
+        /// <summary>Worth reviewing.</summary>
+        Caution,
+
+        /// <summary>A failure or refusal.</summary>
+        Critical
+    }
+
+    /// <summary>What the figure counts.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Formatted figure, ignored when <see cref="Available"/> is false.</summary>
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    /// <summary>Optional one-line clarification of what the figure includes.</summary>
+    [Parameter]
+    public string? Hint { get; set; }
+
+    /// <summary>Whether the backend could measure this at all.</summary>
+    [Parameter]
+    public bool Available { get; set; } = true;
+
+    /// <summary>How the figure should read.</summary>
+    [Parameter]
+    public MetricTone Tone { get; set; } = MetricTone.Plain;
+
+    private string? ToneClass => Tone switch
+    {
+        MetricTone.Lead => "so-metric--lead",
+        MetricTone.Positive => "so-metric--positive",
+        MetricTone.Caution => "so-metric--caution",
+        MetricTone.Critical => "so-metric--critical",
+        _ => null
+    };
+}

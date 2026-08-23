@@ -54,7 +54,7 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/session-expired` | Session lapsed; returns to where the operator was | Anonymous |
 | `/access-denied` | Authorization refusal, with a route to request access | Anonymous |
 | `/error` | Unhandled server error, request reference only | Anonymous |
-| `/` and `/dashboard` | Genel Bakış: can I work, what can I do, what is next | Authenticated |
+| `/` and `/dashboard` | Yönetim Panosu with `Reporting.ManagementView`; otherwise the operator Genel Bakış | Authenticated |
 | `/identity-lookup` | PAM / AD lookup | Authenticated + `Identity.Lookup` |
 | `/account` | Signed-in identity and session security | Authenticated |
 | `/access/me` | Erişimim: status, roles, grouped capabilities | Authenticated |
@@ -63,6 +63,7 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/access/users/{id}` | User detail, role editor, disable, request history | Authenticated + `Access.ManageUsers` |
 | `/operational-records` | Operasyonel Kayıtlar: OR → Jira workspace | Authenticated + `OperationalRecords.View` |
 | `/operational-records/{id}` | Source, workflow, and Jira transfer detail | Authenticated + `OperationalRecords.View` |
+| `/reporting/operators` | Operatör Raporu: paginated per-operator usage | Authenticated + `Reporting.ManagementView` |
 | `/audit-compliance`, `/diagnostics-readonly` | Truthful future-phase placeholders | Authenticated |
 
 Interim endpoints `POST /auth/sign-in` and `GET /auth/sign-out` replace the former `/demo-auth/*`
@@ -231,7 +232,114 @@ Rules specific to this screen:
 Red stays reserved for genuinely critical conditions. Stale, claimed, pending, and reconciliation
 states use warning or informational tones.
 
-## 11. Verification, and what it proves
+## 11. Management reporting (this milestone)
+
+Backend-authoritative, from two endpoints and nothing else:
+
+| Endpoint | Used by |
+|---|---|
+| `GET /api/v1/reporting/management/summary` | Yönetim Panosu |
+| `GET /api/v1/reporting/management/operators` | Operatör Raporu |
+
+**The UI computes no metric.** Every figure on screen is a value the API sent. Bar widths and the
+daily stack heights are proportions of those same counts — a way of drawing a number, not a new
+measurement. No rates, no percentages, no totals the server did not report, and no "time saved":
+ADR-0011 requires every figure to be explainable from persisted evidence, and a browser-derived
+number would have no audit trail behind it.
+
+### Authorization
+
+Gated on the `Reporting.ManagementView` capability reported by `GET /api/v1/access/me`, never on a
+role name and never on which operational screens happen to be reachable. Being able to run an
+identity lookup or move a record to Jira says nothing about entitlement to cross-user analytics.
+
+`/dashboard` serves two boards behind one route: the management report for capability holders, the
+operator board for everyone else. Hiding is a courtesy only — both reporting endpoints re-check the
+capability and audit every privileged read.
+
+### Windows
+
+Presets `today`, `7d`, `30d`, plus a custom range. `ReportingWindowSelection` mirrors the server's
+rules (`ReportingWindowResolver`) so a range the API would reject is explained next to the date
+fields instead of after a round-trip; the server re-validates regardless. Dates are **UTC calendar
+days**, stated on the control, because the backend aggregates on UTC day boundaries and reading a
+picked date as local would shift every bucket by the machine's offset. The end day is inclusive for
+the operator and exclusive on the wire, clamped to now when that bound has not yet arrived. Custom
+ranges are capped at 92 days, the same as the server.
+
+The window shown beside the tabs is the one the API **resolved and echoed**, not the one requested.
+
+### Unmeasured is not zero
+
+The two states mean opposite things to a manager, and the report keeps them apart:
+
+| Contract signal | Rendered as |
+|---|---|
+| `securityAndQuality.rateLimitEvents` is `null` | "Yeterli geçmiş veri yok" |
+| A duration with `sampleCount: 0` and null min/avg/max | "Yeterli geçmiş veri yok" |
+| Every counted metric is zero across the window | "Bu aralıkta kayıtlı kanıt yok" — with the explicit note not to read it as zero |
+| `dataLimitations` | Always shown, in the server's order |
+
+Limitation sentences are rendered through a reviewed translation keyed on the exact server text.
+Anything unrecognised is shown verbatim: an untranslated sentence is a blemish, a paraphrased
+limitation is a false statement about the data.
+
+### Attention areas
+
+Each item is one backend count with a threshold of "greater than zero" — nothing is scored, weighted,
+or combined, so a manager who clicks through finds exactly the number quoted. Prevention counts
+(duplicate create stopped, source changed, source closed) are listed but toned as **guards**, not
+faults: a stopped duplicate is a safety mechanism working, and presenting it beside failures would
+teach the reader to treat a correct outcome as an incident.
+
+### Operator report
+
+Operational analytics, not employee scoring, and the difference is on the page rather than in this
+document. No rank numbers, no leader board, no derived per-person rates, no superlatives. The API
+orders rows by recorded operation volume and the page says so plainly, together with the statement
+that an operation count does not measure effort, difficulty, working hours, or contribution.
+
+Pagination is server-side (`page`, `pageSize`, capped at 100 by the API); the client never holds the
+full set, and the server's returned `page` is treated as authoritative. The endpoint performs no
+directory enrichment, so the actor is the persisted corporate principal and the page says that too.
+
+### Charts
+
+`identityLookup.trend` is the **only** true time series in the v1 contract — the backend buckets
+terminal lookup outcomes by UTC day. Every other reported figure is a point-in-time aggregate, so
+nothing else is drawn as a trend: a line interpolated through numbers the server never bucketed would
+be an invented metric. Adoption is therefore shown as its four reported figures rather than as a
+usage curve, and the panel says a per-day adoption series is not available in this release.
+
+Drawn with CSS heights rather than a chart library, so it follows the same `--so-*` tokens as
+everything else and works in both themes. Exact values stay available in a table, which is also what
+a screen reader gets.
+
+## 12. Sign-in visual treatment
+
+`/login`, `/signed-out`, and `/session-expired` share `LoginLayout` and render without a Blazor
+circuit, so they stay reachable when no circuit can be established.
+
+Above 900px the layout splits: an original wireframe route network on a dark navy field, and the
+sign-in card. The artwork is inline SVG — a great-circle grid, three route arcs of which one carries
+the brand accent, and two swept lines — authored for this project. No airline artwork, livery, or
+logotype is reproduced. It is inline rather than an image so it inherits the palette, scales without a
+second asset request, and can be `aria-hidden` as the decoration it is.
+
+The panel is a dark navy field in **both** themes: it is brand surface rather than reading surface,
+and flipping it to white in light mode would make the product a different page twice a day. The card
+follows the viewer's theme normally.
+
+Below 900px the panel is removed rather than stacked, because on a phone it would push the only
+action on the page below the fold. The card carries its own compact lockup for that case, which is
+hidden when the panel is present so the brand does not appear twice.
+
+Other decisions: the primary action reads **"Oturum aç"**; authentication stays redirect-based and
+provider-agnostic, so the form action changes and the page does not when OIDC replaces the interim
+endpoint; there is no username, password, or role selection; and the environment marker is gated on
+`ShowEnvironmentMarker`, so Demo and Test name themselves and Production does not.
+
+## 13. Verification, and what it proves
 
 Two layers, and they prove different things.
 
@@ -252,8 +360,9 @@ by any UI label claiming they are real.
 
 **Synthetic readiness is not Turuncu Hat readiness.** See `docs/26-ui-backend-contract-gaps.md`.
 
-## 12. Out of scope for this milestone
+## 14. Out of scope for this milestone
 
-The Operational Record → Jira screens are the next milestone. Their navigation entry is deliberately
-absent until the routes exist, so the menu never offers a dead link. Backend gaps are tracked in
-`docs/26-ui-backend-contract-gaps.md`.
+Read-only diagnostics and the audit/compliance view remain truthful placeholders; their navigation
+entries say so rather than offering a dead link. Reporting is confined to the two management
+endpoints — no per-day adoption series, no manual-effort baseline, and no time-saved figure exists to
+show. Backend gaps are tracked in `docs/26-ui-backend-contract-gaps.md`.

@@ -67,6 +67,10 @@
 
     --so-page-max: 1180px;
     --so-page-narrow: 860px;
+    /* The reporting surface only. Wider than the reading measure the rest of the
+       shell uses, because a 30-day chart and a seven-column table need the room
+       a 1920 display has and a 1180px column does not. */
+    --so-page-wide: 1560px;
 
     --so-shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
     --so-shadow: 0 2px 8px rgb(0 0 0 / 8%);
@@ -1164,16 +1168,100 @@ body {
     --so-auth-warning: #B5731A;
     --so-auth-success: #0D7C66;
 
+    /* The illustrated panel stays a dark navy field in both themes. It is brand
+       surface rather than reading surface, and flipping it to white in light mode
+       would turn a considered identity into a different page twice a day. These
+       feed the inline SVG through var() and so must live on this element. */
+    --so-art-field: #0B1626;
+    --so-art-glow: #1E3A5F;
+    --so-art-line: #4C6C93;
+    --so-art-route: #8FB3DA;
+    --so-art-accent: #E2455A;
+    --so-art-text: #FFFFFF;
+    --so-art-muted: #A9BDD6;
+
     margin: 0;
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--so-space-5) var(--so-space-4);
     background: var(--so-auth-bg);
     color: var(--so-auth-text);
     font-family: "Segoe UI", system-ui, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
+}
+
+/* Single column until there is genuinely room for two. Below the split the
+   illustration is removed rather than stacked above the card: on a phone it would
+   push the only action on the page below the fold. */
+.so-auth-shell {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-height: 100vh;
+}
+
+.so-auth-canvas {
+    display: none;
+}
+
+/* Centred in its own column, so the card sits on the optical centre of the
+   remaining space instead of the centre of the viewport. */
+.so-auth-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--so-space-6) var(--so-space-4);
+}
+
+@media (min-width: 900px) {
+    .so-auth-shell {
+        /* The panel takes the smaller share: it is context, the card is the task. */
+        grid-template-columns: minmax(320px, 4fr) minmax(420px, 5fr);
+    }
+
+    .so-auth-canvas {
+        position: relative;
+        display: flex;
+        align-items: flex-end;
+        overflow: hidden;
+        background: var(--so-art-field);
+    }
+
+    /* The card carries its own compact lockup for the narrow layout, where the
+       panel is gone. With the panel present that would be the same brand twice. */
+    .so-auth-card .so-auth-brand {
+        display: none;
+    }
+}
+
+.so-auth-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.so-auth-canvas-text {
+    position: relative;
+    padding: var(--so-space-6);
+    max-width: 30rem;
+}
+
+.so-auth-canvas-mark {
+    display: inline-flex;
+    color: var(--so-art-text);
+}
+
+.so-auth-canvas-title {
+    margin: var(--so-space-3) 0 var(--so-space-2);
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--so-art-text);
+}
+
+.so-auth-canvas-lead {
+    margin: 0;
+    font-size: 0.92rem;
+    line-height: 1.65;
+    color: var(--so-art-muted);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1195,7 +1283,7 @@ body {
 
 .so-auth {
     width: 100%;
-    max-width: 400px;
+    max-width: 440px;
 }
 
 .so-auth-card {
@@ -2184,4 +2272,600 @@ body {
     font-size: 0.86rem;
     line-height: 1.55;
     overflow-wrap: anywhere;
+}
+
+/* =============================================================================
+   Management reporting
+
+   The dashboard is the widest surface in the product, so it gets its own page
+   width and a grid that reflows rather than a fixed column count. Everything
+   below follows the same token rule as the rest of this file: no colour
+   literals, so both palettes and the dark override apply without duplication.
+   ========================================================================== */
+
+.so-page--wide {
+    max-width: var(--so-page-wide);
+}
+
+/* -- window control ---------------------------------------------------- */
+
+.so-window-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--so-space-3);
+}
+
+/* The window the server actually resolved, not the one the operator asked for.
+   Tabular figures stop the timestamps from shifting as the range changes. */
+.so-window-range {
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--so-text-muted);
+}
+
+.so-window-custom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+    margin-top: var(--so-space-4);
+}
+
+.so-window-date {
+    flex: 0 1 190px;
+}
+
+.so-window-hint,
+.so-window-error {
+    margin: var(--so-space-3) 0 0;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+
+.so-window-hint {
+    color: var(--so-text-muted);
+}
+
+.so-window-error {
+    color: var(--so-danger);
+}
+
+/* -- metric tiles ------------------------------------------------------ */
+
+/* Two grids, one rule set. The executive strip is allowed wider tiles because
+   it carries the figures read first; the in-panel grid packs tighter. */
+.so-exec,
+.so-metrics {
+    display: grid;
+    gap: var(--so-space-3);
+}
+
+.so-exec {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.so-metrics {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.so-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--so-space-3);
+    border: 1px solid var(--so-border-soft);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+}
+
+.so-metric-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--so-text-muted);
+}
+
+/* Tabular figures so a column of counts stays aligned while values change. */
+.so-metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    color: var(--so-text);
+}
+
+.so-metric-hint {
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: var(--so-text-faint);
+}
+
+.so-metric--lead .so-metric-value {
+    font-size: 1.85rem;
+    color: var(--so-accent);
+}
+
+.so-metric--positive .so-metric-value {
+    color: var(--so-success);
+}
+
+.so-metric--caution .so-metric-value {
+    color: var(--so-warning);
+}
+
+.so-metric--critical .so-metric-value {
+    color: var(--so-danger);
+}
+
+/* Unmeasured, not zero. Sized down and de-emphasised so it cannot be skimmed as
+   a figure, and left-aligned as a sentence because that is what it is. */
+.so-metric--unavailable .so-metric-value {
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--so-text-faint);
+    font-style: italic;
+}
+
+/* -- report grid ------------------------------------------------------- */
+
+.so-report-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+    gap: var(--so-space-4);
+    margin-top: var(--so-space-4);
+}
+
+/* A grid item defaults to min-width:auto, which lets its widest descendant — the
+   duration table, the operator table — set the column width and push the whole
+   page sideways. The scroll container inside the panel only works once the panel
+   is allowed to be narrower than its content. */
+.so-report-grid > .so-panel {
+    min-width: 0;
+}
+
+/* Panels carrying a chart or a table need the full row: squeezed into half a
+   1920 screen the daily columns stop being readable. */
+.so-report-grid > .so-panel--span {
+    grid-column: 1 / -1;
+}
+
+/* The shell stacks panels with a top margin. Inside a grid the gap already does
+   that, and both together read as an inconsistent rhythm. */
+.so-report-grid > .so-panel + .so-panel {
+    margin-top: 0;
+}
+
+.so-panel-head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+/* -- attention areas --------------------------------------------------- */
+
+/* Two-up once there is room. A single column of nine findings pushes the metrics
+   themselves off the first screen, which inverts what an executive board is for. */
+.so-attention {
+    display: grid;
+    /* min() rather than a bare 430px: auto-fit honours the minimum even when the
+       container is narrower than it, which pushes the page sideways on a phone. */
+    grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr));
+    gap: var(--so-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.so-attention-item {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-3);
+    padding: var(--so-space-3);
+    border: 1px solid var(--so-border-soft);
+    border-left-width: 3px;
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+}
+
+/* The left rule carries the severity. A full tinted fill for every row would
+   make a page of guarded, working safety mechanisms look like a page of faults. */
+.so-attention-item--urgent {
+    border-left-color: var(--so-danger);
+    background: color-mix(in srgb, var(--so-danger) var(--so-tint), transparent);
+}
+
+.so-attention-item--notable {
+    border-left-color: var(--so-warning);
+}
+
+.so-attention-item--guarded {
+    border-left-color: var(--so-success);
+}
+
+.so-attention-count {
+    min-width: 3.5ch;
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--so-text);
+}
+
+.so-attention-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.so-attention-title {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-attention-text {
+    margin: 2px 0 0;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--so-text-muted);
+}
+
+/* -- daily trend chart ------------------------------------------------- */
+
+.so-chart {
+    margin-top: var(--so-space-2);
+}
+
+.so-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-3);
+    margin: 0 0 var(--so-space-3);
+    padding: 0;
+    list-style: none;
+    font-size: 0.74rem;
+    color: var(--so-text-muted);
+}
+
+.so-chart-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.so-chart-key {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+/* Columns share the row equally and bars grow from the baseline, so the plot
+   scales with its container without any width being measured in script. */
+.so-chart-plot {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 2px;
+    height: 180px;
+    padding: var(--so-space-2) 0;
+    border-bottom: 1px solid var(--so-border);
+}
+
+.so-chart-col {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    /* A single-day window would otherwise stretch one bar across the panel. */
+    max-width: 64px;
+}
+
+.so-chart-bar {
+    display: flex;
+    flex-direction: column-reverse;
+    width: 100%;
+    min-height: 1px;
+    border-radius: 2px 2px 0 0;
+    overflow: hidden;
+    background: var(--so-border-soft);
+}
+
+.so-chart-seg {
+    display: block;
+    width: 100%;
+}
+
+.so-chart-seg--success,
+.so-chart-key.so-chart-seg--success {
+    background: var(--so-success);
+}
+
+.so-chart-seg--notfound,
+.so-chart-key.so-chart-seg--notfound {
+    background: var(--so-accent-soft);
+}
+
+.so-chart-seg--rejected,
+.so-chart-key.so-chart-seg--rejected {
+    background: var(--so-warning);
+}
+
+.so-chart-seg--unavailable,
+.so-chart-key.so-chart-seg--unavailable {
+    background: var(--so-danger);
+}
+
+.so-chart-seg--forbidden,
+.so-chart-key.so-chart-seg--forbidden {
+    background: color-mix(in srgb, var(--so-danger) 55%, var(--so-text));
+}
+
+/* Same sizing and justification as the plot, so a tick stays under its column at
+   every day count rather than drifting as the columns hit their width cap. */
+.so-chart-axis {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    margin-top: var(--so-space-1);
+}
+
+.so-chart-tick {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 64px;
+    font-size: 0.68rem;
+    text-align: center;
+    white-space: nowrap;
+    color: var(--so-text-faint);
+}
+
+.so-chart-note {
+    margin: var(--so-space-3) 0 0;
+    font-size: 0.74rem;
+    color: var(--so-text-faint);
+}
+
+.so-chart-table {
+    margin-top: var(--so-space-3);
+}
+
+.so-chart-table > summary {
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: var(--so-accent);
+}
+
+.so-chart-table > summary:hover {
+    text-decoration: underline;
+}
+
+/* -- proportional count bars ------------------------------------------- */
+
+.so-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--so-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.so-bar-row {
+    display: grid;
+    grid-template-columns: minmax(90px, 12rem) 1fr auto;
+    align-items: center;
+    gap: var(--so-space-3);
+}
+
+.so-bar-label {
+    font-size: 0.8rem;
+    color: var(--so-text);
+}
+
+.so-bar-track {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--so-border-soft);
+    overflow: hidden;
+}
+
+.so-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    background: var(--so-accent);
+}
+
+.so-bar-value {
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--so-text);
+}
+
+/* -- tables ------------------------------------------------------------ */
+
+/* Wide tables scroll inside their own panel. The page itself must never scroll
+   sideways, which is what happens if the table is allowed to set the width. */
+.so-table-scroll {
+    overflow-x: auto;
+    margin-top: var(--so-space-2);
+}
+
+.so-plain-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.so-plain-table th,
+.so-plain-table td {
+    padding: var(--so-space-2) var(--so-space-3);
+    text-align: left;
+    border-bottom: 1px solid var(--so-border-soft);
+    white-space: nowrap;
+}
+
+.so-plain-table thead th {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--so-text-muted);
+    border-bottom-color: var(--so-border);
+}
+
+.so-plain-table tbody th {
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-plain-table tbody tr:last-child th,
+.so-plain-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* Scoped to the table so it outweighs the `.so-plain-table th|td` alignment rule;
+   an unscoped `.so-num` loses on specificity and silently does nothing. */
+.so-plain-table .so-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.so-plain-table .so-num--lead {
+    font-weight: 700;
+}
+
+.so-cell-unavailable {
+    font-size: 0.78rem;
+    font-style: italic;
+    color: var(--so-text-faint);
+}
+
+/* -- operator report --------------------------------------------------- */
+
+.so-operator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+/* Initials, not a photograph or a directory name: this report deliberately
+   performs no directory enrichment, and the avatar must not imply otherwise. */
+.so-operator-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+    color: var(--so-accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.so-page-size {
+    width: 110px;
+}
+
+.so-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--so-space-4);
+    margin-top: var(--so-space-4);
+    padding-top: var(--so-space-3);
+    border-top: 1px solid var(--so-border-soft);
+}
+
+.so-pager-state {
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--so-text-muted);
+}
+
+/* -- reported limitations ---------------------------------------------- */
+
+.so-limits {
+    margin-top: var(--so-space-4);
+    border-left: 3px solid var(--so-info);
+}
+
+.so-limit-list {
+    margin: var(--so-space-3) 0 0;
+    padding-left: 1.1rem;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: var(--so-text-muted);
+}
+
+.so-limit-list li + li {
+    margin-top: var(--so-space-1);
+}
+
+/* -- quick links ------------------------------------------------------- */
+
+.so-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.so-quick-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    padding: var(--so-space-2) var(--so-space-3);
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--so-accent);
+    text-decoration: none;
+}
+
+.so-quick-link:hover,
+.so-quick-link:focus-visible {
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+}
+
+/* -- narrow viewports -------------------------------------------------- */
+
+@media (max-width: 720px) {
+    /* One column per panel, and the bar rows give up their fixed label track so
+       long category names wrap instead of squeezing the bar to nothing. */
+    .so-report-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .so-bar-row {
+        grid-template-columns: 1fr auto;
+    }
+
+    .so-bar-track {
+        grid-column: 1 / -1;
+        order: 3;
+    }
+
+    .so-chart-plot {
+        height: 140px;
+    }
+
+    .so-attention-item {
+        align-items: flex-start;
+    }
+
+    .so-window-date {
+        flex: 1 1 100%;
+    }
 }

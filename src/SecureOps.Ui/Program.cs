@@ -108,6 +108,10 @@ builder.Services
     .AddHttpClient<IOperationalRecordApiClient, OperationalRecordApiClient>(ConfigureApiClient)
     .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
 
+builder.Services
+    .AddHttpClient<IManagementReportingApiClient, ManagementReportingApiClient>(ConfigureApiClient)
+    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
+
 WebApplication app = builder.Build();
 
 // Surface the effective API base address once at startup (server-side only).

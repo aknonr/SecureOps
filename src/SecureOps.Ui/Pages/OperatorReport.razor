@@ -1,0 +1,269 @@
+@page "/reporting/operators"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@inject ICurrentAccessProvider AccessProvider
+@inject IManagementReportingApiClient Reporting
+@inject ILogger<OperatorReport> Logger
+
+<PageTitle>Operatör Raporu · SecureOps</PageTitle>
+
+@*
+    Per-operator usage, for capacity and adoption questions.
+
+    This is operational analytics, not employee scoring, and the difference has to survive contact
+    with the page. So: no rank numbers, no leader board, no derived per-person rates, and no
+    superlatives. The API orders rows by recorded operation volume — the UI says so plainly rather
+    than letting the reader infer that position means merit.
+
+    A raw operation count is a count of recorded operations. It does not measure effort, difficulty,
+    working hours, or contribution, and two operators doing the same job can differ several-fold for
+    reasons that have nothing to do with either of them. That caveat is on the page, not in a doc.
+
+    Pagination is server-side: the endpoint returns one bounded page and the total, and the client
+    never holds the full set.
+*@
+
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Operatör Raporu"
+                  Lead="Kalıcı denetim kayıtlarından üretilen, kişi bazlı kullanım dağılımı.">
+        <Actions>
+            <MudButton Href="dashboard" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                Yönetim Panosu
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.ManagementReportingView))
+    {
+        @* Gated on the reporting capability alone. Being able to run operations is unrelated to
+           being entitled to see what everyone else ran. *@
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Operatör raporunu görüntülemek için
+                <code class="so-code">@Capabilities.ManagementReportingView</code> yetkisi gerekir.
+                Hesabınızda tanımlı yetkileri
+                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+        </section>
+    }
+    else
+    {
+        <SoWindowPicker @bind-Preset="_preset"
+                        Applied="_page?.Window"
+                        Busy="_loading"
+                        OnWindowChanged="ApplyWindowAsync" />
+
+        <section class="so-panel so-panel--notice">
+            <p class="so-panel-text so-panel-text--sm">
+                Satırlar, kaydedilen işlem sayısına göre sıralanır. Bu bir başarı sıralaması
+                <strong>değildir</strong>: işlem sayısı; çabayı, işin zorluğunu, çalışma süresini
+                veya katkıyı ölçmez. Rapor kapasite ve yaygınlaşma sorularını yanıtlamak içindir.
+            </p>
+        </section>
+
+        @if (_problem is not null)
+        {
+            <SoProblemPanel Problem="_problem" OnRetry="ReloadAsync" RetryLabel="Yeniden yükle" />
+        }
+        else if (_page is null)
+        {
+            <SoLoading Message="Operatör verileri yükleniyor…" Variant="SoLoading.LoadingVariant.Block" />
+        }
+        else if (_page.TotalItems == 0)
+        {
+            <SoEmptyState Title="Bu aralıkta kayıtlı operatör etkinliği yok"
+                          Description="Seçilen aralık için kalıcı kayıt bulunmuyor. Kalıcı geçmişin bu aralığı henüz kapsamıyor olması da mümkündür."
+                          Icon="@Icons.Material.Outlined.PeopleOutline" />
+        }
+        else
+        {
+            <section class="so-panel">
+                <div class="so-panel-head">
+                    <h2 class="so-panel-title">
+                        @ManagementReportView.Count(_page.TotalItems) operatör
+                    </h2>
+                    <div class="so-panel-head-actions">
+                        <MudSelect T="int" Value="_pageSize" ValueChanged="ChangePageSizeAsync"
+                                   Label="Sayfa boyutu" Dense="true" Margin="Margin.Dense"
+                                   Variant="Variant.Outlined" Class="so-page-size">
+                            @foreach (int size in _pageSizes)
+                            {
+                                <MudSelectItem T="int" Value="@size">@size</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                </div>
+
+                <div class="so-table-scroll">
+                    <table class="so-plain-table so-operator-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Operatör</th>
+                                <th scope="col" class="so-num">Toplam işlem</th>
+                                <th scope="col" class="so-num">Kimlik sorgulama</th>
+                                <th scope="col" class="so-num">Erişim yönetimi</th>
+                                <th scope="col" class="so-num">Operasyonel kayıt → Jira</th>
+                                <th scope="col">İlk etkinlik (UTC)</th>
+                                <th scope="col">Son etkinlik (UTC)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (OperatorActivityResponse row in _page.Items)
+                            {
+                                <tr>
+                                    <th scope="row">
+                                        <span class="so-operator">
+                                            <span class="so-operator-initials" aria-hidden="true">
+                                                @AccessIdentityDisplay.Initials(null, row.Actor)
+                                            </span>
+                                            <code class="so-code">@row.Actor</code>
+                                        </span>
+                                    </th>
+                                    <td class="so-num so-num--lead">@ManagementReportView.Count(row.OperationCount)</td>
+                                    <td class="so-num">@ManagementReportView.Count(Workflow(row, "IdentityLookup"))</td>
+                                    <td class="so-num">@ManagementReportView.Count(Workflow(row, "Access"))</td>
+                                    <td class="so-num">@ManagementReportView.Count(Workflow(row, "OperationalRecordJira"))</td>
+                                    <td>@Timestamp(row.FirstActivityAt)</td>
+                                    <td>@Timestamp(row.LastActivityAt)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="so-pager">
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.ChevronLeft"
+                               Disabled="@(_loading || _page.Page <= 1)"
+                               OnClick="() => GoToPageAsync(_page.Page - 1)">
+                        Önceki
+                    </MudButton>
+
+                    <span class="so-pager-state">
+                        Sayfa @_page.Page / @TotalPages
+                    </span>
+
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                               EndIcon="@Icons.Material.Filled.ChevronRight"
+                               Disabled="@(_loading || _page.Page >= TotalPages)"
+                               OnClick="() => GoToPageAsync(_page.Page + 1)">
+                        Sonraki
+                    </MudButton>
+                </div>
+
+                <p class="so-panel-text so-panel-text--sm">
+                    Operatör değeri, kayıtlarda saklanan kurumsal hesabın kendisidir; bu rapor dizin
+                    üzerinden ad, unvan veya birim bilgisi getirmez.
+                </p>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private static readonly int[] _pageSizes = [25, 50, 100];
+
+    private AccessSnapshot? _access;
+    private ReportingWindowPreset _preset = ReportingWindowPreset.Last7Days;
+    private ReportingWindowRequest _window = ReportingWindowSelection.ForPreset(ReportingWindowPreset.Last7Days);
+    private OperatorActivityPageResponse? _page;
+    private UiProblem? _problem;
+    private bool _loading;
+    private int _pageNumber = 1;
+    private int _pageSize = 50;
+
+    private int TotalPages => _page is null || _page.PageSize <= 0
+        ? 1
+        : Math.Max(1, (int)Math.Ceiling(_page.TotalItems / (double)_page.PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ManagementReportingView))
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task RefreshAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ManagementReportingView))
+        {
+            await ReloadAsync();
+        }
+    }
+
+    // A changed window invalidates the page position: page 4 of the last 7 days is not page 4 of
+    // the last 30, and keeping the number would land the reader somewhere arbitrary.
+    private Task ApplyWindowAsync(ReportingWindowRequest window)
+    {
+        _window = window;
+        _pageNumber = 1;
+        return ReloadAsync();
+    }
+
+    private Task GoToPageAsync(int page)
+    {
+        _pageNumber = Math.Max(1, page);
+        return ReloadAsync();
+    }
+
+    private Task ChangePageSizeAsync(int pageSize)
+    {
+        _pageSize = pageSize;
+        _pageNumber = 1;
+        return ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _page = await Reporting.GetOperatorsAsync(_window, _pageNumber, _pageSize, CancellationToken.None);
+
+            // The server is the authority on where the reader ended up, including when a shrinking
+            // result set leaves the requested page past the end.
+            _pageNumber = _page.Page;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _page = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Operator report unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static long Workflow(OperatorActivityResponse row, string name) =>
+        row.OperationsByWorkflow.FirstOrDefault(item => string.Equals(item.Name, name, StringComparison.Ordinal))?.Count
+        ?? 0;
+
+    private static string Timestamp(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("dd.MM.yyyy HH:mm");
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

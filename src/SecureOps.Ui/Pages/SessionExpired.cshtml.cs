@@ -24,6 +24,16 @@ public sealed class SessionExpiredModel : PageModel
     }
 
     /// <summary>
+    /// Whether this host should name its environment at all.
+    /// </summary>
+    /// <remarks>
+    /// False in Production. A Demo or Test marker is useful to an operator who might otherwise
+    /// mistake a rehearsal for the live platform; naming the environment on the production
+    /// sign-in page is presentation noise that belongs to neither.
+    /// </remarks>
+    public bool ShowEnvironmentMarker => _shellMode.ShowEnvironmentMarker;
+
+    /// <summary>
     /// Current host environment name.
     /// </summary>
     public string EnvironmentName => _shellMode.EnvironmentName;

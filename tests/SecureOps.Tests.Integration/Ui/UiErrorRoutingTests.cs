@@ -83,6 +83,26 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
     }
 
     [Theory]
+    [InlineData("/dashboard")]
+    [InlineData("/reporting/operators")]
+    public async Task ReportingRoutes_ResolveToTheSignInFlow_AndNotToNotFound(string path)
+    {
+        // Both are [Authorize]. Anonymously they must route into sign-in — never be reported as
+        // missing pages, which is what the catch-all fallback would otherwise make them look like
+        // once the router finds no match for a signed-out visitor.
+        HttpResponseMessage response = await CreateClient().GetAsync(path);
+
+        if (response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.Found)
+        {
+            response.Headers.Location!.OriginalString.Should().Contain("login");
+            return;
+        }
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().NotContain("Sayfa bulunamadı");
+    }
+
+    [Theory]
     [InlineData("/session-expired", "Oturum süresi")]
     [InlineData("/signed-out", "Oturumunuz kapatıldı")]
     public async Task SessionStates_AreDistinctFromNotFound(string path, string marker)

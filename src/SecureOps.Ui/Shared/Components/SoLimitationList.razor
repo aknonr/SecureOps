@@ -1,0 +1,36 @@
+@*
+    The backend's own statement of what this report cannot show.
+
+    Kept on the page rather than tucked behind a link. A manager reading a zero has to be able to
+    tell "this did not happen" from "this is not measured", and the server is the only thing that
+    knows which of the two applies.
+
+    Order is the server's. Each sentence is shown through a reviewed translation keyed on the exact
+    server text; anything unrecognised is shown verbatim, because an untranslated sentence is a
+    blemish while a paraphrased limitation is a false statement about the data.
+*@
+
+@if (Items.Count > 0)
+{
+    <section class="so-panel so-limits">
+        <div class="so-panel-head">
+            <h2 class="so-panel-title">Bu raporun sınırları</h2>
+        </div>
+        <p class="so-panel-text so-panel-text--sm">
+            Aşağıdaki maddeler kalıcı kayıtlardan ölçülemeyen alanları belirtir. Bu alanlarda sıfır
+            değeri "olmadı" anlamına gelmez.
+        </p>
+        <ul class="so-limit-list">
+            @foreach (string item in Items)
+            {
+                <li>@ManagementReportView.LimitationLabel(item)</li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    /// <summary>Limitation statements exactly as the API returned them.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<string> Items { get; set; } = [];
+}

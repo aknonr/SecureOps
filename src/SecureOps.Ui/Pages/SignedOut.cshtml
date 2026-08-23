@@ -14,7 +14,7 @@
     and an apparent error.
 *@
 
-<main class="so-auth">
+<div class="so-auth">
     <section class="so-auth-card" aria-labelledby="signed-out-heading">
         <div class="so-auth-brand">
             <span class="so-auth-mark" aria-hidden="true">
@@ -48,5 +48,8 @@
         </a>
     </section>
 
-    <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
-</main>
+    @if (Model.ShowEnvironmentMarker)
+    {
+        <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
+    }
+</div>
