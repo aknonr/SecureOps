@@ -170,8 +170,18 @@ OperationalRecordView.Ownership owner =
                     <SoField Label="OR kodu">
                         <code class="so-code">@_record.OrCode</code>
                     </SoField>
+                    @* Nullable since the legacy Turuncu Hat projection carries no source timestamp.
+                       Shown as unknown rather than hidden: "we do not know when this was raised" is
+                       itself worth seeing, and an invented or defaulted date would be worse. *@
                     <SoField Label="Oluşturulma">
-                        @_record.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        @if (_record.CreatedAt is { } createdAt)
+                        {
+                            @createdAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        }
+                        else
+                        {
+                            <span class="so-unknown">Kaynak sistemde tarih yok</span>
+                        }
                     </SoField>
                     @if (!string.IsNullOrWhiteSpace(_record.Requester))
                     {

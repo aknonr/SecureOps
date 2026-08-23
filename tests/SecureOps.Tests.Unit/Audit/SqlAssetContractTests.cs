@@ -103,9 +103,45 @@ public sealed class SqlAssetContractTests
             .And.Contain("FROM reporting.ManagementOperationalStatus")
             .And.Contain("OccurredAt >= @FromInclusive AND OccurredAt < @ToExclusive")
             .And.Contain("COUNT_BIG(DISTINCT Actor)")
+            .And.Contain("MIN(EarliestAt) AS CoverageFromUtc")
+            .And.Contain("WHERE Action IN @CoverageActions")
+            .And.Contain("@ImportToPreviewKey AS [Key]")
+            .And.Contain("ManagementReportingDurationKeys.ClaimToJiraCreation")
+            .And.Contain("ManagementReportingDurationKeys.ClaimToCompletion")
             .And.Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY")
             .And.Contain("commandTimeout: CommandTimeoutSeconds")
             .And.Contain("cancellationToken: cancellationToken");
+    }
+
+    [Fact]
+    public void ApplicationSessionMigration_UsesAuthoritativeLifecycleWithoutDeleteOrSecrets()
+    {
+        string root = FindRepositoryRoot();
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "007-application-session-governance.sql"));
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "007-application-session-governance.sql"));
+        string repository = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Sessions", "SqlApplicationSessionRepository.cs"));
+        string accessRepository = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Access", "SqlAccessRepository.cs"));
+
+        schema.Should().Contain("CREATE TABLE security.ApplicationSessions")
+            .And.Contain("SessionId uniqueidentifier")
+            .And.Contain("LastSeenAtUtc datetimeoffset(7)")
+            .And.Contain("AbsoluteExpiresAtUtc datetimeoffset(7)")
+            .And.Contain("AuthenticationMethod nvarchar(64)")
+            .And.Contain("AccessVersion bigint")
+            .And.Contain("CREATE OR ALTER VIEW reporting.ManagementSessionStatus")
+            .And.NotContain("Password")
+            .And.NotContain("Token")
+            .And.NotContain("DELETE ");
+        migration.Should().Contain(":r ..\\schema\\007-application-session-governance.sql");
+        repository.Should().Contain("INSERT INTO security.ApplicationSessions")
+            .And.Contain("UPDATE security.ApplicationSessions")
+            .And.Contain("CommandTimeoutSeconds = 15")
+            .And.Contain("LastSeenAtUtc <= @PersistBeforeUtc")
+            .And.Contain("cancellationToken: cancellationToken")
+            .And.NotContain("DELETE FROM")
+            .And.NotContain("Retry");
+        accessRepository.Should().Contain("LastAuthenticatedAt <= DATEADD(MINUTE, -@ActivityPersistenceIntervalMinutes")
+            .And.NotContain("UPDATE security.Users SET LastAuthenticatedAt = SYSUTCDATETIME() WHERE UserId = @UserId;");
     }
 
     private static string FindRepositoryRoot()

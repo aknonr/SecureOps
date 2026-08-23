@@ -12,6 +12,10 @@ For first real-user TEST bootstrap, preserve the current server-owned configurat
 | `DemoAuth__Enabled` | `false` |
 | `Access__DemoCompatibilityEnabled` | `false` |
 | `Access__RepositoryProvider` | `SqlServer` |
+| `SessionSecurity__RepositoryProvider` | `SqlServer` |
+| `SessionSecurity__IdleTimeoutMinutes` / `AbsoluteLifetimeHours` / `ActivityPersistenceIntervalMinutes` | `30` / `12` / `5` |
+| `DataProtection__Mode` / `ApplicationName` | `FileSystemDpapi` / `SecureOps.Api` |
+| `DataProtection__KeyRingPath` | absolute server-owned key-ring path outside deployment payload |
 | `Access__AutoCreateRequest` | `true` |
 | `Access__BootstrapAdministrators__0` | one approved exact `DOMAIN\account` for bootstrap only |
 | `Audit__Provider` | `SqlServer` |
@@ -27,7 +31,7 @@ For first real-user TEST bootstrap, preserve the current server-owned configurat
 | `PamProvider__Provider` | `Mock`; this is pass-through metadata only and is not a real PAM connector |
 | `ConnectionStrings__SecureOpsDb` | server-owned `SecureOpsDb` connection string using Windows Integrated Security, `Encrypt=True`, `TrustServerCertificate=False` |
 
-The runtime identity remains `DOMAIN\WASAST_YONETIM`. Do not configure SQL credentials or KRON/AAPM for this connection. Migrations 001-005 and grants must be completed before SQL providers are selected. After at least two reviewed persisted Admin assignments exist, remove the bootstrap array and restart in a controlled window. Persisted access remains; disabled users are never bootstrapped again.
+The runtime identity remains `DOMAIN\WASAST_YONETIM`. Do not configure SQL credentials or KRON/AAPM for this connection. Migrations 001-007 and grants must be completed before SQL providers are selected. The App Pool identity needs read/write/create permission only on the configured Data Protection key-ring directory; no key material is deployed from Git. After at least two reviewed persisted Admin assignments exist, remove the bootstrap array and restart in a controlled window. Persisted access remains; disabled users are never bootstrapped again.
 
 ## Reporting API and Windows
 
@@ -68,12 +72,15 @@ Adoption and Security:
 - Concurrency conflicts: audited Operational Record claim/state conflicts. Historical access-version conflicts are unavailable because they were not audited.
 - Provider unavailable: identity provider failure/timeout audit events. Operational-source query outages are unavailable historically when no audit event exists.
 - Rate-limit events: unavailable until rate-limit rejection auditing is explicitly designed.
+- Application sessions: reliable starts, idle/absolute timeouts, logout, administrator revocation, access-disable termination, and access-version termination are aggregated. Heartbeats are excluded.
 
-Durations report sample count, minimum, average, and maximum elapsed seconds for import -> preview, claim -> Jira creation, and claim -> completion. They include waits and retries. They are not manual effort, active handling time, time saved, or operator performance.
+Durations report sample count, minimum, average, and maximum elapsed seconds for import -> preview, claim -> Jira creation, and claim -> completion. Stable keys are `importToPreview`, `claimToJiraCreation`, and `claimToCompletion`; UI/application behavior must not use English definitions or array order. Durations include waits and retries. They are not manual effort, active handling time, time saved, or operator performance.
+
+Both report routes expose additive evidence coverage. `coverageFromUtc` is the earliest retained persisted event in the known reporting-action catalog. Coverage is complete only when that boundary exists at or before the requested start. An incomplete zero is not historical evidence of zero. See `docs/30-management-reporting-contract-hardening.md` for the algorithm and stable limitation codes.
 
 ## Database Impact
 
-Migration 005 creates limited `reporting` views over audit/workflow data and supporting indexes. Runtime additionally needs `SELECT` on each reporting view. It still needs no `SELECT` on base `audit.AuditLog` or history tables, no `DELETE`, no DDL, and no schema ownership.
+Migration 005 creates limited `reporting` views over audit/workflow data and supporting indexes. Migration 007 creates authoritative `security.ApplicationSessions` plus a limited reporting view. Runtime needs `SELECT, INSERT, UPDATE` on the session table and `SELECT` on each reporting view. It still needs no `SELECT` on base `audit.AuditLog` or history tables, no `DELETE`, no DDL, and no schema ownership.
 
 ## Known Historical Gaps
 
@@ -81,6 +88,7 @@ Migration 005 creates limited `reporting` views over audit/workflow data and sup
 - Existing rows cannot prove manual-process duration or time saved.
 - Historical rate-limit rejections, access concurrency failures, source-query outages, and bulk-invalid item outcomes are incomplete or absent.
 - A future manual baseline must use an approved, bounded sample: record start/end timestamps and workflow type for the old process, collect no content beyond operational references, aggregate at team level, and compare equivalent work classes and time windows.
+- G-14 stable duration keys, G-15 coded limitations, and G-17 evidence coverage are resolved by the additive backend contract. G-16 adoption and Operational Record/Jira trend series remain explicitly unresolved and out of scope.
 
 ## Direct Package Inventory
 

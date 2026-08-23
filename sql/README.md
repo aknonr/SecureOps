@@ -18,8 +18,11 @@ sql/
 | 002 | Operational Record, Jira correlation, and append-only workflow history |
 | 003 | Access status/authentication fields, claim/freshness metadata, JiraPublisher/Auditor roles, and durable command executions |
 | 004 | Explicit access-user and access-request mutation versions for stale-write rejection |
+| 005 | Management reporting views and supporting indexes |
+| 006 | Preserve unknown Operational Record source creation timestamps as NULL |
+| 007 | Authoritative application sessions, lifecycle indexes, and limited reporting view |
 
-The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded; 004 guards both added columns. No down scripts or migration-history table exists. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
+The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded; 004-007 guard or replace their objects. No down scripts or migration-history table exists. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
 
 Current reviewed offline assets additionally include `002-operational-record-jira-workflow.sql`, which creates `ops.OperationalRecords`, `ops.JiraTransfers`, and append-only workflow history.
 
@@ -41,6 +44,8 @@ No application startup migration or EF migration is currently enabled. The revie
 Audit triggers and append-only enforcement live in `sql/schema/` and are applied as part of the same migration that creates the table.
 
 The Operational Record/Jira workflow uses `schema/002-operational-record-jira-workflow.sql`. DBA review must confirm schema ownership, backup/retention, and runtime grants. The service requires only `SELECT`, `INSERT`, and `UPDATE` on the `ops` tables; it does not require `DELETE`, DDL, or migration permissions.
+
+Application-session governance uses `schema/007-application-session-governance.sql`. Runtime requires `SELECT`, `INSERT`, and `UPDATE` on `security.ApplicationSessions` and `SELECT` on `reporting.ManagementSessionStatus`. It requires no `DELETE`, DDL, schema ownership, or migration permission.
 
 ## Test Harness
 

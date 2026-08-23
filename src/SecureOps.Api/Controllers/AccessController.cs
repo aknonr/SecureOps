@@ -3,10 +3,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using SecureOps.Api.Middleware;
+using SecureOps.Api.Security;
 using SecureOps.Domain.Access;
+using SecureOps.Domain.Sessions;
 using SecureOps.Infrastructure.Access;
-using SecureOps.Infrastructure.Audit;
-using SecureOps.Shared.Audit;
+using SecureOps.Infrastructure.Sessions;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Access;
@@ -23,19 +24,25 @@ namespace SecureOps.Api.Controllers;
 public sealed class AccessController : ControllerBase
 {
     private readonly IApplicationAccessService _accessService;
-    private readonly IAuditWriter _auditWriter;
+    private readonly IApplicationSessionService _sessionService;
+    private readonly ApplicationSessionContext _sessionContext;
+    private readonly ApplicationSessionCookie _sessionCookie;
     private readonly SessionSecurityOptions _sessionOptions;
     private readonly ILogger<AccessController> _logger;
 
     /// <summary>Initializes the controller.</summary>
     public AccessController(
         IApplicationAccessService accessService,
-        IAuditWriter auditWriter,
+        IApplicationSessionService sessionService,
+        ApplicationSessionContext sessionContext,
+        ApplicationSessionCookie sessionCookie,
         IOptions<SessionSecurityOptions> sessionOptions,
         ILogger<AccessController> logger)
     {
         _accessService = accessService;
-        _auditWriter = auditWriter;
+        _sessionService = sessionService;
+        _sessionContext = sessionContext;
+        _sessionCookie = sessionCookie;
         _sessionOptions = sessionOptions.Value;
         _logger = logger;
     }
@@ -67,7 +74,10 @@ public sealed class AccessController : ControllerBase
                 _sessionOptions.HttpOnly,
                 _sessionOptions.SameSite,
                 _sessionOptions.RevalidateAccessOnEveryRequest,
-                "Authentication-provider managed; application access revalidated per request"),
+                "Server-side application session; corporate authentication provider remains independent")
+            {
+                ActivityPersistenceIntervalMinutes = _sessionOptions.ActivityPersistenceIntervalMinutes
+            },
             ToResponse(profile),
             current.LatestRequest is null ? null : ToResponse(current.LatestRequest, profile),
             current.User.Version));
@@ -149,6 +159,13 @@ public sealed class AccessController : ControllerBase
         }
 
         ApplicationUser user = result.Value!.User!;
+        ApplicationSessionTerminationResult sessionsEnded = await _sessionService.EndUserSessionsAsync(user.Id, SessionEndReason.AccessChanged, Context(), cancellationToken);
+        if (!sessionsEnded.IsSuccess)
+        {
+            _logger.LogError("Access roles changed but immediate session lifecycle audit did not complete. UserId: {UserId}. CorrelationId: {CorrelationId}", user.Id, CorrelationId());
+            return Failure<CurrentAccessResponse>(sessionsEnded.ErrorCode!);
+        }
+
         return Ok(ToCurrent(user));
     }
 
@@ -160,33 +177,41 @@ public sealed class AccessController : ControllerBase
     public async Task<ActionResult<CurrentAccessResponse>> DisableAsync(Guid id, [FromBody] DisableAccessRequest request, CancellationToken cancellationToken)
     {
         AccessServiceResult<AccessMutationResult> result = await _accessService.DisableAsync(id, request.Reason, request.ExpectedVersion, Context(), cancellationToken);
-        return result.IsSuccess ? Ok(ToCurrent(result.Value!.User!)) : Failure<CurrentAccessResponse>(result.ErrorCode!);
+        if (!result.IsSuccess)
+        {
+            return Failure<CurrentAccessResponse>(result.ErrorCode!);
+        }
+
+        ApplicationUser user = result.Value!.User!;
+        ApplicationSessionTerminationResult sessionsEnded = await _sessionService.EndUserSessionsAsync(user.Id, SessionEndReason.AccessDisabled, Context(), cancellationToken);
+        if (!sessionsEnded.IsSuccess)
+        {
+            _logger.LogError("Access was disabled but immediate session lifecycle audit did not complete. UserId: {UserId}. CorrelationId: {CorrelationId}", user.Id, CorrelationId());
+            return Failure<CurrentAccessResponse>(sessionsEnded.ErrorCode!);
+        }
+
+        return Ok(ToCurrent(user));
     }
 
-    /// <summary>Records logout intent; Windows authentication remains browser/host managed.</summary>
+    /// <summary>Ends the current SecureOps session; Windows authentication remains browser/host managed.</summary>
     [HttpPost("logout")]
     [ProducesResponseType(typeof(LogoutResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<LogoutResponse>> LogoutAsync(CancellationToken cancellationToken)
     {
-        string correlationId = CorrelationId();
-        try
+        if (_sessionContext.Current is null)
         {
-            await _auditWriter.WriteAsync(new AuditEvent
-            {
-                Actor = User.Identity?.Name ?? "unknown",
-                Action = AuditActions.SessionLogoutRequested,
-                CorrelationId = correlationId,
-                SourceIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                Details = new { authenticationSource = User.FindFirst("secureops:auth_source")?.Value ?? User.Identity?.AuthenticationType }
-            }, cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(ex, "Logout audit failed. CorrelationId: {CorrelationId}", correlationId);
-            return Failure<LogoutResponse>(OperationalErrorCodes.AuditStoreUnavailable);
+            _sessionCookie.Delete(Response);
+            return Failure<LogoutResponse>(OperationalErrorCodes.SessionRevoked);
         }
 
-        return Ok(new LogoutResponse("ProviderManaged", User.FindFirst("secureops:auth_source")?.Value ?? User.Identity?.AuthenticationType ?? "unknown"));
+        ApplicationSessionResult result = await _sessionService.LogoutAsync(_sessionContext.Current.SessionId, Context(), cancellationToken);
+        _sessionCookie.Delete(Response);
+        if (!result.IsSuccess)
+        {
+            return Failure<LogoutResponse>(result.ErrorCode!);
+        }
+
+        return Ok(new LogoutResponse("ApplicationSessionEnded;AuthenticationProviderManaged", User.FindFirst("secureops:auth_source")?.Value ?? User.Identity?.AuthenticationType ?? "unknown"));
     }
 
     private ActionResult<AccessRequestResponse> MutationResponse(AccessServiceResult<AccessMutationResult> result) =>
@@ -206,6 +231,9 @@ public sealed class AccessController : ControllerBase
             OperationalErrorCodes.AccessUserInvalidState => (StatusCodes.Status409Conflict, "lifecycle", false),
             OperationalErrorCodes.AccessConcurrencyConflict => (StatusCodes.Status409Conflict, "concurrency", true),
             OperationalErrorCodes.AuditStoreUnavailable => (StatusCodes.Status503ServiceUnavailable, "audit", true),
+            OperationalErrorCodes.SessionStoreUnavailable => (StatusCodes.Status503ServiceUnavailable, "session-store", true),
+            OperationalErrorCodes.SessionExpired => (StatusCodes.Status403Forbidden, "session", false),
+            OperationalErrorCodes.SessionRevoked => (StatusCodes.Status403Forbidden, "session", false),
             _ => (StatusCodes.Status409Conflict, "access", false)
         };
         return OperationalProblemDetails.Create(details.Status, code, "The access operation could not be completed.", CorrelationId(), details.Stage, details.Retryable);
@@ -218,7 +246,10 @@ public sealed class AccessController : ControllerBase
         user.Capabilities,
         null,
         user.AuthenticationSource,
-        new SessionPolicyResponse(_sessionOptions.IdleTimeoutMinutes, _sessionOptions.AbsoluteLifetimeHours, _sessionOptions.SecureCookie, _sessionOptions.HttpOnly, _sessionOptions.SameSite, _sessionOptions.RevalidateAccessOnEveryRequest, "Authentication-provider managed; application access revalidated per request"),
+        new SessionPolicyResponse(_sessionOptions.IdleTimeoutMinutes, _sessionOptions.AbsoluteLifetimeHours, _sessionOptions.SecureCookie, _sessionOptions.HttpOnly, _sessionOptions.SameSite, _sessionOptions.RevalidateAccessOnEveryRequest, "Server-side application session; corporate authentication provider remains independent")
+        {
+            ActivityPersistenceIntervalMinutes = _sessionOptions.ActivityPersistenceIntervalMinutes
+        },
         Version: user.Version);
 
     private static AccessRequestResponse ToResponse(ApplicationAccessRequest request, AccessIdentityProfile? profile = null) => new(

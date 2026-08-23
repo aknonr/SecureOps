@@ -49,6 +49,7 @@ Endpoints:
 - `GET /api/v1/identity/lookup/capabilities` returns lookup limits and returned-field metadata.
 - `GET /api/v1/health/audit-store` returns safe audit-store status.
 - `GET /api/v1/health/identity-provider` returns safe identity-provider status.
+- `GET /api/v1/health/enterprise-integrations` returns Admin-only provider selection and safe status without endpoint or credential detail.
 
 No endpoint accepts an account value in a URL path or query string.
 

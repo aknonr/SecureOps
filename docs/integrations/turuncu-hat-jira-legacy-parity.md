@@ -1,0 +1,35 @@
+# Turuncu Hat to Jira Legacy Parity
+
+Evidence source: sanitized legacy contract evidence supplied on 2026-08-23. The original PowerShell file and complete external API contracts are not in the repository. Parity is claimed only for behaviors explicitly evidenced below.
+
+| Legacy behavior | SecureOps component | Disposition | Rationale | Automated coverage |
+|---|---|---|---|---|
+| POST `/login` with `req.Username`, `req.Password`, `req.TenantId` and runtime Authorization | `TuruncuHatSessionManager` | Retained and hardened | Exact reviewed property casing; secrets are server-owned and never logged | `EnterpriseAdapterContractTests` |
+| Validate top-level string `LoginResult` and non-empty configured session segment | `TuruncuHatSessionManager` | Retained and evidenced | Controlled success had two pipe-delimited segments; observed lengths are not hard-coded invariants | `EnterpriseAdapterContractTests` |
+| One login per script run | `TuruncuHatSessionManager` | Improved | Thread-safe bounded cache and single-flight refresh avoid per-record login | `EnterpriseAdapterContractTests` |
+| Query `SMSS_oRFF` active records excluding configured DCC and requiring configured group | `TuruncuHatOperationalRecordClient` | Retained as configuration | Base object and numeric values are mutable options | `EnterpriseAdapterContractTests` |
+| Select id/code/name/description/requester from `Key`/`Value` cells | `TuruncuHatQueryParser` | Retained and hardened | Keyed rows map exact requested names independent of order and reject mixed/unknown/duplicate keys; exact-count positional fallback preserves legacy evidence | `EnterpriseAdapterContractTests` |
+| Read the evidenced query envelope | `TuruncuHatQueryParser` | Added validation | A partially present `ErrorDescription`, `ErrorDetails`, `ErrorNo`, `TenantId`, `MaxPages`, `PageNo`, `RecordCount` envelope fails closed | `EnterpriseAdapterContractTests` |
+| HTML-decode title and description | `TuruncuHatQueryParser` | Retained | Uses platform HTML decoding after bounded parsing | `EnterpriseAdapterContractTests` |
+| Legacy query has no source-created timestamp | Nullable `CreatedAt` contract | Intentionally changed | Unknown remains null; no fabricated timestamp | API and repository regression tests |
+| Malformed query item abort behavior not evidenced | `TuruncuHatQueryParser` | Improved | Malformed/oversized records are skipped and counted; valid batch items continue | `EnterpriseAdapterContractTests` |
+| Duplicate handling not evidenced | `TuruncuHatQueryParser` | Improved | Every duplicated source ID or OR code is excluded as ambiguous | `EnterpriseAdapterContractTests` |
+| Basic-authenticated Jira identity and user search | Runtime configuration and `CorporateJiraRequesterResolver` | Evidenced and hardened | Corporate provider validates Basic mode; exact URL-encoded bounded GET; integration identity remains separate from business identities | `EnterpriseAdapterContractTests`, configuration tests |
+| Exact display-name match and use `name` | `CorporateJiraRequesterResolver` | Improved | Unique exact `name` is preferred; unique exact display name is controlled fallback; ambiguity fails | `EnterpriseAdapterContractTests` |
+| Up to three user-search attempts with delay | `CorporateJiraRequesterResolver` | Retained and bounded | Only safe reads retry; auth/contract failures do not | `EnterpriseAdapterContractTests` |
+| Jira project, issue type, summary, description, team field/value, labels, requester field | `JiraIssueDraftService` and `CorporateJiraClient` | Retained as configuration | No mutable corporate identifier is spread through client code | `EnterpriseAdapterContractTests` |
+| Omit requester custom field when unresolved | `CorporateJiraClient` | Retained | Field is emitted only for a unique resolved identifier | `EnterpriseAdapterContractTests` |
+| Leave Jira assignment to project default | `JiraIssueDraftService` and `CorporateJiraClient` | Explicit policy | Default emits no assignee; exact configured operator mapping is the only supported override | `JiraIssueDraftServiceTests`, `EnterpriseAdapterContractTests` |
+| Do not create-set reporter | `CorporateJiraClient` | Evidence-driven restriction | Reporter is absent from reviewed create metadata even though existing issues expose it | `EnterpriseAdapterContractTests`, configuration tests |
+| POST Jira create and read response `key` | `CorporateJiraClient` | Retained and hardened | Bounded response; raw body is never surfaced | `EnterpriseAdapterContractTests` |
+| Retry semantics after uncertain Jira create not evidenced | Existing reconciliation workflow | Intentionally changed | No create retry; ambiguous transport/5xx/invalid-success outcome blocks recreation | `EnterpriseAdapterContractTests`, existing workflow tests |
+| Query configured `BPM_Actvty` after confirmed Jira creation | `TuruncuHatOperationalRecordClient.CloseAsync` | Retained | Uses evidenced backend-owned filter and selected activity fields | `EnterpriseAdapterContractTests` |
+| Select first BPM activity | `TuruncuHatOperationalRecordClient.CloseAsync` | Improved | Exactly one required; zero/multiple fail safely | `EnterpriseAdapterContractTests` |
+| Update status/comment with Jira key | `TuruncuHatOperationalRecordClient.CloseAsync` | Retained as configuration | Flat update list and comment template follow evidence | `EnterpriseAdapterContractTests` |
+| Inspect `UpdateResult.Success` | `TuruncuHatOperationalRecordClient.CloseAsync` | Retained | Only explicit `true` completes; descriptions/details are not exposed | `EnterpriseAdapterContractTests` |
+| Create then source update | `JiraTransferService` | Improved | Jira key is durable before close; close failure retries only close | Existing `JiraTransferServiceTests` and hosted workflow tests |
+| Multiple operators not addressed | Existing claims/fencing/idempotency | Improved | One backend owner; SignalR is not a correctness dependency | Existing concurrency tests |
+
+## Not Proven by Legacy Evidence
+
+No parity claim is made for complete error envelopes, pagination, session-expiry markers, source ETags/conditional update, BPM update outcomes, Jira create outcomes, Jira remote idempotency, provider correlation headers, or Jira account stability. Required fixtures are maintained in `docs/26-enterprise-turuncu-hat-jira-adapters.md`.

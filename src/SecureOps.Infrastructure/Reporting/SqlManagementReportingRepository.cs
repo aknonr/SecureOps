@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Shared.Audit;
+using SecureOps.Shared.Contracts.Reporting;
 
 namespace SecureOps.Infrastructure.Reporting;
 
@@ -50,16 +51,16 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             SELECT
                 (SELECT COUNT_BIG(DISTINCT Actor) FROM reporting.ManagementAuditEvents
                  WHERE OccurredAt >= DATEADD(day, -1, @ToExclusive) AND OccurredAt < @ToExclusive
-                   AND Action IN @AdoptionActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Daily,
+                   AND Action IN @ActiveUserActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Daily,
                 (SELECT COUNT_BIG(DISTINCT Actor) FROM reporting.ManagementAuditEvents
                  WHERE OccurredAt >= DATEADD(day, -7, @ToExclusive) AND OccurredAt < @ToExclusive
-                   AND Action IN @AdoptionActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Weekly,
+                   AND Action IN @ActiveUserActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Weekly,
                 (SELECT COUNT_BIG(DISTINCT Actor) FROM reporting.ManagementAuditEvents
                  WHERE OccurredAt >= DATEADD(day, -30, @ToExclusive) AND OccurredAt < @ToExclusive
-                   AND Action IN @AdoptionActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Monthly,
+                   AND Action IN @ActiveUserActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS Monthly,
                 (SELECT COUNT_BIG(DISTINCT Actor) FROM reporting.ManagementAuditEvents
                  WHERE OccurredAt >= @FromInclusive AND OccurredAt < @ToExclusive
-                   AND Action IN @AdoptionActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS SelectedWindow;
+                   AND Action IN @ActiveUserActions AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%') AS SelectedWindow;
 
             SELECT COUNT_BIG(*)
             FROM reporting.ManagementOperationalStatus
@@ -110,27 +111,36 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             ),
             Durations AS
             (
-                SELECT 'ImportToPreview' AS Name, DATEDIFF_BIG(millisecond, ImportedAt, PreviewedAt) AS DurationMilliseconds
+                SELECT @ImportToPreviewKey AS [Key], DATEDIFF_BIG(millisecond, ImportedAt, PreviewedAt) AS DurationMilliseconds
                 FROM WorkflowStages
                 WHERE ImportedAt IS NOT NULL AND PreviewedAt >= @FromInclusive AND PreviewedAt < @ToExclusive
                   AND ImportedAt <= PreviewedAt
                 UNION ALL
-                SELECT 'ClaimToJiraCreated', DATEDIFF_BIG(millisecond, ClaimedAt, JiraCreatedAt)
+                SELECT @ClaimToJiraCreationKey, DATEDIFF_BIG(millisecond, ClaimedAt, JiraCreatedAt)
                 FROM AuditStages
                 WHERE ClaimedAt IS NOT NULL AND JiraCreatedAt >= @FromInclusive AND JiraCreatedAt < @ToExclusive
                   AND ClaimedAt <= JiraCreatedAt
                 UNION ALL
-                SELECT 'ClaimToCompleted', DATEDIFF_BIG(millisecond, ClaimedAt, CompletedAt)
+                SELECT @ClaimToCompletionKey, DATEDIFF_BIG(millisecond, ClaimedAt, CompletedAt)
                 FROM AuditStages
                 WHERE ClaimedAt IS NOT NULL AND CompletedAt >= @FromInclusive AND CompletedAt < @ToExclusive
                   AND ClaimedAt <= CompletedAt
             )
-            SELECT Name, COUNT_BIG(*) AS SampleCount,
+            SELECT [Key], COUNT_BIG(*) AS SampleCount,
                 MIN(DurationMilliseconds) / 1000.0 AS MinimumSeconds,
                 AVG(CONVERT(float, DurationMilliseconds)) / 1000.0 AS AverageSeconds,
                 MAX(DurationMilliseconds) / 1000.0 AS MaximumSeconds
             FROM Durations
-            GROUP BY Name;
+            GROUP BY [Key];
+
+            SELECT MIN(EarliestAt) AS CoverageFromUtc
+            FROM
+            (
+                SELECT Action, MIN(OccurredAt) AS EarliestAt
+                FROM reporting.ManagementAuditEvents
+                WHERE Action IN @SummaryActions
+                GROUP BY Action
+            ) AS PersistedCoverage;
             """;
 
         object parameters = new
@@ -140,12 +150,16 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             SummaryActions = ReportingMetricCatalog.SummaryActions,
             IdentityTerminalActions = ReportingMetricCatalog.IdentityTerminalActions,
             AdoptionActions = ReportingMetricCatalog.AdoptionActions,
+            ActiveUserActions = ReportingMetricCatalog.ActiveUserActions,
             SourceChangedAction = AuditActions.OperationalRecordSourceChanged,
             RetryAction = AuditActions.WorkflowRetried,
             CompletedAction = AuditActions.WorkflowCompleted,
             FailureActions = new[] { AuditActions.JiraCreateFailed, AuditActions.OperationalRecordCloseFailed },
             ClaimedAction = AuditActions.OperationalRecordClaimed,
             JiraCreatedAction = AuditActions.JiraCreated,
+            ImportToPreviewKey = ManagementReportingDurationKeys.ImportToPreview,
+            ClaimToJiraCreationKey = ManagementReportingDurationKeys.ClaimToJiraCreation,
+            ClaimToCompletionKey = ManagementReportingDurationKeys.ClaimToCompletion,
             TimingActions = new[]
             {
                 AuditActions.OperationalRecordClaimed,
@@ -169,6 +183,7 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
         long reconciliationRequired = await results.ReadSingleAsync<long>();
         ReportingRetryOutcomes retryOutcomes = await results.ReadSingleAsync<ReportingRetryOutcomes>();
         ReportingDurationStatistics[] durations = (await results.ReadAsync<ReportingDurationStatistics>()).ToArray();
+        DateTimeOffset? coverageFromUtc = await results.ReadSingleAsync<DateTimeOffset?>();
 
         return new ManagementReportingData(
             auditCounts,
@@ -177,7 +192,8 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             activeUsers,
             reconciliationRequired,
             retryOutcomes,
-            durations);
+            durations,
+            coverageFromUtc);
     }
 
     /// <inheritdoc />
@@ -188,6 +204,15 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
         CancellationToken cancellationToken)
     {
         const string sql = """
+            SELECT MIN(EarliestAt) AS CoverageFromUtc
+            FROM
+            (
+                SELECT Action, MIN(OccurredAt) AS EarliestAt
+                FROM reporting.ManagementAuditEvents
+                WHERE Action IN @CoverageActions
+                GROUP BY Action
+            ) AS PersistedCoverage;
+
             SELECT COUNT_BIG(DISTINCT Actor)
             FROM reporting.ManagementAuditEvents
             WHERE OccurredAt >= @FromInclusive AND OccurredAt < @ToExclusive
@@ -197,6 +222,7 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             SELECT Actor, COUNT_BIG(*) AS OperationCount,
                 MIN(OccurredAt) AS FirstActivityAt, MAX(OccurredAt) AS LastActivityAt,
                 SUM(CONVERT(bigint, CASE WHEN Action IN @IdentityActions THEN 1 ELSE 0 END)) AS IdentityOperations,
+                SUM(CONVERT(bigint, CASE WHEN Action IN @DirectoryActions THEN 1 ELSE 0 END)) AS DirectoryOperations,
                 SUM(CONVERT(bigint, CASE WHEN Action IN @AccessActions THEN 1 ELSE 0 END)) AS AccessOperations,
                 SUM(CONVERT(bigint, CASE WHEN Action IN @OperationalActions THEN 1 ELSE 0 END)) AS OperationalWorkflowOperations
             FROM reporting.ManagementAuditEvents
@@ -213,7 +239,9 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             FromInclusive = window.FromInclusiveUtc,
             ToExclusive = window.ToExclusiveUtc,
             AdoptionActions = ReportingMetricCatalog.AdoptionActions,
+            CoverageActions = ReportingMetricCatalog.SummaryActions,
             IdentityActions = ReportingMetricCatalog.IdentityTerminalActions,
+            DirectoryActions = ReportingMetricCatalog.DirectoryTerminalActions,
             AccessActions = ReportingMetricCatalog.AccessActivityActions,
             OperationalActions = ReportingMetricCatalog.OperationalWorkflowActions,
             Offset = (page - 1) * pageSize,
@@ -227,8 +255,9 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
             parameters,
             commandTimeout: CommandTimeoutSeconds,
             cancellationToken: cancellationToken));
+        DateTimeOffset? coverageFromUtc = await results.ReadSingleAsync<DateTimeOffset?>();
         long totalItems = await results.ReadSingleAsync<long>();
         OperatorActivityData[] items = (await results.ReadAsync<OperatorActivityData>()).ToArray();
-        return new OperatorActivityDataPage(totalItems, items);
+        return new OperatorActivityDataPage(totalItems, items, coverageFromUtc);
     }
 }

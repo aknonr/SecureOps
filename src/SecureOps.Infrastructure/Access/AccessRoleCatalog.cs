@@ -11,6 +11,9 @@ public static class AccessRoleCatalog
             ["Admin"] =
             [
                 Capabilities.IdentityLookup,
+                Capabilities.DirectoryGroupsView,
+                Capabilities.DirectoryGroupMembersView,
+                Capabilities.DirectoryPrivilegedGroupsView,
                 Capabilities.TeamView,
                 Capabilities.AuditView,
                 Capabilities.AccessAdministration,
@@ -29,6 +32,7 @@ public static class AccessRoleCatalog
             ["Lead"] =
             [
                 Capabilities.IdentityLookup,
+                Capabilities.DirectoryGroupsView,
                 Capabilities.TeamView,
                 Capabilities.SystemDiagnostics,
                 Capabilities.OperationalRecordsView,

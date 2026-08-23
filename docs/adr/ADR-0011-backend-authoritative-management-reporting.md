@@ -22,6 +22,9 @@ SecureOps will expose a backend-authoritative management reporting read model wi
 - SQL views expose only reporting-required columns. The runtime identity receives `SELECT` on those views, not on base audit/history tables.
 - Existing audit event codes and workflow transitions define historical metrics. Missing historical evidence is returned as unavailable or documented as a limitation, never inferred.
 - Elapsed workflow durations are operational elapsed time, not active labor, productivity, or time saved.
+- Duration metrics expose stable machine keys; labels and array position are presentation-only.
+- Data limitations expose stable machine codes with optional fallback messages. Legacy prose remains temporarily for compatibility but is not application logic.
+- Summary and operator responses expose the requested UTC interval, earliest retained persisted audit evidence, and whether the full requested interval begins within that evidence boundary.
 
 ## Consequences
 
@@ -31,6 +34,8 @@ SecureOps will expose a backend-authoritative management reporting read model wi
 - Invalid items skipped inside historical bulk identity requests do not have individual terminal audit rows.
 - Idempotent duplicate-prevention events become measurable only from this release forward.
 - Real-user pilot reporting requires Demo authentication and Demo access compatibility to be disabled during real-user bootstrap and thereafter.
+- Evidence coverage uses the earliest indexed, known reporting action from the existing `reporting.ManagementAuditEvents` view. Report-read audit noise is excluded. A null boundary or a boundary after the requested start is incomplete; metric-specific historical limitations still apply.
+- G-16 adoption and Operational Record/Jira trend series remain out of scope.
 
 ## Rejected Alternatives
 
@@ -44,4 +49,5 @@ SecureOps will expose a backend-authoritative management reporting read model wi
 - `docs/05-security-model.md`
 - `docs/08-audit-model.md`
 - `docs/25-real-user-pilot-management-reporting-and-dotnet10.md`
+- `docs/30-management-reporting-contract-hardening.md`
 - ADR-0010

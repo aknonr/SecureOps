@@ -11,12 +11,14 @@ public static class OperationalRecordConfigurationValidator
     {
         OperationalRecordsOptions operational = configuration.GetSection(OperationalRecordsOptions.SectionName).Get<OperationalRecordsOptions>() ?? new();
         JiraIntegrationOptions jira = configuration.GetSection(JiraIntegrationOptions.SectionName).Get<JiraIntegrationOptions>() ?? new();
+        TuruncuHatOptions turuncuHat = configuration.GetSection(TuruncuHatOptions.SectionName).Get<TuruncuHatOptions>() ?? new();
 
         if (!string.Equals(operational.SourceProvider, "Disabled", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase))
+            && !string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(operational.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"OperationalRecords:SourceProvider '{operational.SourceProvider}' is not implemented. Use Disabled, or Fake only for Development/Demo/Test.");
+                $"OperationalRecords:SourceProvider '{operational.SourceProvider}' is not implemented. Use Disabled, Fake, or TuruncuHat.");
         }
 
         if (string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase)
@@ -47,10 +49,16 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required when OperationalRecords:RepositoryProvider is SqlServer.");
         }
 
-        if (!string.Equals(jira.Provider, "Disabled", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(jira.Provider, "Fake", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(operational.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Jira:Provider must be Disabled, or Fake only for Development/Demo/Test.");
+            ValidateTuruncuHat(turuncuHat);
+        }
+
+        if (!string.Equals(jira.Provider, "Disabled", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(jira.Provider, "Fake", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(jira.Provider, "Corporate", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Jira:Provider must be Disabled, Fake, or Corporate.");
         }
 
         if (string.Equals(jira.Provider, "Fake", StringComparison.OrdinalIgnoreCase)
@@ -70,10 +78,164 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("Jira:UnresolvedRequesterPolicy must be Block or ProceedUnassigned.");
         }
 
+        ValidateJiraIdentityPolicies(jira);
+
         if (jira.SummaryMaxLength is < 32 or > 255)
         {
             throw new InvalidOperationException("Jira:SummaryMaxLength must be between 32 and 255.");
         }
+
+        if (jira.ConnectTimeoutSeconds is < 1 or > 30
+            || jira.RequestTimeoutSeconds is < 1 or > 120
+            || jira.MaxResponseBytes is < 1024 or > 5_242_880
+            || jira.UserSearchMaxAttempts is < 1 or > 3
+            || jira.UserSearchRetryDelayMilliseconds is < 0 or > 5000)
+        {
+            throw new InvalidOperationException("Jira HTTP bounds are invalid.");
+        }
+
+        if (string.Equals(jira.Provider, "Corporate", StringComparison.OrdinalIgnoreCase))
+        {
+            ValidateHttpsBaseUrl(jira.BaseUrl, "Jira:BaseUrl");
+            RequireSecret(jira.Authorization, "Jira:Authorization");
+            if (!string.Equals(jira.AuthenticationMode, "Basic", StringComparison.OrdinalIgnoreCase)
+                || !IsValidBasicAuthorization(jira.Authorization))
+            {
+                throw new InvalidOperationException("Corporate Jira requires the reviewed Jira:AuthenticationMode Basic and a runtime Basic Authorization value.");
+            }
+            if (string.IsNullOrWhiteSpace(jira.ProjectKey)
+                || string.IsNullOrWhiteSpace(jira.IssueTypeId)
+                || string.IsNullOrWhiteSpace(jira.TeamCustomField)
+                || string.IsNullOrWhiteSpace(jira.TeamValue)
+                || string.IsNullOrWhiteSpace(jira.RequesterWatcherCustomField)
+                || jira.Labels.Length == 0
+                || jira.Labels.Any(string.IsNullOrWhiteSpace)
+                || string.IsNullOrEmpty(jira.SummarySeparator)
+                || jira.SummarySeparator.Length > 10
+                || !IsSafeIdentifier(jira.ProjectKey)
+                || !long.TryParse(jira.IssueTypeId, out long issueTypeId)
+                || issueTypeId <= 0
+                || jira.TeamValue.Length > 256
+                || !IsSafeIdentifier(jira.TeamCustomField)
+                || !IsSafeIdentifier(jira.RequesterWatcherCustomField)
+                || jira.Labels.Any(label => label.Length > 128))
+            {
+                throw new InvalidOperationException("Corporate Jira mapping configuration is incomplete or invalid.");
+            }
+        }
+    }
+
+    private static void ValidateJiraIdentityPolicies(JiraIntegrationOptions options)
+    {
+        bool projectDefault = string.Equals(options.AssignmentMode, "ProjectDefault", StringComparison.OrdinalIgnoreCase);
+        bool verifiedMapping = string.Equals(options.AssignmentMode, "VerifiedOperatorMapping", StringComparison.OrdinalIgnoreCase);
+        if (!projectDefault && !verifiedMapping)
+        {
+            throw new InvalidOperationException("Jira:AssignmentMode must be ProjectDefault or VerifiedOperatorMapping.");
+        }
+
+        if (!string.Equals(options.ReporterMode, "ProjectDefault", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Jira:ReporterMode must be ProjectDefault because reporter is absent from the reviewed create metadata.");
+        }
+
+        JiraOperatorAssigneeMappingOptions[] mappings = options.OperatorAssigneeMappings ?? [];
+        if ((projectDefault && mappings.Length != 0)
+            || (verifiedMapping && mappings.Length == 0)
+            || mappings.Any(mapping => !IsSafeIdentity(mapping.SecureOpsActor) || !IsSafeIdentity(mapping.JiraUsername))
+            || mappings.GroupBy(mapping => mapping.SecureOpsActor, StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1))
+        {
+            throw new InvalidOperationException(
+                "Jira operator-assignee mappings must be empty for ProjectDefault, or non-empty, exact, bounded, and actor-unique for VerifiedOperatorMapping.");
+        }
+    }
+
+    private static void ValidateTuruncuHat(TuruncuHatOptions options)
+    {
+        ValidateHttpsBaseUrl(options.BaseUrl, "TuruncuHat:BaseUrl");
+        RequireSecret(options.Authorization, "TuruncuHat:Authorization");
+        RequireSecret(options.Username, "TuruncuHat:Username");
+        RequireSecret(options.Password, "TuruncuHat:Password");
+        if (options.TenantId <= 0
+            || options.RelatedGroupId <= 0
+            || options.ExcludedDccIds.Length == 0
+            || options.ExcludedDccIds.Any(value => value <= 0)
+            || options.ActivityTaskModelId <= 0
+            || options.ActivityGroupId <= 0
+            || options.ActivityMainObjectTypeId <= 0
+            || options.CompletedStatusId <= 0
+            || string.IsNullOrWhiteSpace(options.CompletionCommentTemplate)
+            || !options.CompletionCommentTemplate.Contains("{JiraKey}", StringComparison.Ordinal)
+            || options.CompletionCommentTemplate.Length > 1000
+            || !IsSafeIdentifier(options.SourceBaseObject)
+            || !IsSafeIdentifier(options.ActivityBaseObject))
+        {
+            throw new InvalidOperationException("TuruncuHat business mapping configuration is incomplete or invalid.");
+        }
+
+        if (options.SessionIdSegmentIndex < 0
+            || options.SessionLifetimeSeconds is < 1 or > 86_400
+            || options.ConnectTimeoutSeconds is < 1 or > 30
+            || options.RequestTimeoutSeconds is < 1 or > 120
+            || options.MaxResponseBytes is < 1024 or > 5_242_880
+            || options.MaxDescriptionLength is < 1 or > 8000)
+        {
+            throw new InvalidOperationException("TuruncuHat session or HTTP bounds are invalid.");
+        }
+    }
+
+    private static void ValidateHttpsBaseUrl(string value, string key)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            throw new InvalidOperationException($"{key} must be an absolute HTTPS URL without embedded credentials.");
+        }
+    }
+
+    private static void RequireSecret(string value, string key)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || value.Length > 4096
+            || value.Contains('\r')
+            || value.Contains('\n'))
+        {
+            throw new InvalidOperationException($"{key} is required and must be supplied through controlled runtime configuration.");
+        }
+    }
+
+    private static bool IsSafeIdentifier(string value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= 128
+        && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
+
+    private static bool IsSafeIdentity(string value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && string.Equals(value, value.Trim(), StringComparison.Ordinal)
+        && value.Length <= 256
+        && !value.Any(char.IsControl);
+
+    private static bool IsValidBasicAuthorization(string value)
+    {
+        const string prefix = "Basic ";
+        if (!value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        ReadOnlySpan<char> encoded = value.AsSpan(prefix.Length).Trim();
+        Span<byte> decoded = stackalloc byte[3072];
+        if (encoded.IsEmpty
+            || !Convert.TryFromBase64Chars(encoded, decoded, out int bytesWritten))
+        {
+            return false;
+        }
+
+        int separator = decoded[..bytesWritten].IndexOf((byte)':');
+        return separator > 0 && separator < bytesWritten - 1;
     }
 
     private static bool IsSyntheticEnvironment(string environmentName) =>

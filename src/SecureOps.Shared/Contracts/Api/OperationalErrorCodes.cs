@@ -17,6 +17,16 @@ public static class OperationalErrorCodes
     public const string IdentityProviderTimeout = "IdentityProviderTimeout";
     /// <summary>An identity provider returned an invalid response.</summary>
     public const string IdentityProviderBadResponse = "IdentityProviderBadResponse";
+    /// <summary>An exact directory group was not found.</summary>
+    public const string DirectoryGroupNotFound = "DirectoryGroupNotFound";
+    /// <summary>An exact directory principal was not found.</summary>
+    public const string DirectoryPrincipalNotFound = "DirectoryPrincipalNotFound";
+    /// <summary>A Directory Explorer input was rejected.</summary>
+    public const string DirectoryInvalidInput = "DirectoryInvalidInput";
+    /// <summary>The configured directory provider was unavailable.</summary>
+    public const string DirectoryProviderUnavailable = "DirectoryProviderUnavailable";
+    /// <summary>A bounded directory query exceeded its server-side ceiling.</summary>
+    public const string DirectoryQueryLimitExceeded = "DirectoryQueryLimitExceeded";
     /// <summary>The required audit store is unavailable.</summary>
     public const string AuditStoreUnavailable = "AuditStoreUnavailable";
     /// <summary>The authenticated identity is awaiting access approval.</summary>
@@ -65,6 +75,10 @@ public static class OperationalErrorCodes
     public const string JiraAlreadyCreated = "JiraAlreadyCreated";
     /// <summary>Operational-record close/update failed.</summary>
     public const string OperationalRecordCloseFailed = "OperationalRecordCloseFailed";
+    /// <summary>No active source workflow activity matched the reviewed close contract.</summary>
+    public const string OperationalRecordActivityNotFound = "OperationalRecordActivityNotFound";
+    /// <summary>The source workflow activity query was ambiguous or invalid.</summary>
+    public const string OperationalRecordActivityAmbiguous = "OperationalRecordActivityAmbiguous";
     /// <summary>Operational-record comment update failed.</summary>
     public const string OperationalRecordCommentUpdateFailed = "OperationalRecordCommentUpdateFailed";
     /// <summary>Another workflow operation owns the record.</summary>
@@ -83,4 +97,14 @@ public static class OperationalErrorCodes
     public const string ReportingValidationFailed = "ReportingValidationFailed";
     /// <summary>The persistent reporting read model is unavailable.</summary>
     public const string ReportingUnavailable = "ReportingUnavailable";
+    /// <summary>The server-side application session expired.</summary>
+    public const string SessionExpired = "SessionExpired";
+    /// <summary>The server-side application session was revoked or invalidated.</summary>
+    public const string SessionRevoked = "SessionRevoked";
+    /// <summary>The application-session record was not found.</summary>
+    public const string SessionNotFound = "SessionNotFound";
+    /// <summary>Application-session input failed validation.</summary>
+    public const string SessionValidationFailed = "SessionValidationFailed";
+    /// <summary>The authoritative application-session store is unavailable.</summary>
+    public const string SessionStoreUnavailable = "SessionStoreUnavailable";
 }

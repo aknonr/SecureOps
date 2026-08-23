@@ -581,7 +581,7 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
         public string Title { get; init; } = string.Empty;
         public string Description { get; init; } = string.Empty;
         public string? Requester { get; init; }
-        public DateTimeOffset CreatedAt { get; init; }
+        public DateTimeOffset? CreatedAt { get; init; }
         public string? Environment { get; init; }
         public string? ServerReference { get; init; }
         public string? ApplicationReference { get; init; }

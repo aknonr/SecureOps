@@ -2,9 +2,9 @@
 
 This Codex-owned backend module contains source/Jira/requester interfaces, fail-closed classification, preview mapping, durable workflow orchestration, InMemory and SQL repositories, and fake local adapters. It never executes PowerShell.
 
-Default providers are `OperationalRecords:SourceProvider=Disabled`, `OperationalRecords:RepositoryProvider=InMemory`, and `Jira:Provider=Disabled`. `Fake` is an explicit deterministic source/Jira adapter available only in Development, Demo, and Test; it performs no external I/O. Only the repository can currently select `SqlServer`, using `ConnectionStrings:SecureOpsDb`. Unsupported live providers and Fake in production-style environments fail startup validation.
+Default providers are `OperationalRecords:SourceProvider=Disabled`, `OperationalRecords:RepositoryProvider=InMemory`, and `Jira:Provider=Disabled`. `Fake` is an explicit deterministic source/Jira adapter available only in Development, Demo, and Test; it performs no external I/O. `TuruncuHat` and `Corporate` select typed real-provider adapters, but remain deployment-disabled until the sanitized external contract fixtures in `docs/integrations/turuncu-hat-jira-contract-gaps.md` are approved. Provider configuration fails startup instead of falling back.
 
-The production-style classifier intentionally returns `NeedsManualReview`; approved business rules and a manual-classification contract are deferred. The synthetic source has an exact synthetic-only classifier and requester mapping solely to exercise preview/create/close safely. Requester resolution remains exact. The Jira key is persisted before source close, and unknown Jira outcomes block automatic recreation.
+The Disabled classifier returns `NeedsManualReview`. The TuruncuHat classifier marks only valid active records already selected by the reviewed legacy source filter as eligible; malformed source projections remain manual review. Requester resolution remains exact. The Jira key is persisted before source close, and unknown Jira outcomes block automatic recreation.
 
 Source refresh cannot reclassify a workflow after it advances beyond initial classification states. Automated failure and concurrency scenarios replace `IJiraClient` only inside the integration-test host; runtime providers expose no failure-injection controls. `FakeJiraClient` returns synthetic `FAKE-*` keys only.
 

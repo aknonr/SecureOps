@@ -9,6 +9,12 @@ public static class Policies
     public const string CanIdentityLookup = "CanIdentityLookup";
     /// <summary>Capability policy for bounded bulk identity lookup.</summary>
     public const string CanBulkIdentityLookup = "CanBulkIdentityLookup";
+    /// <summary>Capability policy for exact group metadata and principal direct groups.</summary>
+    public const string CanViewDirectoryGroups = "CanViewDirectoryGroups";
+    /// <summary>Capability policy for exact group direct-member enumeration.</summary>
+    public const string CanViewDirectoryGroupMembers = "CanViewDirectoryGroupMembers";
+    /// <summary>Capability policy for configured privileged-group evidence.</summary>
+    public const string CanViewDirectoryPrivilegedGroups = "CanViewDirectoryPrivilegedGroups";
     /// <summary>Capability policy for team metadata.</summary>
     public const string CanTeamView = "CanTeamView";
     /// <summary>Capability policy for access administration.</summary>

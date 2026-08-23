@@ -6,7 +6,7 @@ namespace SecureOps.Infrastructure.Access;
 public interface IAccessRepository
 {
     /// <summary>Creates a pending user/request on first authentication and returns the current snapshot.</summary>
-    public Task<EnsureAccessUserResult> EnsureUserAsync(CorporatePrincipal principal, bool createRequest, CancellationToken cancellationToken);
+    public Task<EnsureAccessUserResult> EnsureUserAsync(CorporatePrincipal principal, bool createRequest, TimeSpan activityPersistenceInterval, CancellationToken cancellationToken);
     /// <summary>Gets a user by internal identifier.</summary>
     public Task<ApplicationUser?> GetUserAsync(Guid userId, CancellationToken cancellationToken);
     /// <summary>Gets a user by stable corporate principal.</summary>

@@ -11,6 +11,7 @@ using SecureOps.Api.Validation;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Audit;
+using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Auth;
@@ -23,9 +24,11 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 AuditConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 IdentityLookupConfigurationValidator.Validate(builder.Configuration);
+DirectoryExplorerConfigurationValidator.Validate(builder.Configuration);
 ReverseProxyConfiguration.Validate(builder.Configuration);
 OperationalRecordConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
-PlatformSecurityConfigurationValidator.Validate(builder.Configuration);
+PlatformSecurityConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
+DataProtectionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 
 bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
     builder.Environment.EnvironmentName,
@@ -34,6 +37,8 @@ bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
 builder.Services.Configure<DemoApiAuthOptions>(builder.Configuration.GetSection(DemoApiAuthOptions.SectionName));
 builder.Services.Configure<SwaggerOptions>(builder.Configuration.GetSection(SwaggerOptions.SectionName));
 builder.Services.Configure<SessionSecurityOptions>(builder.Configuration.GetSection(SessionSecurityOptions.SectionName));
+builder.Services.AddSecureOpsDataProtection(builder.Configuration);
+builder.Services.AddHostedService<DataProtectionStartupValidationHostedService>();
 
 AuthenticationBuilder authentication = builder.Services.AddAuthentication(options =>
 {
@@ -77,6 +82,10 @@ builder.Services.AddRateLimiter(options =>
     };
     options.AddPolicy(ApiRateLimits.IdentityLookup, context => ApiRateLimits.Partition(context, ApiRateLimits.IdentityLookup, configuredRateLimits.IdentityLookup));
     options.AddPolicy(ApiRateLimits.BulkIdentityLookup, context => ApiRateLimits.Partition(context, ApiRateLimits.BulkIdentityLookup, configuredRateLimits.BulkIdentityLookup));
+    options.AddPolicy(ApiRateLimits.DirectoryGroupQuery, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryGroupQuery, configuredRateLimits.DirectoryGroupQuery));
+    options.AddPolicy(ApiRateLimits.DirectoryGroupMembers, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryGroupMembers, configuredRateLimits.DirectoryGroupMembers));
+    options.AddPolicy(ApiRateLimits.DirectoryEnrichment, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryEnrichment, configuredRateLimits.DirectoryEnrichment));
+    options.AddPolicy(ApiRateLimits.DirectoryPrivilegedGroups, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryPrivilegedGroups, configuredRateLimits.DirectoryPrivilegedGroups));
     options.AddPolicy(ApiRateLimits.OperationalRecordRefresh, context => ApiRateLimits.Partition(context, ApiRateLimits.OperationalRecordRefresh, configuredRateLimits.OperationalRecordRefresh));
     options.AddPolicy(ApiRateLimits.JiraPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraPreview, configuredRateLimits.JiraPreview));
     options.AddPolicy(ApiRateLimits.JiraCreate, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraCreate, configuredRateLimits.JiraCreate));
@@ -136,6 +145,8 @@ builder.Services.AddSwaggerGen(options =>
     }
 });
 builder.Services.AddSecureOpsInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<IDirectoryContinuationTokenCodec, DataProtectedDirectoryContinuationTokenCodec>();
+builder.Services.AddSingleton<ApplicationSessionCookie>();
 if (builder.Configuration.GetValue("Audit:Queue:Enabled", true)
     && !string.Equals(builder.Configuration["Audit:Provider"], "InMemory", StringComparison.OrdinalIgnoreCase))
 {
@@ -156,6 +167,7 @@ if (swaggerUiEnabled)
 app.UseForwardedHeaders();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseAuthentication();
+app.UseMiddleware<ApplicationSessionMiddleware>();
 app.UseMiddleware<AccessDeniedProblemDetailsMiddleware>();
 app.UseMiddleware<AuthorizationDeniedAuditMiddleware>();
 app.UseAuthorization();
@@ -198,6 +210,12 @@ RouteHandlerBuilder identityProviderHealthEndpoint = app.MapGet(
         })
     .WithName("IdentityProviderHealth")
     .WithOpenApi();
+RouteHandlerBuilder enterpriseIntegrationHealthEndpoint = app.MapGet(
+        "/api/v1/health/enterprise-integrations",
+        (EnterpriseIntegrationDiagnostics diagnostics) => Results.Ok(diagnostics.Get()))
+    .WithName("EnterpriseIntegrationHealth")
+    .WithOpenApi()
+    .RequireAuthorization(Policies.AdminOnly);
 
 if (!app.Environment.IsDevelopment())
 {

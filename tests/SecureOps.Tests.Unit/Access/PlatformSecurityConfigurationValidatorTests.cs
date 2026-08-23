@@ -47,6 +47,47 @@ public sealed class PlatformSecurityConfigurationValidatorTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*AutoCreateRequest*");
     }
 
+    [Fact]
+    public void Validate_WhenSessionRepositoryDoesNotMatchAccess_FailsClearly()
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["Access:RepositoryProvider"] = "InMemory",
+            ["SessionSecurity:RepositoryProvider"] = "SqlServer",
+            ["ConnectionStrings:SecureOpsDb"] = "Server=(local);Integrated Security=True;Encrypt=True;TrustServerCertificate=False"
+        });
+
+        Action act = () => PlatformSecurityConfigurationValidator.Validate(configuration);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*providers must match*");
+    }
+
+    [Theory]
+    [InlineData("Pilot")]
+    [InlineData("Production")]
+    public void Validate_ControlledEnvironmentRejectsInMemorySessionAuthority(string environment)
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>());
+
+        Action act = () => PlatformSecurityConfigurationValidator.Validate(configuration, environment);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*RepositoryProvider SqlServer*");
+    }
+
+    [Fact]
+    public void Validate_RejectsUnsafeActivityPersistenceInterval()
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["SessionSecurity:IdleTimeoutMinutes"] = "5",
+            ["SessionSecurity:ActivityPersistenceIntervalMinutes"] = "5"
+        });
+
+        Action act = () => PlatformSecurityConfigurationValidator.Validate(configuration);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*activity-persistence*");
+    }
+
     private static IConfiguration Configuration(IReadOnlyDictionary<string, string?> values) => new ConfigurationBuilder()
         .AddInMemoryCollection(values)
         .Build();

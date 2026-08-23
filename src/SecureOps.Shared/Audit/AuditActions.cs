@@ -46,6 +46,17 @@ public static class AuditActions
     /// <summary>A bounded bulk identity lookup completed.</summary>
     public const string BulkIdentityLookupCompleted = "BulkIdentityLookupCompleted";
 
+    /// <summary>A privileged Directory Explorer query was requested.</summary>
+    public const string DirectoryGroupQueryRequested = "DirectoryGroupQueryRequested";
+    /// <summary>A privileged Directory Explorer query completed or returned not found.</summary>
+    public const string DirectoryGroupQueryCompleted = "DirectoryGroupQueryCompleted";
+    /// <summary>A Directory Explorer query was rejected before provider access.</summary>
+    public const string DirectoryGroupQueryRejected = "DirectoryGroupQueryRejected";
+    /// <summary>A Directory Explorer provider query failed safely.</summary>
+    public const string DirectoryGroupQueryFailed = "DirectoryGroupQueryFailed";
+    /// <summary>Authorization denied a Directory Explorer query.</summary>
+    public const string DirectoryGroupQueryForbidden = "DirectoryGroupQueryForbidden";
+
     /// <summary>
     /// API or UI authorization denied a request.
     /// </summary>
@@ -107,6 +118,22 @@ public static class AuditActions
     public const string IdentityLookupProviderCall = "IdentityLookupProviderCall";
     /// <summary>An authenticated caller requested provider-managed logout.</summary>
     public const string SessionLogoutRequested = "SessionLogoutRequested";
+    /// <summary>A server-side SecureOps application session started.</summary>
+    public const string ApplicationSessionStarted = "ApplicationSessionStarted";
+    /// <summary>An application session reached its idle timeout.</summary>
+    public const string ApplicationSessionIdleTimedOut = "ApplicationSessionIdleTimedOut";
+    /// <summary>An application session reached its absolute timeout.</summary>
+    public const string ApplicationSessionAbsoluteTimedOut = "ApplicationSessionAbsoluteTimedOut";
+    /// <summary>A user ended their SecureOps application session.</summary>
+    public const string ApplicationSessionLoggedOut = "ApplicationSessionLoggedOut";
+    /// <summary>An administrator revoked an application session.</summary>
+    public const string ApplicationSessionRevoked = "ApplicationSessionRevoked";
+    /// <summary>Access disable ended active application sessions.</summary>
+    public const string ApplicationSessionAccessDisabled = "ApplicationSessionAccessDisabled";
+    /// <summary>An access-version change ended active application sessions.</summary>
+    public const string ApplicationSessionAccessChanged = "ApplicationSessionAccessChanged";
+    /// <summary>An administrator viewed active application sessions.</summary>
+    public const string ApplicationSessionsViewed = "ApplicationSessionsViewed";
     /// <summary>A privileged management report was requested.</summary>
     public const string ManagementReportRequested = "ManagementReportRequested";
     /// <summary>A privileged management report was returned.</summary>

@@ -62,13 +62,15 @@ The diagram above captures the original generic inbound-monitoring shape. In the
 
 ASP.NET Core 8 Web API. Hosted on IIS in-process.
 
-Current implementation status: Phase 1A IdentityLookup, provider-neutral access approval/capability authorization, safe health metadata, the fake-adapter Operational Record/Jira workflow, and a SQL-aggregated management reporting read model are implemented. Phase 1 alert intake and diagnostic job orchestration remain planned. SQL contracts exist but are never applied by the application.
+Current implementation status: Phase 1A IdentityLookup, provider-neutral access approval/capability authorization, server-side application-session governance, persistent Data Protection configuration, safe health metadata, the fake-adapter Operational Record/Jira workflow, and a SQL-aggregated management reporting read model are implemented. Phase 1 alert intake and diagnostic job orchestration remain planned. SQL contracts exist but are never applied by the application.
 
 Responsibilities:
 - Accept monitoring webhooks (HMAC-signed).
 - Provide REST API for the UI and any future internal consumers.
 - Enforce authorization.
 - Resolve authenticated principals through persisted Pending/Approved/Disabled application access before capabilities are granted.
+- Keep exact identity lookup and the read-only Directory Explorer as separate services/controllers. Directory Explorer preserves exact direct-group, exact group-metadata, and bounded direct-member queries, and adds bounded provider-neutral enrichment for transitive membership, proven paths, account health, SPNs, and separately authorized privileged-group evidence. It accepts no raw LDAP filters or credentials.
+- Keep authentication provider-neutral and separate from the server-side SecureOps session record. The protected session handle is not a corporate credential or authorization source; current access status and version remain authoritative.
 - Normalize alert payloads.
 - Enqueue diagnostic jobs via Hangfire client API.
 - Resolve exact PAM/AD account lookups through the IdentityLookup service (Phase 1A).
@@ -238,7 +240,7 @@ Each section has a strongly-typed options class in `SecureOps.Shared.Configurati
 - **Serilog** for structured logging in API and Worker.
 - **Sinks:** File (rolling daily), SQL Server (Serilog.Sinks.MSSqlServer), and optionally Application Insights or Seq if added in Phase 6+.
 - **Correlation:** `Activity.Current` traces, propagated to Hangfire jobs and SQL.
-- **Health endpoints:** `/api/v1/health` for liveness, `/api/v1/health/audit-store` for safe audit-store status, and `/api/v1/health/identity-provider` for safe identity-provider configuration status. Detailed DB, Worker heartbeat, and monitoring-chain health are Phase 1+ work.
+- **Health endpoints:** `/api/v1/health` for liveness, `/api/v1/health/audit-store` for safe audit-store status, `/api/v1/health/identity-provider` for safe identity-provider configuration status, and Admin-only `/api/v1/health/enterprise-integrations` for safe Turuncu Hat/Jira selection and availability. URLs, identities, credentials, sessions, and remote payloads are excluded.
 
 ## Theming
 

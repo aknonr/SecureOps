@@ -17,6 +17,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
     private readonly IAccessIdentityProfileResolver _profileResolver;
     private readonly IAuditWriter _auditWriter;
     private readonly AccessOptions _options;
+    private readonly SessionSecurityOptions _sessionOptions;
     private readonly ILogger<ApplicationAccessService> _logger;
 
     /// <summary>Initializes the service.</summary>
@@ -26,6 +27,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         IAccessIdentityProfileResolver profileResolver,
         IAuditWriter auditWriter,
         IOptions<AccessOptions> options,
+        IOptions<SessionSecurityOptions> sessionOptions,
         ILogger<ApplicationAccessService> logger)
     {
         _principalResolver = principalResolver;
@@ -33,6 +35,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         _profileResolver = profileResolver;
         _auditWriter = auditWriter;
         _options = options.Value;
+        _sessionOptions = sessionOptions.Value;
         _logger = logger;
     }
 
@@ -45,7 +48,11 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             return AccessServiceResult<EnsureAccessUserResult>.Fail(OperationalErrorCodes.AccessDenied);
         }
 
-        EnsureAccessUserResult ensured = await _repository.EnsureUserAsync(corporatePrincipal, _options.AutoCreateRequest, cancellationToken);
+        EnsureAccessUserResult ensured = await _repository.EnsureUserAsync(
+            corporatePrincipal,
+            _options.AutoCreateRequest,
+            TimeSpan.FromMinutes(_sessionOptions.ActivityPersistenceIntervalMinutes),
+            cancellationToken);
         if (ensured.UserCreated && !await TryAuditAsync(AuditActions.UserFirstSeen, context, ensured.User.Id, ensured.PendingRequest?.Id, null, null, cancellationToken))
         {
             return AccessServiceResult<EnsureAccessUserResult>.Fail(OperationalErrorCodes.AuditStoreUnavailable);

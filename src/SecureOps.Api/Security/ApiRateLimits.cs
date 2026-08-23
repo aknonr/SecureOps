@@ -10,6 +10,14 @@ public static class ApiRateLimits
     public const string IdentityLookup = "IdentityLookup";
     /// <summary>Bounded bulk exact identity lookup.</summary>
     public const string BulkIdentityLookup = "BulkIdentityLookup";
+    /// <summary>Exact principal groups and exact group metadata.</summary>
+    public const string DirectoryGroupQuery = "DirectoryGroupQuery";
+    /// <summary>Exact group direct-member enumeration.</summary>
+    public const string DirectoryGroupMembers = "DirectoryGroupMembers";
+    /// <summary>Recursive membership and account/service enrichment.</summary>
+    public const string DirectoryEnrichment = "DirectoryEnrichment";
+    /// <summary>Separately authorized privileged-group analysis.</summary>
+    public const string DirectoryPrivilegedGroups = "DirectoryPrivilegedGroups";
     /// <summary>Operational-record source refresh.</summary>
     public const string OperationalRecordRefresh = "OperationalRecordRefresh";
     /// <summary>Read-only Jira preview.</summary>

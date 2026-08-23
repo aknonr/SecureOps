@@ -1,6 +1,6 @@
 # API TEST Deployment Readiness
 
-This is the controlled deployment contract for `release/api-test-20260812`. The application never executes SQL or edits IIS configuration. Server-owned `web.config` and `appsettings*.json` files are excluded from the deployment ZIP.
+This is the general controlled deployment contract. The authoritative 2026-08-23 TEST/Pilot release-candidate manifests are under `docs/release-candidates/2026-08-23-api-test-pilot-rc/`. The application never executes SQL or edits IIS configuration. Server-owned `web.config` and `appsettings*.json` files are excluded from the deployment ZIP.
 
 ## Migration Review
 
@@ -13,8 +13,10 @@ Run the SQLCMD-mode entrypoints in exact order through the approved DBA process:
 | 3 | `sql/migrations/003-platform-access-concurrency-hardening.sql` | access status/authentication columns, two roles, source freshness/claim fields, command execution state | Partially. Columns and the command table are guarded; fixed role IDs, constraint-name checks, and prerequisite tables can still fail. |
 | 4 | `sql/migrations/004-access-read-model-and-versioning.sql` | explicit access-user and access-request mutation versions | Yes for column presence; prerequisite access tables must exist. |
 | 5 | `sql/migrations/005-management-reporting-read-model.sql` | limited reporting views and supporting indexes | Yes for schema, views, and index presence; prerequisite audit and ops objects must exist. |
+| 6 | `sql/migrations/006-operational-record-source-created-at-nullable.sql` | preserves unavailable source-created time as nullable | Yes when the prerequisite Operational Record table exists. |
+| 7 | `sql/migrations/007-application-session-governance.sql` | authoritative application-session table, indexes, and limited reporting view | Yes for object presence/replacement; prerequisite access and reporting schemas must exist. |
 
-The `:r` directives require SQLCMD mode and resolve files under `sql/schema`. Migrations 003-005 require successful 001 and 002. None assumes empty tables, but 001 and 002 require the target object names to be absent. Existing rows are supported by defaults in 003 and 004; adding non-null columns can lock populated tables while SQL Server backfills defaults. Migration 005 can add indexes to populated tables and must be scheduled and reviewed by the DBA.
+The `:r` directives require SQLCMD mode and resolve files under `sql/schema`. Migrations 003-007 require successful prerequisites. None assumes empty tables, but 001 and 002 require the target object names to be absent. Existing rows are supported by defaults in 003 and 004; adding non-null columns can lock populated tables while SQL Server backfills defaults. Migrations 005 and 007 can add indexes and must be scheduled and reviewed by the DBA.
 
 There are no down migrations, migration-history table, encompassing transaction, or automatic rollback. A failure after a `GO` can leave a partially applied database. Before execution, the DBA must inventory schemas, tables, indexes, triggers, constraints, and seeded `RoleId`/`RoleCode` values, take an approved backup or recovery point, and stop on any collision. Do not re-run a failed batch without a DBA-authored corrective plan.
 
@@ -24,8 +26,9 @@ There are no down migrations, migration-history table, encompassing transaction,
 - `security.Users`, `Roles`, `RoleAssignments`, `AccessRequests`, `AccessRequestHistory`; active-role and pending-request unique indexes; status checks; no-self-approval and append-only triggers.
 - `ops.OperationalRecords`, `JiraTransfers`, `OperationalRecordWorkflowHistory`, `CommandExecutions`; source/Jira/idempotency uniqueness; rowversion, source token, validation time, actor lease fields, status/claim checks, and workflow-history append-only trigger.
 - `reporting.ManagementAuditEvents`, `ManagementWorkflowEvents`, and `ManagementOperationalStatus`; limited read views plus reporting indexes on underlying tables.
+- `security.ApplicationSessions`; authoritative lifecycle timestamps/reasons, authentication method, access version, and active-session indexes. `reporting.ManagementSessionStatus` exposes limited aggregate fields.
 
-The DBA migration identity needs controlled DDL authority to create schemas/tables/views/indexes/triggers/constraints and DML authority for role seeds. The runtime identity needs only: `INSERT` on `audit.AuditLog`; `SELECT, INSERT, UPDATE` on `security.Users`, `security.RoleAssignments`, and `security.AccessRequests`; `SELECT` on `security.Roles`; `INSERT` on `security.AccessRequestHistory`; `SELECT, INSERT, UPDATE` on `ops.OperationalRecords`, `ops.JiraTransfers`, and `ops.CommandExecutions`; `INSERT` on `ops.OperationalRecordWorkflowHistory`; and `SELECT` on the three `reporting` views. It needs no direct `SELECT` on base audit/history tables, `DELETE`, DDL, schema ownership, `db_owner`, or `db_ddladmin`. View/trigger ownership chaining must be verified by the DBA.
+The DBA migration identity needs controlled DDL authority to create schemas/tables/views/indexes/triggers/constraints and DML authority for role seeds. The runtime identity needs only: `INSERT` on `audit.AuditLog`; `SELECT, INSERT, UPDATE` on `security.Users`, `security.RoleAssignments`, `security.AccessRequests`, and `security.ApplicationSessions`; `SELECT` on `security.Roles`; `INSERT` on `security.AccessRequestHistory`; `SELECT, INSERT, UPDATE` on `ops.OperationalRecords`, `ops.JiraTransfers`, and `ops.CommandExecutions`; `INSERT` on `ops.OperationalRecordWorkflowHistory`; and `SELECT` on the three reporting views read by current code. It needs no direct `SELECT` on base audit/history tables, unused `reporting.ManagementSessionStatus`, `DELETE`, DDL, schema ownership, `db_owner`, or `db_ddladmin`. Exact grants are in the release-candidate grant-only script. View/trigger ownership chaining must be verified by the DBA.
 
 ## Bootstrap Administrator
 
@@ -45,13 +48,16 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED, TEST-ONLY | `Swagger__Enabled` | `true` |
 | REQUIRED, TEST-ONLY | `DemoAuth__Enabled` | `true` for current compatibility; `false` for Windows-auth bootstrap validation |
 | REQUIRED, TEST-ONLY | `DemoAuth__HeaderName` | `X-SecureOps-Demo-Actor` |
-| REQUIRED | `Access__RepositoryProvider` | `SqlServer` after migrations 001-005 |
+| REQUIRED | `Access__RepositoryProvider` | `SqlServer` after migrations 001-007 |
 | REQUIRED | `Access__AutoCreateRequest` | `true` |
 | REQUIRED, TEST-ONLY | `Access__DemoCompatibilityEnabled` | same enablement decision as `DemoAuth__Enabled` |
 | CONDITIONAL REQUIRED | `Access__BootstrapAdministrators__0` | `<DOMAIN\\approved-bootstrap-account>` when validating first Windows Admin against an empty database |
 | PRODUCTION-FUTURE | `Access__OidcSubjectClaimType` / `Access__OidcIssuerClaimType` | `sub` / `iss`; unused until approved OIDC |
-| REQUIRED | `SessionSecurity__IdleTimeoutMinutes` / `SessionSecurity__AbsoluteLifetimeHours` | `30` / `8` |
+| REQUIRED | `SessionSecurity__IdleTimeoutMinutes` / `SessionSecurity__AbsoluteLifetimeHours` / `SessionSecurity__ActivityPersistenceIntervalMinutes` | `30` / `12` / `5` |
+| REQUIRED | `SessionSecurity__RepositoryProvider` / `SessionSecurity__CookieName` / `SessionSecurity__MaxAdminPageSize` | `SqlServer` / `__Host-SecureOps.ApplicationSession` / `100` |
 | REQUIRED | `SessionSecurity__SecureCookie` / `SessionSecurity__HttpOnly` / `SessionSecurity__SameSite` / `SessionSecurity__RevalidateAccessOnEveryRequest` | `true` / `true` / `Lax` / `true` |
+| REQUIRED | `DataProtection__Mode` / `DataProtection__ApplicationName` | `FileSystemDpapi` / `SecureOps.Api` |
+| REQUIRED | `DataProtection__KeyRingPath` | `<absolute server-owned key-ring directory outside deployment payload>` |
 | REQUIRED | `CommandIdempotency__ExecutionLeaseSeconds` / `CommandIdempotency__MaxKeyLength` | `120` / `128` |
 | REQUIRED | `RateLimiting__IdentityLookup__PermitLimit` / `RateLimiting__IdentityLookup__WindowSeconds` | `10` / `60` |
 | REQUIRED | `RateLimiting__BulkIdentityLookup__PermitLimit` / `RateLimiting__BulkIdentityLookup__WindowSeconds` | `4` / `60` |
@@ -66,15 +72,15 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED | `IdentityLookup__ProviderTimeoutSeconds` / `IdentityLookup__BulkMaxAccounts` | `3` / `20` |
 | REQUIRED | `IdentityLookup__Cache__Enabled` / `IdentityLookup__Cache__TtlSeconds` / `IdentityLookup__Cache__MaxEntries` | `true` / `30` / `500` |
 | REQUIRED, TEST-ONLY | `PamProvider__Provider` / `PamProvider__TimeoutSeconds` | `Mock` / `3` |
-| REQUIRED, TEST-ONLY | `OperationalRecords__SourceProvider` | `Fake` for deterministic synthetic TEST verification; production-style runtimes must use `Disabled` until an approved source adapter exists |
+| REQUIRED | `OperationalRecords__SourceProvider` | `Fake` for deterministic synthetic TEST, `Disabled` for fail-closed runtime, or contract-gated `TuruncuHat` only after separate approval |
 | REQUIRED | `OperationalRecords__RepositoryProvider` / `OperationalRecords__MaxImportCount` / `OperationalRecords__ClaimLeaseSeconds` | `SqlServer` / `100` / `120` |
-| REQUIRED | `Jira__Provider` | `Disabled` for a production-style real-user pilot; `Fake` only for explicit synthetic TEST evidence |
+| REQUIRED | `Jira__Provider` | `Disabled`, `Fake` only for synthetic TEST evidence, or contract-gated `Corporate` only after separate approval |
 | REQUIRED | `Jira__ProjectKey` / `Jira__IssueType` / `Jira__MappingVersion` | `<approved TEST project key>` / `<approved issue type>` / `<reviewed mapping version>` |
 | REQUIRED | `Jira__UnresolvedRequesterPolicy` / `Jira__SummaryMaxLength` | `Block` / `255` |
 
 | REQUIRED | `Audit__Provider` / `Audit__FailClosed` / `Audit__RequirePersistentStoreInProduction` | `SqlServer` / `true` / `true` |
 | REQUIRED | `Audit__Queue__Enabled` / `Audit__Queue__Capacity` / `Audit__Queue__FullBehavior` / `Audit__FlushIntervalSeconds` | `true` / `1000` / `FailClosed` / `1` |
-| REQUIRED | `ConnectionStrings__SecureOpsDb` | `Server=tcp:secureops-mssql-test.thynet.thy.com,3406;Database=SecureOps;Integrated Security=True;Encrypt=True;TrustServerCertificate=False;Application Name=SecureOps.Api;Connect Timeout=15` |
+| REQUIRED, RUNTIME-ONLY | `ConnectionStrings__SecureOpsDb` | `Server=tcp:<SQL_FQDN>,<SQL_PORT>;Database=<DATABASE_NAME>;Integrated Security=True;Encrypt=True;TrustServerCertificate=False;Application Name=SecureOps.Api;Connect Timeout=15` |
 | REQUIRED CURRENT | `ReverseProxy__ForwardedHeaders__Enabled` | `false` until exact API proxy behavior and source IPs are confirmed |
 | CONDITIONAL | `ReverseProxy__ForwardedHeaders__TrustedProxyIps__0` | `<exact trusted API proxy IP>` only when forwarding is explicitly enabled |
 
@@ -101,6 +107,6 @@ Only three older values and the working AD state are confirmed; all other existi
 
 ## Deployment and Rollback
 
-Exact order: verify ZIP SHA256 and payload manifest; take database recovery point; DBA preflight and run 001, 002, 003, 004, 005; verify objects/seeds/triggers/views; grant runtime permissions; preserve server `web.config` and `appsettings*.json`; back up current application payload; apply reviewed IIS environment-variable delta; replace application payload without flattening directories; start/recycle only in the approved window; run the read-only smoke script.
+Exact order: verify ZIP SHA256 and payload manifest; take database recovery point; DBA preflight and run 001, 002, 003, 004, 005, 006, 007; verify objects/seeds/triggers/views; grant runtime permissions; provision and ACL the server-owned Data Protection key ring; preserve server `web.config` and `appsettings*.json`; back up current application payload; apply reviewed IIS environment-variable delta; replace application payload without flattening directories; start/recycle only in the approved window; run the read-only smoke script.
 
 Application rollback restores the prior binaries and prior server configuration while leaving additive database objects in place. Database rollback has no scripted path: stop deployment and use the DBA-approved restore/corrective-migration process. Never drop audit or history data as an application rollback step.

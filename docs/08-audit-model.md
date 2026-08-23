@@ -44,11 +44,23 @@ The audit subsystem is the project's most important non-functional feature. This
 | Identity lookup failed | API | `IdentityLookupFailed` |
 | Identity lookup provider timeout | API | `IdentityLookupProviderTimeout` |
 | Identity lookup authorization denied | API | `IdentityLookupForbidden` |
+| Directory group query requested | API | `DirectoryGroupQueryRequested` |
+| Directory group query completed or not found | API | `DirectoryGroupQueryCompleted` |
+| Directory group query rejected before provider access | API | `DirectoryGroupQueryRejected` |
+| Directory group provider query failed | API | `DirectoryGroupQueryFailed` |
+| Directory group authorization denied | API | `DirectoryGroupQueryForbidden` |
 | Audit query executed | UI/API | `AuditQueried` |
 | Configuration changed (admin) | UI | `ConfigurationChanged` |
 | RBAC mapping changed (admin) | UI | `RbacChanged` |
 | User session opened | UI | `SessionStarted` |
 | User session ended | UI | `SessionEnded` |
+| SecureOps application session started | API | `ApplicationSessionStarted` |
+| SecureOps application session idle timeout | API | `ApplicationSessionIdleTimedOut` |
+| SecureOps application session absolute timeout | API | `ApplicationSessionAbsoluteTimedOut` |
+| SecureOps application session logout | API | `ApplicationSessionLoggedOut` |
+| SecureOps application session revoked | API | `ApplicationSessionRevoked` |
+| SecureOps application session terminated after access disable | API | `ApplicationSessionAccessDisabled` |
+| SecureOps application session terminated after access-version change | API | `ApplicationSessionAccessChanged` |
 | Login failed (informational) | UI | `LoginFailed` |
 | Authorization denied | API/UI | `AuthorizationDenied` |
 | Management report requested | API | `ManagementReportRequested` |
@@ -60,6 +72,10 @@ The audit subsystem is the project's most important non-functional feature. This
 | Phase 8 remediation approved | UI | `RemediationApproved` |
 | Phase 8 remediation executed | Worker | `RemediationExecuted` |
 | Phase 8 remediation aborted | UI/Worker | `RemediationAborted` |
+
+Terminal Directory Explorer actions are projected only as aggregate `DirectoryExplorer` adoption and operator-workflow counts. They do not alter exact identity-lookup metrics, and no group/member payload enters reporting.
+
+Application-session audit details contain internal session/user identifiers, reason codes, authentication method, and access version only. Raw cookie values, corporate credentials, directory payloads, IP/device details, and heartbeat activity are excluded. Management reporting may aggregate starts and terminal reasons; it must not infer employee performance.
 
 ### What is NOT Audited
 

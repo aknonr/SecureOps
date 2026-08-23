@@ -21,7 +21,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     }
 
     /// <inheritdoc />
-    public async Task<EnsureAccessUserResult> EnsureUserAsync(CorporatePrincipal principal, bool createRequest, CancellationToken cancellationToken)
+    public async Task<EnsureAccessUserResult> EnsureUserAsync(CorporatePrincipal principal, bool createRequest, TimeSpan activityPersistenceInterval, CancellationToken cancellationToken)
     {
         const string select = "SELECT UserId FROM security.Users WITH (UPDLOCK, HOLDLOCK) WHERE CorporateIdentity = @CorporateIdentity;";
         await using SqlConnection connection = new(_connectionString);
@@ -41,8 +41,17 @@ public sealed class SqlAccessRepository : IAccessRepository
         }
         else
         {
-            const string updateSeen = "UPDATE security.Users SET LastAuthenticatedAt = SYSUTCDATETIME() WHERE UserId = @UserId;";
-            await connection.ExecuteAsync(Command(updateSeen, new { UserId = userId.GetValueOrDefault() }, transaction, cancellationToken));
+            const string updateSeen = """
+                UPDATE security.Users
+                SET LastAuthenticatedAt = SYSUTCDATETIME()
+                WHERE UserId = @UserId
+                  AND LastAuthenticatedAt <= DATEADD(MINUTE, -@ActivityPersistenceIntervalMinutes, SYSUTCDATETIME());
+                """;
+            await connection.ExecuteAsync(Command(updateSeen, new
+            {
+                UserId = userId.GetValueOrDefault(),
+                ActivityPersistenceIntervalMinutes = (int)activityPersistenceInterval.TotalMinutes
+            }, transaction, cancellationToken));
         }
 
         Guid ensuredUserId = userId ?? throw new InvalidOperationException("Access user identity was not persisted.");

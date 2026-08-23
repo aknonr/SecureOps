@@ -1,0 +1,261 @@
+#pragma warning disable CA1416
+using System.DirectoryServices;
+using System.DirectoryServices.AccountManagement;
+using System.Globalization;
+
+namespace SecureOps.Infrastructure.DirectoryExplorer;
+
+/// <summary>Phase 2 read-only enrichment operations on the existing AccountManagement client.</summary>
+public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichmentClient
+{
+    /// <inheritdoc />
+    public Task<DirectoryPrincipalEnrichmentRecord?> FindPrincipalBySamAccountNameAsync(
+        string account,
+        int maxSpns,
+        CancellationToken cancellationToken) =>
+        RunAsync(() => FindPrincipalRecord(account, IdentityType.SamAccountName, maxSpns), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<DirectoryPrincipalEnrichmentRecord?> FindPrincipalByUpnAsync(
+        string userPrincipalName,
+        int maxSpns,
+        CancellationToken cancellationToken) =>
+        RunAsync(() => FindPrincipalRecord(userPrincipalName, IdentityType.UserPrincipalName, maxSpns), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalMembershipGroupsBySamAccountNameAsync(
+        string account,
+        int maxResults,
+        CancellationToken cancellationToken) =>
+        RunAsync(
+            () => GetPrincipalMembershipGroups(account, IdentityType.SamAccountName, maxResults, cancellationToken),
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalMembershipGroupsByUpnAsync(
+        string userPrincipalName,
+        int maxResults,
+        CancellationToken cancellationToken) =>
+        RunAsync(
+            () => GetPrincipalMembershipGroups(userPrincipalName, IdentityType.UserPrincipalName, maxResults, cancellationToken),
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<DirectoryGroupRecord?> FindEnrichmentGroupAsync(
+        string group,
+        CancellationToken cancellationToken) =>
+        RunAsync(() => FindEnrichmentGroupRecord(group), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetParentGroupsAsync(
+        DirectoryGroupRecord group,
+        int maxResults,
+        CancellationToken cancellationToken) =>
+        RunAsync(() => GetParentGroups(group, maxResults, cancellationToken), cancellationToken);
+
+    private DirectoryPrincipalEnrichmentRecord? FindPrincipalRecord(
+        string value,
+        IdentityType identityType,
+        int maxSpns)
+    {
+        using PrincipalContext context = CreateContext();
+        using var user = UserPrincipal.FindByIdentity(context, identityType, value);
+        if (user is null || !ExactUser(user, value, identityType))
+        {
+            return null;
+        }
+
+        using var entry = user.GetUnderlyingObject() as DirectoryEntry;
+        string[] allSpns = Values(entry, "servicePrincipalName")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(spn => spn, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        long? passwordLastSet = FileTimeValue(entry, "pwdLastSet");
+        return new DirectoryPrincipalEnrichmentRecord(
+            user.Sid?.Value,
+            user.DisplayName,
+            user.SamAccountName,
+            user.UserPrincipalName,
+            user.Enabled,
+            user.IsAccountLockedOut(),
+            ToUtc(user.LastPasswordSet),
+            user.PasswordNeverExpires,
+            ToUtc(user.AccountExpirationDate),
+            passwordLastSet is null ? null : passwordLastSet == 0,
+            FileTimeUtc(entry, "lastLogonTimestamp"),
+            Property(entry, "managedBy"),
+            allSpns.Take(maxSpns).ToArray(),
+            allSpns.Length,
+            allSpns.Length > maxSpns,
+            AccountTypeEvidence(entry));
+    }
+
+    private DirectoryProviderPage<DirectoryGroupRecord>? GetPrincipalMembershipGroups(
+        string value,
+        IdentityType identityType,
+        int maxResults,
+        CancellationToken cancellationToken)
+    {
+        using PrincipalContext context = CreateContext();
+        using var user = UserPrincipal.FindByIdentity(context, identityType, value);
+        return user is null || !ExactUser(user, value, identityType)
+            ? null
+            : BoundedParentGroups(user, maxResults, cancellationToken);
+    }
+
+    private DirectoryGroupRecord? FindEnrichmentGroupRecord(string value)
+    {
+        using PrincipalContext context = CreateContext();
+        using GroupPrincipal? group = FindExactEnrichmentGroup(context, value);
+        return group is null ? null : MapGroup(group);
+    }
+
+    private DirectoryProviderPage<DirectoryGroupRecord>? GetParentGroups(
+        DirectoryGroupRecord record,
+        int maxResults,
+        CancellationToken cancellationToken)
+    {
+        using PrincipalContext context = CreateContext();
+        using GroupPrincipal? group = FindExactEnrichmentGroup(context, record);
+        return group is null ? null : BoundedParentGroups(group, maxResults, cancellationToken);
+    }
+
+    private static DirectoryProviderPage<DirectoryGroupRecord> BoundedParentGroups(
+        Principal principal,
+        int maxResults,
+        CancellationToken cancellationToken)
+    {
+        using PrincipalSearchResult<Principal> parents = principal.GetGroups();
+        List<DirectoryGroupRecord> records = [];
+        bool hasMore = false;
+        foreach (Principal parent in parents)
+        {
+            using (parent)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (parent is not GroupPrincipal group)
+                {
+                    continue;
+                }
+
+                if (records.Count >= maxResults)
+                {
+                    hasMore = true;
+                    break;
+                }
+
+                records.Add(MapGroup(group));
+            }
+        }
+
+        return new DirectoryProviderPage<DirectoryGroupRecord>(
+            records.OrderBy(DirectoryMembershipGraph.GroupKey, StringComparer.Ordinal).ToArray(),
+            hasMore);
+    }
+
+    private static GroupPrincipal? FindExactEnrichmentGroup(PrincipalContext context, string value)
+    {
+        if (value.StartsWith("s-1-", StringComparison.OrdinalIgnoreCase))
+        {
+            var sidGroup = GroupPrincipal.FindByIdentity(context, IdentityType.Sid, value);
+            if (sidGroup is not null && string.Equals(sidGroup.Sid?.Value, value, StringComparison.OrdinalIgnoreCase))
+            {
+                return sidGroup;
+            }
+
+            sidGroup?.Dispose();
+        }
+
+        return FindExactGroup(context, value);
+    }
+
+    private static GroupPrincipal? FindExactEnrichmentGroup(
+        PrincipalContext context,
+        DirectoryGroupRecord record)
+    {
+        if (!string.IsNullOrWhiteSpace(record.StableIdentifier))
+        {
+            var sidGroup = GroupPrincipal.FindByIdentity(
+                context,
+                IdentityType.Sid,
+                record.StableIdentifier);
+            if (sidGroup is not null
+                && string.Equals(sidGroup.Sid?.Value, record.StableIdentifier, StringComparison.OrdinalIgnoreCase))
+            {
+                return sidGroup;
+            }
+
+            sidGroup?.Dispose();
+        }
+
+        string? exact = !string.IsNullOrWhiteSpace(record.SamAccountName)
+            ? record.SamAccountName
+            : record.Name;
+        return exact is null ? null : FindExactGroup(context, exact);
+    }
+
+    private static IEnumerable<string> Values(DirectoryEntry? entry, string propertyName)
+    {
+        if (entry?.Properties[propertyName] is not PropertyValueCollection values)
+        {
+            yield break;
+        }
+
+        foreach (object value in values)
+        {
+            if (value is string text && !string.IsNullOrWhiteSpace(text))
+            {
+                yield return text;
+            }
+        }
+    }
+
+    private static long? FileTimeValue(DirectoryEntry? entry, string propertyName)
+    {
+        object? value = entry?.Properties[propertyName]?.Value;
+        try
+        {
+            return value is null ? null : Convert.ToInt64(value, CultureInfo.InvariantCulture);
+        }
+        catch (Exception exception) when (exception is FormatException or InvalidCastException or OverflowException)
+        {
+            return null;
+        }
+    }
+
+    private static DateTimeOffset? FileTimeUtc(DirectoryEntry? entry, string propertyName)
+    {
+        long? value = FileTimeValue(entry, propertyName);
+        if (value is null or <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return new DateTimeOffset(DateTime.FromFileTimeUtc(value.Value));
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return null;
+        }
+    }
+
+    private static DateTimeOffset? ToUtc(DateTime? value) => value is null
+        ? null
+        : new DateTimeOffset(value.Value.ToUniversalTime());
+
+    private static string AccountTypeEvidence(DirectoryEntry? entry)
+    {
+        string[] objectClasses = Values(entry, "objectClass").ToArray();
+        if (objectClasses.Contains("msDS-GroupManagedServiceAccount", StringComparer.OrdinalIgnoreCase))
+        {
+            return "GroupManagedServiceAccount";
+        }
+
+        return objectClasses.Contains("msDS-ManagedServiceAccount", StringComparer.OrdinalIgnoreCase)
+            ? "ManagedServiceAccount"
+            : "User";
+    }
+}
+#pragma warning restore CA1416

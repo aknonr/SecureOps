@@ -4,11 +4,11 @@
 
 The backend foundation is implemented for TEST validation. Codex owns API, services, integration boundaries, persistence, SQL, authorization, audit, release packaging, and backend tests. Claude owns all Blazor/Razor/CSS/UI work and does not need to change this module.
 
-Real Operational Record and Jira adapters are intentionally deferred. `OperationalRecords:SourceProvider=Fake` selects a deterministic, no-network Development/Demo/Test harness. Production-style environments default to `Disabled` and fail closed until an approved source adapter exists. Jira remains a no-network fake pending its approved contract.
+Typed Turuncu Hat and corporate Jira adapters are implemented behind the existing boundaries and remain disabled by default. `Fake` selects the deterministic no-network Development/Demo/Test harness. Real external TEST activation remains blocked until the sanitized samples in `docs/integrations/turuncu-hat-jira-contract-gaps.md` are reviewed.
 
 ## Legacy Workflow Replacement
 
-No legacy Operational Record/Jira PowerShell script exists in this repository. The known behavior was supplied as requirements and is source material only; the API never launches PowerShell.
+No legacy Operational Record/Jira PowerShell script exists in this repository. Sanitized legacy contract evidence defines only the retained behaviors documented in `docs/integrations/turuncu-hat-jira-legacy-parity.md`; the API never launches PowerShell.
 
 | Legacy step | SecureOps backend component |
 |---|---|
@@ -27,7 +27,7 @@ No legacy Operational Record/Jira PowerShell script exists in this repository. T
 
 `Imported -> Classified -> NeedsManualReview | Eligible -> Previewed -> CreateRequested -> CreatingJira -> JiraCreated -> ClosingOperationalRecord -> Completed`
 
-Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. No approved real-source classification rules exist, so production-style classification selects `NeedsManualReview`. The explicit synthetic source uses a synthetic-only classifier to make its known records eligible for state-machine verification; it is not a corporate business rule and cannot activate outside Development/Demo/Test.
+Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. Disabled mode classifies records for manual review. The Turuncu Hat provider makes only valid active records already returned by the reviewed legacy source filter eligible; malformed projections remain manual review. The synthetic source retains its synthetic-only classifier.
 
 ## Claims, Idempotency, Freshness, and Retry
 
@@ -45,9 +45,11 @@ A source refresh may update bounded source fields, but classification is reappli
 - No password, token, authorization header, or raw remote response is stored or returned.
 - Requester resolution is exact only. Ambiguous matches always fail closed.
 - Unresolved requesters are blocked by default; `ProceedUnassigned` must be an explicit approved policy.
+- Jira assignment defaults to `ProjectDefault`. Only an exact deployment-verified SecureOps actor mapping may emit `assignee`; no AD inference or fuzzy match is permitted.
+- Jira `reporter` is never emitted because it is absent from the reviewed create metadata. The Basic-authenticated integration identity remains separate from the SecureOps actor and source requester.
 - Jira creation and retry require server-side capability policies.
 - The working exact AD/PAM-style identity lookup provider is unchanged.
-- Real source close/update is a state-changing external integration and remains disabled until separately approved.
+- Real source close/update is a state-changing external integration and remains configuration-disabled until the external TEST activation gate is approved.
 
 ## Authorization
 
@@ -65,7 +67,7 @@ Import, classification, preview, create request/result, source-close request/res
 
 ## Persistence and DBA Review
 
-`sql/schema/002-operational-record-jira-workflow.sql` creates the base workflow tables. Offline migration 003 adds source/claim metadata and `ops.CommandExecutions`; migration 004 adds access mutation versions. The application does not run migrations. DBA approval and execution of migrations 001-004 are required before selecting `SqlServer`.
+`sql/schema/002-operational-record-jira-workflow.sql` creates the base workflow tables. Offline migration 003 adds source/claim metadata and `ops.CommandExecutions`; migration 004 adds access mutation versions; migration 006 permits unknown source creation time. The application does not run migrations. DBA approval and execution of applicable ordered migrations are required before selecting `SqlServer`.
 
 Minimum runtime permissions are `SELECT`, `INSERT`, and `UPDATE` on these three `ops` tables; no `DELETE`, DDL, schema-owner, or migration permission is required. Audit-store permissions remain separate.
 
@@ -73,27 +75,31 @@ Minimum runtime permissions are `SELECT`, `INSERT`, and `UPDATE` on these three 
 
 Non-secret keys:
 
-- `OperationalRecords:SourceProvider` (`Disabled`, or `Fake` only in Development/Demo/Test)
+- `OperationalRecords:SourceProvider` (`Disabled`, `Fake` only in Development/Demo/Test, or `TuruncuHat`)
 - `OperationalRecords:RepositoryProvider` (`InMemory` or `SqlServer`)
 - `OperationalRecords:MaxImportCount` (1-500)
 - `OperationalRecords:ClaimLeaseSeconds` (30-900)
 - `CommandIdempotency:ExecutionLeaseSeconds` (30-900)
 - `CommandIdempotency:MaxKeyLength` (32-256)
-- `Jira:Provider` (`Fake` only now)
+- `Jira:Provider` (`Disabled`, `Fake` only in Development/Demo/Test, or `Corporate`)
 - `Jira:ProjectKey`
 - `Jira:IssueType`
 - `Jira:MappingVersion`
 - `Jira:UnresolvedRequesterPolicy` (`Block` or `ProceedUnassigned`)
+- `Jira:AuthenticationMode` (`Basic` for `Corporate`)
+- `Jira:AssignmentMode` (`ProjectDefault` or `VerifiedOperatorMapping`)
+- `Jira:OperatorAssigneeMappings:{n}:SecureOpsActor` and `JiraUsername`
+- `Jira:ReporterMode` (`ProjectDefault` only)
 - `Jira:SummaryMaxLength` (32-255)
 
-Local, Demo, or Test synthetic verification requires both an allowed `ASPNETCORE_ENVIRONMENT` value (`Development`, `Demo`, or `Test`) and `OperationalRecords__SourceProvider=Fake`. Production-style runtime configuration must set `OperationalRecords__SourceProvider=Disabled`; any unimplemented provider name fails startup validation instead of falling back to synthetic data.
+Local synthetic verification requires an allowed environment and explicit `Fake` providers. Real providers require every validated option in `docs/26-enterprise-turuncu-hat-jira-adapters.md`; unsupported or incomplete selection fails startup and never falls back to synthetic data.
 - `ConnectionStrings:SecureOpsDb` when SQL persistence is selected
 
-Future integration authentication must use approved server-side enterprise identity/secret facilities. No credential shape is defined in source.
+Integration authentication values are runtime-only server configuration. Controlled Jira evidence proves Basic authentication; the complete Basic Authorization value remains secret and server-owned. Turuncu Hat authentication scheme remains unproven.
 
 ## TEST Validation
 
-Before enabling a real adapter: review source and Jira contracts, approve field mappings/classification rules, apply SQL through DBA process, configure capability groups, validate service-account permissions, and prove a deterministic Jira reconciliation mechanism. TEST must exercise preview, one create, partial source-close failure, retry, concurrent submission, audit evidence, and correlation IDs with synthetic/non-sensitive records.
+Before enabling a real adapter: approve the outstanding sanitized HTTP samples, review mappings, apply SQL through the DBA process, configure capability groups, and validate service-account permissions. TEST must exercise preview, one create, partial source-close failure, close-only retry, concurrent submission, audit evidence, and manual reconciliation using synthetic/non-sensitive records.
 
 The synthetic source exposes fixed non-corporate records for a stable eligible flow plus stale, closed, and missing revalidation outcomes. Claim ownership, transfer completion, and reconciliation are durable workflow transitions exercised against those records rather than fabricated source fields. A real source adapter still requires approved base URL and authentication, bounded list/detail schemas, exact requester fields, status mapping, version/ETag semantics, close/update contract, error/retry semantics, and ownership approval.
 

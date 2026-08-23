@@ -106,7 +106,10 @@ public sealed class ManagementReportingApiClientTests
         new OperationalWorkflowMetricsResponse(
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, new RetryOutcomeMetricsResponse(0, 0, 0, 0), []),
         new PlatformAdoptionMetricsResponse(0, 0, 0, 0, [], []),
+        new SessionGovernanceMetricsResponse(0, 0, 0, 0, 0, 0, 0),
         new SecurityQualityMetricsResponse(0, 0, 0, 0, null),
+        [],
+        Coverage(),
         []);
 
     private static OperatorActivityPageResponse Page() => new(
@@ -114,7 +117,14 @@ public sealed class ManagementReportingApiClientTests
         3,
         25,
         0,
-        []);
+        [],
+        Coverage());
+
+    private static ReportingEvidenceCoverageResponse Coverage() => new(
+        DateTimeOffset.UnixEpoch,
+        DateTimeOffset.UnixEpoch.AddDays(7),
+        DateTimeOffset.UnixEpoch,
+        CoverageComplete: true);
 
     private sealed class RecordingHandler : HttpMessageHandler
     {

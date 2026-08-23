@@ -1,0 +1,29 @@
+/*
+Grant-only SecureOps runtime contract. Run in the approved SecureOps database.
+This file does not create a login/user, schema, table, or migration object.
+*/
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+
+IF DATABASE_PRINCIPAL_ID(N'DOMAIN\WASAST_YONETIM') IS NULL
+    THROW 51000, 'Create and review the DOMAIN\WASAST_YONETIM database user before applying runtime grants.', 1;
+
+GRANT CONNECT TO [DOMAIN\WASAST_YONETIM];
+
+GRANT INSERT ON OBJECT::audit.AuditLog TO [DOMAIN\WASAST_YONETIM];
+
+GRANT SELECT, INSERT, UPDATE ON OBJECT::security.Users TO [DOMAIN\WASAST_YONETIM];
+GRANT SELECT ON OBJECT::security.Roles TO [DOMAIN\WASAST_YONETIM];
+GRANT SELECT, INSERT, UPDATE ON OBJECT::security.RoleAssignments TO [DOMAIN\WASAST_YONETIM];
+GRANT SELECT, INSERT, UPDATE ON OBJECT::security.AccessRequests TO [DOMAIN\WASAST_YONETIM];
+GRANT INSERT ON OBJECT::security.AccessRequestHistory TO [DOMAIN\WASAST_YONETIM];
+GRANT SELECT, INSERT, UPDATE ON OBJECT::security.ApplicationSessions TO [DOMAIN\WASAST_YONETIM];
+
+GRANT SELECT, INSERT, UPDATE ON OBJECT::ops.OperationalRecords TO [DOMAIN\WASAST_YONETIM];
+GRANT SELECT, INSERT, UPDATE ON OBJECT::ops.JiraTransfers TO [DOMAIN\WASAST_YONETIM];
+GRANT INSERT ON OBJECT::ops.OperationalRecordWorkflowHistory TO [DOMAIN\WASAST_YONETIM];
+GRANT SELECT, INSERT, UPDATE ON OBJECT::ops.CommandExecutions TO [DOMAIN\WASAST_YONETIM];
+
+GRANT SELECT ON OBJECT::reporting.ManagementAuditEvents TO [DOMAIN\WASAST_YONETIM];
+GRANT SELECT ON OBJECT::reporting.ManagementWorkflowEvents TO [DOMAIN\WASAST_YONETIM];
+GRANT SELECT ON OBJECT::reporting.ManagementOperationalStatus TO [DOMAIN\WASAST_YONETIM];

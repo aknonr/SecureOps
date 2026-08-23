@@ -6,5 +6,8 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 public interface IJiraIssueDraftService
 {
     /// <summary>Builds a draft without creating or modifying remote data.</summary>
-    public Task<OperationalRecordResult<JiraIssueDraft>> BuildAsync(OperationalRecord record, CancellationToken cancellationToken);
+    public Task<OperationalRecordResult<JiraIssueDraft>> BuildAsync(
+        OperationalRecord record,
+        string actor,
+        CancellationToken cancellationToken);
 }

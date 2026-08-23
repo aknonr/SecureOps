@@ -56,7 +56,7 @@ public sealed class JiraTransferService : IJiraTransferService
             return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
         }
 
-        OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, cancellationToken);
+        OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, context.Actor, cancellationToken);
         if (!draftResult.IsSuccess)
         {
             return draftResult;
@@ -241,7 +241,7 @@ public sealed class JiraTransferService : IJiraTransferService
             return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
         }
 
-        OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, cancellationToken);
+        OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, context.Actor, cancellationToken);
         if (!draftResult.IsSuccess)
         {
             return new OperationalRecordResult<OperationalRecord>(null, draftResult.Failure);
@@ -286,7 +286,7 @@ public sealed class JiraTransferService : IJiraTransferService
             return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordInvalidState, "workflow", false);
         }
 
-        OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, cancellationToken);
+        OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, context.Actor, cancellationToken);
         if (!draftResult.IsSuccess)
         {
             return new OperationalRecordResult<OperationalRecord>(null, draftResult.Failure);

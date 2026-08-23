@@ -16,11 +16,23 @@ ProblemDetails includes safe `code`, `stage`, `retryable`, `correlationId`, and 
 | `POST /api/v1/access/requests/{id}/reject` | `Access.ApproveRequests` | `{ "reason": "...", "roles": null, "expectedVersion": 1 }` | decided `AccessRequestResponse` | same decision codes |
 | `PUT /api/v1/access/users/{id}/roles` | `Access.AssignRoles` | `{ "roles": ["Lead"], "reason": "...", "expectedVersion": 2 }` | `CurrentAccessResponse` | validation, not found, user state, concurrency codes |
 | `POST /api/v1/access/users/{id}/disable` | `Access.ManageUsers` | `{ "reason": "...", "expectedVersion": 2 }` | disabled `CurrentAccessResponse` | validation, not found, user state, concurrency codes |
-| `POST /api/v1/access/logout` | Authenticated | none | `LogoutResponse`; provider-managed logout intent only | `AuditStoreUnavailable` |
+| `POST /api/v1/access/logout` | Authenticated | none | ends the SecureOps application session and clears its handle; corporate-provider logout remains host/browser managed | `SessionRevoked`, `SessionStoreUnavailable`, `AuditStoreUnavailable` |
 
 Role codes are `Admin`, `Lead`, `Operator`, `JiraPublisher`, `Auditor`, and `ReadOnly`. Render behavior from returned capabilities, but treat server authorization as authoritative.
 
 After rejection, `accessStatus` remains `Pending`, `pendingRequestId` is null, and `latestRequest.status` is `Rejected`. Ordinary access never creates a replacement. There is no reapplication route. Profile fields are nullable provider results; the UI must not derive display data. Role PUT is replace semantics: read the current user and submit its latest `version`, then refresh after any conflict.
+
+## Application Sessions
+
+The `__Host-SecureOps.ApplicationSession` cookie is a Secure, HttpOnly, SameSite=Lax, browser-session-only opaque handle. It is not corporate authentication or an authorization source. Do not persist, display, log, or replay it in UI state.
+
+| Method and route | Capability | Request | Success | Important errors |
+|---|---|---|---|---|
+| `GET /api/v1/sessions/current` | Authenticated | none | safe current session timestamps, internal IDs, authentication method, and access version | `SessionExpired`, `SessionRevoked`, `SessionStoreUnavailable` |
+| `GET /api/v1/sessions/active?page=1&pageSize=50` | `Access.ManageUsers` | bounded page; maximum configured 100 | safe active-session metadata only; no IP, device, cookie, or directory data | validation, authorization, store/audit unavailable |
+| `POST /api/v1/sessions/revoke` | `Access.ManageUsers` | `{ "sessionId": "...", "reason": "..." }` | exact terminal session ID/reason/time | `SessionValidationFailed`, `SessionNotFound`, store/audit unavailable |
+
+Idle expiry, absolute expiry, explicit logout, administrative revocation, access disable, and access-version change are server authoritative. A later Negotiate request may authenticate again and create a new SecureOps session; the application cookie does not implement Remember Me or provider logout.
 
 ## Identity
 
@@ -33,15 +45,34 @@ After rejection, `accessStatus` remains `Pending`, `pendingRequestId` is null, a
 | `GET /api/v1/identity/lookup/cache-diagnostics` | `SystemDiagnostics` | none | aggregate counters without account labels | 403 |
 | `GET /api/v1/health/identity-provider` | Authenticated outside Development | none | provider name and real-provider flag | 401 |
 
+## Directory Explorer
+
+Phase 1 routes remain unchanged. Phase 2 requests are exact-only POST bodies with `account`, required operational `purpose`, and optional `refresh`; membership-path requests also require `targetGroup`. Negative membership-path results are conclusive only when traversal metadata reports no limit or truncation.
+
+| Method and route | Capability | Success |
+|---|---|---|
+| `POST /api/v1/directory/principals/groups` | `Identity.Groups.View` | paged direct groups only |
+| `POST /api/v1/directory/groups/lookup` | `Identity.Groups.View` | exact group metadata |
+| `POST /api/v1/directory/groups/members` | `Identity.Groups.Members.View` | paged direct members only |
+| `POST /api/v1/directory/principals/memberships` | `Identity.Groups.View` | separate direct/transitive groups and traversal metadata |
+| `POST /api/v1/directory/principals/membership-paths` | `Identity.Groups.View` | bounded proven paths to one exact group |
+| `POST /api/v1/directory/principals/account-health` | `Identity.Groups.View` | nullable health evidence; `lastLogonTimestampUtc` is approximate |
+| `POST /api/v1/directory/principals/service-evidence` | `Identity.Groups.View` | bounded SPNs, account-type evidence, and membership counts |
+| `POST /api/v1/directory/principals/privileged-memberships` | `Identity.PrivilegedGroups.View` | Admin-only evidence for exact server-configured groups |
+
+The API does not classify service/PAM accounts from names, infer administrator status from group text, expose LDAP filters/cookies, or use returned directory data as application authorization. Common failures are `DirectoryInvalidInput`, `DirectoryPrincipalNotFound`, `DirectoryGroupNotFound`, `DirectoryQueryLimitExceeded`, `DirectoryProviderUnavailable`, and `AuditStoreUnavailable`.
+
 ## Operational Records
 
-`GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `OperationalRecords:SourceProvider=Fake` is an explicit Development/Demo/Test-only synthetic workflow harness; `Disabled` is the production-style fail-closed setting until an approved source adapter exists.
+`GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `Fake` is Development/Demo/Test-only, `Disabled` fails closed, and `TuruncuHat` is a typed real adapter whose external TEST activation remains contract-gated. `createdAt` is nullable because the reviewed legacy projection does not supply a source timestamp.
+
+`GET /api/v1/health/enterprise-integrations` is Admin-only and exposes only provider selection and safe status; it never exposes URLs, credentials, sessions, identities, or remote payloads.
 
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
 | `GET /api/v1/operational-records` | `OperationalRecords.View` | none | `OperationalRecordResponse[]` | `OperationalSourceUnavailable`, `OperationalRecordQueryFailed`, `AuditStoreUnavailable`, 429 |
 | `GET /api/v1/operational-records/{id}` | `OperationalRecords.View` | route GUID | `OperationalRecordResponse` including claim, freshness, retry, and version state | `OperationalRecordNotFound` |
-| `POST /api/v1/operational-records/{id}/jira-preview` | `OperationalRecords.CreateJiraPreview` | no body | `JiraPreviewResponse`; never creates Jira or closes source | record state/requester/Jira validation codes, 429 |
+| `POST /api/v1/operational-records/{id}/jira-preview` | `OperationalRecords.CreateJiraPreview` | no body | `JiraPreviewResponse`; optional `assigneeUsername` is the effective exact mapped assignee, otherwise null/project default; never creates Jira or closes source | record state/requester/Jira validation codes, 429 |
 | `POST /api/v1/operational-records/{id}/jira` | `OperationalRecords.CreateJira` | optional `Idempotency-Key` header, maximum configured length | `JiraTransferResponse` | `InvalidIdempotencyKey`, `OperationalRecordAlreadyClaimed`, `OperationalRecordChanged`, `OperationalRecordNoLongerOpen`, `WorkflowAlreadyInProgress`, `JiraCreateFailed` |
 | `POST /api/v1/operational-records/{id}/retry` | `OperationalRecords.Retry` | optional `Idempotency-Key` header | resumed `JiraTransferResponse` | `WorkflowAlreadyCompleted`, conflict/freshness/Jira/source-close codes |
 
@@ -55,7 +86,11 @@ The v1 wire contract intentionally serializes Operational Record enums as intege
 
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
-| `GET /api/v1/reporting/management/summary` | `Reporting.ManagementView` | `window=today|7d|30d|custom`; custom also requires UTC `from` and `to` | bounded team-level identity, workflow, adoption, security, and elapsed-duration aggregates | `ReportingValidationFailed`, `ReportingUnavailable`, `AuditStoreUnavailable` |
+| `GET /api/v1/reporting/management/summary` | `Reporting.ManagementView` | `window=today|7d|30d|custom`; custom also requires UTC `from` and `to` | bounded team-level identity, workflow, adoption, session-governance, security, and elapsed-duration aggregates | `ReportingValidationFailed`, `ReportingUnavailable`, `AuditStoreUnavailable` |
 | `GET /api/v1/reporting/management/operators` | `Reporting.ManagementView` | same window plus `page` and `pageSize` (maximum 100) | server-paginated persisted actor counts and activity bounds | same reporting errors |
 
 Only Admin and Auditor receive this capability. Windows are UTC half-open intervals and custom ranges are capped at 92 days. Duration fields are elapsed system workflow time, not active labor or time saved. Operator data must not be rendered as rankings or performance comparisons.
+
+Duration identity is the stable `key`: `importToPreview`, `claimToJiraCreation`, or `claimToCompletion`. UI logic and localization must not match `definition` text or rely on duration array order. The legacy definition remains fallback display text.
+
+Use `limitations[*].code` for localization and behavior; `message` is optional fallback text. The legacy `dataLimitations` string array remains temporarily for compatibility and must not be parsed. Both routes return `coverage` with `requestedFromUtc`, `requestedToUtc`, nullable `coverageFromUtc`, and `coverageComplete`. A zero is a measured zero only when coverage is complete and no matching metric-specific limitation applies. G-16 adoption and Operational Record/Jira trend series remain unavailable and must not be inferred client-side.

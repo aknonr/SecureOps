@@ -7,13 +7,39 @@ namespace SecureOps.Infrastructure.Reporting;
 /// <summary>Projects server-aggregated rows into the stable management reporting contract.</summary>
 public sealed class ManagementReportProjector
 {
-    private static readonly IReadOnlyList<string> _limitations =
+    private static readonly IReadOnlyList<string> _legacyLimitations =
     [
         "Rate-limit rejections are not currently persisted as audit events; this metric is unavailable.",
         "Historical access-version conflicts and Operational Record source-query outages are unavailable when no audit event exists.",
         "Invalid items skipped inside historical bulk identity requests do not have individual terminal audit rows.",
         "Duplicate-create prevention is measurable only from the first release that writes its explicit audit event.",
         "Elapsed durations include waits and retries and are not active labor, time saved, or operator performance."
+    ];
+
+    private static readonly IReadOnlyList<LimitationDefinition> _limitationDefinitions =
+    [
+        new(ManagementReportingLimitationCodes.RateLimitRejectionsUnavailable,
+            "Rate-limit rejections are not currently persisted as audit events; this metric is unavailable."),
+        new(ManagementReportingLimitationCodes.AccessVersionConflictHistoryUnavailable,
+            "Historical access-version conflicts are unavailable when no audit event exists."),
+        new(ManagementReportingLimitationCodes.OperationalSourceOutageHistoryUnavailable,
+            "Historical Operational Record source-query outages are unavailable when no audit event exists."),
+        new(ManagementReportingLimitationCodes.BulkIdentityInvalidItemHistoryUnavailable,
+            "Invalid items skipped inside historical bulk identity requests do not have individual terminal audit rows."),
+        new(ManagementReportingLimitationCodes.DuplicateCreatePreventionHistoryIncomplete,
+            "Duplicate-create prevention is measurable only from the first release that writes its explicit audit event."),
+        new(ManagementReportingLimitationCodes.ElapsedDurationsNotActiveEffort,
+            "Elapsed durations include waits and retries and are not active labor, time saved, or operator performance.")
+    ];
+
+    private static readonly IReadOnlyList<DurationDefinition> _durationDefinitions =
+    [
+        new(ManagementReportingDurationKeys.ImportToPreview,
+            "First persisted import to first persisted preview"),
+        new(ManagementReportingDurationKeys.ClaimToJiraCreation,
+            "Workflow claim to durable Jira issue-key persistence"),
+        new(ManagementReportingDurationKeys.ClaimToCompletion,
+            "Workflow claim to durable workflow completion")
     ];
 
     /// <summary>Projects one summary without reading raw browser or directory data.</summary>
@@ -31,6 +57,7 @@ public sealed class ManagementReportProjector
         long providerUnavailable = Action(actionCounts, AuditActions.IdentityLookupFailed)
             + Action(actionCounts, AuditActions.IdentityLookupProviderTimeout);
         long identityForbidden = Action(actionCounts, AuditActions.IdentityLookupForbidden);
+        long directoryForbidden = Action(actionCounts, AuditActions.DirectoryGroupQueryForbidden);
 
         IdentityLookupMetricsResponse identity = new(
             succeeded + notFound + rejected + providerUnavailable + identityForbidden,
@@ -74,19 +101,32 @@ public sealed class ManagementReportProjector
                 .ToArray());
 
         SecurityQualityMetricsResponse security = new(
-            Action(actionCounts, AuditActions.AuthorizationDenied) + identityForbidden,
+            Action(actionCounts, AuditActions.AuthorizationDenied) + identityForbidden + directoryForbidden,
             Action(actionCounts, AuditActions.OperationalRecordConflict),
             data.ReconciliationRequired,
             providerUnavailable,
             RateLimitEvents: null);
 
+        SessionGovernanceMetricsResponse sessions = new(
+            Action(actionCounts, AuditActions.ApplicationSessionStarted),
+            Action(actionCounts, AuditActions.ApplicationSessionIdleTimedOut),
+            Action(actionCounts, AuditActions.ApplicationSessionAbsoluteTimedOut),
+            Action(actionCounts, AuditActions.ApplicationSessionLoggedOut),
+            Action(actionCounts, AuditActions.ApplicationSessionRevoked),
+            Action(actionCounts, AuditActions.ApplicationSessionAccessDisabled),
+            Action(actionCounts, AuditActions.ApplicationSessionAccessChanged));
+
+        ReportingEvidenceCoverageResponse coverage = Coverage(window, data.CoverageFromUtc);
         return new ManagementReportResponse(
             Window(window),
             identity,
             operational,
             adoption,
+            sessions,
             security,
-            _limitations);
+            _legacyLimitations,
+            coverage,
+            Limitations(coverage));
     }
 
     /// <summary>Projects an already paged server aggregate.</summary>
@@ -107,9 +147,11 @@ public sealed class ManagementReportProjector
                 item.LastActivityAt,
                 [
                     new NamedCountResponse("IdentityLookup", item.IdentityOperations),
+                    new NamedCountResponse("DirectoryExplorer", item.DirectoryOperations),
                     new NamedCountResponse("Access", item.AccessOperations),
                     new NamedCountResponse("OperationalRecordJira", item.OperationalWorkflowOperations)
-                ])).ToArray());
+                ])).ToArray(),
+            Coverage(window, data.CoverageFromUtc));
 
     private static IReadOnlyList<IdentityLookupTrendPointResponse> IdentityTrend(
         ReportingWindow window,
@@ -156,22 +198,50 @@ public sealed class ManagementReportProjector
     private static IReadOnlyList<DurationStatisticsResponse> Durations(
         IReadOnlyList<ReportingDurationStatistics> durations)
     {
-        var indexed = durations.ToDictionary(item => item.Name, StringComparer.Ordinal);
-        return
-        [
-            Duration(indexed, "ImportToPreview", "First persisted import to first persisted preview"),
-            Duration(indexed, "ClaimToJiraCreated", "Workflow claim to durable Jira issue-key persistence"),
-            Duration(indexed, "ClaimToCompleted", "Workflow claim to durable workflow completion")
-        ];
+        var indexed = durations.ToDictionary(item => item.Key, StringComparer.Ordinal);
+        return _durationDefinitions.Select(definition => Duration(indexed, definition)).ToArray();
     }
 
     private static DurationStatisticsResponse Duration(
         IReadOnlyDictionary<string, ReportingDurationStatistics> indexed,
-        string name,
-        string definition) =>
-        indexed.TryGetValue(name, out ReportingDurationStatistics? value)
-            ? new DurationStatisticsResponse(definition, value.SampleCount, value.MinimumSeconds, value.AverageSeconds, value.MaximumSeconds)
-            : new DurationStatisticsResponse(definition, 0, null, null, null);
+        DurationDefinition definition) =>
+        indexed.TryGetValue(definition.Key, out ReportingDurationStatistics? value)
+            ? new DurationStatisticsResponse(
+                definition.Key,
+                definition.Label,
+                value.SampleCount,
+                value.MinimumSeconds,
+                value.AverageSeconds,
+                value.MaximumSeconds)
+            : new DurationStatisticsResponse(definition.Key, definition.Label, 0, null, null, null);
+
+    private static ReportingEvidenceCoverageResponse Coverage(
+        ReportingWindow window,
+        DateTimeOffset? coverageFrom)
+    {
+        DateTimeOffset? normalized = coverageFrom?.ToUniversalTime();
+        return new ReportingEvidenceCoverageResponse(
+            window.FromInclusiveUtc,
+            window.ToExclusiveUtc,
+            normalized,
+            normalized is not null && normalized <= window.FromInclusiveUtc);
+    }
+
+    private static IReadOnlyList<DataLimitationResponse> Limitations(
+        ReportingEvidenceCoverageResponse coverage)
+    {
+        var limitations = _limitationDefinitions
+            .Select(item => new DataLimitationResponse(item.Code, item.Message))
+            .ToList();
+        if (!coverage.CoverageComplete)
+        {
+            limitations.Add(new DataLimitationResponse(
+                ManagementReportingLimitationCodes.HistoryBeforePersistenceUnavailable,
+                "Historical evidence before coverageFromUtc is unavailable."));
+        }
+
+        return limitations;
+    }
 
     private static ReportingWindowResponse Window(ReportingWindow window) =>
         new(window.Selection, window.FromInclusiveUtc, window.ToExclusiveUtc);
@@ -193,4 +263,7 @@ public sealed class ManagementReportProjector
         DateOnly date,
         string action) =>
         counts.TryGetValue((date, action), out long value) ? value : 0;
+
+    private sealed record DurationDefinition(string Key, string Label);
+    private sealed record LimitationDefinition(string Code, string Message);
 }

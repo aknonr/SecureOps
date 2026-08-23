@@ -16,7 +16,7 @@ public sealed class JiraIssueDraftServiceTests
         OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
         JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.Found("jira-account-100")), "Block");
 
-        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, CancellationToken.None);
+        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, "test:operator", CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         JiraIssueDraft draft = result.Value!;
@@ -32,7 +32,7 @@ public sealed class JiraIssueDraftServiceTests
         OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
         JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.Ambiguous()), "ProceedUnassigned");
 
-        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, CancellationToken.None);
+        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, "test:operator", CancellationToken.None);
 
         result.Failure!.Code.Should().Be(OperationalErrorCodes.RequesterResolutionAmbiguous);
     }
@@ -44,7 +44,7 @@ public sealed class JiraIssueDraftServiceTests
         OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
         JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.NotFound()), "ProceedUnassigned");
 
-        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, CancellationToken.None);
+        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, "test:operator", CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         JiraIssueDraft draft = result.Value!;
@@ -52,14 +52,67 @@ public sealed class JiraIssueDraftServiceTests
         draft.Warnings.Should().ContainSingle();
     }
 
-    private static JiraIssueDraftService CreateService(IRequesterResolver resolver, string policy) => new(
+    [Fact]
+    public async Task BuildAsync_WithProjectDefaultAssignment_DoesNotInferAssignee()
+    {
+        InMemoryOperationalRecordRepository repository = new();
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        JiraIssueDraftService service = CreateService(
+            new StubResolver(RequesterResolutionResult.Found("jira-requester")),
+            "Block");
+
+        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(
+            record,
+            "EXAMPLE\\operator",
+            CancellationToken.None);
+
+        result.Value!.AssigneeUsername.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task BuildAsync_WithVerifiedExactOperatorMapping_SelectsOnlyMappedAssignee()
+    {
+        InMemoryOperationalRecordRepository repository = new();
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        JiraIssueDraftService service = CreateService(
+            new StubResolver(RequesterResolutionResult.Found("jira-requester")),
+            "Block",
+            "VerifiedOperatorMapping",
+            [new JiraOperatorAssigneeMappingOptions
+            {
+                SecureOpsActor = "EXAMPLE\\operator",
+                JiraUsername = "verified.operator"
+            }]);
+
+        OperationalRecordResult<JiraIssueDraft> mapped = await service.BuildAsync(
+            record,
+            "example\\OPERATOR",
+            CancellationToken.None);
+        OperationalRecordResult<JiraIssueDraft> unknown = await service.BuildAsync(
+            record,
+            "EXAMPLE\\unknown",
+            CancellationToken.None);
+
+        mapped.Value!.AssigneeUsername.Should().Be("verified.operator");
+        unknown.Value!.AssigneeUsername.Should().BeNull();
+        unknown.Value.Warnings.Should().ContainSingle(message => message.Contains("project default", StringComparison.OrdinalIgnoreCase));
+        mapped.Value.IdempotencyKey.Should().NotBe(unknown.Value.IdempotencyKey);
+    }
+
+    private static JiraIssueDraftService CreateService(
+        IRequesterResolver resolver,
+        string policy,
+        string assignmentMode = "ProjectDefault",
+        JiraOperatorAssigneeMappingOptions[]? mappings = null) => new(
         resolver,
         Options.Create(new JiraIntegrationOptions
         {
             ProjectKey = "TEST",
             IssueType = "Task",
             MappingVersion = "mapping-v1",
-            UnresolvedRequesterPolicy = policy
+            UnresolvedRequesterPolicy = policy,
+            AssignmentMode = assignmentMode,
+            OperatorAssigneeMappings = mappings ?? []
         }));
 
     private sealed class StubResolver(RequesterResolutionResult result) : IRequesterResolver

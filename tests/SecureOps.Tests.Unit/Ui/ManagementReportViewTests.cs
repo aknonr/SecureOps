@@ -54,7 +54,8 @@ public sealed class ManagementReportViewTests
         // The projector returns this shape whenever no workflow in the window produced a
         // measurable interval. "0 sn" would claim the work was instantaneous.
         ManagementReportView.DurationView view = ManagementReportView.Duration(
-            new DurationStatisticsResponse("Workflow claim to durable workflow completion", 0, null, null, null));
+            new DurationStatisticsResponse(
+                "claimToCompletion", "Workflow claim to durable workflow completion", 0, null, null, null));
 
         view.HasSamples.Should().BeFalse();
         view.Average.Should().BeNull();
@@ -65,7 +66,8 @@ public sealed class ManagementReportViewTests
     public void Duration_WithSamples_IsFormatted()
     {
         ManagementReportView.DurationView view = ManagementReportView.Duration(
-            new DurationStatisticsResponse("First persisted import to first persisted preview", 12, 30, 150, 3600));
+            new DurationStatisticsResponse(
+                "importToPreview", "First persisted import to first persisted preview", 12, 30, 150, 3600));
 
         view.HasSamples.Should().BeTrue();
         view.SampleCount.Should().Be(12);
@@ -268,11 +270,21 @@ public sealed class ManagementReportViewTests
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             new RetryOutcomeMetricsResponse(0, 0, 0, 0),
             [
-                new DurationStatisticsResponse("First persisted import to first persisted preview", 0, null, null, null),
-                new DurationStatisticsResponse("Workflow claim to durable Jira issue-key persistence", 0, null, null, null),
-                new DurationStatisticsResponse("Workflow claim to durable workflow completion", 0, null, null, null)
+                new DurationStatisticsResponse(
+                    "importToPreview", "First persisted import to first persisted preview", 0, null, null, null),
+                new DurationStatisticsResponse(
+                    "claimToJiraCreation", "Workflow claim to durable Jira issue-key persistence", 0, null, null, null),
+                new DurationStatisticsResponse(
+                    "claimToCompletion", "Workflow claim to durable workflow completion", 0, null, null, null)
             ]),
         new PlatformAdoptionMetricsResponse(0, 0, 0, 0, [], []),
+        new SessionGovernanceMetricsResponse(0, 0, 0, 0, 0, 0, 0),
         new SecurityQualityMetricsResponse(0, 0, 0, 0, null),
-        ["Rate-limit rejections are not currently persisted as audit events; this metric is unavailable."]);
+        ["Rate-limit rejections are not currently persisted as audit events; this metric is unavailable."],
+        new ReportingEvidenceCoverageResponse(
+            new DateTimeOffset(2026, 8, 16, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 8, 23, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero),
+            CoverageComplete: true),
+        [new DataLimitationResponse("RateLimitRejectionsUnavailable", null)]);
 }

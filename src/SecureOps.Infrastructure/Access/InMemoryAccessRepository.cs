@@ -11,7 +11,7 @@ public sealed class InMemoryAccessRepository : IAccessRepository
     private readonly Dictionary<Guid, StoredRequest> _requests = [];
 
     /// <inheritdoc />
-    public async Task<EnsureAccessUserResult> EnsureUserAsync(CorporatePrincipal principal, bool createRequest, CancellationToken cancellationToken)
+    public async Task<EnsureAccessUserResult> EnsureUserAsync(CorporatePrincipal principal, bool createRequest, TimeSpan activityPersistenceInterval, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -25,7 +25,7 @@ public sealed class InMemoryAccessRepository : IAccessRepository
                 _userIds[principal.Identifier] = userId;
                 userCreated = true;
             }
-            else
+            else if (now - _users[userId].LastAuthenticatedAt >= activityPersistenceInterval)
             {
                 _users[userId] = _users[userId] with { LastAuthenticatedAt = now };
             }

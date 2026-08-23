@@ -11,6 +11,7 @@ ASP.NET Core Web API. Hosted on IIS in-process.
 - Enqueue diagnostic jobs via Hangfire.
 - Expose Phase 1A IdentityLookup endpoints and safe metadata/health endpoints.
 - Expose typed Operational Record query, Jira preview, explicit create, and retry endpoints.
+- Enforce provider-neutral server-side application sessions and persistent Data Protection startup validation.
 
 ## Does NOT
 
@@ -30,6 +31,8 @@ ASP.NET Core Web API. Hosted on IIS in-process.
 Phase 1A IdentityLookup is implemented here through `IdentityController`, validation, authorization, correlation ID middleware, rate-limit policy, and safe health endpoints. Phase 1 alert webhook and diagnostic orchestration endpoints are still planned.
 
 Platform foundation implemented: strict configured forwarded-header trust, explicitly enabled authenticated Demo/Test Swagger, safe ProblemDetails, bounded bulk lookup, and capability bootstrap policies. Windows/AD and database access remain runtime-only validation work; no local API test contacts them.
+
+Application-session middleware runs after authentication and before authorization. The Secure, HttpOnly cookie is an opaque protected handle only; authoritative lifecycle state is resolved through Infrastructure. Directory Explorer continuation tokens use the same persistent Data Protection key ring under a separate purpose. See `docs/28-session-governance-data-protection-and-sql-pilot.md`.
 
 The API release gate verifies Active Directory runtime assemblies, dependency-manifest consistency, and publish-to-ZIP hashes; it does not attempt an AD lookup.
 

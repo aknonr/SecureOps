@@ -1,24 +1,36 @@
 namespace SecureOps.Shared.Configuration;
 
-/// <summary>Provider-neutral web authentication session policy.</summary>
+/// <summary>Provider-neutral SecureOps application-session policy.</summary>
 public sealed class SessionSecurityOptions
 {
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "SessionSecurity";
 
-    /// <summary>Maximum idle period for a future stateful cookie/OIDC session.</summary>
+    /// <summary>Maximum idle period for an application session.</summary>
     public int IdleTimeoutMinutes { get; set; } = 30;
 
-    /// <summary>Absolute maximum lifetime for a future stateful cookie/OIDC session.</summary>
-    public int AbsoluteLifetimeHours { get; set; } = 8;
+    /// <summary>Absolute maximum lifetime for an application session.</summary>
+    public int AbsoluteLifetimeHours { get; set; } = 12;
 
-    /// <summary>Whether any future authentication cookie must be Secure.</summary>
+    /// <summary>Minimum interval between persisted LastSeen updates.</summary>
+    public int ActivityPersistenceIntervalMinutes { get; set; } = 5;
+
+    /// <summary>Session-state repository provider: InMemory or SqlServer.</summary>
+    public string RepositoryProvider { get; set; } = "InMemory";
+
+    /// <summary>Opaque application-session cookie name.</summary>
+    public string CookieName { get; set; } = "__Host-SecureOps.ApplicationSession";
+
+    /// <summary>Maximum administrative active-session page size.</summary>
+    public int MaxAdminPageSize { get; set; } = 100;
+
+    /// <summary>Whether the opaque application-session cookie must be Secure.</summary>
     public bool SecureCookie { get; set; } = true;
 
-    /// <summary>Whether any future authentication cookie must be inaccessible to client script.</summary>
+    /// <summary>Whether the opaque application-session cookie must be inaccessible to client script.</summary>
     public bool HttpOnly { get; set; } = true;
 
-    /// <summary>SameSite mode reserved for a future cookie/OIDC handler.</summary>
+    /// <summary>SameSite mode for the opaque application-session cookie.</summary>
     public string SameSite { get; set; } = "Lax";
 
     /// <summary>Whether application access is revalidated on every authorized request.</summary>

@@ -271,6 +271,14 @@ Until that decision is recorded:
 
 ## Audit (See `docs/08-audit-model.md` for Detail)
 
+Directory Explorer privileged reads require `Identity.Groups.View` or `Identity.Groups.Members.View`; privileged-group analysis separately requires `Identity.PrivilegedGroups.View`. All operations use exact server-controlled queries under the API process identity and reject raw LDAP/filter input and credentials. Recursive Phase 2 reads are bounded by depth, nodes, edges, paths, timeout, cache, and rate limits, return explicit truncation metadata, and audit only safe counts/outcomes rather than membership, SPN, health, path, or raw-DN payloads.
+
+## Application Session Governance
+
+SecureOps tracks an opaque server-side application session after corporate authentication. The cookie contains no credential, role, access decision, directory identity, network address, or device data and cannot grant access by itself. Each protected request remains subject to authentication plus current application access and `AccessVersion` validation. Idle timeout, absolute timeout, logout, administrative revocation, access disable, and access-version change end effective sessions. Last-seen persistence is throttled and heartbeats are not audited.
+
+Pilot and Production require a persistent ASP.NET Core Data Protection key ring protected at rest. Runtime key-ring paths, certificates, and ACLs are server-owned configuration; key material is never stored in source control. Negotiate remains the interim authentication provider and no LDAP username/password login is introduced.
+
 - Append-only `audit.AuditLog` table.
 - UPDATE/DELETE blocked by trigger.
 - Every state-changing operation creates an audit entry.
