@@ -112,6 +112,14 @@ builder.Services
     .AddHttpClient<IManagementReportingApiClient, ManagementReportingApiClient>(ConfigureApiClient)
     .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
 
+builder.Services
+    .AddHttpClient<IDirectoryApiClient, DirectoryApiClient>(ConfigureApiClient)
+    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
+
+builder.Services
+    .AddHttpClient<ISessionApiClient, SessionApiClient>(ConfigureApiClient)
+    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
+
 WebApplication app = builder.Build();
 
 // Surface the effective API base address once at startup (server-side only).

@@ -1,0 +1,158 @@
+@using Microsoft.Extensions.Logging
+@inject IDirectoryApiClient Directory
+@inject ILogger<SoDirectoryPrivileged> Logger
+
+@*
+    Membership in the server-configured privileged groups.
+
+    Restrained on purpose. Privileged membership is a normal, expected property of administrator
+    accounts — it is a fact to establish during an investigation, not an incident. Rendering every
+    match as a red alert would make the screen useless for the people whose job requires those
+    memberships, and would devalue the colour when something genuinely is wrong.
+
+    The configured group set is server-owned. A group that is configured but not found in the
+    directory is shown as such rather than silently dropped: a missing privileged group is itself
+    worth knowing about.
+*@
+
+@if (_loading)
+{
+    <SoLoading Message="Yetkili grup kanıtları getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+}
+else if (_problem is not null)
+{
+    <SoProblemPanel Problem="_problem" OnRetry="@(() => LoadAsync(refresh: true))" />
+}
+else if (_evidence is not null)
+{
+    <div class="so-panel-head">
+        <h3 class="so-subhead so-subhead--flush">Yetkili grup üyeliği</h3>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="@(() => LoadAsync(refresh: true))">
+            Yenile
+        </MudButton>
+    </div>
+
+    <p class="so-panel-text so-panel-text--sm">
+        Yalnızca sunucuda tanımlı yetkili grup listesi denetlenir. Bu liste SecureOps yapılandırmasına
+        aittir; ekrandan değiştirilemez ve grup adından çıkarım yapılmaz.
+    </p>
+
+    <SoTraversalNotice Traversal="_evidence.Traversal" />
+
+    @if (_evidence.Groups.Count == 0)
+    {
+        <p class="so-panel-text so-panel-text--sm">
+            Sunucuda tanımlı yetkili grup yok.
+        </p>
+    }
+    else
+    {
+        @if (!DirectoryView.HasPrivilegedMembership(_evidence))
+        {
+            <div class="so-status-row">
+                <SoStatusBadge Label="Yetkili grup üyeliği yok"
+                               Tone="SoStatusBadge.BadgeTone.Positive"
+                               Icon="@Icons.Material.Filled.CheckCircle" />
+                <span class="so-status-text">
+                    Bu hesap, tanımlı yetkili grupların hiçbirinde üye değil.
+                </span>
+            </div>
+        }
+
+        <div class="so-priv-list">
+            @foreach (DirectoryPrivilegedMembershipDto group in _evidence.Groups)
+            {
+                bool member = group.Direct || group.Transitive;
+                <section class="so-priv @(member ? "so-priv--member" : null)">
+                    <div class="so-priv-head">
+                        <span class="so-priv-name">
+                            @(group.Group is not null ? DirectoryView.GroupName(group.Group) : group.ConfiguredIdentifier)
+                        </span>
+
+                        @if (!group.GroupFound)
+                        {
+                            <SoStatusBadge Label="Grup dizinde bulunamadı"
+                                           Tone="SoStatusBadge.BadgeTone.Caution"
+                                           Icon="@Icons.Material.Filled.SearchOff"
+                                           Title="Yapılandırmada tanımlı, ancak dizinde eşleşmedi." />
+                        }
+                        else if (group.Direct)
+                        {
+                            <SoStatusBadge Label="Doğrudan üye"
+                                           Tone="SoStatusBadge.BadgeTone.Info"
+                                           Icon="@Icons.Material.Filled.ArrowDownward" />
+                        }
+                        else if (group.Transitive)
+                        {
+                            <SoStatusBadge Label="İç içe üyelik"
+                                           Tone="SoStatusBadge.BadgeTone.Info"
+                                           Icon="@Icons.Material.Filled.AccountTree" />
+                        }
+                        else
+                        {
+                            <SoStatusBadge Label="Üye değil" Tone="SoStatusBadge.BadgeTone.Neutral" />
+                        }
+                    </div>
+
+                    <code class="so-code so-code--sm">@group.ConfiguredIdentifier</code>
+
+                    @if (group.Paths.Count > 0)
+                    {
+                        @foreach (DirectoryMembershipPathDto path in group.Paths)
+                        {
+                            <SoMembershipPath Path="path" Account="@Account" />
+                        }
+
+                        @if (group.PathsTruncated)
+                        {
+                            <p class="so-panel-text so-panel-text--sm so-note-caution">
+                                Bu grup için gösterilenden daha fazla yol var; liste kısaltıldı.
+                            </p>
+                        }
+                    }
+                </section>
+            }
+        </div>
+    }
+}
+
+@code {
+    /// <summary>Exact account, as the server normalized it.</summary>
+    [Parameter, EditorRequired]
+    public string Account { get; set; } = string.Empty;
+
+    /// <summary>Operational purpose recorded with every directory call.</summary>
+    [Parameter, EditorRequired]
+    public string Purpose { get; set; } = string.Empty;
+
+    private DirectoryPrivilegedMembershipResponse? _evidence;
+    private UiProblem? _problem;
+    private bool _loading;
+
+    protected override Task OnInitializedAsync() => LoadAsync(refresh: false);
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _evidence = await Directory.GetPrivilegedMembershipsAsync(
+                Account, Purpose, refresh, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _evidence = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Privileged membership evidence unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

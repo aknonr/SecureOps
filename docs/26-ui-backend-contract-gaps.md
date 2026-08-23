@@ -20,10 +20,10 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-11 — Claim owner is not exposed | ✅ **Resolved** by backend `989030c3` |
 | G-12 — `ReconciliationRequired` is not exposed | ✅ **Resolved** by backend `989030c3` |
 | G-13 — No source provider yields records | ✅ **Resolved** by backend `989030c3` |
-| G-14 — A duration statistic carries no stable key | Open |
-| G-15 — Reported limitations are English prose with no code | Open |
-| G-16 — Only identity lookup has daily buckets | Open |
-| G-17 — Zero and "no persisted history" are indistinguishable | Open |
+| G-14 — A duration statistic carries no stable key | ✅ **Resolved** by backend `b0e3b7b` |
+| G-15 — Reported limitations are English prose with no code | ✅ **Resolved** by backend `b0e3b7b` |
+| G-16 — Only identity lookup has daily buckets | Open — confirmed out of scope by `b0e3b7b` |
+| G-17 — Zero and "no persisted history" are indistinguishable | ✅ **Resolved** by backend `b0e3b7b` |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -616,7 +616,7 @@ What it does **not** establish:
 
 ---
 
-## G-14 — A duration statistic carries no stable key
+## G-14 — A duration statistic carries no stable key — ✅ RESOLVED
 
 **Endpoint:** `GET /api/v1/reporting/management/summary`
 **Severity:** Low — cosmetic today, silently wrong later
@@ -643,7 +643,7 @@ internally (`ImportToPreview`, `ClaimToJiraCreated`, `ClaimToCompleted`); it is 
 
 ---
 
-## G-15 — Reported limitations are English prose with no code
+## G-15 — Reported limitations are English prose with no code — ✅ RESOLVED
 
 **Endpoint:** `GET /api/v1/reporting/management/summary`
 **Severity:** Low
@@ -684,7 +684,7 @@ the identity trend.
 
 ---
 
-## G-17 — Zero and "no persisted history" are indistinguishable
+## G-17 — Zero and "no persisted history" are indistinguishable — ✅ RESOLVED
 
 **Endpoint:** `GET /api/v1/reporting/management/summary`
 **Severity:** Medium
@@ -709,6 +709,32 @@ pilot, whose SQL history begins part-way through any range a manager is likely t
 model can answer for — or nullable counts for metrics outside that coverage.
 
 ---
+
+---
+
+## Round 2 resolution notes
+
+Backend `b0e3b7b` closed three of the four gaps this UI raised, and the screens now consume the
+hardened shapes:
+
+- **G-14** — every duration carries a stable `key`. The UI keys on it and ignores `definition` text
+  and array order entirely, which the contract states are presentation details.
+- **G-15** — every limitation carries a stable `code`. The UI localizes on the code; `message` is
+  fallback display only and drives no behaviour.
+- **G-17** — both reporting routes return `coverage`. A zero is now presented as a measured zero only
+  when `coverageComplete` is true, and a partial window names the boundary and the size of the
+  unmeasured head rather than drawing it as no activity.
+- **G-16** remains open and was explicitly left out of scope by the backend. Only
+  `identityLookup.trend` is bucketed by day, so it stays the only trend drawn; no adoption or
+  Operational Record/Jira series is inferred client-side.
+
+No new contract gaps were found while building the Directory Explorer, session administration, or
+integration status screens. Every field those screens needed was present, correctly nullable, and
+accompanied by the traversal or truncation metadata required to present a bounded result honestly.
+
+One backend change required a UI fix rather than a gap entry: `OperationalRecordResponse.createdAt`
+became nullable, because the reviewed legacy Turuncu Hat projection supplies no source timestamp. The
+record detail renders that as "kaynak sistemde tarih yok".
 
 ## Note: enums cross the wire as numbers
 

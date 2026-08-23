@@ -1,12 +1,14 @@
 @*
     Primary navigation, grouped by what the operator is doing rather than by which team built it.
 
-    Entries appear based on capabilities returned by GET /api/v1/access/me, so the menu reflects the
-    server's view of this account instead of the UI's own guess. Hiding an entry only avoids a dead
-    end — the API re-checks every capability on every call.
+    Every entry is gated on a capability returned by GET /api/v1/access/me — never on a role name,
+    and never on "looks like an administrator". An account with an Admin-sounding role but without
+    Access.ManageUsers gets no administration group, because the API would refuse those screens
+    anyway and offering them is a dead end that reads as a permissions bug.
 
-    Planned capabilities stay listed but visibly inert, because "what is coming next" is part of what
-    this navigation is meant to communicate.
+    A group heading appears only when at least one of its entries does, so the menu never shows an
+    empty section. Planned capabilities stay listed but visibly inert, because "what is coming next"
+    is part of what this navigation is meant to communicate.
 *@
 
 @implements IDisposable
@@ -15,8 +17,6 @@
 <MudNavMenu Dense="true" Class="so-nav">
     <AuthorizeView>
         <Authorized Context="signedIn">
-            <div class="so-nav-group">Operasyon</div>
-
             @* Same route either way: the dashboard shows the management report to holders of
                Reporting.ManagementView and the operator board to everyone else. Only the label
                changes, so the entry matches what the page will actually be. *@
@@ -24,18 +24,32 @@
                 @(Can(Capabilities.ManagementReportingView) ? "Yönetim Panosu" : "Genel Bakış")
             </MudNavLink>
 
-            @if (Can(Capabilities.IdentityLookup))
-            {
-                <MudNavLink Href="identity-lookup" Icon="@Icons.Material.Filled.ManageSearch">
-                    Kimlik Sorgulama
-                </MudNavLink>
-            }
-
             @if (Can(Capabilities.OperationalRecordsView))
             {
+                <div class="so-nav-group">Operasyon</div>
+
                 <MudNavLink Href="operational-records" Icon="@Icons.Material.Filled.Assignment">
                     Operasyonel Kayıtlar
                 </MudNavLink>
+            }
+
+            @if (CanAnyDirectory)
+            {
+                <div class="so-nav-group">Dizin</div>
+
+                @if (Can(Capabilities.IdentityLookup))
+                {
+                    <MudNavLink Href="directory/users" Icon="@Icons.Material.Filled.ManageSearch">
+                        Kullanıcı Sorgulama
+                    </MudNavLink>
+                }
+
+                @if (Can(Capabilities.DirectoryGroupsView))
+                {
+                    <MudNavLink Href="directory/groups" Icon="@Icons.Material.Filled.Groups">
+                        Grup Sorgulama
+                    </MudNavLink>
+                }
             }
 
             @* Cross-user analytics is a separate privilege from doing the work. An operator who can
@@ -44,9 +58,42 @@
             {
                 <div class="so-nav-group">Raporlama</div>
 
+                <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Insights">
+                    Yönetim Panosu
+                </MudNavLink>
+
                 <MudNavLink Href="reporting/operators" Icon="@Icons.Material.Filled.QueryStats">
                     Operatör Raporu
                 </MudNavLink>
+            }
+
+            @if (CanAnyAdministration)
+            {
+                <div class="so-nav-group">Yönetim</div>
+
+                @if (Can(Capabilities.AccessApproveRequests))
+                {
+                    <MudNavLink Href="access/requests" Icon="@Icons.Material.Filled.AdminPanelSettings">
+                        Erişim Talepleri
+                    </MudNavLink>
+                }
+
+                @* Gated on ManageUsers rather than ApproveRequests: the users read model is a
+                   different capability, and an approver without it would get a blocked page. *@
+                @if (Can(Capabilities.AccessManageUsers))
+                {
+                    <MudNavLink Href="access/users" Icon="@Icons.Material.Filled.Group">
+                        Kullanıcılar
+                    </MudNavLink>
+
+                    <MudNavLink Href="admin/sessions" Icon="@Icons.Material.Filled.Devices">
+                        Aktif Oturumlar
+                    </MudNavLink>
+
+                    <MudNavLink Href="admin/system-status" Icon="@Icons.Material.Filled.MonitorHeart">
+                        Sistem Durumu
+                    </MudNavLink>
+                }
             }
 
             <div class="so-nav-group">Erişim</div>
@@ -55,30 +102,14 @@
                 Erişimim
             </MudNavLink>
 
-            @if (Can(Capabilities.AccessApproveRequests))
-            {
-                <MudNavLink Href="access/requests" Icon="@Icons.Material.Filled.AdminPanelSettings">
-                    Erişim Talepleri
-                </MudNavLink>
-            }
-
-            @* Gated on ManageUsers rather than ApproveRequests: the users read model is a
-               different capability, and an approver without it would get a blocked page. *@
-            @if (Can(Capabilities.AccessManageUsers))
-            {
-                <MudNavLink Href="access/users" Icon="@Icons.Material.Filled.Group">
-                    Kullanıcılar
-                </MudNavLink>
-            }
-
             <div class="so-nav-group">Sonraki fazlar</div>
 
-            <MudNavLink Href="audit-compliance" Icon="@Icons.Material.Filled.VerifiedUser">
+            <MudNavLink Href="audit-compliance" Icon="@Icons.Material.Filled.FactCheck">
                 Denetim ve Uyum
                 <span class="so-nav-tag">Planlandı</span>
             </MudNavLink>
 
-            <MudNavLink Href="diagnostics-readonly" Icon="@Icons.Material.Filled.FactCheck">
+            <MudNavLink Href="diagnostics-readonly" Icon="@Icons.Material.Filled.Terminal">
                 Salt Okunur Tanılama
                 <span class="so-nav-tag">Planlandı</span>
             </MudNavLink>
@@ -98,6 +129,12 @@
     private void OnAccessChanged() => InvokeAsync(StateHasChanged);
 
     private bool Can(string capability) => _snapshot?.Can(capability) == true;
+
+    private bool CanAnyDirectory =>
+        Can(Capabilities.IdentityLookup) || Can(Capabilities.DirectoryGroupsView);
+
+    private bool CanAnyAdministration =>
+        Can(Capabilities.AccessApproveRequests) || Can(Capabilities.AccessManageUsers);
 
     public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
 }

@@ -85,6 +85,11 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
     [Theory]
     [InlineData("/dashboard")]
     [InlineData("/reporting/operators")]
+    [InlineData("/directory/users")]
+    [InlineData("/directory/groups")]
+    [InlineData("/admin/sessions")]
+    [InlineData("/admin/system-status")]
+    [InlineData("/identity-lookup")]
     public async Task ReportingRoutes_ResolveToTheSignInFlow_AndNotToNotFound(string path)
     {
         // Both are [Authorize]. Anonymously they must route into sign-in — never be reported as

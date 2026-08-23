@@ -1,0 +1,92 @@
+@*
+    Confirmation for ending someone else's session.
+
+    Revocation takes effect on the operator's next request, so it can interrupt work in progress.
+    That consequence is stated before the button, not after, and a reason is required because the
+    audit trail is what makes an administrative interruption defensible afterwards.
+
+    It does not disable the account. Saying so here prevents the opposite mistake — an administrator
+    revoking a session believing they have blocked access, when a fresh corporate authentication
+    will simply create a new one.
+*@
+
+<MudDialog>
+    <DialogContent>
+        <div class="so-confirm">
+            <p class="so-confirm-lead">
+                Bu oturum hemen sonlandırılacak. İlgili kullanıcının bir sonraki isteği kimliksiz
+                kalır ve devam eden işlemi yarıda kesilebilir.
+            </p>
+
+            <SoFieldGrid MinColumnWidth="200px">
+                <SoField Label="Oturum">
+                    <code class="so-code so-code--sm">@Session.SessionId</code>
+                </SoField>
+                <SoField Label="Kullanıcı">
+                    <code class="so-code so-code--sm">@Session.UserId</code>
+                </SoField>
+                <SoField Label="Başlangıç" Value="@Local(Session.StartedAtUtc)" />
+                <SoField Label="Son etkinlik" Value="@Local(Session.LastSeenAtUtc)" />
+            </SoFieldGrid>
+
+            <p class="so-consequence so-consequence--caution">
+                Bu işlem hesabı devre dışı bırakmaz. Kullanıcı kurumsal kimlik doğrulamasını yeniden
+                yaparsa yeni bir oturum açılır. Erişimi kalıcı olarak kapatmak için kullanıcı
+                yönetimini kullanın.
+            </p>
+
+            <MudTextField @bind-Value="_reason"
+                          Label="Gerekçe"
+                          HelperText="Denetim kaydına işlenir. Neden sonlandırdığınızı kısaca yazın."
+                          Required="true"
+                          Immediate="true"
+                          Lines="2"
+                          MaxLength="500"
+                          Error="@(_error is not null)"
+                          ErrorText="@_error"
+                          Variant="Variant.Outlined" />
+        </div>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+        <MudButton OnClick="Confirm"
+                   Variant="Variant.Filled"
+                   Color="Color.Error"
+                   Disabled="@_submitting"
+                   StartIcon="@Icons.Material.Filled.Logout">
+            Oturumu sonlandır
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Session the administrator is about to end.</summary>
+    [Parameter, EditorRequired]
+    public ApplicationSessionResponse Session { get; set; } = default!;
+
+    private string _reason = string.Empty;
+    private string? _error;
+    private bool _submitting;
+
+    private void Cancel() => Dialog.Cancel();
+
+    private void Confirm()
+    {
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _error = "Gerekçe zorunludur.";
+            return;
+        }
+
+        _error = null;
+        _submitting = true;
+        Dialog.Close(DialogResult.Ok(_reason.Trim()));
+    }
+
+    private static string Local(DateTimeOffset value) =>
+        value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+}

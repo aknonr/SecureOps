@@ -1,0 +1,53 @@
+@*
+    One proven chain from the account to the target group.
+
+    Read top to bottom: the account, then each group it passes through, then the target. A chain of
+    one group is a direct membership and is marked as such — that distinction is the first thing an
+    operator troubleshooting a permission needs, because a direct grant is removed in one place and a
+    nested one is not.
+
+    The chain is exactly what the server returned. Nothing here shortens it, merges it with another
+    path, or fills a gap.
+*@
+
+<div class="so-path @(IsDirect ? "so-path--direct" : "so-path--nested")">
+    <div class="so-path-head">
+        <SoStatusBadge Label="@(IsDirect ? "Doğrudan üyelik" : $"İç içe üyelik · {Path.Groups.Count} adım")"
+                       Tone="@(IsDirect ? SoStatusBadge.BadgeTone.Info : SoStatusBadge.BadgeTone.Neutral)"
+                       Icon="@(IsDirect ? Icons.Material.Filled.ArrowDownward : Icons.Material.Filled.AccountTree)" />
+    </div>
+
+    <ol class="so-path-chain">
+        <li class="so-path-node so-path-node--origin">
+            <span class="so-path-role">Hesap</span>
+            <code class="so-code">@Account</code>
+        </li>
+
+        @foreach (DirectoryGroupSummaryDto group in Path.Groups)
+        {
+            bool isTarget = ReferenceEquals(group, Path.Groups[^1]);
+            <li class="so-path-node @(isTarget ? "so-path-node--target" : null)">
+                <span class="so-path-role">@(isTarget ? "Hedef grup" : "Ara grup")</span>
+                <span class="so-path-name">@DirectoryView.GroupName(group)</span>
+                @if (!string.IsNullOrWhiteSpace(group.SamAccountName))
+                {
+                    <code class="so-code so-code--sm">@group.SamAccountName</code>
+                }
+            </li>
+        }
+    </ol>
+</div>
+
+@code {
+    /// <summary>The proven chain, ordered from the direct group to the target.</summary>
+    [Parameter, EditorRequired]
+    public DirectoryMembershipPathDto Path { get; set; } = default!;
+
+    /// <summary>Account the chain starts from, shown as the first node.</summary>
+    [Parameter, EditorRequired]
+    public string Account { get; set; } = string.Empty;
+
+    // A single-group chain means the account holds the target group itself. Derived from the chain
+    // rather than passed in, so it cannot disagree with what is drawn.
+    private bool IsDirect => Path.Groups.Count <= 1;
+}

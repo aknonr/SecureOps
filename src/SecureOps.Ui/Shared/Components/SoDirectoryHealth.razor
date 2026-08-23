@@ -1,0 +1,163 @@
+@using Microsoft.Extensions.Logging
+@inject IDirectoryApiClient Directory
+@inject ILogger<SoDirectoryHealth> Logger
+
+@*
+    Operational account-health evidence.
+
+    Every field on this contract is nullable, and unknown is shown as unknown. A directory that did
+    not return an attribute has not told us the attribute is false — guessing here would produce a
+    confident "password never expires: no" for an account nobody actually read.
+
+    lastLogonTimestamp is the replicated attribute. It can lag by up to the domain's replication
+    interval, so it is labelled as an approximate last-seen time and never as a sign-in record. An
+    operator deciding whether an account is dormant needs to know which of the two they are holding.
+*@
+
+@if (_loading)
+{
+    <SoLoading Message="Hesap sağlığı getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+}
+else if (_problem is not null)
+{
+    <SoProblemPanel Problem="_problem" OnRetry="@(() => LoadAsync(refresh: true))" />
+}
+else if (_health is not null)
+{
+    <div class="so-panel-head">
+        <h3 class="so-subhead so-subhead--flush">Hesap durumu</h3>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="@(() => LoadAsync(refresh: true))">
+            Yenile
+        </MudButton>
+    </div>
+
+    <div class="so-panel-inline">
+        <SoStatusBadge Label="@DirectoryView.Flag(_health.Enabled, "Etkin", "Devre dışı")"
+                       Tone="@Tone(_health.Enabled, whenTrue: SoStatusBadge.BadgeTone.Positive,
+                                   whenFalse: SoStatusBadge.BadgeTone.Critical)"
+                       Icon="@Icons.Material.Filled.PowerSettingsNew" />
+        <SoStatusBadge Label="@DirectoryView.Flag(_health.Locked, "Kilitli", "Kilitli değil")"
+                       Tone="@Tone(_health.Locked, whenTrue: SoStatusBadge.BadgeTone.Critical,
+                                   whenFalse: SoStatusBadge.BadgeTone.Positive)"
+                       Icon="@Icons.Material.Filled.Lock" />
+        <SoStatusBadge Label="@DirectoryView.Flag(_health.PasswordNeverExpires, "Parola süresiz", "Parola süreli")"
+                       Tone="@Tone(_health.PasswordNeverExpires, whenTrue: SoStatusBadge.BadgeTone.Caution,
+                                   whenFalse: SoStatusBadge.BadgeTone.Neutral)"
+                       Icon="@Icons.Material.Filled.Key" />
+        @if (_health.MustChangePassword is true)
+        {
+            <SoStatusBadge Label="İlk girişte parola değişmeli"
+                           Tone="SoStatusBadge.BadgeTone.Caution"
+                           Icon="@Icons.Material.Filled.Autorenew" />
+        }
+    </div>
+
+    <h3 class="so-subhead">Parola</h3>
+    <SoFieldGrid MinColumnWidth="240px">
+        <SoField Label="Parola en son ayarlandı">@Value(DirectoryView.Timestamp(_health.PasswordLastSetUtc))</SoField>
+        <SoField Label="Parola yaşı">@Value(DirectoryView.Days(_health.PasswordAgeDays))</SoField>
+        <SoField Label="Parola süresi dolmaz">
+            @Value(DirectoryView.Flag(_health.PasswordNeverExpires, "Evet", "Hayır"))
+        </SoField>
+        <SoField Label="İlk girişte değiştirilmeli">
+            @Value(DirectoryView.Flag(_health.MustChangePassword, "Evet", "Hayır"))
+        </SoField>
+    </SoFieldGrid>
+
+    <h3 class="so-subhead">Hesap ömrü</h3>
+    <SoFieldGrid MinColumnWidth="240px">
+        <SoField Label="Hesap bitiş tarihi">
+            @if (_health.AccountExpiresUtc is null)
+            {
+                @* Null here is ambiguous by nature — never expires, or not read. The contract does
+                   not separate them, so neither does this label. *@
+                <span class="so-unknown">Tanımlı değil veya okunamadı</span>
+            }
+            else
+            {
+                @DirectoryView.Timestamp(_health.AccountExpiresUtc)
+            }
+        </SoField>
+        <SoField Label="@LastSeenLabel">
+            @Value(DirectoryView.Timestamp(_health.LastLogonTimestampUtc))
+        </SoField>
+    </SoFieldGrid>
+
+    @if (_health.LastLogonTimestampIsApproximate)
+    {
+        <p class="so-panel-text so-panel-text--sm so-note-caution">
+            Son görülen oturum zamanı, etki alanı denetleyicileri arasında gecikmeli çoğaltılan bir
+            özniteliktir. Kesin giriş zamanı değildir ve birkaç güne kadar geride olabilir. Hesabın
+            atıl olup olmadığına yalnızca bu değere bakarak karar vermeyin.
+        </p>
+    }
+}
+
+@code {
+    /// <summary>Exact account, as the server normalized it.</summary>
+    [Parameter, EditorRequired]
+    public string Account { get; set; } = string.Empty;
+
+    /// <summary>Operational purpose recorded with every directory call.</summary>
+    [Parameter, EditorRequired]
+    public string Purpose { get; set; } = string.Empty;
+
+    private DirectoryAccountHealthResponse? _health;
+    private UiProblem? _problem;
+    private bool _loading;
+
+    // Approximate is stated in the label itself, not only in the note below it, so it survives being
+    // read out of context or copied into a ticket.
+    private string LastSeenLabel => _health?.LastLogonTimestampIsApproximate == true
+        ? "Son görülen oturum zamanı (yaklaşık)"
+        : "Son görülen oturum zamanı";
+
+    protected override Task OnInitializedAsync() => LoadAsync(refresh: false);
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _health = await Directory.GetAccountHealthAsync(Account, Purpose, refresh, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _health = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Account health unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static SoStatusBadge.BadgeTone Tone(
+        bool? value,
+        SoStatusBadge.BadgeTone whenTrue,
+        SoStatusBadge.BadgeTone whenFalse) => value switch
+    {
+        true => whenTrue,
+        false => whenFalse,
+        null => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static RenderFragment Value(string text) => builder =>
+    {
+        bool unknown = string.Equals(text, DirectoryView.UnknownText, StringComparison.Ordinal);
+        builder.OpenElement(0, "span");
+        if (unknown)
+        {
+            builder.AddAttribute(1, "class", "so-unknown");
+        }
+
+        builder.AddContent(2, text);
+        builder.CloseElement();
+    };
+}

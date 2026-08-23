@@ -1,3 +1,4 @@
+@page "/directory/users"
 @page "/identity-lookup"
 @attribute [Authorize]
 @using Microsoft.Extensions.Logging
@@ -5,12 +6,12 @@
 @inject IIdentityLookupApiClient IdentityClient
 @inject ICurrentAccessProvider AccessProvider
 @inject NavigationManager Navigation
-@inject ILogger<IdentityLookup> Logger
+@inject ILogger<DirectoryUser> Logger
 
-<PageTitle>Kimlik Sorgulama · SecureOps</PageTitle>
+<PageTitle>Kullanıcı Sorgulama · SecureOps</PageTitle>
 
-<div class="so-page">
-    <SoPageHeader Title="PAM / AD Kimlik Sorgulama"
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Kullanıcı Sorgulama"
                   Lead="Tek bir hesabı inceleme amacıyla sorgulayın. Her sorgu, amacıyla birlikte kayıt altına alınır." />
 
     @if (_access is null)
@@ -35,7 +36,10 @@
     }
     else
     {
-        <div class="so-split">
+        @* Once there is a result the split collapses: the group, SPN, and privileged tables need the
+           full page width, and in a half-width column their action buttons scroll out of reach. The
+           query form stays capped so it does not stretch into a banner. *@
+        <div class="so-split @(_result is not null ? "so-split--result" : null)">
             <section class="so-panel so-lookup-form">
                 <h2 class="so-panel-title">Sorgu</h2>
 
@@ -178,28 +182,85 @@
                                        Title="Sorgunun sunucuda çalıştırıldığı biçim" />
                     </div>
 
-                    <SoFieldGrid>
-                        <SoField Label="Görünen ad" Value="@_result.User!.DisplayName" />
-                        <SoField Label="Hesap" Value="@_result.User.SamAccountName" />
-                        <SoField Label="UPN" Value="@_result.User.UserPrincipalName" />
-                        <SoField Label="E-posta" Value="@_result.User.Mail" />
-                        <SoField Label="Departman" Value="@_result.User.Department" />
-                        <SoField Label="Unvan" Value="@_result.User.Title" />
-                        <SoField Label="Yönetici" Value="@_result.User.ManagerDisplayName" />
-                        <SoField Label="Hesap durumu">
-                            <div class="so-inline-badges">
-                                <SoStatusBadge Label="@EnabledText(_result.User.Enabled)"
-                                               Tone="@EnabledTone(_result.User.Enabled)" />
-                                <SoStatusBadge Label="@LockedText(_result.User.Locked)"
-                                               Tone="@LockedTone(_result.User.Locked)" />
-                            </div>
-                        </SoField>
-                    </SoFieldGrid>
+                    @* Sections load only when opened. Each one is a separate audited, bounded,
+                       rate-limited directory call, so fetching all of them on every lookup would
+                       spend an operator's quota on evidence nobody asked to see. *@
+                    <div class="so-tabs" role="tablist" aria-label="Dizin bölümü">
+                        @foreach (DetailTab tab in AvailableTabs)
+                        {
+                            DetailTab captured = tab;
+                            <button type="button"
+                                    role="tab"
+                                    class="so-tab @(tab == _tab ? "so-tab--active" : null)"
+                                    aria-selected="@(tab == _tab)"
+                                    @onclick="() => _tab = captured">
+                                @TabLabel(tab)
+                            </button>
+                        }
+                    </div>
 
-                    <p class="so-panel-text so-panel-text--sm mt-3">
-                        Yalnızca onaylı operasyon alanları gösterilir. Dönen kişisel ayrıntılar denetim
-                        kaydında saklanmaz; kayıtta sorguyu kimin, hangi amaçla yaptığı tutulur.
-                    </p>
+                    @if (_tab == DetailTab.General)
+                    {
+                        <SoFieldGrid>
+                            <SoField Label="Görünen ad" Value="@_result.User!.DisplayName" />
+                            <SoField Label="Hesap" Value="@_result.User.SamAccountName" />
+                            <SoField Label="UPN" Value="@_result.User.UserPrincipalName" />
+                            <SoField Label="E-posta" Value="@_result.User.Mail" />
+                            <SoField Label="Departman" Value="@_result.User.Department" />
+                            <SoField Label="Unvan" Value="@_result.User.Title" />
+                            <SoField Label="Yönetici" Value="@_result.User.ManagerDisplayName" />
+                            <SoField Label="Hesap durumu">
+                                <div class="so-inline-badges">
+                                    <SoStatusBadge Label="@EnabledText(_result.User.Enabled)"
+                                                   Tone="@EnabledTone(_result.User.Enabled)" />
+                                    <SoStatusBadge Label="@LockedText(_result.User.Locked)"
+                                                   Tone="@LockedTone(_result.User.Locked)" />
+                                </div>
+                            </SoField>
+                        </SoFieldGrid>
+
+                        <p class="so-panel-text so-panel-text--sm mt-3">
+                            Yalnızca onaylı operasyon alanları gösterilir. Dönen kişisel ayrıntılar denetim
+                            kaydında saklanmaz; kayıtta sorguyu kimin, hangi amaçla yaptığı tutulur.
+                        </p>
+                    }
+                    else if (!_access.Can(Capabilities.DirectoryGroupsView))
+                    {
+                        <section class="so-panel so-panel--blocked so-panel--inset">
+                            <h3 class="so-panel-title">Bu bölüm için yetkiniz yok</h3>
+                            <p class="so-panel-text">
+                                Dizin ayrıntılarını görüntülemek için
+                                <code class="so-code">@Capabilities.DirectoryGroupsView</code> yetkisi gerekir.
+                            </p>
+                        </section>
+                    }
+                    else
+                    {
+                        @* Keyed on account and tab so switching accounts rebuilds each panel instead
+                           of showing the previous account's evidence under a new name. *@
+                        @switch (_tab)
+                        {
+                            case DetailTab.Groups:
+                                <SoDirectoryGroups @key="@($"groups:{DirectoryAccount}")"
+                                                   Account="@DirectoryAccount" Purpose="@DirectoryPurpose" />
+                                break;
+
+                            case DetailTab.Health:
+                                <SoDirectoryHealth @key="@($"health:{DirectoryAccount}")"
+                                                   Account="@DirectoryAccount" Purpose="@DirectoryPurpose" />
+                                break;
+
+                            case DetailTab.Service:
+                                <SoDirectoryService @key="@($"service:{DirectoryAccount}")"
+                                                    Account="@DirectoryAccount" Purpose="@DirectoryPurpose" />
+                                break;
+
+                            case DetailTab.Privileged:
+                                <SoDirectoryPrivileged @key="@($"priv:{DirectoryAccount}")"
+                                                       Account="@DirectoryAccount" Purpose="@DirectoryPurpose" />
+                                break;
+                        }
+                    }
                 }
             </section>
         </div>
@@ -207,8 +268,54 @@
 </div>
 
 @code {
+    /// <summary>Sections of the directory record, each backed by its own endpoint.</summary>
+    private enum DetailTab
+    {
+        /// <summary>Identity fields from the exact lookup already performed.</summary>
+        General,
+
+        /// <summary>Direct and nested group membership.</summary>
+        Groups,
+
+        /// <summary>Enablement, lockout, password, and last-seen evidence.</summary>
+        Health,
+
+        /// <summary>SPNs and directory account-type evidence.</summary>
+        Service,
+
+        /// <summary>Membership in the server-configured privileged groups.</summary>
+        Privileged
+    }
+
     private readonly LookupModel _model = new();
     private readonly IdentityLookupResultCache _cache = new();
+
+    private DetailTab _tab = DetailTab.General;
+
+    // Privileged evidence is a separate capability from ordinary group viewing, so the tab is absent
+    // rather than present-and-refusing for an operator who cannot use it.
+    private IEnumerable<DetailTab> AvailableTabs =>
+        _access?.Can(Capabilities.DirectoryPrivilegedGroupsView) == true
+            ? Enum.GetValues<DetailTab>()
+            : Enum.GetValues<DetailTab>().Where(tab => tab != DetailTab.Privileged);
+
+    // The account the server actually resolved, not what was typed. Directory calls must ask about
+    // the same principal the lookup returned, or the sections can describe a different object.
+    private string DirectoryAccount =>
+        !string.IsNullOrWhiteSpace(_result?.NormalizedAccount)
+            ? _result!.NormalizedAccount
+            : _model.Account.Trim();
+
+    private string DirectoryPurpose => _model.Purpose.Trim();
+
+    private static string TabLabel(DetailTab tab) => tab switch
+    {
+        DetailTab.General => "Genel",
+        DetailTab.Groups => "Gruplar",
+        DetailTab.Health => "Hesap Sağlığı",
+        DetailTab.Service => "Servis / SPN",
+        _ => "Yetkili Üyelikler"
+    };
 
     private AccessSnapshot? _access;
     private bool _loading;
@@ -351,6 +458,9 @@
 
             _result = response;
             _completedAt = DateTimeOffset.UtcNow;
+            // A new principal starts on the identity fields; leaving a detail tab open would show the
+            // previous account's section heading while its evidence reloads underneath.
+            _tab = DetailTab.General;
             _cache.Store(request, response, _completedAt.Value);
         }
         catch (SecureOpsApiException ex)

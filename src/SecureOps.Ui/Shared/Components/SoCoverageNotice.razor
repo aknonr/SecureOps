@@ -1,0 +1,68 @@
+@*
+    How much of the requested window persisted evidence actually covers.
+
+    This is the difference between "nothing happened" and "nobody was recording yet", and on a pilot
+    whose SQL history starts part-way through any useful range, it is the single most misreadable
+    thing on the page. A manager asking for 30 days when only 10 are retained must not be shown 20
+    days of zeroes as if they were measured.
+
+    The notice states the boundary and the size of the gap and stops there. It never estimates,
+    extrapolates, or pro-rates the missing part.
+*@
+
+@if (Coverage.State != ManagementReportView.CoverageState.Complete)
+{
+    <section class="so-panel so-coverage @StateClass" role="status">
+        <div class="so-coverage-body">
+            <span class="so-coverage-icon" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.HistoryToggleOff" />
+            </span>
+            <div>
+                <h2 class="so-panel-title">@Title</h2>
+                <p class="so-panel-text so-panel-text--sm">@Detail</p>
+            </div>
+        </div>
+    </section>
+}
+else if (ShowWhenComplete)
+{
+    <p class="so-coverage-complete">
+        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" aria-hidden="true" />
+        Bu aralığın tamamı kalıcı kayıtlarla karşılanıyor; sıfır değerleri ölçülmüş sıfırdır.
+    </p>
+}
+
+@code {
+    /// <summary>Coverage as reported by the API for this report.</summary>
+    [Parameter, EditorRequired]
+    public ManagementReportView.CoverageView Coverage { get; set; } = default!;
+
+    /// <summary>
+    /// Whether to confirm complete coverage rather than staying silent.
+    /// </summary>
+    /// <remarks>
+    /// Worth saying once on the dashboard, because it is what licenses the reader to treat a zero as
+    /// a measurement. Not worth repeating on every subordinate screen.
+    /// </remarks>
+    [Parameter]
+    public bool ShowWhenComplete { get; set; }
+
+    private string StateClass => Coverage.State == ManagementReportView.CoverageState.None
+        ? "so-coverage--none"
+        : "so-coverage--partial";
+
+    private string Title => Coverage.State == ManagementReportView.CoverageState.None
+        ? "Bu aralık için kalıcı kanıt yok"
+        : "Geçmiş kayıt bu aralığın tamamını kapsamıyor";
+
+    private string Detail => Coverage.State == ManagementReportView.CoverageState.None
+        ? "Seçilen aralıkta raporlanabilir kalıcı kayıt bulunmuyor. Buradaki sıfır değerleri "
+          + "\"olmadı\" anlamına gelmez; ölçülemedi anlamına gelir."
+        : $"Kalıcı kayıt {BoundaryText} tarihinde başlıyor. İstenen {Coverage.RequestedDays} günün "
+          + $"ilk {Coverage.UncoveredDays} günü için kanıt yok; bu bölüm sıfır olarak değil, "
+          + "ölçülemedi olarak okunmalıdır.";
+
+    private string BoundaryText => Coverage.CoverageFromUtc is { } from
+        ? from.UtcDateTime.ToString("dd.MM.yyyy HH:mm") + " UTC"
+        : "bilinmiyor";
+}

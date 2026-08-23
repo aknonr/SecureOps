@@ -1,0 +1,229 @@
+@using Microsoft.Extensions.Logging
+@inject IDirectoryApiClient Directory
+@inject ILogger<SoDirectoryGroups> Logger
+
+@*
+    Direct and nested group membership, kept apart.
+
+    The contract returns two sets and this screen never merges them. A direct membership is granted
+    on the group itself; a nested one comes through another group and is removed somewhere else
+    entirely. Presenting them as one list is what makes an operator revoke the wrong thing.
+
+    "Nasıl üye?" answers the question that actually gets asked during an authorization incident, using
+    the server's own proof. The browser never walks the graph.
+*@
+
+@if (_loading)
+{
+    <SoLoading Message="Grup üyelikleri getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+}
+else if (_problem is not null)
+{
+    <SoProblemPanel Problem="_problem" OnRetry="@(() => LoadAsync(refresh: true))" />
+}
+else if (_memberships is not null)
+{
+    <SoTraversalNotice Traversal="_memberships.Traversal" />
+
+    <div class="so-panel-head">
+        <h3 class="so-subhead so-subhead--flush">
+            Doğrudan gruplar
+            <span class="so-count-chip">@_memberships.DirectGroups.Count</span>
+        </h3>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="@(() => LoadAsync(refresh: true))">
+            Yenile
+        </MudButton>
+    </div>
+    <p class="so-panel-text so-panel-text--sm">
+        Hesaba doğrudan atanmış gruplar. Bir üyeliği kaldırmak gerekiyorsa yeri burasıdır.
+    </p>
+    <SoGroupTable Items="_memberships.DirectGroups"
+                  EmptyText="Bu hesaba doğrudan atanmış grup yok."
+                  OnInspect="InspectAsync" />
+
+    <h3 class="so-subhead">
+        Dolaylı / iç içe gruplar
+        <span class="so-count-chip">@_memberships.TransitiveGroups.Count</span>
+    </h3>
+    <p class="so-panel-text so-panel-text--sm">
+        Başka gruplar üzerinden erişilen gruplar. Bunlar hesaptan doğrudan kaldırılamaz; zincirdeki
+        ilgili grup üyeliğinin değişmesi gerekir.
+    </p>
+    <SoGroupTable Items="_memberships.TransitiveGroups"
+                  ShowDepth="true"
+                  EmptyText="İç içe üyelik bulunmadı."
+                  OnInspect="InspectAsync" />
+
+    @if (_pathTarget is not null)
+    {
+        <section class="so-panel so-panel--inset">
+            <div class="so-panel-head">
+                <h3 class="so-panel-title">
+                    Üyelik yolu · @DirectoryView.GroupName(_pathTarget)
+                </h3>
+                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Close"
+                           OnClick="ClosePath">
+                    Kapat
+                </MudButton>
+            </div>
+
+            @if (_pathLoading)
+            {
+                <SoLoading Message="Üyelik yolu çözümleniyor…" />
+            }
+            else if (_pathProblem is not null)
+            {
+                <SoProblemPanel Problem="_pathProblem" OnRetry="@(() => InspectAsync(_pathTarget))" />
+            }
+            else if (_paths is not null)
+            {
+                <SoTraversalNotice Traversal="_paths.Traversal" IsVerdict="true" />
+
+                @if (_paths.IsMember)
+                {
+                    <div class="so-path-summary">
+                        <SoStatusBadge Label="@(_paths.IsDirect ? "Doğrudan üye" : "İç içe üyelik ile üye")"
+                                       Tone="SoStatusBadge.BadgeTone.Positive"
+                                       Icon="@Icons.Material.Filled.CheckCircle" />
+                        <span class="so-status-text">
+                            @_paths.Paths.Count adet kanıtlanmış yol bulundu.
+                        </span>
+                    </div>
+
+                    @foreach (DirectoryMembershipPathDto path in _paths.Paths)
+                    {
+                        <SoMembershipPath Path="path" Account="@Account" />
+                    }
+
+                    @if (_paths.PathsTruncated)
+                    {
+                        @* More chains exist than the server returned. Saying so matters: an operator
+                           removing only the shown paths would not remove the membership. *@
+                        <p class="so-panel-text so-panel-text--sm so-note-caution">
+                            Gösterilenden daha fazla yol var; liste sunucu tarafında kısaltıldı.
+                            Üyeliği kaldırmak için yalnızca buradaki yolları değiştirmek yeterli olmayabilir.
+                        </p>
+                    }
+                }
+                else if (DirectoryView.NegativeIsConclusive(_paths))
+                {
+                    <div class="so-path-summary">
+                        <SoStatusBadge Label="Üye değil"
+                                       Tone="SoStatusBadge.BadgeTone.Neutral"
+                                       Icon="@Icons.Material.Filled.DoNotDisturbOn" />
+                        <span class="so-status-text">
+                            Tarama sınıra takılmadan tamamlandı; bu hesap bu gruba üye değil.
+                        </span>
+                    </div>
+                }
+                else
+                {
+                    @* The one answer this screen must never give is a confident "no" after a bounded
+                       walk. The server did not rule membership out, so neither does the UI. *@
+                    <div class="so-path-summary">
+                        <SoStatusBadge Label="Sonuç kesin değil"
+                                       Tone="SoStatusBadge.BadgeTone.Caution"
+                                       Icon="@Icons.Material.Filled.HelpOutline" />
+                        <span class="so-status-text">
+                            Tarama tamamlanamadığı için üyelik olmadığı söylenemez. Yukarıdaki
+                            sınırlar giderilmeden bu sonuç yetkilendirme kararı için kullanılmamalıdır.
+                        </span>
+                    </div>
+                }
+            }
+        </section>
+    }
+}
+
+@code {
+    /// <summary>Exact account, as the server normalized it.</summary>
+    [Parameter, EditorRequired]
+    public string Account { get; set; } = string.Empty;
+
+    /// <summary>Operational purpose recorded with every directory call.</summary>
+    [Parameter, EditorRequired]
+    public string Purpose { get; set; } = string.Empty;
+
+    private DirectoryPrincipalMembershipsResponse? _memberships;
+    private UiProblem? _problem;
+    private bool _loading;
+
+    private DirectoryGroupSummaryDto? _pathTarget;
+    private DirectoryMembershipPathResponse? _paths;
+    private UiProblem? _pathProblem;
+    private bool _pathLoading;
+
+    // Loaded when the tab is first opened rather than with the lookup. Each directory call is
+    // audited, bounded, and rate-limited, so fetching all four sections up front would spend an
+    // operator's quota on evidence they may not have asked for.
+    protected override Task OnInitializedAsync() => LoadAsync(refresh: false);
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _memberships = await Directory.GetMembershipsAsync(Account, Purpose, refresh, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _memberships = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Directory memberships unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task InspectAsync(DirectoryGroupSummaryDto? group)
+    {
+        if (group is null)
+        {
+            return;
+        }
+
+        // The server matches on an exact identifier; sAMAccountName is the one it resolves most
+        // reliably, with the display name as the only alternative the contract offers.
+        string? target = !string.IsNullOrWhiteSpace(group.SamAccountName) ? group.SamAccountName : group.Name;
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return;
+        }
+
+        _pathTarget = group;
+        _pathLoading = true;
+        _pathProblem = null;
+        _paths = null;
+        StateHasChanged();
+
+        try
+        {
+            _paths = await Directory.GetMembershipPathsAsync(
+                Account, target, Purpose, refresh: false, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _pathProblem = ex.Problem;
+            Logger.LogDebug("Membership path unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _pathLoading = false;
+        }
+    }
+
+    private void ClosePath()
+    {
+        _pathTarget = null;
+        _paths = null;
+        _pathProblem = null;
+    }
+}

@@ -6,6 +6,7 @@
 @inject ICurrentAccessProvider AccessProvider
 @inject IIdentityLookupApiClient IdentityClient
 @inject IDemoModeState ShellMode
+@inject ISessionApiClient SessionsClient
 @inject ILogger<Account> Logger
 
 <PageTitle>Hesabım · SecureOps</PageTitle>
@@ -122,6 +123,45 @@
             </MudButton>
         </div>
     </section>
+
+    @* The server's own view of this session, which is the authoritative one. Timestamps and the
+       absolute deadline come from the session store rather than from the cookie, so what is shown
+       here is what will actually decide when the operator is signed out. The opaque handle itself is
+       never fetched, held, or displayed. *@
+    <section class="so-panel">
+        <div class="so-panel-head">
+            <h2 class="so-panel-title">Oturumum</h2>
+        </div>
+
+        @if (_sessionProblem is not null)
+        {
+            <div class="so-status-row">
+                <SoStatusBadge Label="Oturum bilgisi alınamadı"
+                               Tone="SoStatusBadge.BadgeTone.Caution"
+                               Icon="@Icons.Material.Filled.HelpOutline" />
+                <span class="so-status-text">@_sessionProblem.Title</span>
+            </div>
+        }
+        else if (_session is null)
+        {
+            <SoLoading Message="Oturum bilgisi getiriliyor…" Bare="true" />
+        }
+        else
+        {
+            <SoFieldGrid MinColumnWidth="220px">
+                <SoField Label="Başlangıç" Value="@Local(_session.StartedAtUtc)" />
+                <SoField Label="Son etkinlik" Value="@Local(_session.LastSeenAtUtc)" />
+                <SoField Label="Azami bitiş" Value="@Local(_session.AbsoluteExpiresAtUtc)" />
+                <SoField Label="Kimlik doğrulama" Value="@_session.AuthenticationMethod" />
+            </SoFieldGrid>
+
+            <p class="so-panel-text so-panel-text--sm">
+                Oturum süresi sunucu tarafında yönetilir. Boşta kalma veya azami süre dolduğunda,
+                erişiminiz kapatıldığında ya da yetkileriniz değiştiğinde oturum sonlandırılır ve
+                yeniden kimlik doğrulaması istenir.
+            </p>
+        }
+    </section>
 </div>
 
 @code {
@@ -131,6 +171,11 @@
     private SignedInUser _user = new("bilinmiyor", "bilinmiyor", "bilinmiyor");
     private AccessSnapshot? _access;
     private string? _apiCallerName;
+    private ApplicationSessionResponse? _session;
+    private UiProblem? _sessionProblem;
+
+    private static string Local(DateTimeOffset value) =>
+        value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
 
     private string _authSourceRaw => _access?.Access?.AuthenticationSource ?? _user.AuthenticationSource;
 
@@ -146,6 +191,26 @@
 
         _access = await AccessProvider.GetAsync();
         await LoadApiCallerAsync();
+        await LoadSessionAsync();
+    }
+
+    // Non-fatal. An expired or revoked session is reported by this endpoint as a failure, and the
+    // page must still render the rest of the account rather than turning into an error screen — the
+    // circuit's own authentication handling is what redirects the operator to sign in again.
+    private async Task LoadSessionAsync()
+    {
+        _session = null;
+        _sessionProblem = null;
+
+        try
+        {
+            _session = await SessionsClient.GetCurrentAsync(CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _sessionProblem = ex.Problem;
+            Logger.LogDebug("Current session unavailable. Code: {Code}.", ex.Problem.Code);
+        }
     }
 
     private async Task RefreshAsync()

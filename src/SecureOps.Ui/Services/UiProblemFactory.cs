@@ -235,6 +235,86 @@ public static class UiProblemFactory
             [RetryStep, ReferenceStep, ContactAdminStep],
             retryable: true, requiresRefresh: false),
 
+        // ---- Directory Explorer ---------------------------------------------------------------
+        OperationalErrorCodes.DirectoryInvalidInput => Build(
+            UiProblemKind.Validation, code,
+            "Girilen değer kabul edilmedi",
+            "Dizin sorguları yalnızca tek ve tam bir hesap veya grup kabul eder.",
+            ["Tek bir hesap ya da grup adı girin; joker karakter, LDAP filtresi veya liste kullanmayın.",
+             "DOMAIN\\ad biçimi kabul edilir."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.DirectoryPrincipalNotFound => Build(
+            UiProblemKind.NotFound, code,
+            "Hesap dizinde bulunamadı",
+            "Sorgulanan hesap için dizinde tam eşleşen bir kayıt yok.",
+            ["Hesap yazımını kontrol edin.", "Hesap farklı bir alan adında olabilir."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.DirectoryGroupNotFound => Build(
+            UiProblemKind.NotFound, code,
+            "Grup dizinde bulunamadı",
+            "Sorgulanan grup için dizinde tam eşleşen bir kayıt yok.",
+            ["Grup adının yazımını kontrol edin.", "Grup adı yerine sAMAccountName deneyebilirsiniz."],
+            retryable: false, requiresRefresh: false),
+
+        // Not a failure of the query: the server answered, and told the UI how far it got. The
+        // screens must present that as a bounded result rather than as an empty or negative one.
+        OperationalErrorCodes.DirectoryQueryLimitExceeded => Build(
+            UiProblemKind.Validation, code,
+            "Sorgu sınırı aşıldı",
+            "Bu sorgu, dizin üzerinde izin verilen tarama sınırını aşıyor. Sonuç eksik kalacağı için "
+            + "gösterilmedi.",
+            ["Daha dar bir grup veya hesap ile deneyin.",
+             "Sonuç gerçekten bu kadar büyükse dizin ekibiyle birlikte değerlendirin."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.DirectoryProviderUnavailable => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Dizin servisi yanıt vermiyor",
+            "Dizin sağlayıcısına şu anda ulaşılamıyor. Sorgunuz çalıştırılmadı.",
+            [RetryStep, ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
+        // ---- Application sessions ---------------------------------------------------------------
+        OperationalErrorCodes.SessionExpired => Build(
+            UiProblemKind.SessionExpired, code,
+            "Oturumunuz sona erdi",
+            "SecureOps oturumunuz boşta kalma veya azami süre nedeniyle sunucu tarafında sonlandırıldı.",
+            ["Yeniden oturum açın; kaldığınız sayfaya döneceksiniz."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.SessionRevoked => Build(
+            UiProblemKind.SessionExpired, code,
+            "Oturumunuz sonlandırıldı",
+            "Bu oturum bir yönetici tarafından sonlandırıldı ya da erişim tanımınız değişti.",
+            ["Yeniden oturum açabilirsiniz.", "Erişiminiz kapatıldıysa platform yöneticinize başvurun."],
+            retryable: false, requiresRefresh: false),
+
+        // Already ended is the common case here, and it is not an error the administrator caused:
+        // the session may have expired between the list being rendered and the button being pressed.
+        OperationalErrorCodes.SessionNotFound => Build(
+            UiProblemKind.Conflict, code,
+            "Oturum artık mevcut değil",
+            "Bu oturum zaten sonlanmış olabilir; listeyi görüntülediğinizden bu yana süresi dolmuş "
+            + "veya kullanıcı çıkış yapmış olabilir.",
+            ["Listeyi yenileyip güncel oturumları görün."],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.SessionValidationFailed => Build(
+            UiProblemKind.Validation, code,
+            "Oturum isteği kabul edilmedi",
+            "Gönderilen oturum kimliği veya gerekçe sunucunun beklediği biçimde değil.",
+            ["Gerekçenin boş olmadığından emin olun.", "Listeyi yenileyip işlemi tekrarlayın."],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.SessionStoreUnavailable => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Oturum kayıt deposuna ulaşılamıyor",
+            "Oturum bilgileri okunamadığı için işlem güvenli şekilde durduruldu.",
+            [RetryStep, ReferenceStep, ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
         // ---- Cross-cutting ------------------------------------------------------------------
         OperationalErrorCodes.RateLimitExceeded => Build(
             UiProblemKind.RateLimited, code,

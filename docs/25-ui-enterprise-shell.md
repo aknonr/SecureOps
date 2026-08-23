@@ -55,7 +55,10 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/access-denied` | Authorization refusal, with a route to request access | Anonymous |
 | `/error` | Unhandled server error, request reference only | Anonymous |
 | `/` and `/dashboard` | Yönetim Panosu with `Reporting.ManagementView`; otherwise the operator Genel Bakış | Authenticated |
-| `/identity-lookup` | PAM / AD lookup | Authenticated + `Identity.Lookup` |
+| `/directory/users` (and legacy `/identity-lookup`) | Kullanıcı Sorgulama: exact lookup plus tabbed directory evidence | Authenticated + `Identity.Lookup` |
+| `/directory/groups` | Grup Sorgulama: exact group and its direct members | Authenticated + `Identity.Groups.View` |
+| `/admin/sessions` | Aktif Oturumlar: application-session administration | Authenticated + `Access.ManageUsers` |
+| `/admin/system-status` | Sistem Durumu: enterprise integration state | Authenticated + `Access.ManageUsers` |
 | `/account` | Signed-in identity and session security | Authenticated |
 | `/access/me` | Erişimim: status, roles, grouped capabilities | Authenticated |
 | `/access/requests` | Erişim Talepleri: decision queue | Authenticated + `Access.ApproveRequests` |
@@ -232,7 +235,7 @@ Rules specific to this screen:
 Red stays reserved for genuinely critical conditions. Stale, claimed, pending, and reconciliation
 states use warning or informational tones.
 
-## 11. Management reporting (this milestone)
+## 11. Management reporting
 
 Backend-authoritative, from two endpoints and nothing else:
 
@@ -339,9 +342,192 @@ provider-agnostic, so the form action changes and the page does not when OIDC re
 endpoint; there is no username, password, or role selection; and the environment marker is gated on
 `ShowEnvironmentMarker`, so Demo and Test name themselves and Production does not.
 
-## 13. Verification, and what it proves
+## 13. Directory Explorer
 
-Two layers, and they prove different things.
+Two exact-only screens, both audited on every call.
+
+| Route | Purpose |
+|---|---|
+| `/directory/users` (also `/identity-lookup`) | Kullanıcı Sorgulama — one account, then its evidence in tabs |
+| `/directory/groups` | Grup Sorgulama — one group and its direct members |
+
+Every request carries an operational `purpose` that the API writes to the audit trail, so these are
+not free reads. Each tab therefore loads **on first open**, not when the lookup returns: fetching all
+five sections up front would spend an operator's rate-limited quota on evidence they never asked to
+see. Directory calls use the `normalizedAccount` the server resolved, not the typed string, so every
+section describes the same principal the lookup found.
+
+Nothing traverses a graph in the browser. Direct groups, nested groups, membership paths, and
+privileged evidence are all computed server-side; recomputing or extending any of it here would
+produce an answer nobody could audit.
+
+### Tabs
+
+`Genel` reuses the existing exact-lookup result. `Gruplar`, `Hesap Sağlığı` and `Servis / SPN`
+require `Identity.Groups.View`. `Yetkili Üyelikler` requires `Identity.PrivilegedGroups.View` and is
+**absent** rather than present-and-refusing when that capability is missing.
+
+### Direct and nested membership
+
+The contract returns two sets and the screen never merges them. A direct membership is granted on the
+group itself; a nested one comes through another group and is removed somewhere else entirely.
+Presenting them as one list is what makes an operator revoke the wrong thing, so each list carries
+that instruction explicitly.
+
+`alsoTransitivelyReachable` is a badge on the single direct row, not a second row. The same group
+listed twice reads as two grants, which is exactly the confusion the split exists to prevent. Nested
+rows additionally show `minimumDepth`.
+
+### Membership path
+
+"Nasıl üye?" answers the question actually asked during an authorization incident, using the server's
+own proof. A one-group chain is a direct membership and is styled distinctly from a nested one.
+Multiple returned paths are all rendered — an operator removing only the first would not remove the
+membership — and `pathsTruncated` says so in as many words.
+
+**A bounded traversal is never a negative answer.** `isMember=false` may be shown as "üye değil" only
+when the server reports no limit and no truncation (`DirectoryView.NegativeIsConclusive`). Otherwise
+the screen says the traversal was incomplete and that the result must not drive an authorization
+decision. Every reached bound is listed separately — a depth limit and a provider result limit call
+for different follow-up, and a detected cycle is a directory finding in its own right.
+
+### Account health
+
+Every field on this contract is nullable and unknown is rendered as unknown. A directory that did not
+return an attribute has not said the attribute is false.
+
+`lastLogonTimestampUtc` is the replicated attribute. It is labelled **"Son görülen oturum zamanı
+(yaklaşık)"** — in the label itself, not only in a note beneath it, so the caveat survives being
+copied into a ticket. It is never presented as an exact last sign-in.
+
+### Service evidence
+
+Titled *göstergeler*, not a classification. The API reports what the directory objects say — object
+class, SPNs, `managedBy` — and does not decide that an account is a service account; neither does the
+UI. SPN lists are bounded server-side, and when truncated the screen states that the **count is
+authoritative and the list is not**, so nobody counts visible rows and reports a smaller number.
+
+### Privileged membership
+
+Restrained by design. Privileged membership is a normal, expected property of an administrator
+account — a fact to establish during an investigation, not an incident. A match is marked with an
+accent edge, not an alarm fill; colouring every match red would make the screen useless to the people
+whose job requires those memberships. The configured group set is server-owned, and a group that is
+configured but missing from the directory is surfaced rather than dropped.
+
+### Group lookup
+
+Metadata and members are separate capabilities and separate calls, so an operator who may see that a
+group exists does not automatically see who is in it; a refused member list leaves the metadata
+standing. Members are direct only. A nested group appears as a member and links to **its own exact
+lookup** rather than being expanded in place. Paging is forward-only because the continuation token
+is — "Daha fazla yükle" appends rather than pretending to offer random access the API does not have.
+
+## 14. Application sessions
+
+| Route | Purpose | Capability |
+|---|---|---|
+| `/admin/sessions` | Aktif Oturumlar: server-side session administration | `Access.ManageUsers` |
+| `/account` | "Oturumum" panel for the caller's own session | Authenticated |
+
+Only what the contract exposes: identifiers and timestamps. No IP address, no device, no user agent,
+and above all **no session handle** — the opaque `__Host-SecureOps.ApplicationSession` cookie is the
+credential, and a screen that displayed it would turn a diagnostic view into a way to impersonate
+people. The identity column is the persisted user id; this endpoint performs no directory enrichment,
+and no name is fetched from elsewhere to fill the gap.
+
+Revocation requires confirmation and a reason. The dialog states the consequence before the button —
+the operator's next request is unauthenticated and work in progress can be interrupted — and states
+that it **does not disable the account**, which prevents the opposite mistake. A failed revoke is kept
+separate from the list problem so it survives the reload that follows; an already-ended session is
+reported as a stale-view conflict, because that is usually what it is.
+
+Idle and absolute limits are shown on `/account` from `SessionPolicyResponse`, which the API supplies.
+They are not hard-coded here.
+
+## 15. Integration status
+
+`/admin/system-status` reads `GET /api/v1/health/enterprise-integrations`, which is Admin-only. The
+page shows provider name, configured selection, and a status word — never a URL, credential, account,
+or remote payload.
+
+`Devre dışı` is toned neutral, not as a fault: a provider deliberately switched off is a configuration
+decision, and colouring it red sends operators chasing a non-problem. An unrecognised status renders
+as itself with a neutral tone rather than being coloured green by a default branch.
+
+Three providers are reported, so three appear. The database, background jobs, and the audit store have
+no entry on this endpoint, and the page says so explicitly instead of inventing tiles that would put a
+green light next to something nobody checked.
+
+## 16. Reporting contract hardening (G-14, G-15, G-17)
+
+| Was | Now |
+|---|---|
+| Duration matched on English `definition` text | Matched on stable `key`: `importToPreview`, `claimToJiraCreation`, `claimToCompletion` |
+| Limitations were English prose | Keyed on `code`; `message` is fallback only, never behaviour |
+| Zero was indistinguishable from absent history | `coverage` separates a measured zero from an unmeasured one |
+
+Duration labels ignore `definition` and array position entirely; the contract states both are
+presentation details, so a reworded definition or a reordered array must not change what a row means.
+An unknown key falls back to the server's own definition text.
+
+Coverage drives three distinct states, and the verdict is taken from `coverageComplete` rather than
+recomputed from the dates:
+
+- **Complete** — a quiet line confirms that a zero on the page is a measured zero.
+- **Partial** — a notice names the boundary and how many days of the requested window have no
+  evidence ("istenen 30 günün ilk 20 günü"), and says that part must be read as unmeasured, not zero.
+- **None** — no persisted reportable evidence exists for the window at all.
+
+The empty-window state now distinguishes *no activity* from *no records*: with complete coverage it
+says the window is a measured zero; without, it says evidence is missing and must not be read as zero.
+
+`G-16 remains open.` Only `identityLookup.trend` is bucketed by day, so it remains the only trend
+drawn. No adoption or Operational Record/Jira series was inferred.
+
+Session-governance aggregates (`sessionGovernance`) are surfaced as their own dashboard panel, with a
+link into `/admin/sessions` for holders of `Access.ManageUsers`.
+
+## 17. Navigation
+
+Capability-driven throughout, and a group heading appears only when at least one of its entries does:
+
+```
+Genel Bakış / Yönetim Panosu
+Operasyon    → Operasyonel Kayıtlar          OperationalRecords.View
+Dizin        → Kullanıcı Sorgulama           Identity.Lookup
+             → Grup Sorgulama                Identity.Groups.View
+Raporlama    → Yönetim Panosu                Reporting.ManagementView
+             → Operatör Raporu               Reporting.ManagementView
+Yönetim      → Erişim Talepleri              Access.ApproveRequests
+             → Kullanıcılar                  Access.ManageUsers
+             → Aktif Oturumlar               Access.ManageUsers
+             → Sistem Durumu                 Access.ManageUsers
+Erişim       → Erişimim                      authenticated
+```
+
+An account with an Admin-sounding role but without `Access.ManageUsers` gets no administration group.
+The API would refuse those screens anyway, and offering them is a dead end that reads as a
+permissions bug.
+
+## 18. Layout notes worth keeping
+
+Two defects found by the responsive checks, both worth recording because they recur:
+
+- `display: flex` on a `<th>` takes the cell out of the table box model, and the table then stops
+  containing its own width. The flex container must be a wrapper inside the cell.
+- A wide table inside `overflow-x: auto` scrolls correctly, but its overflow still propagated to
+  `.mud-layout` and grew the document. `.mud-layout { overflow-x: clip }` stops that. `clip` rather
+  than `hidden`: it creates no scroll container, and because `.mud-layout` is only `position:
+  relative` it does not become a containing block for the fixed app bar or drawer.
+
+The Directory user page collapses its two-column split once a principal resolves. Its group, SPN, and
+privileged tables are the widest content in the product, and in a half-width column the trailing
+"Nasıl üye?" action is permanently scrolled out of reach.
+
+## 19. Verification, and what it proves
+
+Three layers, and they prove different things.
 
 **Synthetic end-to-end, against the real API** with `OperationalRecords__SourceProvider=Fake`
 (Development, Demo, and Test only). Every transition is produced by the real SecureOps workflow, not
@@ -353,6 +539,15 @@ fixtures are each rejected by the backend with their own code and create no Jira
 retry blocked, live claim contention, rate limiting, Jira provider failure. Forty checks. This proves
 **presentation only**, and the report says so rather than letting a green tick imply more.
 
+**Contract-shaped stub for reporting, directory, sessions, and integration status.** 117 browser
+checks across complete, partial and absent evidence coverage; direct, nested, multi-path, truncated,
+conclusively-negative and traversal-limited membership; zero, one, many and truncated SPN lists;
+populated and entirely-unknown account health; privileged membership allowed and forbidden; group
+member paging and mixed member types; session listing, revoke confirmation, revoke failure and
+forbidden access; integration status configured, disabled, unavailable and forbidden; four viewports
+(1920, 1366, 834, 390) and both themes. This is presentation verification: the Directory Explorer
+read model needs a real domain, and the reporting read model needs SQL Server with migrations 001–007.
+
 Provider selection is never a user-facing setting. When the source is `Disabled`, the list renders the
 ordinary service-unavailable experience with its correlation reference and never names the provider
 or its configuration. Synthetic records are identifiable by their own `SYN-` source codes rather than
@@ -360,9 +555,11 @@ by any UI label claiming they are real.
 
 **Synthetic readiness is not Turuncu Hat readiness.** See `docs/26-ui-backend-contract-gaps.md`.
 
-## 14. Out of scope for this milestone
+## 20. Out of scope for this milestone
 
 Read-only diagnostics and the audit/compliance view remain truthful placeholders; their navigation
 entries say so rather than offering a dead link. Reporting is confined to the two management
 endpoints — no per-day adoption series, no manual-effort baseline, and no time-saved figure exists to
-show. Backend gaps are tracked in `docs/26-ui-backend-contract-gaps.md`.
+show. The Directory Explorer is read-only throughout: no AD write, no membership change, no password
+entry, and no client-side graph traversal. Backend gaps are tracked in
+`docs/26-ui-backend-contract-gaps.md`.

@@ -76,14 +76,110 @@ public sealed class ManagementReportViewTests
         view.Maximum.Should().Be("1 sa");
     }
 
-    [Fact]
-    public void DurationLabel_FallsBackToTheServerDefinitionWhenUnrecognised()
+    [Theory]
+    [InlineData("importToPreview")]
+    [InlineData("claimToJiraCreation")]
+    [InlineData("claimToCompletion")]
+    public void DurationLabel_TranslatesEveryStableKeyTheContractDefines(string key)
     {
-        // The v1 contract carries no stable key for a duration, only this sentence. An interval
-        // added server-side must render as itself rather than be mislabelled as a known one.
-        ManagementReportView.DurationLabel("Some interval the UI has never seen")
+        // These three keys are the contract's identity for a duration. A missing one would fall
+        // through to English definition text on a Turkish screen.
+        ManagementReportView.DurationLabel(key, "definition text").Should().NotBe("definition text");
+    }
+
+    [Fact]
+    public void DurationLabel_IgnoresTheDefinitionTextWhenChoosingALabel()
+    {
+        // The contract states that definition wording is a presentation detail. A reworded English
+        // definition must not change what the UI thinks the row means.
+        ManagementReportView.DurationLabel("claimToCompletion", "Completely different wording")
+            .Should().Be("Devralma → tamamlanma");
+    }
+
+    [Fact]
+    public void DurationLabel_FallsBackToTheServerDefinitionForAnUnknownKey()
+    {
+        // An interval added server-side must render as itself rather than be mislabelled as one of
+        // the three the UI knows.
+        ManagementReportView.DurationLabel("someNewInterval", "Some interval the UI has never seen")
             .Should().Be("Some interval the UI has never seen");
     }
+
+    [Fact]
+    public void Duration_CarriesTheStableKeyThrough()
+    {
+        ManagementReportView.Duration(
+            new DurationStatisticsResponse("claimToJiraCreation", "anything", 1, 1, 1, 1))
+            .Key.Should().Be("claimToJiraCreation");
+    }
+
+    [Fact]
+    public void Coverage_CompleteMeansAZeroIsAMeasuredZero()
+    {
+        ManagementReportView.CoverageView view = ManagementReportView.Coverage(
+            new ReportingEvidenceCoverageResponse(
+                Utc(8, 16), Utc(8, 23), Utc(8, 1), CoverageComplete: true));
+
+        view.State.Should().Be(ManagementReportView.CoverageState.Complete);
+        view.ZeroIsMeasured.Should().BeTrue();
+        view.UncoveredDays.Should().Be(0);
+    }
+
+    [Fact]
+    public void Coverage_WithNoBoundaryAtAllIsReportedAsNone()
+    {
+        ManagementReportView.CoverageView view = ManagementReportView.Coverage(
+            new ReportingEvidenceCoverageResponse(
+                Utc(8, 16), Utc(8, 23), CoverageFromUtc: null, CoverageComplete: false));
+
+        view.State.Should().Be(ManagementReportView.CoverageState.None);
+        view.ZeroIsMeasured.Should().BeFalse();
+        view.UncoveredDays.Should().Be(7);
+    }
+
+    [Fact]
+    public void Coverage_WithABoundaryInsideTheWindowMeasuresTheUncoveredHead()
+    {
+        // The case the brief names: 30 days asked for, 10 days retained. The other 20 must never be
+        // drawn as zero activity, and the notice has to be able to say how many they are.
+        ManagementReportView.CoverageView view = ManagementReportView.Coverage(
+            new ReportingEvidenceCoverageResponse(
+                Utc(7, 24), Utc(8, 23), Utc(8, 13), CoverageComplete: false));
+
+        view.State.Should().Be(ManagementReportView.CoverageState.Partial);
+        view.RequestedDays.Should().Be(30);
+        view.UncoveredDays.Should().Be(20);
+        view.ZeroIsMeasured.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Coverage_WithABoundaryAfterTheWindowLeavesNothingCovered()
+    {
+        // Persistence began after the whole requested range. Nothing in the window is measured, so
+        // the uncovered span is the entire window rather than a negative number.
+        ManagementReportView.CoverageView view = ManagementReportView.Coverage(
+            new ReportingEvidenceCoverageResponse(
+                Utc(7, 24), Utc(8, 3), Utc(8, 20), CoverageComplete: false));
+
+        view.State.Should().Be(ManagementReportView.CoverageState.Partial);
+        view.UncoveredDays.Should().Be(view.RequestedDays).And.Be(10);
+    }
+
+    [Fact]
+    public void Coverage_TrustsTheServerFlagRatherThanRecomputingItFromDates()
+    {
+        // The server owns the verdict. Even with a boundary that looks complete, a false flag must
+        // not be overridden by client-side arithmetic.
+        ManagementReportView.CoverageView view = ManagementReportView.Coverage(
+            new ReportingEvidenceCoverageResponse(
+                Utc(8, 16), Utc(8, 23), Utc(8, 1), CoverageComplete: false));
+
+        view.State.Should().NotBe(ManagementReportView.CoverageState.Complete);
+        view.ZeroIsMeasured.Should().BeFalse();
+    }
+
+    private static DateTimeOffset Utc(int month, int day) =>
+        new(2026, month, day, 0, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void HasEvidence_IsFalseForACompletelyEmptyWindow()
@@ -203,29 +299,51 @@ public sealed class ManagementReportViewTests
     {
         // These five are the complete set in ManagementReportProjector. Any one left untranslated
         // would put an English sentence on a Turkish management screen.
-        string[] fromServer =
+        string[] codes =
         [
-            "Rate-limit rejections are not currently persisted as audit events; this metric is unavailable.",
-            "Historical access-version conflicts and Operational Record source-query outages are unavailable when no audit event exists.",
-            "Invalid items skipped inside historical bulk identity requests do not have individual terminal audit rows.",
-            "Duplicate-create prevention is measurable only from the first release that writes its explicit audit event.",
-            "Elapsed durations include waits and retries and are not active labor, time saved, or operator performance."
+            "RateLimitRejectionsUnavailable",
+            "AccessVersionConflictHistoryUnavailable",
+            "OperationalSourceOutageHistoryUnavailable",
+            "BulkIdentityInvalidItemHistoryUnavailable",
+            "DuplicateCreatePreventionHistoryIncomplete",
+            "ElapsedDurationsNotActiveEffort",
+            "HistoryBeforePersistenceUnavailable"
         ];
 
-        foreach (string limitation in fromServer)
+        foreach (string code in codes)
         {
-            ManagementReportView.LimitationLabel(limitation).Should().NotBe(limitation);
+            string label = ManagementReportView.LimitationLabel(new DataLimitationResponse(code, null));
+            label.Should().NotBe(code);
+            label.Should().NotBeNullOrWhiteSpace();
         }
     }
 
     [Fact]
-    public void LimitationLabel_ShowsAnUnrecognisedLimitationVerbatim()
+    public void LimitationLabel_IgnoresTheServerMessageForAKnownCode()
     {
-        // Failing towards the server's own words is the safe direction: an untranslated sentence is
-        // a blemish, a dropped or reworded one is a false statement about the data.
-        const string added = "Some limitation added by a later backend release.";
+        // message is fallback presentation text and must never drive what is shown for a code the
+        // UI already translates; otherwise a backend wording change silently rewrites the screen.
+        ManagementReportView
+            .LimitationLabel(new DataLimitationResponse("ElapsedDurationsNotActiveEffort", "English text"))
+            .Should().NotBe("English text");
+    }
 
-        ManagementReportView.LimitationLabel(added).Should().Be(added);
+    [Fact]
+    public void LimitationLabel_FallsBackToTheServerMessageForAnUnknownCode()
+    {
+        ManagementReportView
+            .LimitationLabel(new DataLimitationResponse("SomethingNew", "Server-supplied fallback."))
+            .Should().Be("Server-supplied fallback.");
+    }
+
+    [Fact]
+    public void LimitationLabel_FallsBackToTheCodeWhenThereIsNoMessage()
+    {
+        // Failing towards the server's own identifier is the safe direction: a raw code on screen is
+        // a blemish, a dropped limitation is a false statement about the data.
+        ManagementReportView
+            .LimitationLabel(new DataLimitationResponse("SomethingNew", null))
+            .Should().Be("SomethingNew");
     }
 
     [Theory]

@@ -98,20 +98,30 @@
         {
             <SoProblemPanel Problem="_reportProblem" OnRetry="ReloadReportAsync" RetryLabel="Yeniden yükle" />
         }
-        else if (_report is null)
+        else if (_report is null || _coverage is null)
         {
             <SoLoading Message="Rapor hazırlanıyor…" Variant="SoLoading.LoadingVariant.Block" />
         }
         else if (!ManagementReportView.HasEvidence(_report))
         {
-            <SoEmptyState Title="Bu aralıkta kayıtlı kanıt yok"
-                          Description="Seçilen aralık için kalıcı kayıt bulunmuyor. Bu, hiç işlem yapılmadığı anlamına gelebileceği gibi, kalıcı geçmişin bu aralığı henüz kapsamadığı anlamına da gelebilir. Sıfır olarak yorumlamayın."
+            <SoCoverageNotice Coverage="_coverage" />
+
+            @* With coverage resolved, an empty window can finally be described honestly: a measured
+               absence of activity, or an absence of records. Before G-17 both looked identical. *@
+            <SoEmptyState Title="@(_coverage.ZeroIsMeasured ? "Bu aralıkta işlem yapılmamış" : "Bu aralıkta kayıtlı kanıt yok")"
+                          Description="@(_coverage.ZeroIsMeasured
+                              ? "Kalıcı kayıt bu aralığın tamamını kapsıyor ve hiçbir raporlanabilir işlem kaydedilmemiş. Bu ölçülmüş bir sıfırdır."
+                              : "Seçilen aralık için kalıcı kayıt bulunmuyor. Sıfır olarak yorumlamayın.")"
                           Icon="@Icons.Material.Outlined.QueryStats" />
 
-            <SoLimitationList Items="_report.DataLimitations" />
+            <SoLimitationList Items="_report.Limitations" />
         }
         else
         {
+            @* Above the figures, not below them: whether a zero on this page is a measurement is
+               something the reader has to know before reading any of them. *@
+            <SoCoverageNotice Coverage="_coverage" ShowWhenComplete="true" />
+
             @* -- executive summary ------------------------------------------------------- *@
             <section class="so-panel so-panel--primary">
                 <p class="so-eyebrow">Özet</p>
@@ -386,6 +396,42 @@
                     </p>
                 </section>
 
+                @* -- session governance ----------------------------------------------------- *@
+                <section class="so-panel">
+                    <div class="so-panel-head">
+                        <h2 class="so-panel-title">Oturum yönetişimi</h2>
+                        @if (_snapshot.Can(Capabilities.AccessManageUsers))
+                        {
+                            <MudButton Href="admin/sessions" Variant="Variant.Text" Color="Color.Primary"
+                                       Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
+                                Aktif oturumlar
+                            </MudButton>
+                        }
+                    </div>
+
+                    <div class="so-metrics">
+                        <SoMetric Label="Başlatılan oturum"
+                                  Value="@ManagementReportView.Count(_report.SessionGovernance.Started)"
+                                  Tone="SoMetric.MetricTone.Lead" />
+                        <SoMetric Label="Kullanıcı çıkışı"
+                                  Value="@ManagementReportView.Count(_report.SessionGovernance.LoggedOut)" />
+                        <SoMetric Label="Boşta zaman aşımı"
+                                  Value="@ManagementReportView.Count(_report.SessionGovernance.IdleTimedOut)" />
+                        <SoMetric Label="Mutlak süre doldu"
+                                  Value="@ManagementReportView.Count(_report.SessionGovernance.AbsoluteTimedOut)" />
+                        <SoMetric Label="Yönetici iptali"
+                                  Value="@ManagementReportView.Count(_report.SessionGovernance.Revoked)"
+                                  Tone="@(_report.SessionGovernance.Revoked > 0
+                                           ? SoMetric.MetricTone.Caution
+                                           : SoMetric.MetricTone.Plain)" />
+                        <SoMetric Label="Erişim kapatıldığı için"
+                                  Value="@ManagementReportView.Count(_report.SessionGovernance.AccessDisabledTerminations)" />
+                        <SoMetric Label="Yetki değiştiği için"
+                                  Value="@ManagementReportView.Count(_report.SessionGovernance.AccessChangedTerminations)"
+                                  Hint="Yetki değişimi oturumu sonlandırır" />
+                    </div>
+                </section>
+
                 @* -- security and quality --------------------------------------------------- *@
                 <section class="so-panel">
                     <div class="so-panel-head">
@@ -415,7 +461,7 @@
                 </section>
             </div>
 
-            <SoLimitationList Items="_report.DataLimitations" />
+            <SoLimitationList Items="_report.Limitations" />
 
             @if (_available.Count > 0)
             {
@@ -589,6 +635,7 @@
     private ReportingWindowRequest _window = ReportingWindowSelection.ForPreset(ReportingWindowPreset.Last7Days);
     private ManagementReportResponse? _report;
     private IReadOnlyList<ManagementReportView.AttentionItem> _attention = [];
+    private ManagementReportView.CoverageView? _coverage;
     private UiProblem? _reportProblem;
     private bool _reportLoading;
 
@@ -645,6 +692,7 @@
         {
             _report = await Reporting.GetSummaryAsync(window, CancellationToken.None);
             _attention = ManagementReportView.Attention(_report);
+            _coverage = ManagementReportView.Coverage(_report.Coverage);
         }
         catch (SecureOpsApiException ex)
         {
@@ -652,6 +700,7 @@
             // stale figures under a changed date range are worse than no figures at all.
             _report = null;
             _attention = [];
+            _coverage = null;
             _reportProblem = ex.Problem;
             Logger.LogDebug("Management summary unavailable. Code: {Code}.", ex.Problem.Code);
         }

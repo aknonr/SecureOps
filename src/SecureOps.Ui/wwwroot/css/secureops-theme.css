@@ -170,6 +170,24 @@ body {
 .so-main {
     background-color: var(--so-bg);
     min-height: 100vh;
+
+    /* MudMainContent is a layout flex item, which defaults to min-width:auto and is
+       therefore sized by the min-content of everything inside it. */
+    min-width: 0;
+}
+
+/* The page itself must never scroll sideways; a wide table scrolls inside its own
+   .so-table-scroll container instead.
+
+   That container does clip — its scrollWidth exceeds its clientWidth and the
+   scrollbar works — but the overflow still propagates to .mud-layout and grows the
+   document. Clipping here is what actually stops it. `clip` rather than `hidden`:
+   it creates no scroll container of its own, and because .mud-layout is only
+   position:relative it does not become a containing block for the fixed app bar or
+   drawer, so both keep working. No content becomes unreachable — everything wide
+   enough to be clipped is already inside a scroller. */
+.mud-layout {
+    overflow-x: clip;
 }
 
 .so-main--public {
@@ -721,6 +739,30 @@ body {
 
 .so-split .so-panel + .so-panel {
     margin-top: 0;
+}
+
+/* A minmax(0, …) track lets the column shrink, but the item inside it still
+   defaults to min-width:auto and can push past it. Both are needed before a wide
+   table will scroll inside its own container instead of widening the page. */
+.so-split > .so-panel {
+    min-width: 0;
+}
+
+/* Directory Explorer, once a principal has resolved. Its group, SPN, and
+   privileged tables are the widest content in the product; in a half-width column
+   their trailing action button is permanently scrolled out of view. */
+.so-split--result {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.so-split--result .so-lookup-form {
+    max-width: 760px;
+}
+
+@media (min-width: 1024px) {
+    .so-split--result {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .so-lookup-result {
@@ -2867,5 +2909,410 @@ body {
 
     .so-window-date {
         flex: 1 1 100%;
+    }
+}
+
+/* =============================================================================
+   Directory Explorer, sessions, and integration status
+
+   Same token rule as the rest of this file: no colour literals, so both palettes
+   and the dark override apply without duplication.
+   ========================================================================== */
+
+/* -- shared small pieces ------------------------------------------------ */
+
+/* Absent evidence. Italic and muted so it never reads as a value, which matters
+   most in a table where a real value sits directly above it. */
+.so-unknown {
+    font-style: italic;
+    color: var(--so-text-faint);
+}
+
+.so-wrap {
+    overflow-wrap: anywhere;
+}
+
+.so-cell-wrap {
+    white-space: normal;
+    max-width: 32rem;
+    overflow-wrap: anywhere;
+}
+
+.so-code--sm {
+    font-size: 0.76rem;
+}
+
+.so-code--block {
+    display: block;
+    padding: var(--so-space-2) var(--so-space-3);
+    overflow-wrap: anywhere;
+}
+
+.so-count-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.6rem;
+    height: 1.35rem;
+    margin-left: var(--so-space-2);
+    padding: 0 var(--so-space-2);
+    border-radius: 999px;
+    background: var(--so-bg-sunken);
+    border: 1px solid var(--so-border-soft);
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--so-text-muted);
+}
+
+.so-subhead--flush {
+    margin-top: 0;
+}
+
+/* A panel nested inside another panel. Sunken rather than raised, so depth reads
+   as "inside this" instead of "on top of this". */
+.so-panel--inset {
+    margin-top: var(--so-space-4);
+    background: var(--so-bg-sunken);
+    box-shadow: none;
+}
+
+.so-note-caution {
+    padding-left: var(--so-space-3);
+    border-left: 3px solid var(--so-warning);
+}
+
+/* -- evidence coverage -------------------------------------------------- */
+
+.so-coverage {
+    margin-bottom: var(--so-space-4);
+    border-left: 3px solid var(--so-warning);
+}
+
+.so-coverage--none {
+    border-left-color: var(--so-danger);
+}
+
+.so-coverage-body {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+}
+
+.so-coverage-icon {
+    display: inline-flex;
+    color: var(--so-warning);
+}
+
+.so-coverage--none .so-coverage-icon {
+    color: var(--so-danger);
+}
+
+/* Deliberately quiet. It licenses the reader to trust a zero; it is not news. */
+.so-coverage-complete {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin: 0 0 var(--so-space-4);
+    font-size: 0.78rem;
+    color: var(--so-text-muted);
+}
+
+.so-coverage-complete .mud-icon-root {
+    color: var(--so-success);
+}
+
+/* -- traversal bounds --------------------------------------------------- */
+
+.so-traversal {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+    margin: var(--so-space-3) 0;
+    padding: var(--so-space-3);
+    border: 1px solid color-mix(in srgb, var(--so-warning) 40%, transparent);
+    border-radius: var(--so-radius-sm);
+    background: color-mix(in srgb, var(--so-warning) var(--so-tint), transparent);
+}
+
+.so-traversal-icon {
+    display: inline-flex;
+    color: var(--so-warning);
+}
+
+.so-traversal-title {
+    margin: 0;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-traversal-list {
+    margin: var(--so-space-2) 0 0;
+    padding-left: 1.1rem;
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: var(--so-text-muted);
+}
+
+/* -- membership paths --------------------------------------------------- */
+
+.so-path {
+    margin-top: var(--so-space-3);
+    padding: var(--so-space-3);
+    border: 1px solid var(--so-border-soft);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-surface);
+}
+
+/* Direct and nested chains must be tellable apart at a glance: one is removed on
+   the group itself, the other somewhere further up. */
+.so-path--direct {
+    border-left: 3px solid var(--so-accent);
+}
+
+.so-path--nested {
+    border-left: 3px solid var(--so-info);
+}
+
+.so-path-head {
+    margin-bottom: var(--so-space-2);
+}
+
+.so-path-chain {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.so-path-node {
+    position: relative;
+    padding: var(--so-space-2) 0 var(--so-space-2) var(--so-space-5);
+}
+
+/* The connector between nodes. Drawn with a border rather than a glyph so it
+   scales with the text and disappears cleanly on the last node. */
+.so-path-node::before {
+    content: "";
+    position: absolute;
+    left: 7px;
+    top: 0;
+    bottom: 0;
+    border-left: 2px solid var(--so-border);
+}
+
+.so-path-node:first-child::before {
+    top: 50%;
+}
+
+.so-path-node:last-child::before {
+    bottom: 50%;
+}
+
+.so-path-node::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: calc(50% - 5px);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--so-border);
+}
+
+.so-path-node--origin::after {
+    background: var(--so-accent);
+}
+
+.so-path-node--target::after {
+    background: var(--so-brand);
+}
+
+.so-path-role {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--so-text-faint);
+}
+
+.so-path-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+.so-path-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-3);
+}
+
+/* -- group tables ------------------------------------------------------- */
+
+.so-group-name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    font-weight: 600;
+}
+
+/* -- SPN evidence ------------------------------------------------------- */
+
+.so-spn-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--so-space-1);
+    margin: var(--so-space-2) 0 0;
+    padding: 0;
+    list-style: none;
+    max-height: 22rem;
+    overflow-y: auto;
+}
+
+.so-spn-list code {
+    overflow-wrap: anywhere;
+}
+
+/* -- privileged membership ---------------------------------------------- */
+
+.so-priv-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+    gap: var(--so-space-3);
+    margin-top: var(--so-space-3);
+}
+
+/* Restrained by design. Privileged membership is a normal property of an admin
+   account, so a match is marked with an accent edge rather than an alarm fill. */
+.so-priv {
+    padding: var(--so-space-3);
+    border: 1px solid var(--so-border-soft);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+}
+
+.so-priv--member {
+    border-left: 3px solid var(--so-accent);
+}
+
+.so-priv-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--so-space-2);
+    margin-bottom: var(--so-space-2);
+}
+
+.so-priv-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+/* -- sessions ----------------------------------------------------------- */
+
+/* The administrator's own row. Marked, never disabled: ending your own session is
+   a legitimate action, and hiding the button would just be confusing. */
+.so-row--self {
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+}
+
+/* The wrapper is the flex container, never the cell itself: `display: flex` on a
+   th takes it out of the table box model, and the table then stops containing its
+   own width — which is what pushed the page sideways at 834 and below. */
+.so-session-user {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+/* -- integration status ------------------------------------------------- */
+
+.so-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+    gap: var(--so-space-3);
+    margin-top: var(--so-space-2);
+}
+
+.so-integration {
+    padding: var(--so-space-4);
+    border: 1px solid var(--so-border-soft);
+    border-left-width: 3px;
+    border-radius: var(--so-radius-sm);
+    background: var(--so-bg-sunken);
+}
+
+.so-integration--ok {
+    border-left-color: var(--so-success);
+}
+
+.so-integration--off {
+    border-left-color: var(--so-border);
+}
+
+.so-integration--down {
+    border-left-color: var(--so-danger);
+}
+
+.so-integration--unknown {
+    border-left-color: var(--so-warning);
+}
+
+.so-integration-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--so-space-2);
+}
+
+.so-integration-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--so-text);
+}
+
+.so-integration-text {
+    margin: var(--so-space-2) 0 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--so-text-muted);
+}
+
+.so-integration-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin: var(--so-space-3) 0 0;
+}
+
+.so-integration-meta dt {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--so-text-faint);
+}
+
+.so-integration-meta dd {
+    margin: 0;
+}
+
+/* -- narrow viewports --------------------------------------------------- */
+
+@media (max-width: 720px) {
+    .so-cell-wrap {
+        max-width: 18rem;
+    }
+
+    .so-priv-list,
+    .so-status-grid {
+        grid-template-columns: 1fr;
     }
 }

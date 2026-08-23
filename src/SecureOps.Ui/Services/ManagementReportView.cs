@@ -53,6 +53,7 @@ public static class ManagementReportView
     /// <summary>
     /// One elapsed-duration statistic prepared for display.
     /// </summary>
+    /// <param name="Key">Stable server key that identifies the interval.</param>
     /// <param name="Label">Short Turkish name of the interval.</param>
     /// <param name="Definition">The server's own definition, shown verbatim as the tooltip.</param>
     /// <param name="SampleCount">How many workflows the figures are based on.</param>
@@ -60,6 +61,7 @@ public static class ManagementReportView
     /// <param name="Average">Formatted average, or <c>null</c> when unmeasured.</param>
     /// <param name="Maximum">Formatted maximum, or <c>null</c> when unmeasured.</param>
     public sealed record DurationView(
+        string Key,
         string Label,
         string Definition,
         long SampleCount,
@@ -69,6 +71,38 @@ public static class ManagementReportView
     {
         /// <summary>Whether any workflow in the window produced a measurable elapsed time.</summary>
         public bool HasSamples => SampleCount > 0 && Average is not null;
+    }
+
+    /// <summary>
+    /// How much of the requested window persisted evidence actually covers.
+    /// </summary>
+    public enum CoverageState
+    {
+        /// <summary>Evidence begins at or before the requested start; a zero is a measured zero.</summary>
+        Complete,
+
+        /// <summary>Evidence begins inside the window; the earlier part is unmeasured, not empty.</summary>
+        Partial,
+
+        /// <summary>No persisted reportable evidence exists for the window at all.</summary>
+        None
+    }
+
+    /// <summary>
+    /// The coverage boundary prepared for display.
+    /// </summary>
+    /// <param name="State">Complete, partial, or none.</param>
+    /// <param name="CoverageFromUtc">Earliest instant evidence exists for, when there is one.</param>
+    /// <param name="UncoveredDays">Whole days at the start of the window with no persisted evidence.</param>
+    /// <param name="RequestedDays">Whole days the operator asked for.</param>
+    public sealed record CoverageView(
+        CoverageState State,
+        DateTimeOffset? CoverageFromUtc,
+        int UncoveredDays,
+        int RequestedDays)
+    {
+        /// <summary>Whether a zero anywhere in this report can be read as a measured zero.</summary>
+        public bool ZeroIsMeasured => State == CoverageState.Complete;
     }
 
     /// <summary>
@@ -143,12 +177,52 @@ public static class ManagementReportView
     /// <param name="duration">Server statistic.</param>
     /// <returns>Labelled, formatted view.</returns>
     public static DurationView Duration(DurationStatisticsResponse duration) => new(
-        DurationLabel(duration.Definition),
+        duration.Key,
+        DurationLabel(duration.Key, duration.Definition),
         duration.Definition,
         duration.SampleCount,
         FormatSeconds(duration.MinimumSeconds),
         FormatSeconds(duration.AverageSeconds),
         FormatSeconds(duration.MaximumSeconds));
+
+    /// <summary>
+    /// Reads the coverage boundary the report was built against.
+    /// </summary>
+    /// <param name="coverage">Server coverage block.</param>
+    /// <returns>Coverage state and the size of the uncovered head of the window.</returns>
+    /// <remarks>
+    /// The arithmetic here converts two server timestamps into whole days for the notice. It measures
+    /// nothing: the boundary, the window, and the completeness flag are all the server's, and the
+    /// verdict is taken from <c>coverageComplete</c> rather than recomputed from the dates.
+    /// </remarks>
+    public static CoverageView Coverage(ReportingEvidenceCoverageResponse coverage)
+    {
+        int requestedDays = WholeDays(coverage.RequestedToUtc - coverage.RequestedFromUtc);
+
+        if (coverage.CoverageComplete)
+        {
+            return new CoverageView(CoverageState.Complete, coverage.CoverageFromUtc, 0, requestedDays);
+        }
+
+        if (coverage.CoverageFromUtc is not { } from)
+        {
+            return new CoverageView(CoverageState.None, null, requestedDays, requestedDays);
+        }
+
+        // A boundary at or after the window's end means nothing in the window is covered.
+        TimeSpan uncovered = from >= coverage.RequestedToUtc
+            ? coverage.RequestedToUtc - coverage.RequestedFromUtc
+            : from - coverage.RequestedFromUtc;
+
+        return new CoverageView(
+            CoverageState.Partial,
+            from,
+            Math.Max(0, WholeDays(uncovered)),
+            requestedDays);
+    }
+
+    private static int WholeDays(TimeSpan span) =>
+        span <= TimeSpan.Zero ? 0 : (int)Math.Round(span.TotalDays, MidpointRounding.AwayFromZero);
 
     /// <summary>
     /// Formats an elapsed duration in seconds.
@@ -193,63 +267,71 @@ public static class ManagementReportView
     }
 
     /// <summary>
-    /// Turkish label for a server duration definition.
+    /// Turkish label for a duration, chosen by its stable key.
     /// </summary>
-    /// <param name="definition">Definition sentence as the API returned it.</param>
-    /// <returns>Short label, or the definition itself when it is not one of the known three.</returns>
+    /// <param name="key">Stable server key, the only thing that identifies the interval.</param>
+    /// <param name="definition">Server definition text, used as fallback display only.</param>
+    /// <returns>Short Turkish label, or the server's own definition when the key is unknown.</returns>
     /// <remarks>
-    /// The v1 contract carries no stable key for a duration — only this English definition sentence
-    /// and the array order. Matching on the sentence is therefore the most specific hook available;
-    /// an unrecognised definition falls through to its own text so a new interval added server-side
-    /// still renders truthfully instead of being mislabelled as one of these.
+    /// Keyed on <paramref name="key"/> and never on <paramref name="definition"/> or array position.
+    /// The contract is explicit that English text and ordering are presentation details: a reworded
+    /// definition or a reordered array must not change what the UI thinks a row means. An unknown key
+    /// falls through to the server's text, so an interval added later renders truthfully rather than
+    /// being mislabelled as one of these three.
     /// </remarks>
-    public static string DurationLabel(string definition) => definition switch
+    public static string DurationLabel(string key, string definition) => key switch
     {
-        "First persisted import to first persisted preview" => "İçe alma → önizleme",
-        "Workflow claim to durable Jira issue-key persistence" => "Devralma → Jira kaydı",
-        "Workflow claim to durable workflow completion" => "Devralma → tamamlanma",
+        "importToPreview" => "İçe alma → önizleme",
+        "claimToJiraCreation" => "Devralma → Jira kaydı",
+        "claimToCompletion" => "Devralma → tamamlanma",
         _ => definition
     };
 
     /// <summary>
-    /// Turkish rendering of one reported data limitation.
+    /// Turkish rendering of one reported data limitation, chosen by its stable code.
     /// </summary>
-    /// <param name="limitation">Limitation sentence as the API returned it.</param>
-    /// <returns>Reviewed Turkish translation, or the server text verbatim when unrecognised.</returns>
+    /// <param name="limitation">Limitation as the API returned it.</param>
+    /// <returns>Reviewed Turkish text, the server's fallback message, or the bare code.</returns>
     /// <remarks>
     /// <para>
-    /// These sentences are the only part of the report written as prose, and they carry no code —
-    /// matching on the exact English text is the only hook the v1 contract offers. Each translation
-    /// below is a reviewed rendering of one specific sentence, not a paraphrase: a limitation that
-    /// gets softened in translation stops doing its job, which is to stop a reader treating an
-    /// unmeasured zero as a measured one.
+    /// Keyed on <c>code</c>, which the contract states is the identity; <c>message</c> is fallback
+    /// presentation text and must never drive behaviour. Each translation below is a reviewed
+    /// rendering of one specific limitation, not a paraphrase — a limitation that gets softened in
+    /// translation stops doing its job, which is to stop a reader treating an unmeasured zero as a
+    /// measured one.
     /// </para>
     /// <para>
-    /// Anything the server sends that is not on this list is shown exactly as received. That is the
-    /// safe direction to fail: an English sentence on a Turkish screen is a blemish, whereas a
-    /// silently dropped or mistranslated limitation is a false statement about the data.
+    /// An unknown code degrades in the safe direction: the server's own message if it sent one,
+    /// otherwise the code itself. A code shown raw on a Turkish screen is a blemish; a silently
+    /// dropped limitation is a false statement about the data.
     /// </para>
     /// </remarks>
-    public static string LimitationLabel(string limitation) => limitation switch
+    public static string LimitationLabel(DataLimitationResponse limitation) => limitation.Code switch
     {
-        "Rate-limit rejections are not currently persisted as audit events; this metric is unavailable."
+        "RateLimitRejectionsUnavailable"
             => "Hız sınırı reddi şu anda denetim kaydına yazılmıyor; bu ölçüm kullanılamıyor.",
 
-        "Historical access-version conflicts and Operational Record source-query outages are unavailable when no audit event exists."
-            => "Geçmiş erişim sürüm çakışmaları ve operasyonel kayıt kaynak sorgusu kesintileri, "
-               + "denetim kaydı bulunmadığında ölçülemez.",
+        "AccessVersionConflictHistoryUnavailable"
+            => "Geçmiş erişim sürüm çakışmaları, denetim kaydı bulunmadığında ölçülemez.",
 
-        "Invalid items skipped inside historical bulk identity requests do not have individual terminal audit rows."
+        "OperationalSourceOutageHistoryUnavailable"
+            => "Operasyonel kayıt kaynak sorgusu kesintileri, denetim kaydı bulunmadığında ölçülemez.",
+
+        "BulkIdentityInvalidItemHistoryUnavailable"
             => "Geçmiş toplu kimlik isteklerinde atlanan geçersiz kayıtların ayrı sonuç denetim satırı yoktur.",
 
-        "Duplicate-create prevention is measurable only from the first release that writes its explicit audit event."
+        "DuplicateCreatePreventionHistoryIncomplete"
             => "Mükerrer oluşturma engelleme, bu olayı denetim kaydına yazan ilk sürümden itibaren ölçülebilir.",
 
-        "Elapsed durations include waits and retries and are not active labor, time saved, or operator performance."
+        "ElapsedDurationsNotActiveEffort"
             => "Geçen süreler bekleme ve yeniden denemeleri içerir; aktif çalışma süresi, kazanılan zaman "
                + "veya operatör performansı değildir.",
 
-        _ => limitation
+        "HistoryBeforePersistenceUnavailable"
+            => "İstenen aralığın bir bölümü, kalıcı kayıt tutulmaya başlanmadan öncesine denk geliyor; "
+               + "o bölüm için kanıt yok.",
+
+        _ => string.IsNullOrWhiteSpace(limitation.Message) ? limitation.Code : limitation.Message
     };
 
     /// <summary>

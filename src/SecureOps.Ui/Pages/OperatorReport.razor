@@ -64,6 +64,11 @@
                         Busy="_loading"
                         OnWindowChanged="ApplyWindowAsync" />
 
+        @if (_coverage is not null)
+        {
+            <SoCoverageNotice Coverage="_coverage" />
+        }
+
         <section class="so-panel so-panel--notice">
             <p class="so-panel-text so-panel-text--sm">
                 Satırlar, kaydedilen işlem sayısına göre sıralanır. Bu bir başarı sıralaması
@@ -178,6 +183,7 @@
     private ReportingWindowPreset _preset = ReportingWindowPreset.Last7Days;
     private ReportingWindowRequest _window = ReportingWindowSelection.ForPreset(ReportingWindowPreset.Last7Days);
     private OperatorActivityPageResponse? _page;
+    private ManagementReportView.CoverageView? _coverage;
     private UiProblem? _problem;
     private bool _loading;
     private int _pageNumber = 1;
@@ -239,6 +245,7 @@
         try
         {
             _page = await Reporting.GetOperatorsAsync(_window, _pageNumber, _pageSize, CancellationToken.None);
+            _coverage = ManagementReportView.Coverage(_page.Coverage);
 
             // The server is the authority on where the reader ended up, including when a shrinking
             // result set leaves the requested page past the end.
@@ -247,6 +254,7 @@
         catch (SecureOpsApiException ex)
         {
             _page = null;
+            _coverage = null;
             _problem = ex.Problem;
             Logger.LogDebug("Operator report unavailable. Code: {Code}.", ex.Problem.Code);
         }

@@ -5,9 +5,10 @@
     tell "this did not happen" from "this is not measured", and the server is the only thing that
     knows which of the two applies.
 
-    Order is the server's. Each sentence is shown through a reviewed translation keyed on the exact
-    server text; anything unrecognised is shown verbatim, because an untranslated sentence is a
-    blemish while a paraphrased limitation is a false statement about the data.
+    Order is the server's. Each limitation is shown through a reviewed translation keyed on its
+    stable code; an unknown code degrades to the server's own message, or to the bare code. That is
+    the safe direction — a raw code on screen is a blemish, a dropped limitation is a false
+    statement about the data.
 *@
 
 @if (Items.Count > 0)
@@ -21,7 +22,7 @@
             değeri "olmadı" anlamına gelmez.
         </p>
         <ul class="so-limit-list">
-            @foreach (string item in Items)
+            @foreach (DataLimitationResponse item in Items)
             {
                 <li>@ManagementReportView.LimitationLabel(item)</li>
             }
@@ -30,7 +31,7 @@
 }
 
 @code {
-    /// <summary>Limitation statements exactly as the API returned them.</summary>
+    /// <summary>Structured limitations exactly as the API returned them.</summary>
     [Parameter, EditorRequired]
-    public IReadOnlyList<string> Items { get; set; } = [];
+    public IReadOnlyList<DataLimitationResponse> Items { get; set; } = [];
 }
