@@ -17,7 +17,7 @@ ADR-0013 exposes exact principal direct groups, exact group metadata, and bounde
 - Treat `lastLogonTimestamp` as approximate. Return nullable health fields when AD cannot prove a value. Derive `mustChangePassword` only from an available `pwdLastSet` value.
 - Expose SPNs and account-type evidence without guessing that a naming pattern makes an account a service or PAM account.
 - Protect privileged-group analysis with `Identity.PrivilegedGroups.View`, assigned to Admin only. Monitored groups are exact server-owned identifiers; names are never hard-coded in source.
-- Reuse the bounded Directory Explorer cache/single-flight and audit action family. Audit counts, duration, operation, outcome, and limit state, never membership graphs, SPNs, raw DNs, credentials, or personal profile payloads.
+- Reuse the bounded Directory Explorer cache/single-flight and audit action family. Optional bounded purpose is not a cache or rate-limit key and is audited only by hash and length. Audit counts, duration, operation, outcome, and limit state, never membership graphs, SPNs, raw DNs, credentials, or personal profile payloads.
 - Keep directory data live/provider-backed. Add no SQL migration; management reporting continues to aggregate existing Directory Explorer terminal audit actions.
 
 ## Consequences

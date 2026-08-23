@@ -178,6 +178,39 @@ public sealed class DirectoryEnrichmentQueryServiceTests
             .And.NotContain("PasswordLastSetUtc").And.NotContain(Purpose);
     }
 
+    [Fact]
+    public async Task Enrichment_AcceptsMissingBlankAndTrimmedPurpose()
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out InMemoryAuditWriter audit);
+
+        DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> missing = await service.GetMembershipsAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356"), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryAccountHealthResponse> blank = await service.GetAccountHealthAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", "  "), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryServiceEvidenceResponse> supplied = await service.GetServiceEvidenceAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", "  optional context  "), Context, CancellationToken.None);
+
+        missing.Status.Should().Be(DirectoryQueryStatus.Success);
+        blank.Status.Should().Be(DirectoryQueryStatus.Success);
+        supplied.Status.Should().Be(DirectoryQueryStatus.Success);
+        string json = JsonSerializer.Serialize(audit.Events);
+        json.Should().Contain("\"purposeLength\":16").And.NotContain("optional context");
+    }
+
+    [Theory]
+    [InlineData("oversized")]
+    [InlineData("control")]
+    public async Task Enrichment_RejectsUnsafeSuppliedPurpose(string inputKind)
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out _);
+        string purpose = inputKind == "oversized" ? new string('x', 257) : "context\u0001continuation";
+
+        DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> result = await service.GetMembershipsAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", purpose), Context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.Invalid);
+    }
+
     [Theory]
     [InlineData("pam*")]
     [InlineData("CN=User,DC=example")]

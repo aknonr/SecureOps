@@ -52,19 +52,20 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
         DirectoryQueryExecutionContext context,
         CancellationToken cancellationToken)
     {
+        bool validPurpose = DirectoryLookupPurpose.TryNormalize(request.Purpose, _options.MaxPurposeLength, out string? purpose);
         IdentityAccountNormalizationResult normalized = _accountNormalizer.Normalize(request.Account);
         if (!normalized.IsValid || normalized.NormalizedAccount is null)
         {
-            return await InvalidAsync<DirectoryGroupPageResponse>(PrincipalGroupsOperation, request.Account, request.Purpose, context, cancellationToken);
+            return await InvalidAsync<DirectoryGroupPageResponse>(PrincipalGroupsOperation, request.Account, purpose, context, cancellationToken);
         }
 
         PageInput? page = Page(request.PageSize, request.ContinuationToken, request.Refresh, PrincipalGroupsOperation, normalized.NormalizedAccount);
-        if (page is null || !ValidPurpose(request.Purpose))
+        if (page is null || !validPurpose)
         {
-            return await InvalidAsync<DirectoryGroupPageResponse>(PrincipalGroupsOperation, request.Account, request.Purpose, context, cancellationToken);
+            return await InvalidAsync<DirectoryGroupPageResponse>(PrincipalGroupsOperation, request.Account, purpose, context, cancellationToken);
         }
 
-        if (!await AuditAsync(AuditActions.DirectoryGroupQueryRequested, PrincipalGroupsOperation, normalized.NormalizedAccount, request.Purpose, "Requested", 0, page.Value.PageSize, 0, request.ContinuationToken is not null, context, cancellationToken))
+        if (!await AuditAsync(AuditActions.DirectoryGroupQueryRequested, PrincipalGroupsOperation, normalized.NormalizedAccount, purpose, "Requested", 0, page.Value.PageSize, 0, request.ContinuationToken is not null, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryGroupPageResponse>();
         }
@@ -87,7 +88,7 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
             {
                 return await CompleteFailureAsync<DirectoryGroupPageResponse>(
                     DirectoryQueryStatus.NotFound, OperationalErrorCodes.DirectoryPrincipalNotFound, PrincipalGroupsOperation,
-                    normalized.NormalizedAccount, request.Purpose, stopwatch.Elapsed, page.Value, context, cancellationToken);
+                    normalized.NormalizedAccount, purpose, stopwatch.Elapsed, page.Value, context, cancellationToken);
             }
 
             DirectoryGroupSummaryDto[] items = providerPage.Items.Select(MapGroupSummary).ToArray();
@@ -95,13 +96,13 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
                 ? _tokens.Create(PrincipalGroupsOperation, normalized.NormalizedAccount, page.Value.Offset + items.Length)
                 : null;
             DirectoryGroupPageResponse response = new(items, page.Value.PageSize, continuation);
-            return await CompleteSuccessAsync(response, PrincipalGroupsOperation, normalized.NormalizedAccount, request.Purpose,
+            return await CompleteSuccessAsync(response, PrincipalGroupsOperation, normalized.NormalizedAccount, purpose,
                 stopwatch.Elapsed, page.Value, items.Length, context, cancellationToken);
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
             return await ProviderFailureAsync<DirectoryGroupPageResponse>(exception, PrincipalGroupsOperation, normalized.NormalizedAccount,
-                request.Purpose, stopwatch.Elapsed, page.Value, context, cancellationToken);
+                purpose, stopwatch.Elapsed, page.Value, context, cancellationToken);
         }
     }
 
@@ -111,13 +112,14 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
         DirectoryQueryExecutionContext context,
         CancellationToken cancellationToken)
     {
+        bool validPurpose = DirectoryLookupPurpose.TryNormalize(request.Purpose, _options.MaxPurposeLength, out string? purpose);
         DirectoryInputNormalizationResult normalized = _groupNormalizer.NormalizeGroup(request.Group);
-        if (!normalized.IsValid || normalized.Value is null || !ValidPurpose(request.Purpose))
+        if (!normalized.IsValid || normalized.Value is null || !validPurpose)
         {
-            return await InvalidAsync<DirectoryGroupDetailResponse>(GroupLookupOperation, request.Group, request.Purpose, context, cancellationToken);
+            return await InvalidAsync<DirectoryGroupDetailResponse>(GroupLookupOperation, request.Group, purpose, context, cancellationToken);
         }
 
-        if (!await AuditAsync(AuditActions.DirectoryGroupQueryRequested, GroupLookupOperation, normalized.Value, request.Purpose, "Requested", 0, null, 0, false, context, cancellationToken))
+        if (!await AuditAsync(AuditActions.DirectoryGroupQueryRequested, GroupLookupOperation, normalized.Value, purpose, "Requested", 0, null, 0, false, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryGroupDetailResponse>();
         }
@@ -135,17 +137,17 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
             {
                 return await CompleteFailureAsync<DirectoryGroupDetailResponse>(
                     DirectoryQueryStatus.NotFound, OperationalErrorCodes.DirectoryGroupNotFound, GroupLookupOperation,
-                    normalized.Value, request.Purpose, stopwatch.Elapsed, default, context, cancellationToken);
+                    normalized.Value, purpose, stopwatch.Elapsed, default, context, cancellationToken);
             }
 
             DirectoryGroupDetailResponse response = new(MapGroupDetail(group));
-            return await CompleteSuccessAsync(response, GroupLookupOperation, normalized.Value, request.Purpose,
+            return await CompleteSuccessAsync(response, GroupLookupOperation, normalized.Value, purpose,
                 stopwatch.Elapsed, default, 1, context, cancellationToken);
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
             return await ProviderFailureAsync<DirectoryGroupDetailResponse>(exception, GroupLookupOperation, normalized.Value,
-                request.Purpose, stopwatch.Elapsed, default, context, cancellationToken);
+                purpose, stopwatch.Elapsed, default, context, cancellationToken);
         }
     }
 
@@ -155,19 +157,20 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
         DirectoryQueryExecutionContext context,
         CancellationToken cancellationToken)
     {
+        bool validPurpose = DirectoryLookupPurpose.TryNormalize(request.Purpose, _options.MaxPurposeLength, out string? purpose);
         DirectoryInputNormalizationResult normalized = _groupNormalizer.NormalizeGroup(request.Group);
         if (!normalized.IsValid || normalized.Value is null)
         {
-            return await InvalidAsync<DirectoryMemberPageResponse>(GroupMembersOperation, request.Group, request.Purpose, context, cancellationToken);
+            return await InvalidAsync<DirectoryMemberPageResponse>(GroupMembersOperation, request.Group, purpose, context, cancellationToken);
         }
 
         PageInput? page = Page(request.PageSize, request.ContinuationToken, request.Refresh, GroupMembersOperation, normalized.Value);
-        if (page is null || !ValidPurpose(request.Purpose))
+        if (page is null || !validPurpose)
         {
-            return await InvalidAsync<DirectoryMemberPageResponse>(GroupMembersOperation, request.Group, request.Purpose, context, cancellationToken);
+            return await InvalidAsync<DirectoryMemberPageResponse>(GroupMembersOperation, request.Group, purpose, context, cancellationToken);
         }
 
-        if (!await AuditAsync(AuditActions.DirectoryGroupQueryRequested, GroupMembersOperation, normalized.Value, request.Purpose, "Requested", 0, page.Value.PageSize, 0, request.ContinuationToken is not null, context, cancellationToken))
+        if (!await AuditAsync(AuditActions.DirectoryGroupQueryRequested, GroupMembersOperation, normalized.Value, purpose, "Requested", 0, page.Value.PageSize, 0, request.ContinuationToken is not null, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryMemberPageResponse>();
         }
@@ -186,7 +189,7 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
             {
                 return await CompleteFailureAsync<DirectoryMemberPageResponse>(
                     DirectoryQueryStatus.NotFound, OperationalErrorCodes.DirectoryGroupNotFound, GroupMembersOperation,
-                    normalized.Value, request.Purpose, stopwatch.Elapsed, page.Value, context, cancellationToken);
+                    normalized.Value, purpose, stopwatch.Elapsed, page.Value, context, cancellationToken);
             }
 
             DirectoryMemberDto[] items = providerPage.Items.Select(MapMember).ToArray();
@@ -194,13 +197,13 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
                 ? _tokens.Create(GroupMembersOperation, normalized.Value, page.Value.Offset + items.Length)
                 : null;
             DirectoryMemberPageResponse response = new(items, page.Value.PageSize, continuation);
-            return await CompleteSuccessAsync(response, GroupMembersOperation, normalized.Value, request.Purpose,
+            return await CompleteSuccessAsync(response, GroupMembersOperation, normalized.Value, purpose,
                 stopwatch.Elapsed, page.Value, items.Length, context, cancellationToken);
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
             return await ProviderFailureAsync<DirectoryMemberPageResponse>(exception, GroupMembersOperation, normalized.Value,
-                request.Purpose, stopwatch.Elapsed, page.Value, context, cancellationToken);
+                purpose, stopwatch.Elapsed, page.Value, context, cancellationToken);
         }
     }
 
@@ -215,10 +218,6 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
 
         return new PageInput(offset, pageSize);
     }
-
-    private bool ValidPurpose(string? purpose) => !string.IsNullOrWhiteSpace(purpose)
-        && purpose.Trim().Length <= _options.MaxPurposeLength
-        && !purpose.Any(char.IsControl);
 
     private async Task<DirectoryQueryResult<T>> InvalidAsync<T>(
         string operation, string? target, string? purpose, DirectoryQueryExecutionContext context, CancellationToken cancellationToken)

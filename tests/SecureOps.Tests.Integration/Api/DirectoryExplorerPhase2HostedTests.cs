@@ -21,19 +21,19 @@ public sealed class DirectoryExplorerPhase2HostedTests
         DirectoryPrincipalMembershipsResponse memberships = await PostAsync<DirectoryPrincipalMembershipsResponse>(
             client,
             "/api/v1/directory/principals/memberships",
-            new { account = "CONTOSO\\pam12356", purpose = Purpose });
+            new { account = "CONTOSO\\pam12356" });
         DirectoryMembershipPathResponse paths = await PostAsync<DirectoryMembershipPathResponse>(
             client,
             "/api/v1/directory/principals/membership-paths",
-            new { account = "pam12356", targetGroup = "platform-privileged", purpose = Purpose });
+            new { account = "pam12356", targetGroup = "platform-privileged" });
         DirectoryAccountHealthResponse health = await PostAsync<DirectoryAccountHealthResponse>(
             client,
             "/api/v1/directory/principals/account-health",
-            new { account = "pam12356", purpose = Purpose });
+            new { account = "pam12356" });
         DirectoryServiceEvidenceResponse evidence = await PostAsync<DirectoryServiceEvidenceResponse>(
             client,
             "/api/v1/directory/principals/service-evidence",
-            new { account = "pam12356", purpose = Purpose });
+            new { account = "pam12356" });
 
         memberships.DirectGroups.Should().HaveCount(2);
         memberships.TransitiveGroups.Should().ContainSingle(group =>
@@ -77,9 +77,9 @@ public sealed class DirectoryExplorerPhase2HostedTests
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         var request = new { account = "pam12356", purpose = Purpose };
 
-        HttpResponseMessage forbidden = await lead.PostAsJsonAsync(
-            "/api/v1/directory/principals/privileged-memberships", request);
         HttpResponseMessage allowed = await admin.PostAsJsonAsync(
+            "/api/v1/directory/principals/privileged-memberships", request);
+        HttpResponseMessage forbidden = await lead.PostAsJsonAsync(
             "/api/v1/directory/principals/privileged-memberships", request);
         DirectoryPrivilegedMembershipResponse? response =
             await allowed.Content.ReadFromJsonAsync<DirectoryPrivilegedMembershipResponse>();
@@ -98,12 +98,13 @@ public sealed class DirectoryExplorerPhase2HostedTests
     {
         using WebApplicationFactory<Program> factory = CreateFactory(enrichmentLimit: 1);
         using HttpClient client = Client(factory, DemoApiAuthentication.TeamLeadActor);
-        var request = new { account = "pam12356", purpose = Purpose };
+        var firstRequest = new { account = "pam12356", purpose = "first optional context" };
+        var secondRequest = new { account = "pam12356", purpose = "different optional context" };
 
         HttpResponseMessage first = await client.PostAsJsonAsync(
-            "/api/v1/directory/principals/account-health", request);
+            "/api/v1/directory/principals/account-health", firstRequest);
         HttpResponseMessage second = await client.PostAsJsonAsync(
-            "/api/v1/directory/principals/account-health", request);
+            "/api/v1/directory/principals/account-health", secondRequest);
 
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         second.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
