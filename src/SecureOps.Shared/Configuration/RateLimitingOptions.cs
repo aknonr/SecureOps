@@ -14,6 +14,10 @@ public sealed class RateLimitingOptions
     public OperationRateLimitOptions DirectoryGroupQuery { get; set; } = new(20, 60);
     /// <summary>Directory direct-member enumeration policy.</summary>
     public OperationRateLimitOptions DirectoryGroupMembers { get; set; } = new(10, 60);
+    /// <summary>Directory recursive enrichment and account-evidence policy.</summary>
+    public OperationRateLimitOptions DirectoryEnrichment { get; set; } = new(6, 60);
+    /// <summary>Separately authorized privileged-group analysis policy.</summary>
+    public OperationRateLimitOptions DirectoryPrivilegedGroups { get; set; } = new(4, 60);
     /// <summary>Operational-record refresh policy.</summary>
     public OperationRateLimitOptions OperationalRecordRefresh { get; set; } = new(12, 60);
     /// <summary>Jira preview policy.</summary>

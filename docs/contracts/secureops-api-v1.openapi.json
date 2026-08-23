@@ -1264,6 +1264,561 @@
         }
       }
     },
+    "/api/v1/directory/principals/memberships": {
+      "post": {
+        "tags": [
+          "Directory"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryPrincipalMembershipsResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryPrincipalMembershipsResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryPrincipalMembershipsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/directory/principals/membership-paths": {
+      "post": {
+        "tags": [
+          "Directory"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryMembershipPathRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryMembershipPathRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryMembershipPathRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryMembershipPathResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryMembershipPathResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryMembershipPathResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/directory/principals/account-health": {
+      "post": {
+        "tags": [
+          "Directory"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryAccountHealthResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryAccountHealthResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryAccountHealthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/directory/principals/service-evidence": {
+      "post": {
+        "tags": [
+          "Directory"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryServiceEvidenceResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryServiceEvidenceResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryServiceEvidenceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/directory/principals/privileged-memberships": {
+      "post": {
+        "tags": [
+          "Directory"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryPrincipalEnrichmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryPrivilegedMembershipResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryPrivilegedMembershipResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryPrivilegedMembershipResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
     "/api/v1/identity/me": {
       "get": {
         "tags": [
@@ -3284,6 +3839,51 @@
         },
         "additionalProperties": false
       },
+      "DirectoryAccountHealthResponse": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "locked": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "passwordLastSetUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "passwordAgeDays": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "passwordNeverExpires": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "accountExpiresUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "lastLogonTimestampUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastLogonTimestampIsApproximate": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "DirectoryGroupDetailDto": {
         "type": "object",
         "properties": {
@@ -3481,6 +4081,98 @@
         },
         "additionalProperties": false
       },
+      "DirectoryMembershipGroupDto": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/DirectoryGroupSummaryDto"
+          },
+          "minimumDepth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alsoTransitivelyReachable": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryMembershipPathDto": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryGroupSummaryDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryMembershipPathRequest": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetGroup": {
+            "type": "string",
+            "nullable": true
+          },
+          "purpose": {
+            "type": "string",
+            "nullable": true
+          },
+          "refresh": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryMembershipPathResponse": {
+        "type": "object",
+        "properties": {
+          "isMember": {
+            "type": "boolean"
+          },
+          "isDirect": {
+            "type": "boolean"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryMembershipPathDto"
+            },
+            "nullable": true
+          },
+          "pathsTruncated": {
+            "type": "boolean"
+          },
+          "traversal": {
+            "$ref": "#/components/schemas/DirectoryTraversalMetadataDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryPrincipalEnrichmentRequest": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string",
+            "nullable": true
+          },
+          "purpose": {
+            "type": "string",
+            "nullable": true
+          },
+          "refresh": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "DirectoryPrincipalGroupsRequest": {
         "type": "object",
         "properties": {
@@ -3502,6 +4194,167 @@
             "nullable": true
           },
           "refresh": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryPrincipalMembershipsResponse": {
+        "type": "object",
+        "properties": {
+          "directGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryMembershipGroupDto"
+            },
+            "nullable": true
+          },
+          "transitiveGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryMembershipGroupDto"
+            },
+            "nullable": true
+          },
+          "traversal": {
+            "$ref": "#/components/schemas/DirectoryTraversalMetadataDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryPrivilegedMembershipDto": {
+        "type": "object",
+        "properties": {
+          "configuredIdentifier": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupFound": {
+            "type": "boolean"
+          },
+          "group": {
+            "$ref": "#/components/schemas/DirectoryGroupSummaryDto"
+          },
+          "direct": {
+            "type": "boolean"
+          },
+          "transitive": {
+            "type": "boolean"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryMembershipPathDto"
+            },
+            "nullable": true
+          },
+          "pathsTruncated": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryPrivilegedMembershipResponse": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectoryPrivilegedMembershipDto"
+            },
+            "nullable": true
+          },
+          "traversal": {
+            "$ref": "#/components/schemas/DirectoryTraversalMetadataDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryServiceEvidenceResponse": {
+        "type": "object",
+        "properties": {
+          "servicePrincipalNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "servicePrincipalNameCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "servicePrincipalNamesTruncated": {
+            "type": "boolean"
+          },
+          "managedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountExpiresUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "passwordLastSetUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "passwordAgeDays": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "accountTypeEvidence": {
+            "type": "string",
+            "nullable": true
+          },
+          "directGroupCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "transitiveGroupCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "traversal": {
+            "$ref": "#/components/schemas/DirectoryTraversalMetadataDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DirectoryTraversalMetadataDto": {
+        "type": "object",
+        "properties": {
+          "nodesVisited": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "edgesVisited": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumDepthReached": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cycleDetected": {
+            "type": "boolean"
+          },
+          "depthLimitReached": {
+            "type": "boolean"
+          },
+          "nodeLimitReached": {
+            "type": "boolean"
+          },
+          "edgeLimitReached": {
+            "type": "boolean"
+          },
+          "providerResultLimitReached": {
+            "type": "boolean"
+          },
+          "isTruncated": {
             "type": "boolean"
           }
         },

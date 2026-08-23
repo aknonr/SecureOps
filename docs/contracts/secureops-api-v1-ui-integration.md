@@ -45,6 +45,23 @@ Idle expiry, absolute expiry, explicit logout, administrative revocation, access
 | `GET /api/v1/identity/lookup/cache-diagnostics` | `SystemDiagnostics` | none | aggregate counters without account labels | 403 |
 | `GET /api/v1/health/identity-provider` | Authenticated outside Development | none | provider name and real-provider flag | 401 |
 
+## Directory Explorer
+
+Phase 1 routes remain unchanged. Phase 2 requests are exact-only POST bodies with `account`, required operational `purpose`, and optional `refresh`; membership-path requests also require `targetGroup`. Negative membership-path results are conclusive only when traversal metadata reports no limit or truncation.
+
+| Method and route | Capability | Success |
+|---|---|---|
+| `POST /api/v1/directory/principals/groups` | `Identity.Groups.View` | paged direct groups only |
+| `POST /api/v1/directory/groups/lookup` | `Identity.Groups.View` | exact group metadata |
+| `POST /api/v1/directory/groups/members` | `Identity.Groups.Members.View` | paged direct members only |
+| `POST /api/v1/directory/principals/memberships` | `Identity.Groups.View` | separate direct/transitive groups and traversal metadata |
+| `POST /api/v1/directory/principals/membership-paths` | `Identity.Groups.View` | bounded proven paths to one exact group |
+| `POST /api/v1/directory/principals/account-health` | `Identity.Groups.View` | nullable health evidence; `lastLogonTimestampUtc` is approximate |
+| `POST /api/v1/directory/principals/service-evidence` | `Identity.Groups.View` | bounded SPNs, account-type evidence, and membership counts |
+| `POST /api/v1/directory/principals/privileged-memberships` | `Identity.PrivilegedGroups.View` | Admin-only evidence for exact server-configured groups |
+
+The API does not classify service/PAM accounts from names, infer administrator status from group text, expose LDAP filters/cookies, or use returned directory data as application authorization. Common failures are `DirectoryInvalidInput`, `DirectoryPrincipalNotFound`, `DirectoryGroupNotFound`, `DirectoryQueryLimitExceeded`, `DirectoryProviderUnavailable`, and `AuditStoreUnavailable`.
+
 ## Operational Records
 
 `GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `Fake` is Development/Demo/Test-only, `Disabled` fails closed, and `TuruncuHat` is a typed real adapter whose external TEST activation remains contract-gated. `createdAt` is nullable because the reviewed legacy projection does not supply a source timestamp.

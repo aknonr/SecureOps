@@ -83,4 +83,53 @@ public sealed class DirectorySecurityPrimitiveTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*page sizes*");
     }
 
+    [Fact]
+    public void ConfigurationValidator_RejectsUnsafeTraversalBounds()
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DirectoryExplorer:MaxTraversalDepth"] = "9",
+            ["DirectoryExplorer:MaxTraversalNodes"] = "8"
+        }).Build();
+
+        Action act = () => DirectoryExplorerConfigurationValidator.Validate(configuration);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*traversal and enrichment*");
+    }
+
+    [Theory]
+    [InlineData("admin*")]
+    [InlineData("CN=Admins,DC=example")]
+    public void ConfigurationValidator_RejectsUnsafePrivilegedGroupIdentifier(string identifier)
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DirectoryExplorer:PrivilegedGroupIdentifiers:0"] = identifier
+        }).Build();
+
+        Action act = () => DirectoryExplorerConfigurationValidator.Validate(configuration);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*privileged-group identifiers*");
+    }
+
+    [Fact]
+    public void ConfigurationValidator_AcceptsExactSidAndRejectsNormalizedDuplicates()
+    {
+        IConfiguration valid = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DirectoryExplorer:PrivilegedGroupIdentifiers:0"] = "S-1-5-21-1001"
+        }).Build();
+        IConfiguration duplicate = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["DirectoryExplorer:PrivilegedGroupIdentifiers:0"] = "Ops-Admins",
+            ["DirectoryExplorer:PrivilegedGroupIdentifiers:1"] = "ops-admins"
+        }).Build();
+
+        Action validAct = () => DirectoryExplorerConfigurationValidator.Validate(valid);
+        Action duplicateAct = () => DirectoryExplorerConfigurationValidator.Validate(duplicate);
+
+        validAct.Should().NotThrow();
+        duplicateAct.Should().Throw<InvalidOperationException>().WithMessage("*privileged-group identifiers*");
+    }
+
 }

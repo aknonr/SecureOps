@@ -17,4 +17,15 @@ public sealed class AccessRoleCatalogTests
             AccessRoleCatalog.GetCapabilities([role]).Should().NotContain(Capabilities.ManagementReportingView);
         }
     }
+
+    [Fact]
+    public void PrivilegedDirectoryCapability_IsLimitedToAdmin()
+    {
+        AccessRoleCatalog.GetCapabilities(["Admin"]).Should().Contain(Capabilities.DirectoryPrivilegedGroupsView);
+
+        foreach (string role in new[] { "Lead", "Operator", "JiraPublisher", "Auditor", "ReadOnly" })
+        {
+            AccessRoleCatalog.GetCapabilities([role]).Should().NotContain(Capabilities.DirectoryPrivilegedGroupsView);
+        }
+    }
 }

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Infrastructure.DirectoryExplorer;
@@ -29,6 +30,33 @@ public static class DirectoryExplorerConfigurationValidator
             || options.Cache.TtlSeconds is < 1 or > 300 || options.Cache.MaxEntries is < 1 or > 5000)
         {
             throw new InvalidOperationException("DirectoryExplorer input and cache settings are outside safe bounds.");
+        }
+
+        if (options.TraversalTimeoutSeconds is < 1 or > 60
+            || options.MaxTraversalDepth is < 1 or > 32
+            || options.MaxTraversalNodes is < 1 or > 5000
+            || options.MaxTraversalEdges is < 1 or > 10_000
+            || options.MaxTraversalDepth > options.MaxTraversalNodes
+            || options.MaxMembershipPaths is < 1 or > 20
+            || options.MaxSpnsPerPrincipal is < 1 or > 500
+            || options.MaxPrivilegedGroupIdentifiers is < 1 or > 128)
+        {
+            throw new InvalidOperationException("DirectoryExplorer traversal and enrichment settings are outside safe bounds.");
+        }
+
+        string[] configuredGroups = options.PrivilegedGroupIdentifiers ?? [];
+        DirectoryExactInputNormalizer normalizer = new(Options.Create(options));
+        string[] normalizedGroups = configuredGroups
+            .Select(group => normalizer.NormalizeGroup(group))
+            .Where(result => result.IsValid && result.Value is not null)
+            .Select(result => result.Value!)
+            .ToArray();
+        if (configuredGroups.Length > options.MaxPrivilegedGroupIdentifiers
+            || normalizedGroups.Length != configuredGroups.Length
+            || normalizedGroups.Distinct(StringComparer.OrdinalIgnoreCase).Count() != normalizedGroups.Length)
+        {
+            throw new InvalidOperationException(
+                "DirectoryExplorer privileged-group identifiers must be bounded, unique, and exact-input safe.");
         }
     }
 }

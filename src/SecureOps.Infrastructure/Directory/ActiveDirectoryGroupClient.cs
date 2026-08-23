@@ -8,7 +8,7 @@ using SecureOps.Shared.Configuration;
 namespace SecureOps.Infrastructure.DirectoryExplorer;
 
 /// <summary>Production read-only group transport using the API process identity.</summary>
-public sealed class ActiveDirectoryGroupClient : IActiveDirectoryGroupClient
+public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryGroupClient
 {
     private readonly IdentityLookupOptions _options;
 

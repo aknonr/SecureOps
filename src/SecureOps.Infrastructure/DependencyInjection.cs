@@ -83,6 +83,8 @@ public static class DependencyInjection
         services.AddSingleton<DirectoryExactInputNormalizer>();
         services.AddSingleton<DirectoryQueryCache>();
         services.AddScoped<IDirectoryGroupQueryService, DirectoryGroupQueryService>();
+        services.AddScoped<DirectoryMembershipGraphBuilder>();
+        services.AddScoped<IDirectoryEnrichmentQueryService, DirectoryEnrichmentQueryService>();
 
         string? identityProvider = configuration[$"{IdentityLookupOptions.SectionName}:Provider"];
         if (string.Equals(identityProvider, "ActiveDirectory", StringComparison.OrdinalIgnoreCase))
@@ -90,7 +92,9 @@ public static class DependencyInjection
             services.AddSingleton<IActiveDirectoryLookupClient, ActiveDirectoryLookupClient>();
             services.AddScoped<IIdentityDirectoryProvider, ActiveDirectoryIdentityDirectoryProvider>();
             services.AddSingleton<IActiveDirectoryGroupClient, ActiveDirectoryGroupClient>();
+            services.AddSingleton<IActiveDirectoryEnrichmentClient, ActiveDirectoryGroupClient>();
             services.AddScoped<IDirectoryGroupProvider, ActiveDirectoryDirectoryGroupProvider>();
+            services.AddScoped<IDirectoryEnrichmentProvider, ActiveDirectoryDirectoryEnrichmentProvider>();
         }
         else
         {
@@ -98,6 +102,7 @@ public static class DependencyInjection
                 new MockIdentityDirectoryProvider(
                     serviceProvider.GetRequiredService<IOptions<IdentityLookupOptions>>()));
             services.AddSingleton<IDirectoryGroupProvider, MockDirectoryGroupProvider>();
+            services.AddSingleton<IDirectoryEnrichmentProvider, MockDirectoryEnrichmentProvider>();
         }
 
         string? auditProvider = configuration[$"{AuditOptions.SectionName}:Provider"];

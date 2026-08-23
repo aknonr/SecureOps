@@ -69,7 +69,7 @@ Responsibilities:
 - Provide REST API for the UI and any future internal consumers.
 - Enforce authorization.
 - Resolve authenticated principals through persisted Pending/Approved/Disabled application access before capabilities are granted.
-- Keep exact identity lookup and the read-only Directory Explorer as separate services/controllers. Directory Explorer exposes only exact direct-group, exact group-metadata, and bounded direct-member queries; it accepts no raw LDAP filters and performs no recursive expansion.
+- Keep exact identity lookup and the read-only Directory Explorer as separate services/controllers. Directory Explorer preserves exact direct-group, exact group-metadata, and bounded direct-member queries, and adds bounded provider-neutral enrichment for transitive membership, proven paths, account health, SPNs, and separately authorized privileged-group evidence. It accepts no raw LDAP filters or credentials.
 - Keep authentication provider-neutral and separate from the server-side SecureOps session record. The protected session handle is not a corporate credential or authorization source; current access status and version remain authoritative.
 - Normalize alert payloads.
 - Enqueue diagnostic jobs via Hangfire client API.

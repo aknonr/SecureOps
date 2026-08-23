@@ -21,6 +21,7 @@ public sealed class IdentityAuthorizationPolicyTests
     [InlineData(Policies.CanApproveAccessRequests, Capabilities.AccessApproveRequests)]
     [InlineData(Policies.CanViewDirectoryGroups, Capabilities.DirectoryGroupsView)]
     [InlineData(Policies.CanViewDirectoryGroupMembers, Capabilities.DirectoryGroupMembersView)]
+    [InlineData(Policies.CanViewDirectoryPrivilegedGroups, Capabilities.DirectoryPrivilegedGroupsView)]
     public void Policies_RequireApplicationCapabilityInsteadOfAdGroup(string policyName, string capability)
     {
         using ServiceProvider provider = BuildServices();

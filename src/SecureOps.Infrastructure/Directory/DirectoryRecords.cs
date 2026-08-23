@@ -20,6 +20,25 @@ public sealed record DirectoryMemberRecord(
     string? DistinguishedName,
     string MemberType);
 
+/// <summary>Provider-neutral exact account-health and service evidence.</summary>
+public sealed record DirectoryPrincipalEnrichmentRecord(
+    string? StableIdentifier,
+    string? DisplayName,
+    string? SamAccountName,
+    string? UserPrincipalName,
+    bool? Enabled,
+    bool? Locked,
+    DateTimeOffset? PasswordLastSetUtc,
+    bool? PasswordNeverExpires,
+    DateTimeOffset? AccountExpiresUtc,
+    bool? MustChangePassword,
+    DateTimeOffset? LastLogonTimestampUtc,
+    string? ManagedBy,
+    IReadOnlyList<string> ServicePrincipalNames,
+    int ServicePrincipalNameCount,
+    bool ServicePrincipalNamesTruncated,
+    string AccountTypeEvidence);
+
 /// <summary>One bounded provider page.</summary>
 public sealed record DirectoryProviderPage<T>(IReadOnlyList<T> Items, bool HasMore);
 

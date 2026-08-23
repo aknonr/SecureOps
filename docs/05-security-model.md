@@ -271,7 +271,7 @@ Until that decision is recorded:
 
 ## Audit (See `docs/08-audit-model.md` for Detail)
 
-Directory Explorer privileged reads require application capabilities `Identity.Groups.View` or `Identity.Groups.Members.View`. They use exact server-controlled queries under the API process identity, reject raw LDAP/filter input, bound page size and provider work, do not recursively expand groups, and audit only safe query metadata rather than membership payloads.
+Directory Explorer privileged reads require `Identity.Groups.View` or `Identity.Groups.Members.View`; privileged-group analysis separately requires `Identity.PrivilegedGroups.View`. All operations use exact server-controlled queries under the API process identity and reject raw LDAP/filter input and credentials. Recursive Phase 2 reads are bounded by depth, nodes, edges, paths, timeout, cache, and rate limits, return explicit truncation metadata, and audit only safe counts/outcomes rather than membership, SPN, health, path, or raw-DN payloads.
 
 ## Application Session Governance
 

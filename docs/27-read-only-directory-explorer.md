@@ -63,4 +63,6 @@ No new secret or credential key exists.
 
 ## Deferred
 
-Recursive/transitive expansion, membership paths, privileged-group visibility policy, account health, SPN/service-account enrichment, computer lookup, manager/direct reports, directory writes, and LDAP login are not implemented.
+ADR-0015 and `docs/29-directory-explorer-phase2-enrichment.md` add bounded recursive/transitive membership, proven membership paths, account health, SPN/service evidence, and separately authorized privileged-group analysis through new routes. Phase 1 routes and direct-only semantics remain unchanged.
+
+Computer lookup, manager/direct reports, directory writes, LDAP login, and corporate account classification remain deferred.

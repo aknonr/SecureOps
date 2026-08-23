@@ -20,6 +20,22 @@ public sealed class DirectoryExplorerOptions
     public int MaxGroupInputLength { get; set; } = 256;
     /// <summary>Maximum required operational-purpose length.</summary>
     public int MaxPurposeLength { get; set; } = 256;
+    /// <summary>Total timeout for one recursive membership graph traversal.</summary>
+    public int TraversalTimeoutSeconds { get; set; } = 10;
+    /// <summary>Maximum number of group edges from a principal to explore.</summary>
+    public int MaxTraversalDepth { get; set; } = 8;
+    /// <summary>Maximum number of unique groups retained in one traversal.</summary>
+    public int MaxTraversalNodes { get; set; } = 256;
+    /// <summary>Maximum number of unique membership edges retained in one traversal.</summary>
+    public int MaxTraversalEdges { get; set; } = 512;
+    /// <summary>Maximum proven paths returned for one target group.</summary>
+    public int MaxMembershipPaths { get; set; } = 5;
+    /// <summary>Maximum service principal names returned for one principal.</summary>
+    public int MaxSpnsPerPrincipal { get; set; } = 50;
+    /// <summary>Maximum configured exact privileged-group identifiers.</summary>
+    public int MaxPrivilegedGroupIdentifiers { get; set; } = 32;
+    /// <summary>Server-owned exact SID, sAMAccountName, or group-name identifiers.</summary>
+    public string[] PrivilegedGroupIdentifiers { get; set; } = [];
     /// <summary>Conservative query-cache settings.</summary>
     public DirectoryExplorerCacheOptions Cache { get; set; } = new();
 }
