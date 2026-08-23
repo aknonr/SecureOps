@@ -14,7 +14,7 @@ public sealed record ReportingRetryOutcomes(long Requested, long Succeeded, long
 
 /// <summary>Server-computed elapsed-time statistics.</summary>
 public sealed record ReportingDurationStatistics(
-    string Name,
+    string Key,
     long SampleCount,
     double? MinimumSeconds,
     double? AverageSeconds,
@@ -28,7 +28,8 @@ public sealed record ManagementReportingData(
     ReportingActiveUsers ActiveUsers,
     long ReconciliationRequired,
     ReportingRetryOutcomes RetryOutcomes,
-    IReadOnlyList<ReportingDurationStatistics> Durations);
+    IReadOnlyList<ReportingDurationStatistics> Durations,
+    DateTimeOffset? CoverageFromUtc);
 
 /// <summary>One server-aggregated operator row.</summary>
 public sealed record OperatorActivityData(
@@ -42,4 +43,7 @@ public sealed record OperatorActivityData(
     long OperationalWorkflowOperations);
 
 /// <summary>Server-side paginated operator aggregate page.</summary>
-public sealed record OperatorActivityDataPage(long TotalItems, IReadOnlyList<OperatorActivityData> Items);
+public sealed record OperatorActivityDataPage(
+    long TotalItems,
+    IReadOnlyList<OperatorActivityData> Items,
+    DateTimeOffset? CoverageFromUtc);

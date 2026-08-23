@@ -35,7 +35,7 @@ public sealed class ManagementReportingServiceTests
     {
         StubRepository repository = new()
         {
-            OperatorPage = new OperatorActivityDataPage(250, [])
+            OperatorPage = new OperatorActivityDataPage(250, [], _now.AddDays(-40))
         };
         ManagementReportingService service = Service(repository, new InMemoryAuditWriter());
 
@@ -104,7 +104,7 @@ public sealed class ManagementReportingServiceTests
         public int LastPage { get; private set; }
         public int LastPageSize { get; private set; }
         public Exception? Failure { get; init; }
-        public OperatorActivityDataPage OperatorPage { get; init; } = new(0, []);
+        public OperatorActivityDataPage OperatorPage { get; init; } = new(0, [], null);
 
         public Task<ManagementReportingData> GetSummaryAsync(ReportingWindow window, CancellationToken cancellationToken)
         {
@@ -116,7 +116,7 @@ public sealed class ManagementReportingServiceTests
 
             return Task.FromResult(new ManagementReportingData(
                 [], [], 0, new ReportingActiveUsers(0, 0, 0, 0), 0,
-                new ReportingRetryOutcomes(0, 0, 0), []));
+                new ReportingRetryOutcomes(0, 0, 0), [], null));
         }
 
         public Task<OperatorActivityDataPage> GetOperatorActivityAsync(

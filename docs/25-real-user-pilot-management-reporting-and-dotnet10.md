@@ -74,7 +74,9 @@ Adoption and Security:
 - Rate-limit events: unavailable until rate-limit rejection auditing is explicitly designed.
 - Application sessions: reliable starts, idle/absolute timeouts, logout, administrator revocation, access-disable termination, and access-version termination are aggregated. Heartbeats are excluded.
 
-Durations report sample count, minimum, average, and maximum elapsed seconds for import -> preview, claim -> Jira creation, and claim -> completion. They include waits and retries. They are not manual effort, active handling time, time saved, or operator performance.
+Durations report sample count, minimum, average, and maximum elapsed seconds for import -> preview, claim -> Jira creation, and claim -> completion. Stable keys are `importToPreview`, `claimToJiraCreation`, and `claimToCompletion`; UI/application behavior must not use English definitions or array order. Durations include waits and retries. They are not manual effort, active handling time, time saved, or operator performance.
+
+Both report routes expose additive evidence coverage. `coverageFromUtc` is the earliest retained persisted event in the known reporting-action catalog. Coverage is complete only when that boundary exists at or before the requested start. An incomplete zero is not historical evidence of zero. See `docs/30-management-reporting-contract-hardening.md` for the algorithm and stable limitation codes.
 
 ## Database Impact
 
@@ -86,6 +88,7 @@ Migration 005 creates limited `reporting` views over audit/workflow data and sup
 - Existing rows cannot prove manual-process duration or time saved.
 - Historical rate-limit rejections, access concurrency failures, source-query outages, and bulk-invalid item outcomes are incomplete or absent.
 - A future manual baseline must use an approved, bounded sample: record start/end timestamps and workflow type for the old process, collect no content beyond operational references, aggregate at team level, and compare equivalent work classes and time windows.
+- G-14 stable duration keys, G-15 coded limitations, and G-17 evidence coverage are resolved by the additive backend contract. G-16 adoption and Operational Record/Jira trend series remain explicitly unresolved and out of scope.
 
 ## Direct Package Inventory
 

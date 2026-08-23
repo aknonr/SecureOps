@@ -103,6 +103,11 @@ public sealed class SqlAssetContractTests
             .And.Contain("FROM reporting.ManagementOperationalStatus")
             .And.Contain("OccurredAt >= @FromInclusive AND OccurredAt < @ToExclusive")
             .And.Contain("COUNT_BIG(DISTINCT Actor)")
+            .And.Contain("MIN(EarliestAt) AS CoverageFromUtc")
+            .And.Contain("WHERE Action IN @CoverageActions")
+            .And.Contain("@ImportToPreviewKey AS [Key]")
+            .And.Contain("ManagementReportingDurationKeys.ClaimToJiraCreation")
+            .And.Contain("ManagementReportingDurationKeys.ClaimToCompletion")
             .And.Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY")
             .And.Contain("commandTimeout: CommandTimeoutSeconds")
             .And.Contain("cancellationToken: cancellationToken");

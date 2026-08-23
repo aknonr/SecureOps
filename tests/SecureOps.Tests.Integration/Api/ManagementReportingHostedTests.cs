@@ -32,6 +32,9 @@ public sealed class ManagementReportingHostedTests
         ManagementReportResponse report = (await adminResponse.Content.ReadFromJsonAsync<ManagementReportResponse>())!;
         report.IdentityLookup.TotalLookups.Should().Be(0);
         report.SecurityAndQuality.RateLimitEvents.Should().BeNull();
+        report.Coverage.CoverageComplete.Should().BeTrue();
+        report.Limitations.Should().Contain(item =>
+            item.Code == ManagementReportingLimitationCodes.RateLimitRejectionsUnavailable);
     }
 
     [Fact]
@@ -58,6 +61,7 @@ public sealed class ManagementReportingHostedTests
         page.Page.Should().Be(3);
         page.PageSize.Should().Be(100);
         page.TotalItems.Should().Be(250);
+        page.Coverage.CoverageComplete.Should().BeTrue();
     }
 
     [Fact]
@@ -109,13 +113,13 @@ public sealed class ManagementReportingHostedTests
         public Task<ManagementReportingData> GetSummaryAsync(ReportingWindow window, CancellationToken cancellationToken) =>
             Task.FromResult(new ManagementReportingData(
                 [], [], 0, new ReportingActiveUsers(0, 0, 0, 0), 0,
-                new ReportingRetryOutcomes(0, 0, 0), []));
+                new ReportingRetryOutcomes(0, 0, 0), [], window.FromInclusiveUtc.AddTicks(-1)));
 
         public Task<OperatorActivityDataPage> GetOperatorActivityAsync(
             ReportingWindow window,
             int page,
             int pageSize,
             CancellationToken cancellationToken) =>
-            Task.FromResult(new OperatorActivityDataPage(250, []));
+            Task.FromResult(new OperatorActivityDataPage(250, [], window.FromInclusiveUtc.AddTicks(-1)));
     }
 }

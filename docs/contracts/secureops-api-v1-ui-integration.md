@@ -90,3 +90,7 @@ The v1 wire contract intentionally serializes Operational Record enums as intege
 | `GET /api/v1/reporting/management/operators` | `Reporting.ManagementView` | same window plus `page` and `pageSize` (maximum 100) | server-paginated persisted actor counts and activity bounds | same reporting errors |
 
 Only Admin and Auditor receive this capability. Windows are UTC half-open intervals and custom ranges are capped at 92 days. Duration fields are elapsed system workflow time, not active labor or time saved. Operator data must not be rendered as rankings or performance comparisons.
+
+Duration identity is the stable `key`: `importToPreview`, `claimToJiraCreation`, or `claimToCompletion`. UI logic and localization must not match `definition` text or rely on duration array order. The legacy definition remains fallback display text.
+
+Use `limitations[*].code` for localization and behavior; `message` is optional fallback text. The legacy `dataLimitations` string array remains temporarily for compatibility and must not be parsed. Both routes return `coverage` with `requestedFromUtc`, `requestedToUtc`, nullable `coverageFromUtc`, and `coverageComplete`. A zero is a measured zero only when coverage is complete and no matching metric-specific limitation applies. G-16 adoption and Operational Record/Jira trend series remain unavailable and must not be inferred client-side.

@@ -67,7 +67,8 @@ public sealed class ManagementReportProjectorTests
             ],
             reconciliation: 2,
             retryOutcomes: new ReportingRetryOutcomes(5, 2, 1),
-            durations: [new ReportingDurationStatistics("ClaimToCompleted", 2, 10, 15, 20)]);
+            durations: [new ReportingDurationStatistics(
+                ManagementReportingDurationKeys.ClaimToCompletion, 2, 10, 15, 20)]);
 
         ManagementReportResponse report = new ManagementReportProjector().Project(_window, data);
 
@@ -82,7 +83,8 @@ public sealed class ManagementReportProjectorTests
         report.SecurityAndQuality.ConcurrencyConflicts.Should().Be(3);
         report.SecurityAndQuality.ReconciliationEvents.Should().Be(2);
         report.SecurityAndQuality.RateLimitEvents.Should().BeNull();
-        report.OperationalWorkflow.Durations.Single(item => item.Definition.Contains("completion", StringComparison.Ordinal)).SampleCount.Should().Be(2);
+        report.OperationalWorkflow.Durations.Single(item =>
+            item.Key == ManagementReportingDurationKeys.ClaimToCompletion).SampleCount.Should().Be(2);
     }
 
     [Fact]
@@ -96,6 +98,126 @@ public sealed class ManagementReportProjectorTests
         report.SecurityAndQuality.RateLimitEvents.Should().BeNull();
         report.IdentityLookup.Trend.Should().OnlyContain(point => point.Total == 0);
         report.DataLimitations.Should().NotBeEmpty();
+        report.Coverage.CoverageFromUtc.Should().BeNull();
+        report.Coverage.CoverageComplete.Should().BeFalse();
+        report.Limitations.Should().Contain(item =>
+            item.Code == ManagementReportingLimitationCodes.HistoryBeforePersistenceUnavailable);
+    }
+
+    [Fact]
+    public void Project_DurationMetricsUseStableKeysIndependentOfInputOrderAndDisplayText()
+    {
+        ManagementReportingData data = Data(
+            durations:
+            [
+                new ReportingDurationStatistics(ManagementReportingDurationKeys.ClaimToCompletion, 3, 4, 5, 6),
+                new ReportingDurationStatistics(ManagementReportingDurationKeys.ImportToPreview, 7, 8, 9, 10),
+                new ReportingDurationStatistics(ManagementReportingDurationKeys.ClaimToJiraCreation, 11, 12, 13, 14)
+            ]);
+
+        ManagementReportResponse report = new ManagementReportProjector().Project(_window, data);
+        var indexed = report.OperationalWorkflow.Durations.ToDictionary(item => item.Key, StringComparer.Ordinal);
+        DurationStatisticsResponse localized = indexed[ManagementReportingDurationKeys.ClaimToCompletion] with
+        {
+            Definition = "Localized duration label"
+        };
+
+        indexed.Keys.Should().BeEquivalentTo(
+            ManagementReportingDurationKeys.ImportToPreview,
+            ManagementReportingDurationKeys.ClaimToJiraCreation,
+            ManagementReportingDurationKeys.ClaimToCompletion);
+        indexed[ManagementReportingDurationKeys.ImportToPreview].SampleCount.Should().Be(7);
+        indexed[ManagementReportingDurationKeys.ClaimToJiraCreation].AverageSeconds.Should().Be(13);
+        localized.Key.Should().Be(ManagementReportingDurationKeys.ClaimToCompletion);
+        localized.SampleCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void Project_LimitationsExposeStableCodesWithoutDependingOnEnglishMessages()
+    {
+        ManagementReportResponse report = new ManagementReportProjector().Project(_window, Data());
+        var localized = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [ManagementReportingLimitationCodes.RateLimitRejectionsUnavailable] = "localized-1",
+            [ManagementReportingLimitationCodes.AccessVersionConflictHistoryUnavailable] = "localized-2",
+            [ManagementReportingLimitationCodes.OperationalSourceOutageHistoryUnavailable] = "localized-3",
+            [ManagementReportingLimitationCodes.BulkIdentityInvalidItemHistoryUnavailable] = "localized-4",
+            [ManagementReportingLimitationCodes.DuplicateCreatePreventionHistoryIncomplete] = "localized-5",
+            [ManagementReportingLimitationCodes.ElapsedDurationsNotActiveEffort] = "localized-6",
+            [ManagementReportingLimitationCodes.HistoryBeforePersistenceUnavailable] = "localized-7"
+        };
+
+        report.Limitations.Select(item => localized[item.Code]).Should().OnlyContain(text =>
+            text.StartsWith("localized-", StringComparison.Ordinal));
+        report.Limitations.Should().OnlyContain(item => !string.IsNullOrWhiteSpace(item.Message));
+
+        DataLimitationResponse future = new("FutureLimitation", "Future fallback message");
+        future.Message.Should().Be("Future fallback message");
+    }
+
+    [Fact]
+    public void Project_CoverageDistinguishesPartialHistoryFromCompleteMeasuredZero()
+    {
+        DateTimeOffset partialBoundary = _window.FromInclusiveUtc.AddDays(2);
+        ManagementReportResponse partial = new ManagementReportProjector().Project(
+            _window,
+            Data(coverageFromUtc: partialBoundary));
+        ManagementReportResponse completeZero = new ManagementReportProjector().Project(
+            _window,
+            Data(coverageFromUtc: _window.FromInclusiveUtc.AddTicks(-1)));
+
+        partial.IdentityLookup.TotalLookups.Should().Be(0);
+        partial.Coverage.Should().Be(new ReportingEvidenceCoverageResponse(
+            _window.FromInclusiveUtc, _window.ToExclusiveUtc, partialBoundary, false));
+        partial.Limitations.Should().Contain(item =>
+            item.Code == ManagementReportingLimitationCodes.HistoryBeforePersistenceUnavailable);
+
+        completeZero.IdentityLookup.TotalLookups.Should().Be(0);
+        completeZero.Coverage.CoverageComplete.Should().BeTrue();
+        completeZero.Limitations.Should().NotContain(item =>
+            item.Code == ManagementReportingLimitationCodes.HistoryBeforePersistenceUnavailable);
+    }
+
+    [Fact]
+    public void Project_CoverageBeforeFirstEvidenceRemainsIncompleteAndLaterWindowIsComplete()
+    {
+        DateTimeOffset firstEvidence = _window.ToExclusiveUtc.AddDays(1);
+        ManagementReportResponse beforeEvidence = new ManagementReportProjector().Project(
+            _window,
+            Data(coverageFromUtc: firstEvidence));
+        ReportingWindow laterWindow = new(
+            "custom",
+            firstEvidence.AddDays(1),
+            firstEvidence.AddDays(2));
+        ManagementReportResponse afterEvidence = new ManagementReportProjector().Project(
+            laterWindow,
+            Data(coverageFromUtc: firstEvidence));
+
+        beforeEvidence.Coverage.CoverageComplete.Should().BeFalse();
+        afterEvidence.Coverage.CoverageComplete.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Project_CoveragePreservesTodaySevenThirtyAndCustomRequestedWindows()
+    {
+        ReportingWindow[] windows =
+        [
+            new("today", new DateTimeOffset(_window.ToExclusiveUtc.UtcDateTime.Date, TimeSpan.Zero), _window.ToExclusiveUtc),
+            _window,
+            new("30d", _window.ToExclusiveUtc.AddDays(-30), _window.ToExclusiveUtc),
+            new("custom", _window.ToExclusiveUtc.AddHours(-6), _window.ToExclusiveUtc)
+        ];
+
+        foreach (ReportingWindow window in windows)
+        {
+            ManagementReportResponse report = new ManagementReportProjector().Project(
+                window,
+                Data(coverageFromUtc: window.FromInclusiveUtc));
+
+            report.Coverage.RequestedFromUtc.Should().Be(window.FromInclusiveUtc);
+            report.Coverage.RequestedToUtc.Should().Be(window.ToExclusiveUtc);
+            report.Coverage.CoverageComplete.Should().BeTrue();
+        }
     }
 
     [Fact]
@@ -142,7 +264,7 @@ public sealed class ManagementReportProjectorTests
         OperatorActivityDataPage data = new(250,
         [
             new OperatorActivityData("CONTOSO\\operator-a", 15, _window.FromInclusiveUtc, _window.ToExclusiveUtc.AddMinutes(-1), 5, 3, 2, 5)
-        ]);
+        ], _window.FromInclusiveUtc.AddDays(-1));
 
         OperatorActivityPageResponse result = new ManagementReportProjector().ProjectOperators(_window, 2, 100, data);
 
@@ -152,6 +274,7 @@ public sealed class ManagementReportProjectorTests
         result.Items[0].Actor.Should().Be("CONTOSO\\operator-a");
         result.Items[0].OperationsByWorkflow.Sum(item => item.Count).Should().Be(15);
         result.Items[0].OperationsByWorkflow.Single(item => item.Name == "DirectoryExplorer").Count.Should().Be(3);
+        result.Coverage.CoverageComplete.Should().BeTrue();
     }
 
     private static ReportingAuditCount Count(string action, long count, string? detailCode = null) =>
@@ -163,7 +286,8 @@ public sealed class ManagementReportProjectorTests
         long identityUniqueOperators = 0,
         long reconciliation = 0,
         ReportingRetryOutcomes? retryOutcomes = null,
-        IReadOnlyList<ReportingDurationStatistics>? durations = null) =>
+        IReadOnlyList<ReportingDurationStatistics>? durations = null,
+        DateTimeOffset? coverageFromUtc = null) =>
         new(
             auditCounts ?? [],
             workflowCounts ?? [],
@@ -171,5 +295,6 @@ public sealed class ManagementReportProjectorTests
             new ReportingActiveUsers(0, 0, 0, 0),
             reconciliation,
             retryOutcomes ?? new ReportingRetryOutcomes(0, 0, 0),
-            durations ?? []);
+            durations ?? [],
+            coverageFromUtc);
 }

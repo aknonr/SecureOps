@@ -3839,6 +3839,20 @@
         },
         "additionalProperties": false
       },
+      "DataLimitationResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "DirectoryAccountHealthResponse": {
         "type": "object",
         "properties": {
@@ -4377,6 +4391,10 @@
       "DurationStatisticsResponse": {
         "type": "object",
         "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
           "definition": {
             "type": "string",
             "nullable": true
@@ -4763,6 +4781,16 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ReportingEvidenceCoverageResponse"
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataLimitationResponse"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -5007,6 +5035,9 @@
               "$ref": "#/components/schemas/OperatorActivityResponse"
             },
             "nullable": true
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ReportingEvidenceCoverageResponse"
           }
         },
         "additionalProperties": false
@@ -5102,6 +5133,28 @@
           }
         },
         "additionalProperties": { }
+      },
+      "ReportingEvidenceCoverageResponse": {
+        "type": "object",
+        "properties": {
+          "requestedFromUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestedToUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coverageFromUtc": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "coverageComplete": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "ReportingWindowResponse": {
         "type": "object",
