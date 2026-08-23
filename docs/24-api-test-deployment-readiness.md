@@ -1,6 +1,6 @@
 # API TEST Deployment Readiness
 
-This is the controlled deployment contract for `release/api-test-20260812`. The application never executes SQL or edits IIS configuration. Server-owned `web.config` and `appsettings*.json` files are excluded from the deployment ZIP.
+This is the general controlled deployment contract. The authoritative 2026-08-23 TEST/Pilot release-candidate manifests are under `docs/release-candidates/2026-08-23-api-test-pilot-rc/`. The application never executes SQL or edits IIS configuration. Server-owned `web.config` and `appsettings*.json` files are excluded from the deployment ZIP.
 
 ## Migration Review
 
@@ -28,7 +28,7 @@ There are no down migrations, migration-history table, encompassing transaction,
 - `reporting.ManagementAuditEvents`, `ManagementWorkflowEvents`, and `ManagementOperationalStatus`; limited read views plus reporting indexes on underlying tables.
 - `security.ApplicationSessions`; authoritative lifecycle timestamps/reasons, authentication method, access version, and active-session indexes. `reporting.ManagementSessionStatus` exposes limited aggregate fields.
 
-The DBA migration identity needs controlled DDL authority to create schemas/tables/views/indexes/triggers/constraints and DML authority for role seeds. The runtime identity needs only: `INSERT` on `audit.AuditLog`; `SELECT, INSERT, UPDATE` on `security.Users`, `security.RoleAssignments`, `security.AccessRequests`, and `security.ApplicationSessions`; `SELECT` on `security.Roles`; `INSERT` on `security.AccessRequestHistory`; `SELECT, INSERT, UPDATE` on `ops.OperationalRecords`, `ops.JiraTransfers`, and `ops.CommandExecutions`; `INSERT` on `ops.OperationalRecordWorkflowHistory`; and `SELECT` on the four `reporting` views. It needs no direct `SELECT` on base audit/history tables, `DELETE`, DDL, schema ownership, `db_owner`, or `db_ddladmin`. View/trigger ownership chaining must be verified by the DBA.
+The DBA migration identity needs controlled DDL authority to create schemas/tables/views/indexes/triggers/constraints and DML authority for role seeds. The runtime identity needs only: `INSERT` on `audit.AuditLog`; `SELECT, INSERT, UPDATE` on `security.Users`, `security.RoleAssignments`, `security.AccessRequests`, and `security.ApplicationSessions`; `SELECT` on `security.Roles`; `INSERT` on `security.AccessRequestHistory`; `SELECT, INSERT, UPDATE` on `ops.OperationalRecords`, `ops.JiraTransfers`, and `ops.CommandExecutions`; `INSERT` on `ops.OperationalRecordWorkflowHistory`; and `SELECT` on the three reporting views read by current code. It needs no direct `SELECT` on base audit/history tables, unused `reporting.ManagementSessionStatus`, `DELETE`, DDL, schema ownership, `db_owner`, or `db_ddladmin`. Exact grants are in the release-candidate grant-only script. View/trigger ownership chaining must be verified by the DBA.
 
 ## Bootstrap Administrator
 
@@ -80,7 +80,7 @@ Values in angle brackets require controlled deployment input. All booleans are l
 
 | REQUIRED | `Audit__Provider` / `Audit__FailClosed` / `Audit__RequirePersistentStoreInProduction` | `SqlServer` / `true` / `true` |
 | REQUIRED | `Audit__Queue__Enabled` / `Audit__Queue__Capacity` / `Audit__Queue__FullBehavior` / `Audit__FlushIntervalSeconds` | `true` / `1000` / `FailClosed` / `1` |
-| REQUIRED | `ConnectionStrings__SecureOpsDb` | `Server=tcp:secureops-mssql-test.thynet.thy.com,3406;Database=SecureOps;Integrated Security=True;Encrypt=True;TrustServerCertificate=False;Application Name=SecureOps.Api;Connect Timeout=15` |
+| REQUIRED, RUNTIME-ONLY | `ConnectionStrings__SecureOpsDb` | `Server=tcp:<SQL_FQDN>,<SQL_PORT>;Database=<DATABASE_NAME>;Integrated Security=True;Encrypt=True;TrustServerCertificate=False;Application Name=SecureOps.Api;Connect Timeout=15` |
 | REQUIRED CURRENT | `ReverseProxy__ForwardedHeaders__Enabled` | `false` until exact API proxy behavior and source IPs are confirmed |
 | CONDITIONAL | `ReverseProxy__ForwardedHeaders__TrustedProxyIps__0` | `<exact trusted API proxy IP>` only when forwarding is explicitly enabled |
 
