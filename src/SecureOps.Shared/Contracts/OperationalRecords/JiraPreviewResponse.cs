@@ -11,4 +11,5 @@ public sealed record JiraPreviewResponse(
     string? RequesterAccountId,
     string MappingVersion,
     string IdempotencyKey,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    string? AssigneeUsername = null);

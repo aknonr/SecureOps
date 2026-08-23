@@ -3824,6 +3824,10 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "assigneeUsername": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

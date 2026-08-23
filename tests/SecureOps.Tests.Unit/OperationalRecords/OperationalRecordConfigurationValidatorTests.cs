@@ -145,6 +145,53 @@ public sealed class OperationalRecordConfigurationValidatorTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*Jira:BaseUrl*HTTPS*");
     }
 
+    [Fact]
+    public void Validate_WithReporterOverride_FailsBecauseCreateMetadataDoesNotSupportIt()
+    {
+        Dictionary<string, string?> values = EnterpriseValues();
+        values["Jira:ReporterMode"] = "Explicit";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*ReporterMode*reviewed create metadata*");
+    }
+
+    [Fact]
+    public void Validate_WithMalformedBasicAuthorization_FailsClearly()
+    {
+        Dictionary<string, string?> values = EnterpriseValues();
+        values["Jira:Authorization"] = "Basic not-base64";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*AuthenticationMode Basic*runtime Basic Authorization*");
+    }
+
+    [Fact]
+    public void Validate_WithProjectDefaultAndAssigneeMappings_FailsClearly()
+    {
+        Dictionary<string, string?> values = EnterpriseValues();
+        values["Jira:OperatorAssigneeMappings:0:SecureOpsActor"] = "EXAMPLE\\operator";
+        values["Jira:OperatorAssigneeMappings:0:JiraUsername"] = "verified.operator";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*empty for ProjectDefault*");
+    }
+
+    [Fact]
+    public void Validate_WithVerifiedExactOperatorMapping_Succeeds()
+    {
+        Dictionary<string, string?> values = EnterpriseValues();
+        values["Jira:AssignmentMode"] = "VerifiedOperatorMapping";
+        values["Jira:OperatorAssigneeMappings:0:SecureOpsActor"] = "EXAMPLE\\operator";
+        values["Jira:OperatorAssigneeMappings:0:JiraUsername"] = "verified.operator";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().NotThrow();
+    }
+
     private static Dictionary<string, string?> EnterpriseValues() => new()
     {
         ["OperationalRecords:SourceProvider"] = "TuruncuHat",
@@ -165,13 +212,14 @@ public sealed class OperationalRecordConfigurationValidatorTests
         ["TuruncuHat:CompletionCommentTemplate"] = "Transferred to {JiraKey}",
         ["TuruncuHat:SessionLifetimeSeconds"] = "60",
         ["Jira:BaseUrl"] = "https://jira.invalid/",
-        ["Jira:Authorization"] = "Sanitized runtime value",
-        ["Jira:ProjectKey"] = "SAFE",
-        ["Jira:IssueTypeId"] = "10001",
-        ["Jira:TeamCustomField"] = "customfield_team",
-        ["Jira:TeamValue"] = "Safe Team",
-        ["Jira:RequesterWatcherCustomField"] = "customfield_requester",
-        ["Jira:Labels:0"] = "safe-label"
+        ["Jira:Authorization"] = "Basic c2FuaXRpemVkOnNlY3JldA==",
+        ["Jira:AuthenticationMode"] = "Basic",
+        ["Jira:ProjectKey"] = "SDM",
+        ["Jira:IssueTypeId"] = "3",
+        ["Jira:TeamCustomField"] = "customfield_12700",
+        ["Jira:TeamValue"] = "WASAS",
+        ["Jira:RequesterWatcherCustomField"] = "customfield_11500",
+        ["Jira:Labels:0"] = "SunucuTalep"
     };
 
     private static IConfiguration Configuration(Dictionary<string, string?> values) =>

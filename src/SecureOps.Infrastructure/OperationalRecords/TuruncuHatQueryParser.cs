@@ -3,26 +3,37 @@ using System.Text.Json;
 
 namespace SecureOps.Infrastructure.OperationalRecords;
 
-/// <summary>Strict parser for the evidenced positional Turuncu Hat query projection.</summary>
+/// <summary>Strict parser for evidenced keyed and legacy positional Turuncu Hat query projections.</summary>
 internal static class TuruncuHatQueryParser
 {
-    public static ParsedSourceRecords ParseSource(JsonElement root, int maximumDescriptionLength)
+    private static readonly string[] _envelopeProperties =
+        ["ErrorDescription", "ErrorDetails", "ErrorNo", "TenantId", "MaxPages", "PageNo", "RecordCount"];
+
+    public static ParsedSourceRecords ParseSource(
+        JsonElement root,
+        int maximumDescriptionLength,
+        IReadOnlyList<string> expectedKeys)
     {
         JsonElement items = GetItems(root);
         List<OperationalRecordSourceItem> parsed = [];
         int malformed = 0;
         foreach (JsonElement item in items.EnumerateArray())
         {
-            if (!TryValue(item, 0, out string? sourceId)
-                || !TryValue(item, 1, out string? orCode)
-                || !TryValue(item, 2, out string? encodedTitle)
-                || !TryValue(item, 3, out string? encodedDescription)
-                || !TryOptionalValue(item, 4, out string? requester))
+            if (!TryProjection(item, expectedKeys, out IReadOnlyList<string?> values)
+                || string.IsNullOrWhiteSpace(values[0])
+                || string.IsNullOrWhiteSpace(values[1])
+                || string.IsNullOrWhiteSpace(values[2])
+                || string.IsNullOrWhiteSpace(values[3]))
             {
                 malformed++;
                 continue;
             }
 
+            string sourceId = values[0]!;
+            string orCode = values[1]!;
+            string encodedTitle = values[2]!;
+            string encodedDescription = values[3]!;
+            string? requester = values[4];
             string title = WebUtility.HtmlDecode(encodedTitle!).Trim();
             string description = WebUtility.HtmlDecode(encodedDescription!).Trim();
             requester = string.IsNullOrWhiteSpace(requester) ? null : requester.Trim();
@@ -60,15 +71,16 @@ internal static class TuruncuHatQueryParser
         return new ParsedSourceRecords(unique, malformed);
     }
 
-    public static IReadOnlyList<string> ParseActivityIds(JsonElement root)
+    public static IReadOnlyList<string> ParseActivityIds(JsonElement root, IReadOnlyList<string> expectedKeys)
     {
         JsonElement items = GetItems(root);
         List<string> ids = [];
         foreach (JsonElement item in items.EnumerateArray())
         {
-            if (TryValue(item, 0, out string? id) && !string.IsNullOrWhiteSpace(id))
+            if (TryProjection(item, expectedKeys, out IReadOnlyList<string?> values)
+                && !string.IsNullOrWhiteSpace(values[0]))
             {
-                ids.Add(id.Trim());
+                ids.Add(values[0]!.Trim());
             }
         }
 
@@ -85,47 +97,103 @@ internal static class TuruncuHatQueryParser
             throw new InvalidDataException("Turuncu Hat query response did not match the reviewed contract.");
         }
 
+        int evidencedEnvelopePropertyCount = _envelopeProperties.Count(property =>
+            queryResult.TryGetProperty(property, out _));
+        if (evidencedEnvelopePropertyCount != 0 && evidencedEnvelopePropertyCount != _envelopeProperties.Length)
+        {
+            throw new InvalidDataException("Turuncu Hat query response contained an incomplete evidenced envelope.");
+        }
+
         return items;
     }
 
-    private static bool TryOptionalValue(JsonElement item, int index, out string? value)
+    private static bool TryProjection(
+        JsonElement item,
+        IReadOnlyList<string> expectedKeys,
+        out IReadOnlyList<string?> values)
     {
-        if (item.ValueKind != JsonValueKind.Array || item.GetArrayLength() <= index)
+        values = [];
+        if (item.ValueKind != JsonValueKind.Array || item.GetArrayLength() != expectedKeys.Count)
         {
-            value = null;
             return false;
         }
 
-        JsonElement cell = item[index];
-        if (cell.ValueKind != JsonValueKind.Array || cell.GetArrayLength() == 0)
+        List<(string? Key, string? Value)> cells = [];
+        foreach (JsonElement cell in item.EnumerateArray())
         {
-            value = null;
+            if (cell.ValueKind != JsonValueKind.Array || cell.GetArrayLength() > 1)
+            {
+                return false;
+            }
+
+            if (cell.GetArrayLength() == 0)
+            {
+                cells.Add((null, null));
+                continue;
+            }
+
+            JsonElement first = cell[0];
+            if (first.ValueKind != JsonValueKind.Object
+                || !first.TryGetProperty("Value", out JsonElement valueElement)
+                || !TryAsString(valueElement, out string? value))
+            {
+                return false;
+            }
+
+            string? key = first.TryGetProperty("Key", out JsonElement keyElement)
+                && keyElement.ValueKind == JsonValueKind.String
+                ? keyElement.GetString()
+                : null;
+            cells.Add((string.IsNullOrWhiteSpace(key) ? null : key, value));
+        }
+
+        int keyedCount = cells.Count(cell => cell.Key is not null);
+        if (keyedCount == 0)
+        {
+            values = cells.Select(cell => cell.Value).ToArray();
             return true;
         }
 
-        JsonElement first = cell[0];
-        if (first.ValueKind != JsonValueKind.Object || !first.TryGetProperty("Value", out JsonElement element))
+        if (keyedCount != expectedKeys.Count)
         {
-            value = null;
             return false;
         }
 
-        value = AsString(element);
+        Dictionary<string, string?> keyed = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((string? key, string? value) in cells)
+        {
+            if (!keyed.TryAdd(key!, value))
+            {
+                return false;
+            }
+        }
+
+        if (keyed.Count != expectedKeys.Count || expectedKeys.Any(key => !keyed.ContainsKey(key)))
+        {
+            return false;
+        }
+
+        values = expectedKeys.Select(key => keyed[key]).ToArray();
         return true;
     }
 
-    private static bool TryValue(JsonElement item, int index, out string? value) =>
-        TryOptionalValue(item, index, out value) && !string.IsNullOrWhiteSpace(value);
-
-    private static string? AsString(JsonElement element) => element.ValueKind switch
+    private static bool TryAsString(JsonElement element, out string? value)
     {
-        JsonValueKind.String => element.GetString(),
-        JsonValueKind.Number => element.GetRawText(),
-        JsonValueKind.True => "True",
-        JsonValueKind.False => "False",
-        JsonValueKind.Null => null,
-        _ => null
-    };
+        value = element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.GetRawText(),
+            JsonValueKind.True => "True",
+            JsonValueKind.False => "False",
+            JsonValueKind.Null => null,
+            _ => null
+        };
+        return element.ValueKind is JsonValueKind.String
+            or JsonValueKind.Number
+            or JsonValueKind.True
+            or JsonValueKind.False
+            or JsonValueKind.Null;
+    }
 
     private static HashSet<string> Duplicates(IEnumerable<string> values) => values
         .GroupBy(value => value, StringComparer.OrdinalIgnoreCase)

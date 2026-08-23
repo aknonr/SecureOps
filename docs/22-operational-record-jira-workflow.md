@@ -45,6 +45,8 @@ A source refresh may update bounded source fields, but classification is reappli
 - No password, token, authorization header, or raw remote response is stored or returned.
 - Requester resolution is exact only. Ambiguous matches always fail closed.
 - Unresolved requesters are blocked by default; `ProceedUnassigned` must be an explicit approved policy.
+- Jira assignment defaults to `ProjectDefault`. Only an exact deployment-verified SecureOps actor mapping may emit `assignee`; no AD inference or fuzzy match is permitted.
+- Jira `reporter` is never emitted because it is absent from the reviewed create metadata. The Basic-authenticated integration identity remains separate from the SecureOps actor and source requester.
 - Jira creation and retry require server-side capability policies.
 - The working exact AD/PAM-style identity lookup provider is unchanged.
 - Real source close/update is a state-changing external integration and remains configuration-disabled until the external TEST activation gate is approved.
@@ -84,12 +86,16 @@ Non-secret keys:
 - `Jira:IssueType`
 - `Jira:MappingVersion`
 - `Jira:UnresolvedRequesterPolicy` (`Block` or `ProceedUnassigned`)
+- `Jira:AuthenticationMode` (`Basic` for `Corporate`)
+- `Jira:AssignmentMode` (`ProjectDefault` or `VerifiedOperatorMapping`)
+- `Jira:OperatorAssigneeMappings:{n}:SecureOpsActor` and `JiraUsername`
+- `Jira:ReporterMode` (`ProjectDefault` only)
 - `Jira:SummaryMaxLength` (32-255)
 
 Local synthetic verification requires an allowed environment and explicit `Fake` providers. Real providers require every validated option in `docs/26-enterprise-turuncu-hat-jira-adapters.md`; unsupported or incomplete selection fails startup and never falls back to synthetic data.
 - `ConnectionStrings:SecureOpsDb` when SQL persistence is selected
 
-Integration authentication values are runtime-only server configuration. No credential value or authentication scheme is embedded in source because the sanitized evidence does not prove the scheme.
+Integration authentication values are runtime-only server configuration. Controlled Jira evidence proves Basic authentication; the complete Basic Authorization value remains secret and server-owned. Turuncu Hat authentication scheme remains unproven.
 
 ## TEST Validation
 

@@ -82,7 +82,9 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
             _activitySelects,
             "activity-query",
             cancellationToken);
-        IReadOnlyList<string> activityIds = TuruncuHatQueryParser.ParseActivityIds(activityResponse.RootElement);
+        IReadOnlyList<string> activityIds = TuruncuHatQueryParser.ParseActivityIds(
+            activityResponse.RootElement,
+            _activitySelects);
         if (activityIds.Count == 0)
         {
             throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordActivityNotFound, false);
@@ -114,7 +116,10 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         ParsedSourceRecords parsed;
         try
         {
-            parsed = TuruncuHatQueryParser.ParseSource(response.RootElement, _options.MaxDescriptionLength);
+            parsed = TuruncuHatQueryParser.ParseSource(
+                response.RootElement,
+                _options.MaxDescriptionLength,
+                _sourceSelects);
         }
         catch (Exception exception) when (exception is InvalidDataException or JsonException)
         {

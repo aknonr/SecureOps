@@ -20,7 +20,10 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
     }
 
     /// <inheritdoc />
-    public async Task<OperationalRecordResult<JiraIssueDraft>> BuildAsync(OperationalRecord record, CancellationToken cancellationToken)
+    public async Task<OperationalRecordResult<JiraIssueDraft>> BuildAsync(
+        OperationalRecord record,
+        string actor,
+        CancellationToken cancellationToken)
     {
         if (!record.JiraEligible || record.WorkflowState is OperationalRecordWorkflowState.NeedsManualReview or OperationalRecordWorkflowState.Imported or OperationalRecordWorkflowState.Classified)
         {
@@ -62,7 +65,11 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
         AppendReference(description, "Server", record.ServerReference);
         AppendReference(description, "Application", record.ApplicationReference);
 
-        string idempotencyKey = OperationalRecordIdempotency.Create(record.SourceRecordId, _options.MappingVersion);
+        string? assigneeUsername = ResolveAssignee(actor, warnings);
+        string idempotencyMapping = assigneeUsername is null
+            ? _options.MappingVersion
+            : $"{_options.MappingVersion}\nassignee:{assigneeUsername}";
+        string idempotencyKey = OperationalRecordIdempotency.Create(record.SourceRecordId, idempotencyMapping);
         return OperationalRecordResult<JiraIssueDraft>.Success(new JiraIssueDraft(
             record.Id,
             record.OrCode,
@@ -73,7 +80,26 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             requesterAccountId,
             _options.MappingVersion,
             idempotencyKey,
-            warnings));
+            warnings,
+            assigneeUsername));
+    }
+
+    private string? ResolveAssignee(string actor, ICollection<string> warnings)
+    {
+        if (!string.Equals(_options.AssignmentMode, "VerifiedOperatorMapping", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        JiraOperatorAssigneeMappingOptions? mapping = _options.OperatorAssigneeMappings.SingleOrDefault(candidate =>
+            string.Equals(candidate.SecureOpsActor, actor, StringComparison.OrdinalIgnoreCase));
+        if (mapping is null)
+        {
+            warnings.Add("Assignee uses the Jira project default because no verified exact operator mapping exists.");
+            return null;
+        }
+
+        return mapping.JiraUsername;
     }
 
     private static void AppendReference(StringBuilder builder, string label, string? value)

@@ -78,6 +78,8 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("Jira:UnresolvedRequesterPolicy must be Block or ProceedUnassigned.");
         }
 
+        ValidateJiraIdentityPolicies(jira);
+
         if (jira.SummaryMaxLength is < 32 or > 255)
         {
             throw new InvalidOperationException("Jira:SummaryMaxLength must be between 32 and 255.");
@@ -96,6 +98,11 @@ public static class OperationalRecordConfigurationValidator
         {
             ValidateHttpsBaseUrl(jira.BaseUrl, "Jira:BaseUrl");
             RequireSecret(jira.Authorization, "Jira:Authorization");
+            if (!string.Equals(jira.AuthenticationMode, "Basic", StringComparison.OrdinalIgnoreCase)
+                || !IsValidBasicAuthorization(jira.Authorization))
+            {
+                throw new InvalidOperationException("Corporate Jira requires the reviewed Jira:AuthenticationMode Basic and a runtime Basic Authorization value.");
+            }
             if (string.IsNullOrWhiteSpace(jira.ProjectKey)
                 || string.IsNullOrWhiteSpace(jira.IssueTypeId)
                 || string.IsNullOrWhiteSpace(jira.TeamCustomField)
@@ -115,6 +122,31 @@ public static class OperationalRecordConfigurationValidator
             {
                 throw new InvalidOperationException("Corporate Jira mapping configuration is incomplete or invalid.");
             }
+        }
+    }
+
+    private static void ValidateJiraIdentityPolicies(JiraIntegrationOptions options)
+    {
+        bool projectDefault = string.Equals(options.AssignmentMode, "ProjectDefault", StringComparison.OrdinalIgnoreCase);
+        bool verifiedMapping = string.Equals(options.AssignmentMode, "VerifiedOperatorMapping", StringComparison.OrdinalIgnoreCase);
+        if (!projectDefault && !verifiedMapping)
+        {
+            throw new InvalidOperationException("Jira:AssignmentMode must be ProjectDefault or VerifiedOperatorMapping.");
+        }
+
+        if (!string.Equals(options.ReporterMode, "ProjectDefault", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Jira:ReporterMode must be ProjectDefault because reporter is absent from the reviewed create metadata.");
+        }
+
+        JiraOperatorAssigneeMappingOptions[] mappings = options.OperatorAssigneeMappings ?? [];
+        if ((projectDefault && mappings.Length != 0)
+            || (verifiedMapping && mappings.Length == 0)
+            || mappings.Any(mapping => !IsSafeIdentity(mapping.SecureOpsActor) || !IsSafeIdentity(mapping.JiraUsername))
+            || mappings.GroupBy(mapping => mapping.SecureOpsActor, StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1))
+        {
+            throw new InvalidOperationException(
+                "Jira operator-assignee mappings must be empty for ProjectDefault, or non-empty, exact, bounded, and actor-unique for VerifiedOperatorMapping.");
         }
     }
 
@@ -179,6 +211,32 @@ public static class OperationalRecordConfigurationValidator
         !string.IsNullOrWhiteSpace(value)
         && value.Length <= 128
         && value.All(character => char.IsAsciiLetterOrDigit(character) || character == '_');
+
+    private static bool IsSafeIdentity(string value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && string.Equals(value, value.Trim(), StringComparison.Ordinal)
+        && value.Length <= 256
+        && !value.Any(char.IsControl);
+
+    private static bool IsValidBasicAuthorization(string value)
+    {
+        const string prefix = "Basic ";
+        if (!value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        ReadOnlySpan<char> encoded = value.AsSpan(prefix.Length).Trim();
+        Span<byte> decoded = stackalloc byte[3072];
+        if (encoded.IsEmpty
+            || !Convert.TryFromBase64Chars(encoded, decoded, out int bytesWritten))
+        {
+            return false;
+        }
+
+        int separator = decoded[..bytesWritten].IndexOf((byte)':');
+        return separator > 0 && separator < bytesWritten - 1;
+    }
 
     private static bool IsSyntheticEnvironment(string environmentName) =>
         string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase)

@@ -86,9 +86,13 @@ public sealed class EnterpriseAdapterContractTests
     public async Task SourceClient_ParsesReviewedProjection_AndHtmlDecodesText()
     {
         const string response = """
-            {"QueryResult":{"Items":[
-              [[{"Value":"1001"}],[{"Value":"OR-100"}],[{"Value":"Short &amp; safe"}],[{"Value":"Detail &lt;encoded&gt;"}],[{"Value":"Exact Requester"}]]
-            ]}}
+            {"QueryResult":{"ErrorDescription":"","ErrorDetails":"","ErrorNo":0,"TenantId":218,
+              "Items":[[[{"Key":"p_description","Value":"Detail &lt;encoded&gt;"}],
+                         [{"Key":"id","Value":"1001"}],
+                         [{"Key":"p_rel_requester","Value":"Exact Requester"}],
+                         [{"Key":"p_name","Value":"Short &amp; safe"}],
+                         [{"Key":"p_code","Value":"OR-100"}]]],
+              "MaxPages":1,"PageNo":1,"RecordCount":1}}
             """;
         ScriptedHandler handler = new(Response(HttpStatusCode.OK, response));
         TuruncuHatOperationalRecordClient client = SourceClient(handler);
@@ -135,6 +139,34 @@ public sealed class EnterpriseAdapterContractTests
         records.Should().ContainSingle().Which.OrCode.Should().Be("OR-100");
     }
 
+    [Fact]
+    public async Task SourceClient_KeyedProjection_RejectsUnexpectedOrDuplicateKeys()
+    {
+        const string response = """
+            {"QueryResult":{"Items":[
+              [[{"Key":"id","Value":"1001"}],[{"Key":"p_code","Value":"OR-100"}],[{"Key":"p_name","Value":"Title"}],[{"Key":"p_description","Value":"Description"}],[{"Key":"unexpected","Value":"Requester"}]],
+              [[{"Key":"id","Value":"1002"}],[{"Key":"p_code","Value":"OR-200"}],[{"Key":"p_name","Value":"Title"}],[{"Key":"p_name","Value":"Description"}],[{"Key":"p_rel_requester","Value":"Requester"}]]
+            ]}}
+            """;
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SourceClient_PartialEvidencedEnvelope_FailsClosed()
+    {
+        const string response = "{\"QueryResult\":{\"ErrorNo\":0,\"Items\":[]}}";
+
+        Func<Task> act = async () => await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        ExternalIntegrationException exception = (await act.Should().ThrowAsync<ExternalIntegrationException>()).Which;
+        exception.ErrorCode.Should().Be(OperationalErrorCodes.OperationalRecordQueryFailed);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -168,7 +200,7 @@ public sealed class EnterpriseAdapterContractTests
     [Fact]
     public async Task SourceClose_WithAmbiguousActivity_FailsWithoutUpdate()
     {
-        const string response = "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"1\"}]],[[{\"Value\":\"2\"}]]]}}";
+        const string response = "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"1\"}],[{\"Value\":\"ignored\"}]],[[{\"Value\":\"2\"}],[{\"Value\":\"ignored\"}]]]}}";
         ScriptedHandler handler = new(Response(HttpStatusCode.OK, response));
         TuruncuHatOperationalRecordClient client = SourceClient(handler);
 
@@ -182,7 +214,7 @@ public sealed class EnterpriseAdapterContractTests
     [Fact]
     public async Task SourceClose_WithDuplicateRowsForSameActivity_RemainsAmbiguous()
     {
-        const string response = "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"1\"}]],[[{\"Value\":\"1\"}]]]}}";
+        const string response = "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"1\"}],[{\"Value\":\"ignored\"}]],[[{\"Value\":\"1\"}],[{\"Value\":\"ignored\"}]]]}}";
         ScriptedHandler handler = new(Response(HttpStatusCode.OK, response));
         TuruncuHatOperationalRecordClient client = SourceClient(handler);
 
@@ -207,7 +239,7 @@ public sealed class EnterpriseAdapterContractTests
     public async Task SourceClose_ExplicitUpdateFailure_RemainsRetryableCloseOnlyFailure()
     {
         ScriptedHandler handler = new(
-            Response(HttpStatusCode.OK, "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"9001\"}]]]}}"),
+            Response(HttpStatusCode.OK, "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"9001\"}],[{\"Value\":\"ignored\"}]]]}}"),
             Response(HttpStatusCode.OK, "{\"UpdateResult\":{\"Success\":false}}"));
 
         Func<Task> act = () => SourceClient(handler).CloseAsync("1001", "OR-100", "SAFE-123", CancellationToken.None);
@@ -306,8 +338,32 @@ public sealed class EnterpriseAdapterContractTests
         result.IssueKey.Should().Be("SAFE-123");
         handler.Requests.Should().ContainSingle();
         handler.Requests[0].Path.Should().Be("/rest/api/2/issue");
-        handler.Requests[0].Body.Should().Contain("customfield_team").And.Contain("customfield_requester");
+        using var payload = JsonDocument.Parse(handler.Requests[0].Body);
+        JsonElement fields = payload.RootElement.GetProperty("fields");
+        fields.GetProperty("issuetype").GetProperty("id").GetString().Should().Be("3");
+        fields.GetProperty("customfield_12700").GetProperty("value").GetString().Should().Be("WASAS");
+        fields.GetProperty("customfield_11500")[0].GetProperty("name").GetString().Should().Be("exact.account");
+        fields.GetProperty("labels")[0].GetString().Should().Be("SunucuTalep");
+        fields.TryGetProperty("reporter", out _).Should().BeFalse();
+        fields.TryGetProperty("assignee", out _).Should().BeFalse();
         handler.Requests[0].Headers.Should().NotContainKey("Idempotency-Key");
+    }
+
+    [Fact]
+    public async Task JiraCreate_EmitsOnlyVerifiedExplicitAssignee_AndNeverReporter()
+    {
+        ScriptedHandler handler = new(Response(HttpStatusCode.Created, "{\"key\":\"SAFE-123\"}"));
+        CorporateJiraClient client = JiraClient(handler);
+        JiraIssueDraft draft = new(
+            Guid.NewGuid(), "OR-100", "SDM", "Task", "Summary", "Description",
+            null, "v1", new string('f', 64), [], "verified.operator");
+
+        _ = await client.CreateIssueAsync(draft, CancellationToken.None);
+
+        using var payload = JsonDocument.Parse(handler.Requests[0].Body);
+        JsonElement fields = payload.RootElement.GetProperty("fields");
+        fields.GetProperty("assignee").GetProperty("name").GetString().Should().Be("verified.operator");
+        fields.TryGetProperty("reporter", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -438,11 +494,11 @@ public sealed class EnterpriseAdapterContractTests
     {
         Authorization = "Sanitized runtime value",
         ProjectKey = "SAFE",
-        IssueTypeId = "10001",
-        TeamCustomField = "customfield_team",
-        TeamValue = "Safe Team",
-        RequesterWatcherCustomField = "customfield_requester",
-        Labels = ["safe-label"],
+        IssueTypeId = "3",
+        TeamCustomField = "customfield_12700",
+        TeamValue = "WASAS",
+        RequesterWatcherCustomField = "customfield_11500",
+        Labels = ["SunucuTalep"],
         UserSearchRetryDelayMilliseconds = 0
     };
 

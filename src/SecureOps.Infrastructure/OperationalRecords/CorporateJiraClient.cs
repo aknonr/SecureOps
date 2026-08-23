@@ -50,6 +50,10 @@ public sealed class CorporateJiraClient : IJiraClient
         {
             fields[_options.RequesterWatcherCustomField] = new[] { new { name = draft.RequesterAccountId } };
         }
+        if (!string.IsNullOrWhiteSpace(draft.AssigneeUsername))
+        {
+            fields["assignee"] = new { name = draft.AssigneeUsername };
+        }
 
         var stopwatch = Stopwatch.StartNew();
         using HttpRequestMessage request = new(HttpMethod.Post, "rest/api/2/issue")

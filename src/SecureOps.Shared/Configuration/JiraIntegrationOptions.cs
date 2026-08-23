@@ -15,6 +15,9 @@ public sealed class JiraIntegrationOptions
     /// <summary>Complete runtime Authorization header value; scheme remains deployment-owned.</summary>
     public string Authorization { get; set; } = string.Empty;
 
+    /// <summary>Reviewed Jira authentication scheme.</summary>
+    public string AuthenticationMode { get; set; } = "Basic";
+
     /// <summary>Configured Jira project key used in previews.</summary>
     public string ProjectKey { get; set; } = "TEST";
 
@@ -45,6 +48,15 @@ public sealed class JiraIntegrationOptions
     /// <summary>Configured requester/watcher custom-field key.</summary>
     public string RequesterWatcherCustomField { get; set; } = string.Empty;
 
+    /// <summary>Assignee policy: ProjectDefault or VerifiedOperatorMapping.</summary>
+    public string AssignmentMode { get; set; } = "ProjectDefault";
+
+    /// <summary>Exact deployment-owned SecureOps actor to Jira username mappings.</summary>
+    public JiraOperatorAssigneeMappingOptions[] OperatorAssigneeMappings { get; set; } = [];
+
+    /// <summary>Reporter policy. Only ProjectDefault is supported by the reviewed create metadata.</summary>
+    public string ReporterMode { get; set; } = "ProjectDefault";
+
     /// <summary>Configured issue labels.</summary>
     public string[] Labels { get; set; } = [];
 
@@ -62,4 +74,14 @@ public sealed class JiraIntegrationOptions
 
     /// <summary>Delay between retryable Jira user-search attempts.</summary>
     public int UserSearchRetryDelayMilliseconds { get; set; } = 500;
+}
+
+/// <summary>One exact, deployment-verified operator assignment mapping.</summary>
+public sealed class JiraOperatorAssigneeMappingOptions
+{
+    /// <summary>Exact authenticated SecureOps actor.</summary>
+    public string SecureOpsActor { get; set; } = string.Empty;
+
+    /// <summary>Exact Jira username verified by the deployment owner.</summary>
+    public string JiraUsername { get; set; } = string.Empty;
 }

@@ -93,7 +93,8 @@ public sealed class OperationalRecordsController : ControllerBase
             draft.RequesterAccountId,
             draft.MappingVersion,
             draft.IdempotencyKey,
-            draft.Warnings));
+            draft.Warnings,
+            draft.AssigneeUsername));
     }
 
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>

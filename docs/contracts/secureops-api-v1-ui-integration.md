@@ -55,7 +55,7 @@ Idle expiry, absolute expiry, explicit logout, administrative revocation, access
 |---|---|---|---|---|
 | `GET /api/v1/operational-records` | `OperationalRecords.View` | none | `OperationalRecordResponse[]` | `OperationalSourceUnavailable`, `OperationalRecordQueryFailed`, `AuditStoreUnavailable`, 429 |
 | `GET /api/v1/operational-records/{id}` | `OperationalRecords.View` | route GUID | `OperationalRecordResponse` including claim, freshness, retry, and version state | `OperationalRecordNotFound` |
-| `POST /api/v1/operational-records/{id}/jira-preview` | `OperationalRecords.CreateJiraPreview` | no body | `JiraPreviewResponse`; never creates Jira or closes source | record state/requester/Jira validation codes, 429 |
+| `POST /api/v1/operational-records/{id}/jira-preview` | `OperationalRecords.CreateJiraPreview` | no body | `JiraPreviewResponse`; optional `assigneeUsername` is the effective exact mapped assignee, otherwise null/project default; never creates Jira or closes source | record state/requester/Jira validation codes, 429 |
 | `POST /api/v1/operational-records/{id}/jira` | `OperationalRecords.CreateJira` | optional `Idempotency-Key` header, maximum configured length | `JiraTransferResponse` | `InvalidIdempotencyKey`, `OperationalRecordAlreadyClaimed`, `OperationalRecordChanged`, `OperationalRecordNoLongerOpen`, `WorkflowAlreadyInProgress`, `JiraCreateFailed` |
 | `POST /api/v1/operational-records/{id}/retry` | `OperationalRecords.Retry` | optional `Idempotency-Key` header | resumed `JiraTransferResponse` | `WorkflowAlreadyCompleted`, conflict/freshness/Jira/source-close codes |
 
