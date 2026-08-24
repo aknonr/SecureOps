@@ -59,4 +59,11 @@ public sealed class ActiveDirectoryDirectoryGroupProvider : IDirectoryGroupProvi
         int resultLimit,
         CancellationToken cancellationToken) =>
         _client.GetDirectMembersAsync(normalizedGroup, offset, pageSize, resultLimit, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersForAnalysisAsync(
+        string normalizedGroup,
+        int maxResults,
+        CancellationToken cancellationToken) =>
+        _client.GetDirectMembersForAnalysisAsync(normalizedGroup, maxResults, cancellationToken);
 }

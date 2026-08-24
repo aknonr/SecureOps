@@ -58,7 +58,7 @@ Canonical wording:
 - Wildcards, comma/semicolon-separated lists, whitespace-separated lists, LDAP filters, and raw distinguished names are rejected.
 - Returned fields are limited to display name, account name, UPN, mail, department, title, manager display name, enabled/locked state, and source.
 - Group membership, SID, distinguished name, phone, address, password metadata, and raw LDAP attributes are not returned.
-- Audit stores query metadata and matched account identifier only; it does not store returned personal detail fields.
+- Audit stores target hash/length, optional purpose hash/length, and outcome metadata only; it does not store raw target or returned personal detail fields.
 - `POST /api/v1/identity/lookup` is the only endpoint that accepts an account value. Account values are never accepted in URL paths or query strings.
 - If audit writing is unavailable, lookup fails closed before AD/PAM provider access.
 - Provider implementations repeat max-length and exact-input validation even after controller/service validation.
@@ -127,7 +127,7 @@ The future UI calls these Phase 1A endpoints:
 - Confirm non-development Swagger requires authentication.
 - Confirm TeamLead/Admin users can call `POST /api/v1/identity/lookup`.
 - Confirm Operator-only and Auditor-only users cannot call lookup.
-- Confirm invalid wildcard, bulk, LDAP-filter-like, raw DN, too-long, and empty-purpose inputs return 400 and are audited as `IdentityLookupRejected`.
+- Confirm invalid wildcard, bulk, LDAP-filter-like, raw DN, too-long account input, and unsafe supplied purpose return 400 and are audited as `IdentityLookupRejected`; omitted/blank purpose remains valid.
 - Confirm audit store outage returns `AuditUnavailable` before AD access.
 - Confirm AD timeout returns `DirectoryProviderTimeout` and is audited as `IdentityLookupProviderTimeout`.
 - Confirm health endpoints do not disclose connection strings, file paths, real accounts, or personal details.

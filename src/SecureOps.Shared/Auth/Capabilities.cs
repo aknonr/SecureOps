@@ -13,6 +13,8 @@ public static class Capabilities
     public const string DirectoryGroupMembersView = "Identity.Groups.Members.View";
     /// <summary>View configured privileged-group membership evidence.</summary>
     public const string DirectoryPrivilegedGroupsView = "Identity.PrivilegedGroups.View";
+    /// <summary>Export bounded exact-group membership evidence.</summary>
+    public const string DirectoryGroupExport = "Identity.Groups.Export";
     /// <summary>View approved team metadata.</summary>
     public const string TeamView = "TeamView";
     /// <summary>View operational audit evidence.</summary>

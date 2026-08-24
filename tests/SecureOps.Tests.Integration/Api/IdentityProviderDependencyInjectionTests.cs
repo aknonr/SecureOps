@@ -77,7 +77,7 @@ public sealed class IdentityProviderDependencyInjectionTests
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
             "/api/v1/identity/lookup",
-            new { account = "pam12356", purpose = "Approved operational lookup" });
+            new { account = "pam12356" });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         IdentityLookupResponse? result = await response.Content.ReadFromJsonAsync<IdentityLookupResponse>();

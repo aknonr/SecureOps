@@ -58,6 +58,10 @@ public static class AuditActions
     public const string DirectoryGroupQueryForbidden = "DirectoryGroupQueryForbidden";
     /// <summary>A Directory Explorer request was rejected by its actor-and-operation rate limit.</summary>
     public const string DirectoryGroupQueryRateLimited = "DirectoryGroupQueryRateLimited";
+    /// <summary>A bounded group analysis reached a terminal outcome.</summary>
+    public const string DirectoryGroupAnalysisCompleted = "DirectoryGroupAnalysisCompleted";
+    /// <summary>An authorized bounded group membership export was produced.</summary>
+    public const string DirectoryGroupMembershipExported = "DirectoryGroupMembershipExported";
 
     /// <summary>
     /// API or UI authorization denied a request.

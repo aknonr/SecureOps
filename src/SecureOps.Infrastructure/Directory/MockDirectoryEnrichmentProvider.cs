@@ -10,7 +10,10 @@ public sealed class MockDirectoryEnrichmentProvider : IDirectoryEnrichmentProvid
     private static readonly IReadOnlyDictionary<string, string[]> _directGroups =
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
-            ["pam12356"] = ["ops-read", "dist-universal"],
+            ["pam12356"] = ["primary-domain-users", "ops-read", "dist-universal"],
+            ["normal.user"] = ["primary-domain-users", "ops-read"],
+            ["pam.zero"] = ["primary-domain-users", "ops-read"],
+            ["service.zero"] = ["primary-domain-users", "ops-read"],
             ["zero.groups"] = []
         };
     private static readonly IReadOnlyDictionary<string, string[]> _parents =
@@ -43,9 +46,8 @@ public sealed class MockDirectoryEnrichmentProvider : IDirectoryEnrichmentProvid
             return Task.FromResult<DirectoryPrincipalEnrichmentRecord?>(null);
         }
 
-        string[] allSpns = account == "pam12356"
-            ? ["HTTP/sample-app.example.invalid", "MSSQLSvc/sample-db.example.invalid:1433"]
-            : [];
+        string[] allSpns = [];
+        bool passwordNeverExpires = account == "service.zero";
         DirectoryPrincipalEnrichmentRecord record = new(
             "S-1-5-21-2001",
             "Sample Operations Account",
@@ -54,7 +56,7 @@ public sealed class MockDirectoryEnrichmentProvider : IDirectoryEnrichmentProvid
             true,
             false,
             new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero),
-            false,
+            passwordNeverExpires,
             null,
             false,
             new DateTimeOffset(2026, 8, 20, 0, 0, 0, TimeSpan.Zero),
@@ -133,7 +135,8 @@ public sealed class MockDirectoryEnrichmentProvider : IDirectoryEnrichmentProvid
             ["dist-universal"] = Group(1002, "Operations Announcements", "dist-universal", "Distribution", "Universal"),
             ["nested-ops"] = Group(1003, "Nested Operations", "nested-ops"),
             ["platform-privileged"] = Group(1004, "Sample Privileged Tier", "platform-privileged"),
-            ["unrelated-group"] = Group(1005, "Unrelated Group", "unrelated-group")
+            ["unrelated-group"] = Group(1005, "Unrelated Group", "unrelated-group"),
+            ["primary-domain-users"] = Group(513, "Primary Domain Users", "primary-domain-users", membershipKind: "Primary")
         };
 
     private static DirectoryGroupRecord Group(
@@ -141,12 +144,14 @@ public sealed class MockDirectoryEnrichmentProvider : IDirectoryEnrichmentProvid
         string name,
         string account,
         string category = "Security",
-        string scope = "Global") => new(
+        string scope = "Global",
+        string? membershipKind = null) => new(
             $"S-1-5-21-{sid}",
             name,
             account,
             $"CN={name},OU=Groups,DC=example,DC=invalid",
             null,
             category,
-            scope);
+            scope,
+            MembershipKind: membershipKind);
 }

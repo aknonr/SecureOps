@@ -173,6 +173,11 @@ public sealed class IdentityController : ControllerBase
                 : AuditUnavailable(correlationId);
         }
 
+        request = request with
+        {
+            Purpose = string.IsNullOrWhiteSpace(request.Purpose) ? null : request.Purpose.Trim()
+        };
+
         IdentityLookupExecutionContext context = new(
             User.Identity?.Name ?? "unknown",
             HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -226,10 +231,17 @@ public sealed class IdentityController : ControllerBase
         CancellationToken cancellationToken)
     {
         string correlationId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
-        if (request?.Accounts is null || request.Accounts.Count == 0 || request.Accounts.Count > _options.BulkMaxAccounts || string.IsNullOrWhiteSpace(request.Purpose))
+        if (request?.Accounts is null || request.Accounts.Count == 0 || request.Accounts.Count > _options.BulkMaxAccounts
+            || (request.Purpose?.Trim().Length ?? 0) > 500
+            || (!string.IsNullOrWhiteSpace(request.Purpose) && request.Purpose.Any(char.IsControl)))
         {
             return OperationalProblemDetails.Create(StatusCodes.Status400BadRequest, "InvalidIdentityInput", "The bulk identity lookup request was rejected.", correlationId, "validation", false);
         }
+
+        request = request with
+        {
+            Purpose = string.IsNullOrWhiteSpace(request.Purpose) ? null : request.Purpose.Trim()
+        };
 
         List<(string Input, string? Normalized, string? Error)> accounts = [];
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
@@ -301,8 +313,9 @@ public sealed class IdentityController : ControllerBase
                         accountProvided = !string.IsNullOrWhiteSpace(request?.Account),
                         accountLength = request?.Account?.Trim().Length,
                         accountInputHash = AuditAccountHasher.HashAccountInput(request?.Account),
-                        purpose = request?.Purpose,
-                        turuncuhatEvtId = request?.TuruncuhatEvtId,
+                        purposeHash = AuditAccountHasher.HashAccountInput(request?.Purpose),
+                        purposeLength = request?.Purpose?.Trim().Length,
+                        legacyEventReferencesProvided = request?.AlertId is not null || !string.IsNullOrWhiteSpace(request?.TuruncuhatEvtId),
                         resultStatus = "Rejected",
                         errorCode,
                         rejectedFields
@@ -333,7 +346,14 @@ public sealed class IdentityController : ControllerBase
                 AlertId = request.AlertId,
                 CorrelationId = correlationId,
                 SourceIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
-                Details = new { accountCount, request.Purpose, request.TuruncuhatEvtId, resultSummary }
+                Details = new
+                {
+                    accountCount,
+                    purposeHash = AuditAccountHasher.HashAccountInput(request.Purpose),
+                    purposeLength = request.Purpose?.Length,
+                    legacyEventReferencesProvided = request.AlertId is not null || !string.IsNullOrWhiteSpace(request.TuruncuhatEvtId),
+                    resultSummary
+                }
             }, cancellationToken);
             return true;
         }
@@ -351,11 +371,6 @@ public sealed class IdentityController : ControllerBase
 
     private static string ResolveValidationErrorCode(IReadOnlyCollection<string> rejectedFields)
     {
-        if (rejectedFields.Contains(nameof(IdentityLookupRequest.Purpose), StringComparer.Ordinal))
-        {
-            return "PurposeRequired";
-        }
-
         if (rejectedFields.Contains(nameof(IdentityLookupRequest.Account), StringComparer.Ordinal))
         {
             return "EmptyAccount";

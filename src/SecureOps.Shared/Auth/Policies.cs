@@ -15,6 +15,8 @@ public static class Policies
     public const string CanViewDirectoryGroupMembers = "CanViewDirectoryGroupMembers";
     /// <summary>Capability policy for configured privileged-group evidence.</summary>
     public const string CanViewDirectoryPrivilegedGroups = "CanViewDirectoryPrivilegedGroups";
+    /// <summary>Capability policy for bounded group membership export.</summary>
+    public const string CanExportDirectoryGroups = "CanExportDirectoryGroups";
     /// <summary>Capability policy for team metadata.</summary>
     public const string CanTeamView = "CanTeamView";
     /// <summary>Capability policy for access administration.</summary>

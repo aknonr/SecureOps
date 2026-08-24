@@ -19,14 +19,17 @@ public sealed class DirectoryController : ControllerBase
 {
     private readonly IDirectoryGroupQueryService _service;
     private readonly IDirectoryEnrichmentQueryService _enrichmentService;
+    private readonly IDirectoryGroupAnalysisService _analysisService;
 
     /// <summary>Initializes the controller.</summary>
     public DirectoryController(
         IDirectoryGroupQueryService service,
-        IDirectoryEnrichmentQueryService enrichmentService)
+        IDirectoryEnrichmentQueryService enrichmentService,
+        IDirectoryGroupAnalysisService analysisService)
     {
         _service = service;
         _enrichmentService = enrichmentService;
+        _analysisService = analysisService;
     }
 
     /// <summary>Returns one exact principal's direct group memberships.</summary>
@@ -190,6 +193,49 @@ public sealed class DirectoryController : ControllerBase
         return Map(result, "The exact directory principal was not found.");
     }
 
+    /// <summary>Returns bounded direct, effective, topology, and parent evidence for one exact group.</summary>
+    [HttpPost("groups/analysis")]
+    [Authorize(Policy = Policies.CanViewDirectoryGroupMembers)]
+    [EnableRateLimiting(ApiRateLimits.DirectoryGroupAnalysis)]
+    [ProducesResponseType(typeof(DirectoryGroupAnalysisResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<DirectoryGroupAnalysisResponse>> AnalyzeGroupAsync(
+        [FromBody] DirectoryGroupAnalysisRequest? request,
+        CancellationToken cancellationToken)
+    {
+        DirectoryQueryResult<DirectoryGroupAnalysisResponse> result = await _analysisService.AnalyzeAsync(
+            request ?? new DirectoryGroupAnalysisRequest(null), Context(), cancellationToken);
+        return Map(result, "The exact directory group was not found.");
+    }
+
+    /// <summary>Exports one complete bounded membership view as formula-safe CSV.</summary>
+    [HttpPost("groups/export")]
+    [Authorize(Policy = Policies.CanExportDirectoryGroups)]
+    [EnableRateLimiting(ApiRateLimits.DirectoryGroupExport)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> ExportGroupAsync(
+        [FromBody] DirectoryGroupExportRequest? request,
+        CancellationToken cancellationToken)
+    {
+        DirectoryQueryResult<DirectoryGroupExportResult> result = await _analysisService.ExportAsync(
+            request ?? new DirectoryGroupExportRequest(null, null, null), Context(), cancellationToken);
+        if (result.Status == DirectoryQueryStatus.Success && result.Value is not null)
+        {
+            return File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
+        }
+
+        return Map(result, "The exact directory group was not found.").Result!;
+    }
+
     private DirectoryQueryExecutionContext Context() => new(
         User.Identity?.Name ?? "unknown",
         HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -200,7 +246,15 @@ public sealed class DirectoryController : ControllerBase
         DirectoryQueryStatus.Success => Ok(result.Value),
         DirectoryQueryStatus.NotFound => Problem(StatusCodes.Status404NotFound, result.ErrorCode!, notFoundDetail, "provider", false),
         DirectoryQueryStatus.Invalid => Problem(StatusCodes.Status400BadRequest, OperationalErrorCodes.DirectoryInvalidInput, "The exact directory request was rejected.", "validation", false),
-        DirectoryQueryStatus.LimitExceeded => Problem(StatusCodes.Status422UnprocessableEntity, OperationalErrorCodes.DirectoryQueryLimitExceeded, "The bounded directory query exceeded its server-side result ceiling.", "provider", false),
+        DirectoryQueryStatus.LimitExceeded => Problem(
+            StatusCodes.Status422UnprocessableEntity,
+            result.ErrorCode ?? OperationalErrorCodes.DirectoryQueryLimitExceeded,
+            result.ErrorCode == OperationalErrorCodes.DirectoryTraversalPartial
+                ? "The bounded directory traversal returned explicit partial evidence."
+                : "The bounded directory query exceeded its server-side result ceiling.",
+            "provider",
+            false),
+        DirectoryQueryStatus.ProviderTimeout => Problem(StatusCodes.Status503ServiceUnavailable, OperationalErrorCodes.DirectoryProviderTimeout, "The directory provider timed out.", "provider", true),
         DirectoryQueryStatus.AuditUnavailable => Problem(StatusCodes.Status503ServiceUnavailable, OperationalErrorCodes.AuditStoreUnavailable, "Required audit storage is unavailable.", "audit", true),
         _ => Problem(StatusCodes.Status503ServiceUnavailable, OperationalErrorCodes.DirectoryProviderUnavailable, "The directory provider is unavailable.", "provider", true)
     };

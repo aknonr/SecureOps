@@ -35,6 +35,7 @@ public static class SecureOpsAuthorization
             AddCapability(options, Policies.CanViewDirectoryGroups, Capabilities.DirectoryGroupsView);
             AddCapability(options, Policies.CanViewDirectoryGroupMembers, Capabilities.DirectoryGroupMembersView);
             AddCapability(options, Policies.CanViewDirectoryPrivilegedGroups, Capabilities.DirectoryPrivilegedGroupsView);
+            AddCapability(options, Policies.CanExportDirectoryGroups, Capabilities.DirectoryGroupExport);
             AddCapability(options, Policies.CanTeamView, Capabilities.TeamView);
             AddCapability(options, Policies.CanAccessAdministration, Capabilities.AccessManageUsers);
             AddCapability(options, Policies.CanSystemDiagnostics, Capabilities.SystemDiagnostics);

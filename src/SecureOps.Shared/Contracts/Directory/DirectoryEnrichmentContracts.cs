@@ -70,9 +70,10 @@ public sealed record DirectoryServiceEvidenceResponse(
     DateTimeOffset? PasswordLastSetUtc,
     int? PasswordAgeDays,
     string AccountTypeEvidence,
-    int DirectGroupCount,
-    int TransitiveGroupCount,
-    DirectoryTraversalMetadataDto Traversal);
+    int? DirectGroupCount,
+    int? TransitiveGroupCount,
+    DirectoryTraversalMetadataDto? Traversal,
+    bool MembershipEvidenceAvailable);
 
 /// <summary>Evidence for one exact server-configured privileged group.</summary>
 public sealed record DirectoryPrivilegedMembershipDto(

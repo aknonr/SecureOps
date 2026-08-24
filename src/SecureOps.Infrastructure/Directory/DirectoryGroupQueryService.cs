@@ -95,7 +95,7 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
             string? continuation = providerPage.HasMore
                 ? _tokens.Create(PrincipalGroupsOperation, normalized.NormalizedAccount, page.Value.Offset + items.Length)
                 : null;
-            DirectoryGroupPageResponse response = new(items, page.Value.PageSize, continuation);
+            DirectoryGroupPageResponse response = new(items, page.Value.PageSize, continuation, !providerPage.IsPartial);
             return await CompleteSuccessAsync(response, PrincipalGroupsOperation, normalized.NormalizedAccount, purpose,
                 stopwatch.Elapsed, page.Value, items.Length, context, cancellationToken);
         }
@@ -251,14 +251,19 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
         DirectoryQueryExecutionContext context, CancellationToken cancellationToken)
     {
         bool limit = exception is DirectoryQueryLimitExceededException;
-        string errorCode = limit ? OperationalErrorCodes.DirectoryQueryLimitExceeded : OperationalErrorCodes.DirectoryProviderUnavailable;
+        bool timeout = exception is TimeoutException;
+        string errorCode = limit
+            ? OperationalErrorCodes.DirectoryQueryLimitExceeded
+            : timeout ? OperationalErrorCodes.DirectoryProviderTimeout : OperationalErrorCodes.DirectoryProviderUnavailable;
         bool audited = await AuditAsync(AuditActions.DirectoryGroupQueryFailed, operation, target, purpose,
-            limit ? "LimitExceeded" : "ProviderUnavailable", duration.TotalMilliseconds,
+            limit ? "LimitExceeded" : timeout ? "ProviderTimeout" : "ProviderUnavailable", duration.TotalMilliseconds,
             page.PageSize == 0 ? null : page.PageSize, 0, page.Offset > 0, context, cancellationToken);
         _logger.LogWarning("Directory query failed safely. Operation: {Operation}. ErrorCode: {ErrorCode}. CorrelationId: {CorrelationId}",
             operation, errorCode, context.CorrelationId);
         return audited
-            ? DirectoryQueryResult<T>.Failure(limit ? DirectoryQueryStatus.LimitExceeded : DirectoryQueryStatus.ProviderUnavailable, errorCode)
+            ? DirectoryQueryResult<T>.Failure(
+                limit ? DirectoryQueryStatus.LimitExceeded : timeout ? DirectoryQueryStatus.ProviderTimeout : DirectoryQueryStatus.ProviderUnavailable,
+                errorCode)
             : AuditUnavailable<T>();
     }
 
@@ -309,11 +314,12 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
 
     private static DirectoryGroupSummaryDto MapGroupSummary(DirectoryGroupRecord group) => new(
         group.StableIdentifier, group.Name, group.SamAccountName, group.DistinguishedName,
-        group.Description, group.Category, group.Scope);
+        group.Description, group.Category, group.Scope, group.MembershipKind);
 
     private static DirectoryGroupDetailDto MapGroupDetail(DirectoryGroupRecord group) => new(
         group.StableIdentifier, group.Name, group.SamAccountName, group.DistinguishedName,
-        group.Description, group.Category, group.Scope, group.ManagedBy, group.DirectMemberCount);
+        group.Description, group.Category, group.Scope, group.ManagedBy, group.DirectMemberCount,
+        group.ManagedByDisplayName, group.CreatedAtUtc, group.ChangedAtUtc);
 
     private static DirectoryMemberDto MapMember(DirectoryMemberRecord member) => new(
         member.StableIdentifier, member.Name, member.SamAccountName, member.DistinguishedName, member.MemberType);

@@ -14,4 +14,8 @@ public interface IActiveDirectoryGroupClient
     /// <summary>Returns one exact group's direct members.</summary>
     public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersAsync(
         string group, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken);
+    /// <summary>Returns bounded explicit member links for recursive analysis.</summary>
+    public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersForAnalysisAsync(
+        string group, int maxResults, CancellationToken cancellationToken) =>
+        GetDirectMembersAsync(group, 0, maxResults, maxResults + 1, cancellationToken);
 }

@@ -201,7 +201,9 @@ public sealed class DirectoryExplorerHostedTests
 
         openApi.Should().Contain("/api/v1/directory/principals/groups")
             .And.Contain("/api/v1/directory/groups/lookup")
-            .And.Contain("/api/v1/directory/groups/members");
+            .And.Contain("/api/v1/directory/groups/members")
+            .And.Contain("/api/v1/directory/groups/analysis")
+            .And.Contain("/api/v1/directory/groups/export");
     }
 
     private const string Purpose = "Approved synthetic directory verification";

@@ -85,6 +85,8 @@ public static class DependencyInjection
         services.AddScoped<IDirectoryGroupQueryService, DirectoryGroupQueryService>();
         services.AddScoped<DirectoryMembershipGraphBuilder>();
         services.AddScoped<IDirectoryEnrichmentQueryService, DirectoryEnrichmentQueryService>();
+        services.AddScoped<DirectoryGroupAnalysisBuilder>();
+        services.AddScoped<IDirectoryGroupAnalysisService, DirectoryGroupAnalysisService>();
 
         string? identityProvider = configuration[$"{IdentityLookupOptions.SectionName}:Provider"];
         if (string.Equals(identityProvider, "ActiveDirectory", StringComparison.OrdinalIgnoreCase))

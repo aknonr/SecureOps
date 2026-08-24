@@ -12,7 +12,9 @@ internal static class DirectoryRateLimitAudit
         ApiRateLimits.DirectoryGroupQuery,
         ApiRateLimits.DirectoryGroupMembers,
         ApiRateLimits.DirectoryEnrichment,
-        ApiRateLimits.DirectoryPrivilegedGroups
+        ApiRateLimits.DirectoryPrivilegedGroups,
+        ApiRateLimits.DirectoryGroupAnalysis,
+        ApiRateLimits.DirectoryGroupExport
     ];
 
     /// <summary>Writes a best-effort event after the request has already been safely rejected.</summary>

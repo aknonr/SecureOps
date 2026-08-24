@@ -246,17 +246,8 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            (DirectoryPrincipalEnrichmentRecord? principal, DirectoryMembershipGraph? graph) = await WithTraversalTimeoutAsync(
-                async token =>
-                {
-                    DirectoryPrincipalEnrichmentRecord? record = await GetPrincipalAsync(
-                        input.Value.Account, _options.MaxSpnsPerPrincipal, request.Refresh, token);
-                    DirectoryMembershipGraph? membershipGraph = record is null
-                        ? null
-                        : await GetGraphAsync(input.Value.Account, request.Refresh, token);
-                    return (record, membershipGraph);
-                },
-                cancellationToken);
+            DirectoryPrincipalEnrichmentRecord? principal = await GetPrincipalAsync(
+                input.Value.Account, _options.MaxSpnsPerPrincipal, request.Refresh, cancellationToken);
             if (principal is null)
             {
                 return await NotFoundAsync<DirectoryServiceEvidenceResponse>(
@@ -265,12 +256,22 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
                     QueryMetrics.Empty, context, cancellationToken);
             }
 
-            if (graph is null)
+            DirectoryMembershipGraph? graph = null;
+            try
             {
-                throw new DirectoryProviderUnavailableException();
+                graph = await WithTraversalTimeoutAsync(
+                    token => GetGraphAsync(input.Value.Account, request.Refresh, token),
+                    cancellationToken);
+            }
+            catch (Exception exception) when (IsExpectedProviderFailure(exception))
+            {
+                _logger.LogWarning(
+                    "Directory membership evidence was unavailable while principal evidence succeeded. Operation: {Operation}. CorrelationId: {CorrelationId}",
+                    ServiceEvidenceOperation,
+                    context.CorrelationId);
             }
 
-            DirectoryPrincipalMembershipsResponse memberships = Memberships(graph);
+            DirectoryPrincipalMembershipsResponse? memberships = graph is null ? null : Memberships(graph);
             DirectoryServiceEvidenceResponse response = new(
                 principal.ServicePrincipalNames,
                 principal.ServicePrincipalNameCount,
@@ -280,12 +281,18 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
                 principal.PasswordLastSetUtc,
                 PasswordAgeDays(principal.PasswordLastSetUtc),
                 principal.AccountTypeEvidence,
-                memberships.DirectGroups.Count,
-                memberships.TransitiveGroups.Count,
-                MapTraversal(graph.Traversal));
+                memberships?.DirectGroups.Count,
+                memberships?.TransitiveGroups.Count,
+                graph is null ? null : MapTraversal(graph.Traversal),
+                graph is not null);
             return await SuccessAsync(response, ServiceEvidenceOperation, input.Value.Account, null, purpose,
-                stopwatch.Elapsed, Metrics(graph, response.DirectGroupCount, response.TransitiveGroupCount, 1),
-                context, cancellationToken);
+                stopwatch.Elapsed,
+                graph is null
+                    ? QueryMetrics.Empty with { ResultCount = 1, Truncated = true }
+                    : Metrics(graph, response.DirectGroupCount!.Value, response.TransitiveGroupCount!.Value, 1),
+                context,
+                cancellationToken,
+                graph is null ? "SucceededPartial" : "Succeeded");
         }
         catch (Exception exception) when (IsExpectedProviderFailure(exception))
         {
@@ -496,7 +503,8 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         group.DistinguishedName,
         group.Description,
         group.Category,
-        group.Scope);
+        group.Scope,
+        group.MembershipKind);
 
     private static DirectoryTraversalMetadataDto MapTraversal(DirectoryTraversalState traversal) => new(
         traversal.NodesVisited,
@@ -572,7 +580,8 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         TimeSpan duration,
         QueryMetrics metrics,
         DirectoryQueryExecutionContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string outcome = "Succeeded")
     {
         bool audited = await AuditAsync(
             AuditActions.DirectoryGroupQueryCompleted,
@@ -580,7 +589,7 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
             target,
             secondaryTarget,
             purpose,
-            "Succeeded",
+            outcome,
             duration,
             metrics,
             context,
@@ -627,16 +636,17 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         CancellationToken cancellationToken)
     {
         bool limit = exception is DirectoryQueryLimitExceededException;
+        bool timeout = exception is TimeoutException;
         string errorCode = limit
             ? OperationalErrorCodes.DirectoryQueryLimitExceeded
-            : OperationalErrorCodes.DirectoryProviderUnavailable;
+            : timeout ? OperationalErrorCodes.DirectoryProviderTimeout : OperationalErrorCodes.DirectoryProviderUnavailable;
         bool audited = await AuditAsync(
             AuditActions.DirectoryGroupQueryFailed,
             operation,
             target,
             secondaryTarget,
             purpose,
-            limit ? "LimitExceeded" : "ProviderUnavailable",
+            limit ? "LimitExceeded" : timeout ? "ProviderTimeout" : "ProviderUnavailable",
             duration,
             metrics,
             context,
@@ -648,7 +658,7 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
             context.CorrelationId);
         return audited
             ? DirectoryQueryResult<T>.Failure(
-                limit ? DirectoryQueryStatus.LimitExceeded : DirectoryQueryStatus.ProviderUnavailable,
+                limit ? DirectoryQueryStatus.LimitExceeded : timeout ? DirectoryQueryStatus.ProviderTimeout : DirectoryQueryStatus.ProviderUnavailable,
                 errorCode)
             : AuditUnavailable<T>();
     }

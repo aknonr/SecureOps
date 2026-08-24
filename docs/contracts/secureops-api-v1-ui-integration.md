@@ -40,14 +40,14 @@ Idle expiry, absolute expiry, explicit logout, administrative revocation, access
 |---|---|---|---|---|
 | `GET /api/v1/identity/me` | Authenticated | none | current caller metadata | 401 |
 | `GET /api/v1/identity/lookup/capabilities` | `Identity.Lookup` | none | validation limits, returned fields, and effective active-provider `supportsUpnLookup` | `AccessPending`, `AccessDisabled`, `AccessDenied` |
-| `POST /api/v1/identity/lookup` | `Identity.Lookup` | `{ "account": "sample.user", "purpose": "Approved operational purpose", "alertId": null, "turuncuhatEvtId": null }` | `IdentityLookupResponse` | `InvalidIdentityInput`, `IdentityNotFound`, `IdentityProviderTimeout`, `IdentityProviderUnavailable`, `AuditStoreUnavailable` |
-| `POST /api/v1/identity/bulk-lookup` | `Identity.Lookup` | same purpose plus `accounts` array, maximum configured count | ordered `BulkIdentityLookupResponse` | `InvalidIdentityInput`, 429 |
+| `POST /api/v1/identity/lookup` | `Identity.Lookup` | `{ "account": "sample.user", "purpose": null }`; purpose is optional; legacy `alertId`/`turuncuhatEvtId` are deprecated and optional | `IdentityLookupResponse` | `InvalidIdentityInput`, `IdentityNotFound`, `IdentityProviderTimeout`, `IdentityProviderUnavailable`, `AuditStoreUnavailable` |
+| `POST /api/v1/identity/bulk-lookup` | `Identity.Lookup` | `accounts` array plus optional purpose, maximum configured count | ordered `BulkIdentityLookupResponse` | `InvalidIdentityInput`, 429 |
 | `GET /api/v1/identity/lookup/cache-diagnostics` | `SystemDiagnostics` | none | aggregate counters without account labels | 403 |
 | `GET /api/v1/health/identity-provider` | Authenticated outside Development | none | provider name and real-provider flag | 401 |
 
 ## Directory Explorer
 
-Phase 1 routes remain unchanged. Phase 2 requests are exact-only POST bodies with `account`, required operational `purpose`, and optional `refresh`; membership-path requests also require `targetGroup`. Negative membership-path results are conclusive only when traversal metadata reports no limit or truncation.
+Phase 1 routes remain unchanged. Directory requests are exact-only POST bodies with `account` or `group`, optional `purpose`, and optional `refresh`; membership-path requests also require `targetGroup`. Negative membership-path results are conclusive only when traversal metadata reports no limit or truncation.
 
 | Method and route | Capability | Success |
 |---|---|---|
@@ -59,8 +59,10 @@ Phase 1 routes remain unchanged. Phase 2 requests are exact-only POST bodies wit
 | `POST /api/v1/directory/principals/account-health` | `Identity.Groups.View` | nullable health evidence; `lastLogonTimestampUtc` is approximate |
 | `POST /api/v1/directory/principals/service-evidence` | `Identity.Groups.View` | bounded SPNs, account-type evidence, and membership counts |
 | `POST /api/v1/directory/principals/privileged-memberships` | `Identity.PrivilegedGroups.View` | Admin-only evidence for exact server-configured groups |
+| `POST /api/v1/directory/groups/analysis` | `Identity.Groups.Members.View` | overview, explicit direct members, nested groups, bounded effective members/topology, direct/transitive parents, completeness metadata |
+| `POST /api/v1/directory/groups/export` | `Identity.Groups.Export` | Admin-only bounded formula-safe CSV for explicit direct or effective members |
 
-The API does not classify service/PAM accounts from names, infer administrator status from group text, expose LDAP filters/cookies, or use returned directory data as application authorization. Common failures are `DirectoryInvalidInput`, `DirectoryPrincipalNotFound`, `DirectoryGroupNotFound`, `DirectoryQueryLimitExceeded`, `DirectoryProviderUnavailable`, and `AuditStoreUnavailable`.
+The API does not classify service/PAM accounts from names, infer administrator status from group text, expose LDAP filters/cookies, or use returned directory data as application authorization. Zero SPNs is successful empty evidence. Primary membership is separate from explicit direct membership, and group member lists state that primary-group-only relationships are not included. Common failures are `DirectoryInvalidInput`, `DirectoryPrincipalNotFound`, `DirectoryGroupNotFound`, `DirectoryQueryLimitExceeded`, `DirectoryTraversalPartial`, `DirectoryProviderTimeout`, `DirectoryProviderUnavailable`, and `AuditStoreUnavailable`.
 
 ## Operational Records
 

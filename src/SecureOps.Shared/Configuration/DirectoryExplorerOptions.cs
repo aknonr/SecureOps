@@ -32,6 +32,10 @@ public sealed class DirectoryExplorerOptions
     public int MaxMembershipPaths { get; set; } = 5;
     /// <summary>Maximum service principal names returned for one principal.</summary>
     public int MaxSpnsPerPrincipal { get; set; } = 50;
+    /// <summary>Maximum effective leaf principals returned by group analysis.</summary>
+    public int MaxEffectiveMembers { get; set; } = 250;
+    /// <summary>Maximum rows emitted by one membership export.</summary>
+    public int MaxExportRows { get; set; } = 500;
     /// <summary>Maximum configured exact privileged-group identifiers.</summary>
     public int MaxPrivilegedGroupIdentifiers { get; set; } = 32;
     /// <summary>Server-owned exact SID, sAMAccountName, or group-name identifiers.</summary>

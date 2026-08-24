@@ -37,6 +37,8 @@ public static class DirectoryExplorerConfigurationValidator
             || options.MaxTraversalNodes is < 1 or > 5000
             || options.MaxTraversalEdges is < 1 or > 10_000
             || options.MaxTraversalDepth > options.MaxTraversalNodes
+            || options.MaxEffectiveMembers is < 1 or > 5000
+            || options.MaxExportRows is < 1 or > 5000
             || options.MaxMembershipPaths is < 1 or > 20
             || options.MaxSpnsPerPrincipal is < 1 or > 500
             || options.MaxPrivilegedGroupIdentifiers is < 1 or > 128)

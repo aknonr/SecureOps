@@ -2,6 +2,7 @@
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Globalization;
+using System.Security.Principal;
 
 namespace SecureOps.Infrastructure.DirectoryExplorer;
 
@@ -98,9 +99,14 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
     {
         using PrincipalContext context = CreateContext();
         using var user = UserPrincipal.FindByIdentity(context, identityType, value);
-        return user is null || !ExactUser(user, value, identityType)
-            ? null
-            : BoundedParentGroups(user, maxResults, cancellationToken);
+        if (user is null || !ExactUser(user, value, identityType))
+        {
+            return null;
+        }
+
+        PrincipalMembershipSet memberships = ReadPrincipalMemberships(
+            context, user, maxResults, cancellationToken);
+        return new DirectoryProviderPage<DirectoryGroupRecord>(memberships.Groups, false, memberships.IsPartial);
     }
 
     private DirectoryGroupRecord? FindEnrichmentGroupRecord(string value)
@@ -125,32 +131,145 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
         int maxResults,
         CancellationToken cancellationToken)
     {
-        using PrincipalSearchResult<Principal> parents = principal.GetGroups();
+        PrincipalContext context = principal.Context;
+        using var entry = principal.GetUnderlyingObject() as DirectoryEntry;
         List<DirectoryGroupRecord> records = [];
         bool hasMore = false;
-        foreach (Principal parent in parents)
+        bool partial = false;
+        int resolutionFailures = 0;
+        foreach (string distinguishedName in Values(entry, "memberOf"))
         {
-            using (parent)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (records.Count >= maxResults)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (parent is not GroupPrincipal group)
-                {
-                    continue;
-                }
-
-                if (records.Count >= maxResults)
-                {
-                    hasMore = true;
-                    break;
-                }
-
-                records.Add(MapGroup(group));
+                hasMore = true;
+                break;
             }
+
+            using GroupPrincipal? group = FindGroupByDistinguishedName(context, distinguishedName);
+            if (group is null)
+            {
+                partial = true;
+                resolutionFailures++;
+                continue;
+            }
+
+            records.Add(MapGroup(group, "Direct"));
+        }
+
+        if (resolutionFailures > 0 && records.Count == 0)
+        {
+            throw new DirectoryProviderUnavailableException();
         }
 
         return new DirectoryProviderPage<DirectoryGroupRecord>(
             records.OrderBy(DirectoryMembershipGraph.GroupKey, StringComparer.Ordinal).ToArray(),
-            hasMore);
+            hasMore,
+            partial);
+    }
+
+    private static PrincipalMembershipSet ReadPrincipalMemberships(
+        PrincipalContext context,
+        UserPrincipal user,
+        int maxResults,
+        CancellationToken cancellationToken)
+    {
+        using var entry = user.GetUnderlyingObject() as DirectoryEntry;
+        var records = new Dictionary<string, DirectoryGroupRecord>(StringComparer.OrdinalIgnoreCase);
+        bool partial = false;
+        int resolutionFailures = 0;
+
+        GroupPrincipal? primaryGroup = FindPrimaryGroup(context, entry);
+        if (primaryGroup is not null)
+        {
+            using (primaryGroup)
+            {
+                DirectoryGroupRecord record = MapGroup(primaryGroup, "Primary");
+                string? key = DirectoryMembershipGraph.GroupKey(record);
+                if (key is not null)
+                {
+                    records[key] = record;
+                }
+            }
+        }
+        else if (entry?.Properties["primaryGroupID"]?.Value is not null)
+        {
+            partial = true;
+            resolutionFailures++;
+        }
+
+        foreach (string distinguishedName in Values(entry, "memberOf"))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (records.Count >= maxResults)
+            {
+                partial = true;
+                break;
+            }
+
+            using GroupPrincipal? group = FindGroupByDistinguishedName(context, distinguishedName);
+            if (group is null)
+            {
+                partial = true;
+                resolutionFailures++;
+                continue;
+            }
+
+            DirectoryGroupRecord record = MapGroup(group, "Direct");
+            string? key = DirectoryMembershipGraph.GroupKey(record);
+            if (key is not null && !records.ContainsKey(key))
+            {
+                records[key] = record;
+            }
+        }
+
+        if (resolutionFailures > 0 && records.Count == 0)
+        {
+            throw new DirectoryProviderUnavailableException();
+        }
+
+        return new PrincipalMembershipSet(
+            records.Values.OrderBy(DirectoryMembershipGraph.GroupKey, StringComparer.Ordinal).ToList(),
+            partial);
+    }
+
+    private static GroupPrincipal? FindGroupByDistinguishedName(PrincipalContext context, string distinguishedName)
+    {
+        var group = GroupPrincipal.FindByIdentity(
+            context, IdentityType.DistinguishedName, distinguishedName);
+        if (group is not null
+            && string.Equals(group.DistinguishedName, distinguishedName, StringComparison.OrdinalIgnoreCase))
+        {
+            return group;
+        }
+
+        group?.Dispose();
+        return null;
+    }
+
+    private static GroupPrincipal? FindPrimaryGroup(PrincipalContext context, DirectoryEntry? entry)
+    {
+        if (entry?.Properties["objectSid"]?.Value is not byte[] objectSid
+            || entry.Properties["primaryGroupID"]?.Value is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var principalSid = new SecurityIdentifier(objectSid, 0);
+            SecurityIdentifier? domainSid = principalSid.AccountDomainSid;
+            int primaryGroupRid = Convert.ToInt32(
+                entry.Properties["primaryGroupID"].Value, CultureInfo.InvariantCulture);
+            return domainSid is null
+                ? null
+                : GroupPrincipal.FindByIdentity(
+                    context, IdentityType.Sid, $"{domainSid.Value}-{primaryGroupRid}");
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException or InvalidCastException or OverflowException)
+        {
+            return null;
+        }
     }
 
     private static GroupPrincipal? FindExactEnrichmentGroup(PrincipalContext context, string value)
@@ -257,5 +376,7 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
             ? "ManagedServiceAccount"
             : "User";
     }
+
+    private sealed record PrincipalMembershipSet(List<DirectoryGroupRecord> Groups, bool IsPartial);
 }
 #pragma warning restore CA1416

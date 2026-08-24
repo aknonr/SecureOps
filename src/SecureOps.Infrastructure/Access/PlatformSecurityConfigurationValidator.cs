@@ -90,7 +90,7 @@ public static class PlatformSecurityConfigurationValidator
             throw new InvalidOperationException("CommandIdempotency settings are outside safe bounds.");
         }
 
-        foreach (OperationRateLimitOptions policy in new[] { rateLimits.IdentityLookup, rateLimits.BulkIdentityLookup, rateLimits.DirectoryGroupQuery, rateLimits.DirectoryGroupMembers, rateLimits.DirectoryEnrichment, rateLimits.DirectoryPrivilegedGroups, rateLimits.OperationalRecordRefresh, rateLimits.JiraPreview, rateLimits.JiraCreate, rateLimits.WorkflowRetry })
+        foreach (OperationRateLimitOptions policy in new[] { rateLimits.IdentityLookup, rateLimits.BulkIdentityLookup, rateLimits.DirectoryGroupQuery, rateLimits.DirectoryGroupMembers, rateLimits.DirectoryEnrichment, rateLimits.DirectoryPrivilegedGroups, rateLimits.DirectoryGroupAnalysis, rateLimits.DirectoryGroupExport, rateLimits.OperationalRecordRefresh, rateLimits.JiraPreview, rateLimits.JiraCreate, rateLimits.WorkflowRetry })
         {
             if (policy.PermitLimit is < 1 or > 1000 || policy.WindowSeconds is < 1 or > 3600)
             {

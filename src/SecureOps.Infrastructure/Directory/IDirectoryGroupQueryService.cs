@@ -30,6 +30,8 @@ public enum DirectoryQueryStatus
     Invalid,
     /// <summary>Provider was unavailable or timed out.</summary>
     ProviderUnavailable,
+    /// <summary>The provider exceeded its configured timeout.</summary>
+    ProviderTimeout,
     /// <summary>Provider result ceiling was exceeded.</summary>
     LimitExceeded,
     /// <summary>Required audit could not be persisted.</summary>

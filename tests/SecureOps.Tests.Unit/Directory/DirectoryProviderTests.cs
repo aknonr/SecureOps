@@ -17,7 +17,8 @@ public sealed class DirectoryProviderTests
         DirectoryProviderPage<DirectoryGroupRecord>? result = await provider.GetPrincipalDirectGroupsAsync(
             account, 0, 10, 100, CancellationToken.None);
 
-        result!.Items.Should().HaveCount(2);
+        result!.Items.Should().HaveCount(3);
+        result.Items.Should().ContainSingle(group => group.MembershipKind == "Primary");
         result.Items.Should().OnlyContain(group => group.Category == "Security" || group.Category == "Distribution");
     }
 
