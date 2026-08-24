@@ -189,7 +189,7 @@ public sealed class DirectoryApiClientTests
         new([], Traversal());
 
     private static DirectoryServiceEvidenceResponse ServiceEvidence() =>
-        new([], 0, false, null, null, null, null, "User", 0, 0, Traversal());
+        new([], 0, false, null, null, null, null, "User", 0, 0, Traversal(), MembershipEvidenceAvailable: true);
 
     private static DirectoryTraversalMetadataDto Traversal() =>
         new(0, 0, 0, false, false, false, false, false, false);

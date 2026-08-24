@@ -76,8 +76,10 @@ public sealed class DirectoryEnrichmentProviderTests
             direct!.Items.Single(item => item.SamAccountName == "ops-read"), 10, CancellationToken.None);
 
         principal!.Enabled.Should().BeTrue();
-        principal.ServicePrincipalNames.Should().ContainSingle();
-        principal.ServicePrincipalNamesTruncated.Should().BeTrue();
+        principal.ServicePrincipalNames.Should().BeEmpty();
+        principal.ServicePrincipalNameCount.Should().Be(0);
+        principal.ServicePrincipalNamesTruncated.Should().BeFalse();
+        direct.Items.Should().ContainSingle(item => item.MembershipKind == "Primary");
         parents!.Items.Should().ContainSingle(item => item.SamAccountName == "nested-ops");
     }
 

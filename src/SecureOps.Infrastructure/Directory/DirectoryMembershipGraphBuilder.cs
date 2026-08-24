@@ -44,7 +44,7 @@ public sealed class DirectoryMembershipGraphBuilder
         bool depthLimitReached = false;
         bool nodeLimitReached = false;
         bool edgeLimitReached = false;
-        bool providerLimitReached = directPage.HasMore;
+        bool providerLimitReached = directPage.HasMore || directPage.IsPartial;
 
         foreach (DirectoryGroupRecord group in Order(directPage.Items))
         {
@@ -101,7 +101,7 @@ public sealed class DirectoryMembershipGraphBuilder
                 throw new DirectoryProviderUnavailableException();
             }
 
-            providerLimitReached |= parentPage.HasMore;
+            providerLimitReached |= parentPage.HasMore || parentPage.IsPartial;
             foreach (DirectoryGroupRecord parent in Order(parentPage.Items))
             {
                 cancellationToken.ThrowIfCancellationRequested();

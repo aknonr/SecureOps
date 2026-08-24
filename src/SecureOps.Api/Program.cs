@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using SecureOps.Api.Middleware;
+using SecureOps.Api.OpenApi;
 using SecureOps.Api.Security;
 using SecureOps.Api.Services;
 using SecureOps.Api.Validation;
@@ -88,6 +89,8 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(ApiRateLimits.DirectoryGroupMembers, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryGroupMembers, configuredRateLimits.DirectoryGroupMembers));
     options.AddPolicy(ApiRateLimits.DirectoryEnrichment, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryEnrichment, configuredRateLimits.DirectoryEnrichment));
     options.AddPolicy(ApiRateLimits.DirectoryPrivilegedGroups, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryPrivilegedGroups, configuredRateLimits.DirectoryPrivilegedGroups));
+    options.AddPolicy(ApiRateLimits.DirectoryGroupAnalysis, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryGroupAnalysis, configuredRateLimits.DirectoryGroupAnalysis));
+    options.AddPolicy(ApiRateLimits.DirectoryGroupExport, context => ApiRateLimits.Partition(context, ApiRateLimits.DirectoryGroupExport, configuredRateLimits.DirectoryGroupExport));
     options.AddPolicy(ApiRateLimits.OperationalRecordRefresh, context => ApiRateLimits.Partition(context, ApiRateLimits.OperationalRecordRefresh, configuredRateLimits.OperationalRecordRefresh));
     options.AddPolicy(ApiRateLimits.JiraPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraPreview, configuredRateLimits.JiraPreview));
     options.AddPolicy(ApiRateLimits.JiraCreate, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraCreate, configuredRateLimits.JiraCreate));
@@ -99,6 +102,7 @@ builder.Services.AddScoped<IValidator<IdentityLookupRequest>, IdentityLookupRequ
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.SchemaFilter<LegacyIdentityEventReferenceSchemaFilter>();
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "SecureOps API",

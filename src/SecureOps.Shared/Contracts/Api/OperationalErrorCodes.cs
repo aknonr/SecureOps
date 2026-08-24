@@ -25,6 +25,10 @@ public static class OperationalErrorCodes
     public const string DirectoryInvalidInput = "DirectoryInvalidInput";
     /// <summary>The configured directory provider was unavailable.</summary>
     public const string DirectoryProviderUnavailable = "DirectoryProviderUnavailable";
+    /// <summary>The configured directory provider timed out.</summary>
+    public const string DirectoryProviderTimeout = "DirectoryProviderTimeout";
+    /// <summary>A bounded directory traversal returned explicit partial evidence.</summary>
+    public const string DirectoryTraversalPartial = "DirectoryTraversalPartial";
     /// <summary>A bounded directory query exceeded its server-side ceiling.</summary>
     public const string DirectoryQueryLimitExceeded = "DirectoryQueryLimitExceeded";
     /// <summary>The required audit store is unavailable.</summary>

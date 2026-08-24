@@ -18,6 +18,10 @@ public static class ApiRateLimits
     public const string DirectoryEnrichment = "DirectoryEnrichment";
     /// <summary>Separately authorized privileged-group analysis.</summary>
     public const string DirectoryPrivilegedGroups = "DirectoryPrivilegedGroups";
+    /// <summary>Bounded nested and parent group analysis.</summary>
+    public const string DirectoryGroupAnalysis = "DirectoryGroupAnalysis";
+    /// <summary>Authorized bounded group membership export.</summary>
+    public const string DirectoryGroupExport = "DirectoryGroupExport";
     /// <summary>Operational-record source refresh.</summary>
     public const string OperationalRecordRefresh = "OperationalRecordRefresh";
     /// <summary>Read-only Jira preview.</summary>

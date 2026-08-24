@@ -134,22 +134,22 @@ Each action defines its own `Details` shape:
 { "turuncuhatEvtId": "EVT-54321", "actionTaken": true }
 
 // IdentityLookupRequested
-{ "normalizedAccount": "sample-admin", "accountInputHash": "<sha256>", "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Requested" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": null, "purposeLength": null, "legacyEventReferencesProvided": false, "resultStatus": "Requested" }
 
 // IdentityLookupSucceeded
-{ "normalizedAccount": "sample-admin", "matchedAccount": "sample-admin", "accountInputHash": "<sha256>", "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Succeeded" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": "<sha256-or-null>", "purposeLength": 18, "legacyEventReferencesProvided": false, "resultStatus": "Succeeded" }
 
 // IdentityLookupNotFound
-{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "NotFound" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": null, "purposeLength": null, "resultStatus": "NotFound" }
 
 // IdentityLookupRejected
-{ "normalizedAccount": null, "accountProvided": true, "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Rejected", "rejectedFields": ["Account"] }
+{ "normalizedAccount": null, "accountProvided": true, "accountLength": 12, "accountInputHash": "<sha256>", "purposeHash": null, "purposeLength": null, "legacyEventReferencesProvided": false, "resultStatus": "Rejected", "rejectedFields": ["Account"] }
 
 // IdentityLookupFailed
-{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Failed", "errorCode": "ProviderUnavailable" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": null, "purposeLength": null, "resultStatus": "Failed", "errorCode": "ProviderUnavailable" }
 
 // IdentityLookupProviderTimeout
-{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "ProviderTimeout", "errorCode": "DirectoryProviderTimeout" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": null, "purposeLength": null, "resultStatus": "ProviderTimeout", "errorCode": "DirectoryProviderTimeout" }
 
 // IdentityLookupForbidden
 { "endpoint": "/api/v1/identity/lookup", "method": "POST", "statusCode": 403, "resultStatus": "Forbidden" }
@@ -160,7 +160,7 @@ Each action defines its own `Details` shape:
 
 Document each shape in `contracts/schemas/audit-event.schema.json`.
 
-Identity lookup audit details must not store returned personal detail fields such as display name, mail, department, title, manager display name, group membership, SID, DN, phone, address, password metadata, or raw LDAP attributes. Store the normalized account, matched account identifier, account input hash/length, purpose/context, correlation ID, source IP, and outcome metadata only. Rejected suspicious input should not store raw account text.
+Identity and directory audit details must not store returned personal detail fields such as display name, mail, department, title, manager display name, group membership, SID, DN, phone, address, password metadata, SPNs, or raw LDAP attributes. Store target hash/length, optional purpose hash/length, correlation ID, source IP, operation, counts/limits, and outcome metadata only. Rejected suspicious input must not store raw account text. Group export audit stores mode, format, row count, target hash, and outcome, never exported rows.
 
 ## Audit Persistence Providers
 

@@ -15,4 +15,8 @@ public interface IDirectoryGroupProvider
     /// <summary>Returns one exact group's direct members or null when the group is unknown.</summary>
     public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersAsync(
         string normalizedGroup, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken);
+    /// <summary>Returns a bounded first page for recursive server-side analysis.</summary>
+    public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersForAnalysisAsync(
+        string normalizedGroup, int maxResults, CancellationToken cancellationToken) =>
+        GetDirectMembersAsync(normalizedGroup, 0, maxResults, maxResults + 1, cancellationToken);
 }

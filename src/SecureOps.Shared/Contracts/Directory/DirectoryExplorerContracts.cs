@@ -27,7 +27,8 @@ public sealed record DirectoryGroupSummaryDto(
     string? DistinguishedName,
     string? Description,
     string Category,
-    string Scope);
+    string Scope,
+    string? MembershipKind = null);
 
 /// <summary>Safe exact group metadata.</summary>
 public sealed record DirectoryGroupDetailDto(
@@ -39,7 +40,10 @@ public sealed record DirectoryGroupDetailDto(
     string Category,
     string Scope,
     string? ManagedBy,
-    int? DirectMemberCount);
+    int? DirectMemberCount,
+    string? ManagedByDisplayName = null,
+    DateTimeOffset? CreatedAtUtc = null,
+    DateTimeOffset? ChangedAtUtc = null);
 
 /// <summary>Safe direct member projection.</summary>
 public sealed record DirectoryMemberDto(
@@ -53,7 +57,8 @@ public sealed record DirectoryMemberDto(
 public sealed record DirectoryGroupPageResponse(
     IReadOnlyList<DirectoryGroupSummaryDto> Items,
     int PageSize,
-    string? ContinuationToken);
+    string? ContinuationToken,
+    bool IsComplete = true);
 
 /// <summary>Exact group metadata response.</summary>
 public sealed record DirectoryGroupDetailResponse(DirectoryGroupDetailDto Group);
@@ -62,4 +67,6 @@ public sealed record DirectoryGroupDetailResponse(DirectoryGroupDetailDto Group)
 public sealed record DirectoryMemberPageResponse(
     IReadOnlyList<DirectoryMemberDto> Items,
     int PageSize,
-    string? ContinuationToken);
+    string? ContinuationToken,
+    bool IncludesPrimaryGroupMembers = false,
+    string MembershipSemantics = "ExplicitMemberLinks");

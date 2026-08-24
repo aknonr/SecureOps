@@ -283,8 +283,9 @@ public sealed class IdentityLookupService : IIdentityLookupService
                     {
                         accountInputHash = AuditAccountHasher.HashAccountInput(request.Account),
                         accountLength = request.Account?.Trim().Length,
-                        request.Purpose,
-                        request.TuruncuhatEvtId,
+                        purposeHash = AuditAccountHasher.HashAccountInput(request.Purpose),
+                        purposeLength = request.Purpose?.Length,
+                        legacyEventReferencesProvided = request.AlertId is not null || !string.IsNullOrWhiteSpace(request.TuruncuhatEvtId),
                         resultStatus = ToResultStatus(action),
                         errorCode
                     }

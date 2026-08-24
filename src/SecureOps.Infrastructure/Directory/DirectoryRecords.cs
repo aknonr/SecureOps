@@ -10,7 +10,11 @@ public sealed record DirectoryGroupRecord(
     string Category,
     string Scope,
     string? ManagedBy = null,
-    int? DirectMemberCount = null);
+    int? DirectMemberCount = null,
+    string? ManagedByDisplayName = null,
+    DateTimeOffset? CreatedAtUtc = null,
+    DateTimeOffset? ChangedAtUtc = null,
+    string? MembershipKind = null);
 
 /// <summary>Provider-neutral safe direct member record.</summary>
 public sealed record DirectoryMemberRecord(
@@ -40,7 +44,7 @@ public sealed record DirectoryPrincipalEnrichmentRecord(
     string AccountTypeEvidence);
 
 /// <summary>One bounded provider page.</summary>
-public sealed record DirectoryProviderPage<T>(IReadOnlyList<T> Items, bool HasMore);
+public sealed record DirectoryProviderPage<T>(IReadOnlyList<T> Items, bool HasMore, bool IsPartial = false);
 
 /// <summary>Safe provider result-limit failure.</summary>
 public sealed class DirectoryQueryLimitExceededException : Exception

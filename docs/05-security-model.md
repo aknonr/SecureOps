@@ -11,7 +11,7 @@ Security is the defining constraint of this project. This document is the canoni
 | Webhook spoofing | Medium | Medium | HMAC-signed payloads, source IP allowlist |
 | Audit tampering | High | Low | Append-only triggers, separate DB role for audit writes |
 | Privilege escalation through UI | High | Low | Server-side authorization on every endpoint |
-| Identity lookup misuse as people search | Medium | Medium | TeamLead/Admin only; exact lookup only; purpose required; all lookups audited |
+| Identity lookup misuse as people search | Medium | Medium | TeamLead/Admin only; exact lookup only; bounded rate; all requests/outcomes audited with target hash |
 | Leakage of internal data via AI (Phase 7) | High | Medium | Self-hosted only + mandatory masking |
 | Misuse as employee surveillance | Medium | Medium | UI framing, role separation, audit of audit queries |
 
@@ -117,7 +117,7 @@ Forbidden:
 - Wildcard, bulk, fuzzy, or directory-browsing search.
 - Returning group membership, SID, distinguished name, phone, address, password metadata, or raw LDAP attributes.
 
-Every lookup requires a purpose/context value and writes audit entries for request and outcome. Audit details must not store returned personal-detail fields beyond the matched account identifier.
+Every lookup writes audit entries for request and outcome. Purpose/context is optional for read-only identity and directory lookup; supplied text is represented only by hash and length, and no default reason is fabricated. Audit details must not store returned personal-detail fields or raw directory targets.
 
 Production hardening:
 - `POST /api/v1/identity/lookup` is the only endpoint that accepts an account value. The API must not add `GET` lookup routes by account because account values would leak into URLs, browser history, proxy logs, and IIS access logs.

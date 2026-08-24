@@ -11,11 +11,11 @@ ADR-0013 exposes exact principal direct groups, exact group metadata, and bounde
 
 - Keep all Phase 1 routes and semantics unchanged. Phase 2 uses new POST contracts under `/api/v1/directory` so identifiers remain out of URLs.
 - Extend the existing process-identity AccountManagement client architecture with provider-neutral enrichment primitives. Do not accept LDAP credentials, filters, distinguished names, wildcards, or partial search input.
-- Model direct membership as one directory edge. Model transitive membership as groups reachable through two or more edges. A group reached both ways appears only in `directGroups`; `alsoTransitivelyReachable` records the additional evidence.
+- Model explicit direct membership as one `memberOf` edge, primary membership as a distinct `primaryGroupID` relationship, and transitive membership as groups reachable through two or more proven parent edges. A group reached both directly and transitively appears only in `directGroups`; `alsoTransitivelyReachable` records the additional evidence.
 - Build a deterministic directed graph from exact directory relationships. Bound total depth, unique nodes, unique edges, total traversal time, and returned paths. Detect cycles and duplicate edges. Return explicit limit metadata instead of silently presenting a complete graph.
 - Return a bounded deterministic set of shortest-first simple membership paths. A path is reported only when every edge was returned by the directory provider.
 - Treat `lastLogonTimestamp` as approximate. Return nullable health fields when AD cannot prove a value. Derive `mustChangePassword` only from an available `pwdLastSet` value.
-- Expose SPNs and account-type evidence without guessing that a naming pattern makes an account a service or PAM account.
+- Expose SPNs and account-type evidence without guessing that a naming pattern makes an account a service or PAM account. Zero SPNs is a successful empty read. Principal/SPN success is not invalidated by an independent membership-graph failure.
 - Protect privileged-group analysis with `Identity.PrivilegedGroups.View`, assigned to Admin only. Monitored groups are exact server-owned identifiers; names are never hard-coded in source.
 - Reuse the bounded Directory Explorer cache/single-flight and audit action family. Optional bounded purpose is not a cache or rate-limit key and is audited only by hash and length. Audit counts, duration, operation, outcome, and limit state, never membership graphs, SPNs, raw DNs, credentials, or personal profile payloads.
 - Keep directory data live/provider-backed. Add no SQL migration; management reporting continues to aggregate existing Directory Explorer terminal audit actions.

@@ -34,6 +34,11 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryGroupCl
         string group, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) =>
         RunAsync(() => GetMembers(group, offset, pageSize, resultLimit, cancellationToken), cancellationToken);
 
+    /// <inheritdoc />
+    public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersForAnalysisAsync(
+        string group, int maxResults, CancellationToken cancellationToken) =>
+        RunAsync(() => GetMembersForAnalysis(group, maxResults, cancellationToken), cancellationToken);
+
     private DirectoryProviderPage<DirectoryGroupRecord>? GetPrincipalGroups(
         string value,
         IdentityType identityType,
@@ -49,21 +54,9 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryGroupCl
             return null;
         }
 
-        using PrincipalSearchResult<Principal> groups = user.GetGroups();
-        List<DirectoryGroupRecord> records = [];
-        foreach (Principal principal in groups)
-        {
-            using (principal)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (principal is GroupPrincipal group)
-                {
-                    AddBounded(records, MapGroup(group), resultLimit);
-                }
-            }
-        }
-
-        return Page(records, offset, pageSize);
+        PrincipalMembershipSet memberships = ReadPrincipalMemberships(
+            context, user, resultLimit, cancellationToken);
+        return Page(memberships.Groups, offset, pageSize, memberships.IsPartial);
     }
 
     private DirectoryGroupRecord? FindGroupRecord(string value)
@@ -100,6 +93,38 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryGroupCl
         return Page(records, offset, pageSize);
     }
 
+    private DirectoryProviderPage<DirectoryMemberRecord>? GetMembersForAnalysis(
+        string value,
+        int maxResults,
+        CancellationToken cancellationToken)
+    {
+        using PrincipalContext context = CreateContext();
+        using GroupPrincipal? group = FindExactGroup(context, value);
+        if (group is null)
+        {
+            return null;
+        }
+
+        List<DirectoryMemberRecord> records = [];
+        bool hasMore = false;
+        foreach (Principal principal in group.Members)
+        {
+            using (principal)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (records.Count >= maxResults)
+                {
+                    hasMore = true;
+                    break;
+                }
+
+                records.Add(MapMember(principal));
+            }
+        }
+
+        return Page(records, 0, maxResults) with { HasMore = hasMore };
+    }
+
     private PrincipalContext CreateContext() => string.IsNullOrWhiteSpace(_options.Container)
         ? new PrincipalContext(ContextType.Domain, _options.DomainName)
         : new PrincipalContext(ContextType.Domain, _options.DomainName, _options.Container);
@@ -132,18 +157,23 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryGroupCl
         string.Equals(group.SamAccountName, value, StringComparison.OrdinalIgnoreCase)
         || string.Equals(group.Name, value, StringComparison.OrdinalIgnoreCase);
 
-    private static DirectoryGroupRecord MapGroup(GroupPrincipal group)
+    private static DirectoryGroupRecord MapGroup(GroupPrincipal group, string? membershipKind = null)
     {
-        var entry = group.GetUnderlyingObject() as DirectoryEntry;
+        using var entry = group.GetUnderlyingObject() as DirectoryEntry;
+        string? managedBy = Property(entry, "managedBy");
         return new DirectoryGroupRecord(
-            group.Sid?.Value,
-            group.Name,
-            group.SamAccountName,
-            group.DistinguishedName,
-            group.Description,
-            group.IsSecurityGroup == true ? "Security" : group.IsSecurityGroup == false ? "Distribution" : "Unknown",
-            Scope(group.GroupScope),
-            Property(entry, "managedBy"));
+            StableIdentifier: group.Sid?.Value,
+            Name: group.Name,
+            SamAccountName: group.SamAccountName,
+            DistinguishedName: group.DistinguishedName,
+            Description: group.Description,
+            Category: group.IsSecurityGroup == true ? "Security" : group.IsSecurityGroup == false ? "Distribution" : "Unknown",
+            Scope: Scope(group.GroupScope),
+            ManagedBy: managedBy,
+            ManagedByDisplayName: ManagedByDisplayName(managedBy),
+            CreatedAtUtc: DateTimeProperty(entry, "whenCreated"),
+            ChangedAtUtc: DateTimeProperty(entry, "whenChanged"),
+            MembershipKind: membershipKind);
     }
 
     private static DirectoryMemberRecord MapMember(Principal principal) => new(
@@ -180,7 +210,7 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryGroupCl
         records.Add(record);
     }
 
-    private static DirectoryProviderPage<T> Page<T>(List<T> records, int offset, int pageSize)
+    private static DirectoryProviderPage<T> Page<T>(List<T> records, int offset, int pageSize, bool isPartial = false)
     {
         IEnumerable<T> ordered = typeof(T) == typeof(DirectoryGroupRecord)
             ? records.Cast<DirectoryGroupRecord>()
@@ -194,7 +224,35 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryGroupCl
                 .ThenBy(item => item.DistinguishedName, StringComparer.OrdinalIgnoreCase)
                 .Cast<T>();
         T[] all = ordered.ToArray();
-        return new DirectoryProviderPage<T>(all.Skip(offset).Take(pageSize).ToArray(), offset + pageSize < all.Length);
+        return new DirectoryProviderPage<T>(all.Skip(offset).Take(pageSize).ToArray(), offset + pageSize < all.Length, isPartial);
+    }
+
+    private static string? ManagedByDisplayName(string? distinguishedName)
+    {
+        if (string.IsNullOrWhiteSpace(distinguishedName))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var entry = new DirectoryEntry($"LDAP://{distinguishedName}");
+            return Property(entry, "displayName") ?? Property(entry, "name");
+        }
+        catch (Exception exception) when (exception is DirectoryServicesCOMException or COMException)
+        {
+            return null;
+        }
+    }
+
+    private static DateTimeOffset? DateTimeProperty(DirectoryEntry? entry, string name)
+    {
+        object? value = entry?.Properties[name]?.Value;
+        return value switch
+        {
+            DateTime dateTime => new DateTimeOffset(dateTime.ToUniversalTime()),
+            _ => null
+        };
     }
 
     private static async Task<T> RunAsync<T>(Func<T> operation, CancellationToken cancellationToken)

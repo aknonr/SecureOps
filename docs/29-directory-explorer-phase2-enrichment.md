@@ -14,7 +14,7 @@ All requests require an exact account and allow an optional bounded operational 
 
 ## Membership Semantics
 
-`directGroups` contains one-edge memberships. `transitiveGroups` contains groups whose shortest discovered path has at least two edges. A group discovered both directly and through nesting is returned only in `directGroups`, with `alsoTransitivelyReachable=true`.
+`directGroups` contains one-edge relationships and separately labels `membershipKind=Direct|Primary`. AD `memberOf` supplies direct backlinks but excludes the primary group, which is derived from `primaryGroupID`. `transitiveGroups` contains groups whose shortest discovered path has at least two edges. A group discovered both directly and through nesting is returned only in `directGroups`, with `alsoTransitivelyReachable=true`.
 
 The provider supplies exact parent-group edges. The graph builder sorts every adjacency list, suppresses duplicate edges, detects cycles, and visits each unique group once for expansion. Traversal is bounded by depth, unique node count, unique edge count, provider result limits, cancellation, and a total timeout.
 
@@ -24,7 +24,7 @@ Membership paths are shortest-first simple paths over the proven graph. The resu
 
 Account health exposes nullable `enabled`, `locked`, `passwordLastSetUtc`, calculated `passwordAgeDays`, `passwordNeverExpires`, `accountExpiresUtc`, `mustChangePassword`, and `lastLogonTimestampUtc`. `lastLogonTimestampUtc` is always labeled approximate and may be stale because AD replication is deliberately delayed. Missing attributes remain null; the API does not infer them.
 
-Service evidence exposes bounded, sorted SPNs with total/truncation metadata, `managedBy`, account expiration, password age, direct/transitive group counts, and AD object-class evidence. An SPN or naming pattern is evidence only; the API does not declare an account to be a corporate service or PAM account.
+Service evidence exposes bounded, sorted SPNs with total/truncation metadata, `managedBy`, account expiration, password age, nullable direct/transitive group counts, and AD object-class evidence. Zero SPNs is successful empty evidence. Membership graph failure does not discard successful principal/SPN evidence: `membershipEvidenceAvailable=false`, counts and traversal are null. An SPN, password setting, or naming pattern is evidence only; the API does not declare an account to be a corporate service or PAM account.
 
 ## Privileged Membership
 

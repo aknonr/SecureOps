@@ -23,7 +23,9 @@ public sealed class DirectoryEnrichmentQueryServiceTests
 
         result.Status.Should().Be(DirectoryQueryStatus.Success);
         result.Value!.DirectGroups.Select(item => item.Group.SamAccountName)
-            .Should().Equal("ops-read", "dist-universal");
+            .Should().Equal("ops-read", "dist-universal", "primary-domain-users");
+        result.Value.DirectGroups.Single(item => item.Group.SamAccountName == "primary-domain-users")
+            .Group.MembershipKind.Should().Be("Primary");
         result.Value.TransitiveGroups.Select(item => item.Group.SamAccountName)
             .Should().Equal("nested-ops", "platform-privileged");
         result.Value.DirectGroups.Single(item => item.Group.SamAccountName == "ops-read")
@@ -119,7 +121,8 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryQueryResult<DirectoryAccountHealthResponse> result = await service.GetAccountHealthAsync(
             new DirectoryPrincipalEnrichmentRequest("sample.user", Purpose), Context, CancellationToken.None);
 
-        result.Status.Should().Be(DirectoryQueryStatus.ProviderUnavailable);
+        result.Status.Should().Be(DirectoryQueryStatus.ProviderTimeout);
+        result.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryProviderTimeout);
         provider.CancellationObserved.Should().BeTrue();
     }
 
@@ -146,6 +149,48 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         result.Value.ServicePrincipalNames.Should().HaveCount(returned);
         result.Value.ServicePrincipalNamesTruncated.Should().Be(truncated);
         result.Value.AccountTypeEvidence.Should().Be("User");
+        result.Value.MembershipEvidenceAvailable.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("normal.user", false)]
+    [InlineData("pam.zero", false)]
+    [InlineData("service.zero", true)]
+    public async Task ServiceEvidence_ZeroSpnsRemainSuccessfulUserEvidence(
+        string account,
+        bool passwordNeverExpires)
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out _);
+
+        DirectoryQueryResult<DirectoryServiceEvidenceResponse> evidence = await service.GetServiceEvidenceAsync(
+            new DirectoryPrincipalEnrichmentRequest(account), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryAccountHealthResponse> health = await service.GetAccountHealthAsync(
+            new DirectoryPrincipalEnrichmentRequest(account), Context, CancellationToken.None);
+
+        evidence.Status.Should().Be(DirectoryQueryStatus.Success);
+        evidence.Value!.ServicePrincipalNames.Should().BeEmpty();
+        evidence.Value.ServicePrincipalNameCount.Should().Be(0);
+        evidence.Value.ServicePrincipalNamesTruncated.Should().BeFalse();
+        evidence.Value.AccountTypeEvidence.Should().Be("User");
+        health.Value!.PasswordNeverExpires.Should().Be(passwordNeverExpires);
+    }
+
+    [Fact]
+    public async Task ServiceEvidence_PrincipalReadSurvivesIndependentMembershipFailure()
+    {
+        DirectoryEnrichmentQueryService service = CreateService(
+            new PrincipalOnlyProvider(Principal()), Options(), Now, out _);
+
+        DirectoryQueryResult<DirectoryServiceEvidenceResponse> result = await service.GetServiceEvidenceAsync(
+            new DirectoryPrincipalEnrichmentRequest("sample.user"), Context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.Success);
+        result.Value!.ServicePrincipalNames.Should().BeEmpty();
+        result.Value.ServicePrincipalNameCount.Should().Be(0);
+        result.Value.MembershipEvidenceAvailable.Should().BeFalse();
+        result.Value.DirectGroupCount.Should().BeNull();
+        result.Value.TransitiveGroupCount.Should().BeNull();
+        result.Value.Traversal.Should().BeNull();
     }
 
     [Fact]
@@ -379,5 +424,33 @@ public sealed class DirectoryEnrichmentQueryServiceTests
             int maxResults,
             CancellationToken cancellationToken) =>
             Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(null);
+    }
+
+    private sealed class PrincipalOnlyProvider(DirectoryPrincipalEnrichmentRecord principal) : IDirectoryEnrichmentProvider
+    {
+        public string ProviderName => "PrincipalOnly";
+
+        public Task<DirectoryPrincipalEnrichmentRecord?> FindPrincipalAsync(
+            string normalizedAccount,
+            int maxSpns,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryPrincipalEnrichmentRecord?>(principal);
+
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectMembershipGroupsAsync(
+            string normalizedAccount,
+            int maxResults,
+            CancellationToken cancellationToken) =>
+            throw new DirectoryProviderUnavailableException();
+
+        public Task<DirectoryGroupRecord?> FindGroupAsync(
+            string normalizedGroup,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryGroupRecord?>(null);
+
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetParentGroupsAsync(
+            DirectoryGroupRecord group,
+            int maxResults,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(new([], false));
     }
 }

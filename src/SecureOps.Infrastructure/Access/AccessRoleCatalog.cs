@@ -14,6 +14,7 @@ public static class AccessRoleCatalog
                 Capabilities.DirectoryGroupsView,
                 Capabilities.DirectoryGroupMembersView,
                 Capabilities.DirectoryPrivilegedGroupsView,
+                Capabilities.DirectoryGroupExport,
                 Capabilities.TeamView,
                 Capabilities.AuditView,
                 Capabilities.AccessAdministration,

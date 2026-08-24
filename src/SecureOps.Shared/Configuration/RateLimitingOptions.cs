@@ -18,6 +18,10 @@ public sealed class RateLimitingOptions
     public OperationRateLimitOptions DirectoryEnrichment { get; set; } = new(6, 60);
     /// <summary>Separately authorized privileged-group analysis policy.</summary>
     public OperationRateLimitOptions DirectoryPrivilegedGroups { get; set; } = new(4, 60);
+    /// <summary>Bounded recursive group analysis.</summary>
+    public OperationRateLimitOptions DirectoryGroupAnalysis { get; set; } = new(4, 60);
+    /// <summary>Authorized bounded membership export.</summary>
+    public OperationRateLimitOptions DirectoryGroupExport { get; set; } = new(2, 60);
     /// <summary>Operational-record refresh policy.</summary>
     public OperationRateLimitOptions OperationalRecordRefresh { get; set; } = new(12, 60);
     /// <summary>Jira preview policy.</summary>

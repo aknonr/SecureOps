@@ -194,6 +194,9 @@ public sealed class IdentityLookupServiceTests
         auditJson.Should().NotContain("example.admin@contoso.local");
         auditJson.Should().NotContain("Windows Operations");
         auditJson.Should().NotContain("Example Manager");
+        auditJson.Should().NotContain("EVT-54321 incident response verification");
+        auditJson.Should().NotContain("\"pam12356\"");
+        auditJson.Should().Contain("purposeHash").And.Contain("legacyEventReferencesProvided");
     }
 
     private static IdentityLookupService CreateService(

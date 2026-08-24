@@ -35,7 +35,8 @@ public sealed class DirectoryExplorerPhase2HostedTests
             "/api/v1/directory/principals/service-evidence",
             new { account = "pam12356" });
 
-        memberships.DirectGroups.Should().HaveCount(2);
+        memberships.DirectGroups.Should().HaveCount(3);
+        memberships.DirectGroups.Should().ContainSingle(group => group.Group.MembershipKind == "Primary");
         memberships.TransitiveGroups.Should().ContainSingle(group =>
             group.Group.SamAccountName == "platform-privileged");
         memberships.Traversal.CycleDetected.Should().BeTrue();
@@ -44,7 +45,9 @@ public sealed class DirectoryExplorerPhase2HostedTests
         paths.Paths.Should().HaveCount(2);
         health.Enabled.Should().BeTrue();
         health.LastLogonTimestampIsApproximate.Should().BeTrue();
-        evidence.ServicePrincipalNames.Should().HaveCount(2);
+        evidence.ServicePrincipalNames.Should().BeEmpty();
+        evidence.ServicePrincipalNameCount.Should().Be(0);
+        evidence.ServicePrincipalNamesTruncated.Should().BeFalse();
         evidence.AccountTypeEvidence.Should().Be("User");
     }
 

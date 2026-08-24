@@ -9,7 +9,7 @@ public sealed class MockDirectoryGroupProvider : IDirectoryGroupProvider
     private static readonly IReadOnlyDictionary<string, string[]> _principalGroups =
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
-            ["pam12356"] = ["ops-read", "dist-universal"],
+            ["pam12356"] = ["primary-domain-users", "ops-read", "dist-universal"],
             ["zero.groups"] = []
         };
 
@@ -104,7 +104,8 @@ public sealed class MockDirectoryGroupProvider : IDirectoryGroupProvider
         {
             ["ops-read"] = new("S-1-5-21-1001", "Operations Readers", "ops-read", "CN=Operations Readers,OU=Groups,DC=contoso,DC=local", "Read-only operations access", "Security", "Global", "CN=Example Manager,OU=Users,DC=contoso,DC=local", 3),
             ["dist-universal"] = new("S-1-5-21-1002", "Operations Announcements", "dist-universal", "CN=Operations Announcements,OU=Groups,DC=contoso,DC=local", "Operations distribution", "Distribution", "Universal", null, 0),
-            ["domain-local-empty"] = new("S-1-5-21-1003", "Domain Local Empty", "domain-local-empty", "CN=Domain Local Empty,OU=Groups,DC=contoso,DC=local", null, "Security", "DomainLocal", null, 0)
+            ["domain-local-empty"] = new("S-1-5-21-1003", "Domain Local Empty", "domain-local-empty", "CN=Domain Local Empty,OU=Groups,DC=contoso,DC=local", null, "Security", "DomainLocal", null, 0),
+            ["primary-domain-users"] = new("S-1-5-21-513", "Primary Domain Users", "primary-domain-users", "CN=Primary Domain Users,OU=Groups,DC=contoso,DC=local", null, "Security", "Global", MembershipKind: "Primary")
         };
 
     private static IReadOnlyDictionary<string, DirectoryMemberRecord[]> CreateMembers() =>
@@ -117,6 +118,7 @@ public sealed class MockDirectoryGroupProvider : IDirectoryGroupProvider
                 new("S-1-5-21-2003", "OPS-WIN-01", "OPS-WIN-01$", "CN=OPS-WIN-01,OU=Computers,DC=contoso,DC=local", "Computer")
             ],
             ["dist-universal"] = [],
-            ["domain-local-empty"] = []
+            ["domain-local-empty"] = [],
+            ["primary-domain-users"] = []
         };
 }

@@ -23,11 +23,15 @@ public sealed class DirectoryGroupQueryServiceTests
             new DirectoryPrincipalGroupsRequest("CONTOSO\\pam12356", Purpose, 1), Context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupPageResponse> second = await service.GetPrincipalGroupsAsync(
             new DirectoryPrincipalGroupsRequest("pam12356", Purpose, 1, first.Value!.ContinuationToken), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryGroupPageResponse> third = await service.GetPrincipalGroupsAsync(
+            new DirectoryPrincipalGroupsRequest("pam12356", Purpose, 1, second.Value!.ContinuationToken), Context, CancellationToken.None);
 
         first.Status.Should().Be(DirectoryQueryStatus.Success);
         first.Value!.Items.Should().ContainSingle(); first.Value.ContinuationToken.Should().NotBeNullOrWhiteSpace();
-        second.Value!.Items.Should().ContainSingle(); second.Value.ContinuationToken.Should().BeNull();
-        first.Value.Items[0].SamAccountName.Should().NotBe(second.Value.Items[0].SamAccountName);
+        second.Value!.Items.Should().ContainSingle(); second.Value.ContinuationToken.Should().NotBeNullOrWhiteSpace();
+        third.Value!.Items.Should().ContainSingle(); third.Value.ContinuationToken.Should().BeNull();
+        new[] { first.Value.Items[0].SamAccountName, second.Value.Items[0].SamAccountName, third.Value.Items[0].SamAccountName }
+            .Should().OnlyHaveUniqueItems();
         audit.Events.Select(item => item.Action).Should().Contain(AuditActions.DirectoryGroupQueryCompleted);
     }
 

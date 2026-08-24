@@ -8,7 +8,7 @@ Phase 1 adds three backend operations:
 - exact group to safe metadata;
 - exact group to direct members.
 
-Direct means one Active Directory membership edge. Nested groups are returned as `Group` members and are never expanded. Transitive authorization groups are not queried.
+Direct group members follow one explicit AD `member` edge. Nested groups are returned as `Group` members and are never expanded by the Phase 1 route. Principal membership includes explicit `memberOf` relationships plus the separately labeled `Primary` relationship derived from `primaryGroupID`; transitive groups are not returned by the Phase 1 route.
 
 ## API Contract
 
@@ -25,6 +25,8 @@ Principal and member-list responses are bounded pages. `pageSize` defaults to 50
 ## Returned Data
 
 Group summaries contain stable SID when available, name, sAMAccountName, distinguished name, description, `Security|Distribution`, and `Global|Universal|DomainLocal|Unknown`. Group detail may contain a managed-by distinguished-name identifier and direct member count only when the provider can obtain it safely.
+
+Principal group summaries may expose `membershipKind=Direct|Primary`. Group-member pages state `membershipSemantics=ExplicitMemberLinks` and `includesPrimaryGroupMembers=false`; AD's group `member` attribute does not prove membership represented only through a principal's `primaryGroupID`.
 
 Direct members contain stable SID when available, name, sAMAccountName, distinguished name, and `User|Group|Computer|Other`. No recursive data, profile enrichment, mail, phone, address, password metadata, SPNs, or raw attributes are returned.
 
@@ -70,3 +72,5 @@ No new secret or credential key exists.
 ADR-0015 and `docs/29-directory-explorer-phase2-enrichment.md` add bounded recursive/transitive membership, proven membership paths, account health, SPN/service evidence, and separately authorized privileged-group analysis through new routes. Phase 1 routes and direct-only semantics remain unchanged.
 
 Computer lookup, manager/direct reports, directory writes, LDAP login, and corporate account classification remain deferred.
+
+Bounded group analysis and export are additive contracts documented in `docs/31-active-directory-realworld-group-analysis.md`.

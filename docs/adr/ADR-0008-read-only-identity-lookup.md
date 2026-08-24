@@ -18,7 +18,7 @@ The first implementation:
 
 - Exposes `POST /api/v1/identity/lookup`.
 - Requires `TeamLeadOrAbove`.
-- Accepts one exact account value and a non-empty purpose/context.
+- Accepts one exact account value and an optional bounded purpose/context. Omitted or whitespace purpose is valid for a read-only lookup and no default reason is fabricated.
 - Normalizes the account by configuration.
 - Rejects wildcard, bulk, LDAP-filter, and search-style input.
 - Resolves directly against Active Directory with read-only APIs.
