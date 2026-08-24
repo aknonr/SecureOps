@@ -3328,3 +3328,318 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* =============================================================================
+   Active Directory screens
+
+   Two states per screen: a search box, then a result. The search state is
+   deliberately sparse; the result state gives the evidence the full width and
+   keeps the query itself to a single compact line.
+   ========================================================================== */
+
+/* -- search state ------------------------------------------------------- */
+
+.so-search-panel {
+    max-width: 900px;
+}
+
+.so-search-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+}
+
+.so-search-field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Nudged down to sit on the input's baseline rather than its label. */
+.so-search-button {
+    flex: 0 0 auto;
+    margin-top: 6px;
+    height: 40px;
+}
+
+.so-search-hints {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-4);
+}
+
+.so-hint-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--so-text-faint);
+}
+
+/* -- result state ------------------------------------------------------- */
+
+/* The query, reduced to one line. It has done its job; the evidence below it
+   is what the operator came for. */
+.so-result-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--so-space-3);
+    margin-bottom: var(--so-space-4);
+    padding-bottom: var(--so-space-3);
+    border-bottom: 1px solid var(--so-border);
+}
+
+.so-result-query {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--so-space-3);
+    min-width: 0;
+}
+
+.so-result-query-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--so-text-muted);
+}
+
+.so-result-query-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.so-result-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+/* -- principal and group header ----------------------------------------- */
+
+.so-principal-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-4);
+}
+
+.so-principal-text {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+.so-principal-name {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--so-text);
+    overflow-wrap: anywhere;
+}
+
+.so-principal-account {
+    display: inline-block;
+    margin-top: var(--so-space-2);
+    font-size: 0.82rem;
+}
+
+.so-principal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+.so-avatar--group {
+    color: var(--so-accent);
+    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
+}
+
+/* -- membership sections ------------------------------------------------ */
+
+.so-membership-title {
+    display: flex;
+    align-items: center;
+    margin: var(--so-space-5) 0 var(--so-space-2);
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--so-text);
+}
+
+/* Primary group behaves unlike the other two — it cannot be removed from a
+   member list at all — so its section carries an edge the others do not. */
+.so-membership-title--distinct {
+    padding-left: var(--so-space-3);
+    border-left: 3px solid var(--so-info);
+}
+
+/* -- inline field help -------------------------------------------------- */
+
+/* Technical Active Directory concepts get one sentence where they appear,
+   rather than a glossary the operator has to go and find. */
+.so-field-help {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--so-text-faint);
+}
+
+/* -- partial and scoped-failure notices --------------------------------- */
+
+/* A section failing is a section's problem. This keeps the surrounding
+   evidence — which succeeded — exactly where it was. */
+.so-partial-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+    margin: var(--so-space-3) 0;
+    padding: var(--so-space-3);
+    border: 1px solid color-mix(in srgb, var(--so-info) 40%, transparent);
+    border-radius: var(--so-radius-sm);
+    background: color-mix(in srgb, var(--so-info) var(--so-tint), transparent);
+}
+
+.so-partial-notice--problem {
+    border-color: color-mix(in srgb, var(--so-warning) 45%, transparent);
+    background: color-mix(in srgb, var(--so-warning) var(--so-tint), transparent);
+}
+
+.so-partial-icon {
+    display: inline-flex;
+    color: var(--so-info);
+}
+
+.so-partial-notice--problem .so-partial-icon {
+    color: var(--so-warning);
+}
+
+.so-partial-title {
+    margin: 0;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+/* -- on-demand analysis prompt ------------------------------------------ */
+
+/* The expensive walk is a decision, so it looks like one. */
+.so-analysis-prompt {
+    border-left: 3px solid var(--so-accent);
+}
+
+/* -- breadcrumb --------------------------------------------------------- */
+
+.so-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin-bottom: var(--so-space-3);
+    font-size: 0.8rem;
+    color: var(--so-text-muted);
+}
+
+.so-breadcrumb-root {
+    font-weight: 600;
+    color: var(--so-text-faint);
+}
+
+.so-breadcrumb-sep {
+    color: var(--so-text-faint);
+}
+
+.so-breadcrumb-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--so-accent);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.so-breadcrumb-link:hover,
+.so-breadcrumb-link:focus-visible {
+    text-decoration: underline;
+}
+
+.so-breadcrumb-current {
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+/* -- technical detail disclosure ---------------------------------------- */
+
+/* Distinguished names and SIDs are the one place raw Active Directory naming
+   belongs, and they stay folded away until asked for. */
+.so-technical {
+    margin-top: var(--so-space-4);
+    padding-top: var(--so-space-3);
+    border-top: 1px solid var(--so-border-soft);
+}
+
+.so-technical > summary {
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--so-accent);
+}
+
+.so-technical > summary:hover {
+    text-decoration: underline;
+}
+
+.so-technical > *:not(summary) {
+    margin-top: var(--so-space-3);
+}
+
+/* -- membership check --------------------------------------------------- */
+
+.so-check-result {
+    margin-top: var(--so-space-4);
+    padding-top: var(--so-space-3);
+    border-top: 1px solid var(--so-border-soft);
+}
+
+.so-check-verdict {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-3);
+    margin-bottom: var(--so-space-2);
+}
+
+.so-check-kind {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--so-text);
+}
+
+/* -- narrow viewports --------------------------------------------------- */
+
+@media (max-width: 720px) {
+    /* The button drops under the field rather than squeezing it to nothing. */
+    .so-search-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .so-search-button {
+        margin-top: 0;
+    }
+
+    .so-result-head {
+        align-items: flex-start;
+    }
+
+    .so-principal-head {
+        gap: var(--so-space-3);
+    }
+}

@@ -35,5 +35,25 @@
 
     <script src="_framework/blazor.server.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script>
+        // Hands the operator a file the server produced. The bytes, the name, and the content type
+        // all come from the API response; nothing is generated or reformatted here, which is what
+        // keeps an export traceable to the audited server-side operation.
+        window.secureOpsDownload = function (fileName, contentType, base64) {
+            var binary = atob(base64);
+            var bytes = new Uint8Array(binary.length);
+            for (var i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
+
+            var url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            // Revoked on the next tick so the click has already been handled.
+            setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+        };
+    </script>
 </body>
 </html>

@@ -17,7 +17,7 @@
 
 @if (_loading)
 {
-    <SoLoading Message="Yetkili grup kanıtları getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+    <SoLoading Message="Ayrıcalıklı grup kanıtları getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
 }
 else if (_problem is not null)
 {
@@ -26,7 +26,7 @@ else if (_problem is not null)
 else if (_evidence is not null)
 {
     <div class="so-panel-head">
-        <h3 class="so-subhead so-subhead--flush">Yetkili grup üyeliği</h3>
+        <h3 class="so-subhead so-subhead--flush">Ayrıcalıklı Grup Üyelikleri</h3>
         <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
                    StartIcon="@Icons.Material.Filled.Refresh"
                    OnClick="@(() => LoadAsync(refresh: true))">
@@ -35,7 +35,7 @@ else if (_evidence is not null)
     </div>
 
     <p class="so-panel-text so-panel-text--sm">
-        Yalnızca sunucuda tanımlı yetkili grup listesi denetlenir. Bu liste SecureOps yapılandırmasına
+        Yalnızca sunucuda tanımlı ayrıcalıklı grup listesi denetlenir. Bu liste SecureOps yapılandırmasına
         aittir; ekrandan değiştirilemez ve grup adından çıkarım yapılmaz.
     </p>
 
@@ -44,7 +44,7 @@ else if (_evidence is not null)
     @if (_evidence.Groups.Count == 0)
     {
         <p class="so-panel-text so-panel-text--sm">
-            Sunucuda tanımlı yetkili grup yok.
+            Sunucuda tanımlı ayrıcalıklı grup yok.
         </p>
     }
     else
@@ -52,11 +52,11 @@ else if (_evidence is not null)
         @if (!DirectoryView.HasPrivilegedMembership(_evidence))
         {
             <div class="so-status-row">
-                <SoStatusBadge Label="Yetkili grup üyeliği yok"
+                <SoStatusBadge Label="Ayrıcalıklı grup üyeliği yok"
                                Tone="SoStatusBadge.BadgeTone.Positive"
                                Icon="@Icons.Material.Filled.CheckCircle" />
                 <span class="so-status-text">
-                    Bu hesap, tanımlı yetkili grupların hiçbirinde üye değil.
+                    Bu hesap, tanımlı ayrıcalıklı grupların hiçbirinde üye değil.
                 </span>
             </div>
         }
@@ -123,10 +123,6 @@ else if (_evidence is not null)
     [Parameter, EditorRequired]
     public string Account { get; set; } = string.Empty;
 
-    /// <summary>Optional operational context; <c>null</c> when the operator gave none.</summary>
-    [Parameter]
-    public string? Purpose { get; set; }
-
     private DirectoryPrivilegedMembershipResponse? _evidence;
     private UiProblem? _problem;
     private bool _loading;
@@ -142,7 +138,7 @@ else if (_evidence is not null)
         try
         {
             _evidence = await Directory.GetPrivilegedMembershipsAsync(
-                Account, Purpose, refresh, CancellationToken.None);
+                Account, null, refresh, CancellationToken.None);
         }
         catch (SecureOpsApiException ex)
         {

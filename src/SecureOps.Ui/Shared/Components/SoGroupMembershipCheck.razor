@@ -1,0 +1,215 @@
+@using Microsoft.Extensions.Logging
+@inject IDirectoryApiClient Directory
+@inject ILogger<SoGroupMembershipCheck> Logger
+
+@*
+    "Is this account a member of this group?"
+
+    The question an operator actually asks during an access incident, answered with the server's own
+    proof rather than by downloading every member and searching. One bounded membership-path call
+    per question; the browser never walks the graph.
+
+    The answer has three shapes and they are not interchangeable:
+
+      Member          — with the proven chain, and whether it is direct, primary, or nested.
+      Not a member    — only when the server walked the whole graph without hitting a bound.
+      Indeterminate   — a bounded or truncated walk. This is NOT a negative answer, and saying
+                        "üyelik bulunamadı" here would be presenting a search limit as a security
+                        decision.
+*@
+
+<section class="so-panel">
+    <div class="so-panel-head">
+        <h3 class="so-subhead so-subhead--flush">Üyelik Kontrolü</h3>
+    </div>
+
+    <p class="so-panel-text so-panel-text--sm">
+        Belirli bir kullanıcı, PAM veya servis hesabı
+        <strong>@GroupDisplayName</strong> grubuna doğrudan ya da dolaylı olarak üye mi?
+    </p>
+
+    <EditForm Model="_model" OnValidSubmit="CheckAsync">
+        <DataAnnotationsValidator />
+
+        <div class="so-search-row">
+            <MudTextField @bind-Value="_model.Account"
+                          Label="Kullanıcı / hesap"
+                          Placeholder="kullanici01"
+                          HelperText="Tam hesap adı. DOMAIN\hesap biçimi kabul edilir."
+                          Required="true"
+                          Immediate="true"
+                          MaxLength="128"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.PersonSearch"
+                          Variant="Variant.Outlined"
+                          Class="so-search-field" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="@_loading"
+                       StartIcon="@Icons.Material.Filled.Rule"
+                       Class="so-search-button">
+                Üyeliği Kontrol Et
+            </MudButton>
+        </div>
+    </EditForm>
+
+    @if (_loading)
+    {
+        <SoLoading Message="Üyelik kanıtı çözümleniyor…" />
+    }
+    else if (_problem is not null)
+    {
+        <SoProblemPanel Problem="_problem" OnRetry="CheckAsync" RetryLabel="Tekrar Dene" />
+    }
+    else if (_result is not null)
+    {
+        <div class="so-check-result">
+            @if (_result.IsMember)
+            {
+                <div class="so-check-verdict so-check-verdict--member">
+                    <SoStatusBadge Label="Üye"
+                                   Tone="SoStatusBadge.BadgeTone.Positive"
+                                   Icon="@Icons.Material.Filled.CheckCircle" />
+                    <span class="so-check-kind">@VerdictKind</span>
+                </div>
+
+                @if (VerdictExplanation is { } explanation)
+                {
+                    <p class="so-panel-text so-panel-text--sm">@explanation</p>
+                }
+
+                @if (_result.Paths.Count > 0)
+                {
+                    @foreach (DirectoryMembershipPathDto path in _result.Paths)
+                    {
+                        <SoMembershipPath Path="path" Account="@_checkedAccount" />
+                    }
+
+                    @if (_result.PathsTruncated)
+                    {
+                        <p class="so-panel-text so-panel-text--sm so-note-caution">
+                            Gösterilenden daha fazla yol var; liste sunucu tarafında kısaltıldı.
+                            Üyeliği kaldırmak için yalnızca buradaki yolları değiştirmek yeterli olmayabilir.
+                        </p>
+                    }
+                }
+                else
+                {
+                    @* Membership without a rendered chain is the primary-group case: it is not a
+                       memberOf link, so there is no chain to draw. *@
+                    <p class="so-panel-text so-panel-text--sm">
+                        Bu üyelik için gösterilecek bir grup zinciri yok.
+                    </p>
+                }
+            }
+            else if (DirectoryView.NegativeIsConclusive(_result))
+            {
+                <div class="so-check-verdict">
+                    <SoStatusBadge Label="Üyelik bulunamadı"
+                                   Tone="SoStatusBadge.BadgeTone.Neutral"
+                                   Icon="@Icons.Material.Filled.DoNotDisturbOn" />
+                </div>
+                <p class="so-panel-text so-panel-text--sm">
+                    Tarama sınıra takılmadan tamamlandı; bu hesap bu gruba doğrudan ya da dolaylı
+                    olarak üye değil.
+                </p>
+            }
+            else
+            {
+                @* The guard. A bounded walk proves nothing about the paths it did not take. *@
+                <div class="so-check-verdict so-check-verdict--indeterminate">
+                    <SoStatusBadge Label="Üyelik doğrulanamadı"
+                                   Tone="SoStatusBadge.BadgeTone.Caution"
+                                   Icon="@Icons.Material.Filled.HelpOutline" />
+                </div>
+                <p class="so-panel-text so-panel-text--sm">
+                    Analiz tamamlanamadı. Bu sonuç üyeliğin bulunmadığı anlamına gelmez ve
+                    yetkilendirme kararı için kullanılmamalıdır.
+                </p>
+                <SoTraversalNotice Traversal="_result.Traversal" IsVerdict="true" />
+            }
+        </div>
+    }
+</section>
+
+@code {
+    /// <summary>Exact group identifier sent to the API.</summary>
+    [Parameter, EditorRequired]
+    public string Group { get; set; } = string.Empty;
+
+    /// <summary>Group name shown to the operator.</summary>
+    [Parameter, EditorRequired]
+    public string GroupDisplayName { get; set; } = string.Empty;
+
+    private readonly CheckModel _model = new();
+
+    private DirectoryMembershipPathResponse? _result;
+    private UiProblem? _problem;
+    private string _checkedAccount = string.Empty;
+    private bool _loading;
+
+    private string VerdictKind
+    {
+        get
+        {
+            string? kind = _result is null ? null : DirectoryView.PathMembershipKind(_result);
+            if (kind is not null)
+            {
+                return DirectoryView.MembershipKindLabel(kind);
+            }
+
+            return _result?.IsDirect == true ? "Doğrudan üyelik" : "Dolaylı üyelik";
+        }
+    }
+
+    private string? VerdictExplanation
+    {
+        get
+        {
+            string? kind = _result is null ? null : DirectoryView.PathMembershipKind(_result);
+            return kind is not null
+                ? DirectoryView.MembershipKindExplanation(kind)
+                : _result?.IsDirect == true
+                    ? "Hesap bu gruba doğrudan eklenmiş."
+                    : "Hesap bu gruba başka bir grup üzerinden erişiyor.";
+        }
+    }
+
+    private async Task CheckAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_model.Account))
+        {
+            return;
+        }
+
+        _checkedAccount = _model.Account.Trim();
+        _loading = true;
+        _problem = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            _result = await Directory.GetMembershipPathsAsync(
+                _checkedAccount, Group, null, refresh: false, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            Logger.LogDebug("Membership check unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private sealed class CheckModel
+    {
+        [Required(ErrorMessage = "Hesap zorunludur.")]
+        [MaxLength(128)]
+        public string Account { get; set; } = string.Empty;
+    }
+}

@@ -25,7 +25,7 @@ else if (_problem is not null)
 else if (_health is not null)
 {
     <div class="so-panel-head">
-        <h3 class="so-subhead so-subhead--flush">Hesap durumu</h3>
+        <h3 class="so-subhead so-subhead--flush">Hesap ve Parola Bilgileri</h3>
         <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
                    StartIcon="@Icons.Material.Filled.Refresh"
                    OnClick="@(() => LoadAsync(refresh: true))">
@@ -42,10 +42,10 @@ else if (_health is not null)
                        Tone="@Tone(_health.Locked, whenTrue: SoStatusBadge.BadgeTone.Critical,
                                    whenFalse: SoStatusBadge.BadgeTone.Positive)"
                        Icon="@Icons.Material.Filled.Lock" />
-        <SoStatusBadge Label="@DirectoryView.Flag(_health.PasswordNeverExpires, "Parola süresiz", "Parola süreli")"
-                       Tone="@Tone(_health.PasswordNeverExpires, whenTrue: SoStatusBadge.BadgeTone.Caution,
-                                   whenFalse: SoStatusBadge.BadgeTone.Neutral)"
-                       Icon="@Icons.Material.Filled.Key" />
+        <SoStatusBadge Label="@DirectoryView.Flag(_health.PasswordNeverExpires, "Parolanın süresi dolmaz", "Parolanın süresi dolar")"
+                       Tone="SoStatusBadge.BadgeTone.Neutral"
+                       Icon="@Icons.Material.Filled.Key"
+                       Title="Dizin kaydından okunan bir ayardır; tek başına bir bulgu değildir." />
         @if (_health.MustChangePassword is true)
         {
             <SoStatusBadge Label="İlk girişte parola değişmeli"
@@ -56,12 +56,12 @@ else if (_health is not null)
 
     <h3 class="so-subhead">Parola</h3>
     <SoFieldGrid MinColumnWidth="240px">
-        <SoField Label="Parola en son ayarlandı">@Value(DirectoryView.Timestamp(_health.PasswordLastSetUtc))</SoField>
+        <SoField Label="Parola son değiştirilme zamanı">@Value(DirectoryView.Timestamp(_health.PasswordLastSetUtc))</SoField>
         <SoField Label="Parola yaşı">@Value(DirectoryView.Days(_health.PasswordAgeDays))</SoField>
-        <SoField Label="Parola süresi dolmaz">
+        <SoField Label="Parolanın süresi dolmaz">
             @Value(DirectoryView.Flag(_health.PasswordNeverExpires, "Evet", "Hayır"))
         </SoField>
-        <SoField Label="İlk girişte değiştirilmeli">
+        <SoField Label="İlk girişte parola değişimi">
             @Value(DirectoryView.Flag(_health.MustChangePassword, "Evet", "Hayır"))
         </SoField>
     </SoFieldGrid>
@@ -88,9 +88,9 @@ else if (_health is not null)
     @if (_health.LastLogonTimestampIsApproximate)
     {
         <p class="so-panel-text so-panel-text--sm so-note-caution">
-            Son görülen oturum zamanı, etki alanı denetleyicileri arasında gecikmeli çoğaltılan bir
-            özniteliktir. Kesin giriş zamanı değildir ve birkaç güne kadar geride olabilir. Hesabın
-            atıl olup olmadığına yalnızca bu değere bakarak karar vermeyin.
+            Bu değer etki alanı denetleyicileri arasında gecikmeli çoğaltılabilir ve kesin son giriş
+            zamanı değildir. Birkaç güne kadar geride olabilir; hesabın atıl olup olmadığına yalnızca
+            bu değere bakarak karar vermeyin.
         </p>
     }
 }
@@ -99,10 +99,6 @@ else if (_health is not null)
     /// <summary>Exact account, as the server normalized it.</summary>
     [Parameter, EditorRequired]
     public string Account { get; set; } = string.Empty;
-
-    /// <summary>Optional operational context; <c>null</c> when the operator gave none.</summary>
-    [Parameter]
-    public string? Purpose { get; set; }
 
     private DirectoryAccountHealthResponse? _health;
     private UiProblem? _problem;
@@ -124,7 +120,7 @@ else if (_health is not null)
 
         try
         {
-            _health = await Directory.GetAccountHealthAsync(Account, Purpose, refresh, CancellationToken.None);
+            _health = await Directory.GetAccountHealthAsync(Account, null, refresh, CancellationToken.None);
         }
         catch (SecureOpsApiException ex)
         {

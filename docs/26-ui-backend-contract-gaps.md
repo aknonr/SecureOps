@@ -24,7 +24,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-15 — Reported limitations are English prose with no code | ✅ **Resolved** by backend `b0e3b7b` |
 | G-16 — Only identity lookup has daily buckets | Open — confirmed out of scope by `b0e3b7b` |
 | G-17 — Zero and "no persisted history" are indistinguishable | ✅ **Resolved** by backend `b0e3b7b` |
-| G-18 — UI integration contract still calls the directory purpose required | Open — documentation only |
+| G-18 — UI integration contract still calls the directory purpose required | Open — documentation only, no longer reached by the UI |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -741,7 +741,7 @@ record detail renders that as "kaynak sistemde tarih yok".
 
 **Endpoint:** `POST /api/v1/directory/*`
 **Severity:** Low — documentation only, no runtime effect
-**Status:** Open
+**Status:** Open, and no longer reached by the UI
 
 Backend `a607ac4` made `purpose` optional on every read-only Directory Explorer route. `docs/27`,
 `docs/29`, `DirectoryExplorerOptions`, and `DirectoryLookupPurpose` all say so. The UI integration
@@ -756,6 +756,12 @@ every `Purpose` parameter defaults to `null` — so the UI follows the code and 
 **What would resolve it.** Correcting that sentence in
 `docs/contracts/secureops-api-v1-ui-integration.md`. Backend-owned, so it is recorded here rather
 than edited.
+
+**Update after the Active Directory redesign.** The UI no longer sends `purpose` on any directory
+route, or on `POST /api/v1/identity/lookup` — the field was removed from both screens rather than
+kept as an optional input nobody filled in. So the stale sentence can no longer mislead a UI author
+about what to send. It can still mislead a *backend* reader about what the routes accept, which is
+why the gap stays open rather than being closed by a UI change.
 
 ---
 
@@ -795,3 +801,19 @@ Re-verified after merging `4adab66c`:
   not-found path into a false positive.
 - `GET /identity/lookup/capabilities` is unchanged: `maxAccountLength: 128`, the same nine
   `returnedFields`, and the same six `rejectedInputClasses`. The UI needed no contract change.
+
+Confirmed against `f89f996` while building the Active Directory redesign, and recorded so nobody
+re-opens the investigation:
+
+- `membershipKind` reaches the membership-path response, not only the memberships response. It
+  travels through `DirectoryMembershipGraph` into `MapPath`, so the membership check can answer
+  **Birincil Grup** rather than flattening a primary-group membership into a direct one. No contract
+  change was needed for the three-verdict check.
+- `POST /api/v1/directory/groups/analysis` returns nested groups, effective members and parent
+  memberships from a single bounded traversal, which is why the UI spends one call for three tabs.
+- `POST /api/v1/directory/groups/export` refuses a partial effective-membership export with
+  `DirectoryTraversalPartial` (422). The UI hides the button as well, but the server is the authority.
+- `DirectoryProviderTimeout` is a distinct code from `DirectoryProviderUnavailable`. Both were being
+  rendered with the same "unreachable" wording; that was a UI defect and is corrected.
+
+**No new backend gaps were found in this milestone.**

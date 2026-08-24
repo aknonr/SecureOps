@@ -170,4 +170,28 @@ public sealed class UiProblemFactoryTests
         timeout.Retryable.Should().BeTrue();
         timeout.RequiresRefresh.Should().BeTrue("the request may have completed server-side");
     }
+
+    [Fact]
+    public void DirectoryFailures_SpeakAboutActiveDirectoryRatherThanAGenericDirectory()
+    {
+        // Operators read these titles under pressure. Both unreachable codes name the system they
+        // are talking about, and a timeout is never dressed up as an outage: a query that ran out
+        // of time says so, because "unreachable" sends the operator to the wrong investigation.
+        UiProblem identity = UiProblemFactory.FromResponse(
+            503,
+            new ProblemDetailsPayload { Code = OperationalErrorCodes.IdentityProviderUnavailable });
+        UiProblem directory = UiProblemFactory.FromResponse(
+            503,
+            new ProblemDetailsPayload { Code = OperationalErrorCodes.DirectoryProviderUnavailable });
+        UiProblem timeout = UiProblemFactory.FromResponse(
+            503,
+            new ProblemDetailsPayload { Code = OperationalErrorCodes.DirectoryProviderTimeout });
+
+        identity.Title.Should().Contain("Active Directory");
+        directory.Title.Should().Contain("Active Directory");
+
+        timeout.Title.Should().NotContain("ulaşılamıyor",
+            "a query that exceeded its time limit is not evidence that the directory is down");
+        timeout.Title.Should().Contain("süre sınırı");
+    }
 }

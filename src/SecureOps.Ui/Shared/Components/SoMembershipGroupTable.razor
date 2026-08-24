@@ -1,0 +1,157 @@
+@*
+    One membership relationship, as its own titled table.
+
+    Direct, primary, and transitive get their own section rather than a column in a shared table.
+    A shared table invites the eye to read them as one list with a qualifier, which is exactly the
+    reading that gets the wrong membership revoked.
+
+    Name and account name are shown as separate columns only when they actually differ. In many
+    directories a group's name and sAMAccountName are identical, and printing the same string twice
+    under two labels wastes a column and implies a distinction that is not there.
+*@
+
+<h4 class="so-membership-title @(Tone == SectionTone.Distinct ? "so-membership-title--distinct" : null)">
+    @Title
+    <span class="so-count-chip">@Items.Count</span>
+</h4>
+
+@if (!string.IsNullOrWhiteSpace(Description))
+{
+    <p class="so-panel-text so-panel-text--sm">@Description</p>
+}
+
+@if (Items.Count == 0)
+{
+    <p class="so-panel-text so-panel-text--sm so-unknown">@EmptyText</p>
+}
+else
+{
+    <div class="so-table-scroll">
+        <table class="so-plain-table so-group-table">
+            <thead>
+                <tr>
+                    <th scope="col">@DirectoryView.GroupNameLabel</th>
+                    @if (_showAccountColumn)
+                    {
+                        <th scope="col">@DirectoryView.GroupAccountLabel</th>
+                    }
+                    <th scope="col">@DirectoryView.CategoryLabelName</th>
+                    <th scope="col">@DirectoryView.ScopeLabelName</th>
+                    @if (ShowDepth)
+                    {
+                        <th scope="col" class="so-num">Adım</th>
+                    }
+                    <th scope="col">Açıklama</th>
+                    <th scope="col"><span class="sr-only">İşlem</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (DirectoryMembershipGroupDto item in Items)
+                {
+                    DirectoryMembershipGroupDto captured = item;
+                    <tr>
+                        <th scope="row">
+                            <span class="so-group-name">@DirectoryView.GroupName(item.Group)</span>
+                            @if (item.AlsoTransitivelyReachable)
+                            {
+                                <SoStatusBadge Label="Ayrıca iç içe"
+                                               Tone="SoStatusBadge.BadgeTone.Neutral"
+                                               Title="Bu grup doğrudan atanmış, ayrıca başka gruplar üzerinden de erişilebilir durumda." />
+                            }
+                        </th>
+                        @if (_showAccountColumn)
+                        {
+                            <td>
+                                @if (DirectoryView.ShowAccountNameSeparately(item.Group.Name, item.Group.SamAccountName))
+                                {
+                                    <code class="so-code so-code--sm">@item.Group.SamAccountName</code>
+                                }
+                                else
+                                {
+                                    <span class="so-unknown">—</span>
+                                }
+                            </td>
+                        }
+                        <td title="@DirectoryView.CategoryExplanation(item.Group.Category)">
+                            @DirectoryView.CategoryLabel(item.Group.Category)
+                        </td>
+                        <td title="@DirectoryView.ScopeExplanation(item.Group.Scope)">
+                            @DirectoryView.ScopeLabel(item.Group.Scope)
+                        </td>
+                        @if (ShowDepth)
+                        {
+                            <td class="so-num" title="Hedefe ulaşan en kısa zincirdeki adım sayısı">
+                                @item.MinimumDepth
+                            </td>
+                        }
+                        <td class="so-cell-wrap">
+                            @if (!string.IsNullOrWhiteSpace(item.Group.Description))
+                            {
+                                @item.Group.Description
+                            }
+                            else
+                            {
+                                <span class="so-unknown">—</span>
+                            }
+                        </td>
+                        <td>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                       EndIcon="@Icons.Material.Filled.ChevronRight"
+                                       OnClick="@(() => OnOpenGroup.InvokeAsync(captured.Group))">
+                                Grubu İncele
+                            </MudButton>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    /// <summary>How prominently the section should read.</summary>
+    public enum SectionTone
+    {
+        /// <summary>An ordinary membership set.</summary>
+        Plain,
+
+        /// <summary>A relationship that behaves differently from the others.</summary>
+        Distinct
+    }
+
+    /// <summary>Section heading.</summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>One line on what this relationship means operationally.</summary>
+    [Parameter]
+    public string? Description { get; set; }
+
+    /// <summary>Groups exactly as the API returned them, in the API's order.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DirectoryMembershipGroupDto> Items { get; set; } = [];
+
+    /// <summary>Shown when the list is empty.</summary>
+    [Parameter]
+    public string EmptyText { get; set; } = "Kayıt yok.";
+
+    /// <summary>Whether to show the minimum depth column.</summary>
+    /// <remarks>Meaningful for nested groups only; a direct group is always one step away.</remarks>
+    [Parameter]
+    public bool ShowDepth { get; set; }
+
+    /// <summary>How prominently the section should read.</summary>
+    [Parameter]
+    public SectionTone Tone { get; set; } = SectionTone.Plain;
+
+    /// <summary>Raised when the operator wants to analyse one of these groups.</summary>
+    [Parameter]
+    public EventCallback<DirectoryGroupSummaryDto> OnOpenGroup { get; set; }
+
+    private bool _showAccountColumn;
+
+    protected override void OnParametersSet() =>
+        // Dropped entirely when no row would fill it, rather than shown full of dashes.
+        _showAccountColumn = Items.Any(item =>
+            DirectoryView.ShowAccountNameSeparately(item.Group.Name, item.Group.SamAccountName));
+}

@@ -4,44 +4,44 @@
 @using Microsoft.Extensions.Logging
 @inject IDirectoryApiClient Directory
 @inject ICurrentAccessProvider AccessProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 @inject ILogger<DirectoryGroup> Logger
 
-<PageTitle>Grup Sorgulama · SecureOps</PageTitle>
+<PageTitle>AD Grup Analizi · SecureOps</PageTitle>
 
 @*
-    Exact group lookup.
+    Exact Active Directory group analysis.
 
-    Same discipline as the user screen: one exact group, no filter syntax and no wildcard. Metadata
-    and members are separate capabilities and separate calls, so an operator who may see that a group
-    exists does not automatically see who is in it.
+    Cost is the organising principle. Group metadata comes back in milliseconds; member enumeration
+    can take hundreds of milliseconds; the nested-group walk is bounded but expensive, and on some
+    real groups member enumeration fails only after ten seconds. So nothing loads unless the operator
+    opens it, and the expensive walk sits behind an explicit button rather than a tab click.
 
-    The purpose is optional. The query itself is recorded either way; what the operator now chooses is
-    whether to add context to that record, not whether the record exists.
+    The consequence that matters most: a fast successful overview plus a failed member enumeration is
+    not "Active Directory is down". The overview stays on screen and only the failing section reports
+    its own problem, with its own retry.
 
-    The member table lists direct members only. A nested group appears as a member and links to its
-    own lookup rather than being expanded in place — expanding it here would be a client-side graph
-    walk, which is exactly what the contract keeps on the server.
-
-    Paging is forward-only because the continuation token is. "Daha fazla yükle" appends the next
-    page rather than pretending to offer random access the API does not have.
+    Nested groups are navigated by running each group's own exact lookup. The browser never builds
+    topology; the server returns it.
 *@
 
 <div class="so-page so-page--wide">
-    <SoPageHeader Title="Grup Sorgulama"
-                  Lead="Tek bir grubu tam adıyla sorgulayın. Her sorgu kayıt altına alınır." />
-
     @if (_access is null)
     {
+        <SoPageHeader Title="AD Grup Analizi" />
         <SoLoading Message="Yetkileriniz doğrulanıyor…" />
     }
     else if (!_access.IsResolved)
     {
+        <SoPageHeader Title="AD Grup Analizi" />
         <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
     }
     else if (!_access.Can(Capabilities.DirectoryGroupsView))
     {
+        <SoPageHeader Title="AD Grup Analizi" />
         <section class="so-panel so-panel--blocked">
-            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <h2 class="so-panel-title">Bu bilgi için yetkiniz bulunmuyor</h2>
             <p class="so-panel-text">
                 Grup sorgulamak için <code class="so-code">@Capabilities.DirectoryGroupsView</code>
                 yetkisi gerekir. Hesabınızda tanımlı yetkileri
@@ -49,302 +49,282 @@
             </p>
         </section>
     }
-    else
+    else if (_submittedGroup is null)
     {
-        <div class="so-split">
-            <section class="so-panel so-lookup-form">
-                <h2 class="so-panel-title">Sorgu</h2>
+        @* -- search state ------------------------------------------------------------------- *@
+        <SoPageHeader Title="AD Grup Analizi"
+                      Lead="Active Directory üzerindeki bir grubu adı veya AD grup hesap adıyla sorgulayarak grup bilgilerini, üyelerini, iç içe grup ilişkilerini ve üst grup üyeliklerini inceleyebilirsiniz." />
 
-                <EditForm Model="_model" OnValidSubmit="@(() => LoadGroupAsync(refresh: false))">
-                    <DataAnnotationsValidator />
+        <section class="so-panel so-search-panel">
+            <EditForm Model="_model" OnValidSubmit="@(() => SearchAsync(_model.Group, resetTrail: true))">
+                <DataAnnotationsValidator />
 
+                <div class="so-search-row">
                     <MudTextField @bind-Value="_model.Group"
-                                  Label="Grup"
-                                  Placeholder="GRP-Ornek-Operasyon"
-                                  HelperText="Tek bir grup. Ad veya sAMAccountName kabul edilir."
+                                  Label="Grup adı veya AD grup hesap adı"
+                                  Placeholder="GRP-ORNEK-OPERASYON"
+                                  HelperText="Tek bir grup. Tam ad veya AD grup hesap adı kabul edilir."
                                   Required="true"
                                   Immediate="true"
                                   MaxLength="256"
                                   Adornment="Adornment.Start"
                                   AdornmentIcon="@Icons.Material.Filled.Groups"
-                                  Variant="Variant.Outlined" />
-
-                    @* Optional since backend a607ac4. Deliberately understated: a read-only lookup
-                       does not need a justification, and a field that looks mandatory would keep
-                       operators typing one out of habit. *@
-                    <MudTextField @bind-Value="_model.Purpose"
-                                  @bind-Value:after="OnPurposeChanged"
-                                  Label="Açıklama"
-                                  HelperText="Opsiyonel — sorgu amacını belirtmek isterseniz ekleyebilirsiniz."
-                                  Error="@(_purposeError is not null)"
-                                  ErrorText="@_purposeError"
-                                  Immediate="true"
-                                  Lines="2"
-                                  MaxLength="@DirectoryPurposeInput.MaxLength"
                                   Variant="Variant.Outlined"
-                                  Class="mt-4 so-optional-field" />
+                                  Class="so-search-field" />
 
-                    <div class="so-form-actions">
-                        <MudButton ButtonType="ButtonType.Submit"
-                                   Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   Disabled="@(_loading || _purposeError is not null)"
-                                   StartIcon="@Icons.Material.Filled.ManageSearch">
-                            Sorgula
-                        </MudButton>
-
-                        @if (_group is not null)
-                        {
-                            <MudButton Variant="Variant.Text" Color="Color.Primary"
-                                       Disabled="@_loading"
-                                       StartIcon="@Icons.Material.Filled.Refresh"
-                                       OnClick="@(() => LoadGroupAsync(refresh: true))">
-                                Yenile
-                            </MudButton>
-                        }
-                    </div>
-                </EditForm>
-
-                <p class="so-panel-text so-panel-text--sm mt-3">
-                    Joker karakter, LDAP filtresi veya liste kabul edilmez.
-                </p>
-            </section>
-
-            <section class="so-panel so-lookup-result">
-                <h2 class="so-panel-title">Grup</h2>
-
-                @if (_loading)
-                {
-                    <SoLoading Message="Grup getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
-                }
-                else if (_problem is not null)
-                {
-                    <SoProblemPanel Problem="_problem" OnRetry="@(() => LoadGroupAsync(refresh: true))" />
-                }
-                else if (_group is null)
-                {
-                    <SoEmptyState Title="Henüz sorgu çalıştırılmadı"
-                                  Description="Grup adını girip Sorgula'ya basın."
-                                  Icon="@Icons.Material.Outlined.Groups" />
-                }
-                else
-                {
-                    <div class="so-result-tags">
-                        <SoStatusBadge Label="Bulundu"
-                                       Tone="SoStatusBadge.BadgeTone.Positive"
-                                       Icon="@Icons.Material.Filled.CheckCircle" />
-                        <SoStatusBadge Label="@DirectoryView.CategoryLabel(_group.Category)"
-                                       Tone="SoStatusBadge.BadgeTone.Info" />
-                        <SoStatusBadge Label="@DirectoryView.ScopeLabel(_group.Scope)"
-                                       Tone="SoStatusBadge.BadgeTone.Neutral" />
-                    </div>
-
-                    <SoFieldGrid>
-                        <SoField Label="Grup adı" Value="@DirectoryView.GroupName(_group)" />
-                        <SoField Label="Hesap adı">
-                            @if (!string.IsNullOrWhiteSpace(_group.SamAccountName))
-                            {
-                                <code class="so-code so-code--sm">@_group.SamAccountName</code>
-                            }
-                            else
-                            {
-                                <span class="so-unknown">@DirectoryView.UnknownText</span>
-                            }
-                        </SoField>
-                        <SoField Label="Tür" Value="@DirectoryView.CategoryLabel(_group.Category)" />
-                        <SoField Label="Kapsam" Value="@DirectoryView.ScopeLabel(_group.Scope)" />
-                        <SoField Label="Sorumlu (managedBy)">
-                            @if (!string.IsNullOrWhiteSpace(_group.ManagedBy))
-                            {
-                                <span class="so-wrap">@_group.ManagedBy</span>
-                            }
-                            else
-                            {
-                                <span class="so-unknown">@DirectoryView.UnknownText</span>
-                            }
-                        </SoField>
-                        <SoField Label="Doğrudan üye sayısı">
-                            @if (_group.DirectMemberCount is { } count)
-                            {
-                                @ManagementReportView.Count(count)
-                            }
-                            else
-                            {
-                                <span class="so-unknown">@DirectoryView.UnknownText</span>
-                            }
-                        </SoField>
-                    </SoFieldGrid>
-
-                    @if (!string.IsNullOrWhiteSpace(_group.Description))
-                    {
-                        <h3 class="so-subhead">Açıklama</h3>
-                        <p class="so-panel-text so-wrap">@_group.Description</p>
-                    }
-
-                    @if (!string.IsNullOrWhiteSpace(_group.DistinguishedName))
-                    {
-                        <h3 class="so-subhead">Ayırt edici ad</h3>
-                        <code class="so-code so-code--block">@_group.DistinguishedName</code>
-                    }
-                }
-            </section>
-        </div>
-
-        @if (_group is not null && _problem is null && !_loading)
-        {
-            <section class="so-panel">
-                <div class="so-panel-head">
-                    <h2 class="so-panel-title">
-                        Doğrudan üyeler
-                        @if (_members.Count > 0)
-                        {
-                            <span class="so-count-chip">@_members.Count</span>
-                        }
-                    </h2>
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@_loading"
+                               StartIcon="@Icons.Material.Filled.ManageSearch"
+                               Class="so-search-button">
+                        Sorgula
+                    </MudButton>
                 </div>
+            </EditForm>
 
-                @if (!_access.Can(Capabilities.DirectoryGroupMembersView))
-                {
-                    @* A different capability from reading the group itself, so the refusal is
-                       specific rather than hiding the whole page. *@
-                    <p class="so-panel-text">
-                        Üye listesini görüntülemek için
-                        <code class="so-code">@Capabilities.DirectoryGroupMembersView</code> yetkisi gerekir.
-                    </p>
-                }
-                else
-                {
-                    <p class="so-panel-text so-panel-text--sm">
-                        Yalnızca doğrudan üyeler listelenir. İç içe gruplar burada üye olarak görünür
-                        ve açılmaz; içeriğini görmek için grubun kendi sorgusuna geçin.
-                    </p>
+            <div class="so-search-hints">
+                <span class="so-hint-label">Örnek biçimler</span>
+                <code class="so-code so-code--sm">GRP-ORNEK-OPERASYON</code>
+                <code class="so-code so-code--sm">Ornek Operasyon Ekibi</code>
+            </div>
 
-                    @if (_membersProblem is not null)
+            <p class="so-panel-text so-panel-text--sm">
+                Tam grup adıyla sorgulanır. Joker karakter, LDAP filtresi veya dizin taraması
+                desteklenmez.
+            </p>
+        </section>
+    }
+    else
+    {
+        @* -- result state ------------------------------------------------------------------- *@
+        @if (_trail.Count > 1)
+        {
+            <nav class="so-breadcrumb" aria-label="Grup gezinme geçmişi">
+                <span class="so-breadcrumb-root">Active Directory</span>
+                @for (int i = 0; i < _trail.Count; i++)
+                {
+                    string step = _trail[i];
+                    bool isCurrent = i == _trail.Count - 1;
+                    <span class="so-breadcrumb-sep" aria-hidden="true">›</span>
+                    @if (isCurrent)
                     {
-                        <SoProblemPanel Problem="_membersProblem" OnRetry="@(() => LoadMembersAsync(reset: true))"
-                                        RetryLabel="Yeniden yükle" />
-                    }
-                    else if (_membersLoading && _members.Count == 0)
-                    {
-                        <SoLoading Message="Üyeler getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
-                    }
-                    else if (_members.Count == 0)
-                    {
-                        <SoEmptyState Title="Bu grubun doğrudan üyesi yok"
-                                      Description="Grup boş olabilir veya yalnızca başka gruplar üzerinden kullanılıyor olabilir."
-                                      Icon="@Icons.Material.Outlined.GroupOff" />
+                        <span class="so-breadcrumb-current">@step</span>
                     }
                     else
                     {
-                        <div class="so-table-scroll">
-                            <table class="so-plain-table">
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Üye</th>
-                                        <th scope="col">Hesap adı</th>
-                                        <th scope="col">Tür</th>
-                                        <th scope="col">Ayırt edici ad</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (DirectoryMemberDto member in _members)
-                                    {
-                                        DirectoryMemberDto captured = member;
-                                        <tr>
-                                            <th scope="row">@DirectoryView.MemberName(member)</th>
-                                            <td>
-                                                @if (!string.IsNullOrWhiteSpace(member.SamAccountName))
-                                                {
-                                                    <code class="so-code so-code--sm">@member.SamAccountName</code>
-                                                }
-                                                else
-                                                {
-                                                    <span class="so-unknown">—</span>
-                                                }
-                                            </td>
-                                            <td>
-                                                <SoStatusBadge Label="@DirectoryView.MemberTypeLabel(member.MemberType)"
-                                                               Tone="@MemberTone(member.MemberType)" />
-                                                @if (IsGroup(member))
-                                                {
-                                                    <MudButton Variant="Variant.Text" Color="Color.Primary"
-                                                               Size="Size.Small"
-                                                               OnClick="@(() => OpenNestedAsync(captured))">
-                                                        Bu grubu aç
-                                                    </MudButton>
-                                                }
-                                            </td>
-                                            <td class="so-cell-wrap">
-                                                @if (!string.IsNullOrWhiteSpace(member.DistinguishedName))
-                                                {
-                                                    <code class="so-code so-code--sm">@member.DistinguishedName</code>
-                                                }
-                                                else
-                                                {
-                                                    <span class="so-unknown">—</span>
-                                                }
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-
-                        @if (_continuationToken is not null)
-                        {
-                            <div class="so-pager">
-                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
-                                           Disabled="@_membersLoading"
-                                           StartIcon="@Icons.Material.Filled.ExpandMore"
-                                           OnClick="@(() => LoadMembersAsync(reset: false))">
-                                    Daha fazla yükle
-                                </MudButton>
-                                <span class="so-pager-state">
-                                    @_members.Count üye yüklendi; devamı var.
-                                </span>
-                            </div>
-                        }
+                        <button type="button" class="so-breadcrumb-link"
+                                @onclick="@(() => NavigateTrailAsync(step))">
+                            @step
+                        </button>
                     }
                 }
-            </section>
+            </nav>
+        }
+
+        <div class="so-result-head">
+            <div class="so-result-query">
+                <span class="so-result-query-label">AD Grup Analizi</span>
+                <code class="so-code so-result-query-value">@_submittedGroup</code>
+            </div>
+            <div class="so-result-actions">
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                           Disabled="@_loading"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="@(() => SearchAsync(_submittedGroup!, resetTrail: false, refresh: true))">
+                    Yenile
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="StartNewQuery">
+                    Yeni Sorgu
+                </MudButton>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <SoLoading Message="Grup bilgileri getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+        }
+        else if (_problem is not null)
+        {
+            <SoProblemPanel Problem="_problem"
+                            OnRetry="@(() => SearchAsync(_submittedGroup!, resetTrail: false, refresh: true))" />
+        }
+        else if (_group is not null)
+        {
+            <SoGroupHeader Group="_group" />
+
+            <div class="so-tabs" role="tablist" aria-label="Grup analizi bölümü">
+                @foreach (GroupTab tab in AvailableTabs)
+                {
+                    GroupTab captured = tab;
+                    <button type="button"
+                            role="tab"
+                            class="so-tab @(tab == _tab ? "so-tab--active" : null)"
+                            aria-selected="@(tab == _tab)"
+                            @onclick="() => _tab = captured">
+                        @TabLabel(tab)
+                    </button>
+                }
+            </div>
+
+            @switch (_tab)
+            {
+                case GroupTab.Overview:
+                    <SoGroupOverview Group="_group" />
+                    break;
+
+                case GroupTab.DirectMembers:
+                    <SoGroupDirectMembers @key="@($"members:{_submittedGroup}")"
+                                          Group="_submittedGroup!"
+                                          CanExport="@_canExport"
+                                          Exporting="@_exporting"
+                                          OnOpenGroup="OpenGroupAsync"
+                                          OnOpenUser="OpenUser"
+                                          OnExport="@(() => ExportAsync("DirectMembers"))" />
+                    break;
+
+                case GroupTab.NestedGroups:
+                case GroupTab.EffectiveMembers:
+                case GroupTab.ParentGroups:
+                    <SoGroupAnalysisSection Section="_tab"
+                                            Analysis="_analysis"
+                                            Problem="_analysisProblem"
+                                            Loading="_analysisLoading"
+                                            CanExport="@_canExport"
+                                            Exporting="@_exporting"
+                                            OnRun="@(() => RunAnalysisAsync(refresh: false))"
+                                            OnOpenGroup="OpenGroupAsync"
+                                            OnOpenUser="OpenUser"
+                                            OnExport="@(() => ExportAsync("EffectiveMembers"))" />
+                    break;
+
+                case GroupTab.MembershipCheck:
+                    <SoGroupMembershipCheck @key="@($"check:{_submittedGroup}")"
+                                            Group="_submittedGroup!"
+                                            GroupDisplayName="@DirectoryView.GroupName(_group)" />
+                    break;
+            }
+
+            @if (_exportProblem is not null)
+            {
+                <SoProblemPanel Problem="_exportProblem" />
+            }
         }
     }
 </div>
 
 @code {
+    /// <summary>Sections of the group analysis, each with its own cost.</summary>
+    public enum GroupTab
+    {
+        /// <summary>Group metadata only. Cheap, and the landing section.</summary>
+        Overview,
+
+        /// <summary>Explicit member links, paged.</summary>
+        DirectMembers,
+
+        /// <summary>Groups that are direct members of this group.</summary>
+        NestedGroups,
+
+        /// <summary>Leaf principals reached by expanding nested groups.</summary>
+        EffectiveMembers,
+
+        /// <summary>Groups this group is itself a member of.</summary>
+        ParentGroups,
+
+        /// <summary>Whether one exact account reaches this group.</summary>
+        MembershipCheck
+    }
+
     private readonly GroupModel _model = new();
+    private readonly List<string> _trail = [];
 
     private AccessSnapshot? _access;
+    private string? _submittedGroup;
     private DirectoryGroupDetailDto? _group;
     private UiProblem? _problem;
     private bool _loading;
+    private GroupTab _tab = GroupTab.Overview;
 
-    private readonly List<DirectoryMemberDto> _members = [];
-    private string? _continuationToken;
-    private UiProblem? _membersProblem;
-    private bool _membersLoading;
-    private string? _purposeError;
+    private DirectoryGroupAnalysisResponse? _analysis;
+    private UiProblem? _analysisProblem;
+    private bool _analysisLoading;
 
-    // Sent to every call on this page, so metadata and members are recorded identically.
-    private string? Purpose => DirectoryPurposeInput.Normalize(_model.Purpose);
+    private UiProblem? _exportProblem;
+    private bool _exporting;
+    private bool _canExport;
 
-    private void OnPurposeChanged() => _purposeError = DirectoryPurposeInput.Validate(_model.Purpose);
+    /// <summary>Group supplied by a link from another screen.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "group")]
+    public string? GroupQuery { get; set; }
+
+    // Member enumeration and the nested walk are a separate capability from reading the group, so an
+    // operator who may see that a group exists does not automatically see who is in it.
+    private IEnumerable<GroupTab> AvailableTabs =>
+        _access?.Can(Capabilities.DirectoryGroupMembersView) == true
+            ? Enum.GetValues<GroupTab>()
+            : [GroupTab.Overview, GroupTab.MembershipCheck];
+
+    private static string TabLabel(GroupTab tab) => tab switch
+    {
+        GroupTab.Overview => "Genel Bakış",
+        GroupTab.DirectMembers => "Doğrudan Üyeler",
+        GroupTab.NestedGroups => "İç İçe Gruplar",
+        GroupTab.EffectiveMembers => "Tüm Etkin Üyeler",
+        GroupTab.ParentGroups => "Üyesi Olduğu Gruplar",
+        _ => "Üyelik Kontrolü"
+    };
 
     protected override async Task OnInitializedAsync()
     {
         AccessProvider.Changed += OnAccessChanged;
         _access = await AccessProvider.GetAsync(CancellationToken.None);
+        _canExport = _access.Can(Capabilities.DirectoryGroupExport);
+
+        // Arriving from a group link on the account screen goes straight to that group.
+        if (!string.IsNullOrWhiteSpace(GroupQuery))
+        {
+            _model.Group = GroupQuery;
+            await SearchAsync(GroupQuery, resetTrail: true);
+        }
     }
 
-    private async Task ReloadAccessAsync() => _access = await AccessProvider.RefreshAsync(CancellationToken.None);
-
-    private async Task LoadGroupAsync(bool refresh)
+    private async Task ReloadAccessAsync()
     {
-        // Only the group is required now; a blank purpose is a valid query.
-        if (string.IsNullOrWhiteSpace(_model.Group) || _purposeError is not null)
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        _canExport = _access.Can(Capabilities.DirectoryGroupExport);
+    }
+
+    private async Task SearchAsync(string group, bool resetTrail, bool refresh = false)
+    {
+        if (string.IsNullOrWhiteSpace(group))
         {
             return;
         }
+
+        string target = group.Trim();
+        _submittedGroup = target;
+        _model.Group = target;
+
+        if (resetTrail)
+        {
+            _trail.Clear();
+        }
+
+        if (_trail.Count == 0 || !string.Equals(_trail[^1], target, StringComparison.OrdinalIgnoreCase))
+        {
+            _trail.Add(target);
+        }
+
+        // A new group invalidates every analysed section; keeping them would describe one group's
+        // nesting under another's name.
+        _analysis = null;
+        _analysisProblem = null;
+        _exportProblem = null;
+        _tab = GroupTab.Overview;
 
         _loading = true;
         _problem = null;
@@ -352,9 +332,8 @@
 
         try
         {
-            DirectoryGroupDetailResponse response = await Directory.GetGroupAsync(
-                _model.Group.Trim(), Purpose, refresh, CancellationToken.None);
-
+            DirectoryGroupDetailResponse response =
+                await Directory.GetGroupAsync(target, null, refresh, CancellationToken.None);
             _group = response.Group;
         }
         catch (SecureOpsApiException ex)
@@ -367,95 +346,112 @@
         {
             _loading = false;
         }
-
-        if (_group is not null && _access?.Can(Capabilities.DirectoryGroupMembersView) == true)
-        {
-            await LoadMembersAsync(reset: true);
-        }
-        else
-        {
-            ResetMembers();
-        }
     }
 
-    private async Task LoadMembersAsync(bool reset)
+    // The bounded nested-group walk. Never automatic: the operator asks for it, because it is the one
+    // call here that can take seconds and consume a rate-limit slot. One call produces the nested
+    // groups, the effective members, and the parent groups, so all three share this result.
+    private async Task RunAnalysisAsync(bool refresh)
     {
-        if (_group is null)
+        if (_submittedGroup is null)
         {
             return;
         }
 
-        if (reset)
-        {
-            ResetMembers();
-        }
-
-        _membersLoading = true;
-        _membersProblem = null;
+        _analysisLoading = true;
+        _analysisProblem = null;
         StateHasChanged();
 
         try
         {
-            DirectoryMemberPageResponse page = await Directory.GetGroupMembersAsync(
-                _model.Group.Trim(),
-                Purpose,
-                pageSize: null,
-                continuationToken: _continuationToken,
-                CancellationToken.None);
-
-            _members.AddRange(page.Items);
-
-            // The API signals "no more" by omitting the token. Treating an empty string as a token
-            // would loop forever on the last page.
-            _continuationToken = string.IsNullOrWhiteSpace(page.ContinuationToken)
-                ? null
-                : page.ContinuationToken;
+            _analysis = await Directory.AnalyzeGroupAsync(_submittedGroup, null, refresh, CancellationToken.None);
         }
         catch (SecureOpsApiException ex)
         {
-            _membersProblem = ex.Problem;
-            Logger.LogDebug("Directory group members unavailable. Code: {Code}.", ex.Problem.Code);
+            _analysis = null;
+            _analysisProblem = ex.Problem;
+            Logger.LogDebug("Group analysis unavailable. Code: {Code}.", ex.Problem.Code);
         }
         finally
         {
-            _membersLoading = false;
+            _analysisLoading = false;
         }
     }
 
-    // Follows a nested group by running its own exact lookup, which keeps every expansion an audited
-    // server call instead of a client-side traversal.
-    private Task OpenNestedAsync(DirectoryMemberDto member)
+    private async Task ExportAsync(string mode)
     {
-        string? target = !string.IsNullOrWhiteSpace(member.SamAccountName)
-            ? member.SamAccountName
-            : member.Name;
-
-        if (string.IsNullOrWhiteSpace(target))
+        if (_submittedGroup is null || _exporting)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        _model.Group = target;
-        return LoadGroupAsync(refresh: false);
+        _exporting = true;
+        _exportProblem = null;
+        StateHasChanged();
+
+        try
+        {
+            DirectoryExportFile file = await Directory.ExportGroupAsync(
+                _submittedGroup, mode, null, CancellationToken.None);
+
+            // The server produced the bytes, the file name, and the content type. The browser only
+            // hands them to the operator; nothing is generated or reformatted here.
+            await JS.InvokeVoidAsync(
+                "secureOpsDownload", file.FileName, file.ContentType, Convert.ToBase64String(file.Content));
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _exportProblem = ex.Problem;
+            Logger.LogWarning(
+                "Group export failed. Mode: {Mode}. Code: {Code}. CorrelationId: {CorrelationId}.",
+                mode, ex.Problem.Code, ex.Problem.CorrelationId);
+        }
+        finally
+        {
+            _exporting = false;
+        }
     }
 
-    private void ResetMembers()
+    private Task OpenGroupAsync(DirectoryGroupSummaryDto group)
     {
-        _members.Clear();
-        _continuationToken = null;
-        _membersProblem = null;
+        string? target = DirectoryView.ExactGroupIdentifier(group);
+        return string.IsNullOrWhiteSpace(target) ? Task.CompletedTask : SearchAsync(target, resetTrail: false);
     }
 
-    private static bool IsGroup(DirectoryMemberDto member) =>
-        string.Equals(member.MemberType, "Group", StringComparison.Ordinal);
-
-    private static SoStatusBadge.BadgeTone MemberTone(string memberType) => memberType switch
+    private void OpenUser(DirectoryMemberDto member)
     {
-        "Group" => SoStatusBadge.BadgeTone.Info,
-        "Computer" => SoStatusBadge.BadgeTone.Neutral,
-        "User" => SoStatusBadge.BadgeTone.Neutral,
-        _ => SoStatusBadge.BadgeTone.Neutral
-    };
+        string? target = DirectoryView.ExactMemberIdentifier(member);
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            Navigation.NavigateTo($"directory/users?account={Uri.EscapeDataString(target)}");
+        }
+    }
+
+    // Going back through the breadcrumb truncates the trail rather than appending, so the path
+    // reflects where the operator is rather than everywhere they have been.
+    private Task NavigateTrailAsync(string step)
+    {
+        int index = _trail.FindIndex(item => string.Equals(item, step, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0)
+        {
+            _trail.RemoveRange(index, _trail.Count - index);
+        }
+
+        return SearchAsync(step, resetTrail: false);
+    }
+
+    private void StartNewQuery()
+    {
+        _submittedGroup = null;
+        _group = null;
+        _problem = null;
+        _analysis = null;
+        _analysisProblem = null;
+        _exportProblem = null;
+        _trail.Clear();
+        _model.Group = string.Empty;
+        _tab = GroupTab.Overview;
+    }
 
     private void OnAccessChanged() => InvokeAsync(StateHasChanged);
 
@@ -466,9 +462,5 @@
         [Required(ErrorMessage = "Grup zorunludur.")]
         [MaxLength(256)]
         public string Group { get; set; } = string.Empty;
-
-        // No [Required]: read-only directory queries accept an omitted purpose. Length is checked
-        // by DirectoryPurposeInput against the server bound rather than duplicated here.
-        public string Purpose { get; set; } = string.Empty;
     }
 }

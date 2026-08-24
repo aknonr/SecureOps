@@ -216,8 +216,8 @@ public static class UiProblemFactory
 
         OperationalErrorCodes.IdentityProviderUnavailable => Build(
             UiProblemKind.UpstreamUnavailable, code,
-            "Dizin servisi yanıt vermiyor",
-            "Kimlik sağlayıcısına şu anda ulaşılamıyor. Sorgunuz çalıştırılmadı.",
+            "Active Directory hizmetine şu anda ulaşılamıyor",
+            "Hesap sorgusu için dizin sağlayıcısına bağlanılamadı. Sorgunuz çalıştırılmadı.",
             [RetryStep, ContactAdminStep],
             retryable: true, requiresRefresh: false),
 
@@ -271,10 +271,35 @@ public static class UiProblemFactory
 
         OperationalErrorCodes.DirectoryProviderUnavailable => Build(
             UiProblemKind.UpstreamUnavailable, code,
-            "Dizin servisi yanıt vermiyor",
-            "Dizin sağlayıcısına şu anda ulaşılamıyor. Sorgunuz çalıştırılmadı.",
+            "Active Directory hizmetine şu anda ulaşılamıyor",
+            "Dizin sağlayıcısına bağlanılamadı. Sorgunuz çalıştırılmadı.",
             [RetryStep, ContactAdminStep],
             retryable: true, requiresRefresh: false),
+
+        // Distinct from unavailable on purpose. The directory answered other calls; this one ran
+        // out of time. Retrying a narrower query is often the right move, and telling an operator
+        // "AD is down" when it is not sends them to the wrong team.
+        OperationalErrorCodes.DirectoryProviderTimeout => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Active Directory sorgusu süre sınırı içinde tamamlanamadı",
+            "Sorgu, sunucu tarafındaki süre sınırına takıldı. Bu, dizin hizmetinin çalışmadığı "
+            + "anlamına gelmez; sorgu bu grup için beklenenden uzun sürmüş olabilir.",
+            ["Daha dar bir grup veya hesap ile tekrar deneyin.",
+             RetryStep,
+             ContactAdminStep],
+            retryable: true, requiresRefresh: false),
+
+        // A result, not a failure: the server walked as far as its bounds allowed and said so. The
+        // one thing that must never follow is a "no membership" conclusion.
+        OperationalErrorCodes.DirectoryTraversalPartial => Build(
+            UiProblemKind.Validation, code,
+            "Üyelik analizi kısmi tamamlandı",
+            "Analiz, sunucu tarafındaki güvenlik ve başarım sınırları içinde kısmen tamamlandı. "
+            + "Elde edilen kanıt eksiktir.",
+            ["Kısmi sonuç, üyelik yok kararı için kullanılmamalıdır.",
+             "Daha dar bir grup ile analiz etmeyi deneyin.",
+             ContactAdminStep],
+            retryable: false, requiresRefresh: false),
 
         // ---- Application sessions ---------------------------------------------------------------
         OperationalErrorCodes.SessionExpired => Build(

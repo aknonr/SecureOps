@@ -170,4 +170,49 @@ public interface IDirectoryApiClient
         int? pageSize,
         string? continuationToken,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Runs the bounded nested-group analysis for one exact group.
+    /// </summary>
+    /// <param name="group">Exact group identifier.</param>
+    /// <param name="purpose">Optional operational context.</param>
+    /// <param name="refresh">Bypasses the server-side query cache.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Overview, direct members, nested groups, effective members, topology, and parents.</returns>
+    /// <remarks>
+    /// The expensive call on these screens: it walks the nested-group graph under a server-side
+    /// timeout and node, depth, edge, and result ceiling. It is never issued automatically — the
+    /// operator asks for it — and a bounded result comes back as HTTP 200 with
+    /// <c>isComplete=false</c>, which must not be presented as a complete answer.
+    /// </remarks>
+    public Task<DirectoryGroupAnalysisResponse> AnalyzeGroupAsync(
+        string group,
+        string? purpose,
+        bool refresh,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Exports one group's membership as CSV.
+    /// </summary>
+    /// <param name="group">Exact group identifier.</param>
+    /// <param name="mode"><c>DirectMembers</c> or <c>EffectiveMembers</c>.</param>
+    /// <param name="purpose">Optional operational context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>File name, content type, and bytes exactly as the server produced them.</returns>
+    /// <remarks>
+    /// Requires <c>Identity.Groups.Export</c>. The server sorts deterministically, enforces a row
+    /// ceiling, neutralizes spreadsheet formula characters, and refuses to export a partial
+    /// effective-membership result. The UI generates no CSV of its own.
+    /// </remarks>
+    public Task<DirectoryExportFile> ExportGroupAsync(
+        string group,
+        string mode,
+        string? purpose,
+        CancellationToken cancellationToken);
 }
+
+/// <summary>One exported file exactly as the API produced it.</summary>
+/// <param name="FileName">Server-supplied file name.</param>
+/// <param name="ContentType">Server-supplied content type.</param>
+/// <param name="Content">File bytes.</param>
+public sealed record DirectoryExportFile(string FileName, string ContentType, byte[] Content);

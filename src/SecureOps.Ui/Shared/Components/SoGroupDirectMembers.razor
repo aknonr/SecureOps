@@ -1,0 +1,248 @@
+@using Microsoft.Extensions.Logging
+@inject IDirectoryApiClient Directory
+@inject ILogger<SoGroupDirectMembers> Logger
+
+@*
+    Explicit member links only.
+
+    This is the AD `member` attribute and nothing else. It does not include accounts whose only
+    relationship to the group is primaryGroupID, and the response says so — a member list that
+    quietly implied completeness would send an operator looking for a user who is genuinely in the
+    group but not in this list.
+
+    Paging is forward-only because the continuation token is. "Daha fazla yükle" appends rather than
+    pretending to offer random access the API does not have.
+
+    A failure here is this section's failure. The group overview above stays exactly as it was.
+*@
+
+<section class="so-panel">
+    <div class="so-panel-head">
+        <h3 class="so-subhead so-subhead--flush">
+            Doğrudan Üyeler
+            @if (_members.Count > 0)
+            {
+                <span class="so-count-chip">@_members.Count</span>
+            }
+        </h3>
+        <div class="so-panel-head-actions">
+            @if (CanExport && _members.Count > 0)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                           Disabled="@Exporting"
+                           StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@(() => OnExport.InvokeAsync())">
+                    Dışa Aktar (CSV)
+                </MudButton>
+            }
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       Disabled="@_loading"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="@(() => LoadAsync(reset: true))">
+                Yenile
+            </MudButton>
+        </div>
+    </div>
+
+    <p class="so-panel-text so-panel-text--sm">
+        Yalnızca gruba açıkça eklenmiş üyeler listelenir. Birincil grubu bu grup olan hesaplar bu
+        listede yer almaz. İç içe gruplar burada üye olarak görünür ve açılmaz; içeriğini görmek için
+        grubun kendi analizine geçin.
+    </p>
+
+    @if (_problem is not null)
+    {
+        @* Scoped to this section on purpose: the overview above remains valid evidence. *@
+        <div class="so-partial-notice so-partial-notice--problem" role="status">
+            <span class="so-partial-icon" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.WarningAmber" Size="Size.Small" />
+            </span>
+            <div>
+                <p class="so-partial-title">Grup bilgileri alındı ancak üye listesi tamamlanamadı.</p>
+                <p class="so-panel-text so-panel-text--sm">@_problem.Explanation</p>
+                @if (_problem.CorrelationId is { Length: > 0 } correlationId)
+                {
+                    <p class="so-panel-text so-panel-text--sm">
+                        Destek referansı: <code class="so-code so-code--sm">@correlationId</code>
+                    </p>
+                }
+                <div class="so-panel-actions">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               Disabled="@_loading"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="@(() => LoadAsync(reset: true))">
+                        Tekrar Dene
+                    </MudButton>
+                </div>
+            </div>
+        </div>
+    }
+    else if (_loading && _members.Count == 0)
+    {
+        <SoLoading Message="Üyeler getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+    }
+    else if (_members.Count == 0)
+    {
+        @* A successful empty read is a finding, not an error. *@
+        <p class="so-panel-text so-panel-text--sm so-unknown">
+            Bu grubun doğrudan üyesi bulunmuyor.
+        </p>
+    }
+    else
+    {
+        <div class="so-table-scroll">
+            <table class="so-plain-table so-member-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Üye</th>
+                        <th scope="col">AD Hesap Adı</th>
+                        <th scope="col">@DirectoryView.ObjectTypeLabel</th>
+                        <th scope="col"><span class="sr-only">İşlem</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (DirectoryMemberDto member in _members)
+                    {
+                        DirectoryMemberDto captured = member;
+                        <tr>
+                            <th scope="row">@DirectoryView.MemberName(member)</th>
+                            <td>
+                                @if (DirectoryView.ShowAccountNameSeparately(member.Name, member.SamAccountName))
+                                {
+                                    <code class="so-code so-code--sm">@member.SamAccountName</code>
+                                }
+                                else
+                                {
+                                    <span class="so-unknown">—</span>
+                                }
+                            </td>
+                            <td>
+                                <SoStatusBadge Label="@DirectoryView.MemberTypeLabel(member.MemberType)"
+                                               Tone="SoStatusBadge.BadgeTone.Neutral" />
+                            </td>
+                            <td>
+                                @if (IsGroup(member))
+                                {
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                               EndIcon="@Icons.Material.Filled.ChevronRight"
+                                               OnClick="@(() => OnOpenGroup.InvokeAsync(AsSummary(captured)))">
+                                        Grubu İncele
+                                    </MudButton>
+                                }
+                                else if (IsUser(member))
+                                {
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                               EndIcon="@Icons.Material.Filled.ChevronRight"
+                                               OnClick="@(() => OnOpenUser.InvokeAsync(captured))">
+                                        Hesabı İncele
+                                    </MudButton>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (_continuationToken is not null)
+        {
+            <div class="so-pager">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                           Disabled="@_loading"
+                           StartIcon="@Icons.Material.Filled.ExpandMore"
+                           OnClick="@(() => LoadAsync(reset: false))">
+                    Daha fazla yükle
+                </MudButton>
+                <span class="so-pager-state">@_members.Count üye yüklendi; devamı var.</span>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    /// <summary>Exact group identifier.</summary>
+    [Parameter, EditorRequired]
+    public string Group { get; set; } = string.Empty;
+
+    /// <summary>Whether the caller holds the export capability.</summary>
+    [Parameter]
+    public bool CanExport { get; set; }
+
+    /// <summary>Whether an export is already running.</summary>
+    [Parameter]
+    public bool Exporting { get; set; }
+
+    /// <summary>Raised when the operator wants to analyse a nested group.</summary>
+    [Parameter]
+    public EventCallback<DirectoryGroupSummaryDto> OnOpenGroup { get; set; }
+
+    /// <summary>Raised when the operator wants to inspect a member account.</summary>
+    [Parameter]
+    public EventCallback<DirectoryMemberDto> OnOpenUser { get; set; }
+
+    /// <summary>Raised when the operator asks for a CSV of these members.</summary>
+    [Parameter]
+    public EventCallback OnExport { get; set; }
+
+    private readonly List<DirectoryMemberDto> _members = [];
+    private string? _continuationToken;
+    private UiProblem? _problem;
+    private bool _loading;
+
+    protected override Task OnInitializedAsync() => LoadAsync(reset: true);
+
+    private async Task LoadAsync(bool reset)
+    {
+        if (reset)
+        {
+            _members.Clear();
+            _continuationToken = null;
+        }
+
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            DirectoryMemberPageResponse page = await Directory.GetGroupMembersAsync(
+                Group, null, pageSize: null, continuationToken: _continuationToken, CancellationToken.None);
+
+            _members.AddRange(page.Items);
+
+            // The API signals "no more" by omitting the token. Treating an empty string as a token
+            // would loop forever on the last page.
+            _continuationToken = string.IsNullOrWhiteSpace(page.ContinuationToken)
+                ? null
+                : page.ContinuationToken;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            Logger.LogDebug("Directory group members unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // Object type only. A user object is a user object whether it belongs to a person, to PAM, or to
+    // a service, and this row offers the account screen for all three.
+    private static bool IsGroup(DirectoryMemberDto member) =>
+        string.Equals(member.MemberType, "Group", StringComparison.Ordinal);
+
+    private static bool IsUser(DirectoryMemberDto member) =>
+        string.Equals(member.MemberType, "User", StringComparison.Ordinal);
+
+    // A member row carries the same naming fields a group summary needs, so following a nested group
+    // does not require a second lookup just to build the request.
+    private static DirectoryGroupSummaryDto AsSummary(DirectoryMemberDto member) => new(
+        member.StableIdentifier,
+        member.Name,
+        member.SamAccountName,
+        member.DistinguishedName,
+        null,
+        "Unknown",
+        "Unknown");
+}

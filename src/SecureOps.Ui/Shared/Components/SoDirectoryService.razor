@@ -5,18 +5,24 @@
 @*
     Service-account indicators from directory evidence.
 
-    Deliberately titled as indicators. The API reports what the directory objects say — object class,
-    SPNs, delegation-adjacent attributes — and does not decide that an account is a service account.
-    Neither does this panel: an ordinary user object carrying SPNs is shown as exactly that, and the
-    operator draws the conclusion.
+    Indicators, not a classification. The API reports what the directory object says — object class,
+    SPNs, managedBy, password policy — and does not decide that an account is a service account.
+    Neither does this panel, in either direction: an ordinary user object carrying SPNs is shown as
+    exactly that, and an account with no SPNs is not thereby "not a service account".
 
-    SPN lists are bounded server-side. When the list is truncated the count is still authoritative,
-    and the panel says which is which so nobody counts the rows and reports a smaller number.
+    Two results are easy to render as failures and must not be:
+
+      SPN count 0 with a successful read is empty evidence, not an outage. It says this account has
+      no service principal names, which is a finding.
+
+      membershipEvidenceAvailable=false means the principal and SPN read succeeded while the group
+      graph did not. The panel keeps everything it does have and marks only the counts unknown,
+      rather than collapsing into "Active Directory yanıt vermiyor".
 *@
 
 @if (_loading)
 {
-    <SoLoading Message="Servis kanıtları getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+    <SoLoading Message="Servis göstergeleri getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
 }
 else if (_problem is not null)
 {
@@ -24,99 +30,129 @@ else if (_problem is not null)
 }
 else if (_evidence is not null)
 {
-    <div class="so-panel-head">
-        <h3 class="so-subhead so-subhead--flush">Servis hesabı göstergeleri</h3>
-        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Refresh"
-                   OnClick="@(() => LoadAsync(refresh: true))">
-            Yenile
-        </MudButton>
-    </div>
+    <section class="so-panel">
+        <div class="so-panel-head">
+            <h3 class="so-subhead so-subhead--flush">Servis Hesabı Göstergeleri</h3>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="@(() => LoadAsync(refresh: true))">
+                Yenile
+            </MudButton>
+        </div>
 
-    <p class="so-panel-text so-panel-text--sm">
-        Aşağıdakiler dizinden okunan kanıtlardır, sınıflandırma değildir. SecureOps bir hesabın
-        servis hesabı olduğuna karar vermez; kararı bu kanıtlara bakarak siz verirsiniz.
-    </p>
-
-    <SoTraversalNotice Traversal="_evidence.Traversal" />
-
-    <div class="so-metrics">
-        <SoMetric Label="SPN sayısı"
-                  Value="@ManagementReportView.Count(_evidence.ServicePrincipalNameCount)"
-                  Hint="@(_evidence.ServicePrincipalNamesTruncated ? "Liste kısaltıldı, sayı tamdır" : null)"
-                  Tone="@(_evidence.ServicePrincipalNameCount > 0
-                           ? SoMetric.MetricTone.Lead
-                           : SoMetric.MetricTone.Plain)" />
-        <SoMetric Label="Doğrudan grup"
-                  Value="@ManagementReportView.Count(_evidence.DirectGroupCount)" />
-        <SoMetric Label="İç içe grup"
-                  Value="@ManagementReportView.Count(_evidence.TransitiveGroupCount)" />
-    </div>
-
-    <SoFieldGrid MinColumnWidth="240px">
-        <SoField Label="Dizin nesne türü">
-            @DirectoryView.AccountTypeEvidenceLabel(_evidence.AccountTypeEvidence)
-        </SoField>
-        <SoField Label="Sorumlu (managedBy)">
-            @if (string.IsNullOrWhiteSpace(_evidence.ManagedBy))
-            {
-                <span class="so-unknown">@DirectoryView.UnknownText</span>
-            }
-            else
-            {
-                <span class="so-wrap">@_evidence.ManagedBy</span>
-            }
-        </SoField>
-        <SoField Label="Parola en son ayarlandı">
-            @DirectoryView.Timestamp(_evidence.PasswordLastSetUtc)
-        </SoField>
-        <SoField Label="Parola yaşı">@DirectoryView.Days(_evidence.PasswordAgeDays)</SoField>
-        <SoField Label="Hesap bitiş tarihi">
-            @DirectoryView.Timestamp(_evidence.AccountExpiresUtc)
-        </SoField>
-    </SoFieldGrid>
-
-    <h3 class="so-subhead">
-        Servis asıl adları (SPN)
-        <span class="so-count-chip">@_evidence.ServicePrincipalNameCount</span>
-    </h3>
-
-    @if (_evidence.ServicePrincipalNames.Count == 0)
-    {
         <p class="so-panel-text so-panel-text--sm">
-            Bu hesap için SPN kaydı bulunmuyor.
+            Aşağıdakiler Active Directory'den okunan kanıtlardır, kesin bir sınıflandırma değildir.
+            SecureOps bir hesabın servis hesabı olduğuna karar vermez; kararı bu kanıtlara bakarak
+            siz verirsiniz.
         </p>
-    }
-    else
-    {
-        <ul class="so-spn-list">
-            @foreach (string spn in _evidence.ServicePrincipalNames)
-            {
-                <li><code class="so-code so-code--sm">@spn</code></li>
-            }
-        </ul>
 
-        @if (_evidence.ServicePrincipalNamesTruncated)
+        @if (!_evidence.MembershipEvidenceAvailable)
         {
-            @* Count and list disagree by design. Saying so prevents someone counting the visible
-               rows and reporting a smaller number than the account actually carries. *@
-            <p class="so-panel-text so-panel-text--sm so-note-caution">
-                Toplam @_evidence.ServicePrincipalNameCount SPN'den yalnızca ilk
-                @_evidence.ServicePrincipalNames.Count tanesi gösteriliyor; liste sunucu tarafında
-                sınırlandırıldı. Sayı tam, liste eksiktir.
+            @* The principal read worked. Only the group graph did not, and saying which is which
+               stops an operator reporting an AD outage that is not happening. *@
+            <div class="so-partial-notice" role="status">
+                <span class="so-partial-icon" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
+                </span>
+                <div>
+                    <p class="so-partial-title">Hesap bilgileri alındı, grup sayıları alınamadı</p>
+                    <p class="so-panel-text so-panel-text--sm">
+                        Bu hesabın nesne ve SPN bilgileri başarıyla okundu; grup üyeliği sayıları bu
+                        sorguda elde edilemedi. Aşağıdaki SPN kanıtları geçerlidir.
+                    </p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <SoTraversalNotice Traversal="_evidence.Traversal" />
+        }
+
+        <div class="so-metrics">
+            <SoMetric Label="SPN sayısı"
+                      Value="@_evidence.ServicePrincipalNameCount.ToString()"
+                      Hint="@(_evidence.ServicePrincipalNamesTruncated ? "Liste kısaltıldı, sayı tamdır" : null)"
+                      Tone="@(_evidence.ServicePrincipalNameCount > 0
+                               ? SoMetric.MetricTone.Lead
+                               : SoMetric.MetricTone.Plain)" />
+            <SoMetric Label="Doğrudan grup"
+                      Value="@DirectoryView.Count(_evidence.DirectGroupCount)"
+                      Available="@(_evidence.DirectGroupCount is not null)" />
+            <SoMetric Label="İç içe grup"
+                      Value="@DirectoryView.Count(_evidence.TransitiveGroupCount)"
+                      Available="@(_evidence.TransitiveGroupCount is not null)" />
+        </div>
+
+        <SoFieldGrid MinColumnWidth="260px">
+            <SoField Label="@DirectoryView.ObjectTypeLabel">
+                @DirectoryView.AccountTypeEvidenceLabel(_evidence.AccountTypeEvidence)
+            </SoField>
+            <SoField Label="@DirectoryView.ManagedByLabel">
+                @if (string.IsNullOrWhiteSpace(_evidence.ManagedBy))
+                {
+                    <span class="so-unknown">@DirectoryView.NotDefinedText</span>
+                }
+                else
+                {
+                    <span class="so-wrap">@_evidence.ManagedBy</span>
+                }
+            </SoField>
+            <SoField Label="Parola son değiştirilme zamanı">
+                @DirectoryView.Timestamp(_evidence.PasswordLastSetUtc)
+            </SoField>
+            <SoField Label="Parola yaşı">@DirectoryView.Days(_evidence.PasswordAgeDays)</SoField>
+            <SoField Label="Hesap bitiş tarihi">
+                @if (_evidence.AccountExpiresUtc is null)
+                {
+                    <span class="so-unknown">@DirectoryView.NotDefinedText</span>
+                }
+                else
+                {
+                    @DirectoryView.Timestamp(_evidence.AccountExpiresUtc)
+                }
+            </SoField>
+        </SoFieldGrid>
+
+        <h3 class="so-subhead">
+            Service Principal Name (SPN)
+            <span class="so-count-chip">@_evidence.ServicePrincipalNameCount</span>
+        </h3>
+        <p class="so-panel-text so-panel-text--sm">@DirectoryView.SpnHelp</p>
+
+        @if (_evidence.ServicePrincipalNameCount == 0)
+        {
+            @* Successful empty evidence. Never an error, and never a conclusion about the account. *@
+            <p class="so-panel-text so-panel-text--sm so-unknown">
+                Bu hesap üzerinde tanımlı SPN bulunmuyor.
             </p>
         }
-    }
+        else
+        {
+            <ul class="so-spn-list">
+                @foreach (string spn in _evidence.ServicePrincipalNames)
+                {
+                    <li><code class="so-code so-code--sm">@spn</code></li>
+                }
+            </ul>
+
+            @if (_evidence.ServicePrincipalNamesTruncated)
+            {
+                @* Count and list disagree by design. Saying so prevents someone counting the visible
+                   rows and reporting a smaller number than the account actually carries. *@
+                <p class="so-panel-text so-panel-text--sm so-note-caution">
+                    Toplam @_evidence.ServicePrincipalNameCount SPN'den yalnızca ilk
+                    @_evidence.ServicePrincipalNames.Count tanesi gösteriliyor; liste sunucu tarafında
+                    sınırlandırıldı. Sayı tam, liste eksiktir.
+                </p>
+            }
+        }
+    </section>
 }
 
 @code {
     /// <summary>Exact account, as the server normalized it.</summary>
     [Parameter, EditorRequired]
     public string Account { get; set; } = string.Empty;
-
-    /// <summary>Optional operational context; <c>null</c> when the operator gave none.</summary>
-    [Parameter]
-    public string? Purpose { get; set; }
 
     private DirectoryServiceEvidenceResponse? _evidence;
     private UiProblem? _problem;
@@ -132,7 +168,7 @@ else if (_evidence is not null)
 
         try
         {
-            _evidence = await Directory.GetServiceEvidenceAsync(Account, Purpose, refresh, CancellationToken.None);
+            _evidence = await Directory.GetServiceEvidenceAsync(Account, null, refresh, CancellationToken.None);
         }
         catch (SecureOpsApiException ex)
         {

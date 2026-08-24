@@ -114,6 +114,63 @@ public sealed class DirectoryApiClient : IDirectoryApiClient
             new DirectoryGroupMembersRequest(group, purpose, pageSize, continuationToken),
             cancellationToken);
 
+    /// <inheritdoc />
+    public Task<DirectoryGroupAnalysisResponse> AnalyzeGroupAsync(
+        string group,
+        string? purpose,
+        bool refresh,
+        CancellationToken cancellationToken) =>
+        PostAsync<DirectoryGroupAnalysisRequest, DirectoryGroupAnalysisResponse>(
+            "api/v1/directory/groups/analysis",
+            new DirectoryGroupAnalysisRequest(group, purpose, refresh),
+            cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<DirectoryExportFile> ExportGroupAsync(
+        string group,
+        string mode,
+        string? purpose,
+        CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response;
+
+        try
+        {
+            // Format is pinned to Csv: the contract offers nothing else, and passing through a
+            // caller-chosen value would invite a request the server would only reject.
+            response = await _httpClient.PostAsJsonAsync(
+                "api/v1/directory/groups/export",
+                new DirectoryGroupExportRequest(group, mode, "Csv", purpose),
+                ApiResponseReader.JsonOptions,
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        {
+            throw ApiResponseReader.ToTransportException(ex, cancellationToken);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                throw await ApiResponseReader.ToExceptionAsync(response, cancellationToken);
+            }
+
+            byte[] content = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+
+            // The server names the file; echoing its name keeps the export traceable to the audited
+            // operation rather than to something the browser invented.
+            string fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? "directory-group-export.csv";
+
+            return new DirectoryExportFile(
+                fileName,
+                response.Content.Headers.ContentType?.MediaType ?? "text/csv",
+                content);
+        }
+    }
+
     private async Task<TResponse> PostAsync<TRequest, TResponse>(
         string route,
         TRequest body,

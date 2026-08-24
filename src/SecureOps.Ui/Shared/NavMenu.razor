@@ -35,19 +35,19 @@
 
             @if (CanAnyDirectory)
             {
-                <div class="so-nav-group">Dizin</div>
+                <div class="so-nav-group" lang="en">Active Directory</div>
 
                 @if (Can(Capabilities.IdentityLookup))
                 {
                     <MudNavLink Href="directory/users" Icon="@Icons.Material.Filled.ManageSearch">
-                        Kullanıcı Sorgulama
+                        AD Kullanıcı ve Hesap Sorgulama
                     </MudNavLink>
                 }
 
                 @if (Can(Capabilities.DirectoryGroupsView))
                 {
                     <MudNavLink Href="directory/groups" Icon="@Icons.Material.Filled.Groups">
-                        Grup Sorgulama
+                        AD Grup Analizi
                     </MudNavLink>
                 }
             }

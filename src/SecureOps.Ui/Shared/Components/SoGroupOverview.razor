@@ -1,0 +1,127 @@
+@*
+    Group metadata, and only metadata.
+
+    Deliberately independent of member enumeration: this read returns in milliseconds while the
+    member list can take far longer or fail outright, and an operator asking "what is this group"
+    should not wait for an answer to "who is in it".
+
+    Absent values are stated rather than blanked, and stated precisely. A group with no description
+    has no description — that is a fact about the directory, not a rendering gap — and SecureOps does
+    not guess what the group is for from its name.
+*@
+
+<section class="so-panel">
+    <div class="so-panel-head">
+        <h3 class="so-subhead so-subhead--flush">Genel Bakış</h3>
+    </div>
+
+    <SoFieldGrid MinColumnWidth="280px">
+        <SoField Label="@DirectoryView.GroupNameLabel">@DirectoryView.GroupName(Group)</SoField>
+
+        <SoField Label="@DirectoryView.GroupAccountLabel">
+            @if (!string.IsNullOrWhiteSpace(Group.SamAccountName))
+            {
+                <code class="so-code so-code--sm">@Group.SamAccountName</code>
+            }
+            else
+            {
+                <span class="so-unknown">@DirectoryView.UnknownText</span>
+            }
+        </SoField>
+
+        <SoField Label="@DirectoryView.CategoryLabelName">
+            @DirectoryView.CategoryLabel(Group.Category)
+            @if (DirectoryView.CategoryExplanation(Group.Category) is { } categoryHelp)
+            {
+                <span class="so-field-help">@categoryHelp</span>
+            }
+        </SoField>
+
+        <SoField Label="@DirectoryView.ScopeLabelName">
+            @DirectoryView.ScopeLabel(Group.Scope)
+            @if (DirectoryView.ScopeExplanation(Group.Scope) is { } scopeHelp)
+            {
+                <span class="so-field-help">@scopeHelp</span>
+            }
+        </SoField>
+
+        <SoField Label="@DirectoryView.ManagedByLabel">
+            @if (!string.IsNullOrWhiteSpace(Group.ManagedByDisplayName))
+            {
+                <span class="so-wrap">@Group.ManagedByDisplayName</span>
+            }
+            else if (!string.IsNullOrWhiteSpace(Group.ManagedBy))
+            {
+                <span class="so-wrap">@Group.ManagedBy</span>
+            }
+            else
+            {
+                <span class="so-unknown">Grup sorumlusu tanımlanmamış.</span>
+            }
+        </SoField>
+
+        <SoField Label="Doğrudan üye sayısı">
+            @if (Group.DirectMemberCount is { } count)
+            {
+                @count
+                <span class="so-field-help">Yalnızca açık üye bağlantıları sayılır.</span>
+            }
+            else
+            {
+                <span class="so-unknown">@DirectoryView.UnknownText</span>
+            }
+        </SoField>
+    </SoFieldGrid>
+
+    <h3 class="so-subhead">Açıklama</h3>
+    @if (!string.IsNullOrWhiteSpace(Group.Description))
+    {
+        <p class="so-panel-text so-wrap">@Group.Description</p>
+    }
+    else
+    {
+        @* No invented purpose. A group's use is not derivable from its name or its members. *@
+        <p class="so-panel-text so-panel-text--sm so-unknown">
+            Active Directory üzerinde açıklama tanımlanmamış.
+        </p>
+    }
+
+    <details class="so-technical">
+        <summary>Teknik ayrıntılar</summary>
+        <SoFieldGrid MinColumnWidth="280px">
+            <SoField Label="@DirectoryView.DistinguishedNameLabel">
+                @if (!string.IsNullOrWhiteSpace(Group.DistinguishedName))
+                {
+                    <code class="so-code so-code--sm so-wrap">@Group.DistinguishedName</code>
+                }
+                else
+                {
+                    <span class="so-unknown">@DirectoryView.UnknownText</span>
+                }
+            </SoField>
+            <SoField Label="Güvenlik tanımlayıcısı (SID)">
+                @if (!string.IsNullOrWhiteSpace(Group.StableIdentifier))
+                {
+                    <code class="so-code so-code--sm so-wrap">@Group.StableIdentifier</code>
+                }
+                else
+                {
+                    <span class="so-unknown">@DirectoryView.UnknownText</span>
+                }
+            </SoField>
+            <SoField Label="Oluşturulma">@DirectoryView.Timestamp(Group.CreatedAtUtc)</SoField>
+            <SoField Label="Son değişiklik">@DirectoryView.Timestamp(Group.ChangedAtUtc)</SoField>
+        </SoFieldGrid>
+    </details>
+
+    <p class="so-panel-text so-panel-text--sm">
+        Buradaki bilgiler yalnızca Active Directory kaydından gelir. Grubun Windows yerel gruplarında,
+        dosya izinlerinde, IIS'te veya uygulamalarda nerede kullanıldığını göstermez.
+    </p>
+</section>
+
+@code {
+    /// <summary>Group metadata exactly as the API returned it.</summary>
+    [Parameter, EditorRequired]
+    public DirectoryGroupDetailDto Group { get; set; } = default!;
+}

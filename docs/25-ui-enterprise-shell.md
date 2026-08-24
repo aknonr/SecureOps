@@ -55,8 +55,8 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/access-denied` | Authorization refusal, with a route to request access | Anonymous |
 | `/error` | Unhandled server error, request reference only | Anonymous |
 | `/` and `/dashboard` | Yönetim Panosu with `Reporting.ManagementView`; otherwise the operator Genel Bakış | Authenticated |
-| `/directory/users` (and legacy `/identity-lookup`) | Kullanıcı Sorgulama: exact lookup plus tabbed directory evidence | Authenticated + `Identity.Lookup` |
-| `/directory/groups` | Grup Sorgulama: exact group and its direct members | Authenticated + `Identity.Groups.View` |
+| `/directory/users` (and legacy `/identity-lookup`) | AD Kullanıcı ve Hesap Sorgulama: exact lookup plus tabbed directory evidence | Authenticated + `Identity.Lookup` |
+| `/directory/groups` | AD Grup Analizi: exact group, its members, and bounded nested analysis | Authenticated + `Identity.Groups.View` |
 | `/admin/sessions` | Aktif Oturumlar: application-session administration | Authenticated + `Access.ManageUsers` |
 | `/admin/system-status` | Sistem Durumu: enterprise integration state | Authenticated + `Access.ManageUsers` |
 | `/account` | Signed-in identity and session security | Authenticated |
@@ -342,86 +342,90 @@ provider-agnostic, so the form action changes and the page does not when OIDC re
 endpoint; there is no username, password, or role selection; and the environment marker is gated on
 `ShowEnvironmentMarker`, so Demo and Test name themselves and Production does not.
 
-## 13. Directory Explorer
+## 13. Active Directory screens
 
-Two exact-only screens, both audited on every call.
+Two exact-only screens, both audited on every call. Backend `f89f996` added real-world group
+analysis; this milestone rebuilt the surface around it so the screens read as Windows operations
+rather than as a directory browser.
 
 | Route | Purpose |
 |---|---|
-| `/directory/users` (also `/identity-lookup`) | Kullanıcı Sorgulama — one account, then its evidence in tabs |
-| `/directory/groups` | Grup Sorgulama — one group and its direct members |
+| `/directory/users` (also `/identity-lookup`) | AD Kullanıcı ve Hesap Sorgulama |
+| `/directory/groups` | AD Grup Analizi |
 
-Both take an exact target and an **optional** description. Neither accepts a filter, a wildcard, or
-LDAP syntax.
+Neither accepts a filter, a wildcard, or LDAP syntax. Both take one exact target.
 
-Every request is audited and rate-limited, so each tab loads **on first open**, not when the lookup
-returns: fetching all five sections up front would spend an operator's quota on evidence they never
-asked to see. Directory calls use the `normalizedAccount` the server resolved when there is one, and
-the exact account the operator typed otherwise — the endpoints normalize server-side either way.
+### Search, then result
 
-### The purpose is optional
+Each screen has two states. Before a query it is a search box and nothing else. After one, the query
+collapses to a single compact line and the evidence takes the full width of the page. An operator
+who has already asked the question does not need the form that asked it still occupying a third of
+the screen.
 
-Since backend `a607ac4`, `purpose` is optional on every read-only `/api/v1/directory/*` route.
-Omitted, null, empty, and whitespace all mean the same thing, and the query is recorded either way —
-what the operator now chooses is whether to add context to that record, not whether the record
-exists. Both screens label the field **Açıklama** with the helper *"Opsiyonel — sorgu amacını
-belirtmek isterseniz ekleyebilirsiniz"*, carry no required marker, and drop a step in label and
-helper weight so the field reads as an offer rather than a demand.
+### The reason field is gone
 
-`DirectoryPurposeInput` mirrors the server's `DirectoryLookupPurpose`: blank collapses to `null`
-rather than to an empty string, a supplied value is trimmed **before** its length is measured, the
-bound is 256 characters (`DirectoryExplorer:MaxPurposeLength`), and control characters are refused.
-The server re-validates all of it; this exists so the operator sees the problem beside the field.
+The read-only directory routes no longer ask for one. `a607ac4` made `purpose` optional; this
+milestone removed the field from both screens, along with the legacy alert reference and
+`turuncuhatEvtId` inputs that survived from the first identity-lookup design. The query is still
+recorded on every call — what changed is that the record no longer depends on the operator filling
+in a box the backend does not require.
 
-Purpose text is not a cache key and not a rate-limit partition — the backend excludes it from both,
-so editing it cannot bypass either. The UI adds no throttling of its own: rate limiting is the
-server's, and a 429 renders through the ordinary `RateLimitExceeded` experience.
-
-**One exception, and it is not a directory route.** The `Genel` tab is backed by
-`POST /api/v1/identity/lookup`, whose contract still requires a purpose. Rather than gate the whole
-screen on that, the requirement is raised inside the tab that has it: the other four tabs work with
-no reason at all, and `Genel` asks for one when the operator wants identity fields. No default is
-invented to fill the gap — a purpose the operator never wrote would be a fabricated audit entry.
+`POST /api/v1/identity/lookup` no longer receives one either. Nothing in the UI now sends a directory
+purpose, and `DirectoryPurposeInput` is retained only for the write workflows described below.
 
 Write workflows are untouched. An access decision and a session revocation still require a reason,
 because those are actions taken against someone and the justification is what makes them defensible
 afterwards. Looking something up is not.
 
-Nothing traverses a graph in the browser. Direct groups, nested groups, membership paths, and
-privileged evidence are all computed server-side; recomputing or extending any of it here would
-produce an answer nobody could audit.
+### Vocabulary
 
-### Tabs
+Active Directory attribute names do not reach the screen. Every field is labelled in the language an
+operator uses, and the technical concept gets one sentence where it appears rather than a glossary
+somewhere else.
 
-`Genel` reuses the existing exact-lookup result. `Gruplar`, `Hesap Sağlığı` and `Servis / SPN`
-require `Identity.Groups.View`. `Yetkili Üyelikler` requires `Identity.PrivilegedGroups.View` and is
-**absent** rather than present-and-refusing when that capability is missing.
+| Screen | Underlying attribute |
+|---|---|
+| Ad Soyad | `displayName` |
+| AD Kullanıcı Adı / AD Grup Hesap Adı | `sAMAccountName` |
+| Kurumsal Oturum Adı (UPN) | `userPrincipalName` |
+| Üyesi Olduğu Gruplar | `memberOf` |
+| Grup Türü | `groupType` category |
+| Grup Kapsamı | `groupType` scope |
+| Grup Sorumlusu | `managedBy` |
+| AD Nesne Yolu | `distinguishedName` |
+| AD Nesne Türü | `objectClass` |
 
-### Direct and nested membership
+Distinguished names and SIDs are the one place raw directory naming belongs. They stay folded inside
+a disclosure rather than leading the overview.
 
-The contract returns two sets and the screen never merges them. A direct membership is granted on the
-group itself; a nested one comes through another group and is removed somewhere else entirely.
-Presenting them as one list is what makes an operator revoke the wrong thing, so each list carries
-that instruction explicitly.
+Two things are deliberately **not** translated. Group scope renders as `Global`, `Universal` and
+`Domain Local` because those are the words in the Windows tooling the operator will open next, and a
+Turkish paraphrase would break the match. The nav section label `Active Directory` carries
+`lang="en"`: under Turkish case mapping, `text-transform: uppercase` would render it
+*ACTİVE DİRECTORY*.
+
+### User screen tabs
+
+`Genel Bilgiler` reuses the exact-lookup result. `Grup Üyelikleri`, `Hesap ve Parola Bilgileri` and
+`Servis Hesabı Göstergeleri` require `Identity.Groups.View`. `Ayrıcalıklı Grup Üyelikleri` requires
+`Identity.PrivilegedGroups.View` and is **absent** rather than present-and-refusing when that
+capability is missing. Each tab loads on first open: every request is audited and rate-limited, and
+fetching all five up front would spend an operator's quota on evidence they never asked to see.
+
+### Three kinds of membership
+
+The screen tells apart what Active Directory itself keeps separate, and never merges them:
+
+- **Doğrudan Üyelik** — a backlink on `memberOf`. This is where a membership is removed.
+- **Birincil Grup** — resolved from `primaryGroupID`. It is not in `memberOf` at all, and it cannot
+  be removed from the group's member list; it is changed on the account. Its section carries an edge
+  the others do not, because treating it like a direct membership leads to an operation that fails.
+- **Dolaylı / İç İçe Üyelik** — reached through another group, and removed somewhere else entirely.
 
 `alsoTransitivelyReachable` is a badge on the single direct row, not a second row. The same group
-listed twice reads as two grants, which is exactly the confusion the split exists to prevent. Nested
-rows additionally show `minimumDepth`.
+listed twice reads as two grants, which is exactly the confusion the split exists to prevent.
 
-### Membership path
-
-"Nasıl üye?" answers the question actually asked during an authorization incident, using the server's
-own proof. A one-group chain is a direct membership and is styled distinctly from a nested one.
-Multiple returned paths are all rendered — an operator removing only the first would not remove the
-membership — and `pathsTruncated` says so in as many words.
-
-**A bounded traversal is never a negative answer.** `isMember=false` may be shown as "üye değil" only
-when the server reports no limit and no truncation (`DirectoryView.NegativeIsConclusive`). Otherwise
-the screen says the traversal was incomplete and that the result must not drive an authorization
-decision. Every reached bound is listed separately — a depth limit and a provider result limit call
-for different follow-up, and a detected cycle is a directory finding in its own right.
-
-### Account health
+### Account and password evidence
 
 Every field on this contract is nullable and unknown is rendered as unknown. A directory that did not
 return an attribute has not said the attribute is false.
@@ -430,12 +434,20 @@ return an attribute has not said the attribute is false.
 (yaklaşık)"** — in the label itself, not only in a note beneath it, so the caveat survives being
 copied into a ticket. It is never presented as an exact last sign-in.
 
-### Service evidence
+### Service account indicators
 
 Titled *göstergeler*, not a classification. The API reports what the directory objects say — object
 class, SPNs, `managedBy` — and does not decide that an account is a service account; neither does the
-UI. SPN lists are bounded server-side, and when truncated the screen states that the **count is
-authoritative and the list is not**, so nobody counts visible rows and reports a smaller number.
+UI.
+
+**An account with no SPN is a fact, not a failure.** It renders as *"Bu hesap üzerinde tanımlı SPN
+bulunmuyor."* — never as a directory outage, and never as an error panel. When SPN lists are
+truncated server-side the screen states that the **count is authoritative and the list is not**, so
+nobody counts visible rows and reports a smaller number.
+
+When principal evidence resolves but the group counts do not, the tab keeps the evidence it has and
+reports the gap in place: *"Hesap bilgileri alındı, grup sayıları alınamadı."* Losing the whole tab
+because one of its two calls failed throws away a working answer.
 
 ### Privileged membership
 
@@ -445,13 +457,77 @@ accent edge, not an alarm fill; colouring every match red would make the screen 
 whose job requires those memberships. The configured group set is server-owned, and a group that is
 configured but missing from the directory is surfaced rather than dropped.
 
-### Group lookup
+## 13a. Group analysis
 
-Metadata and members are separate capabilities and separate calls, so an operator who may see that a
-group exists does not automatically see who is in it; a refused member list leaves the metadata
-standing. Members are direct only. A nested group appears as a member and links to **its own exact
-lookup** rather than being expanded in place. Paging is forward-only because the continuation token
-is — "Daha fazla yükle" appends rather than pretending to offer random access the API does not have.
+Cost is the organising principle, because the three calls behind this screen do not cost remotely the
+same thing. Group metadata returns in milliseconds. Member enumeration can take hundreds of
+milliseconds, and on real groups it sometimes fails only after ten seconds. The bounded nested walk
+is the expensive one.
+
+So the screen loads in that order, and never speculatively:
+
+| Tab | Call | When |
+|---|---|---|
+| Genel Bakış | `groups/lookup` | with the query |
+| Doğrudan Üyeler | `groups/members` | on first open |
+| İç İçe Gruplar · Tüm Etkin Üyeler · Üyesi Olduğu Gruplar | `groups/analysis` | on an explicit button |
+| Üyelik Kontrolü | `principals/membership-paths` | on submit |
+
+The walk sits behind **Analizi Çalıştır** rather than a tab click because one call produces nested
+groups, effective members and parent memberships together: three tabs, one traversal. Opening a tab
+is not a decision to spend it.
+
+### A failed member list is not an outage
+
+This is the behaviour the milestone exists to get right. A fast successful overview plus a failed
+member enumeration is **not** "Active Directory is down". The overview stays exactly where it is, and
+only the failing section reports its own problem, with its own retry:
+
+> Grup bilgileri alındı ancak üye listesi tamamlanamadı.
+
+`DirectoryProviderTimeout` gets its own words — *"Active Directory sorgusu süre sınırı içinde
+tamamlanamadı"* — and never borrows *ulaşılamıyor*. A query that ran out of time and a directory that
+cannot be reached send an operator to two different investigations.
+
+### Nested navigation
+
+A nested group opens **its own exact lookup**, and a breadcrumb rooted at `Active Directory` records
+how the operator got there. The browser never builds topology and never traverses a graph; the server
+returns it. Recomputing or extending any of it here would produce an answer nobody could audit.
+
+### Partial traversal
+
+`isComplete=false` at HTTP 200 is a bounded result, not an empty one. The rows shown are real; the
+list is not finished. The banner says so and states the consequence plainly — the result must not be
+used to conclude that a membership does not exist — and lists every bound reached separately, because
+a depth limit, a provider result limit and a detected cycle each call for different follow-up.
+
+### Membership check
+
+"Üye mi?" answers the question actually asked during an authorization incident, using the server's own
+proof, and gives one of exactly three verdicts:
+
+- **Üye** — with the kind of membership, so a primary-group answer is not mistaken for a direct one.
+- **Üyelik bulunamadı** — permitted **only** when the server reports no limit and no truncation
+  (`DirectoryView.NegativeIsConclusive`).
+- **Üyelik doğrulanamadı** — a bounded traversal. Never rendered as a negative answer.
+
+### CSV export
+
+Gated on `Identity.Groups.Export` from `/api/v1/access/me`, never on a role name. Without the
+capability the button is not drawn. The file is produced by the server, streamed through
+`window.secureOpsDownload`, and keeps the server's own filename; the browser does not build a CSV.
+
+Partial effective-membership results are not exportable, and the server refuses them with
+`DirectoryTraversalPartial` — a spreadsheet outlives the banner that qualified it.
+
+### Group metadata and members are separate capabilities
+
+An operator who may see that a group exists does not automatically see who is in it, and a refused
+member list leaves the metadata standing. Members are direct only; a nested group appears as a member
+and links to its own lookup rather than being expanded in place. Paging is forward-only because the
+continuation token is — "Daha fazla yükle" appends rather than pretending to offer random access the
+API does not have.
 
 ## 14. Application sessions
 
@@ -525,8 +601,9 @@ Capability-driven throughout, and a group heading appears only when at least one
 ```
 Genel Bakış / Yönetim Panosu
 Operasyon    → Operasyonel Kayıtlar          OperationalRecords.View
-Dizin        → Kullanıcı Sorgulama           Identity.Lookup
-             → Grup Sorgulama                Identity.Groups.View
+Active Directory
+             → AD Kullanıcı ve Hesap Sorgulama   Identity.Lookup
+             → AD Grup Analizi                   Identity.Groups.View
 Raporlama    → Yönetim Panosu                Reporting.ManagementView
              → Operatör Raporu               Reporting.ManagementView
 Yönetim      → Erişim Talepleri              Access.ApproveRequests
@@ -551,9 +628,9 @@ Two defects found by the responsive checks, both worth recording because they re
   than `hidden`: it creates no scroll container, and because `.mud-layout` is only `position:
   relative` it does not become a containing block for the fixed app bar or drawer.
 
-The Directory user page collapses its two-column split once a principal resolves. Its group, SPN, and
-privileged tables are the widest content in the product, and in a half-width column the trailing
-"Nasıl üye?" action is permanently scrolled out of reach.
+The Active Directory screens use the full content width once a result resolves. Their group, SPN and
+member tables are the widest content in the product, and in a half-width column the trailing row
+action is permanently scrolled out of reach.
 
 ## 19. Verification, and what it proves
 
@@ -569,14 +646,27 @@ fixtures are each rejected by the backend with their own code and create no Jira
 retry blocked, live claim contention, rate limiting, Jira provider failure. Forty checks. This proves
 **presentation only**, and the report says so rather than letting a green tick imply more.
 
-**Contract-shaped stub for reporting, directory, sessions, and integration status.** 117 browser
-checks across complete, partial and absent evidence coverage; direct, nested, multi-path, truncated,
-conclusively-negative and traversal-limited membership; zero, one, many and truncated SPN lists;
-populated and entirely-unknown account health; privileged membership allowed and forbidden; group
-member paging and mixed member types; session listing, revoke confirmation, revoke failure and
-forbidden access; integration status configured, disabled, unavailable and forbidden; four viewports
-(1920, 1366, 834, 390) and both themes. This is presentation verification: the Directory Explorer
-read model needs a real domain, and the reporting read model needs SQL Server with migrations 001–007.
+**Contract-shaped stub for reporting, sessions, and integration status.** 61 browser checks across
+complete, partial and absent evidence coverage; session listing, revoke confirmation, revoke failure
+and forbidden access; integration status configured, disabled, unavailable and forbidden. Its
+directory assertions were retired when the Active Directory redesign replaced that surface.
+
+**Contract-shaped stub for the Active Directory screens.** 131 browser checks: navigation naming and
+casing; the legacy route; a true 404 on an unknown path; the removed reason, alert and Turuncuhat
+fields; the search-then-result collapse; every user and group label; direct, primary and transitive
+membership told apart; zero, one and truncated SPN lists; principal evidence usable while graph
+evidence is not; group overview independent of member enumeration; a member enumeration that times
+out while the overview stands; the analysis walk behind its button; nested navigation with
+breadcrumbs; the three membership-check verdicts; partial traversal and the export it refuses; export
+allowed and forbidden; 404, invalid input, 403, timeout and unavailable each in their own words; a
+scan for leaked LDAP, provider and exception text on every error state; four viewports (1920, 1366,
+834, 390) and both themes.
+
+**Write-workflow guard.** 2 checks confirming session revocation still demands a reason — the
+boundary the optional-reason delta was careful not to cross.
+
+This is presentation verification: the Active Directory read model needs a real domain, and the
+reporting read model needs SQL Server with migrations 001–007.
 
 Provider selection is never a user-facing setting. When the source is `Disabled`, the list renders the
 ordinary service-unavailable experience with its correlation reference and never names the provider
@@ -590,6 +680,7 @@ by any UI label claiming they are real.
 Read-only diagnostics and the audit/compliance view remain truthful placeholders; their navigation
 entries say so rather than offering a dead link. Reporting is confined to the two management
 endpoints — no per-day adoption series, no manual-effort baseline, and no time-saved figure exists to
-show. The Directory Explorer is read-only throughout: no AD write, no membership change, no password
-entry, and no client-side graph traversal. Backend gaps are tracked in
+show. The Active Directory screens are read-only throughout: no AD write, no membership change, no account
+enable/disable, no password reset, no LDAP credential form, no directory-wide enumeration, no XLSX
+export, and no client-side graph traversal. Backend gaps are tracked in
 `docs/26-ui-backend-contract-gaps.md`.
