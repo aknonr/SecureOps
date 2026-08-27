@@ -89,6 +89,21 @@ public sealed class ManagementReportingServiceTests
         audit.Events.Select(item => item.Action).Should().Contain(AuditActions.ManagementReportFailed);
     }
 
+    [Fact]
+    public async Task GetSummaryAsync_WhenPersistenceIsNotConfigured_ReturnsDistinctStableCode()
+    {
+        StubRepository repository = new()
+        {
+            Failure = new ReportingPersistenceNotConfiguredException("synthetic not configured")
+        };
+        ManagementReportingService service = Service(repository, new InMemoryAuditWriter());
+
+        ManagementReportingResult<ManagementReportResponse> result = await service.GetSummaryAsync(
+            "7d", null, null, _context, CancellationToken.None);
+
+        result.ErrorCode.Should().Be(OperationalErrorCodes.ReportingPersistenceNotConfigured);
+    }
+
     private static ManagementReportingService Service(IManagementReportingRepository repository, IAuditWriter auditWriter) =>
         new(
             new ReportingWindowResolver(new FixedTimeProvider(_now)),

@@ -77,6 +77,7 @@ public sealed class ManagementReportingController : ControllerBase
     private ActionResult<T> Failure<T>(string errorCode)
     {
         bool validation = errorCode == OperationalErrorCodes.ReportingValidationFailed;
+        bool notConfigured = errorCode == OperationalErrorCodes.ReportingPersistenceNotConfigured;
         int status = validation ? StatusCodes.Status400BadRequest : StatusCodes.Status503ServiceUnavailable;
         string stage = validation
             ? "validation"
@@ -84,9 +85,13 @@ public sealed class ManagementReportingController : ControllerBase
         return OperationalProblemDetails.Create(
             status,
             errorCode,
-            validation ? "The reporting request is invalid." : "Management reporting is currently unavailable.",
+            validation
+                ? "The reporting request is invalid."
+                : notConfigured
+                    ? "Management reporting persistence is not configured."
+                    : "Management reporting is currently unavailable.",
             Activity.Current?.Id ?? HttpContext.TraceIdentifier,
             stage,
-            retryable: !validation);
+            retryable: !validation && !notConfigured);
     }
 }

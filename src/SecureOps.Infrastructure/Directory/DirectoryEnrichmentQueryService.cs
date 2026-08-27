@@ -504,7 +504,8 @@ public sealed class DirectoryEnrichmentQueryService : IDirectoryEnrichmentQueryS
         group.Description,
         group.Category,
         group.Scope,
-        group.MembershipKind);
+        group.MembershipKind,
+        group.SamAccountName);
 
     private static DirectoryTraversalMetadataDto MapTraversal(DirectoryTraversalState traversal) => new(
         traversal.NodesVisited,

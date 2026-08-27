@@ -8,7 +8,12 @@ public sealed record ApplicationSessionResponse(
     DateTimeOffset LastSeenAtUtc,
     DateTimeOffset AbsoluteExpiresAtUtc,
     string AuthenticationMethod,
-    long AccessVersion);
+    long AccessVersion,
+    string? Principal = null,
+    string? NormalizedPrincipal = null,
+    string? DisplayName = null,
+    string? AuthenticationProvider = null,
+    bool IsCurrent = false);
 
 /// <summary>Bounded active-session administrative page.</summary>
 public sealed record ActiveApplicationSessionsResponse(

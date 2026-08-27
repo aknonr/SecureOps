@@ -15,16 +15,23 @@ public static class OperationalRecordConfigurationValidator
 
         if (!string.Equals(operational.SourceProvider, "Disabled", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(operational.SourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(operational.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"OperationalRecords:SourceProvider '{operational.SourceProvider}' is not implemented. Use Disabled, Fake, or TuruncuHat.");
+                $"OperationalRecords:SourceProvider '{operational.SourceProvider}' is not implemented. Use Disabled, Simulation, Fake, or TuruncuHat.");
         }
 
         if (string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase)
             && !IsSyntheticEnvironment(environmentName))
         {
             throw new InvalidOperationException("OperationalRecords:SourceProvider Fake is permitted only in Development, Demo, or Test.");
+        }
+
+        if (string.Equals(operational.SourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase)
+            && !IsSyntheticEnvironment(environmentName))
+        {
+            throw new InvalidOperationException("OperationalRecords:SourceProvider Simulation is permitted only in Development, Demo, or Test.");
         }
 
         if (!string.Equals(operational.RepositoryProvider, "InMemory", StringComparison.OrdinalIgnoreCase)
@@ -56,15 +63,30 @@ public static class OperationalRecordConfigurationValidator
 
         if (!string.Equals(jira.Provider, "Disabled", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(jira.Provider, "Fake", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(jira.Provider, "Simulation", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(jira.Provider, "Corporate", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Jira:Provider must be Disabled, Fake, or Corporate.");
+            throw new InvalidOperationException("Jira:Provider must be Disabled, Simulation, Fake, or Corporate.");
         }
 
         if (string.Equals(jira.Provider, "Fake", StringComparison.OrdinalIgnoreCase)
             && !IsSyntheticEnvironment(environmentName))
         {
             throw new InvalidOperationException("Jira:Provider Fake is permitted only in Development, Demo, or Test.");
+        }
+
+
+        bool simulationSource = string.Equals(operational.SourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase);
+        bool simulationJira = string.Equals(jira.Provider, "Simulation", StringComparison.OrdinalIgnoreCase);
+        if ((simulationSource || simulationJira) && (!simulationSource || !simulationJira))
+        {
+            throw new InvalidOperationException(
+                "TEST simulation requires both OperationalRecords:SourceProvider and Jira:Provider to be Simulation.");
+        }
+
+        if (simulationJira && !IsSyntheticEnvironment(environmentName))
+        {
+            throw new InvalidOperationException("Jira:Provider Simulation is permitted only in Development, Demo, or Test.");
         }
 
         if (string.IsNullOrWhiteSpace(jira.ProjectKey) || string.IsNullOrWhiteSpace(jira.IssueType) || string.IsNullOrWhiteSpace(jira.MappingVersion))

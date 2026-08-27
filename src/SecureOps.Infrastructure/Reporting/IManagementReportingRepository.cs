@@ -15,10 +15,20 @@ public interface IManagementReportingRepository
 }
 
 /// <summary>Signals that authoritative persistent reporting is not available.</summary>
-public sealed class ReportingUnavailableException : Exception
+public class ReportingUnavailableException : Exception
 {
     /// <summary>Initializes the exception.</summary>
     public ReportingUnavailableException(string message)
+        : base(message)
+    {
+    }
+}
+
+/// <summary>Raised when the authoritative reporting persistence set is intentionally not configured.</summary>
+public sealed class ReportingPersistenceNotConfiguredException : ReportingUnavailableException
+{
+    /// <summary>Initializes the exception.</summary>
+    public ReportingPersistenceNotConfiguredException(string message)
         : base(message)
     {
     }

@@ -13,6 +13,10 @@
 - `POST /api/v1/sessions/revoke` requires `Access.Users.Manage` and revokes an exact session identifier with a bounded operational reason.
 - `POST /api/v1/access/logout` ends the current SecureOps session and clears its handle. Negotiate remains browser/host managed and may authenticate a later request again.
 
+Session responses retain internal IDs for backend correctness and add nullable persisted identity metadata: principal/normalized principal, authentication provider, display name when a persisted value exists, and `isCurrent`. The current access model does not persist a display name, so the API returns null rather than contacting AD or inventing one.
+
+Administrative listing now atomically marks previously unvisited idle/absolute expirations terminal before returning active rows. The server-rendered UI still must correlate all typed API clients to one browser authentication session and call API logout; merging missing-cookie requests by user is prohibited because separate/private browsers must remain distinct.
+
 ## Data Protection Deployment
 
 For one pilot node, create a server-owned key-ring directory outside the deployment payload, grant the App Pool identity read/write/create access only to that directory, and select local-machine DPAPI protection. Back up the key ring under the same access and retention controls as other authentication material. For multiple nodes, use one access-controlled shared key ring and certificate protection where each node can read the private key; keep the same application name on all nodes.

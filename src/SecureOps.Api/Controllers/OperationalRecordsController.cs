@@ -26,18 +26,26 @@ public sealed class OperationalRecordsController : ControllerBase
     private readonly IJiraTransferService _transferService;
     private readonly CommandIdempotencyOptions _commandOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly bool _simulationMode;
 
     /// <summary>Initializes the controller.</summary>
     public OperationalRecordsController(
         IOperationalRecordService recordService,
         IJiraTransferService transferService,
         Microsoft.Extensions.Options.IOptions<CommandIdempotencyOptions> commandOptions,
+        Microsoft.Extensions.Options.IOptions<OperationalRecordsOptions> operationalOptions,
+        Microsoft.Extensions.Options.IOptions<JiraIntegrationOptions> jiraOptions,
         TimeProvider timeProvider)
     {
         _recordService = recordService;
         _transferService = transferService;
         _commandOptions = commandOptions.Value;
         _timeProvider = timeProvider;
+        _simulationMode = string.Equals(
+                operationalOptions.Value.SourceProvider,
+                "Simulation",
+                StringComparison.OrdinalIgnoreCase)
+            && string.Equals(jiraOptions.Value.Provider, "Simulation", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Refreshes and returns a bounded list of active operational records.</summary>
@@ -94,7 +102,9 @@ public sealed class OperationalRecordsController : ControllerBase
             draft.MappingVersion,
             draft.IdempotencyKey,
             draft.Warnings,
-            draft.AssigneeUsername));
+            draft.AssigneeUsername,
+            _simulationMode,
+            SimulationNotice()));
     }
 
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>
@@ -222,7 +232,10 @@ public sealed class OperationalRecordsController : ControllerBase
         record.Version,
         record.ReconciliationRequired,
         IsRetryEligible(record),
-        !string.IsNullOrWhiteSpace(record.JiraIssueKey));
+        !string.IsNullOrWhiteSpace(record.JiraIssueKey),
+        PresentationState(record),
+        _simulationMode,
+        SimulationNotice());
 
     private static bool IsRetryEligible(OperationalRecord record) =>
         !record.ReconciliationRequired
@@ -236,7 +249,7 @@ public sealed class OperationalRecordsController : ControllerBase
         string.IsNullOrWhiteSpace(idempotencyKey)
         || CommandIdempotency.IsValid(idempotencyKey, _commandOptions.MaxKeyLength);
 
-    private static JiraTransferResponse ToTransferResponse(OperationalRecord record, string correlationId) => new(
+    private JiraTransferResponse ToTransferResponse(OperationalRecord record, string correlationId) => new(
         record.Id,
         record.OrCode,
         record.WorkflowState,
@@ -244,5 +257,22 @@ public sealed class OperationalRecordsController : ControllerBase
         record.MappingVersion ?? string.Empty,
         record.IdempotencyKey ?? string.Empty,
         record.RetryCount,
-        correlationId);
+        correlationId,
+        _simulationMode,
+        SimulationNotice());
+
+    private string? SimulationNotice() =>
+        _simulationMode ? SimulationOperationalRecordClient.OperatorNotice : null;
+
+    private static string PresentationState(OperationalRecord record) => record.WorkflowState switch
+    {
+        OperationalRecordWorkflowState.Completed => OperationalRecordPresentationStates.Completed,
+        OperationalRecordWorkflowState.Eligible or OperationalRecordWorkflowState.Previewed =>
+            OperationalRecordPresentationStates.Actionable,
+        OperationalRecordWorkflowState.CreateRequested or
+        OperationalRecordWorkflowState.CreatingJira or
+        OperationalRecordWorkflowState.JiraCreated or
+        OperationalRecordWorkflowState.ClosingOperationalRecord => OperationalRecordPresentationStates.InProgress,
+        _ => OperationalRecordPresentationStates.NeedsAttention
+    };
 }

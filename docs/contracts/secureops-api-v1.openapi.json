@@ -3933,6 +3933,25 @@
           "accessVersion": {
             "type": "integer",
             "format": "int64"
+          },
+          "principal": {
+            "type": "string",
+            "nullable": true
+          },
+          "normalizedPrincipal": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "authenticationProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "isCurrent": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -4273,6 +4292,10 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "lookupKey": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -4435,6 +4458,10 @@
           "membershipKind": {
             "type": "string",
             "nullable": true
+          },
+          "lookupKey": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -4490,6 +4517,10 @@
             "nullable": true
           },
           "memberType": {
+            "type": "string",
+            "nullable": true
+          },
+          "lookupKey": {
             "type": "string",
             "nullable": true
           }
@@ -5137,6 +5168,13 @@
           "assigneeUsername": {
             "type": "string",
             "nullable": true
+          },
+          "simulationMode": {
+            "type": "boolean"
+          },
+          "simulationNotice": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -5172,6 +5210,13 @@
             "format": "int32"
           },
           "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "simulationMode": {
+            "type": "boolean"
+          },
+          "simulationNotice": {
             "type": "string",
             "nullable": true
           }
@@ -5371,6 +5416,17 @@
           },
           "jiraExists": {
             "type": "boolean"
+          },
+          "presentationState": {
+            "type": "string",
+            "nullable": true
+          },
+          "simulationMode": {
+            "type": "boolean"
+          },
+          "simulationNotice": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

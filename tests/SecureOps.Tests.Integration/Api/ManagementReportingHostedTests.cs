@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -75,6 +76,20 @@ public sealed class ManagementReportingHostedTests
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, "ReportingValidationFailed");
     }
 
+    [Fact]
+    public async Task Summary_WhenSqlPersistenceIsNotConfigured_ReturnsPreciseNonRetryableProblem()
+    {
+        using WebApplicationFactory<Program> factory = CreateUnconfiguredFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/summary?window=7d");
+        JsonNode problem = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        problem["code"]!.GetValue<string>().Should().Be("ReportingPersistenceNotConfigured");
+        problem["retryable"]!.GetValue<bool>().Should().BeFalse();
+    }
+
     private static WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -92,6 +107,23 @@ public sealed class ManagementReportingHostedTests
                 services.RemoveAll<IManagementReportingRepository>();
                 services.AddSingleton<IManagementReportingRepository, StubReportingRepository>();
             });
+        });
+
+    private static WebApplicationFactory<Program> CreateUnconfiguredFactory() =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Test");
+            builder.UseSetting("DemoAuth:Enabled", "true");
+            builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
+            builder.UseSetting("Access:DemoCompatibilityEnabled", "true");
+            builder.UseSetting("Access:RepositoryProvider", "InMemory");
+            builder.UseSetting("SessionSecurity:RepositoryProvider", "InMemory");
+            builder.UseSetting("DataProtection:Mode", "Ephemeral");
+            builder.UseSetting("Audit:Provider", "InMemory");
+            builder.UseSetting("IdentityLookup:Provider", "Mock");
+            builder.UseSetting("OperationalRecords:SourceProvider", "Disabled");
+            builder.UseSetting("OperationalRecords:RepositoryProvider", "InMemory");
+            builder.UseSetting("Jira:Provider", "Disabled");
         });
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)

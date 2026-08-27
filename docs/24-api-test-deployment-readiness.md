@@ -72,9 +72,9 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED | `IdentityLookup__ProviderTimeoutSeconds` / `IdentityLookup__BulkMaxAccounts` | `3` / `20` |
 | REQUIRED | `IdentityLookup__Cache__Enabled` / `IdentityLookup__Cache__TtlSeconds` / `IdentityLookup__Cache__MaxEntries` | `true` / `30` / `500` |
 | REQUIRED, TEST-ONLY | `PamProvider__Provider` / `PamProvider__TimeoutSeconds` | `Mock` / `3` |
-| REQUIRED | `OperationalRecords__SourceProvider` | `Fake` for deterministic synthetic TEST, `Disabled` for fail-closed runtime, or contract-gated `TuruncuHat` only after separate approval |
+| REQUIRED | `OperationalRecords__SourceProvider` | paired `Simulation` for operator-visible deterministic TEST, legacy `Fake` for automated compatibility, `Disabled` for fail-closed runtime, or contract-gated `TuruncuHat` only after separate approval |
 | REQUIRED | `OperationalRecords__RepositoryProvider` / `OperationalRecords__MaxImportCount` / `OperationalRecords__ClaimLeaseSeconds` | `SqlServer` / `100` / `120` |
-| REQUIRED | `Jira__Provider` | `Disabled`, `Fake` only for synthetic TEST evidence, or contract-gated `Corporate` only after separate approval |
+| REQUIRED | `Jira__Provider` | `Disabled`, paired `Simulation` for operator-visible synthetic TEST, legacy `Fake` for automated compatibility, or contract-gated `Corporate` only after separate approval |
 | REQUIRED | `Jira__ProjectKey` / `Jira__IssueType` / `Jira__MappingVersion` | `<approved TEST project key>` / `<approved issue type>` / `<reviewed mapping version>` |
 | REQUIRED | `Jira__UnresolvedRequesterPolicy` / `Jira__SummaryMaxLength` | `Block` / `255` |
 
@@ -84,7 +84,7 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED CURRENT | `ReverseProxy__ForwardedHeaders__Enabled` | `false` until exact API proxy behavior and source IPs are confirmed |
 | CONDITIONAL | `ReverseProxy__ForwardedHeaders__TrustedProxyIps__0` | `<exact trusted API proxy IP>` only when forwarding is explicitly enabled |
 
-`Fake` source records and `FAKE-*` Jira keys are synthetic TEST evidence only. Jira failure/unknown-outcome/concurrency injection exists solely as private automated-test host replacements and has no deployable configuration key, HTTP control, or production activation path.
+`Simulation` source records and `SIM-*` Jira keys are synthetic TEST evidence only. The provider has fixed scenarios, performs no network I/O, must be selected on both sides, and fails startup outside Development/Demo/Test. `Fake`/`FAKE-*` remains a legacy automated-test compatibility path.
 
 Do not configure SQL usernames/passwords. The Integrated Security identity is `DOMAIN\\WASAST_YONETIM`. File-audit keys are obsolete when SQL audit is selected. `IdentityLookup__RateLimit__*` is obsolete; the active keys are under `RateLimiting__*`.
 
@@ -110,3 +110,19 @@ Only three older values and the working AD state are confirmed; all other existi
 Exact order: verify ZIP SHA256 and payload manifest; take database recovery point; DBA preflight and run 001, 002, 003, 004, 005, 006, 007; verify objects/seeds/triggers/views; grant runtime permissions; provision and ACL the server-owned Data Protection key ring; preserve server `web.config` and `appsettings*.json`; back up current application payload; apply reviewed IIS environment-variable delta; replace application payload without flattening directories; start/recycle only in the approved window; run the read-only smoke script.
 
 Application rollback restores the prior binaries and prior server configuration while leaving additive database objects in place. Database rollback has no scripted path: stop deployment and use the DBA-approved restore/corrective-migration process. Never drop audit or history data as an application rollback step.
+
+## Deployed TEST Evidence Record
+
+This section is intentionally blank until an operator completes a deployment. Package creation, build output, or a release-candidate directory is not deployment evidence.
+
+| Evidence | Operator-recorded value |
+|---|---|
+| API source SHA | `<not deployed/recorded>` |
+| UI source SHA | `<not deployed/recorded>` |
+| API package SHA256 | `<not deployed/recorded>` |
+| UI package SHA256 | `<not deployed/recorded>` |
+| Deployed timestamp (UTC) | `<not deployed/recorded>` |
+| Server / environment | `<not deployed/recorded>` |
+| Server-owned configuration baseline ID | `<not deployed/recorded>` |
+| Rollback package / baseline | `<not deployed/recorded>` |
+| Read-only smoke-test result and evidence reference | `<not deployed/recorded>` |

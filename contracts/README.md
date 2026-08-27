@@ -53,13 +53,13 @@ Endpoints:
 
 No endpoint accepts an account value in a URL path or query string.
 
-Error responses use:
+Current API errors use RFC ProblemDetails with stable extensions:
 
 ```json
-{ "errorCode": "AuditUnavailable", "message": "Identity lookup audit is unavailable.", "correlationId": "trace-id" }
+{ "title": "Identity lookup could not be completed.", "status": 503, "code": "AuditStoreUnavailable", "stage": "audit", "retryable": true, "correlationId": "trace-id" }
 ```
 
-Known lookup `errorCode` values are `InvalidRequestBody`, `PurposeRequired`, `InvalidIdentityLookupRequest`, `EmptyAccount`, `AccountTooLong`, `BulkLookupRejected`, `SearchPatternRejected`, `AccountPatternRejected`, `AuditUnavailable`, `DirectoryProviderTimeout`, `ProviderUnavailable`, `RateLimitExceeded`, and `IdentityLookupUnavailable`.
+Read-only identity/directory `purpose` is optional; omitted, null, empty, and whitespace values are valid. Current stable `code` values include `InvalidIdentityInput`, `IdentityNotFound`, `IdentityProviderTimeout`, `IdentityProviderUnavailable`, `DirectoryInvalidInput`, `DirectoryPrincipalNotFound`, `DirectoryGroupNotFound`, `DirectoryQueryLimitExceeded`, `DirectoryTraversalPartial`, `DirectoryProviderTimeout`, `DirectoryProviderUnavailable`, `AuditStoreUnavailable`, and `RateLimitExceeded`. The OpenAPI snapshot and `docs/contracts/secureops-api-v1-ui-integration.md` are authoritative for the current HTTP contract.
 
 `GET /api/v1/health/audit-store` returns safe status only. If a queued persistent audit write fails in the background, the response may show `status: "Unhealthy"` and `lastErrorCode: "AuditSinkUnavailable"`; it must not expose file paths, connection strings, account names, or personal data.
 

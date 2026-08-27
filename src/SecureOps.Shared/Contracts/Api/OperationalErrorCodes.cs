@@ -99,6 +99,8 @@ public static class OperationalErrorCodes
     public const string WorkflowAlreadyInProgress = "WorkflowAlreadyInProgress";
     /// <summary>A reporting window or pagination request is invalid.</summary>
     public const string ReportingValidationFailed = "ReportingValidationFailed";
+    /// <summary>Authoritative SQL persistence required by management reporting is intentionally not configured.</summary>
+    public const string ReportingPersistenceNotConfigured = "ReportingPersistenceNotConfigured";
     /// <summary>The persistent reporting read model is unavailable.</summary>
     public const string ReportingUnavailable = "ReportingUnavailable";
     /// <summary>The server-side application session expired.</summary>

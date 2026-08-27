@@ -6,7 +6,7 @@ public sealed class JiraIntegrationOptions
     /// <summary>Configuration section name.</summary>
     public const string SectionName = "Jira";
 
-    /// <summary>Jira provider: Disabled, or Fake only in an explicitly synthetic environment.</summary>
+    /// <summary>Jira provider: Disabled, Simulation/Fake in an allowed synthetic environment, or Corporate.</summary>
     public string Provider { get; set; } = "Disabled";
 
     /// <summary>HTTPS provider base URL.</summary>

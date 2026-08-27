@@ -48,6 +48,36 @@ public sealed class OperationalRecordConfigurationValidatorTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*Fake*Development, Demo, or Test*");
     }
 
+    [Theory]
+    [InlineData("Pilot")]
+    [InlineData("Production")]
+    public void Validate_WithSimulationProvidersOutsideSyntheticEnvironment_FailsStartup(string environmentName)
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["OperationalRecords:SourceProvider"] = "Simulation",
+            ["Jira:Provider"] = "Simulation"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, environmentName);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Simulation*Development, Demo, or Test*");
+    }
+
+    [Fact]
+    public void Validate_WithOnlyOneSimulationProvider_FailsStartup()
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["OperationalRecords:SourceProvider"] = "Simulation",
+            ["Jira:Provider"] = "Disabled"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*both*Simulation*");
+    }
+
     [Fact]
     public void Validate_WithDisabledSourceInProduction_Succeeds()
     {

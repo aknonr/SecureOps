@@ -16,5 +16,6 @@ public sealed class UnavailableManagementReportingRepository : IManagementReport
         Task.FromException<OperatorActivityDataPage>(Unavailable());
 
     private static ReportingUnavailableException Unavailable() =>
-        new("Management reporting requires SQL Audit, Access, and Operational Record persistence.");
+        new ReportingPersistenceNotConfiguredException(
+            "Management reporting requires SQL Audit, Access, and Operational Record persistence.");
 }

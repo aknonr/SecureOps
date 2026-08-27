@@ -9,4 +9,6 @@ public sealed record IntegrationProviderHealthResponse(
 /// <summary>Safe Turuncu Hat and Jira provider diagnostics.</summary>
 public sealed record EnterpriseIntegrationHealthResponse(
     IntegrationProviderHealthResponse TuruncuHat,
-    IntegrationProviderHealthResponse Jira);
+    IntegrationProviderHealthResponse Jira,
+    bool SimulationMode = false,
+    string? OperatorNotice = null);

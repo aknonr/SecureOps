@@ -4,7 +4,7 @@
 
 The backend foundation is implemented for TEST validation. Codex owns API, services, integration boundaries, persistence, SQL, authorization, audit, release packaging, and backend tests. Claude owns all Blazor/Razor/CSS/UI work and does not need to change this module.
 
-Typed Turuncu Hat and corporate Jira adapters are implemented behind the existing boundaries and remain disabled by default. `Fake` selects the deterministic no-network Development/Demo/Test harness. Real external TEST activation remains blocked until the sanitized samples in `docs/integrations/turuncu-hat-jira-contract-gaps.md` are reviewed.
+Typed Turuncu Hat and corporate Jira adapters are implemented behind the existing boundaries and remain disabled by default. Paired `Simulation` selects the explicit deterministic no-network Development/Demo/Test workflow harness; legacy `Fake` remains for compatibility. Real external TEST activation remains blocked until the sanitized samples in `docs/integrations/turuncu-hat-jira-contract-gaps.md` are reviewed.
 
 ## Legacy Workflow Replacement
 
@@ -75,13 +75,13 @@ Minimum runtime permissions are `SELECT`, `INSERT`, and `UPDATE` on these three 
 
 Non-secret keys:
 
-- `OperationalRecords:SourceProvider` (`Disabled`, `Fake` only in Development/Demo/Test, or `TuruncuHat`)
+- `OperationalRecords:SourceProvider` (`Disabled`, paired `Simulation` or legacy `Fake` only in Development/Demo/Test, or `TuruncuHat`)
 - `OperationalRecords:RepositoryProvider` (`InMemory` or `SqlServer`)
 - `OperationalRecords:MaxImportCount` (1-500)
 - `OperationalRecords:ClaimLeaseSeconds` (30-900)
 - `CommandIdempotency:ExecutionLeaseSeconds` (30-900)
 - `CommandIdempotency:MaxKeyLength` (32-256)
-- `Jira:Provider` (`Disabled`, `Fake` only in Development/Demo/Test, or `Corporate`)
+- `Jira:Provider` (`Disabled`, paired `Simulation` or legacy `Fake` only in Development/Demo/Test, or `Corporate`)
 - `Jira:ProjectKey`
 - `Jira:IssueType`
 - `Jira:MappingVersion`
@@ -92,7 +92,7 @@ Non-secret keys:
 - `Jira:ReporterMode` (`ProjectDefault` only)
 - `Jira:SummaryMaxLength` (32-255)
 
-Local synthetic verification requires an allowed environment and explicit `Fake` providers. Real providers require every validated option in `docs/26-enterprise-turuncu-hat-jira-adapters.md`; unsupported or incomplete selection fails startup and never falls back to synthetic data.
+Operator-visible TEST verification uses `Simulation` for both providers. Pairing is mandatory, it is rejected in Pilot/Production, it registers only in-process clients, and responses state that no real Jira issue will be created. Real providers require every validated option in `docs/26-enterprise-turuncu-hat-jira-adapters.md`; unsupported or incomplete selection fails startup and never falls back to synthetic data.
 - `ConnectionStrings:SecureOpsDb` when SQL persistence is selected
 
 Integration authentication values are runtime-only server configuration. Controlled Jira evidence proves Basic authentication; the complete Basic Authorization value remains secret and server-owned. Turuncu Hat authentication scheme remains unproven.
@@ -101,7 +101,7 @@ Integration authentication values are runtime-only server configuration. Control
 
 Before enabling a real adapter: approve the outstanding sanitized HTTP samples, review mappings, apply SQL through the DBA process, configure capability groups, and validate service-account permissions. TEST must exercise preview, one create, partial source-close failure, close-only retry, concurrent submission, audit evidence, and manual reconciliation using synthetic/non-sensitive records.
 
-The synthetic source exposes fixed non-corporate records for a stable eligible flow plus stale, closed, and missing revalidation outcomes. Claim ownership, transfer completion, and reconciliation are durable workflow transitions exercised against those records rather than fabricated source fields. A real source adapter still requires approved base URL and authentication, bounded list/detail schemas, exact requester fields, status mapping, version/ETag semantics, close/update contract, error/retry semantics, and ownership approval.
+The simulation source exposes only fixed non-corporate records for happy/idempotent replay, stale-before-create, Jira failure, unknown Jira outcome, and source-close failure/close-only retry. Claim ownership, transfer completion, and reconciliation are durable workflow transitions exercised against those records rather than fabricated source fields. A real source adapter still requires approved base URL and authentication, bounded list/detail schemas, exact requester fields, status mapping, version/ETag semantics, close/update contract, error/retry semantics, and ownership approval.
 
 Automated integration tests replace `IJiraClient` only inside the test host with private scripted or coordinated doubles. These produce synthetic success, safe retryable failure, unknown outcome, and overlap barriers without sleeps or external I/O. No failure-injection setting, route, header, or production service is added. `FakeJiraClient` remains the configured Fake/Test Jira provider and every `FAKE-*` key is synthetic, not evidence of a real Jira issue.
 

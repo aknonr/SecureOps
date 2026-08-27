@@ -102,11 +102,15 @@ public sealed class ManagementReportingService : IManagementReportingService
 
             return ManagementReportingResult<ManagementReportResponse>.Success(response);
         }
+        catch (ReportingPersistenceNotConfiguredException ex)
+        {
+            return await ReportingFailureAsync<ManagementReportResponse>(
+                ex, "summary", window, context, OperationalErrorCodes.ReportingPersistenceNotConfigured);
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Management summary failed. CorrelationId: {CorrelationId}", context.CorrelationId);
-            _ = await TryAuditAsync(AuditActions.ManagementReportFailed, "summary", window, context, OperationalErrorCodes.ReportingUnavailable, CancellationToken.None);
-            return ManagementReportingResult<ManagementReportResponse>.Fail(OperationalErrorCodes.ReportingUnavailable);
+            return await ReportingFailureAsync<ManagementReportResponse>(
+                ex, "summary", window, context, OperationalErrorCodes.ReportingUnavailable);
         }
     }
 
@@ -143,12 +147,34 @@ public sealed class ManagementReportingService : IManagementReportingService
 
             return ManagementReportingResult<OperatorActivityPageResponse>.Success(response);
         }
+        catch (ReportingPersistenceNotConfiguredException ex)
+        {
+            return await ReportingFailureAsync<OperatorActivityPageResponse>(
+                ex, "operators", window, context, OperationalErrorCodes.ReportingPersistenceNotConfigured);
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Operator management report failed. CorrelationId: {CorrelationId}", context.CorrelationId);
-            _ = await TryAuditAsync(AuditActions.ManagementReportFailed, "operators", window, context, OperationalErrorCodes.ReportingUnavailable, CancellationToken.None);
-            return ManagementReportingResult<OperatorActivityPageResponse>.Fail(OperationalErrorCodes.ReportingUnavailable);
+            return await ReportingFailureAsync<OperatorActivityPageResponse>(
+                ex, "operators", window, context, OperationalErrorCodes.ReportingUnavailable);
         }
+    }
+
+    private async Task<ManagementReportingResult<T>> ReportingFailureAsync<T>(
+        Exception exception,
+        string report,
+        ReportingWindow window,
+        ManagementReportingContext context,
+        string errorCode)
+    {
+        _logger.LogError(exception, "Management report failed. Report: {Report}. CorrelationId: {CorrelationId}", report, context.CorrelationId);
+        _ = await TryAuditAsync(
+            AuditActions.ManagementReportFailed,
+            report,
+            window,
+            context,
+            errorCode,
+            CancellationToken.None);
+        return ManagementReportingResult<T>.Fail(errorCode);
     }
 
     private async Task<ManagementReportingResult<T>> ValidationFailureAsync<T>(

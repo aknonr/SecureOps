@@ -89,6 +89,32 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ApplicationSession>> EndExpiredAsync(
+        DateTimeOffset nowUtc,
+        DateTimeOffset idleCutoffUtc,
+        int maximumCount,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            UPDATE TOP (@MaximumCount) security.ApplicationSessions
+            SET EndedAtUtc = @NowUtc,
+                EndReason = CASE
+                    WHEN AbsoluteExpiresAtUtc <= @NowUtc THEN 'AbsoluteTimeout'
+                    ELSE 'IdleTimeout'
+                END
+            OUTPUT inserted.SessionId, inserted.UserId, inserted.StartedAtUtc, inserted.LastSeenAtUtc,
+                inserted.AbsoluteExpiresAtUtc, inserted.EndedAtUtc, inserted.EndReason,
+                inserted.AuthenticationMethod, inserted.AccessVersion
+            WHERE EndedAtUtc IS NULL
+              AND (AbsoluteExpiresAtUtc <= @NowUtc OR LastSeenAtUtc <= @IdleCutoffUtc);
+            """;
+        await using SqlConnection connection = new(_connectionString);
+        IEnumerable<SessionRow> rows = await connection.QueryAsync<SessionRow>(
+            Command(sql, new { NowUtc = nowUtc, IdleCutoffUtc = idleCutoffUtc, MaximumCount = maximumCount }, null, cancellationToken));
+        return rows.Select(Map).ToArray();
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ApplicationSession>> ListActiveAsync(DateTimeOffset absoluteCutoffUtc, DateTimeOffset idleCutoffUtc, int skip, int take, CancellationToken cancellationToken)
     {
         const string sql = $"""

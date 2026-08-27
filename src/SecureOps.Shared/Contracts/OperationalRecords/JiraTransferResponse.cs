@@ -11,4 +11,6 @@ public sealed record JiraTransferResponse(
     string MappingVersion,
     string IdempotencyKey,
     int RetryCount,
-    string CorrelationId);
+    string CorrelationId,
+    bool SimulationMode = false,
+    string? SimulationNotice = null);

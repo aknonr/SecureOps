@@ -101,6 +101,48 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ApplicationSession>> EndExpiredAsync(
+        DateTimeOffset nowUtc,
+        DateTimeOffset idleCutoffUtc,
+        int maximumCount,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            List<ApplicationSession> ended = [];
+            foreach (ApplicationSession session in _sessions.Values
+                         .Where(item => item.IsActive
+                             && (item.AbsoluteExpiresAtUtc <= nowUtc || item.LastSeenAtUtc <= idleCutoffUtc))
+                         .OrderBy(item => item.AbsoluteExpiresAtUtc)
+                         .ThenBy(item => item.LastSeenAtUtc)
+                         .Take(maximumCount)
+                         .ToArray())
+            {
+                SessionEndReason? reason = session.AbsoluteExpiresAtUtc <= nowUtc
+                    ? SessionEndReason.AbsoluteTimeout
+                    : session.LastSeenAtUtc <= idleCutoffUtc
+                        ? SessionEndReason.IdleTimeout
+                        : null;
+                if (reason is null)
+                {
+                    continue;
+                }
+
+                ApplicationSession terminal = session with { EndedAtUtc = nowUtc, EndReason = reason };
+                _sessions[session.SessionId] = terminal;
+                ended.Add(terminal);
+            }
+
+            return ended;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ApplicationSession>> ListActiveAsync(DateTimeOffset absoluteCutoffUtc, DateTimeOffset idleCutoffUtc, int skip, int take, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);

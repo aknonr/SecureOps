@@ -12,4 +12,6 @@ public sealed record JiraPreviewResponse(
     string MappingVersion,
     string IdempotencyKey,
     IReadOnlyList<string> Warnings,
-    string? AssigneeUsername = null);
+    string? AssigneeUsername = null,
+    bool SimulationMode = false,
+    string? SimulationNotice = null);

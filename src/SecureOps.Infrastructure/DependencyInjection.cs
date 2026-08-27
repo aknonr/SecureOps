@@ -153,7 +153,12 @@ public static class DependencyInjection
         services.AddScoped<ApplicationSessionContext>();
 
         string? sourceProvider = configuration[$"{OperationalRecordsOptions.SectionName}:SourceProvider"];
-        if (string.Equals(sourceProvider, "Fake", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(sourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IOperationalRecordClient, SimulationOperationalRecordClient>();
+            services.AddSingleton<IOperationalRecordClassifier, SimulationOperationalRecordClassifier>();
+        }
+        else if (string.Equals(sourceProvider, "Fake", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IOperationalRecordClient, FakeOperationalRecordClient>();
             services.AddSingleton<IOperationalRecordClassifier, FakeOperationalRecordClassifier>();
@@ -183,7 +188,12 @@ public static class DependencyInjection
         }
 
         string? jiraProvider = configuration[$"{JiraIntegrationOptions.SectionName}:Provider"];
-        if (string.Equals(jiraProvider, "Fake", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(jiraProvider, "Simulation", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IJiraClient, SimulationJiraClient>();
+            services.AddSingleton<IRequesterResolver, SimulationRequesterResolver>();
+        }
+        else if (string.Equals(jiraProvider, "Fake", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IJiraClient, FakeJiraClient>();
             services.AddSingleton<IRequesterResolver, FakeRequesterResolver>();

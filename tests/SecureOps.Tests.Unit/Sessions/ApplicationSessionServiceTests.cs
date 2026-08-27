@@ -127,6 +127,22 @@ public sealed class ApplicationSessionServiceTests
         fixture.Audit.Events.Should().NotContain(item => item.Action == AuditActions.ApplicationSessionStarted);
     }
 
+    [Fact]
+    public async Task ListActive_TransitionsUnvisitedExpiredSessionsBeforeReturningPage()
+    {
+        Fixture fixture = new();
+        ApplicationSessionResult started = await fixture.StartAsync();
+        fixture.Time.Advance(TimeSpan.FromMinutes(30));
+
+        ApplicationSessionListResult result = await fixture.Service.ListActiveAsync(1, 50, Fixture.Context, default);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Sessions.Should().BeEmpty();
+        (await fixture.Repository.GetAsync(started.Session!.SessionId, default))!.EndReason
+            .Should().Be(SessionEndReason.IdleTimeout);
+        fixture.Audit.Events.Should().Contain(item => item.Action == AuditActions.ApplicationSessionIdleTimedOut);
+    }
+
     private sealed class Fixture
     {
         private readonly IApplicationAccessService _access = Substitute.For<IApplicationAccessService>();
@@ -185,6 +201,7 @@ public sealed class ApplicationSessionServiceTests
         }
         public Task<bool> EndAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken) => _inner.EndAsync(sessionId, endedAtUtc, reason, cancellationToken);
         public Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken) => _inner.EndActiveForUserAsync(userId, endedAtUtc, reason, cancellationToken);
+        public Task<IReadOnlyList<ApplicationSession>> EndExpiredAsync(DateTimeOffset nowUtc, DateTimeOffset idleCutoffUtc, int maximumCount, CancellationToken cancellationToken) => _inner.EndExpiredAsync(nowUtc, idleCutoffUtc, maximumCount, cancellationToken);
         public Task<IReadOnlyList<ApplicationSession>> ListActiveAsync(DateTimeOffset absoluteCutoffUtc, DateTimeOffset idleCutoffUtc, int skip, int take, CancellationToken cancellationToken) => _inner.ListActiveAsync(absoluteCutoffUtc, idleCutoffUtc, skip, take, cancellationToken);
     }
 

@@ -41,6 +41,32 @@ public sealed class DirectoryExplorerHostedTests
     }
 
     [Fact]
+    public async Task GroupOverview_CanonicalLookupKey_DrivesDirectMemberRequest()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient client = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+
+        HttpResponseMessage overviewResponse = await client.PostAsJsonAsync(
+            "/api/v1/directory/groups/lookup",
+            new DirectoryGroupLookupRequest("Operations Readers", Purpose));
+        DirectoryGroupDetailResponse overview = (await overviewResponse.Content
+            .ReadFromJsonAsync<DirectoryGroupDetailResponse>())!;
+        HttpResponseMessage membersResponse = await client.PostAsJsonAsync(
+            "/api/v1/directory/groups/members",
+            new DirectoryGroupMembersRequest(overview.Group.LookupKey, Purpose, 25));
+        DirectoryMemberPageResponse members = (await membersResponse.Content
+            .ReadFromJsonAsync<DirectoryMemberPageResponse>())!;
+
+        overviewResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        overview.Group.Name.Should().Be("Operations Readers");
+        overview.Group.SamAccountName.Should().Be("ops-read");
+        overview.Group.LookupKey.Should().Be("ops-read");
+        membersResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        members.PageSize.Should().Be(25);
+        members.Items.Single(item => item.MemberType == "Group").LookupKey.Should().Be("nested-ops");
+    }
+
+    [Fact]
     public async Task PlatformAdmin_CanPageDirectTypedMembers()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();

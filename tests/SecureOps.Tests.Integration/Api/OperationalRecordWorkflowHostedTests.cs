@@ -24,15 +24,93 @@ public sealed class OperationalRecordWorkflowHostedTests
     public void SourceProviderConfiguration_SelectsExplicitImplementation()
     {
         using ServiceProvider fakeServices = Services("Fake");
+        using ServiceProvider simulationServices = Services("Simulation");
         using ServiceProvider disabledServices = Services("Disabled");
 
         fakeServices.GetRequiredService<IOperationalRecordClient>().Should().BeOfType<FakeOperationalRecordClient>();
         fakeServices.GetRequiredService<IOperationalRecordClassifier>().Should().BeOfType<FakeOperationalRecordClassifier>();
         fakeServices.GetRequiredService<IRequesterResolver>().Should().BeOfType<FakeRequesterResolver>();
         fakeServices.GetRequiredService<IJiraClient>().Should().BeOfType<FakeJiraClient>();
+        simulationServices.GetRequiredService<IOperationalRecordClient>().Should().BeOfType<SimulationOperationalRecordClient>();
+        simulationServices.GetRequiredService<IOperationalRecordClassifier>().Should().BeOfType<SimulationOperationalRecordClassifier>();
+        simulationServices.GetRequiredService<IRequesterResolver>().Should().BeOfType<SimulationRequesterResolver>();
+        simulationServices.GetRequiredService<IJiraClient>().Should().BeOfType<SimulationJiraClient>();
         disabledServices.GetRequiredService<IOperationalRecordClient>().Should().BeOfType<DisabledOperationalRecordClient>();
         disabledServices.GetRequiredService<IOperationalRecordClassifier>().Should().BeOfType<ManualReviewOperationalRecordClassifier>();
         disabledServices.GetRequiredService<IRequesterResolver>().Should().BeOfType<UnresolvedRequesterResolver>();
+    }
+
+    [Fact]
+    public async Task SimulationProvider_ExercisesAllControlledWorkflowOutcomesWithoutNetworkProviders()
+    {
+        using WebApplicationFactory<Program> factory = CreateSimulationFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+
+        EnterpriseIntegrationHealthResponse health = (await admin.GetFromJsonAsync<EnterpriseIntegrationHealthResponse>(
+            "/api/v1/health/enterprise-integrations"))!;
+        health.SimulationMode.Should().BeTrue();
+        health.OperatorNotice.Should().Contain("no real Jira issue");
+
+        OperationalRecordResponse happy = await GetRecordAsync(admin, "SIM-OR-100");
+        happy.SimulationMode.Should().BeTrue();
+        happy.PresentationState.Should().Be(OperationalRecordPresentationStates.Actionable);
+        JiraPreviewResponse preview = (await (await admin.PostAsync(
+            $"/api/v1/operational-records/{happy.Id}/jira-preview", null)).Content.ReadFromJsonAsync<JiraPreviewResponse>())!;
+        preview.SimulationMode.Should().BeTrue();
+        preview.SimulationNotice.Should().Contain("no real Jira issue");
+        HttpResponseMessage created = await PostCommandAsync(
+            admin, $"/api/v1/operational-records/{happy.Id}/jira", "simulation-happy");
+        JiraTransferResponse createdBody = (await created.Content.ReadFromJsonAsync<JiraTransferResponse>())!;
+        HttpResponseMessage replay = await PostCommandAsync(
+            admin, $"/api/v1/operational-records/{happy.Id}/jira", "simulation-happy");
+        JiraTransferResponse replayBody = (await replay.Content.ReadFromJsonAsync<JiraTransferResponse>())!;
+        created.StatusCode.Should().Be(HttpStatusCode.OK);
+        replay.StatusCode.Should().Be(HttpStatusCode.OK);
+        replayBody.JiraIssueKey.Should().Be(createdBody.JiraIssueKey);
+
+        OperationalRecordResponse stale = await GetRecordAsync(admin, "SIM-OR-200");
+        await admin.PostAsync($"/api/v1/operational-records/{stale.Id}/jira-preview", null);
+        await AssertProblemAsync(
+            await PostCommandAsync(admin, $"/api/v1/operational-records/{stale.Id}/jira", "simulation-stale"),
+            HttpStatusCode.Conflict,
+            OperationalErrorCodes.OperationalRecordChanged);
+
+        OperationalRecordResponse jiraFailure = await GetRecordAsync(admin, "SIM-OR-300");
+        await admin.PostAsync($"/api/v1/operational-records/{jiraFailure.Id}/jira-preview", null);
+        await AssertProblemAsync(
+            await PostCommandAsync(admin, $"/api/v1/operational-records/{jiraFailure.Id}/jira", "simulation-jira-failure"),
+            HttpStatusCode.ServiceUnavailable,
+            OperationalErrorCodes.JiraCreateFailed);
+        (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{jiraFailure.Id}"))!
+            .RetryEligible.Should().BeTrue();
+
+        OperationalRecordResponse unknown = await GetRecordAsync(admin, "SIM-OR-400");
+        await admin.PostAsync($"/api/v1/operational-records/{unknown.Id}/jira-preview", null);
+        await AssertProblemAsync(
+            await PostCommandAsync(admin, $"/api/v1/operational-records/{unknown.Id}/jira", "simulation-jira-unknown"),
+            HttpStatusCode.ServiceUnavailable,
+            OperationalErrorCodes.JiraCreateFailed);
+        OperationalRecordResponse unknownState = (await admin.GetFromJsonAsync<OperationalRecordResponse>(
+            $"/api/v1/operational-records/{unknown.Id}"))!;
+        unknownState.ReconciliationRequired.Should().BeTrue();
+        unknownState.RetryEligible.Should().BeFalse();
+
+        OperationalRecordResponse closeFailure = await GetRecordAsync(admin, "SIM-OR-500");
+        await admin.PostAsync($"/api/v1/operational-records/{closeFailure.Id}/jira-preview", null);
+        await AssertProblemAsync(
+            await PostCommandAsync(admin, $"/api/v1/operational-records/{closeFailure.Id}/jira", "simulation-close-failure"),
+            HttpStatusCode.ServiceUnavailable,
+            OperationalErrorCodes.OperationalRecordCloseFailed);
+        OperationalRecordResponse pendingClose = (await admin.GetFromJsonAsync<OperationalRecordResponse>(
+            $"/api/v1/operational-records/{closeFailure.Id}"))!;
+        pendingClose.JiraExists.Should().BeTrue();
+        pendingClose.RetryEligible.Should().BeTrue();
+        HttpResponseMessage closeRetry = await PostCommandAsync(
+            admin, $"/api/v1/operational-records/{closeFailure.Id}/retry", "simulation-close-retry");
+        JiraTransferResponse closeRetryBody = (await closeRetry.Content.ReadFromJsonAsync<JiraTransferResponse>())!;
+        closeRetry.StatusCode.Should().Be(HttpStatusCode.OK);
+        closeRetryBody.JiraIssueKey.Should().Be(pendingClose.JiraIssueKey);
+        closeRetryBody.WorkflowState.Should().Be(OperationalRecordWorkflowState.Completed);
     }
 
     [Fact]
@@ -346,6 +424,27 @@ public sealed class OperationalRecordWorkflowHostedTests
             }
         });
 
+    private static WebApplicationFactory<Program> CreateSimulationFactory() => new WebApplicationFactory<Program>()
+        .WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Test");
+            builder.UseSetting("DemoAuth:Enabled", "true");
+            builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
+            builder.UseSetting("Access:DemoCompatibilityEnabled", "true");
+            builder.UseSetting("Access:RepositoryProvider", "InMemory");
+            builder.UseSetting("SessionSecurity:RepositoryProvider", "InMemory");
+            builder.UseSetting("DataProtection:Mode", "Ephemeral");
+            builder.UseSetting("Audit:Provider", "InMemory");
+            builder.UseSetting("IdentityLookup:Provider", "Mock");
+            builder.UseSetting("OperationalRecords:SourceProvider", "Simulation");
+            builder.UseSetting("OperationalRecords:RepositoryProvider", "InMemory");
+            builder.UseSetting("Jira:Provider", "Simulation");
+            builder.UseSetting("RateLimiting:OperationalRecordRefresh:PermitLimit", "100");
+            builder.UseSetting("RateLimiting:JiraPreview:PermitLimit", "100");
+            builder.UseSetting("RateLimiting:JiraCreate:PermitLimit", "100");
+            builder.UseSetting("RateLimiting:WorkflowRetry:PermitLimit", "100");
+        });
+
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
         HttpClient client = factory.CreateClient();
@@ -368,7 +467,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["OperationalRecords:SourceProvider"] = sourceProvider,
-            ["Jira:Provider"] = sourceProvider == "Fake" ? "Fake" : "Disabled",
+            ["Jira:Provider"] = sourceProvider is "Fake" or "Simulation" ? sourceProvider : "Disabled",
             ["Audit:Provider"] = "InMemory"
         }).Build();
         ServiceCollection services = new();

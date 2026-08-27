@@ -20,6 +20,13 @@ public interface IApplicationSessionRepository
     /// <summary>Ends all active sessions for one user and returns the affected identifiers.</summary>
     public Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken);
 
+    /// <summary>Atomically transitions active sessions whose idle or absolute lifetime has elapsed.</summary>
+    public Task<IReadOnlyList<ApplicationSession>> EndExpiredAsync(
+        DateTimeOffset nowUtc,
+        DateTimeOffset idleCutoffUtc,
+        int maximumCount,
+        CancellationToken cancellationToken);
+
     /// <summary>Returns a bounded page of currently effective sessions.</summary>
     public Task<IReadOnlyList<ApplicationSession>> ListActiveAsync(DateTimeOffset absoluteCutoffUtc, DateTimeOffset idleCutoffUtc, int skip, int take, CancellationToken cancellationToken);
 }

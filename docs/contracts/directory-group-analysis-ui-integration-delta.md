@@ -19,6 +19,11 @@ This is a backend contract delta for Claude-owned UI integration. It does not au
 
 Use `POST /api/v1/directory/groups/analysis` with `{ group, purpose?, refresh? }` after checking `Identity.Groups.Members.View`.
 
+- Render group `name`, but use the additive server-returned `lookupKey` for subsequent group/member/analysis/path/export calls.
+- `lookupKey` is an exact `sAMAccountName`; it is not a DN or LDAP filter. Never fall back to `distinguishedName`.
+- Use the same rule for nested group navigation and user-to-group navigation. Member rows also expose nullable `lookupKey`.
+- Direct-member pages already support 25/50/100 through `pageSize` and opaque `continuationToken`; do not add another paging route.
+
 Render these as distinct views:
 
 - `overview`
@@ -36,3 +41,5 @@ Render these as distinct views:
 Use `POST /api/v1/directory/groups/export` only when `Identity.Groups.Export` is present. Submit `mode=DirectMembers|EffectiveMembers` and `format=Csv`. The browser receives a file response. Do not relabel one mode as the other.
 
 Handle stable outcomes independently: 404 not found, 400 invalid input, 403 forbidden, 429 rate limited, 503 `DirectoryProviderUnavailable`, 503 `DirectoryProviderTimeout`, 422 `DirectoryTraversalPartial`, and successful empty/partial 200 responses. Preserve the correlation ID for support.
+
+Group overview state is independent from direct-member/analysis state. If member enumeration fails after overview succeeds, retain the overview and fail only that section. A successful empty member page is not an outage; an incomplete effective result must keep `isComplete=false` and traversal-limit evidence visible.

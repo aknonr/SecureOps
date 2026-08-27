@@ -164,6 +164,22 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         try
         {
             DateTimeOffset now = _timeProvider.GetUtcNow();
+            IReadOnlyList<ApplicationSession> expired = await _repository.EndExpiredAsync(
+                now,
+                now.AddMinutes(-_options.IdleTimeoutMinutes),
+                _options.MaxAdminPageSize,
+                cancellationToken);
+            foreach (ApplicationSession session in expired)
+            {
+                string action = session.EndReason == SessionEndReason.AbsoluteTimeout
+                    ? AuditActions.ApplicationSessionAbsoluteTimedOut
+                    : AuditActions.ApplicationSessionIdleTimedOut;
+                if (!await TryAuditAsync(action, session, session.EndReason, context, null, cancellationToken))
+                {
+                    return new ApplicationSessionListResult(null, OperationalErrorCodes.AuditStoreUnavailable);
+                }
+            }
+
             IReadOnlyList<ApplicationSession> sessions = await _repository.ListActiveAsync(
                 now,
                 now.AddMinutes(-_options.IdleTimeoutMinutes),

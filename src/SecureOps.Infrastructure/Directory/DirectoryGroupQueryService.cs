@@ -314,15 +314,16 @@ public sealed class DirectoryGroupQueryService : IDirectoryGroupQueryService
 
     private static DirectoryGroupSummaryDto MapGroupSummary(DirectoryGroupRecord group) => new(
         group.StableIdentifier, group.Name, group.SamAccountName, group.DistinguishedName,
-        group.Description, group.Category, group.Scope, group.MembershipKind);
+        group.Description, group.Category, group.Scope, group.MembershipKind, group.SamAccountName);
 
     private static DirectoryGroupDetailDto MapGroupDetail(DirectoryGroupRecord group) => new(
         group.StableIdentifier, group.Name, group.SamAccountName, group.DistinguishedName,
         group.Description, group.Category, group.Scope, group.ManagedBy, group.DirectMemberCount,
-        group.ManagedByDisplayName, group.CreatedAtUtc, group.ChangedAtUtc);
+        group.ManagedByDisplayName, group.CreatedAtUtc, group.ChangedAtUtc, group.SamAccountName);
 
     private static DirectoryMemberDto MapMember(DirectoryMemberRecord member) => new(
-        member.StableIdentifier, member.Name, member.SamAccountName, member.DistinguishedName, member.MemberType);
+        member.StableIdentifier, member.Name, member.SamAccountName, member.DistinguishedName,
+        member.MemberType, member.SamAccountName);
 
     private readonly record struct PageInput(int Offset, int PageSize);
 }

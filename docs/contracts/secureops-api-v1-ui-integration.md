@@ -28,11 +28,13 @@ The `__Host-SecureOps.ApplicationSession` cookie is a Secure, HttpOnly, SameSite
 
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
-| `GET /api/v1/sessions/current` | Authenticated | none | safe current session timestamps, internal IDs, authentication method, and access version | `SessionExpired`, `SessionRevoked`, `SessionStoreUnavailable` |
-| `GET /api/v1/sessions/active?page=1&pageSize=50` | `Access.ManageUsers` | bounded page; maximum configured 100 | safe active-session metadata only; no IP, device, cookie, or directory data | validation, authorization, store/audit unavailable |
+| `GET /api/v1/sessions/current` | Authenticated | none | safe current session timestamps, internal IDs, provider-neutral principal/provider metadata, `isCurrent=true`, authentication method, and access version | `SessionExpired`, `SessionRevoked`, `SessionStoreUnavailable` |
+| `GET /api/v1/sessions/active?page=1&pageSize=50` | `Access.ManageUsers` | bounded page; maximum configured 100 | safe active-session metadata with nullable `principal`, `normalizedPrincipal`, `displayName`, `authenticationProvider`, and `isCurrent`; no IP, device, cookie, or directory data | validation, authorization, store/audit unavailable |
 | `POST /api/v1/sessions/revoke` | `Access.ManageUsers` | `{ "sessionId": "...", "reason": "..." }` | exact terminal session ID/reason/time | `SessionValidationFailed`, `SessionNotFound`, store/audit unavailable |
 
 Idle expiry, absolute expiry, explicit logout, administrative revocation, access disable, and access-version change are server authoritative. A later Negotiate request may authenticate again and create a new SecureOps session; the application cookie does not implement Remember Me or provider logout.
+
+One browser authentication session must present one stable application-session handle to every API client. The server-rendered UI must forward a protected browser-session correlation value through one shared API session handler; separate typed-client cookie containers are not browser identity. Do not merge missing-cookie sessions by user, because that would collapse separate/private browsers and weaken revocation semantics. The current UI does not yet implement this forwarding, so end-to-end browser deduplication and API logout remain a UI-owned integration blocker.
 
 ## Identity
 
@@ -64,9 +66,11 @@ Phase 1 routes remain unchanged. Directory requests are exact-only POST bodies w
 
 The API does not classify service/PAM accounts from names, infer administrator status from group text, expose LDAP filters/cookies, or use returned directory data as application authorization. Zero SPNs is successful empty evidence. Primary membership is separate from explicit direct membership, and group member lists state that primary-group-only relationships are not included. Common failures are `DirectoryInvalidInput`, `DirectoryPrincipalNotFound`, `DirectoryGroupNotFound`, `DirectoryQueryLimitExceeded`, `DirectoryTraversalPartial`, `DirectoryProviderTimeout`, `DirectoryProviderUnavailable`, and `AuditStoreUnavailable`.
 
+Group and member DTOs now return nullable `lookupKey`. When present it is the server-returned exact `sAMAccountName` to use for group lookup, direct members, analysis, membership checks, export, and nested navigation. Display `name`, but send `lookupKey`; never send `distinguishedName`. Direct-member pages accept bounded sizes 25, 50, and 100 and use the existing opaque continuation token.
+
 ## Operational Records
 
-`GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `Fake` is Development/Demo/Test-only, `Disabled` fails closed, and `TuruncuHat` is a typed real adapter whose external TEST activation remains contract-gated. `createdAt` is nullable because the reviewed legacy projection does not supply a source timestamp.
+`GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `Simulation` and legacy `Fake` are Development/Demo/Test-only, `Disabled` fails closed, and `TuruncuHat` is a typed real adapter whose external TEST activation remains contract-gated. `createdAt` is nullable because the reviewed legacy projection does not supply a source timestamp.
 
 `GET /api/v1/health/enterprise-integrations` is Admin-only and exposes only provider selection and safe status; it never exposes URLs, credentials, sessions, identities, or remote payloads.
 
@@ -82,13 +86,17 @@ The UI must refresh authoritative record state after 409, 422, or command comple
 
 `OperationalRecordResponse.claimed` means the stored claim expiry is later than server time. `claimedBy`, `claimedAt`, and `claimExpiresAt` are the authoritative lease metadata; an expired lease can retain historical owner/timestamps while `claimed=false`. `version` changes with persisted workflow mutations. `reconciliationRequired=true` means an unknown Jira-create outcome blocks automatic retry. `jiraExists=true` means a trusted Jira key is persisted. `retryEligible=true` means the current durable state is one the retry endpoint can safely resume; it is always false while reconciliation is required.
 
+`presentationState` is a stable UI category independent of English descriptions: `NeedsAttention` -> "İnceleme Gerekiyor", `Actionable` -> "Jira'ya Aktarılabilir", `InProgress` -> "İşlemde", and `Completed` -> "Tamamlandı". The operator sequence is `Kaydı İncele` -> `Jira Taslağını Önizle` -> `Doğrula` -> `Jira Kaydı Oluştur` -> `Kaynak Kaydı Tamamla`.
+
+When both providers are explicitly `Simulation`, record, preview, transfer, and enterprise-health responses return `simulationMode=true` plus the notice that no real Jira issue will be created. The fixed synthetic scenarios cover happy path/idempotent replay, stale source, safe Jira failure, unknown Jira outcome requiring reconciliation, source-completion failure, and close-only retry. `Simulation` is rejected at startup in Pilot and Production and cannot be paired with a real provider.
+
 The v1 wire contract intentionally serializes Operational Record enums as integers. `OperationalRecordClassification` is `ServerRequest=0`, `EnvironmentRequest=1`, `SoftwareInstallation=2`, `ConfigurationRequest=3`, `OperationalSupport=4`, `NotJiraEligible=5`, `NeedsManualReview=6`. `OperationalRecordWorkflowState` is `Imported=0`, `Classified=1`, `NeedsManualReview=2`, `Eligible=3`, `Previewed=4`, `CreateRequested=5`, `CreatingJira=6`, `JiraCreated=7`, `ClosingOperationalRecord=8`, `Completed=9`, `JiraCreateFailed=10`, `OperationalRecordCloseFailed=11`. These values must not be renumbered or reordered. A future string-enum representation requires an explicitly versioned API contract; it cannot be introduced silently in v1.
 
 ## Management Reporting
 
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
-| `GET /api/v1/reporting/management/summary` | `Reporting.ManagementView` | `window=today|7d|30d|custom`; custom also requires UTC `from` and `to` | bounded team-level identity, workflow, adoption, session-governance, security, and elapsed-duration aggregates | `ReportingValidationFailed`, `ReportingUnavailable`, `AuditStoreUnavailable` |
+| `GET /api/v1/reporting/management/summary` | `Reporting.ManagementView` | `window=today|7d|30d|custom`; custom also requires UTC `from` and `to` | bounded team-level identity, workflow, adoption, session-governance, security, and elapsed-duration aggregates | `ReportingValidationFailed`, non-retryable `ReportingPersistenceNotConfigured`, retryable `ReportingUnavailable`, `AuditStoreUnavailable` |
 | `GET /api/v1/reporting/management/operators` | `Reporting.ManagementView` | same window plus `page` and `pageSize` (maximum 100) | server-paginated persisted actor counts and activity bounds | same reporting errors |
 
 Only Admin and Auditor receive this capability. Windows are UTC half-open intervals and custom ranges are capped at 92 days. Duration fields are elapsed system workflow time, not active labor or time saved. Operator data must not be rendered as rankings or performance comparisons.

@@ -121,6 +121,8 @@ public sealed class OperationalRecordsControllerTests
             new EmptyRecordService(),
             new StubTransferService(previewResult),
             Options.Create(new CommandIdempotencyOptions()),
+            Options.Create(new OperationalRecordsOptions()),
+            Options.Create(new JiraIntegrationOptions()),
             new FixedTimeProvider(Now))
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
@@ -134,6 +136,8 @@ public sealed class OperationalRecordsControllerTests
             new StubRecordService(record),
             new StubTransferService(OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.WorkflowConflict, "test", false)),
             Options.Create(new CommandIdempotencyOptions()),
+            Options.Create(new OperationalRecordsOptions()),
+            Options.Create(new JiraIntegrationOptions()),
             new FixedTimeProvider(Now))
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }

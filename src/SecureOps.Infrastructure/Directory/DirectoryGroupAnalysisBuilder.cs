@@ -317,14 +317,15 @@ public sealed class DirectoryGroupAnalysisBuilder
     private static DirectoryGroupDetailDto Detail(DirectoryGroupRecord group) => new(
         group.StableIdentifier, group.Name, group.SamAccountName, group.DistinguishedName,
         group.Description, group.Category, group.Scope, group.ManagedBy, group.DirectMemberCount,
-        group.ManagedByDisplayName, group.CreatedAtUtc, group.ChangedAtUtc);
+        group.ManagedByDisplayName, group.CreatedAtUtc, group.ChangedAtUtc, group.SamAccountName);
 
     private static DirectoryGroupSummaryDto Group(DirectoryGroupRecord group) => new(
         group.StableIdentifier, group.Name, group.SamAccountName, group.DistinguishedName,
-        group.Description, group.Category, group.Scope, group.MembershipKind);
+        group.Description, group.Category, group.Scope, group.MembershipKind, group.SamAccountName);
 
     private static DirectoryMemberDto Member(DirectoryMemberRecord member) => new(
-        member.StableIdentifier, member.Name, member.SamAccountName, member.DistinguishedName, member.MemberType);
+        member.StableIdentifier, member.Name, member.SamAccountName, member.DistinguishedName,
+        member.MemberType, member.SamAccountName);
 
     private static DirectoryTraversalMetadataDto Traversal(DirectoryTraversalState state) => new(
         state.NodesVisited, state.EdgesVisited, state.MaximumDepthReached, state.CycleDetected,

@@ -28,7 +28,8 @@ public sealed record DirectoryGroupSummaryDto(
     string? Description,
     string Category,
     string Scope,
-    string? MembershipKind = null);
+    string? MembershipKind = null,
+    string? LookupKey = null);
 
 /// <summary>Safe exact group metadata.</summary>
 public sealed record DirectoryGroupDetailDto(
@@ -43,7 +44,8 @@ public sealed record DirectoryGroupDetailDto(
     int? DirectMemberCount,
     string? ManagedByDisplayName = null,
     DateTimeOffset? CreatedAtUtc = null,
-    DateTimeOffset? ChangedAtUtc = null);
+    DateTimeOffset? ChangedAtUtc = null,
+    string? LookupKey = null);
 
 /// <summary>Safe direct member projection.</summary>
 public sealed record DirectoryMemberDto(
@@ -51,7 +53,8 @@ public sealed record DirectoryMemberDto(
     string? Name,
     string? SamAccountName,
     string? DistinguishedName,
-    string MemberType);
+    string MemberType,
+    string? LookupKey = null);
 
 /// <summary>Bounded direct-group page.</summary>
 public sealed record DirectoryGroupPageResponse(

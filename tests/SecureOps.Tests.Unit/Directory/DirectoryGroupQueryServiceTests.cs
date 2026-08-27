@@ -62,6 +62,7 @@ public sealed class DirectoryGroupQueryServiceTests
 
         found.Value!.Group.Category.Should().Be("Distribution");
         found.Value.Group.Scope.Should().Be("Universal");
+        found.Value.Group.LookupKey.Should().Be("dist-universal");
         missing.Status.Should().Be(DirectoryQueryStatus.NotFound);
         missing.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryGroupNotFound);
     }
@@ -129,7 +130,124 @@ public sealed class DirectoryGroupQueryServiceTests
             new DirectoryGroupMembersRequest("ops-read", Purpose, 101), Context, CancellationToken.None);
 
         found.Value!.Items.Select(item => item.MemberType).Should().BeEquivalentTo("User", "Group", "Computer");
+        found.Value.Items.Single(item => item.MemberType == "Group").LookupKey.Should().Be("nested-ops");
+        found.Value.Items.Single(item => item.MemberType == "User").LookupKey.Should().Be("pam12356");
         invalid.Status.Should().Be(DirectoryQueryStatus.Invalid);
+    }
+
+    [Theory]
+    [InlineData(25)]
+    [InlineData(50)]
+    [InlineData(100)]
+    public async Task Members_AcceptsUiFriendlyBoundedPageSizes(int pageSize)
+    {
+        DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
+
+        DirectoryQueryResult<DirectoryMemberPageResponse> result = await service.GetGroupMembersAsync(
+            new DirectoryGroupMembersRequest("ops-read", Purpose, pageSize), Context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.Success);
+        result.Value!.PageSize.Should().Be(pageSize);
+    }
+
+    [Fact]
+    public async Task OverviewNameWithSpaces_ReturnsSamLookupKeyThatDirectMembersAccepts()
+    {
+        DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
+        DirectoryQueryResult<DirectoryGroupDetailResponse> overview = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("Operations Readers", Purpose), Context, CancellationToken.None);
+
+        DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
+            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, Purpose, 25),
+            Context,
+            CancellationToken.None);
+
+        overview.Status.Should().Be(DirectoryQueryStatus.Success);
+        overview.Value.Group.Name.Should().NotBe(overview.Value.Group.SamAccountName);
+        overview.Value.Group.LookupKey.Should().Be("ops-read");
+        members.Status.Should().Be(DirectoryQueryStatus.Success);
+        members.Value!.Items.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task OverviewCanRemainSuccessfulWhenMemberSectionFails()
+    {
+        OverviewOnlyProvider provider = new();
+        DirectoryGroupQueryService service = CreateService(provider, out _);
+
+        DirectoryQueryResult<DirectoryGroupDetailResponse> overview = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("similar-group-a", Purpose), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
+            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, Purpose), Context, CancellationToken.None);
+
+        overview.Status.Should().Be(DirectoryQueryStatus.Success);
+        overview.Value.Group.Name.Should().Be("Similar Group A");
+        overview.Value.Group.LookupKey.Should().Be("similar-group-a");
+        members.Status.Should().Be(DirectoryQueryStatus.ProviderUnavailable);
+    }
+
+    [Fact]
+    public async Task OverviewCanRemainSuccessfulWhenDirectMembersAreEmpty()
+    {
+        DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
+
+        DirectoryQueryResult<DirectoryGroupDetailResponse> overview = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("Operations Announcements", Purpose), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
+            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, Purpose), Context, CancellationToken.None);
+
+        overview.Status.Should().Be(DirectoryQueryStatus.Success);
+        members.Status.Should().Be(DirectoryQueryStatus.Success);
+        members.Value!.Items.Should().BeEmpty();
+        members.Value.ContinuationToken.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OverviewCanRemainSuccessfulWhenDirectMembersTimeOut()
+    {
+        DirectoryExplorerOptions options = new()
+        {
+            ProviderTimeoutSeconds = 1,
+            Cache = new DirectoryExplorerCacheOptions { Enabled = false }
+        };
+        DirectoryGroupQueryService service = CreateService(
+            new TimeoutMembersProvider(), new InMemoryAuditWriter(), options);
+
+        DirectoryQueryResult<DirectoryGroupDetailResponse> overview = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("timeout-group", Purpose), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
+            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, Purpose), Context, CancellationToken.None);
+
+        overview.Status.Should().Be(DirectoryQueryStatus.Success);
+        members.Status.Should().Be(DirectoryQueryStatus.ProviderTimeout);
+        members.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryProviderTimeout);
+    }
+
+    [Fact]
+    public async Task CanonicalKeys_CoverEqualDifferentSimilarNestedAndUserNavigationCases()
+    {
+        DirectoryGroupQueryService service = CreateService(new NavigationProvider(), out _);
+
+        DirectoryQueryResult<DirectoryGroupDetailResponse> equal = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("same-name", Purpose), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryGroupDetailResponse> spaced = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("Display Name With Spaces", Purpose), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryGroupDetailResponse> similarA = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("Very Similar Group", Purpose), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryGroupDetailResponse> similarB = await service.GetGroupAsync(
+            new DirectoryGroupLookupRequest("Very Similar Group 2", Purpose), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryGroupPageResponse> fromUser = await service.GetPrincipalGroupsAsync(
+            new DirectoryPrincipalGroupsRequest("pam12356", Purpose), Context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryMemberPageResponse> nested = await service.GetGroupMembersAsync(
+            new DirectoryGroupMembersRequest("different-sam", Purpose), Context, CancellationToken.None);
+
+        equal.Value!.Group.LookupKey.Should().Be("same-name");
+        spaced.Value!.Group.LookupKey.Should().Be("different-sam");
+        similarA.Value!.Group.LookupKey.Should().Be("similar-a");
+        similarB.Value!.Group.LookupKey.Should().Be("similar-b");
+        similarA.Value.Group.LookupKey.Should().NotBe(similarB.Value.Group.LookupKey);
+        fromUser.Value!.Items.Should().OnlyContain(item => !string.IsNullOrWhiteSpace(item.LookupKey));
+        nested.Value!.Items.Single().LookupKey.Should().Be("nested-sam");
     }
 
     [Fact]
@@ -233,6 +351,62 @@ public sealed class DirectoryGroupQueryServiceTests
         public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectGroupsAsync(string normalizedAccount, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) { Calls++; return Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(null); }
         public Task<DirectoryGroupRecord?> FindGroupAsync(string normalizedGroup, CancellationToken cancellationToken) { Calls++; return Task.FromResult<DirectoryGroupRecord?>(null); }
         public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersAsync(string normalizedGroup, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) { Calls++; return Task.FromResult<DirectoryProviderPage<DirectoryMemberRecord>?>(null); }
+    }
+
+    private sealed class OverviewOnlyProvider : IDirectoryGroupProvider
+    {
+        public string ProviderName => "OverviewOnly";
+        public bool SupportsUpnLookup => false;
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectGroupsAsync(string normalizedAccount, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(null);
+        public Task<DirectoryGroupRecord?> FindGroupAsync(string normalizedGroup, CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryGroupRecord?>(new DirectoryGroupRecord(
+                "S-1-5-21-9001", "Similar Group A", "similar-group-a",
+                "CN=Similar Group A,OU=Groups,DC=example,DC=invalid", null, "Security", "Global"));
+        public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersAsync(string normalizedGroup, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) =>
+            throw new DirectoryProviderUnavailableException();
+    }
+
+    private sealed class NavigationProvider : IDirectoryGroupProvider
+    {
+        private static readonly DirectoryGroupRecord[] Groups =
+        [
+            new("S-1", "same-name", "same-name", null, null, "Security", "Global"),
+            new("S-2", "Display Name With Spaces", "different-sam", null, null, "Security", "Global"),
+            new("S-3", "Very Similar Group", "similar-a", null, null, "Security", "Global"),
+            new("S-4", "Very Similar Group 2", "similar-b", null, null, "Security", "Global")
+        ];
+
+        public string ProviderName => "Navigation";
+        public bool SupportsUpnLookup => false;
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectGroupsAsync(string normalizedAccount, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(
+                new DirectoryProviderPage<DirectoryGroupRecord>(Groups.Take(pageSize).ToArray(), false));
+        public Task<DirectoryGroupRecord?> FindGroupAsync(string normalizedGroup, CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryGroupRecord?>(Groups.SingleOrDefault(group =>
+                string.Equals(group.Name, normalizedGroup, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(group.SamAccountName, normalizedGroup, StringComparison.OrdinalIgnoreCase)));
+        public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersAsync(string normalizedGroup, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryMemberRecord>?>(
+                new DirectoryProviderPage<DirectoryMemberRecord>(
+                    [new DirectoryMemberRecord("S-5", "Nested Display", "nested-sam", null, "Group")],
+                    false));
+    }
+
+    private sealed class TimeoutMembersProvider : IDirectoryGroupProvider
+    {
+        public string ProviderName => "TimeoutMembers";
+        public bool SupportsUpnLookup => false;
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectGroupsAsync(string normalizedAccount, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(null);
+        public Task<DirectoryGroupRecord?> FindGroupAsync(string normalizedGroup, CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryGroupRecord?>(new DirectoryGroupRecord(
+                "S-6", "Timeout Group", "timeout-group", null, null, "Security", "Global"));
+        public async Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersAsync(string normalizedGroup, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return null;
+        }
     }
 
     private sealed class ThrowingAuditWriter : IAuditWriter

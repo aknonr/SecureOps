@@ -42,9 +42,16 @@ public sealed class EnterpriseIntegrationDiagnostics
     }
 
     /// <summary>Returns safe provider state.</summary>
-    public EnterpriseIntegrationHealthResponse Get() => new(
-        Provider("TuruncuHat", _operational.SourceProvider),
-        Provider("Jira", _jira.Provider));
+    public EnterpriseIntegrationHealthResponse Get()
+    {
+        bool simulation = string.Equals(_operational.SourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(_jira.Provider, "Simulation", StringComparison.OrdinalIgnoreCase);
+        return new(
+            Provider("TuruncuHat", _operational.SourceProvider),
+            Provider("Jira", _jira.Provider),
+            simulation,
+            simulation ? SimulationOperationalRecordClient.OperatorNotice : null);
+    }
 
     private IntegrationProviderHealthResponse Provider(string provider, string selection) =>
         new(

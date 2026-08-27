@@ -29,6 +29,10 @@ public sealed class ApplicationSessionHostedTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         current.SessionId.Should().NotBeEmpty();
         current.UserId.Should().NotBeEmpty();
+        current.Principal.Should().Be("demo:platform-admin");
+        current.NormalizedPrincipal.Should().Be("demo:platform-admin");
+        current.AuthenticationProvider.Should().Be("demo-api-bridge");
+        current.IsCurrent.Should().BeTrue();
         current.AbsoluteExpiresAtUtc.Should().BeAfter(current.StartedAtUtc);
         setCookie.Should().StartWith("__Host-SecureOps.ApplicationSession=")
             .And.Contain("path=/")
@@ -37,6 +41,30 @@ public sealed class ApplicationSessionHostedTests
             .And.Contain("samesite=lax")
             .And.NotContain("expires=")
             .And.NotContain("max-age=");
+    }
+
+    [Fact]
+    public async Task PreservedBrowserHandle_ReusesOneSession_WhileSeparateBrowserGetsAnother()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient browser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        using HttpClient privateBrowser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse first, string cookie) = await StartAsync(browser);
+
+        using HttpRequestMessage refresh = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
+        ApplicationSessionResponse refreshed = (await (await browser.SendAsync(refresh)).Content
+            .ReadFromJsonAsync<ApplicationSessionResponse>())!;
+        using HttpRequestMessage navigation = Request(HttpMethod.Get, "/api/v1/access/me", cookie);
+        HttpResponseMessage navigationResponse = await browser.SendAsync(navigation);
+        using HttpRequestMessage anotherTab = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
+        ApplicationSessionResponse tab = (await (await browser.SendAsync(anotherTab)).Content
+            .ReadFromJsonAsync<ApplicationSessionResponse>())!;
+        (ApplicationSessionResponse separate, _) = await StartAsync(privateBrowser);
+
+        refreshed.SessionId.Should().Be(first.SessionId);
+        tab.SessionId.Should().Be(first.SessionId);
+        navigationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        separate.SessionId.Should().NotBe(first.SessionId);
     }
 
     [Fact]
@@ -58,16 +86,22 @@ public sealed class ApplicationSessionHostedTests
         HttpResponseMessage revokeResponse = await admin.SendAsync(revoke);
         using HttpRequestMessage replay = Request(HttpMethod.Get, "/api/v1/sessions/current", leadState.LeadCookie);
         HttpResponseMessage replayResponse = await lead.SendAsync(replay);
+        using HttpRequestMessage relist = Request(HttpMethod.Get, "/api/v1/sessions/active", adminState.AdminCookie);
+        ActiveApplicationSessionsResponse afterRevoke = (await (await admin.SendAsync(relist)).Content
+            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>())!;
 
         await AssertProblemAsync(leadListResponse, HttpStatusCode.Forbidden, "AccessDenied");
         adminListResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         active.Items.Select(item => item.SessionId).Should().Contain([leadState.LeadSession.SessionId, adminState.AdminSession.SessionId]);
+        active.Items.Single(item => item.SessionId == adminState.AdminSession.SessionId).IsCurrent.Should().BeTrue();
+        active.Items.Should().OnlyContain(item => !string.IsNullOrWhiteSpace(item.Principal));
         active.Items.Select(item => JsonSerializer.Serialize(item))
-            .Should().OnlyContain(json => !json.Contains("ip", StringComparison.OrdinalIgnoreCase)
-                && !json.Contains("device", StringComparison.OrdinalIgnoreCase)
-                && !json.Contains("cookie", StringComparison.OrdinalIgnoreCase));
+            .Should().OnlyContain(json => !json.Contains("\"ip\"", StringComparison.OrdinalIgnoreCase)
+                && !json.Contains("\"device\"", StringComparison.OrdinalIgnoreCase)
+                && !json.Contains("\"cookie\"", StringComparison.OrdinalIgnoreCase));
         revokeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         await AssertProblemAsync(replayResponse, HttpStatusCode.Forbidden, "SessionRevoked");
+        afterRevoke.Items.Select(item => item.SessionId).Should().NotContain(leadState.LeadSession.SessionId);
     }
 
     [Fact]
@@ -83,6 +117,31 @@ public sealed class ApplicationSessionHostedTests
         HttpResponseMessage response = await admin.SendAsync(request);
 
         await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionRevoked");
+    }
+
+    [Fact]
+    public async Task Logout_EndsCurrentSessionClearsHandleAndExcludesItFromActiveList()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient browser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse ended, string cookie) = await StartAsync(browser);
+
+        using HttpRequestMessage logout = Request(HttpMethod.Post, "/api/v1/access/logout", cookie);
+        HttpResponseMessage logoutResponse = await browser.SendAsync(logout);
+        using HttpRequestMessage replay = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
+        HttpResponseMessage replayResponse = await browser.SendAsync(replay);
+        using HttpClient otherBrowser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse current, string currentCookie) = await StartAsync(otherBrowser);
+        using HttpRequestMessage list = Request(HttpMethod.Get, "/api/v1/sessions/active", currentCookie);
+        ActiveApplicationSessionsResponse active = (await (await otherBrowser.SendAsync(list)).Content
+            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>())!;
+
+        logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        logoutResponse.Headers.GetValues("Set-Cookie").Should().Contain(value =>
+            value.StartsWith("__Host-SecureOps.ApplicationSession=", StringComparison.Ordinal)
+            && value.Contains("expires=", StringComparison.OrdinalIgnoreCase));
+        await AssertProblemAsync(replayResponse, HttpStatusCode.Forbidden, "SessionRevoked");
+        active.Items.Select(item => item.SessionId).Should().Contain(current.SessionId).And.NotContain(ended.SessionId);
     }
 
     private static WebApplicationFactory<Program> CreateFactory() =>
