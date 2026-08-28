@@ -55,8 +55,8 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/access-denied` | Authorization refusal, with a route to request access | Anonymous |
 | `/error` | Unhandled server error, request reference only | Anonymous |
 | `/` and `/dashboard` | Yönetim Panosu with `Reporting.ManagementView`; otherwise the operator Genel Bakış | Authenticated |
-| `/directory/users` (and legacy `/identity-lookup`) | AD Kullanıcı ve Hesap Sorgulama: exact lookup plus tabbed directory evidence | Authenticated + `Identity.Lookup` |
-| `/directory/groups` | AD Grup Analizi: exact group, its members, and bounded nested analysis | Authenticated + `Identity.Groups.View` |
+| `/directory/users?account=…&tab=…` (and legacy `/identity-lookup`) | AD Kullanıcı ve Hesap Sorgulama: exact lookup plus tabbed directory evidence | Authenticated + `Identity.Lookup` |
+| `/directory/groups?group=…` | AD Grup Analizi: exact group, its members, and bounded nested analysis | Authenticated + `Identity.Groups.View` |
 | `/admin/sessions` | Aktif Oturumlar: application-session administration | Authenticated + `Access.ManageUsers` |
 | `/admin/system-status` | Sistem Durumu: enterprise integration state | Authenticated + `Access.ManageUsers` |
 | `/account` | Signed-in identity and session security | Authenticated |
@@ -684,3 +684,106 @@ show. The Active Directory screens are read-only throughout: no AD write, no mem
 enable/disable, no password reset, no LDAP credential form, no directory-wide enumeration, no XLSX
 export, and no client-side graph traversal. Backend gaps are tracked in
 `docs/26-ui-backend-contract-gaps.md`.
+
+## 21. TEST pilot operations hardening
+
+This milestone integrates the backend hardening from commit `3347b4a` and closes the TEST usability
+findings operators reported. It is an operational-usability pass, not a visual redesign.
+
+### Browser-session-aware API transport
+
+The API application session is a cookie. Previously each typed `HttpClient` kept its own cookie
+container, and `IHttpClientFactory` pools one handler chain per client name — so a container was
+neither per-browser nor per-operator. A refresh opened another application session, navigation opened
+more, and the Aktif Oturumlar page filled with duplicates of one person.
+
+The UI now runs one transport strategy for every SecureOps API client:
+
+- `UseCookies=false` on the primary handler, so no handler owns a cookie jar.
+- A protected browser-session correlation value, issued as a claim inside the encrypted UI
+  authentication cookie. It is stable for a browser session, shared by that browser's tabs, and
+  different in a separate or private browser.
+- `ApiSessionStore` keeps one server-side `CookieContainer` per correlation value.
+  `ApiSessionCookieHandler` replays it and captures `Set-Cookie`. A first-request gate serialises
+  simultaneous tabs so two of them establish one application session rather than one each.
+- Clients stamp the correlation value on the request; the handler removes it before the request is
+  sent, so it never reaches the API.
+
+The handle is carried, never shown: it is not rendered, logged, put in a URL, or exposed to the
+browser. Requests without a correlation value still succeed — they simply do not share a jar, which
+is the safe degradation. Sessions are never merged by username.
+
+`AddSecureOpsApiClient` is the only registration path, and a unit test asserts every typed client
+takes `IApiSessionContext`, because a client that skipped it would fail silently.
+
+### Sign-out ends the API session
+
+`GET /auth/sign-out` calls `POST /api/v1/access/logout` **before** the UI authentication sign-out,
+then drops the browser session's cookie jar. If the API call fails the operator is still signed out
+and the failure is logged with its safe code and correlation ID only; refusing to sign someone out
+because the API was unreachable would strand them signed in. The jar is dropped either way.
+
+### Aktif Oturumlar
+
+Columns are Kullanıcı, Oturum Başlangıcı, Son Aktivite, Bitiş / Süre, Kimlik Doğrulama, Durum,
+İşlem. Identity leads with `displayName`, falling back to `principal` then `normalizedPrincipal`, and
+stops at an explicit "Kimlik bilgisi yok" rather than inventing a person. The account line is omitted
+when it would repeat the name. Internal identifiers and `accessVersion` moved under **Teknik
+ayrıntılar**; they are support material, not identity. `isCurrent` marks **Bu oturum**. Revocation
+still requires a reason, still states that it does not disable the AD account, and still reloads the
+list afterwards.
+
+### Directory navigation
+
+`lookupKey` is used for group details, direct members, nested navigation, user→group and parent-group
+navigation, and export. Display name is rendered; the server's key is sent. A distinguished name is
+never sent. After an overview resolves, subsequent calls stop replaying whatever the operator typed.
+
+Directory screens are addressable. The account, its open tab, and the current group live in the URL,
+so browser Back restores the previous account and tab, Forward works, and group and member actions
+are real anchors — Ctrl+Click, middle-click, and "Yeni sekmede aç" work without the UI implementing
+them. Tab switches replace rather than push, so they do not bury the previous account. No secret,
+token, or purpose statement goes in a URL.
+
+Direct members page server-side at 25/50/100 with Önceki/Sonraki over the opaque continuation token.
+Effective members are windowed at the same sizes over the server's already-bounded result; the counts
+and the partial-result banner always describe the whole analysis, so paging can never make a partial
+answer look complete. `Analizi Çalıştır` stays explicit, and Üyelik Kontrolü remains the way to
+answer "is this user in this group".
+
+### Operational Records
+
+Labels come from the backend's stable `presentationState` and from nothing else: `NeedsAttention` →
+İnceleme Gerekiyor, `Actionable` → Jira'ya Aktarılabilir, `InProgress` → İşlemde, `Completed` →
+Tamamlandı. An unrecognised category reports as unknown rather than being folded into one of the four.
+The list groups on the same value instead of re-deriving its own.
+
+A restrained step line shows the operator sequence — Kaydı İncele → Jira Taslağını Önizle → Bilgileri
+Doğrula → Jira Kaydı Oluştur → Kaynak Kaydı Tamamla — positioned from durable state, so it survives a
+refresh. Failures are explained operationally: a changed source, a prevented duplicate, an unverified
+outcome needing reconciliation, and a Jira success whose source close failed. A persisted Jira key
+stays visible wherever one exists. Fencing, idempotency, mapping versions, and correlation internals
+moved under **Teknik ayrıntılar ve destek bilgisi**.
+
+### TEST simulation
+
+When the backend reports `simulationMode`, a prominent **TEST SİMÜLASYONU** banner states that the
+operation creates no record in the real Turuncu Hat or Jira, and repeats it inside the create
+confirmation where the decision is actually made. The server-supplied notice is shown in addition to
+that guarantee, never instead of it. The UI never decides that a run is simulated and never simulates
+anything itself; the backend's synthetic scenarios are exercised as ordinary responses.
+
+### Management reporting readiness
+
+`ReportingPersistenceNotConfigured` and `ReportingUnavailable` are both `503` and were both falling
+through to the generic "servis yanıt vermiyor". They are now distinct: not-configured is a readiness
+state — "Yönetim raporlaması henüz etkin değil" — that is non-retryable and offers no retry button,
+while unavailable stays a retryable service problem. Forbidden remains an ordinary authorization
+state and no-evidence keeps its honest coverage wording. No metric is invented in any of them.
+
+### Operatör Raporu
+
+Removed from the primary navigation. The route, the capability, and the endpoint are unchanged; it is
+reached as a drill-down from the Yönetim Panosu, where the window, coverage notice, and limitations
+that stop per-actor counts reading as a ranking already sit. The anti-ranking statement on the page
+is unchanged and pinned by a test.

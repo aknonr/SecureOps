@@ -13,9 +13,11 @@ public sealed class AccessApiClient : IAccessApiClient
     /// Initializes a new access API client.
     /// </summary>
     /// <param name="httpClient">Configured HTTP client.</param>
-    public AccessApiClient(HttpClient httpClient)
+    /// <param name="sessionContext">Browser session whose API cookies these calls belong to.</param>
+    public AccessApiClient(HttpClient httpClient, IApiSessionContext sessionContext)
     {
         _httpClient = httpClient;
+        ApiSessionHeaders.Attach(httpClient, sessionContext);
     }
 
     /// <inheritdoc />

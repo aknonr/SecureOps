@@ -6,7 +6,10 @@
     rendered here — UiProblemFactory has already reduced the failure to safe wording.
 *@
 
-<div class="so-problem so-problem--@Kind" role="alert">
+@* A readiness state is not an alert. Announcing "raporlama henüz etkin değil" with
+   role="alert" interrupts a screen reader for a condition that is working as
+   configured, so only real failures get the assertive role. *@
+<div class="so-problem so-problem--@Kind" role="@Role">
     <div class="so-problem-icon" aria-hidden="true">
         <MudIcon Icon="@Icon" Size="Size.Small" />
     </div>
@@ -74,6 +77,8 @@
     // page supplied a handler. Offering it otherwise invites an operator to hammer a dead end.
     private bool ShowRetry => Problem.Retryable && OnRetry.HasDelegate;
 
+    private string Role => Problem.Kind == UiProblemKind.NotConfigured ? "status" : "alert";
+
     private string Kind => Problem.Severity switch
     {
         Severity.Error => "error",
@@ -93,6 +98,7 @@
         UiProblemKind.RateLimited => Icons.Material.Filled.Speed,
         UiProblemKind.Conflict => Icons.Material.Filled.SyncProblem,
         UiProblemKind.UpstreamUnavailable => Icons.Material.Filled.CloudOff,
+        UiProblemKind.NotConfigured => Icons.Material.Filled.Settings,
         UiProblemKind.Network => Icons.Material.Filled.WifiOff,
         UiProblemKind.Timeout => Icons.Material.Filled.Timer,
         _ => Icons.Material.Filled.ErrorOutline

@@ -117,6 +117,98 @@ public static class OperationalRecordView
             : Ownership.Other;
     }
 
+    /// <summary>
+    /// Operator-facing label for the backend's stable presentation category.
+    /// </summary>
+    /// <param name="presentationState">The contract's <c>presentationState</c> value.</param>
+    /// <returns>The documented Turkish label for that category.</returns>
+    /// <remarks>
+    /// Mapped from the stable category code and from nothing else. The English descriptions and the
+    /// eligibility prose that travel alongside it are presentation details on the server's side of
+    /// the contract; keying a label off them would make a backend reword silently change what the
+    /// operator is told.
+    /// <para>
+    /// An unrecognised value is reported as unknown rather than folded into one of the four. A
+    /// category this UI has never seen is a contract gap, and quietly labelling it "İnceleme
+    /// Gerekiyor" would hide that while asserting something about the record that may be false.
+    /// </para>
+    /// </remarks>
+    public static string PresentationLabel(string? presentationState) => presentationState switch
+    {
+        OperationalRecordPresentationStates.NeedsAttention => "İnceleme Gerekiyor",
+        OperationalRecordPresentationStates.Actionable => "Jira'ya Aktarılabilir",
+        OperationalRecordPresentationStates.InProgress => "İşlemde",
+        OperationalRecordPresentationStates.Completed => "Tamamlandı",
+        _ => "Durum bilinmiyor"
+    };
+
+    /// <summary>Badge tone for a presentation category.</summary>
+    /// <param name="presentationState">The contract's <c>presentationState</c> value.</param>
+    /// <returns>Tone.</returns>
+    public static SoStatusBadge.BadgeTone PresentationTone(string? presentationState) => presentationState switch
+    {
+        OperationalRecordPresentationStates.NeedsAttention => SoStatusBadge.BadgeTone.Caution,
+        OperationalRecordPresentationStates.Actionable => SoStatusBadge.BadgeTone.Info,
+        OperationalRecordPresentationStates.InProgress => SoStatusBadge.BadgeTone.Info,
+        OperationalRecordPresentationStates.Completed => SoStatusBadge.BadgeTone.Positive,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    /// <summary>Icon for a presentation category, so the category is not carried by colour alone.</summary>
+    /// <param name="presentationState">The contract's <c>presentationState</c> value.</param>
+    /// <returns>Material icon name.</returns>
+    public static string PresentationIcon(string? presentationState) => presentationState switch
+    {
+        OperationalRecordPresentationStates.NeedsAttention => Icons.Material.Filled.ReportProblem,
+        OperationalRecordPresentationStates.Actionable => Icons.Material.Filled.PlayCircleOutline,
+        OperationalRecordPresentationStates.InProgress => Icons.Material.Filled.Sync,
+        OperationalRecordPresentationStates.Completed => Icons.Material.Filled.TaskAlt,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+
+    /// <summary>
+    /// The operator's path through a transfer, in the order they walk it.
+    /// </summary>
+    /// <remarks>
+    /// Named for what the operator does, not for what the workflow is called internally. The steps
+    /// exist so somebody who is not a developer can see what has already happened and what the next
+    /// button will actually do.
+    /// </remarks>
+    public static readonly IReadOnlyList<string> OperatorSteps =
+    [
+        "Kaydı İncele",
+        "Jira Taslağını Önizle",
+        "Bilgileri Doğrula",
+        "Jira Kaydı Oluştur",
+        "Kaynak Kaydı Tamamla"
+    ];
+
+    /// <summary>
+    /// Which operator step a record is currently on.
+    /// </summary>
+    /// <param name="record">Authoritative record.</param>
+    /// <returns>Zero-based index into <see cref="OperatorSteps"/>; the count when finished.</returns>
+    /// <remarks>
+    /// Derived from durable workflow state, never from what the operator last clicked. A record that
+    /// is mid-create after a browser refresh must still show as mid-create.
+    /// </remarks>
+    public static int CurrentStep(OperationalRecordResponse record) => record.WorkflowState switch
+    {
+        OperationalRecordWorkflowState.Completed => OperatorSteps.Count,
+
+        OperationalRecordWorkflowState.JiraCreated
+            or OperationalRecordWorkflowState.ClosingOperationalRecord
+            or OperationalRecordWorkflowState.OperationalRecordCloseFailed => 4,
+
+        OperationalRecordWorkflowState.CreateRequested
+            or OperationalRecordWorkflowState.CreatingJira
+            or OperationalRecordWorkflowState.JiraCreateFailed => 3,
+
+        OperationalRecordWorkflowState.Previewed => 2,
+
+        _ => 0
+    };
+
     /// <summary>Turkish label for a workflow state.</summary>
     /// <param name="state">Workflow state.</param>
     /// <returns>Operator-facing label.</returns>
@@ -147,13 +239,13 @@ public static class OperationalRecordView
         OperationalRecordWorkflowState.NeedsManualReview =>
             "Onaylı bir kural bu kaydı sınıflandıramadı. Jira aktarımı için sınıflandırma gerekir.",
         OperationalRecordWorkflowState.CreatingJira =>
-            "Bir oluşturma denemesi başlatıldı ve sonucu bilinmiyor. Yeni bir Jira kaydı oluşturmak "
-            + "mükerrer kayıt riski taşır.",
+            "Jira isteğinin sonucu kesin olarak doğrulanamadı. Yeni kayıt oluşturmadan önce "
+            + "uzlaştırma gereklidir.",
         OperationalRecordWorkflowState.JiraCreateFailed =>
             "Güvenilir bir Jira anahtarı kaydedilmeden önce oluşturma başarısız oldu.",
         OperationalRecordWorkflowState.OperationalRecordCloseFailed =>
-            "Jira kaydı oluşturuldu; yalnızca kaynak kaydın kapatılması tamamlanamadı. Kalan iş "
-            + "kaynak tarafındadır — yeni bir Jira kaydı oluşturulmamalıdır.",
+            "Jira kaydı oluşturuldu ancak kaynak kayıt tamamlanamadı. Jira tekrar oluşturulmadan "
+            + "kaynak tamamlama işlemi yeniden denenebilir.",
         OperationalRecordWorkflowState.Completed =>
             "Jira oluşturuldu ve kaynak kayıt kapatıldı.",
         _ => null

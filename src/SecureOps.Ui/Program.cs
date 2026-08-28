@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -78,6 +79,28 @@ builder.Services
         options.AccessDeniedPath = "/access-denied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+
+        // Every authenticated browser session carries a correlation value used to pick its API
+        // cookie jar. Issuing it here rather than only at sign-in means a session established by
+        // any current or future authentication path gets one, and a cookie predating this change
+        // is upgraded on its next request instead of silently losing session reuse.
+        //
+        // It is a random value with no authority of its own, and it never leaves the server: the
+        // browser only ever sees it inside this encrypted cookie.
+        options.Events.OnValidatePrincipal = context =>
+        {
+            if (context.Principal?.Identity is ClaimsIdentity { IsAuthenticated: true } identity
+                && identity.FindFirst(SignedInUserService.BrowserSessionClaim) is null)
+            {
+                identity.AddClaim(new Claim(
+                    SignedInUserService.BrowserSessionClaim,
+                    Guid.NewGuid().ToString("N")));
+
+                context.ShouldRenew = true;
+            }
+
+            return Task.CompletedTask;
+        };
     });
 
 // No role or capability policies are registered here on purpose. Application authority lives in the
@@ -90,35 +113,23 @@ builder.Services.AddScoped<IDemoModeState, DemoModeState>();
 builder.Services.AddScoped<ISignedInUserService, SignedInUserService>();
 builder.Services.AddScoped<ICurrentAccessProvider, CurrentAccessProvider>();
 
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<IApiSessionStore, ApiSessionStore>();
+builder.Services.AddScoped<IApiSessionContext, ApiSessionContext>();
+
 builder.Services.AddTransient<DemoApiAuthHeaderHandler>();
+builder.Services.AddTransient<ApiSessionCookieHandler>();
 
-builder.Services
-    .AddHttpClient<IIdentityLookupApiClient, IdentityLookupApiClient>(ConfigureApiClient)
-    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
-
-builder.Services
-    .AddHttpClient<IAccessApiClient, AccessApiClient>(ConfigureApiClient)
-    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
-
-builder.Services
-    .AddHttpClient<IAccessAdminApiClient, AccessAdminApiClient>(ConfigureApiClient)
-    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
-
-builder.Services
-    .AddHttpClient<IOperationalRecordApiClient, OperationalRecordApiClient>(ConfigureApiClient)
-    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
-
-builder.Services
-    .AddHttpClient<IManagementReportingApiClient, ManagementReportingApiClient>(ConfigureApiClient)
-    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
-
-builder.Services
-    .AddHttpClient<IDirectoryApiClient, DirectoryApiClient>(ConfigureApiClient)
-    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
-
-builder.Services
-    .AddHttpClient<ISessionApiClient, SessionApiClient>(ConfigureApiClient)
-    .AddHttpMessageHandler<DemoApiAuthHeaderHandler>();
+// One transport strategy for every SecureOps API client. Registering them through a single helper
+// is the point: the API's application session is a cookie, and a client that opted out of this
+// pipeline would quietly start a second session for the same browser on every page load.
+AddSecureOpsApiClient<IIdentityLookupApiClient, IdentityLookupApiClient>(builder.Services);
+AddSecureOpsApiClient<IAccessApiClient, AccessApiClient>(builder.Services);
+AddSecureOpsApiClient<IAccessAdminApiClient, AccessAdminApiClient>(builder.Services);
+AddSecureOpsApiClient<IOperationalRecordApiClient, OperationalRecordApiClient>(builder.Services);
+AddSecureOpsApiClient<IManagementReportingApiClient, ManagementReportingApiClient>(builder.Services);
+AddSecureOpsApiClient<IDirectoryApiClient, DirectoryApiClient>(builder.Services);
+AddSecureOpsApiClient<ISessionApiClient, SessionApiClient>(builder.Services);
 
 WebApplication app = builder.Build();
 
@@ -138,6 +149,20 @@ if (identityApiOptions.UsedLegacyKey)
 else
 {
     app.Logger.LogInformation("SecureOps API base address: {BaseAddress}.", identityApiOptions.BaseAddress);
+}
+
+// The application-session cookie is __Host- prefixed, which means Secure, which means it is only
+// ever sent over HTTPS. Against a cleartext API address the UI therefore cannot replay it, and the
+// symptom is subtle: everything works, but every request opens another application session and the
+// Aktif Oturumlar page fills with duplicates. Said out loud at startup so it is diagnosable.
+if (identityApiOptions.BaseAddress is { IsAbsoluteUri: true } baseAddress
+    && !string.Equals(baseAddress.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+{
+    app.Logger.LogWarning(
+        "SecureOps API base address {BaseAddress} is not HTTPS. The application-session cookie is "
+            + "Secure, so it cannot be replayed over this scheme and each request will establish a "
+            + "separate application session.",
+        baseAddress);
 }
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
@@ -203,10 +228,51 @@ app.MapPost(
 // Sign-out lands on a page that confirms the outcome rather than back on the sign-in form, so a
 // deliberate exit is never mistaken for a failed attempt. Anonymous because an already-lapsed session
 // must still be able to complete a clean sign-out instead of being challenged.
+//
+// The API session is ended first, and deliberately so. Signing out of the UI only drops this
+// application's cookie; the SecureOps application session lives in the API and would stay open,
+// still listed on the Active Sessions page, until it idled out. Ending it first means "oturumu
+// kapat" means what the operator thinks it means.
 app.MapGet(
     "/auth/sign-out",
-    async (HttpContext httpContext) =>
+    async (
+        HttpContext httpContext,
+        IAccessApiClient accessApi,
+        IApiSessionContext sessionContext,
+        IApiSessionStore sessionStore,
+        ILoggerFactory loggerFactory) =>
     {
+        string? browserSessionKey = sessionContext.BrowserSessionKey;
+        ILogger logger = loggerFactory.CreateLogger("SecureOps.Ui.SignOut");
+
+        try
+        {
+            await accessApi.LogoutAsync(httpContext.RequestAborted);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            // Reported, never surfaced. The operator asked to leave, and refusing to sign them out
+            // because the API was unreachable would strand them signed in. Only the safe problem
+            // code and correlation ID are recorded — no cookie, handle, or session identifier.
+            logger.LogWarning(
+                "API application-session logout did not complete. Code: {Code}. CorrelationId: {CorrelationId}.",
+                ex.Problem.Code,
+                ex.Problem.CorrelationId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "API application-session logout failed before UI sign-out.");
+        }
+        finally
+        {
+            // Dropped either way. If logout succeeded the handle is dead; if it failed, replaying it
+            // for whoever signs in next on this browser would be worse than losing session reuse.
+            if (browserSessionKey is not null)
+            {
+                sessionStore.Remove(browserSessionKey);
+            }
+        }
+
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToTrusted(httpContext, "signed-out?provider=managed");
     })
@@ -216,6 +282,21 @@ app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
 app.Run();
+
+// Registers one SecureOps API client on the shared browser-session transport.
+//
+// UseCookies is off on purpose. A handler's own CookieContainer is not browser identity: the factory
+// pools one handler chain per client name and shares it across every operator, so its container
+// would both split one browser across several API sessions and mix separate browsers into one.
+// ApiSessionCookieHandler replaces it with a jar chosen by the caller's browser session.
+static IHttpClientBuilder AddSecureOpsApiClient<TClient, TImplementation>(IServiceCollection services)
+    where TClient : class
+    where TImplementation : class, TClient =>
+    services
+        .AddHttpClient<TClient, TImplementation>(ConfigureApiClient)
+        .ConfigurePrimaryHttpMessageHandler(static () => new SocketsHttpHandler { UseCookies = false })
+        .AddHttpMessageHandler<DemoApiAuthHeaderHandler>()
+        .AddHttpMessageHandler<ApiSessionCookieHandler>();
 
 static void ConfigureApiClient(IServiceProvider serviceProvider, HttpClient client)
 {

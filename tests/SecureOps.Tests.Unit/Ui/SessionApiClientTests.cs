@@ -97,7 +97,7 @@ public sealed class SessionApiClientTests
     {
         RecordingHandler handler = new(body, status, errorCode);
         HttpClient httpClient = new(handler) { BaseAddress = new Uri("http://localhost:5000/") };
-        return (new SessionApiClient(httpClient), handler);
+        return (new SessionApiClient(httpClient, new FakeApiSessionContext()), handler);
     }
 
     private static ActiveApplicationSessionsResponse Page() => new(2, 25, []);

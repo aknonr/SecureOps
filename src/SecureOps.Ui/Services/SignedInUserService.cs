@@ -16,6 +16,15 @@ public sealed class SignedInUserService : ISignedInUserService
     /// <summary>Claim carrying a display name when the provider supplies one.</summary>
     public const string DisplayNameClaim = "secureops:display_name";
 
+    /// <summary>Claim carrying the browser-session correlation value for API calls.</summary>
+    /// <remarks>
+    /// Lives inside the encrypted authentication cookie, so it is stable for one browser session,
+    /// shared by that browser's tabs, and different in a separate or private browser. It is a
+    /// correlation value only -- it grants nothing and is never rendered, logged, or put in a URL.
+    /// See <see cref="IApiSessionContext"/>.
+    /// </remarks>
+    public const string BrowserSessionClaim = "secureops:browser_session";
+
     /// <summary>Authentication source value used by the interim cookie sign-in path.</summary>
     public const string InterimAuthenticationSource = "interim-cookie";
 
@@ -61,7 +70,8 @@ public sealed class SignedInUserService : ISignedInUserService
         [
             new(ClaimTypes.NameIdentifier, accountName),
             new(ClaimTypes.Name, accountName),
-            new(AuthenticationSourceClaim, InterimAuthenticationSource)
+            new(AuthenticationSourceClaim, InterimAuthenticationSource),
+            new(BrowserSessionClaim, Guid.NewGuid().ToString("N"))
         ];
 
         return new ClaimsPrincipal(new ClaimsIdentity(

@@ -448,6 +448,14 @@ body {
     margin-bottom: var(--so-space-3);
 }
 
+/* Secondary head inside a panel: the range caption and its page-size control,
+   sitting above a table rather than above the panel. Wraps so a long range
+   caption and the select do not collide on a narrow viewport. */
+.so-panel-head--sub {
+    flex-wrap: wrap;
+    margin-top: var(--so-space-3);
+}
+
 .so-panel-title {
     margin: 0;
     font-size: 1rem;
@@ -2739,6 +2747,33 @@ body {
     margin-top: var(--so-space-2);
 }
 
+/* Row actions that navigate are anchors, not buttons, so the browser's own
+   affordances work: Ctrl+Click, middle-click, and "Yeni sekmede aç". Styled to
+   sit at the same weight as the text buttons they replaced. */
+.so-row-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-1);
+    padding: 4px 8px;
+    border-radius: var(--so-radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--so-accent);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.so-row-link::after {
+    content: "›";
+    font-weight: 400;
+}
+
+.so-row-link:hover,
+.so-row-link:focus-visible {
+    background: color-mix(in srgb, var(--so-accent) 10%, transparent);
+    text-decoration: underline;
+}
+
 .so-plain-table {
     width: 100%;
     border-collapse: collapse;
@@ -3237,11 +3272,37 @@ body {
 /* The wrapper is the flex container, never the cell itself: `display: flex` on a
    th takes it out of the table box model, and the table then stops containing its
    own width — which is what pushed the page sideways at 834 and below. */
+/* Identity reads as a person first and an account second: the name carries the
+   weight, the DOMAIN\user line sits under it in a quieter tone. Stacked rather
+   than inline so a long account name never pushes the name out of view. */
 .so-session-user {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--so-space-2);
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.so-session-name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.so-session-account {
+    font-size: 0.8rem;
+    color: var(--so-text-muted);
+    overflow-wrap: anywhere;
+}
+
+/* Absolute end time with the remaining span beneath it. The clock time answers
+   "when", the remainder answers "how urgent" without arithmetic. */
+.so-session-expiry {
+    display: block;
+}
+
+.so-session-remaining {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--so-text-muted);
 }
 
 /* -- integration status ------------------------------------------------- */
@@ -3642,4 +3703,103 @@ body {
     .so-principal-head {
         gap: var(--so-space-3);
     }
+}
+
+/* -- test simulation ----------------------------------------------------- */
+
+/* Prominent enough that nobody presses "Jira Kaydı Oluştur" without seeing it,
+   calm enough that it does not read as a fault. Uses the caution ramp rather
+   than the error one: a simulated run is a configured state, not a problem. */
+.so-simulation {
+    display: flex;
+    gap: var(--so-space-3);
+    align-items: flex-start;
+    margin-bottom: var(--so-space-4);
+    padding: var(--so-space-3) var(--so-space-4);
+    border: 1px solid color-mix(in srgb, var(--so-warning) 45%, transparent);
+    border-left: 4px solid var(--so-warning);
+    border-radius: var(--so-radius);
+    background: color-mix(in srgb, var(--so-warning) var(--so-tint), transparent);
+}
+
+.so-simulation-icon {
+    display: inline-flex;
+    color: var(--so-warning);
+}
+
+.so-simulation-text {
+    min-width: 0;
+}
+
+.so-simulation-title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--so-warning);
+}
+
+.so-simulation-body {
+    margin: 2px 0 0;
+    font-size: 0.9rem;
+}
+
+.so-simulation-note {
+    margin: var(--so-space-2) 0 0;
+    font-size: 0.82rem;
+    color: var(--so-text-muted);
+}
+
+/* -- operator step line -------------------------------------------------- */
+
+/* A line of steps rather than a wizard. It reports progress; it never drives
+   the workflow, which stays governed by authoritative server state. */
+.so-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2) var(--so-space-4);
+    margin: 0 0 var(--so-space-4);
+    padding: 0;
+    list-style: none;
+}
+
+.so-step {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    font-size: 0.85rem;
+    color: var(--so-text-muted);
+}
+
+.so-step-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--so-border-soft);
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.so-step--done {
+    color: var(--so-text);
+}
+
+.so-step--done .so-step-marker {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--so-success) 22%, transparent);
+    color: var(--so-success);
+}
+
+.so-step--active {
+    color: var(--so-text);
+    font-weight: 600;
+}
+
+.so-step--active .so-step-marker {
+    border-color: var(--so-accent);
+    background: color-mix(in srgb, var(--so-accent) 15%, transparent);
+    color: var(--so-accent);
 }

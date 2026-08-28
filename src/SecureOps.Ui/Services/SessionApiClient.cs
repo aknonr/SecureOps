@@ -16,9 +16,11 @@ public sealed class SessionApiClient : ISessionApiClient
     /// Initializes a new session API client.
     /// </summary>
     /// <param name="httpClient">Configured HTTP client.</param>
-    public SessionApiClient(HttpClient httpClient)
+    /// <param name="sessionContext">Browser session whose API cookies these calls belong to.</param>
+    public SessionApiClient(HttpClient httpClient, IApiSessionContext sessionContext)
     {
         _httpClient = httpClient;
+        ApiSessionHeaders.Attach(httpClient, sessionContext);
     }
 
     /// <inheritdoc />

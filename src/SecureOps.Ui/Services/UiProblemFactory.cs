@@ -408,7 +408,7 @@ public static class UiProblemFactory
         OperationalErrorCodes.OperationalRecordChanged => Build(
             UiProblemKind.Conflict, code,
             "Kaynak kayıt değişmiş",
-            "Bu kayıt SecureOps'a alındıktan sonra kaynak sistemde değişti. Ekrandaki bilgi güncel değil.",
+            "Kaynak kayıt önizlemeden sonra değişti. Jira kaydı oluşturulmadı. Kaydı yeniden inceleyin.",
             [RefreshStep, "Güncel içeriği doğruladıktan sonra işlemi tekrarlayın."],
             retryable: false, requiresRefresh: true),
 
@@ -421,9 +421,10 @@ public static class UiProblemFactory
 
         OperationalErrorCodes.OperationalRecordCloseFailed => Build(
             UiProblemKind.Conflict, code,
-            "Kaynak kayıt kapatılamadı",
-            "Jira tarafı tamamlandı, ancak kaynak kayıt kapatılamadı. İş akışı yarım kalmış durumda.",
-            ["Mutabakat için işlemi yeniden deneyin.", ReferenceStep, ContactAdminStep],
+            "Kaynak kayıt tamamlanamadı",
+            "Jira kaydı oluşturuldu ancak kaynak kayıt tamamlanamadı. Jira tekrar oluşturulmadan "
+                + "kaynak tamamlama işlemi yeniden denenebilir.",
+            ["Kaynak tamamlama işlemini yeniden deneyin.", ReferenceStep, ContactAdminStep],
             retryable: true, requiresRefresh: true),
 
         OperationalErrorCodes.OperationalRecordCommentUpdateFailed => Build(
@@ -480,7 +481,7 @@ public static class UiProblemFactory
         OperationalErrorCodes.JiraAlreadyCreated => Build(
             UiProblemKind.Conflict, code,
             "Bu kayıt için Jira zaten oluşturulmuş",
-            "Bu operasyonel kayıt ve eşleme için bir Jira kaydı hâlihazırda mevcut. Mükerrer kayıt oluşturulmadı.",
+            "Bu kayıt için daha önce işlem başlatıldığı için ikinci bir Jira kaydı oluşturulmadı.",
             [RefreshStep, "Mevcut Jira kaydını inceleyin."],
             retryable: false, requiresRefresh: true),
 
@@ -505,6 +506,34 @@ public static class UiProblemFactory
             "Aynı kapsamda bir komut zaten yürütülüyor. Mükerrer çalıştırma engellendi.",
             ["İşlem tamamlanana kadar bekleyin.", RefreshStep],
             retryable: true, requiresRefresh: true),
+
+        // ---- Management reporting --------------------------------------------------------------
+        // Two 503s that mean opposite things, which is why they are mapped explicitly instead of
+        // falling through to the generic "servis yanıt vermiyor". Reporting persistence has simply
+        // not been enabled yet in this environment; reporting it as an outage sends an administrator
+        // to investigate a fault that does not exist, and it will never clear by retrying.
+        OperationalErrorCodes.ReportingPersistenceNotConfigured => Build(
+            UiProblemKind.NotConfigured, code,
+            "Yönetim raporlaması henüz etkin değil",
+            "Bu ekran kalıcı SQL raporlama verisi etkinleştirildiğinde gerçek kullanım ve operasyon "
+                + "metriklerini gösterecektir.",
+            ["Raporlamanın etkinleştirilmesi için platform yöneticinize başvurun."],
+            retryable: false, requiresRefresh: false),
+
+        OperationalErrorCodes.ReportingUnavailable => Build(
+            UiProblemKind.UpstreamUnavailable, code,
+            "Raporlama servisi şu anda yanıt vermiyor",
+            "Raporlama verisi geçici olarak okunamadı. Bu bir yapılandırma eksikliği değil; "
+                + "tekrar denenebilir.",
+            [RetryStep, ReferenceStep, ContactAdminStep],
+            retryable: true, requiresRefresh: true),
+
+        OperationalErrorCodes.ReportingValidationFailed => Build(
+            UiProblemKind.Validation, code,
+            "Rapor aralığı kabul edilmedi",
+            "Seçilen tarih aralığı sunucu kurallarına uymuyor.",
+            ["Farklı bir dönem seçip tekrar deneyin."],
+            retryable: false, requiresRefresh: false),
 
         _ => FromStatus(statusCode) with { Code = code }
     };
@@ -560,10 +589,13 @@ public static class UiProblemFactory
             [RetryStep, ReferenceStep, ContactAdminStep],
             retryable: true, requiresRefresh: true),
 
+        // The last resort. It says the one thing that is certainly true and nothing else: an
+        // unclassified failure has no safe detail to offer, and the support reference is what turns
+        // "it did not work" into something an administrator can actually escalate.
         _ => Build(
             UiProblemKind.Unexpected, "UnexpectedError",
-            "Beklenmeyen bir hata oluştu",
             "İşlem tamamlanamadı.",
+            "Beklenmeyen bir durum oluştu ve işlem tamamlanmadı.",
             [RetryStep, ReferenceStep, ContactAdminStep],
             retryable: true, requiresRefresh: true)
     };

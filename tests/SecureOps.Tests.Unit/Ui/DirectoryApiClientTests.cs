@@ -258,7 +258,7 @@ public sealed class DirectoryApiClientTests
     {
         RecordingHandler handler = new(body, status, errorCode, throws, fileContent, fileName);
         HttpClient httpClient = new(handler) { BaseAddress = new Uri("http://localhost:5000/") };
-        return (new DirectoryApiClient(httpClient), handler);
+        return (new DirectoryApiClient(httpClient, new FakeApiSessionContext()), handler);
     }
 
     private static DirectoryAccountHealthResponse Health() =>

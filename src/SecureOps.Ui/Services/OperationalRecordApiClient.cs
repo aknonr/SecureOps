@@ -15,9 +15,11 @@ public sealed class OperationalRecordApiClient : IOperationalRecordApiClient
     /// Initializes a new operational-record API client.
     /// </summary>
     /// <param name="httpClient">Configured HTTP client.</param>
-    public OperationalRecordApiClient(HttpClient httpClient)
+    /// <param name="sessionContext">Browser session whose API cookies these calls belong to.</param>
+    public OperationalRecordApiClient(HttpClient httpClient, IApiSessionContext sessionContext)
     {
         _httpClient = httpClient;
+        ApiSessionHeaders.Attach(httpClient, sessionContext);
     }
 
     /// <inheritdoc />

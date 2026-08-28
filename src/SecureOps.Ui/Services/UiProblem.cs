@@ -36,6 +36,17 @@ public enum UiProblemKind
     /// <summary>A dependency the operation needs is temporarily unavailable.</summary>
     UpstreamUnavailable,
 
+    /// <summary>
+    /// The capability exists but has not been enabled in this environment yet.
+    /// </summary>
+    /// <remarks>
+    /// Kept apart from <see cref="UpstreamUnavailable"/> because the two need opposite responses.
+    /// An unavailable service is a fault worth retrying and worth escalating; a feature that was
+    /// never switched on is working exactly as configured, and telling an operator it "is not
+    /// responding" sends them to chase an outage that does not exist.
+    /// </remarks>
+    NotConfigured,
+
     /// <summary>The API could not be reached at the transport layer.</summary>
     Network,
 
@@ -81,6 +92,7 @@ public sealed record UiProblem(
     {
         UiProblemKind.AccessPending => Severity.Info,
         UiProblemKind.NotFound => Severity.Info,
+        UiProblemKind.NotConfigured => Severity.Info,
         UiProblemKind.Validation => Severity.Warning,
         UiProblemKind.RateLimited => Severity.Warning,
         UiProblemKind.Conflict => Severity.Warning,

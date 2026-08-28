@@ -23,7 +23,7 @@
 
 <div class="so-page">
     <SoPageHeader Title="Operasyonel Kayıtlar"
-                  Lead="Kaynak kayıtların Jira aktarım durumu ve sahiplik bilgisi.">
+                  Lead="Turuncu Hat üzerinden gelen uygun operasyon kayıtlarını inceleyebilir, Jira kaydı taslağını kontrol edebilir ve uygun kayıtları Jira'ya aktarabilirsiniz.">
         <Actions>
             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Refresh"
@@ -56,6 +56,10 @@
     }
     else
     {
+        @* Reported by the records themselves. If the configured providers are simulated, the
+           operator must know that before opening anything, not after pressing a create button. *@
+        <SoSimulationBanner Active="@_simulationMode" Notice="@_simulationNotice" />
+
         <section class="so-panel so-panel--tabs">
             <div class="so-tabs" role="tablist" aria-label="Kayıt grubu">
                 @foreach (RecordGroup group in _groups)
@@ -132,9 +136,16 @@
                                 </span>
 
                                 <span class="so-record-states">
-                                    <SoStatusBadge Label="@OperationalRecordView.StateLabel(record.WorkflowState)"
-                                                   Tone="@OperationalRecordView.StateTone(record.WorkflowState)"
-                                                   Icon="@OperationalRecordView.StateIcon(record.WorkflowState)" />
+                                    @* The backend's stable category leads. The workflow stage stays
+                                       underneath it as detail, because "Jira oluşturuldu" and
+                                       "Tamamlandı" answer different questions. *@
+                                    <SoStatusBadge Label="@OperationalRecordView.PresentationLabel(record.PresentationState)"
+                                                   Tone="@OperationalRecordView.PresentationTone(record.PresentationState)"
+                                                   Icon="@OperationalRecordView.PresentationIcon(record.PresentationState)" />
+
+                                    <span class="so-chip so-chip--quiet" title="İş akışı aşaması">
+                                        @OperationalRecordView.StateLabel(record.WorkflowState)
+                                    </span>
 
                                     @if (OperationalRecordView.HasJira(record))
                                     {
@@ -210,36 +221,61 @@
     private bool _loading;
     private string? _actor;
 
+    // Reported per record by the API. Any simulated record means the configured providers are
+    // simulated, so the banner is shown for the page rather than per row.
+    private bool _simulationMode;
+    private string? _simulationNotice;
+
     private IReadOnlyList<OperationalRecordResponse> Filtered =>
         _records is null ? [] : _records.Where(r => GroupOf(r) == _group).ToArray();
 
     private int Count(RecordGroup group) =>
         _records is null ? 0 : _records.Count(r => GroupOf(r) == group);
 
-    private static RecordGroup GroupOf(OperationalRecordResponse record)
+    // The backend owns this categorisation now. Re-deriving it from workflow state and action
+    // availability meant the list could disagree with the record screen about what a record needs,
+    // and every new workflow state had to be classified in two places.
+    //
+    // An unrecognised category is grouped as needing attention because a record has to appear
+    // somewhere and that is the conservative bucket. The label stays honest about not knowing.
+    private static RecordGroup GroupOf(OperationalRecordResponse record) => record.PresentationState switch
     {
-        if (OperationalRecordView.NeedsAttention(record))
+        OperationalRecordPresentationStates.Actionable => RecordGroup.Actionable,
+        OperationalRecordPresentationStates.InProgress => RecordGroup.InProgress,
+        OperationalRecordPresentationStates.Completed => RecordGroup.Completed,
+        _ => RecordGroup.NeedsAttention
+    };
+
+    // Landing on an empty tab while five records wait one tab over is how an operator concludes
+    // there is nothing to do. The priority order is the order of the tabs, so this only ever moves
+    // forward to the first group that actually has work, and it runs on load rather than on every
+    // render so it never overrides a tab the operator chose themselves.
+    private void SelectGroupWithWork()
+    {
+        if (Count(_group) > 0)
         {
-            return RecordGroup.NeedsAttention;
+            return;
         }
 
-        if (record.WorkflowState == OperationalRecordWorkflowState.Completed)
+        foreach (RecordGroup group in _groups)
         {
-            return RecordGroup.Completed;
+            if (Count(group) > 0)
+            {
+                _group = group;
+                return;
+            }
         }
-
-        OperationalRecordView.Actions actions = OperationalRecordView.ActionsFor(record);
-        return actions.Preview || actions.Create || actions.Retry
-            ? RecordGroup.Actionable
-            : RecordGroup.InProgress;
     }
 
-    private static string GroupLabel(RecordGroup group) => group switch
+    private static string GroupLabel(RecordGroup group) =>
+        OperationalRecordView.PresentationLabel(PresentationCode(group));
+
+    private static string PresentationCode(RecordGroup group) => group switch
     {
-        RecordGroup.NeedsAttention => "İlgi gerekiyor",
-        RecordGroup.Actionable => "İşlem yapılabilir",
-        RecordGroup.InProgress => "Sürüyor",
-        _ => "Tamamlanan"
+        RecordGroup.Actionable => OperationalRecordPresentationStates.Actionable,
+        RecordGroup.InProgress => OperationalRecordPresentationStates.InProgress,
+        RecordGroup.Completed => OperationalRecordPresentationStates.Completed,
+        _ => OperationalRecordPresentationStates.NeedsAttention
     };
 
 private static string OwnerLabel(OperationalRecordView.Ownership owner) => owner switch
@@ -303,11 +339,22 @@ private static string OwnerLabel(OperationalRecordView.Ownership owner) => owner
         try
         {
             _records = await Records.ListAsync(CancellationToken.None);
+            SelectGroupWithWork();
+
+            _simulationMode = _records.Any(record => record.SimulationMode);
+            _simulationNotice = _records
+                .FirstOrDefault(record => !string.IsNullOrWhiteSpace(record.SimulationNotice))
+                ?.SimulationNotice;
         }
         catch (SecureOpsApiException ex)
         {
             _problem = ex.Problem;
             _records = null;
+
+            // Cleared on failure: a stale "no real write" promise next to an unknown list state
+            // would be a claim the page can no longer support.
+            _simulationMode = false;
+            _simulationNotice = null;
         }
         finally
         {

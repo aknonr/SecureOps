@@ -54,16 +54,18 @@
 
             @* Cross-user analytics is a separate privilege from doing the work. An operator who can
                run lookups or move records to Jira has no entry here. *@
+            @* Operatör Raporu is deliberately absent. The route, the capability, and the backend
+               endpoint are all unchanged — it is reached as a drill-down from the Yönetim Panosu,
+               where the coverage and limitation context that makes those counts readable already
+               sits. As a top-level destination beside the dashboard it read as a per-person
+               scoreboard, which is precisely what the anti-ranking semantics exist to prevent, and
+               no current product evidence asks for it at that level. *@
             @if (Can(Capabilities.ManagementReportingView))
             {
                 <div class="so-nav-group">Raporlama</div>
 
                 <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Insights">
                     Yönetim Panosu
-                </MudNavLink>
-
-                <MudNavLink Href="reporting/operators" Icon="@Icons.Material.Filled.QueryStats">
-                    Operatör Raporu
                 </MudNavLink>
             }
 

@@ -56,7 +56,7 @@
                       Lead="Active Directory üzerindeki bir grubu adı veya AD grup hesap adıyla sorgulayarak grup bilgilerini, üyelerini, iç içe grup ilişkilerini ve üst grup üyeliklerini inceleyebilirsiniz." />
 
         <section class="so-panel so-search-panel">
-            <EditForm Model="_model" OnValidSubmit="@(() => SearchAsync(_model.Group, resetTrail: true))">
+            <EditForm Model="_model" OnValidSubmit="@(() => GoToGroup(_model.Group))">
                 <DataAnnotationsValidator />
 
                 <div class="so-search-row">
@@ -114,7 +114,7 @@
                     else
                     {
                         <button type="button" class="so-breadcrumb-link"
-                                @onclick="@(() => NavigateTrailAsync(step))">
+                                @onclick="@(() => GoToGroup(step))">
                             @step
                         </button>
                     }
@@ -131,7 +131,7 @@
                 <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
                            Disabled="@_loading"
                            StartIcon="@Icons.Material.Filled.Refresh"
-                           OnClick="@(() => SearchAsync(_submittedGroup!, resetTrail: false, refresh: true))">
+                           OnClick="@(() => LoadGroupAsync(_submittedGroup!, refresh: true))">
                     Yenile
                 </MudButton>
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
@@ -149,7 +149,7 @@
         else if (_problem is not null)
         {
             <SoProblemPanel Problem="_problem"
-                            OnRetry="@(() => SearchAsync(_submittedGroup!, resetTrail: false, refresh: true))" />
+                            OnRetry="@(() => LoadGroupAsync(_submittedGroup!, refresh: true))" />
         }
         else if (_group is not null)
         {
@@ -176,12 +176,12 @@
                     break;
 
                 case GroupTab.DirectMembers:
-                    <SoGroupDirectMembers @key="@($"members:{_submittedGroup}")"
-                                          Group="_submittedGroup!"
+                    @* Keyed on the lookup key, not on what was typed: the same group reached by two
+                       different search strings is one group and must not remount. *@
+                    <SoGroupDirectMembers @key="@($"members:{LookupKey}")"
+                                          Group="@LookupKey"
                                           CanExport="@_canExport"
                                           Exporting="@_exporting"
-                                          OnOpenGroup="OpenGroupAsync"
-                                          OnOpenUser="OpenUser"
                                           OnExport="@(() => ExportAsync("DirectMembers"))" />
                     break;
 
@@ -195,14 +195,12 @@
                                             CanExport="@_canExport"
                                             Exporting="@_exporting"
                                             OnRun="@(() => RunAnalysisAsync(refresh: false))"
-                                            OnOpenGroup="OpenGroupAsync"
-                                            OnOpenUser="OpenUser"
                                             OnExport="@(() => ExportAsync("EffectiveMembers"))" />
                     break;
 
                 case GroupTab.MembershipCheck:
-                    <SoGroupMembershipCheck @key="@($"check:{_submittedGroup}")"
-                                            Group="_submittedGroup!"
+                    <SoGroupMembershipCheck @key="@($"check:{LookupKey}")"
+                                            Group="@LookupKey"
                                             GroupDisplayName="@DirectoryView.GroupName(_group)" />
                     break;
             }
@@ -278,18 +276,38 @@
         _ => "Üyelik Kontrolü"
     };
 
+    // The exact identifier every call after the overview uses. The server's lookupKey wins over
+    // sAMAccountName, which wins over the display name; what the operator typed is never replayed,
+    // because it found the group once but does not identify it.
+    private string LookupKey =>
+        (_group is null ? null : DirectoryView.ExactGroupIdentifier(_group)) ?? _submittedGroup ?? string.Empty;
+
     protected override async Task OnInitializedAsync()
     {
         AccessProvider.Changed += OnAccessChanged;
         _access = await AccessProvider.GetAsync(CancellationToken.None);
         _canExport = _access.Can(Capabilities.DirectoryGroupExport);
+    }
 
-        // Arriving from a group link on the account screen goes straight to that group.
-        if (!string.IsNullOrWhiteSpace(GroupQuery))
+    // The URL is the state. Every arrival — a link from the account screen, a nested group, the
+    // search form, browser Back, browser Forward, a tab restored from history — comes through here,
+    // so all of them behave the same way and none of them depends on component memory surviving.
+    protected override async Task OnParametersSetAsync()
+    {
+        string? target = string.IsNullOrWhiteSpace(GroupQuery) ? null : GroupQuery.Trim();
+
+        if (string.Equals(target, _submittedGroup, StringComparison.OrdinalIgnoreCase))
         {
-            _model.Group = GroupQuery;
-            await SearchAsync(GroupQuery, resetTrail: true);
+            return;
         }
+
+        if (target is null)
+        {
+            ResetToSearch();
+            return;
+        }
+
+        await LoadGroupAsync(target, refresh: false);
     }
 
     private async Task ReloadAccessAsync()
@@ -298,26 +316,21 @@
         _canExport = _access.Can(Capabilities.DirectoryGroupExport);
     }
 
-    private async Task SearchAsync(string group, bool resetTrail, bool refresh = false)
+    // Navigation, not loading. Pushing the group into the URL is what gives the operator Back,
+    // Forward, a shareable address, and a link that opens in a new tab.
+    private void GoToGroup(string? group)
     {
-        if (string.IsNullOrWhiteSpace(group))
+        if (!string.IsNullOrWhiteSpace(group))
         {
-            return;
+            Navigation.NavigateTo(DirectoryRoutes.Group(group));
         }
+    }
 
-        string target = group.Trim();
+    private async Task LoadGroupAsync(string target, bool refresh)
+    {
         _submittedGroup = target;
         _model.Group = target;
-
-        if (resetTrail)
-        {
-            _trail.Clear();
-        }
-
-        if (_trail.Count == 0 || !string.Equals(_trail[^1], target, StringComparison.OrdinalIgnoreCase))
-        {
-            _trail.Add(target);
-        }
+        RecordTrail(target);
 
         // A new group invalidates every analysed section; keeping them would describe one group's
         // nesting under another's name.
@@ -348,12 +361,27 @@
         }
     }
 
+    // Revisiting a group already on the trail truncates back to it rather than appending, so the
+    // breadcrumb shows where the operator is instead of everywhere they have been.
+    private void RecordTrail(string target)
+    {
+        int existing = _trail.FindIndex(step => string.Equals(step, target, StringComparison.OrdinalIgnoreCase));
+
+        if (existing >= 0)
+        {
+            _trail.RemoveRange(existing + 1, _trail.Count - existing - 1);
+            return;
+        }
+
+        _trail.Add(target);
+    }
+
     // The bounded nested-group walk. Never automatic: the operator asks for it, because it is the one
     // call here that can take seconds and consume a rate-limit slot. One call produces the nested
     // groups, the effective members, and the parent groups, so all three share this result.
     private async Task RunAnalysisAsync(bool refresh)
     {
-        if (_submittedGroup is null)
+        if (_group is null)
         {
             return;
         }
@@ -364,7 +392,7 @@
 
         try
         {
-            _analysis = await Directory.AnalyzeGroupAsync(_submittedGroup, null, refresh, CancellationToken.None);
+            _analysis = await Directory.AnalyzeGroupAsync(LookupKey, null, refresh, CancellationToken.None);
         }
         catch (SecureOpsApiException ex)
         {
@@ -380,7 +408,7 @@
 
     private async Task ExportAsync(string mode)
     {
-        if (_submittedGroup is null || _exporting)
+        if (_group is null || _exporting)
         {
             return;
         }
@@ -392,7 +420,7 @@
         try
         {
             DirectoryExportFile file = await Directory.ExportGroupAsync(
-                _submittedGroup, mode, null, CancellationToken.None);
+                LookupKey, mode, null, CancellationToken.None);
 
             // The server produced the bytes, the file name, and the content type. The browser only
             // hands them to the operator; nothing is generated or reformatted here.
@@ -412,35 +440,11 @@
         }
     }
 
-    private Task OpenGroupAsync(DirectoryGroupSummaryDto group)
-    {
-        string? target = DirectoryView.ExactGroupIdentifier(group);
-        return string.IsNullOrWhiteSpace(target) ? Task.CompletedTask : SearchAsync(target, resetTrail: false);
-    }
+    // Navigates to the bare page. The reset itself happens in OnParametersSetAsync when the query
+    // string comes back empty, so "Yeni Sorgu" is a history entry like every other move here.
+    private void StartNewQuery() => Navigation.NavigateTo(DirectoryRoutes.GroupsPath);
 
-    private void OpenUser(DirectoryMemberDto member)
-    {
-        string? target = DirectoryView.ExactMemberIdentifier(member);
-        if (!string.IsNullOrWhiteSpace(target))
-        {
-            Navigation.NavigateTo($"directory/users?account={Uri.EscapeDataString(target)}");
-        }
-    }
-
-    // Going back through the breadcrumb truncates the trail rather than appending, so the path
-    // reflects where the operator is rather than everywhere they have been.
-    private Task NavigateTrailAsync(string step)
-    {
-        int index = _trail.FindIndex(item => string.Equals(item, step, StringComparison.OrdinalIgnoreCase));
-        if (index >= 0)
-        {
-            _trail.RemoveRange(index, _trail.Count - index);
-        }
-
-        return SearchAsync(step, resetTrail: false);
-    }
-
-    private void StartNewQuery()
+    private void ResetToSearch()
     {
         _submittedGroup = null;
         _group = null;

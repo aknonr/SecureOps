@@ -95,11 +95,10 @@ else
                             }
                         </td>
                         <td>
-                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                                       EndIcon="@Icons.Material.Filled.ChevronRight"
-                                       OnClick="@(() => OnOpenGroup.InvokeAsync(captured.Group))">
+                            <a class="so-row-link"
+                               href="@DirectoryRoutes.Group(DirectoryView.ExactGroupIdentifier(captured.Group))">
                                 Grubu İncele
-                            </MudButton>
+                            </a>
                         </td>
                     </tr>
                 }
@@ -143,10 +142,6 @@ else
     /// <summary>How prominently the section should read.</summary>
     [Parameter]
     public SectionTone Tone { get; set; } = SectionTone.Plain;
-
-    /// <summary>Raised when the operator wants to analyse one of these groups.</summary>
-    [Parameter]
-    public EventCallback<DirectoryGroupSummaryDto> OnOpenGroup { get; set; }
 
     private bool _showAccountColumn;
 

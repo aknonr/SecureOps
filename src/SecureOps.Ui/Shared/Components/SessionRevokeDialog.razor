@@ -18,15 +18,19 @@
                 kalır ve devam eden işlemi yarıda kesilebilir.
             </p>
 
+            @* The confirmation names a person. Asking an administrator to approve ending
+               "6f9619ff-8b86-…" is asking them to confirm something they cannot actually read. *@
             <SoFieldGrid MinColumnWidth="200px">
-                <SoField Label="Oturum">
-                    <code class="so-code so-code--sm">@Session.SessionId</code>
-                </SoField>
                 <SoField Label="Kullanıcı">
-                    <code class="so-code so-code--sm">@Session.UserId</code>
+                    <span class="so-session-name">@SessionView.Name(Session)</span>
+                    @if (SessionView.Account(Session) is { } account)
+                    {
+                        <span class="so-session-account">@account</span>
+                    }
                 </SoField>
-                <SoField Label="Başlangıç" Value="@Local(Session.StartedAtUtc)" />
-                <SoField Label="Son etkinlik" Value="@Local(Session.LastSeenAtUtc)" />
+                <SoField Label="Kimlik doğrulama" Value="@SessionView.Authentication(Session)" />
+                <SoField Label="Oturum başlangıcı" Value="@SessionView.Local(Session.StartedAtUtc)" />
+                <SoField Label="Son aktivite" Value="@SessionView.Local(Session.LastSeenAtUtc)" />
             </SoFieldGrid>
 
             <p class="so-consequence so-consequence--caution">
@@ -87,6 +91,4 @@
         Dialog.Close(DialogResult.Ok(_reason.Trim()));
     }
 
-    private static string Local(DateTimeOffset value) =>
-        value.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
 }

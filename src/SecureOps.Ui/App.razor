@@ -6,6 +6,8 @@
     than a blank page.
 *@
 
+@inject IApiSessionContext ApiSession
+
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
@@ -47,3 +49,21 @@
         </NotFound>
     </Router>
 </CascadingAuthenticationState>
+
+
+@code {
+    /// <summary>Browser-session correlation value captured by the request that started the circuit.</summary>
+    /// <remarks>
+    /// Supplied by <c>_Host.cshtml</c>. A circuit has no <c>HttpContext</c>, so the value cannot be
+    /// read from the authentication cookie once the connection is live — it has to be handed in at
+    /// the root. Blazor Server encrypts root component parameters into the prerendered marker, so
+    /// the value is not readable in the page source and cannot be tampered with by the client.
+    /// </remarks>
+    [Parameter]
+    public string? BrowserSessionKey { get; set; }
+
+    // Seeded synchronously at the root, before any page or layout resolves an API client. Doing this
+    // in an async lifecycle method further down the tree would race the first API call, and a call
+    // that misses the correlation value opens a second application session.
+    protected override void OnInitialized() => ApiSession.Seed(BrowserSessionKey);
+}

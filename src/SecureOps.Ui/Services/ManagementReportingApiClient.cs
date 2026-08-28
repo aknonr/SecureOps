@@ -14,9 +14,11 @@ public sealed class ManagementReportingApiClient : IManagementReportingApiClient
     /// Initializes a new management reporting API client.
     /// </summary>
     /// <param name="httpClient">Configured HTTP client.</param>
-    public ManagementReportingApiClient(HttpClient httpClient)
+    /// <param name="sessionContext">Browser session whose API cookies these calls belong to.</param>
+    public ManagementReportingApiClient(HttpClient httpClient, IApiSessionContext sessionContext)
     {
         _httpClient = httpClient;
+        ApiSessionHeaders.Attach(httpClient, sessionContext);
     }
 
     /// <inheritdoc />

@@ -14,9 +14,11 @@ public sealed class IdentityLookupApiClient : IIdentityLookupApiClient
     /// Initializes a new identity lookup API client.
     /// </summary>
     /// <param name="httpClient">Configured HTTP client.</param>
-    public IdentityLookupApiClient(HttpClient httpClient)
+    /// <param name="sessionContext">Browser session whose API cookies these calls belong to.</param>
+    public IdentityLookupApiClient(HttpClient httpClient, IApiSessionContext sessionContext)
     {
         _httpClient = httpClient;
+        ApiSessionHeaders.Attach(httpClient, sessionContext);
     }
 
     /// <inheritdoc />

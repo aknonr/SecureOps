@@ -359,9 +359,13 @@
                 <section class="so-panel">
                     <div class="so-panel-head">
                         <h2 class="so-panel-title">Platform kullanımı</h2>
+                        @* The only entry point to the operator detail, and deliberately so. Reached
+                           from here it inherits this page's window, coverage notice, and
+                           limitations — the context that stops per-actor counts being read as a
+                           ranking. It is not in the primary navigation. *@
                         <MudButton Href="reporting/operators" Variant="Variant.Text" Color="Color.Primary"
                                    Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
-                            Operatör raporu
+                            Operatör Raporu
                         </MudButton>
                     </div>
 

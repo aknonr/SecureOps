@@ -147,11 +147,10 @@ else
                                         @DirectoryView.ScopeLabel(group.Scope)
                                     </td>
                                     <td>
-                                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                                                   EndIcon="@Icons.Material.Filled.ChevronRight"
-                                                   OnClick="@(() => OnOpenGroup.InvokeAsync(captured))">
+                                        <a class="so-row-link"
+                                           href="@DirectoryRoutes.Group(DirectoryView.ExactGroupIdentifier(captured))">
                                             Grubu İncele
-                                        </MudButton>
+                                        </a>
                                     </td>
                                 </tr>
                             }
@@ -179,6 +178,23 @@ else
             }
             else
             {
+                @* Presentation only. The server already bounded this list; this decides how much of
+                   it is on screen at once, and the totals below always report the whole result so
+                   paging can never make a partial answer look like a complete one. *@
+                <div class="so-panel-head so-panel-head--sub">
+                    <span class="so-pager-state">
+                        @Analysis.EffectiveMembers.Count üyeden @(EffectiveFirst + 1)–@EffectiveLast arası
+                    </span>
+                    <MudSelect T="int" Value="_effectivePageSize" ValueChanged="ChangeEffectivePageSize"
+                               Label="Sayfa boyutu" Dense="true" Margin="Margin.Dense"
+                               Variant="Variant.Outlined" Class="so-page-size">
+                        @foreach (int size in PageSizes)
+                        {
+                            <MudSelectItem T="int" Value="@size">@size</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+
                 <div class="so-table-scroll">
                     <table class="so-plain-table so-member-table">
                         <thead>
@@ -190,7 +206,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (DirectoryMemberDto member in Analysis.EffectiveMembers)
+                            @foreach (DirectoryMemberDto member in EffectivePage)
                             {
                                 DirectoryMemberDto captured = member;
                                 <tr>
@@ -212,11 +228,10 @@ else
                                     <td>
                                         @if (string.Equals(member.MemberType, "User", StringComparison.Ordinal))
                                         {
-                                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                                                       EndIcon="@Icons.Material.Filled.ChevronRight"
-                                                       OnClick="@(() => OnOpenUser.InvokeAsync(captured))">
+                                            <a class="so-row-link"
+                                               href="@DirectoryRoutes.User(DirectoryView.ExactMemberIdentifier(captured))">
                                                 Hesabı İncele
-                                            </MudButton>
+                                            </a>
                                         }
                                     </td>
                                 </tr>
@@ -224,6 +239,27 @@ else
                         </tbody>
                     </table>
                 </div>
+
+                @if (Analysis.EffectiveMembers.Count > _effectivePageSize)
+                {
+                    <div class="so-pager">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.ChevronLeft"
+                                   Disabled="@(_effectivePage == 0)"
+                                   OnClick="@(() => _effectivePage--)">
+                            Önceki
+                        </MudButton>
+
+                        <span class="so-pager-state">Sayfa @(_effectivePage + 1) / @EffectivePageCount</span>
+
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                   EndIcon="@Icons.Material.Filled.ChevronRight"
+                                   Disabled="@(_effectivePage + 1 >= EffectivePageCount)"
+                                   OnClick="@(() => _effectivePage++)">
+                            Sonraki
+                        </MudButton>
+                    </div>
+                }
             }
         }
         else
@@ -231,15 +267,13 @@ else
             <SoMembershipGroupTable Title="Doğrudan Üst Gruplar"
                                     Description="Bu grup, aşağıdaki grupların doğrudan üyesidir."
                                     Items="Analysis.ParentMemberships.DirectParents"
-                                    EmptyText="Bu grup başka bir grubun doğrudan üyesi değil."
-                                    OnOpenGroup="OnOpenGroup" />
+                                    EmptyText="Bu grup başka bir grubun doğrudan üyesi değil." />
 
             <SoMembershipGroupTable Title="Dolaylı Üst Gruplar"
                                     Description="Araya giren gruplar üzerinden ulaşılan üst gruplar."
                                     Items="Analysis.ParentMemberships.TransitiveParents"
                                     ShowDepth="true"
-                                    EmptyText="Dolaylı üst grup bulunmadı."
-                                    OnOpenGroup="OnOpenGroup" />
+                                    EmptyText="Dolaylı üst grup bulunmadı." />
 
             <SoTraversalNotice Traversal="Analysis.ParentMemberships.Traversal" />
         }
@@ -275,23 +309,55 @@ else
     [Parameter]
     public EventCallback OnRun { get; set; }
 
-    /// <summary>Raised when the operator wants to analyse another group.</summary>
-    [Parameter]
-    public EventCallback<DirectoryGroupSummaryDto> OnOpenGroup { get; set; }
-
-    /// <summary>Raised when the operator wants to inspect a member account.</summary>
-    [Parameter]
-    public EventCallback<DirectoryMemberDto> OnOpenUser { get; set; }
-
     /// <summary>Raised when the operator asks for a CSV of the effective members.</summary>
     [Parameter]
     public EventCallback OnExport { get; set; }
 
+    /// <summary>Page sizes offered for the effective-member list.</summary>
+    private static readonly int[] PageSizes = [25, 50, 100];
+
     private bool _isComplete = true;
     private IReadOnlyList<string> _limits = [];
+    private int _effectivePageSize = 25;
+    private int _effectivePage;
+
+    // Windowing over the server's already-bounded result. It changes how much is rendered at once,
+    // never what the result claims: the count and the partial-result banner always describe the
+    // whole analysis.
+    private IEnumerable<DirectoryMemberDto> EffectivePage =>
+        Analysis is null
+            ? []
+            : Analysis.EffectiveMembers.Skip(EffectiveFirst).Take(_effectivePageSize);
+
+    private int EffectiveFirst => _effectivePage * _effectivePageSize;
+
+    private int EffectiveLast => Analysis is null
+        ? 0
+        : Math.Min(EffectiveFirst + _effectivePageSize, Analysis.EffectiveMembers.Count);
+
+    private int EffectivePageCount => Analysis is null
+        ? 1
+        : Math.Max(1, (int)Math.Ceiling(Analysis.EffectiveMembers.Count / (double)_effectivePageSize));
+
+    private void ChangeEffectivePageSize(int pageSize)
+    {
+        _effectivePageSize = pageSize;
+        _effectivePage = 0;
+    }
+
+    private DirectoryGroupAnalysisResponse? _pagedAnalysis;
 
     protected override void OnParametersSet()
     {
+        // Reset only when the evidence itself changed. A re-run must not leave the operator on a
+        // page number that belonged to the previous result; an unrelated parent re-render must not
+        // yank them back to page one mid-read.
+        if (!ReferenceEquals(_pagedAnalysis, Analysis))
+        {
+            _pagedAnalysis = Analysis;
+            _effectivePage = 0;
+        }
+
         if (Analysis is null)
         {
             _isComplete = true;

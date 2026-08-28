@@ -1,6 +1,5 @@
 @using Microsoft.Extensions.Logging
 @inject IDirectoryApiClient Directory
-@inject NavigationManager Navigation
 @inject ILogger<SoDirectoryGroups> Logger
 
 @*
@@ -43,24 +42,21 @@ else if (_memberships is not null)
         <SoMembershipGroupTable Title="Doğrudan Üyelik"
                                 Description="Hesap bu gruplara doğrudan eklenmiş. Bir üyeliği kaldırmak gerekiyorsa yeri burasıdır."
                                 Items="_direct"
-                                EmptyText="Bu hesaba doğrudan atanmış grup yok."
-                                OnOpenGroup="OpenGroup" />
+                                EmptyText="Bu hesaba doğrudan atanmış grup yok." />
 
         @if (_primary.Count > 0)
         {
             <SoMembershipGroupTable Title="Birincil Grup"
                                     Description="Hesabın Active Directory birincil grubudur. Bu ilişki üye listesinden kaldırılamaz; hesabın birincil grup tanımının değişmesi gerekir."
                                     Items="_primary"
-                                    Tone="SoMembershipGroupTable.SectionTone.Distinct"
-                                    OnOpenGroup="OpenGroup" />
+                                    Tone="SoMembershipGroupTable.SectionTone.Distinct" />
         }
 
         <SoMembershipGroupTable Title="Dolaylı / İç İçe Üyelik"
                                 Description="Başka gruplar üzerinden erişilen gruplar. Bunlar hesaptan doğrudan kaldırılamaz; zincirdeki ilgili grup üyeliğinin değişmesi gerekir."
                                 Items="_transitive"
                                 ShowDepth="true"
-                                EmptyText="İç içe üyelik bulunmadı."
-                                OnOpenGroup="OpenGroup" />
+                                EmptyText="İç içe üyelik bulunmadı." />
 
         <p class="so-panel-text so-panel-text--sm">
             Active Directory <code class="so-code so-code--sm">memberOf</code> yalnızca doğrudan
@@ -122,14 +118,5 @@ else if (_memberships is not null)
             .Where(item => !string.Equals(item.Group.MembershipKind, "Primary", StringComparison.Ordinal))
             .ToArray();
         _transitive = memberships.TransitiveGroups;
-    }
-
-    private void OpenGroup(DirectoryGroupSummaryDto group)
-    {
-        string? target = DirectoryView.ExactGroupIdentifier(group);
-        if (!string.IsNullOrWhiteSpace(target))
-        {
-            Navigation.NavigateTo($"directory/groups?group={Uri.EscapeDataString(target)}");
-        }
     }
 }

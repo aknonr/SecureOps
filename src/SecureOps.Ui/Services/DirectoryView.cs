@@ -136,22 +136,40 @@ public static class DirectoryView
     /// The exact identifier to send when looking this group up again.
     /// </summary>
     /// <param name="group">Group summary.</param>
-    /// <returns>Account name if present, otherwise the display name; <c>null</c> when neither is.</returns>
+    /// <returns>The server's lookup key when supplied, otherwise account name, otherwise display name.</returns>
     /// <remarks>
-    /// <c>sAMAccountName</c> resolves most reliably server-side, and the contract offers the display
-    /// name as the only alternative. A distinguished name is deliberately never sent: the endpoints
-    /// reject raw DNs.
+    /// <c>lookupKey</c> wins whenever the server supplies one. It is the canonical exact
+    /// <c>sAMAccountName</c> the backend resolved for this object, so navigating with it asks about
+    /// the group the operator is actually looking at rather than re-resolving a display string that
+    /// may match a different object or none at all.
+    /// <para>
+    /// A distinguished name is never sent, at any point in the chain: the endpoints reject raw DNs,
+    /// and a DN typed or pasted into a lookup is not exact input, it is a filter.
+    /// </para>
     /// </remarks>
     public static string? ExactGroupIdentifier(DirectoryGroupSummaryDto group) =>
-        FirstNonEmpty(group.SamAccountName, group.Name);
+        FirstNonEmpty(group.LookupKey, group.SamAccountName, group.Name);
+
+    /// <summary>
+    /// The exact identifier to send for subsequent calls about a resolved group.
+    /// </summary>
+    /// <param name="group">Resolved group metadata.</param>
+    /// <returns>The server's lookup key when supplied, otherwise account name, otherwise display name.</returns>
+    /// <remarks>
+    /// Used after an overview resolves, so member, analysis, membership-check, and export calls stop
+    /// replaying whatever the operator typed. What they typed found the group once; the server's own
+    /// key is what identifies it.
+    /// </remarks>
+    public static string? ExactGroupIdentifier(DirectoryGroupDetailDto group) =>
+        FirstNonEmpty(group.LookupKey, group.SamAccountName, group.Name);
 
     /// <summary>
     /// The exact identifier to send when looking a member up again.
     /// </summary>
     /// <param name="member">Member projection.</param>
-    /// <returns>Account name if present, otherwise the display name; <c>null</c> when neither is.</returns>
+    /// <returns>The server's lookup key when supplied, otherwise account name, otherwise display name.</returns>
     public static string? ExactMemberIdentifier(DirectoryMemberDto member) =>
-        FirstNonEmpty(member.SamAccountName, member.Name);
+        FirstNonEmpty(member.LookupKey, member.SamAccountName, member.Name);
 
     // ---- vocabulary --------------------------------------------------------------------------
 

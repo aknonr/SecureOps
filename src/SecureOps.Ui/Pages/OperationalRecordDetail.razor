@@ -79,6 +79,15 @@
 OperationalRecordView.Ownership owner =
             OperationalRecordView.OwnershipOf(_record, DateTimeOffset.UtcNow, _actor);
 
+        @* Above everything else. Whether a real Jira issue will be created changes the meaning of
+           every button below, so it cannot sit further down the page. *@
+        <SoSimulationBanner Active="@SimulationActive" Notice="@SimulationNotice" />
+
+        @* Where this transfer has got to, in the operator's own sequence rather than in workflow
+           state names. Derived from durable state, so it survives a refresh and agrees between
+           two operators looking at the same record. *@
+        <SoOperatorSteps Current="@OperationalRecordView.CurrentStep(_record)" />
+
         @if (_result is not null)
         {
             <section class="so-panel so-panel--result" role="status">
@@ -236,6 +245,12 @@ OperationalRecordView.Ownership owner =
                 <h2 class="so-panel-title">SecureOps iş akışı</h2>
 
                 <div class="so-state-head">
+                    @* Category first, stage second. The category is what the operator is deciding
+                       from; the stage is what support asks about. *@
+                    <SoStatusBadge Label="@OperationalRecordView.PresentationLabel(_record.PresentationState)"
+                                   Tone="@OperationalRecordView.PresentationTone(_record.PresentationState)"
+                                   Icon="@OperationalRecordView.PresentationIcon(_record.PresentationState)" />
+
                     <SoStatusBadge Label="@OperationalRecordView.StateLabel(_record.WorkflowState)"
                                    Tone="@OperationalRecordView.StateTone(_record.WorkflowState)"
                                    Icon="@OperationalRecordView.StateIcon(_record.WorkflowState)" />
@@ -352,22 +367,39 @@ OperationalRecordView.Ownership owner =
                     <p class="so-field-empty">Henüz Jira kaydı oluşturulmadı.</p>
                 }
 
-                @if (!string.IsNullOrWhiteSpace(_record.LastErrorCode))
-                {
-                    <SoFieldGrid MinColumnWidth="220px">
-                        <SoField Label="Son hata kodu">
-                            <code class="so-code">@_record.LastErrorCode</code>
+                @* Error codes, mapping versions, and record identifiers are support material. They
+                   are kept — they are what a support call needs — and folded away, because an
+                   operator deciding whether to press "Jira Kaydı Oluştur" is not reading them. *@
+                <details class="so-technical">
+                    <summary>Teknik ayrıntılar ve destek bilgisi</summary>
+                    <SoFieldGrid MinColumnWidth="240px">
+                        @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
+                        {
+                            <SoField Label="Destek referansı">
+                                <code class="so-code so-code--sm">@_record.CorrelationId</code>
+                            </SoField>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_record.LastErrorCode))
+                        {
+                            <SoField Label="Son hata kodu">
+                                <code class="so-code so-code--sm">@_record.LastErrorCode</code>
+                            </SoField>
+                        }
+                        @if (_preview is not null)
+                        {
+                            <SoField Label="Eşleme sürümü">
+                                <code class="so-code so-code--sm">@_preview.MappingVersion</code>
+                            </SoField>
+                        }
+                        <SoField Label="Kayıt tanımlayıcısı">
+                            <code class="so-code so-code--sm">@_record.Id</code>
                         </SoField>
+                        <SoField Label="Kayıt sürümü">
+                            <code class="so-code so-code--sm">@_record.Version</code>
+                        </SoField>
+                        <SoField Label="Deneme sayısı">@_record.RetryCount</SoField>
                     </SoFieldGrid>
-                }
-
-                @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
-                {
-                    <p class="so-problem-reference">
-                        <span>Destek referansı</span>
-                        <code>@_record.CorrelationId</code>
-                    </p>
-                }
+                </details>
 
                 @if (_preview is not null)
                 {
@@ -376,7 +408,6 @@ OperationalRecordView.Ownership owner =
                     <SoFieldGrid MinColumnWidth="200px">
                         <SoField Label="Proje">@_preview.ProjectKey</SoField>
                         <SoField Label="Kayıt tipi">@_preview.IssueType</SoField>
-                        <SoField Label="Eşleme sürümü">@_preview.MappingVersion</SoField>
                         <SoField Label="Talep eden hesabı">
                             @if (string.IsNullOrWhiteSpace(_preview.RequesterAccountId))
                             {
@@ -387,6 +418,10 @@ OperationalRecordView.Ownership owner =
                                 @_preview.RequesterAccountId
                             }
                         </SoField>
+                        @if (!string.IsNullOrWhiteSpace(_preview.AssigneeUsername))
+                        {
+                            <SoField Label="Atanacak kişi">@_preview.AssigneeUsername</SoField>
+                        }
                     </SoFieldGrid>
 
                     <h4 class="so-subhead">Özet</h4>
@@ -419,7 +454,7 @@ OperationalRecordView.Ownership owner =
                                    StartIcon="@Icons.Material.Filled.Preview"
                                    Disabled="@(_busy || !actions.Preview)"
                                    OnClick="PreviewAsync">
-                            Önizle
+                            Jira Taslağını Önizle
                         </MudButton>
                     }
 
@@ -431,7 +466,7 @@ OperationalRecordView.Ownership owner =
                                    StartIcon="@Icons.Material.Filled.AddTask"
                                    Disabled="@(_busy || !actions.Create || _preview is null)"
                                    OnClick="CreateAsync">
-                            Jira kaydı oluştur
+                            Jira Kaydı Oluştur
                         </MudButton>
                     }
 
@@ -441,7 +476,7 @@ OperationalRecordView.Ownership owner =
                                    StartIcon="@Icons.Material.Filled.RestartAlt"
                                    Disabled="@(_busy || !actions.Retry)"
                                    OnClick="RetryAsync">
-                            Aktarımı sürdür
+                            Yeniden Dene
                         </MudButton>
                     }
                 </div>
@@ -482,6 +517,15 @@ OperationalRecordView.Ownership owner =
     private string? _actor;
     private bool _loading;
     private bool _busy;
+
+    // Simulation is reported independently on the record, the preview, and the transfer result. Any
+    // of them saying so is enough: the operator must be told before the button, and a preview that
+    // announces a simulated run must not be contradicted by a record fetched a moment earlier.
+    private bool SimulationActive =>
+        _record?.SimulationMode == true || _preview?.SimulationMode == true;
+
+    private string? SimulationNotice =>
+        _preview?.SimulationNotice ?? _record?.SimulationNotice;
 
     private string HeaderTitle => _record is null ? "Operasyonel kayıt" : _record.OrCode;
 

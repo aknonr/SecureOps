@@ -57,7 +57,7 @@
                       Lead="Active Directory üzerindeki kullanıcı, PAM veya servis hesapları tam hesap adıyla sorgulanabilir." />
 
         <section class="so-panel so-search-panel">
-            <EditForm Model="_model" OnValidSubmit="@(() => RunLookupAsync(force: false))">
+            <EditForm Model="_model" OnValidSubmit="SubmitSearch">
                 <DataAnnotationsValidator />
 
                 <div class="so-search-row">
@@ -102,7 +102,8 @@
 
             <p class="so-panel-text so-panel-text--sm">
                 Tam hesap adıyla sorgulanır. Joker karakter, LDAP filtresi veya birden fazla hesap
-                kabul edilmez; hesap değeri adres çubuğunda taşınmaz.
+                kabul edilmez. Sorgulanan hesap ve açık sekme adres çubuğunda taşınır; böylece
+                tarayıcının geri/ileri düğmeleri ve bağlantıyı yeni sekmede açma çalışır.
             </p>
         </section>
     }
@@ -175,7 +176,7 @@
                             role="tab"
                             class="so-tab @(tab == _tab ? "so-tab--active" : null)"
                             aria-selected="@(tab == _tab)"
-                            @onclick="() => _tab = captured">
+                            @onclick="() => GoToTab(captured)">
                         @TabLabel(tab)
                     </button>
                 }
@@ -273,6 +274,16 @@
     [SupplyParameterFromQuery(Name = "account")]
     public string? AccountQuery { get; set; }
 
+    /// <summary>Section to open, so Back returns to the tab the operator left.</summary>
+    /// <remarks>
+    /// The real TEST complaint this fixes: looking up a user, opening Grup Üyelikleri, following a
+    /// group, then pressing Back — and losing both the account and the tab. Neither survived in
+    /// component state, so the operator had to retype the lookup. Both live in the URL now.
+    /// </remarks>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? TabQuery { get; set; }
+
     private readonly LookupModel _model = new();
     private readonly IdentityLookupResultCache _cache = new();
 
@@ -344,13 +355,65 @@
         }
 
         await LoadCapabilitiesAsync();
+    }
 
-        // Arriving from a member row on the group screen runs that account straight away.
-        if (!string.IsNullOrWhiteSpace(AccountQuery))
+    // The URL is the state. A member row on the group screen, the search form, browser Back, browser
+    // Forward, and a link opened in a new tab all arrive here, so all of them restore the same thing.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_access?.Can(Capabilities.IdentityLookup) != true)
         {
-            _model.Account = AccountQuery;
+            return;
+        }
+
+        string? account = string.IsNullOrWhiteSpace(AccountQuery) ? null : AccountQuery.Trim();
+
+        if (account is null)
+        {
+            if (_submittedAccount is not null)
+            {
+                ResetToSearch();
+            }
+
+            return;
+        }
+
+        // The tab is applied before the lookup so a restored Grup Üyelikleri lands on the section the
+        // operator left rather than flashing the summary first.
+        _tab = ParseTab(TabQuery);
+
+        if (!string.Equals(_submittedAccount, account, StringComparison.OrdinalIgnoreCase))
+        {
+            _model.Account = account;
             await RunLookupAsync(force: false);
         }
+    }
+
+    private static DetailTab ParseTab(string? value) => value?.ToLowerInvariant() switch
+    {
+        "groups" => DetailTab.Groups,
+        "account" => DetailTab.Account,
+        "service" => DetailTab.Service,
+        "privileged" => DetailTab.Privileged,
+        _ => DetailTab.General
+    };
+
+    private static string TabSlug(DetailTab tab) => tab switch
+    {
+        DetailTab.Groups => "groups",
+        DetailTab.Account => "account",
+        DetailTab.Service => "service",
+        DetailTab.Privileged => "privileged",
+        _ => "general"
+    };
+
+    // Replaces rather than pushes. The tab belongs in the address so leaving and coming back returns
+    // to it, but every tab click becoming a history entry would bury the previous account under a
+    // stack of Back presses.
+    private void GoToTab(DetailTab tab)
+    {
+        _tab = tab;
+        Navigation.NavigateTo(DirectoryRoutes.User(_submittedAccount, TabSlug(tab)), replace: true);
     }
 
     // Validation limits come from the server rather than being hard-coded, so a configuration change
@@ -394,7 +457,27 @@
         _accountAdvisory = validation.IsValid ? validation.Advisory : null;
     }
 
-    private void StartNewQuery()
+    // Navigates to the bare page; the reset happens when the empty query string comes back through
+    // OnParametersSetAsync, so "Yeni Sorgu" is a history entry like every other move here.
+    private void StartNewQuery() => Navigation.NavigateTo(DirectoryRoutes.UsersPath);
+
+    // Validated before navigating so an invalid account is reported on the form rather than becoming
+    // a URL that resolves to a lookup failure.
+    private void SubmitSearch()
+    {
+        AccountValidationResult validation =
+            AccountInputRules.Validate(_model.Account, _maxAccountLength, _supportsUpn);
+
+        if (!validation.IsValid)
+        {
+            _accountError = validation.Message;
+            return;
+        }
+
+        Navigation.NavigateTo(DirectoryRoutes.User(_model.Account.Trim()));
+    }
+
+    private void ResetToSearch()
     {
         _result = null;
         _problem = null;

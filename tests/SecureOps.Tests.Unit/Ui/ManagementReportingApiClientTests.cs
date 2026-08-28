@@ -97,7 +97,7 @@ public sealed class ManagementReportingApiClientTests
     {
         RecordingHandler handler = new(body ?? Report(), status, throws);
         HttpClient httpClient = new(handler) { BaseAddress = new Uri("http://localhost:5000/") };
-        return (new ManagementReportingApiClient(httpClient), handler);
+        return (new ManagementReportingApiClient(httpClient, new FakeApiSessionContext()), handler);
     }
 
     private static ManagementReportResponse Report() => new(

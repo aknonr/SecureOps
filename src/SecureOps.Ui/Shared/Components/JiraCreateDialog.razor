@@ -16,7 +16,7 @@
             <span class="so-dialog-icon so-dialog--grant" aria-hidden="true">
                 <MudIcon Icon="@Icons.Material.Filled.AddTask" />
             </span>
-            <span>Jira kaydı oluştur</span>
+            <span>Jira Kaydı Oluştur</span>
         </div>
     </TitleContent>
 
@@ -27,11 +27,26 @@
             <span class="so-dialog-subject-meta">Kaynak: @Record.SourceRecordId</span>
         </div>
 
-        <p class="so-dialog-consequence so-dialog--grant">
-            Seçilen kayıt için Jira'da yeni bir kayıt oluşturulacak ve ardından kaynak kaydın
-            kapatılması denenecek. <strong>Bu işlem SecureOps üzerinden geri alınamaz.</strong>
-            Sonuç doğrulanana kadar işlemi tekrarlamayın.
-        </p>
+        @* Repeated here, at the point of no return. An operator who scrolled past the banner on the
+           page must still know whether this button writes to the real Jira. *@
+        <SoSimulationBanner Active="@Preview.SimulationMode" Notice="@Preview.SimulationNotice" />
+
+        @if (Preview.SimulationMode)
+        {
+            <p class="so-dialog-consequence">
+                Bu bir test simülasyonudur. Jira'da veya Turuncu Hat'ta gerçek bir kayıt
+                oluşturulmaz; iş akışının sonucu SecureOps üzerinde gösterilir.
+            </p>
+        }
+        else
+        {
+            <p class="so-dialog-consequence so-dialog--grant">
+                Seçilen kayıt için Jira'da <strong>gerçek bir kayıt oluşturulacak</strong> ve
+                ardından kaynak kaydın kapatılması denenecek.
+                <strong>Bu işlem SecureOps üzerinden geri alınamaz.</strong>
+                Sonuç doğrulanana kadar işlemi tekrarlamayın.
+            </p>
+        }
 
         <fieldset class="so-role-picker">
             <legend>Aktarılacak içerik</legend>

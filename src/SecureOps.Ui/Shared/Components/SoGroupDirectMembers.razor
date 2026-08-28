@@ -10,8 +10,14 @@
     quietly implied completeness would send an operator looking for a user who is genuinely in the
     group but not in this list.
 
-    Paging is forward-only because the continuation token is. "Daha fazla yükle" appends rather than
-    pretending to offer random access the API does not have.
+    Paging is forward-only because the continuation token is, so "Önceki" replays tokens the page has
+    already been given rather than pretending to offer random access the API does not have. One page
+    at a time, at a size the operator chose: a group with thousands of members must not arrive as one
+    unreadable list.
+
+    Rows link rather than dispatch. A member is an addressable thing, so "Grubu İncele" and "Hesabı
+    İncele" are anchors — which is what makes Ctrl+Click, middle-click, and "Yeni sekmede aç" work
+    without this component knowing anything about them.
 
     A failure here is this section's failure. The group overview above stays exactly as it was.
 *@
@@ -26,6 +32,14 @@
             }
         </h3>
         <div class="so-panel-head-actions">
+            <MudSelect T="int" Value="_pageSize" ValueChanged="ChangePageSizeAsync"
+                       Label="Sayfa boyutu" Dense="true" Margin="Margin.Dense"
+                       Variant="Variant.Outlined" Class="so-page-size">
+                @foreach (int size in PageSizes)
+                {
+                    <MudSelectItem T="int" Value="@size">@size</MudSelectItem>
+                }
+            </MudSelect>
             @if (CanExport && _members.Count > 0)
             {
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
@@ -45,9 +59,8 @@
     </div>
 
     <p class="so-panel-text so-panel-text--sm">
-        Yalnızca gruba açıkça eklenmiş üyeler listelenir. Birincil grubu bu grup olan hesaplar bu
-        listede yer almaz. İç içe gruplar burada üye olarak görünür ve açılmaz; içeriğini görmek için
-        grubun kendi analizine geçin.
+        Bu liste gruba doğrudan eklenmiş AD nesnelerini gösterir. İç içe grupların üyeleri bu listede
+        otomatik olarak açılmaz. Birincil grubu bu grup olan hesaplar da bu listede yer almaz.
     </p>
 
     @if (_problem is not null)
@@ -121,21 +134,21 @@
                                                Tone="SoStatusBadge.BadgeTone.Neutral" />
                             </td>
                             <td>
+                                @* Real anchors: an operator comparing two groups opens the second in
+                                   a new tab, and a button cannot be opened in a new tab. *@
                                 @if (IsGroup(member))
                                 {
-                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                                               EndIcon="@Icons.Material.Filled.ChevronRight"
-                                               OnClick="@(() => OnOpenGroup.InvokeAsync(AsSummary(captured)))">
+                                    <a class="so-row-link"
+                                       href="@DirectoryRoutes.Group(DirectoryView.ExactMemberIdentifier(captured))">
                                         Grubu İncele
-                                    </MudButton>
+                                    </a>
                                 }
                                 else if (IsUser(member))
                                 {
-                                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
-                                               EndIcon="@Icons.Material.Filled.ChevronRight"
-                                               OnClick="@(() => OnOpenUser.InvokeAsync(captured))">
+                                    <a class="so-row-link"
+                                       href="@DirectoryRoutes.User(DirectoryView.ExactMemberIdentifier(captured))">
                                         Hesabı İncele
-                                    </MudButton>
+                                    </a>
                                 }
                             </td>
                         </tr>
@@ -144,18 +157,25 @@
             </table>
         </div>
 
-        @if (_continuationToken is not null)
-        {
-            <div class="so-pager">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
-                           Disabled="@_loading"
-                           StartIcon="@Icons.Material.Filled.ExpandMore"
-                           OnClick="@(() => LoadAsync(reset: false))">
-                    Daha fazla yükle
-                </MudButton>
-                <span class="so-pager-state">@_members.Count üye yüklendi; devamı var.</span>
-            </div>
-        }
+        <div class="so-pager">
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ChevronLeft"
+                       Disabled="@(_loading || _pageIndex == 0)"
+                       OnClick="PreviousPageAsync">
+                Önceki
+            </MudButton>
+
+            <span class="so-pager-state">
+                Sayfa @(_pageIndex + 1) · bu sayfada @_members.Count üye
+            </span>
+
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       EndIcon="@Icons.Material.Filled.ChevronRight"
+                       Disabled="@(_loading || _continuationToken is null)"
+                       OnClick="NextPageAsync">
+                Sonraki
+            </MudButton>
+        </div>
     }
 </section>
 
@@ -172,46 +192,89 @@
     [Parameter]
     public bool Exporting { get; set; }
 
-    /// <summary>Raised when the operator wants to analyse a nested group.</summary>
-    [Parameter]
-    public EventCallback<DirectoryGroupSummaryDto> OnOpenGroup { get; set; }
-
-    /// <summary>Raised when the operator wants to inspect a member account.</summary>
-    [Parameter]
-    public EventCallback<DirectoryMemberDto> OnOpenUser { get; set; }
-
     /// <summary>Raised when the operator asks for a CSV of these members.</summary>
     [Parameter]
     public EventCallback OnExport { get; set; }
 
+    /// <summary>Page sizes the API accepts for direct-member pages.</summary>
+    private static readonly int[] PageSizes = [25, 50, 100];
+
     private readonly List<DirectoryMemberDto> _members = [];
+
+    // Tokens already spent, indexed by the page they opened. The continuation token is opaque and
+    // forward-only, so this is the only way to offer "Önceki" without re-walking from the start.
+    private readonly List<string?> _pageTokens = [null];
+
+    private int _pageIndex;
+    private int _pageSize = 25;
     private string? _continuationToken;
     private UiProblem? _problem;
     private bool _loading;
 
     protected override Task OnInitializedAsync() => LoadAsync(reset: true);
 
+    private Task ChangePageSizeAsync(int pageSize)
+    {
+        _pageSize = pageSize;
+        return LoadAsync(reset: true);
+    }
+
+    private Task NextPageAsync()
+    {
+        if (_continuationToken is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _pageIndex++;
+
+        // Recorded before the request so a failed page still knows how it was reached.
+        if (_pageTokens.Count == _pageIndex)
+        {
+            _pageTokens.Add(_continuationToken);
+        }
+
+        return LoadAsync(reset: false);
+    }
+
+    private Task PreviousPageAsync()
+    {
+        if (_pageIndex == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        _pageIndex--;
+        return LoadAsync(reset: false);
+    }
+
     private async Task LoadAsync(bool reset)
     {
         if (reset)
         {
-            _members.Clear();
-            _continuationToken = null;
+            _pageIndex = 0;
+            _pageTokens.Clear();
+            _pageTokens.Add(null);
         }
 
         _loading = true;
         _problem = null;
+        _members.Clear();
         StateHasChanged();
 
         try
         {
             DirectoryMemberPageResponse page = await Directory.GetGroupMembersAsync(
-                Group, null, pageSize: null, continuationToken: _continuationToken, CancellationToken.None);
+                Group,
+                null,
+                pageSize: _pageSize,
+                continuationToken: _pageTokens[_pageIndex],
+                CancellationToken.None);
 
             _members.AddRange(page.Items);
 
             // The API signals "no more" by omitting the token. Treating an empty string as a token
-            // would loop forever on the last page.
+            // would offer a "Sonraki" that returns the same page forever.
             _continuationToken = string.IsNullOrWhiteSpace(page.ContinuationToken)
                 ? null
                 : page.ContinuationToken;
@@ -234,15 +297,4 @@
 
     private static bool IsUser(DirectoryMemberDto member) =>
         string.Equals(member.MemberType, "User", StringComparison.Ordinal);
-
-    // A member row carries the same naming fields a group summary needs, so following a nested group
-    // does not require a second lookup just to build the request.
-    private static DirectoryGroupSummaryDto AsSummary(DirectoryMemberDto member) => new(
-        member.StableIdentifier,
-        member.Name,
-        member.SamAccountName,
-        member.DistinguishedName,
-        null,
-        "Unknown",
-        "Unknown");
 }
