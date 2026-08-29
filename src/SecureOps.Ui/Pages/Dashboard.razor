@@ -34,7 +34,7 @@
         <Actions>
             @if (_managementView)
             {
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.Refresh"
                            Disabled="@_reportLoading"
                            OnClick="ReloadReportAsync">
@@ -68,7 +68,7 @@
                            StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
                     Durumu yenile
                 </MudButton>
-                <MudButton Href="access/me" Variant="Variant.Text" Color="Color.Primary">
+                <MudButton Href="access/me" Variant="Variant.Text" Color="Color.Default">
                     Erişim ayrıntıları
                 </MudButton>
             </div>
@@ -201,7 +201,7 @@
                         <h2 class="so-panel-title">AD / PAM etkinliği</h2>
                         @if (_snapshot.Can(Capabilities.IdentityLookup))
                         {
-                            <MudButton Href="identity-lookup" Variant="Variant.Text" Color="Color.Primary"
+                            <MudButton Href="identity-lookup" Variant="Variant.Text" Color="Color.Default"
                                        Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
                                 Kimlik sorgulama
                             </MudButton>
@@ -252,7 +252,7 @@
                         <h2 class="so-panel-title">Operasyonel kayıt → Jira</h2>
                         @if (_snapshot.Can(Capabilities.OperationalRecordsView))
                         {
-                            <MudButton Href="operational-records" Variant="Variant.Text" Color="Color.Primary"
+                            <MudButton Href="operational-records" Variant="Variant.Text" Color="Color.Default"
                                        Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
                                 Kayıtlar
                             </MudButton>
@@ -363,7 +363,7 @@
                            from here it inherits this page's window, coverage notice, and
                            limitations — the context that stops per-actor counts being read as a
                            ranking. It is not in the primary navigation. *@
-                        <MudButton Href="reporting/operators" Variant="Variant.Text" Color="Color.Primary"
+                        <MudButton Href="reporting/operators" Variant="Variant.Text" Color="Color.Default"
                                    Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
                             Operatör Raporu
                         </MudButton>
@@ -406,7 +406,7 @@
                         <h2 class="so-panel-title">Oturum yönetişimi</h2>
                         @if (_snapshot.Can(Capabilities.AccessManageUsers))
                         {
-                            <MudButton Href="admin/sessions" Variant="Variant.Text" Color="Color.Primary"
+                            <MudButton Href="admin/sessions" Variant="Variant.Text" Color="Color.Default"
                                        Size="Size.Small" EndIcon="@Icons.Material.Filled.ChevronRight">
                                 Aktif oturumlar
                             </MudButton>
@@ -529,7 +529,7 @@
                 <section class="so-panel">
                     <div class="so-panel-head">
                         <h2 class="so-panel-title">Sistem durumu</h2>
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                    StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
                             Yenile
                         </MudButton>
@@ -590,7 +590,7 @@
                     <p class="so-panel-text so-panel-text--sm">
                         @_snapshot.Capabilities.Count yetki tanımlı.
                     </p>
-                    <MudButton Href="access/me" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small">
+                    <MudButton Href="access/me" Variant="Variant.Text" Color="Color.Default" Size="Size.Small">
                         Ayrıntılar
                     </MudButton>
                 </section>

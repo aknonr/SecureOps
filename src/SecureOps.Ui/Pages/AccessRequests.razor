@@ -25,7 +25,7 @@
     <SoPageHeader Title="Erişim Talepleri"
                   Lead="Karar bekleyen ve sonuçlanmış uygulama erişim talepleri.">
         <Actions>
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Refresh"
                        Disabled="@(_busy || _loading)"
                        OnClick="() => ReloadAsync(announce: true)">
@@ -298,7 +298,7 @@
                            request's, so they belong on the record that supplies it. *@
                         @if (_access.Can(Capabilities.AccessManageUsers))
                         {
-                            <MudButton Variant="Variant.Text" Color="Color.Primary"
+                            <MudButton Variant="Variant.Text" Color="Color.Default"
                                        StartIcon="@Icons.Material.Filled.PersonSearch"
                                        Href="@($"access/users/{_selected.UserId}")">
                                 Kullanıcı kaydını aç

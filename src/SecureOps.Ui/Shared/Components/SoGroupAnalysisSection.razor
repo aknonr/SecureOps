@@ -58,7 +58,7 @@ else
                         Dışa Aktar (CSV)
                     </MudButton>
                 }
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                            StartIcon="@Icons.Material.Filled.Refresh"
                            OnClick="@(() => OnRun.InvokeAsync())">
                     Yeniden Çalıştır
@@ -243,7 +243,7 @@ else
                 @if (Analysis.EffectiveMembers.Count > _effectivePageSize)
                 {
                     <div class="so-pager">
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                    StartIcon="@Icons.Material.Filled.ChevronLeft"
                                    Disabled="@(_effectivePage == 0)"
                                    OnClick="@(() => _effectivePage--)">
@@ -252,7 +252,7 @@ else
 
                         <span class="so-pager-state">Sayfa @(_effectivePage + 1) / @EffectivePageCount</span>
 
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                    EndIcon="@Icons.Material.Filled.ChevronRight"
                                    Disabled="@(_effectivePage + 1 >= EffectivePageCount)"
                                    OnClick="@(() => _effectivePage++)">

@@ -49,7 +49,7 @@
                     Dışa Aktar (CSV)
                 </MudButton>
             }
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                        Disabled="@_loading"
                        StartIcon="@Icons.Material.Filled.Refresh"
                        OnClick="@(() => LoadAsync(reset: true))">
@@ -158,7 +158,7 @@
         </div>
 
         <div class="so-pager">
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.ChevronLeft"
                        Disabled="@(_loading || _pageIndex == 0)"
                        OnClick="PreviousPageAsync">
@@ -169,7 +169,7 @@
                 Sayfa @(_pageIndex + 1) · bu sayfada @_members.Count üye
             </span>
 
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                        EndIcon="@Icons.Material.Filled.ChevronRight"
                        Disabled="@(_loading || _continuationToken is null)"
                        OnClick="NextPageAsync">

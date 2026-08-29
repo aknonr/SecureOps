@@ -39,7 +39,14 @@
     --so-brand-rule: 2px;
 
     /* -- accents -------------------------------------------------------- */
-    --so-accent: var(--mud-palette-primary);
+    /* Interactive-but-ordinary: text buttons, pagers, disclosure summaries, row
+       links. Deliberately NOT the brand red. Once red became the primary action
+       colour it stopped being usable for every interactive thing on the page —
+       a screen where the refresh button, the pager, and the row actions are all
+       brand red reads as an alert, and the one action that genuinely is primary
+       stops standing out. Red is reserved for --so-brand below. */
+    --so-accent: var(--mud-palette-action-default);
+    --so-accent-quiet: var(--mud-palette-text-secondary);
     --so-accent-strong: var(--mud-palette-primary-darken);
     --so-accent-soft: var(--mud-palette-primary-lighten);
     --so-success: var(--mud-palette-success);
@@ -1244,12 +1251,13 @@ body {
        surface rather than reading surface, and flipping it to white in light mode
        would turn a considered identity into a different page twice a day. These
        feed the inline SVG through var() and so must live on this element. */
-    --so-art-field: #0B1626;
-    --so-art-glow: #1E3A5F;
+    --so-art-field: #070C15;
+    --so-art-glow: #16304F;
     --so-art-line: #4C6C93;
     --so-art-route: #8FB3DA;
     --so-art-accent: #E2455A;
     --so-art-text: #FFFFFF;
+    --so-art-plane: #D9E2EF;
     --so-art-muted: #A9BDD6;
 
     margin: 0;
@@ -1264,50 +1272,95 @@ body {
    illustration is removed rather than stacked above the card: on a phone it would
    push the only action on the page below the fold. */
 .so-auth-shell {
-    display: grid;
-    grid-template-columns: 1fr;
+    position: relative;
     min-height: 100vh;
+    overflow: hidden;
+    background: var(--so-art-field);
 }
 
-.so-auth-canvas {
-    display: none;
-}
-
-/* Centred in its own column, so the card sits on the optical centre of the
-   remaining space instead of the centre of the viewport. */
-.so-auth-stage {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--so-space-6) var(--so-space-4);
-}
-
-@media (min-width: 900px) {
-    .so-auth-shell {
-        /* The panel takes the smaller share: it is context, the card is the task. */
-        grid-template-columns: minmax(320px, 4fr) minmax(420px, 5fr);
-    }
-
-    .so-auth-canvas {
-        position: relative;
-        display: flex;
-        align-items: flex-end;
-        overflow: hidden;
-        background: var(--so-art-field);
-    }
-
-    /* The card carries its own compact lockup for the narrow layout, where the
-       panel is gone. With the panel present that would be the same brand twice. */
-    .so-auth-card .so-auth-brand {
-        display: none;
-    }
-}
-
-.so-auth-art {
+/* Full-bleed field. The card floats over it rather than sitting beside it in a
+   column, which is what gives the page its depth: one continuous night sky with
+   the task placed on it. */
+.so-auth-field {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
+}
+
+/* Corporate lockup, top-left, over the field. */
+.so-auth-lockup {
+    position: absolute;
+    top: clamp(20px, 4vh, 44px);
+    left: clamp(20px, 4vw, 56px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 1;
+}
+
+.so-auth-lockup-mark {
+    display: block;
+    border-radius: 50%;
+    background: #FFFFFF;
+}
+
+.so-auth-lockup-text {
+    display: flex;
+    flex-direction: column;
+    font-size: 1.02rem;
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: 0.06em;
+    color: var(--so-art-text);
+}
+
+.so-auth-legal {
+    position: absolute;
+    bottom: clamp(16px, 3vh, 34px);
+    left: clamp(20px, 4vw, 56px);
+    right: clamp(20px, 4vw, 56px);
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--so-art-muted);
+    z-index: 1;
+}
+
+/* The card is the task, so it holds the right side on desktop and the centre of
+   the page everywhere else. */
+.so-auth-stage {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: clamp(72px, 12vh, 120px) var(--so-space-4) clamp(64px, 10vh, 96px);
+}
+
+@media (min-width: 1000px) {
+    .so-auth-stage {
+        justify-content: flex-end;
+        padding-right: clamp(40px, 6vw, 104px);
+    }
+}
+
+/* Below the split width the field stays as atmosphere: still visible, but dimmed
+   so it never competes with the only action on the page. */
+@media (max-width: 999px) {
+    .so-auth-field {
+        opacity: 0.5;
+    }
+
+    .so-auth-lockup {
+        top: 18px;
+    }
+}
+
+@media (max-width: 620px) {
+    .so-auth-legal {
+        display: none;
+    }
 }
 
 .so-auth-canvas-text {
@@ -1359,16 +1412,17 @@ body {
 }
 
 .so-auth-card {
-    background: var(--so-auth-surface);
-    border: 1px solid var(--so-auth-border);
-    /* Same brand gesture as the app bar rule, so the signed-out and signed-in shells
-       read as one product. Auth pages render without a Blazor circuit and cannot see
-       --mud-palette-*, hence the literal token above. */
-    border-top: 2px solid var(--so-auth-brand);
-    border-radius: var(--so-radius-lg);
-    padding: var(--so-space-6) var(--so-space-5);
-    box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+    position: relative;
+    width: min(100%, 512px);
+    padding: clamp(30px, 4vw, 46px) clamp(24px, 3.4vw, 46px) clamp(28px, 3.4vw, 40px);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 18px;
+    /* A slight vertical gradient rather than a flat fill: it is what makes the
+       card read as lifted off the field instead of cut out of it. */
+    background: linear-gradient(180deg, rgba(30, 40, 56, 0.94), rgba(18, 25, 37, 0.96));
+    box-shadow: 0 24px 60px rgb(0 0 0 / 45%), 0 2px 0 rgb(255 255 255 / 4%) inset;
     text-align: center;
+    backdrop-filter: blur(2px);
 }
 
 .so-auth-brand {
@@ -1421,18 +1475,39 @@ body {
     color: var(--so-auth-warning);
 }
 
+.so-auth-emblem {
+    display: block;
+    width: clamp(84px, 11vw, 104px);
+    height: auto;
+    margin: 0 auto var(--so-space-5);
+    border-radius: 50%;
+    background: #FFFFFF;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 35%);
+}
+
 .so-auth-title {
     margin: 0 0 var(--so-space-2);
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: clamp(1.45rem, 2.4vw, 1.86rem);
+    font-weight: 700;
     letter-spacing: -0.01em;
+    color: var(--so-art-text);
 }
 
 .so-auth-lead {
-    margin: 0 0 var(--so-space-5);
-    font-size: 0.88rem;
-    line-height: 1.6;
-    color: var(--so-auth-muted);
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--so-art-muted);
+}
+
+/* Short brand rule under the subtitle: the one small piece of red above the
+   call to action, which is what makes the button read as the next step. */
+.so-auth-rule {
+    display: block;
+    width: 108px;
+    height: 2px;
+    margin: var(--so-space-5) auto;
+    background: var(--so-art-accent);
+    border-radius: 2px;
 }
 
 .so-auth-form {
@@ -1440,29 +1515,35 @@ body {
 }
 
 .so-auth-submit {
-    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--so-space-2);
+    gap: 10px;
     width: 100%;
-    min-height: 44px;
-    padding: 0 var(--so-space-4);
+    padding: 15px 20px;
     border: 0;
-    border-radius: var(--so-radius);
-    background: var(--so-auth-accent);
-    color: var(--so-auth-on-accent);
-    font: inherit;
-    font-size: 0.92rem;
-    font-weight: 600;
-    text-decoration: none;
+    border-radius: 10px;
+    background: var(--so-art-accent);
+    color: #FFFFFF;
+    font-family: inherit;
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
     cursor: pointer;
-    transition: background-color 120ms ease;
+    transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.so-auth-submit-icon {
+    flex: 0 0 auto;
 }
 
 .so-auth-submit:hover,
 .so-auth-submit:focus-visible {
-    background: var(--so-auth-accent-hover);
+    background: #E01B33;
+    /* A restrained lift and glow on the one primary action. Deliberately not a
+       large red surface elsewhere on the page. */
+    box-shadow: 0 8px 24px rgb(201 1 25 / 38%);
+    transform: translateY(-1px);
 }
 
 .so-auth-submit-spinner {
@@ -1496,10 +1577,32 @@ body {
 }
 
 .so-auth-note {
-    margin: var(--so-space-4) 0 0;
-    font-size: 0.78rem;
-    line-height: 1.55;
-    color: var(--so-auth-muted);
+    margin: var(--so-space-3) 0 0;
+    font-size: 0.86rem;
+    color: var(--so-art-muted);
+}
+
+.so-auth-divider {
+    height: 1px;
+    margin: var(--so-space-5) 0 var(--so-space-4);
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.so-auth-assurance {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    color: var(--so-art-muted);
+    text-align: left;
+}
+
+.so-auth-assurance svg {
+    flex: 0 0 auto;
+    color: var(--so-art-muted);
 }
 
 .so-auth-alert {
@@ -1669,8 +1772,8 @@ body {
 }
 
 .so-tab--active {
-    background: color-mix(in srgb, var(--so-accent) var(--so-tint), transparent);
-    color: var(--so-accent);
+    background: color-mix(in srgb, var(--so-brand) var(--so-tint), transparent);
+    color: var(--so-brand);
 }
 
 .so-tab-count {
@@ -2780,7 +2883,7 @@ body {
     border-radius: var(--so-radius-sm);
     font-size: 0.82rem;
     font-weight: 600;
-    color: var(--so-accent);
+    color: var(--so-text-muted);
     text-decoration: none;
     white-space: nowrap;
 }
@@ -2792,7 +2895,8 @@ body {
 
 .so-row-link:hover,
 .so-row-link:focus-visible {
-    background: color-mix(in srgb, var(--so-accent) 10%, transparent);
+    color: var(--so-brand);
+    background: color-mix(in srgb, var(--so-brand) 10%, transparent);
     text-decoration: underline;
 }
 
@@ -3994,33 +4098,6 @@ body {
     border-color: var(--so-border-soft);
 }
 
-/* -- sign-in route aircraft ---------------------------------------------- */
-
-/* Travels the highlighted route on the sign-in canvas. Slow and single: this is
-   ambient context, not an animation to watch. */
-.so-auth-plane {
-    offset-path: path("M170 380 Q 420 260 610 620");
-    offset-rotate: auto;
-    animation: so-auth-fly 14s ease-in-out infinite;
-}
-
-@keyframes so-auth-fly {
-    0%   { offset-distance: 0%;   opacity: 0; }
-    8%   { opacity: 1; }
-    88%  { opacity: 1; }
-    100% { offset-distance: 100%; opacity: 0; }
-}
-
-/* Parked at the origin, fully visible, not travelling. The route itself still
-   communicates the concept without any movement. */
-@media (prefers-reduced-motion: reduce) {
-    .so-auth-plane {
-        offset-distance: 0%;
-        opacity: 1;
-        animation: none;
-    }
-}
-
 /* -- corporate emblem ---------------------------------------------------- */
 
 /* The emblem's bird is knocked out of the artwork rather than painted white, so
@@ -4032,4 +4109,53 @@ body {
     display: block;
     border-radius: 50%;
     background: #FFFFFF;
+}
+
+/* -- sign-in field motion ------------------------------------------------ */
+
+/* The hub pulses slowly and the aircraft flies the highlighted route once every
+   quarter minute. Both are ambient: slow enough to read as atmosphere rather
+   than as something demanding attention on a sign-in screen. */
+.so-auth-hub-glow {
+    transform-origin: 430px 540px;
+    animation: so-hub-pulse 4.5s ease-in-out infinite;
+}
+
+.so-auth-route-hot {
+    filter: drop-shadow(0 0 6px rgb(201 1 25 / 45%));
+}
+
+.so-auth-plane {
+    offset-path: path("M430 540 C 560 380 700 300 880 268");
+    offset-rotate: auto;
+    animation: so-plane-fly 15s ease-in-out infinite;
+}
+
+@keyframes so-hub-pulse {
+    0%, 100% { transform: scale(0.9); opacity: 0.75; }
+    50%      { transform: scale(1.12); opacity: 1; }
+}
+
+
+@keyframes so-plane-fly {
+    0%   { offset-distance: 0%; opacity: 0; }
+    8%   { opacity: 1; }
+    35%  { offset-distance: 100%; opacity: 1; }
+    88%  { offset-distance: 100%; opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+}
+
+/* Nothing on this page needs motion to be understood: the route, the hub, and
+   the aircraft are all decoration. Under reduced motion the route is simply
+   drawn and the aircraft parked at its end. */
+@media (prefers-reduced-motion: reduce) {
+    .so-auth-hub-glow,
+    .so-auth-plane {
+        animation: none;
+    }
+
+    .so-auth-plane {
+        offset-distance: 100%;
+        opacity: 1;
+    }
 }

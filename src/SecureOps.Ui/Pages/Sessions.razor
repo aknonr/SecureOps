@@ -26,7 +26,7 @@
     <SoPageHeader Title="Aktif Oturumlar"
                   Lead="WASAS üzerinde açık uygulama oturumlarını görüntüleyebilir ve gerektiğinde sonlandırabilirsiniz.">
         <Actions>
-            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Refresh"
                        Disabled="@_loading"
                        OnClick="ReloadAsync">
@@ -212,7 +212,7 @@
                 </details>
 
                 <div class="so-pager">
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                StartIcon="@Icons.Material.Filled.ChevronLeft"
                                Disabled="@(_loading || _page.Page <= 1)"
                                OnClick="@(() => GoToPageAsync(_page.Page - 1))">
@@ -223,7 +223,7 @@
 
                     @* The contract returns no total, so "there is a next page" can only be inferred
                        from a full page. An empty next page is preferable to hiding a real one. *@
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                EndIcon="@Icons.Material.Filled.ChevronRight"
                                Disabled="@(_loading || _page.Items.Count < _page.PageSize)"
                                OnClick="@(() => GoToPageAsync(_page.Page + 1))">

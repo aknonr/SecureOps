@@ -1,11 +1,8 @@
-﻿@page "/login"
+@page "/login"
 @model LoginModel
 @{
     Layout = "LoginLayout";
     ViewData["Title"] = "Oturum aç";
-
-    // Resolved through Url.Content so the reference survives a non-root IIS path base. A "~/" written
-    // directly into <use href> is not rewritten: tag helpers do not process SVG child elements.
 }
 
 @*
@@ -13,72 +10,73 @@
 
     Shaped like a redirect-based enterprise sign-in: one primary action that hands off, and a return
     path that brings the operator back where they were. When an identity provider replaces the interim
-    endpoint, the form action changes and this page does not.
+    endpoint, the form action, the label, and the note below it change — the card does not.
 
     No role or profile selection appears here. Permissions are resolved by the API after sign-in, so
     presenting a choice would imply the operator picks their own authority.
 *@
 
-<div class="so-auth">
-    <section class="so-auth-card" aria-labelledby="login-heading">
-        <div class="so-auth-brand">
-            <span class="so-auth-mark" aria-hidden="true">
-                <img src="@Url.Content("~/brand/approved/thy-emblem-256.png")" width="44" height="44" alt="" />
-            </span>
-            <span class="so-auth-brand-text">
-                @WasasBrand.ShortName
-                <small>@WasasBrand.NameSuffix</small>
-            </span>
-        </div>
+<section class="so-auth-card" aria-labelledby="login-heading">
+    <img class="so-auth-emblem" src="@Url.Content("~/brand/approved/thy-emblem-256.png")"
+         width="104" height="104" alt="" />
 
-        <h1 id="login-heading" class="so-auth-title">Oturum açın</h1>
-        <p class="so-auth-lead">
-            Devam etmek için kurumsal hesabınızla kimlik doğrulaması yapın.
+    <h1 id="login-heading" class="so-auth-title">@WasasBrand.Name</h1>
+    <p class="so-auth-lead">@WasasBrand.Tagline</p>
+
+    <span class="so-auth-rule" aria-hidden="true"></span>
+
+    @if (Model.ErrorMessage is not null)
+    {
+        <div class="so-auth-alert so-auth-alert--error" role="alert">@Model.ErrorMessage</div>
+    }
+
+    @if (Model.SignInEnabled)
+    {
+        <form method="post" action="@Url.Content("~/auth/sign-in")" class="so-auth-form" id="so-signin-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+
+            @* Styled as the corporate sign-in action it will become, labelled as the thing it
+               actually is today. The interim path establishes a local TEST session; naming it after
+               corporate single sign-on would tell an operator their corporate credentials had been
+               checked when nothing checked them. Enabling OIDC later changes the label, the note,
+               and the form action — not this markup. *@
+            <button type="submit" class="so-auth-submit">
+                <svg class="so-auth-submit-icon" viewBox="0 0 24 24" width="20" height="20"
+                     role="presentation" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Zm0 2a3 3 0 0 1 3 3v3H9V6a3 3 0 0 1 3-3Zm0 11a2 2 0 0 1 1 3.73V19a1 1 0 0 1-2 0v-1.27A2 2 0 0 1 12 14Z" />
+                </svg>
+                <span class="so-auth-submit-label">TEST Girişi</span>
+                <span class="so-auth-submit-spinner" aria-hidden="true"></span>
+            </button>
+        </form>
+
+        <p class="so-auth-note">Bu ortamda kurumsal SSO henüz etkin değildir.</p>
+
+        <div class="so-auth-divider" aria-hidden="true"></div>
+
+        <p class="so-auth-assurance">
+            <svg viewBox="0 0 24 24" width="18" height="18" role="presentation" aria-hidden="true" focusable="false">
+                <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"
+                      d="M12 3 4.5 6v5.5c0 4.4 3.1 8.1 7.5 9.5 4.4-1.4 7.5-5.1 7.5-9.5V6L12 3Z" />
+                <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                      stroke-linejoin="round" d="m9 12 2 2 4-4" />
+            </svg>
+            <span>WASAS parola sormaz ve saklamaz. Yetkiler kurumsal erişim kayıtlarından belirlenir.</span>
         </p>
-
-        @if (Model.ErrorMessage is not null)
-        {
-            <div class="so-auth-alert so-auth-alert--error" role="alert">@Model.ErrorMessage</div>
-        }
-
-        @if (Model.SignInEnabled)
-        {
-            <form method="post" action="@Url.Content("~/auth/sign-in")" class="so-auth-form" id="so-signin-form">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-
-                @* The label states what this button actually does. The interim path establishes a
-                   local TEST session; naming it after corporate single sign-on would promise an identity
-                   provider that is not configured. An operator would reasonably conclude their
-                   corporate credentials had been checked when nothing checked them.
-
-                   When an approved OIDC provider is wired up, this becomes the corporate label and
-                   the note below it changes with it. The surrounding markup does not. *@
-                <button type="submit" class="so-auth-submit">
-                    <span class="so-auth-submit-label">TEST Girişi</span>
-                    <span class="so-auth-submit-spinner" aria-hidden="true"></span>
-                </button>
-            </form>
-
-            <p class="so-auth-note">
-                Bu ortamda kurumsal tek oturum açma (SSO) etkin değildir. Giriş, yalnızca TEST
-                amaçlı yerel bir oturum başlatır. WASAS parola sormaz ve saklamaz; yetkileriniz
-                oturum açtıktan sonra kurumsal erişim kayıtlarınızdan belirlenir.
-            </p>
-        }
-        else
-        {
-            <div class="so-auth-alert so-auth-alert--warning" role="alert">
-                Bu ortamda oturum açma yapılandırılmamış. Erişim için platform yöneticinize başvurun.
-            </div>
-        }
-    </section>
+    }
+    else
+    {
+        <div class="so-auth-alert so-auth-alert--warning" role="alert">
+            Bu ortamda oturum açma yapılandırılmamış. Erişim için platform yöneticinize başvurun.
+        </div>
+    }
 
     @if (Model.ShowEnvironmentMarker)
     {
         <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
     }
-</div>
+</section>
 
 @if (Model.SignInEnabled)
 {

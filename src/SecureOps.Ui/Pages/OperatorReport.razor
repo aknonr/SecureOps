@@ -28,7 +28,7 @@
     <SoPageHeader Title="Operatör Raporu"
                   Lead="Kalıcı denetim kayıtlarından üretilen, kişi bazlı kullanım dağılımı.">
         <Actions>
-            <MudButton Href="dashboard" Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+            <MudButton Href="dashboard" Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.ArrowBack">
                 Yönetim Panosu
             </MudButton>
@@ -148,7 +148,7 @@
                 </div>
 
                 <div class="so-pager">
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                StartIcon="@Icons.Material.Filled.ChevronLeft"
                                Disabled="@(_loading || _page.Page <= 1)"
                                OnClick="() => GoToPageAsync(_page.Page - 1)">
@@ -159,7 +159,7 @@
                         Sayfa @_page.Page / @TotalPages
                     </span>
 
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                EndIcon="@Icons.Material.Filled.ChevronRight"
                                Disabled="@(_loading || _page.Page >= TotalPages)"
                                OnClick="() => GoToPageAsync(_page.Page + 1)">

@@ -49,7 +49,9 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
         string body = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        body.Should().Contain("Oturum açın");
+        // The sign-in action itself, rather than a heading: the card now leads with the product
+        // name, and what proves this is the sign-in page is that it offers the sign-in action.
+        body.Should().Contain("TEST Girişi");
         body.Should().NotContain("Sayfa bulunamadı");
     }
 
