@@ -29,8 +29,8 @@
                 </svg>
             </span>
             <span class="so-auth-brand-text">
-                SecureOps
-                <small>Operasyon Platformu</small>
+                @WasasBrand.ShortName
+                <small>@WasasBrand.NameSuffix</small>
             </span>
         </div>
 
@@ -50,15 +50,23 @@
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
 
+                @* The label states what this button actually does. The interim path establishes a
+                   local TEST session; naming it after corporate single sign-on would promise an identity
+                   provider that is not configured. An operator would reasonably conclude their
+                   corporate credentials had been checked when nothing checked them.
+
+                   When an approved OIDC provider is wired up, this becomes the corporate label and
+                   the note below it changes with it. The surrounding markup does not. *@
                 <button type="submit" class="so-auth-submit">
-                    <span class="so-auth-submit-label">Oturum aç</span>
+                    <span class="so-auth-submit-label">TEST Girişi</span>
                     <span class="so-auth-submit-spinner" aria-hidden="true"></span>
                 </button>
             </form>
 
             <p class="so-auth-note">
-                Kimlik doğrulaması kurumsal sağlayıcı üzerinden yapılır. SecureOps parola sormaz ve
-                saklamaz. Yetkileriniz oturum açtıktan sonra kurumsal erişim kayıtlarınızdan belirlenir.
+                Bu ortamda kurumsal tek oturum açma (SSO) etkin değildir. Giriş, yalnızca TEST
+                amaçlı yerel bir oturum başlatır. WASAS parola sormaz ve saklamaz; yetkileriniz
+                oturum açtıktan sonra kurumsal erişim kayıtlarınızdan belirlenir.
             </p>
         }
         else

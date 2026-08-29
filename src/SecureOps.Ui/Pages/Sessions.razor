@@ -7,7 +7,7 @@
 @inject IDialogService Dialogs
 @inject ILogger<Sessions> Logger
 
-<PageTitle>Aktif Oturumlar · SecureOps</PageTitle>
+<PageTitle>Aktif Oturumlar · @WasasBrand.Name</PageTitle>
 
 @*
     Application-session administration.
@@ -24,7 +24,7 @@
 
 <div class="so-page so-page--wide">
     <SoPageHeader Title="Aktif Oturumlar"
-                  Lead="SecureOps üzerinde açık uygulama oturumlarını görüntüleyebilir ve gerektiğinde sonlandırabilirsiniz.">
+                  Lead="WASAS üzerinde açık uygulama oturumlarını görüntüleyebilir ve gerektiğinde sonlandırabilirsiniz.">
         <Actions>
             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Refresh"
@@ -109,7 +109,7 @@
             else if (!Listed.Any())
             {
                 <SoEmptyState Title="Açık oturum yok"
-                              Description="Bu sayfada listelenecek etkin SecureOps oturumu bulunmuyor."
+                              Description="Bu sayfada listelenecek etkin WASAS oturumu bulunmuyor."
                               Icon="@Icons.Material.Outlined.NoAccounts" />
             }
             else

@@ -3,7 +3,7 @@
 @implements IDisposable
 @inject ICurrentAccessProvider AccessProvider
 
-<PageTitle>Erişimim · SecureOps</PageTitle>
+<PageTitle>Erişimim · @WasasBrand.Name</PageTitle>
 
 @*
     What this account may do, in the operator's language.
@@ -15,7 +15,7 @@
 
 <div class="so-page so-page--narrow">
     <SoPageHeader Title="Erişimim"
-                  Lead="SecureOps üzerindeki durumunuz, rolleriniz ve yetkileriniz.">
+                  Lead="WASAS üzerindeki durumunuz, rolleriniz ve yetkileriniz.">
         <Actions>
             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
@@ -171,7 +171,7 @@
     private string StatusDescription => _access switch
     {
         { IsApproved: true } =>
-            "SecureOps ekranlarını rolleriniz kapsamında kullanabilirsiniz.",
+            "WASAS ekranlarını rolleriniz kapsamında kullanabilirsiniz.",
         { IsRejected: true } =>
             "Bir yönetici erişim talebinizi reddetti. Bekleyen bir talebiniz yok ve uygulamayı yeniden açmanız yeni bir talep oluşturmaz. Erişim gerekiyorsa yöneticinizle görüşün.",
         { IsPending: true } =>

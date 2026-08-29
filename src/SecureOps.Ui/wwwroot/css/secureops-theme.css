@@ -141,11 +141,33 @@ body {
     color: var(--so-appbar-text);
 }
 
+/* WASAS leads, the descriptor follows in a quieter tone. Stacked so the app bar
+   carries the full product name at desktop width without a long single line, and
+   the descriptor drops away below md where the space belongs to the account menu. */
 .so-brand-name {
-    font-size: 0.95rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
     white-space: nowrap;
+}
+
+.so-brand-name-primary {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.so-brand-name-suffix {
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    opacity: 0.72;
+}
+
+@media (max-width: 599px) {
+    .so-brand-name-suffix {
+        display: none;
+    }
 }
 
 .so-env-chip {
@@ -3842,4 +3864,96 @@ body {
     margin: 2px 0 0;
     font-size: 0.88rem;
     color: var(--so-text-muted);
+}
+
+/* -- flight loading ------------------------------------------------------ */
+
+/* Inline SVG plus CSS. No image request, no animation library, and it follows
+   the palette through the same tokens as the rest of the shell. */
+.so-flight {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--so-space-2);
+    padding: var(--so-space-5) var(--so-space-4);
+}
+
+.so-flight--bare {
+    padding: var(--so-space-3) 0;
+}
+
+.so-flight-svg {
+    width: 100%;
+    max-width: 240px;
+    height: auto;
+}
+
+.so-flight-track {
+    fill: none;
+    stroke: var(--so-border);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-dasharray: 4 6;
+}
+
+/* The flown portion sweeps along the same geometry as the track. 320 comfortably
+   exceeds the path length, so the dash never wraps and restarts mid-route. */
+.so-flight-flown {
+    fill: none;
+    stroke: var(--so-brand);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 320;
+    stroke-dashoffset: 320;
+    animation: so-flight-draw 2.4s ease-in-out infinite;
+}
+
+.so-flight-node {
+    fill: var(--so-border);
+}
+
+.so-flight-node--end {
+    fill: var(--so-brand);
+}
+
+.so-flight-plane {
+    fill: var(--so-brand);
+    offset-path: path("M 16 56 Q 120 4 224 20");
+    offset-rotate: auto;
+    animation: so-flight-travel 2.4s ease-in-out infinite;
+}
+
+.so-flight-message {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--so-text-muted);
+    text-align: center;
+}
+
+@keyframes so-flight-draw {
+    0%   { stroke-dashoffset: 320; }
+    70%  { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: 0; }
+}
+
+@keyframes so-flight-travel {
+    0%   { offset-distance: 0%; }
+    70%  { offset-distance: 100%; }
+    100% { offset-distance: 100%; }
+}
+
+/* Motion is decoration here; the role, the live region, and the message carry the
+   state. When motion is declined the aircraft parks at the origin, the route shows
+   its full length as a static track, and nothing travels or sweeps. */
+@media (prefers-reduced-motion: reduce) {
+    .so-flight-flown {
+        stroke-dashoffset: 0;
+        animation: none;
+        opacity: 0.55;
+    }
+
+    .so-flight-plane {
+        offset-distance: 0%;
+        animation: none;
+    }
 }

@@ -9,7 +9,7 @@
 @inject IManagementReportingApiClient Reporting
 @inject ILogger<Dashboard> Logger
 
-<PageTitle>@(_managementView ? "Yönetim Panosu" : "Genel Bakış") · SecureOps</PageTitle>
+<PageTitle>@WasasBrand.Title(_managementView ? "Yönetim Panosu" : "Genel Bakış")</PageTitle>
 
 @*
     Two boards behind one route.
@@ -82,7 +82,7 @@
                            Icon="@Icons.Material.Filled.NoAccounts" />
             <h2 class="so-panel-title">Uygulama erişiminiz devre dışı</h2>
             <p class="so-panel-text">
-                SecureOps operasyon ekranlarını kullanamazsınız. Erişiminizin yeniden açılması için
+                WASAS operasyon ekranlarını kullanamazsınız. Erişiminizin yeniden açılması için
                 platform yöneticinize başvurun.
             </p>
         </section>
@@ -628,7 +628,7 @@
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private AccessSnapshot? _snapshot;
-    private string _greeting = "SecureOps operasyon platformu.";
+    private string _greeting = "WASAS operasyon platformu.";
     private IReadOnlyList<OperatorTask> _available = [];
 
     private IdentityProviderHealthResponse? _providerHealth;

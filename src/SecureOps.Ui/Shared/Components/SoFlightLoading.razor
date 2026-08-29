@@ -1,0 +1,53 @@
+@*
+    The loading state, in the product's own visual language.
+
+    A small aircraft follows a curved route: the flown portion is brand red, the remainder is a
+    neutral track. It is drawn as inline SVG with CSS animation — no image, no animation library, no
+    external request — so it costs nothing to load and follows the theme through the same tokens as
+    everything else.
+
+    It reports progress; it does not measure it. The route length is not tied to how far along a
+    request is, because the server does not report that, and a bar that appeared to track real
+    progress would be inventing information. What it communicates is "this is working, wait".
+
+    Accessibility is not the animation. The role, the live region, and the message carry the state,
+    so an operator who cannot see motion — or has asked not to be shown any — gets the same
+    information. Under prefers-reduced-motion the aircraft parks at the origin and nothing travels.
+*@
+
+<div class="so-flight @(Bare ? "so-flight--bare" : null)" role="status" aria-live="polite" aria-busy="true">
+    <svg class="so-flight-svg" viewBox="0 0 240 72" role="presentation" aria-hidden="true" focusable="false">
+        @* Two copies of one path: the neutral track, and the red flown portion revealed by a
+           dash offset. Identical geometry keeps them registered at every viewport width. *@
+        <path class="so-flight-track" d="@RoutePath" />
+        <path class="so-flight-flown" d="@RoutePath" />
+
+        <circle class="so-flight-node" cx="16" cy="56" r="3" />
+        <circle class="so-flight-node so-flight-node--end" cx="224" cy="20" r="3" />
+
+        @* Rotated to sit along the route's tangent at the point it rides. *@
+        <g class="so-flight-plane">
+            <path d="M -7 0 L 5 0 L 9 -3 L 5 2 L 9 7 L 5 4 L -7 4 L -9 2 Z" transform="rotate(-14)" />
+        </g>
+    </svg>
+
+    <p class="so-flight-message">@Message</p>
+</div>
+
+@code {
+    // A single shallow arc. Deliberately gentle: a steep climb reads as a departure graphic, and
+    // this is a progress indicator that happens to be aviation-shaped, not an illustration.
+    private const string RoutePath = "M 16 56 Q 120 4 224 20";
+
+    /// <summary>Message describing what is being fetched.</summary>
+    /// <remarks>
+    /// Should name the work rather than the mechanism — "AD grup bilgileri getiriliyor…" tells an
+    /// operator what is happening; "İstek gönderiliyor…" does not.
+    /// </remarks>
+    [Parameter]
+    public string Message { get; set; } = "Yükleniyor…";
+
+    /// <summary>Renders inline within a panel instead of as a standalone block.</summary>
+    [Parameter]
+    public bool Bare { get; set; }
+}

@@ -13,10 +13,27 @@
     makes reports progress. See docs/20 §3 on not faking progress.
 *@
 
-<div class="@CssClass" role="status" aria-busy="true" aria-live="polite">
-    <MudProgressCircular Indeterminate="true" Size="@SpinnerSize" />
-    <span class="so-loading-text">@Message</span>
-</div>
+@*
+    The Block variant carries the product's flight treatment; Inline keeps the compact spinner.
+    That split is deliberate: a route drawing itself inside a one-line region would be noise, while
+    a panel with nothing in it yet is exactly where the product's own visual language belongs.
+
+    Both announce identically, so the choice is presentation only. SoFlightLoading owns its own
+    role/aria-live, so this wrapper does not add a second live region around it.
+*@
+@if (Variant == LoadingVariant.Block)
+{
+    <div class="@CssClass">
+        <SoFlightLoading Message="@Message" Bare="true" />
+    </div>
+}
+else
+{
+    <div class="@CssClass" role="status" aria-busy="true" aria-live="polite">
+        <MudProgressCircular Indeterminate="true" Size="@SpinnerSize" />
+        <span class="so-loading-text">@Message</span>
+    </div>
+}
 
 @code {
     /// <summary>How much of the surface is pending.</summary>
