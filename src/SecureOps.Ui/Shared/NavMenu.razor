@@ -26,7 +26,7 @@
 
             @if (Can(Capabilities.OperationalRecordsView))
             {
-                <div class="so-nav-group">Operasyon</div>
+                <div class="so-nav-group">OPERASYON</div>
 
                 <MudNavLink Href="operational-records" Icon="@Icons.Material.Filled.Assignment">
                     Operasyonel Kayıtlar
@@ -35,7 +35,7 @@
 
             @if (CanAnyDirectory)
             {
-                <div class="so-nav-group" lang="en">Active Directory</div>
+                <div class="so-nav-group" lang="en">ACTIVE DIRECTORY</div>
 
                 @if (Can(Capabilities.IdentityLookup))
                 {
@@ -62,7 +62,7 @@
                no current product evidence asks for it at that level. *@
             @if (Can(Capabilities.ManagementReportingView))
             {
-                <div class="so-nav-group">Raporlama</div>
+                <div class="so-nav-group">RAPORLAMA</div>
 
                 <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Insights">
                     Yönetim Panosu
@@ -71,7 +71,7 @@
 
             @if (CanAnyAdministration)
             {
-                <div class="so-nav-group">Yönetim</div>
+                <div class="so-nav-group">ERİŞİM VE OTURUM</div>
 
                 @if (Can(Capabilities.AccessApproveRequests))
                 {
@@ -98,13 +98,13 @@
                 }
             }
 
-            <div class="so-nav-group">Erişim</div>
+            <div class="so-nav-group">HESABIM</div>
 
             <MudNavLink Href="access/me" Icon="@Icons.Material.Filled.VerifiedUser">
                 Erişimim
             </MudNavLink>
 
-            <div class="so-nav-group">Sonraki fazlar</div>
+            <div class="so-nav-group">SONRAKİ FAZLAR</div>
 
             <MudNavLink Href="audit-compliance" Icon="@Icons.Material.Filled.FactCheck">
                 Denetim ve Uyum

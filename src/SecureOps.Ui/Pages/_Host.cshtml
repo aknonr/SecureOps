@@ -20,9 +20,11 @@
     <title>@WasasBrand.Name</title>
     <base href="~/" />
 
-    @* SVG first for modern browsers; the ICO answers older clients and bare /favicon.ico probes. *@
-    <link rel="icon" href="~/brand/favicon.svg" type="image/svg+xml" />
-    <link rel="alternate icon" href="~/brand/favicon.ico" sizes="32x32" />
+    @* Approved corporate emblem, served from this application. Versioned so a palette or asset
+       change is not held back by a cached tab icon. *@
+    <link rel="icon" href="~/brand/favicon-32.png?v=2" type="image/png" sizes="32x32" />
+    <link rel="icon" href="~/brand/favicon-16.png?v=2" type="image/png" sizes="16x16" />
+    <link rel="alternate icon" href="~/brand/favicon.ico?v=2" sizes="16x16 32x32" />
     <meta name="color-scheme" content="light dark" />
     <meta name="application-name" content="@WasasBrand.Name" />
 
@@ -45,6 +47,14 @@
     <script src="_framework/blazor.server.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script>
+        // Appearance preference. Presentation only: no identity, no authorization, nothing the API
+        // is told about, and never a cookie -- a cookie would travel on every request and belongs to
+        // authentication, not to which palette somebody prefers.
+        window.secureOpsAppearance = {
+            read: function () { try { return localStorage.getItem("wasas.appearance"); } catch (e) { return null; } },
+            write: function (v) { try { localStorage.setItem("wasas.appearance", v); } catch (e) { } }
+        };
+
         // Hands the operator a file the server produced. The bytes, the name, and the content type
         // all come from the API response; nothing is generated or reformatted here, which is what
         // keeps an export traceable to the audited server-side operation.

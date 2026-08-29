@@ -113,15 +113,30 @@ The shell and every page must satisfy, at **1366×768**, **1440×900**, and **~3
   spacing, radius, and typography tokens, consumed by both MudBlazor components and custom CSS.
   (Today the MudBlazor palette in `SecureOpsTheme.cs` and the CSS variables in `secureops-theme.css`
   are two sources with slightly divergent hex values; the redesign must converge them.)
-- **Palette:** dark navy/graphite shell; neutral surfaces; **one controlled red accent** for
-  errors/critical only. Avoid a second decorative accent competing with the red.
+- **Palette:** dark navy/graphite shell; neutral surfaces; **corporate red as the brand accent** for
+  primary actions, selected navigation, active tabs, and brand details. Because red now carries brand
+  meaning as well as failure meaning, the two must be separated on **luminance** — error sits
+  markedly darker in Light and markedly lighter in Dark/Night than the brand value — and **no state
+  may rely on colour alone**: every error surface carries an icon, an explicit message, and a
+  semantic container.
 - **Accessible text contrast** (target WCAG AA for body and status text).
-- **Strictly prohibited:** Turkish Airlines / Turkish Technology logos, public website images,
-  trademarked graphics, copied layouts, or copied CSS. Only local, generic SVG/iconography.
+- **Corporate assets: local and approved only.** Corporate emblem and identity assets are permitted
+  where an approved asset has been supplied into the repository under `wwwroot/brand/approved/`, and
+  are used only from there. Still prohibited: fetching logos or imagery from public websites at build
+  or run time, hotlinking external assets, public-site screenshots or photography, copied layouts,
+  and copied CSS. Redrawing or materially altering a corporate emblem is prohibited; the supplied
+  asset is used as-is, and derived raster sizes are generated from it by
+  `src/SecureOps.Ui/build/make-brand-assets.js`.
+- **This contract records a product decision, not a legal one.** It does not assert trademark
+  clearance or licensing approval for any corporate asset; that determination sits with the asset
+  owner. Branding stays isolated in the theme, `wwwroot/brand/`, and the brand components so it
+  remains replaceable without touching page structure.
 - The approved future corporate template must be able to replace **theme tokens and assets only**,
   without changing page structure or component hierarchy.
-- Approved future corporate assets, when supplied, will live under `wwwroot/brand/approved`
-  (this gate does **not** create that folder or any assets).
+- Approved corporate assets live under `wwwroot/brand/approved`. The emblem master supplied for this
+  milestone is `thy-emblem-master.png` (2000×2000 indexed PNG, red on transparent). The brand red
+  `#C90119` is that file's own fully opaque palette entry — sampled from the artwork rather than
+  transcribed from a colour site — and is the single source for `SecureOpsTheme.BrandRed`.
 
 ## 8. Screenshot-Based Acceptance Checklist
 

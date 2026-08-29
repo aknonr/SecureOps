@@ -12,14 +12,16 @@ namespace SecureOps.Ui.Shared;
 /// requirement in <c>docs/20-ui-visual-design-contract.md</c> §7 and means a palette change here
 /// reaches custom CSS and MudBlazor components together.
 /// <para>
-/// <b>Identity: red, white, dark navy, neutral.</b> Navy is the structural colour (app bar, drawer,
-/// headings, primary actions), white and the neutral greys carry content, and red is the brand
-/// accent. Red is deliberately confined to the <i>chrome</i> — the rule beneath the app bar, the
-/// rule above the sign-in card, and the application icon — and never appears inside page content.
-/// That is what keeps it compatible with red's other job in an operations tool: inside the content
-/// area, red means a problem and nothing else, so a status colour can never be mistaken for
-/// decoration. The alternative, red as the primary action colour, was rejected for exactly that
-/// collision.
+/// <b>Identity: corporate red, white, dark navy, neutral.</b> Red is the brand accent and, since the
+/// corporate identity was adopted, also the primary action colour: selected navigation, primary
+/// buttons, active tabs, and the flight route. Navy remains the structural colour of the app bar and
+/// drawer, and the neutral greys carry content.
+/// <para>
+/// Because red now means "brand" as well as "problem", the two are separated on luminance rather
+/// than hue — error sits markedly darker in Light and markedly lighter in Dark/Night than the brand
+/// value — and no error state relies on colour at all: every one carries an icon, an explicit
+/// message, and a semantic container. Red on its own never means failure.
+/// </para>
 /// </para>
 /// <para>
 /// <b>Dark palette.</b> Built as a ladder of elevation steps rather than one flat surface colour:
@@ -44,21 +46,24 @@ public static class SecureOpsTheme
     {
         Palette = new PaletteLight
         {
-            Primary = "#1F3D66",
-            PrimaryDarken = "#16294A",
-            PrimaryLighten = "#33598C",
+            // Brand red is the primary action colour now that the corporate identity is
+            // adopted. Error moves further from it in luminance so a failure never reads as a
+            // button, and every error surface still carries an icon and explicit text.
+            Primary = BrandRed,
+            PrimaryDarken = BrandRedHover,
+            PrimaryLighten = "#E8394E",
             Secondary = "#46566E",
 
             // Brand red. The Tertiary slot carries the identity colour so the single-source rule
             // holds: CSS reads it as --so-brand via --mud-palette-tertiary. No MudBlazor component
             // uses Color.Tertiary, so this slot has no other meaning. See the class remarks for why
             // red is confined to the chrome.
-            Tertiary = "#B81D2B",
+            Tertiary = BrandRed,
 
             Info = "#2E5A86",
             Success = "#0D7C66",
             Warning = "#B5731A",
-            Error = "#B3261E",
+            Error = "#8E1B16",
             Dark = "#14233F",
             Background = "#EEF1F6",
             BackgroundGrey = "#E4E9F1",
@@ -85,9 +90,9 @@ public static class SecureOpsTheme
         {
             // Accent lightened from the light palette's #1F3D66: a mid navy reads as almost black
             // against a dark ground and fails contrast on filled buttons.
-            Primary = "#6E9FD8",
-            PrimaryDarken = "#4F7FB8",
-            PrimaryLighten = "#94BCEA",
+            Primary = BrandRedOnDark,
+            PrimaryDarken = BrandRed,
+            PrimaryLighten = "#FF6B7D",
             Secondary = "#8797AE",
 
             // Brand red, lifted from the light palette's #B81D2B: a deep crimson turns muddy and
@@ -99,7 +104,7 @@ public static class SecureOpsTheme
             // Status colours desaturated and lightened so they stay distinguishable without glowing.
             Success = "#4FBFA2",
             Warning = "#E0B057",
-            Error = "#F08A80",
+            Error = "#FF8A80",
 
             Dark = "#080D17",
 
@@ -154,5 +159,108 @@ public static class SecureOpsTheme
             H6 = new H6 { LetterSpacing = "0" }
         }
     };
+
+    /// <summary>
+    /// The corporate red, sampled from the approved emblem rather than transcribed from a colour
+    /// site.
+    /// </summary>
+    /// <remarks>
+    /// <c>wwwroot/brand/approved/thy-emblem-master.png</c> is an indexed PNG whose palette is one
+    /// red at 125 alpha steps. The fully opaque entry — and the dominant colour of the artwork — is
+    /// this value, so it is the emblem's own red rather than an approximation of it.
+    /// </remarks>
+    public const string BrandRed = "#C90119";
+
+    /// <summary>Hover/pressed step for the brand red.</summary>
+    public const string BrandRedHover = "#A80115";
+
+    /// <summary>Lighter brand red used where a dark ground would swallow the base value.</summary>
+    public const string BrandRedOnDark = "#E8394E";
+
+    /// <summary>
+    /// Night palette: the strongest expression of the corporate identity.
+    /// </summary>
+    /// <remarks>
+    /// A deeper ground than Dark, closer to black with a navy cast, and cards that separate by
+    /// luminance rather than by heavy borders. Error is deliberately pushed well away from the brand
+    /// red in luminance: once red is also the primary action colour, a failure that merely "looks
+    /// red" is indistinguishable from a button, so the two must differ on more than hue — and every
+    /// error surface additionally carries an icon and explicit text.
+    /// </remarks>
+    private static readonly PaletteDark NightPalette = new()
+    {
+        Primary = BrandRedOnDark,
+        PrimaryDarken = "#C90119",
+        PrimaryLighten = "#FF6B7D",
+        Secondary = "#8797AE",
+        Tertiary = BrandRedOnDark,
+
+        Info = "#6E9FD8",
+        Success = "#4FBFA2",
+        Warning = "#E0B057",
+        Error = "#FF8A80",
+
+        Background = "#05080F",        // app ground, near black with a navy cast
+        BackgroundGrey = "#02040A",    // recessed areas
+        Surface = "#0E141F",           // cards
+        DrawerBackground = "#080D16",  // navigation, one step under cards
+        AppbarBackground = "#05080F",
+        AppbarText = "#E6ECF5",
+        DrawerText = "#C3CEDF",
+        DrawerIcon = "#8FA0B8",
+
+        TextPrimary = "#EDF2F9",
+        TextSecondary = "#9FAFC5",
+        ActionDefault = "#9FAFC5",
+        ActionDisabled = "rgba(237,242,249,0.30)",
+        ActionDisabledBackground = "rgba(237,242,249,0.08)",
+
+        Divider = "#1A2434",
+        DividerLight = "#131B28",
+        LinesDefault = "#1A2434",
+        LinesInputs = "#2A3852",
+        TableLines = "#161F2C",
+        TableHover = "rgba(255,255,255,0.030)"
+    };
+
+    /// <summary>
+    /// Returns the theme for an appearance mode.
+    /// </summary>
+    /// <param name="mode">Selected appearance.</param>
+    /// <returns>The theme whose dark palette matches the mode.</returns>
+    /// <remarks>
+    /// MudBlazor carries one light and one dark palette per theme, so a third mode is expressed by
+    /// swapping which dark palette the theme holds rather than by inventing a third slot. Light and
+    /// Dark share the original theme; Night substitutes its own palette. All three keep the same
+    /// light palette, so switching away from Night and back does not change Light.
+    /// </remarks>
+    public static MudTheme For(AppearanceMode mode) => mode == AppearanceMode.Night ? NightTheme : Theme;
+
+    private static readonly MudTheme NightTheme = new()
+    {
+        Palette = Theme.Palette,
+        PaletteDark = NightPalette,
+        LayoutProperties = Theme.LayoutProperties,
+        Typography = Theme.Typography
+    };
 #pragma warning restore CS0618
+}
+
+/// <summary>
+/// The appearance modes an operator can choose.
+/// </summary>
+/// <remarks>
+/// Presentation only. The choice is never sent to the API, never persisted server-side, and carries
+/// no authorization meaning.
+/// </remarks>
+public enum AppearanceMode
+{
+    /// <summary>Light surfaces with charcoal text.</summary>
+    Light,
+
+    /// <summary>Neutral dark grey, tuned for long operational shifts.</summary>
+    Dark,
+
+    /// <summary>Near-black navy; the strongest corporate expression.</summary>
+    Night
 }

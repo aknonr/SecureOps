@@ -66,7 +66,7 @@ You are working in a repository owned by a single Windows System Administrator w
 
 | Pattern | Reason |
 |---|---|
-| `localStorage` or `sessionStorage` in Blazor | Use server state or scoped DI |
+| `localStorage`/`sessionStorage` for anything but a non-sensitive presentation preference | Use server state or scoped DI. The one sanctioned exception is the appearance mode (`wasas.appearance`): it carries no identity, no authorization, and is never sent to the API. Never a cookie for it — a cookie travels on every request and belongs to authentication. |
 | Direct SQL string concatenation | Always parameterized queries or EF Core |
 | `Stop-Service`, `Restart-Service`, `Remove-Item` in any PowerShell | Read-only MVP |
 | External HTTP to OpenAI, Anthropic, Google AI | No public AI |

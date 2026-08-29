@@ -127,7 +127,8 @@ public sealed class WasasBrandingTests
         string host = File.ReadAllText(Path.Combine(UiRoot(), "Pages", "_Host.cshtml"));
 
         host.Should().Contain("@WasasBrand.Name");
-        host.Should().Contain("brand/favicon.svg");
+        host.Should().Contain("brand/favicon-32.png");
+        host.Should().Contain("brand/favicon-16.png");
         host.Should().Contain("brand/favicon.ico");
         host.Should().NotContain("http://");
         host.Should().NotContain("seeklogo");

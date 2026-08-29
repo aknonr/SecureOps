@@ -56,10 +56,22 @@
 
         <MudDivider Class="my-1" />
 
-        <MudMenuItem Icon="@(IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
-                     OnClick="OnToggleTheme">
-            @(IsDarkMode ? "Aydınlık tema" : "Koyu tema")
-        </MudMenuItem>
+        @* Three deliberate appearances rather than a two-way toggle. Night is the strongest
+           corporate expression; Dark is the neutral one for long shifts. *@
+        <div class="so-appearance-label">Görünüm</div>
+        @foreach ((AppearanceMode mode, string label, string icon) in Appearances)
+        {
+            AppearanceMode captured = mode;
+            <MudMenuItem Icon="@icon"
+                         OnClick="@(() => OnSelectMode.InvokeAsync(captured))"
+                         Class="@(mode == Mode ? "so-appearance--active" : null)">
+                @label
+                @if (mode == Mode)
+                {
+                    <span class="sr-only">(seçili)</span>
+                }
+            </MudMenuItem>
+        }
 
         <MudDivider Class="my-1" />
 
@@ -76,13 +88,20 @@
     [Parameter, EditorRequired]
     public SignedInUser User { get; set; } = default!;
 
-    /// <summary>Whether the dark palette is active.</summary>
+    /// <summary>Active appearance mode.</summary>
     [Parameter]
-    public bool IsDarkMode { get; set; }
+    public AppearanceMode Mode { get; set; }
 
-    /// <summary>Invoked when the operator switches theme.</summary>
+    /// <summary>Invoked when the operator picks an appearance.</summary>
     [Parameter]
-    public EventCallback OnToggleTheme { get; set; }
+    public EventCallback<AppearanceMode> OnSelectMode { get; set; }
+
+    private static readonly (AppearanceMode Mode, string Label, string Icon)[] Appearances =
+    [
+        (AppearanceMode.Light, "Açık", Icons.Material.Filled.LightMode),
+        (AppearanceMode.Dark, "Koyu", Icons.Material.Filled.DarkMode),
+        (AppearanceMode.Night, "Gece", Icons.Material.Filled.Bedtime)
+    ];
 
     private AccessSnapshot? _snapshot;
 

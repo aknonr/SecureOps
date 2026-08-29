@@ -16,7 +16,6 @@
 @{
     Layout = null;
     string title = ViewData["Title"] as string ?? "Oturum";
-    string canvasMarkHref = Url.Content("~/brand/secureops-mark.svg") + "#mark";
 }
 <!DOCTYPE html>
 <html lang="tr">
@@ -25,8 +24,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@WasasBrand.Title(title)</title>
     <base href="~/" />
-    <link rel="icon" href="~/brand/favicon.svg" type="image/svg+xml" />
-    <link rel="alternate icon" href="~/brand/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="~/brand/favicon-32.png?v=2" type="image/png" sizes="32x32" />
+    <link rel="icon" href="~/brand/favicon-16.png?v=2" type="image/png" sizes="16x16" />
+    <link rel="alternate icon" href="~/brand/favicon.ico?v=2" sizes="16x16 32x32" />
     <meta name="color-scheme" content="light dark" />
     <link href="~/css/secureops-theme.css" rel="stylesheet" />
 </head>
@@ -78,6 +78,15 @@
                 <path d="M170 380 Q 420 260 610 620" fill="none"
                       stroke="var(--so-art-accent)" stroke-width="1.8" opacity="0.9" />
 
+                @* One aircraft, on the one highlighted route. The movement is what makes the panel
+                   read as an operations picture rather than a static diagram, and one is enough —
+                   several would turn a sign-in screen into a screensaver. Purely decorative, so it
+                   is hidden from assistive technology and stops entirely under reduced motion. *@
+                <g class="so-auth-plane" aria-hidden="true">
+                    <path d="M -9 0 L 6 0 L 11 -4 L 6 3 L 11 9 L 6 5 L -9 5 L -11 2.5 Z"
+                          fill="var(--so-art-accent)" />
+                </g>
+
                 <g fill="var(--so-art-route)">
                     <circle cx="200" cy="560" r="4" />
                     <circle cx="600" cy="300" r="4" />
@@ -103,9 +112,7 @@
 
             <div class="so-auth-canvas-text">
                 <span class="so-auth-canvas-mark" aria-hidden="true">
-                    <svg viewBox="0 0 32 32" width="34" height="34" role="presentation">
-                        <use href="@canvasMarkHref" />
-                    </svg>
+                    <img src="@Url.Content("~/brand/approved/thy-emblem-256.png")" width="36" height="36" alt="" />
                 </span>
                 <p class="so-auth-canvas-title">@WasasBrand.ShortName</p>
                 <p class="so-auth-canvas-lead">

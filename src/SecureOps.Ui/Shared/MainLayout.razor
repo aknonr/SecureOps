@@ -5,7 +5,7 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
 
-<MudThemeProvider @ref="_themeProvider" Theme="@SecureOpsTheme.Theme" IsDarkMode="@_isDarkMode" />
+<MudThemeProvider @ref="_themeProvider" Theme="@SecureOpsTheme.For(_mode)" IsDarkMode="@IsDarkMode" />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
@@ -28,10 +28,11 @@
                                title="Menü" />
 
                 <a class="so-brand" href="dashboard">
+                    @* Approved corporate emblem, restrained. The bird is knocked out of the
+                       artwork rather than painted, so it sits on a light plate to read against
+                       the dark app bar. *@
                     <span class="so-brand-mark" aria-hidden="true">
-                        <svg viewBox="0 0 32 32" width="22" height="22" role="presentation">
-                            <use href="brand/secureops-mark.svg#mark" />
-                        </svg>
+                        <img src="brand/approved/thy-emblem-256.png" width="24" height="24" alt="" />
                     </span>
                     <span class="so-brand-name">
                         <span class="so-brand-name-primary">@WasasBrand.ShortName</span>
@@ -51,8 +52,8 @@
                 }
 
                 <UserMenu User="currentUser"
-                          IsDarkMode="_isDarkMode"
-                          OnToggleTheme="ToggleDarkMode" />
+                          Mode="_mode"
+                          OnSelectMode="SetModeAsync" />
             </MudAppBar>
 
             <MudDrawer @bind-Open="_drawerOpen"
@@ -82,8 +83,11 @@
 @code {
     private MudThemeProvider _themeProvider = null!;
     private bool _drawerOpen = true;
-    private bool _isDarkMode;
+    private AppearanceMode _mode = AppearanceMode.Dark;
     private bool _isDesktop = true;
+
+    // Dark and Night both drive MudBlazor's dark palette; the theme object decides which one.
+    private bool IsDarkMode => _mode != AppearanceMode.Light;
 
     protected override void OnInitialized()
     {
@@ -97,21 +101,57 @@
             return;
         }
 
-        // Start from the operating system's preference. The project forbids localStorage, so a
-        // manual choice cannot outlive the circuit; without this an operator on a dark desktop
-        // would get a white flash and have to re-toggle on every sign-in and every reconnect.
-        // The toggle in the account menu still overrides it for the rest of the session.
-        _isDarkMode = await _themeProvider.GetSystemPreference();
+        // A stored choice wins; otherwise fall back to the operating system's preference so an
+        // operator on a dark desktop does not get a white flash on every sign-in and reconnect.
+        string? stored = await ReadStoredModeAsync();
+
+        _mode = stored switch
+        {
+            "light" => AppearanceMode.Light,
+            "dark" => AppearanceMode.Dark,
+            "night" => AppearanceMode.Night,
+            _ => await _themeProvider.GetSystemPreference() ? AppearanceMode.Night : AppearanceMode.Light
+        };
+
         await SyncThemeClassAsync();
         StateHasChanged();
     }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
-    private async Task ToggleDarkMode()
+    private async Task SetModeAsync(AppearanceMode mode)
     {
-        _isDarkMode = !_isDarkMode;
+        _mode = mode;
         await SyncThemeClassAsync();
+        await StoreModeAsync(mode);
+    }
+
+    // Appearance is a presentation preference: no identity, no authorization, nothing the API is
+    // told about. It is read defensively because a browser with storage disabled or partitioned
+    // throws here, and an unavailable preference must degrade to the system default rather than
+    // break the shell.
+    private async Task<string?> ReadStoredModeAsync()
+    {
+        try
+        {
+            return await Js.InvokeAsync<string?>("secureOpsAppearance.read");
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+    }
+
+    private async Task StoreModeAsync(AppearanceMode mode)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("secureOpsAppearance.write", mode.ToString().ToLowerInvariant());
+        }
+        catch (JSException)
+        {
+            // The choice still applies for this circuit; only its persistence is lost.
+        }
     }
 
     /// <summary>
@@ -128,8 +168,12 @@
     /// down would leave the account menu on light-mode tints.
     /// </para>
     /// </remarks>
-    private ValueTask SyncThemeClassAsync() =>
-        Js.InvokeVoidAsync("document.documentElement.classList.toggle", "so-dark", _isDarkMode);
+    private async Task SyncThemeClassAsync()
+    {
+        await Js.InvokeVoidAsync("document.documentElement.classList.toggle", "so-dark", IsDarkMode);
+        await Js.InvokeVoidAsync(
+            "document.documentElement.classList.toggle", "so-night", _mode == AppearanceMode.Night);
+    }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
