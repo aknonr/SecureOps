@@ -1254,10 +1254,11 @@ body {
     --so-art-field: #070C15;
     --so-art-glow: #16304F;
     --so-art-line: #4C6C93;
-    --so-art-route: #8FB3DA;
+    --so-art-route: #A9B9CE;
     --so-art-accent: #E2455A;
     --so-art-text: #FFFFFF;
-    --so-art-plane: #D9E2EF;
+    --so-art-plane: #E8EEF7;
+    --so-art-land: #E8A33D;
     --so-art-muted: #A9BDD6;
 
     margin: 0;
@@ -1281,11 +1282,28 @@ body {
 /* Full-bleed field. The card floats over it rather than sitting beside it in a
    column, which is what gives the page its depth: one continuous night sky with
    the task placed on it. */
+.so-auth-map,
 .so-auth-field {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
+}
+
+/* Coloured by the palette rather than by fills baked into the file: the same asset serves the
+   amber night earth and the cooler daylight map. Repeated as -webkit- for Chrome/Edge, which is
+   what this application actually runs on. */
+.so-auth-map {
+    background: var(--so-art-land);
+    -webkit-mask-image: url("../brand/world-dots.svg");
+    mask-image: url("../brand/world-dots.svg");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    opacity: 0.62;
 }
 
 /* Corporate lockup, top-left, over the field. */
@@ -4126,9 +4144,9 @@ body {
 }
 
 .so-auth-plane {
-    offset-path: path("M430 540 C 560 380 700 300 880 268");
+    offset-path: path("M322 193 Q 250 120 168 104");
     offset-rotate: auto;
-    animation: so-plane-fly 15s ease-in-out infinite;
+    animation: so-plane-fly 16s ease-in-out infinite;
 }
 
 @keyframes so-hub-pulse {

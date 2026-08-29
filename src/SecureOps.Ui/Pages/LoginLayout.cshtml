@@ -5,11 +5,11 @@
     never see navigation for pages they cannot open, and these pages must render even when no circuit
     can be established.
 
-    Composition: one full-bleed dark field carrying an abstract route network, with the sign-in card
-    floating over its right side. The network is drawn in SVG rather than shipped as an image — it
-    inherits the palette, scales to any viewport without a second request, costs a few kilobytes
-    instead of a megabyte, and reproduces no map artwork or airline livery. The scattered points read
-    as a night-side world without tracing one.
+    Composition: one full-bleed field carrying a dot-matrix world map, with the sign-in card floating
+    over its right side. The map is generated from longitude/latitude polygons rather than traced
+    from anyone else's artwork, applied as a CSS mask so the palette colours it, and shares its
+    coordinate system with the route overlay so the hub sits on Türkiye. No place names are drawn:
+    the geography carries the meaning.
 
     Below the split breakpoint the field stays as an atmospheric backdrop and the card becomes the
     page, because on a phone an illustration above the fold pushes the actual sign-in action off it.
@@ -34,79 +34,55 @@
 </head>
 <body class="so-auth-body">
     <div class="so-auth-shell">
-        @* Decorative throughout: hidden from assistive technology, and every element of it stops
-           moving under prefers-reduced-motion. Nothing here carries information. *@
-        <svg class="so-auth-field" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"
+        @* The map is a CSS mask over a themed colour rather than an inline SVG: one cached asset,
+           88 KB, coloured by the palette instead of by baked-in fills, and no per-request markup.
+           Generated from wwwroot/brand/world-dots.svg. *@
+        <div class="so-auth-map" aria-hidden="true"></div>
+
+        @* Routes share the map's coordinate system exactly -- viewBox 0 0 1000 660 over longitude
+           -25..155 and latitude 72..-38 -- so the hub lands on Türkiye and every destination sits
+           where it belongs. Decorative: hidden from assistive technology, and all of it stops under
+           prefers-reduced-motion. No place names are rendered. *@
+        <svg class="so-auth-field" viewBox="0 0 1000 660" preserveAspectRatio="xMidYMid meet"
              role="presentation" aria-hidden="true" focusable="false">
             <defs>
-                <radialGradient id="so-field-glow" cx="27%" cy="60%" r="46%">
-                    <stop offset="0%" stop-color="var(--so-art-glow)" stop-opacity="0.42" />
-                    <stop offset="100%" stop-color="var(--so-art-glow)" stop-opacity="0" />
-                </radialGradient>
                 <radialGradient id="so-hub-glow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="var(--so-art-accent)" stop-opacity="0.85" />
+                    <stop offset="0%" stop-color="var(--so-art-accent)" stop-opacity="0.9" />
                     <stop offset="100%" stop-color="var(--so-art-accent)" stop-opacity="0" />
                 </radialGradient>
             </defs>
 
-            <rect width="1600" height="900" fill="var(--so-art-field)" />
-            <rect width="1600" height="900" fill="url(#so-field-glow)" />
-
-            @* Night-side scatter. Denser toward the hub so the field reads as populated land rather
-               than as evenly distributed noise. *@
-            <g class="so-auth-scatter" fill="var(--so-art-route)">
-                @{
-                    // Deterministic: the same field renders on every request, so the page never
-                    // "flickers" into a different arrangement between reloads.
-                    var rng = new Random(20260829);
-                    for (int i = 0; i < 260; i++)
-                    {
-                        double angle = rng.NextDouble() * Math.PI * 2;
-                        double spread = Math.Pow(rng.NextDouble(), 0.62) * 560;
-                        double cx = 430 + (Math.Cos(angle) * spread * 1.45);
-                        double cy = 540 + (Math.Sin(angle) * spread * 0.60);
-
-                        if (cx < 10 || cx > 1590 || cy < 90 || cy > 880)
-                        {
-                            continue;
-                        }
-
-                        double r = 0.7 + (rng.NextDouble() * 1.5);
-                        double o = 0.16 + (rng.NextDouble() * 0.42);
-                        <circle cx="@cx.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
-                                cy="@cy.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
-                                r="@r.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
-                                opacity="@o.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" />
-                    }
-                }
+            @* Destinations reached from the Türkiye hub. Thin and low-contrast so the single red
+               route reads as the subject rather than as one line among many. *@
+            <g class="so-auth-routes" fill="none" stroke="var(--so-art-route)" stroke-width="0.7" opacity="0.45">
+                <path d="M322 193 Q 220 120 138 123" />
+                <path d="M322 193 Q 235 150 152 139" />
+                <path d="M322 193 Q 250 140 187 132" />
+                <path d="M322 193 Q 340 130 348 97" />
+                <path d="M322 193 Q 390 225 446 281" />
+                <path d="M322 193 Q 450 200 568 260" />
+                <path d="M322 193 Q 560 140 786 193" />
+                <path d="M322 193 Q 540 290 716 424" />
+                <path d="M322 193 Q 320 220 312 252" />
+                <path d="M322 193 Q 230 290 158 393" />
+                <path d="M322 193 Q 250 420 241 635" />
+                <path d="M322 193 Q 620 130 915 218" />
             </g>
 
-            @* Routes radiating from one hub. Thin and low-contrast so the single red one reads as
-               the subject rather than as one line among many. *@
-            <g class="so-auth-routes" fill="none" stroke="var(--so-art-line)" stroke-width="1.1">
-                <path d="M430 540 C 300 300 180 240 60 210" opacity="0.30" />
-                <path d="M430 540 C 360 260 300 150 250 90" opacity="0.26" />
-                <path d="M430 540 C 520 250 640 160 760 120" opacity="0.34" />
-                <path d="M430 540 C 620 330 860 250 1090 230" opacity="0.30" />
-                <path d="M430 540 C 700 420 980 380 1290 350" opacity="0.26" />
-                <path d="M430 540 C 700 520 1000 520 1340 520" opacity="0.22" />
-                <path d="M430 540 C 660 640 920 700 1220 730" opacity="0.24" />
-                <path d="M430 540 C 560 700 700 790 880 840" opacity="0.22" />
-                <path d="M430 540 C 380 700 330 800 280 870" opacity="0.20" />
-                <path d="M430 540 C 250 620 140 680 40 730" opacity="0.22" />
-            </g>
-
-            @* The one highlighted route, and the aircraft that flies it. *@
+            @* The one highlighted route, drawn persistently so the page's signature element is never
+               absent while somebody is looking at it. *@
             <path id="so-auth-route" class="so-auth-route-hot"
-                  d="M430 540 C 560 380 700 300 880 268"
-                  fill="none" stroke="var(--so-art-accent)" stroke-width="2" />
+                  d="M322 193 Q 250 120 168 104"
+                  fill="none" stroke="var(--so-art-accent)" stroke-width="1.4" />
 
-            <circle class="so-auth-hub-glow" cx="430" cy="540" r="46" fill="url(#so-hub-glow)" />
-            <circle cx="430" cy="540" r="5" fill="var(--so-art-accent)" />
+            <circle class="so-auth-hub-glow" cx="322" cy="193" r="18" fill="url(#so-hub-glow)" />
+            <circle cx="322" cy="193" r="2.4" fill="var(--so-art-accent)" />
 
+            @* Same silhouette as SoAircraft.razor, inlined because this layout runs without a
+               Blazor circuit and therefore renders no components. A test pins the two together. *@
             <g class="so-auth-plane">
-                <path d="M -11 0 L 7 0 L 13 -5 L 7 3.5 L 13 11 L 7 6 L -11 6 L -13.5 3 Z"
-                      fill="var(--so-art-plane)" />
+                <path fill="var(--so-art-plane)" transform="scale(0.62)"
+                      d="M18 0 C16 -1.2 13 -1.9 9 -2.1 L5 -2.1 L-5 -12.5 L-8.5 -12.5 L-2.5 -2.1 L-10 -2.1 L-14.5 -7.5 L-17 -7.5 L-13.5 -2 L-16 -1.6 L-16 1.6 L-13.5 2 L-17 7.5 L-14.5 7.5 L-10 2.1 L-2.5 2.1 L-8.5 12.5 L-5 12.5 L5 2.1 L9 2.1 C13 1.9 16 1.2 18 0 Z" />
             </g>
         </svg>
 

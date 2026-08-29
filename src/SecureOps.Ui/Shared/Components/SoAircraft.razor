@@ -1,0 +1,38 @@
+@*
+    Commercial airliner silhouette, seen from above, nose pointing along +x.
+
+    Drawn as one path so it can be dropped into any SVG and rotated by offset-rotate along a flight
+    path. The proportions are what make it read as an airliner rather than as an arrow or a rocket:
+    a tapered nose, a constant-width fuselage, swept wings set forward of centre, and a separate
+    swept tailplane at the back. The earlier abstract dart had none of those and looked like a
+    missile, which is the specific thing this replaces.
+
+    Nose-at-+x matters: CSS offset-rotate aligns the element's positive x axis with the path tangent,
+    so an aircraft authored pointing any other way flies sideways.
+*@
+
+<g class="@Class" transform="scale(@Scale.ToString(System.Globalization.CultureInfo.InvariantCulture))">
+    <path fill="@Fill"
+          d="M18 0
+             C16 -1.2 13 -1.9 9 -2.1
+             L5 -2.1 L-5 -12.5 L-8.5 -12.5 L-2.5 -2.1
+             L-10 -2.1 L-14.5 -7.5 L-17 -7.5 L-13.5 -2
+             L-16 -1.6 L-16 1.6 L-13.5 2
+             L-17 7.5 L-14.5 7.5 L-10 2.1
+             L-2.5 2.1 L-8.5 12.5 L-5 12.5 L5 2.1
+             L9 2.1 C13 1.9 16 1.2 18 0 Z" />
+</g>
+
+@code {
+    /// <summary>Fill for the silhouette. Defaults to the surrounding colour.</summary>
+    [Parameter]
+    public string Fill { get; set; } = "currentColor";
+
+    /// <summary>Uniform scale. The path is authored at roughly 34 units nose to tail.</summary>
+    [Parameter]
+    public double Scale { get; set; } = 1;
+
+    /// <summary>Class applied to the group, used to attach the flight animation.</summary>
+    [Parameter]
+    public string? Class { get; set; }
+}
