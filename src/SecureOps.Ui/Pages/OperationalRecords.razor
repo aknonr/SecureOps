@@ -60,6 +60,9 @@
            operator must know that before opening anything, not after pressing a create button. *@
         <SoSimulationBanner Active="@_simulationMode" Notice="@_simulationNotice" />
 
+        @* A different state from simulation, and never shown as one: here the data is real. *@
+        <SoReadOnlyIntegrationBanner Active="@_readOnlyMode" Notice="@_readOnlyNotice" />
+
         <section class="so-panel so-panel--tabs">
             <div class="so-tabs" role="tablist" aria-label="Kayıt grubu">
                 @foreach (RecordGroup group in _groups)
@@ -226,6 +229,10 @@
     private bool _simulationMode;
     private string? _simulationNotice;
 
+    // The same reasoning for the real-data write fence, which is an environment-wide setting.
+    private bool _readOnlyMode;
+    private string? _readOnlyNotice;
+
     private IReadOnlyList<OperationalRecordResponse> Filtered =>
         _records is null ? [] : _records.Where(r => GroupOf(r) == _group).ToArray();
 
@@ -345,6 +352,11 @@ private static string OwnerLabel(OperationalRecordView.Ownership owner) => owner
             _simulationNotice = _records
                 .FirstOrDefault(record => !string.IsNullOrWhiteSpace(record.SimulationNotice))
                 ?.SimulationNotice;
+
+            _readOnlyMode = _records.Any(record => record.ReadOnlyIntegrationMode);
+            _readOnlyNotice = _records
+                .FirstOrDefault(record => !string.IsNullOrWhiteSpace(record.ReadOnlyNotice))
+                ?.ReadOnlyNotice;
         }
         catch (SecureOpsApiException ex)
         {
@@ -355,6 +367,8 @@ private static string OwnerLabel(OperationalRecordView.Ownership owner) => owner
             // would be a claim the page can no longer support.
             _simulationMode = false;
             _simulationNotice = null;
+            _readOnlyMode = false;
+            _readOnlyNotice = null;
         }
         finally
         {

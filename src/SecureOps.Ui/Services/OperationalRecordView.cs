@@ -40,7 +40,27 @@ public static class OperationalRecordView
     /// <param name="Create">The workflow stage permits creating the Jira issue.</param>
     /// <param name="Retry">Authoritative state says a failed stage can be resumed.</param>
     /// <param name="BlockedReason">Why no action is offered, or <c>null</c> when one is.</param>
-    public sealed record Actions(bool Preview, bool Create, bool Retry, string? BlockedReason);
+    /// <param name="WriteFenceReason">
+    /// Why writes specifically are unavailable while reads still are, or <c>null</c> when no fence
+    /// applies.
+    /// </param>
+    /// <remarks>
+    /// <see cref="WriteFenceReason"/> is deliberately separate from <see cref="BlockedReason"/>.
+    /// A blocked reason explains a workflow stage that offers nothing; a write fence explains an
+    /// environment where reading and previewing still work and only the external write is closed.
+    /// Collapsing them would tell an operator the record is not ready when in fact it is, and the
+    /// environment is what stops them.
+    /// </remarks>
+    public sealed record Actions(
+        bool Preview,
+        bool Create,
+        bool Retry,
+        string? BlockedReason,
+        string? WriteFenceReason = null);
+
+    /// <summary>Explains a disabled write while the record itself is otherwise actionable.</summary>
+    public const string WriteFenceHelp =
+        "Gerçek veri read-only TEST modunda kullanılıyor. Dış sistemlere yazma işlemleri kapalıdır.";
 
     /// <summary>Shown when the workflow stalled but the server does not permit resuming it.</summary>
     private const string RetryBlocked =
@@ -321,7 +341,22 @@ public static class OperationalRecordView
     /// </summary>
     /// <param name="record">Authoritative record.</param>
     /// <returns>Permitted actions and, when none, why.</returns>
-    public static Actions ActionsFor(OperationalRecordResponse record)
+    public static Actions ActionsFor(OperationalRecordResponse record) =>
+        ApplyWriteFence(WorkflowActionsFor(record), record);
+
+    // The environment fence is applied last, over whatever the workflow would otherwise allow.
+    // Placing it here rather than inside each state means a state added later cannot accidentally
+    // offer a write the environment forbids — the server would reject it anyway, but offering a
+    // button that can only fail is how an operator learns to distrust the screen.
+    //
+    // Preview is deliberately untouched: reads and the Jira draft still work in this mode, and that
+    // is most of what the record screen is for.
+    private static Actions ApplyWriteFence(Actions actions, OperationalRecordResponse record) =>
+        record.ReadOnlyIntegrationMode
+            ? actions with { Create = false, Retry = false, WriteFenceReason = WriteFenceHelp }
+            : actions;
+
+    private static Actions WorkflowActionsFor(OperationalRecordResponse record)
     {
         if (!record.JiraEligible)
         {

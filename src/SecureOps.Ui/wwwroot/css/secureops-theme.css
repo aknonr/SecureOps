@@ -3803,3 +3803,43 @@ body {
     background: color-mix(in srgb, var(--so-accent) 15%, transparent);
     color: var(--so-accent);
 }
+
+/* -- real-data read-only environment ------------------------------------- */
+
+/* Neutral surface with one brand accent rule. Deliberately calmer than the
+   simulation banner and nothing like an error: the environment is behaving as
+   configured, and the data on screen is real. */
+.so-readonly {
+    display: flex;
+    gap: var(--so-space-3);
+    align-items: flex-start;
+    margin-bottom: var(--so-space-4);
+    padding: var(--so-space-3) var(--so-space-4);
+    border: 1px solid var(--so-border);
+    border-left: 4px solid var(--so-brand);
+    border-radius: var(--so-radius);
+    background: var(--so-bg-sunken);
+}
+
+.so-readonly-icon {
+    display: inline-flex;
+    color: var(--so-brand);
+}
+
+.so-readonly-text {
+    min-width: 0;
+}
+
+.so-readonly-title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--so-text);
+}
+
+.so-readonly-body {
+    margin: 2px 0 0;
+    font-size: 0.88rem;
+    color: var(--so-text-muted);
+}

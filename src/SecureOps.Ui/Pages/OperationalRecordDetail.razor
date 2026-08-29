@@ -83,6 +83,9 @@ OperationalRecordView.Ownership owner =
            every button below, so it cannot sit further down the page. *@
         <SoSimulationBanner Active="@SimulationActive" Notice="@SimulationNotice" />
 
+        @* Distinct from simulation: the data below is real, only the writes are closed. *@
+        <SoReadOnlyIntegrationBanner Active="@ReadOnlyActive" Notice="@ReadOnlyNotice" />
+
         @* Where this transfer has got to, in the operator's own sequence rather than in workflow
            state names. Derived from durable state, so it survives a refresh and agrees between
            two operators looking at the same record. *@
@@ -462,24 +465,36 @@ OperationalRecordView.Ownership owner =
                     {
                         @* Creation requires a preview first: the confirmation must show what will
                            actually be sent, and only the server can say what that is. *@
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.AddTask"
-                                   Disabled="@(_busy || !actions.Create || _preview is null)"
-                                   OnClick="CreateAsync">
-                            Jira Kaydı Oluştur
-                        </MudButton>
+<MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.AddTask"
+                                       Disabled="@(_busy || !actions.Create || _preview is null)"
+                                       OnClick="CreateAsync">
+                                Jira Kaydı Oluştur
+                            </MudButton>
+                        </MudTooltip>
                     }
 
                     @if (_access.Can(Capabilities.OperationalRecordsRetry))
                     {
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.RestartAlt"
-                                   Disabled="@(_busy || !actions.Retry)"
-                                   OnClick="RetryAsync">
-                            Yeniden Dene
-                        </MudButton>
+<MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.RestartAlt"
+                                       Disabled="@(_busy || !actions.Retry)"
+                                       OnClick="RetryAsync">
+                                Yeniden Dene
+                            </MudButton>
+                        </MudTooltip>
                     }
                 </div>
+
+                @* Stated next to the buttons it disables. The actions stay visible rather than
+                   disappearing, so the operator can see where the workflow stops and why, instead
+                   of wondering whether they lack a permission. *@
+                @if (actions.WriteFenceReason is { Length: > 0 } fenced)
+                {
+                    <p class="so-panel-text so-panel-text--sm">@fenced</p>
+                }
 
                 @if (actions.BlockedReason is { Length: > 0 } blocked)
                 {
@@ -523,6 +538,14 @@ OperationalRecordView.Ownership owner =
     // announces a simulated run must not be contradicted by a record fetched a moment earlier.
     private bool SimulationActive =>
         _record?.SimulationMode == true || _preview?.SimulationMode == true;
+
+    // Same either/or reasoning as simulation: the preview and the record both report the mode, and
+    // the operator must be told before the button regardless of which one was fetched last.
+    private bool ReadOnlyActive =>
+        _record?.ReadOnlyIntegrationMode == true || _preview?.ReadOnlyIntegrationMode == true;
+
+    private string? ReadOnlyNotice =>
+        _preview?.ReadOnlyNotice ?? _record?.ReadOnlyNotice;
 
     private string? SimulationNotice =>
         _preview?.SimulationNotice ?? _record?.SimulationNotice;

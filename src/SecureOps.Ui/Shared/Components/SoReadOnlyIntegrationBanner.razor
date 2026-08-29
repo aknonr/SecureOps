@@ -1,0 +1,50 @@
+@*
+    Real-data read-only environment notice.
+
+    This is not an error and must not be styled as one. The environment is working exactly as
+    configured: real Turuncu Hat and Jira data can be read, and every external write is fenced off.
+    An operator who reads this as a fault will go looking for an outage that does not exist.
+
+    It is also deliberately distinct from the simulation banner. Simulation means the data itself is
+    synthetic. This means the data is real — which is the more consequential state, because what is
+    on screen is genuine operational information even though nothing can be written back.
+
+    Neutral container with a single brand accent rule, not a red alert surface.
+*@
+
+@if (Active)
+{
+    <div class="so-readonly" role="status">
+        <span class="so-readonly-icon" aria-hidden="true">
+            <MudIcon Icon="@Icons.Material.Filled.EditOff" />
+        </span>
+        <div class="so-readonly-text">
+            <p class="so-readonly-title">GERÇEK VERİ — YAZMA KAPALI</p>
+            <p class="so-readonly-body">@Explanation</p>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Backend-supplied fallback used when no server notice is returned.</summary>
+    /// <remarks>
+    /// Says what still works before what does not. The operator's first question in this mode is
+    /// "can I trust what I am looking at", and the answer is yes.
+    /// </remarks>
+    public const string DefaultNotice =
+        "Gerçek Turuncu Hat ve Jira verileri okunabilir. Jira kaydı oluşturma ve kaynak kayıt "
+        + "güncelleme işlemleri bu TEST modunda kapalıdır.";
+
+    /// <summary>Whether the backend reported <c>readOnlyIntegrationMode</c> for this response.</summary>
+    [Parameter]
+    public bool Active { get; set; }
+
+    /// <summary>Server-supplied <c>readOnlyNotice</c>, when one was returned.</summary>
+    [Parameter]
+    public string? Notice { get; set; }
+
+    // The server's wording wins when present; the constant is a fallback, not a default the UI
+    // asserts over the backend.
+    private string Explanation =>
+        string.IsNullOrWhiteSpace(Notice) ? DefaultNotice : Notice!;
+}

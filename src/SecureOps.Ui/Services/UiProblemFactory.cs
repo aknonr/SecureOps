@@ -507,6 +507,17 @@ public static class UiProblemFactory
             ["İşlem tamamlanana kadar bekleyin.", RefreshStep],
             retryable: true, requiresRefresh: true),
 
+        // ---- Real-data read-only integration ----------------------------------------------------
+        // Not a fault. The environment is configured to read real Turuncu Hat and Jira data while
+        // refusing every external write, so the server refused exactly as intended. No retry step is
+        // offered: repeating the same forbidden write is the one thing that cannot help.
+        OperationalErrorCodes.ExternalWritesDisabled => Build(
+            UiProblemKind.Conflict, code,
+            "Yazma işlemi bu modda kapalı",
+            "Bu TEST modunda dış sistemlere yazma işlemleri kapalıdır.",
+            ["Kaydı inceleyebilir ve Jira taslağını önizleyebilirsiniz.", ReferenceStep],
+            retryable: false, requiresRefresh: true),
+
         // ---- Management reporting --------------------------------------------------------------
         // Two 503s that mean opposite things, which is why they are mapped explicitly instead of
         // falling through to the generic "servis yanıt vermiyor". Reporting persistence has simply
