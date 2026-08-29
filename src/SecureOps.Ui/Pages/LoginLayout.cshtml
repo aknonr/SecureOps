@@ -29,62 +29,92 @@
     <link rel="icon" href="~/brand/favicon-32.png?v=2" type="image/png" sizes="32x32" />
     <link rel="icon" href="~/brand/favicon-16.png?v=2" type="image/png" sizes="16x16" />
     <link rel="alternate icon" href="~/brand/favicon.ico?v=2" sizes="16x16 32x32" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+        (function () {
+            var mode = null;
+            try { mode = localStorage.getItem("wasas.appearance"); } catch (e) { }
+            if (mode !== "light" && mode !== "dark" && mode !== "night") {
+                mode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+                    ? "night"
+                    : "light";
+            }
+            document.documentElement.dataset.soAppearance = mode;
+            document.documentElement.style.colorScheme = mode === "light" ? "light" : "dark";
+        })();
+    </script>
     <link href="~/css/secureops-theme.css" rel="stylesheet" />
 </head>
 <body class="so-auth-body">
     <div class="so-auth-shell">
-        @* The map is a CSS mask over a themed colour rather than an inline SVG: one cached asset,
-           88 KB, coloured by the palette instead of by baked-in fills, and no per-request markup.
-           Generated from wwwroot/brand/world-dots.svg. *@
-        <div class="so-auth-map" aria-hidden="true"></div>
+        @* Generated local masks: recognisable regional geography plus irregular inhabited lights. *@
+        <div class="so-auth-art" aria-hidden="true">
+        <div class="so-auth-map"></div>
+        <div class="so-auth-lights"></div>
 
-        @* Routes share the map's coordinate system exactly -- viewBox 0 0 1000 660 over longitude
-           -25..155 and latitude 72..-38 -- so the hub lands on Türkiye and every destination sits
-           where it belongs. Decorative: hidden from assistive technology, and all of it stops under
-           prefers-reduced-motion. No place names are rendered. *@
-        <svg class="so-auth-field" viewBox="0 0 1000 660" preserveAspectRatio="xMidYMid meet"
+        @* The map and routes share longitude -25..100 and latitude 72..-38. The hub is Türkiye,
+           expressed only by location art; no place label is rendered. *@
+        <svg class="so-auth-field" viewBox="0 0 1000 660" preserveAspectRatio="xMidYMid slice"
              role="presentation" aria-hidden="true" focusable="false">
             <defs>
                 <radialGradient id="so-hub-glow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="var(--so-art-accent)" stop-opacity="0.9" />
+                    <stop offset="0%" stop-color="var(--so-art-accent)" stop-opacity="0.95" />
                     <stop offset="100%" stop-color="var(--so-art-accent)" stop-opacity="0" />
                 </radialGradient>
+                <linearGradient id="so-aircraft-body" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--so-art-plane-bright)" />
+                    <stop offset="58%" stop-color="var(--so-art-plane)" />
+                    <stop offset="100%" stop-color="var(--so-art-plane-shade)" />
+                </linearGradient>
             </defs>
 
             @* Destinations reached from the Türkiye hub. Thin and low-contrast so the single red
                route reads as the subject rather than as one line among many. *@
-            <g class="so-auth-routes" fill="none" stroke="var(--so-art-route)" stroke-width="0.7" opacity="0.45">
-                <path d="M322 193 Q 220 120 138 123" />
-                <path d="M322 193 Q 235 150 152 139" />
-                <path d="M322 193 Q 250 140 187 132" />
-                <path d="M322 193 Q 340 130 348 97" />
-                <path d="M322 193 Q 390 225 446 281" />
-                <path d="M322 193 Q 450 200 568 260" />
-                <path d="M322 193 Q 560 140 786 193" />
-                <path d="M322 193 Q 540 290 716 424" />
-                <path d="M322 193 Q 320 220 312 252" />
-                <path d="M322 193 Q 230 290 158 393" />
-                <path d="M322 193 Q 250 420 241 635" />
-                <path d="M322 193 Q 620 130 915 218" />
+            <g class="so-auth-routes" fill="none" stroke="var(--so-art-route)" stroke-width="1.05">
+                <path d="M463 198 Q 350 82 199 123" />
+                <path d="M463 198 Q 350 130 219 139" />
+                <path d="M463 198 Q 365 168 300 181" />
+                <path d="M463 198 Q 452 92 501 98" />
+                <path d="M463 198 Q 500 170 558 182" />
+                <path d="M463 198 Q 545 220 642 281" />
+                <path d="M463 198 Q 650 165 818 260" />
+                <path d="M463 198 Q 500 290 494 440" />
+                <path d="M463 198 Q 348 296 227 393" />
+                <path d="M463 198 Q 360 395 347 635" />
+                <path d="M463 198 Q 455 228 450 252" />
+            </g>
+
+            <g class="so-auth-destinations" fill="var(--so-art-route-node)">
+                <circle cx="199" cy="123" r="2.2" /><circle cx="219" cy="139" r="2.2" />
+                <circle cx="300" cy="181" r="2.2" /><circle cx="501" cy="98" r="2.2" />
+                <circle cx="558" cy="182" r="2.2" /><circle cx="642" cy="281" r="2.2" />
+                <circle cx="818" cy="260" r="2.2" /><circle cx="494" cy="440" r="2.2" />
+                <circle cx="227" cy="393" r="2.2" /><circle cx="347" cy="635" r="2.2" />
+                <circle cx="450" cy="252" r="2.2" />
             </g>
 
             @* The one highlighted route, drawn persistently so the page's signature element is never
                absent while somebody is looking at it. *@
             <path id="so-auth-route" class="so-auth-route-hot"
-                  d="M322 193 Q 250 120 168 104"
-                  fill="none" stroke="var(--so-art-accent)" stroke-width="1.4" />
+                  d="M463 198 Q 350 82 199 123"
+                  fill="none" stroke="var(--so-art-accent)" stroke-width="2.1" />
 
-            <circle class="so-auth-hub-glow" cx="322" cy="193" r="18" fill="url(#so-hub-glow)" />
-            <circle cx="322" cy="193" r="2.4" fill="var(--so-art-accent)" />
+            <circle class="so-auth-hub-glow" cx="463" cy="198" r="25" fill="url(#so-hub-glow)" />
+            <circle class="so-auth-hub-ring" cx="463" cy="198" r="5.5" />
+            <circle cx="463" cy="198" r="2.2" fill="var(--so-art-hub-core)" />
 
             @* Same silhouette as SoAircraft.razor, inlined because this layout runs without a
                Blazor circuit and therefore renders no components. A test pins the two together. *@
             <g class="so-auth-plane">
-                <path fill="var(--so-art-plane)" transform="scale(0.62)"
-                      d="M18 0 C16 -1.2 13 -1.9 9 -2.1 L5 -2.1 L-5 -12.5 L-8.5 -12.5 L-2.5 -2.1 L-10 -2.1 L-14.5 -7.5 L-17 -7.5 L-13.5 -2 L-16 -1.6 L-16 1.6 L-13.5 2 L-17 7.5 L-14.5 7.5 L-10 2.1 L-2.5 2.1 L-8.5 12.5 L-5 12.5 L5 2.1 L9 2.1 C13 1.9 16 1.2 18 0 Z" />
+                <path class="so-aircraft-shadow"
+                      d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
+                <path class="so-aircraft-body" fill="url(#so-aircraft-body)"
+                      d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
+                <path class="so-aircraft-tail" d="M-30 -3 L-25 -14 L-19 -14 L-20 -3 Z" />
+                <path class="so-aircraft-cabin" d="M-18 0 H27" />
             </g>
         </svg>
+        </div>
 
         @* Corporate lockup. The emblem is the approved asset; the wordmark beside it is set in the
            application's own type rather than reproduced from artwork. *@

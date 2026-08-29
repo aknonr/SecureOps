@@ -412,7 +412,7 @@ body {
     font-size: 1.4rem;
     font-weight: 600;
     line-height: 1.25;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     color: var(--so-text);
 }
 
@@ -1295,8 +1295,8 @@ body {
    what this application actually runs on. */
 .so-auth-map {
     background: var(--so-art-land);
-    -webkit-mask-image: url("../brand/world-dots.svg");
-    mask-image: url("../brand/world-dots.svg");
+    -webkit-mask-image: url("../brand/world-land.svg");
+    mask-image: url("../brand/world-land.svg");
     -webkit-mask-size: contain;
     mask-size: contain;
     -webkit-mask-position: center;
@@ -1396,7 +1396,7 @@ body {
     margin: var(--so-space-3) 0 var(--so-space-2);
     font-size: 1.9rem;
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
     color: var(--so-art-text);
 }
 
@@ -1507,7 +1507,7 @@ body {
     margin: 0 0 var(--so-space-2);
     font-size: clamp(1.45rem, 2.4vw, 1.86rem);
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     color: var(--so-art-text);
 }
 
@@ -4175,5 +4175,915 @@ body {
     .so-auth-plane {
         offset-distance: 100%;
         opacity: 1;
+    }
+}
+
+/* =============================================================================
+   Reference-accurate aviation field
+   ========================================================================== */
+
+.so-auth-body,
+.so-auth-body *,
+.so-auth-body *::before,
+.so-auth-body *::after {
+    box-sizing: border-box;
+}
+
+.so-auth-body {
+    --so-auth-bg: #e9eef4;
+    --so-auth-surface: rgb(255 255 255 / 94%);
+    --so-auth-border: #cfd8e3;
+    --so-auth-text: #162130;
+    --so-auth-muted: #667489;
+    --so-auth-brand: #c90119;
+    --so-auth-brand-hover: #a80115;
+    --so-art-ocean: linear-gradient(145deg, #d7effc 0%, #91c8e8 48%, #5ca0cf 100%);
+    --so-art-land: linear-gradient(130deg, #b9d7c4 0%, #8eb9a8 32%, #d9d3b3 60%, #b8c8b4 100%);
+    --so-art-light: #fffdf3;
+    --so-art-light-opacity: 0.62;
+    --so-art-route: rgb(255 255 255 / 78%);
+    --so-art-route-node: #ffffff;
+    --so-art-accent: #c90119;
+    --so-art-hub-core: #ffffff;
+    --so-art-text: #172334;
+    --so-art-muted: #667489;
+    --so-art-plane-bright: #ffffff;
+    --so-art-plane: #e8edf2;
+    --so-art-plane-shade: #aeb8c4;
+}
+
+html[data-so-appearance="dark"] .so-auth-body {
+    --so-auth-bg: #171c23;
+    --so-auth-surface: rgb(29 35 44 / 96%);
+    --so-auth-border: #3a4553;
+    --so-auth-text: #edf1f6;
+    --so-auth-muted: #aeb8c6;
+    --so-art-ocean: linear-gradient(145deg, #252e39 0%, #151b23 52%, #0d1218 100%);
+    --so-art-land: linear-gradient(135deg, #3b4b57 0%, #293843 46%, #4b4b43 100%);
+    --so-art-light: #e8c886;
+    --so-art-light-opacity: 0.34;
+    --so-art-route: rgb(193 205 219 / 38%);
+    --so-art-route-node: #9eabb9;
+    --so-art-text: #f1f4f8;
+    --so-art-muted: #aeb8c6;
+}
+
+html[data-so-appearance="night"] .so-auth-body {
+    --so-auth-bg: #050a11;
+    --so-auth-surface: rgb(16 25 38 / 96%);
+    --so-auth-border: #334052;
+    --so-auth-text: #f3f6fa;
+    --so-auth-muted: #9eacbf;
+    --so-art-ocean: linear-gradient(145deg, #0a1624 0%, #030914 55%, #01050b 100%);
+    --so-art-land: linear-gradient(135deg, #14283b 0%, #0d1b2b 48%, #1a2630 100%);
+    --so-art-light: #f4b56a;
+    --so-art-light-opacity: 0.88;
+    --so-art-route: rgb(169 187 209 / 34%);
+    --so-art-route-node: #b5c0cc;
+    --so-art-text: #ffffff;
+    --so-art-muted: #9eacbf;
+}
+
+.so-auth-shell {
+    isolation: isolate;
+    min-height: 100svh;
+    background: var(--so-art-ocean);
+}
+
+.so-auth-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+        linear-gradient(168deg, rgb(255 255 255 / 24%) 0%, transparent 25%),
+        linear-gradient(12deg, transparent 62%, rgb(255 255 255 / 13%) 74%, transparent 86%);
+    opacity: 0.9;
+}
+
+html[data-so-appearance="dark"] .so-auth-shell::before,
+html[data-so-appearance="night"] .so-auth-shell::before {
+    background:
+        linear-gradient(155deg, rgb(72 102 139 / 10%) 0%, transparent 38%),
+        linear-gradient(12deg, transparent 62%, rgb(42 65 94 / 9%) 78%, transparent 90%);
+}
+
+.so-auth-art {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 62%;
+    overflow: hidden;
+}
+
+.so-auth-map,
+.so-auth-lights,
+.so-auth-field {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.so-auth-map {
+    background: var(--so-art-land);
+    -webkit-mask-image: url("../brand/world-land.svg");
+    mask-image: url("../brand/world-land.svg");
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    opacity: 0.94;
+    filter: drop-shadow(0 0 1px rgb(255 255 255 / 18%));
+}
+
+.so-auth-lights {
+    background: var(--so-art-light);
+    -webkit-mask-image: url("../brand/world-lights.svg");
+    mask-image: url("../brand/world-lights.svg");
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    opacity: var(--so-art-light-opacity);
+    filter: drop-shadow(0 0 3px var(--so-art-light));
+}
+
+html[data-so-appearance="light"] .so-auth-map {
+    filter: drop-shadow(0 1px 1px rgb(26 73 104 / 18%));
+}
+
+.so-auth-field {
+    overflow: visible;
+}
+
+.so-auth-routes {
+    opacity: 0.55;
+}
+
+.so-auth-destinations {
+    opacity: 0.76;
+    filter: drop-shadow(0 0 4px var(--so-art-route-node));
+}
+
+.so-auth-stage {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: 44%;
+    min-height: 100svh;
+    justify-content: center;
+    padding: 48px clamp(28px, 3vw, 64px);
+}
+
+.so-auth-card {
+    width: 100%;
+    max-width: 640px;
+    padding: 42px clamp(30px, 3vw, 50px) 38px;
+    border: 1px solid var(--so-auth-border);
+    border-radius: 16px;
+    background: var(--so-auth-surface);
+    box-shadow: 0 24px 62px rgb(0 0 0 / 30%), 0 1px 0 rgb(255 255 255 / 8%) inset;
+    color: var(--so-auth-text);
+    backdrop-filter: blur(8px);
+}
+
+html[data-so-appearance="light"] .so-auth-card {
+    box-shadow: 0 22px 55px rgb(35 68 91 / 24%), 0 1px 0 #ffffff inset;
+}
+
+.so-auth-emblem {
+    width: 92px;
+    margin-bottom: 24px;
+    box-shadow: 0 7px 20px rgb(0 0 0 / 22%);
+}
+
+.so-auth-title {
+    margin-bottom: 8px;
+    font-size: 1.85rem;
+    letter-spacing: 0;
+    color: var(--so-auth-text);
+}
+
+.so-auth-lead,
+.so-auth-note,
+.so-auth-assurance,
+.so-auth-assurance svg {
+    color: var(--so-auth-muted);
+}
+
+.so-auth-lead {
+    font-size: 0.94rem;
+}
+
+.so-auth-rule {
+    width: 86px;
+    height: 2px;
+    margin: 24px auto 26px;
+    background: var(--so-auth-brand);
+}
+
+.so-auth-submit {
+    position: relative;
+    isolation: isolate;
+    min-height: 56px;
+    padding: 14px 20px;
+    border-radius: 8px;
+    background: var(--so-auth-brand);
+    font-size: 1.02rem;
+    letter-spacing: 0;
+}
+
+.so-auth-submit-icon,
+.so-auth-submit-label,
+.so-auth-submit-spinner {
+    position: relative;
+    z-index: 1;
+    color: #ffffff;
+    -webkit-text-fill-color: #ffffff;
+}
+
+.so-auth-submit:hover,
+.so-auth-submit:focus-visible {
+    background: var(--so-auth-brand-hover);
+    box-shadow: 0 8px 24px rgb(201 1 25 / 30%);
+}
+
+.so-auth-submit:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--so-auth-brand) 40%, #ffffff);
+    outline-offset: 3px;
+}
+
+.so-auth-divider {
+    margin: 24px 0 22px;
+    background: color-mix(in srgb, var(--so-auth-muted) 23%, transparent);
+}
+
+.so-auth-assurance {
+    justify-content: flex-start;
+}
+
+.so-auth-foot {
+    margin-top: 32px;
+    color: var(--so-auth-muted);
+}
+
+.so-auth-lockup {
+    top: clamp(24px, 4vh, 48px);
+    left: clamp(24px, 3.5vw, 58px);
+}
+
+.so-auth-lockup-mark {
+    width: 46px;
+    height: 46px;
+}
+
+.so-auth-lockup-text {
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    color: var(--so-art-text);
+}
+
+.so-auth-legal {
+    display: none;
+}
+
+.so-auth-hub-glow {
+    transform-origin: 463px 198px;
+}
+
+.so-auth-hub-ring {
+    fill: none;
+    stroke: var(--so-art-accent);
+    stroke-width: 1.8;
+    filter: drop-shadow(0 0 6px var(--so-art-accent));
+}
+
+.so-auth-route-hot {
+    filter: drop-shadow(0 0 4px rgb(201 1 25 / 50%));
+}
+
+.so-auth-plane {
+    offset-path: path("M463 198 Q 350 82 199 123");
+    offset-distance: 56%;
+    offset-rotate: auto;
+    animation: so-plane-fly-reference 18s ease-in-out infinite;
+    filter: drop-shadow(0 4px 5px rgb(0 0 0 / 42%));
+}
+
+.so-aircraft-shadow {
+    fill: rgb(0 0 0 / 28%);
+    transform: translate(2px, 3px);
+}
+
+.so-aircraft-tail {
+    fill: var(--so-auth-brand);
+}
+
+.so-aircraft-cabin {
+    fill: none;
+    stroke: rgb(79 91 106 / 58%);
+    stroke-width: 1.2;
+    stroke-linecap: round;
+}
+
+@keyframes so-plane-fly-reference {
+    0%, 100% { offset-distance: 48%; }
+    50% { offset-distance: 66%; }
+}
+
+@media (max-width: 1099px) {
+    .so-auth-art {
+        width: 100%;
+        opacity: 0.76;
+    }
+
+    .so-auth-stage {
+        width: 100%;
+        justify-content: flex-end;
+        padding: 78px 34px 54px 42%;
+    }
+
+    .so-auth-card {
+        max-width: 540px;
+    }
+
+    .so-auth-legal {
+        max-width: 36%;
+    }
+}
+
+@media (max-width: 899px) {
+    .so-auth-art {
+        opacity: 0.46;
+    }
+
+    .so-auth-stage {
+        justify-content: center;
+        padding: 88px 24px 46px;
+    }
+
+    .so-auth-card {
+        max-width: 540px;
+    }
+
+    .so-auth-lockup {
+        top: 18px;
+        left: 22px;
+    }
+
+    .so-auth-legal {
+        display: none;
+    }
+}
+
+@media (max-width: 520px) {
+    .so-auth-stage {
+        align-items: flex-start;
+        padding: 84px 14px 24px;
+    }
+
+    .so-auth-card {
+        padding: 28px 22px 24px;
+        border-radius: 12px;
+    }
+
+    .so-auth-emblem {
+        width: 72px;
+        margin-bottom: 18px;
+    }
+
+    .so-auth-title {
+        font-size: 1.5rem;
+    }
+
+    .so-auth-lead {
+        font-size: 0.84rem;
+    }
+
+    .so-auth-rule {
+        margin: 18px auto 20px;
+    }
+
+    .so-auth-submit {
+        min-height: 52px;
+    }
+
+    .so-auth-divider {
+        margin: 20px 0 18px;
+    }
+
+    .so-auth-assurance {
+        font-size: 0.78rem;
+    }
+
+    .so-auth-foot {
+        margin-top: 22px;
+    }
+
+    .so-auth-lockup-mark {
+        width: 36px;
+        height: 36px;
+    }
+
+    .so-auth-lockup-text {
+        font-size: 0.8rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .so-auth-plane {
+        offset-distance: 58%;
+        animation: none;
+        opacity: 1;
+    }
+}
+
+/* -- reference loading panel -------------------------------------------- */
+
+.so-flight {
+    width: 100%;
+    padding: var(--so-space-4);
+}
+
+.so-flight--bare {
+    padding: 0;
+}
+
+.so-flight-card {
+    --so-loading-border: #354357;
+    --so-loading-text: #f1f4f8;
+    --so-loading-muted: #b4bfce;
+    --so-loading-track: #2a3749;
+    --so-loading-red: #e8394e;
+
+    width: min(100%, 570px);
+    min-height: 318px;
+    margin: 0 auto;
+    padding: 16px 34px 28px;
+    overflow: hidden;
+    border: 1px solid var(--so-loading-border);
+    border-radius: 12px;
+    background: linear-gradient(160deg, #182334 0%, #0d1521 68%, #101a28 100%);
+    box-shadow: 0 22px 52px rgb(0 0 0 / 42%), 0 1px 0 rgb(255 255 255 / 5%) inset;
+    color: var(--so-loading-text);
+}
+
+.so-flight-svg {
+    display: block;
+    width: 100%;
+    max-width: none;
+    height: 174px;
+}
+
+.so-flight-map {
+    filter: invert(1);
+    opacity: 0.09;
+}
+
+.so-flight-emblem {
+    filter: drop-shadow(0 4px 8px rgb(0 0 0 / 35%));
+}
+
+.so-flight-track,
+.so-flight-flown {
+    fill: none;
+    stroke-linecap: round;
+}
+
+.so-flight-track {
+    stroke: #58677a;
+    stroke-width: 1.4;
+    stroke-dasharray: 4 7;
+    opacity: 0.72;
+}
+
+.so-flight-flown {
+    stroke: var(--so-loading-red);
+    stroke-width: 2.2;
+    stroke-dasharray: 480;
+    stroke-dashoffset: 480;
+    filter: drop-shadow(0 0 3px rgb(232 57 78 / 45%));
+    animation: so-flight-draw-reference 2.8s ease-in-out infinite;
+}
+
+.so-flight-hub-glow {
+    transform-origin: 246px 66px;
+    animation: so-hub-pulse 2.8s ease-in-out infinite;
+}
+
+.so-flight-node {
+    fill: #ffffff;
+    stroke: var(--so-loading-red);
+    stroke-width: 2;
+    filter: drop-shadow(0 0 5px var(--so-loading-red));
+}
+
+.so-flight-plane {
+    fill: initial;
+    offset-path: path("M 246 66 Q 340 142 468 82");
+    offset-distance: 60%;
+    offset-rotate: auto;
+    animation: so-flight-travel-reference 2.8s ease-in-out infinite;
+    filter: drop-shadow(0 3px 4px rgb(0 0 0 / 48%));
+}
+
+.so-flight-plane-shadow {
+    fill: rgb(0 0 0 / 28%);
+    transform: translate(2px, 3px);
+}
+
+.so-flight-plane-tail {
+    fill: var(--so-loading-red);
+}
+
+.so-flight-copy {
+    text-align: center;
+}
+
+.so-flight-title {
+    margin: 0;
+    color: var(--so-loading-text);
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.so-flight-message {
+    margin: 8px 0 0;
+    color: var(--so-loading-muted);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.so-flight-activity {
+    position: relative;
+    display: block;
+    height: 4px;
+    margin-top: 24px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: var(--so-loading-track);
+}
+
+.so-flight-activity span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 34%;
+    border-radius: inherit;
+    background: var(--so-loading-red);
+    animation: so-flight-activity 1.55s ease-in-out infinite;
+}
+
+@keyframes so-flight-draw-reference {
+    0% { stroke-dashoffset: 480; }
+    72%, 100% { stroke-dashoffset: 0; }
+}
+
+@keyframes so-flight-travel-reference {
+    0% { offset-distance: 0%; opacity: 1; }
+    72%, 100% { offset-distance: 100%; opacity: 1; }
+}
+
+@keyframes so-flight-activity {
+    0% { transform: translateX(-110%); }
+    55% { transform: translateX(195%); }
+    100% { transform: translateX(305%); }
+}
+
+@media (max-width: 520px) {
+    .so-flight-card {
+        min-height: 278px;
+        padding: 10px 18px 22px;
+        border-radius: 8px;
+    }
+
+    .so-flight-svg {
+        height: 150px;
+    }
+
+    .so-flight-title {
+        font-size: 1.12rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .so-flight-flown {
+        stroke-dashoffset: 0;
+        animation: none;
+        opacity: 0.72;
+    }
+
+    .so-flight-plane {
+        offset-distance: 72%;
+        animation: none;
+        opacity: 1;
+    }
+
+    .so-flight-hub-glow,
+    .so-flight-activity span {
+        animation: none;
+    }
+
+    .so-flight-activity span {
+        transform: translateX(96%);
+    }
+}
+
+/* =============================================================================
+   Reference-accurate authenticated shell
+   ========================================================================== */
+
+:root {
+    --so-radius-sm: 5px;
+    --so-radius: 8px;
+    --so-radius-lg: 10px;
+}
+
+.so-appbar {
+    border-bottom: 1px solid color-mix(in srgb, var(--so-appbar-text) 12%, transparent);
+    box-shadow: 0 6px 24px rgb(0 0 0 / 16%);
+}
+
+.so-appbar .mud-toolbar-root {
+    gap: 4px;
+    padding-inline: 18px;
+}
+
+.so-brand {
+    gap: 12px;
+}
+
+.so-brand-mark img {
+    width: 36px;
+    height: 36px;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+
+.so-brand-name {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 5px;
+    line-height: 1;
+}
+
+.so-brand-name-primary,
+.so-brand-name-suffix {
+    font-size: 1rem;
+    font-weight: 650;
+    letter-spacing: 0;
+    opacity: 1;
+}
+
+.so-brand-name-suffix {
+    color: color-mix(in srgb, var(--so-appbar-text) 92%, transparent);
+}
+
+.so-env-chip {
+    margin-right: 10px;
+    padding: 3px 10px;
+    border-color: color-mix(in srgb, var(--so-appbar-text) 24%, transparent);
+    background: color-mix(in srgb, var(--so-appbar-text) 5%, transparent);
+}
+
+.so-drawer {
+    border-right-color: color-mix(in srgb, var(--so-border) 78%, transparent);
+    box-shadow: 8px 0 24px rgb(0 0 0 / 5%);
+}
+
+.so-nav {
+    padding: 10px 0 22px;
+}
+
+.so-nav-group {
+    padding: 17px 18px 5px;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+}
+
+.so-nav .mud-nav-link {
+    min-height: 42px;
+    margin: 2px 8px;
+    padding: 8px 12px;
+    border-radius: 5px;
+    color: var(--mud-palette-drawer-text);
+    font-size: 0.84rem;
+    line-height: 1.35;
+}
+
+.so-nav .mud-nav-link .mud-nav-link-icon {
+    margin-inline-end: 12px;
+    color: var(--mud-palette-drawer-icon);
+}
+
+.so-nav .mud-nav-link:hover,
+.so-nav .mud-nav-link:focus-visible {
+    background: color-mix(in srgb, var(--so-text-muted) 9%, transparent);
+}
+
+.so-nav .mud-nav-link.active {
+    color: var(--so-brand) !important;
+    background: color-mix(in srgb, var(--so-brand) 11%, transparent);
+    box-shadow: inset 3px 0 0 var(--so-brand);
+    font-weight: 650;
+}
+
+.so-nav .mud-nav-link.active .mud-nav-link-icon {
+    color: var(--so-brand) !important;
+}
+
+.so-main {
+    background: var(--so-bg);
+}
+
+.so-page {
+    padding: 26px 24px 40px;
+}
+
+.so-page-header {
+    margin-bottom: 20px;
+}
+
+.so-page-title {
+    font-size: 1.55rem;
+    font-weight: 650;
+    letter-spacing: 0;
+}
+
+.so-page-lead {
+    margin-top: 5px;
+    font-size: 0.86rem;
+}
+
+.so-panel {
+    padding: 20px;
+    border-radius: 8px;
+    border-color: color-mix(in srgb, var(--so-border) 88%, transparent);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 6%);
+}
+
+:root.so-dark .so-panel {
+    box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+}
+
+:root.so-night .so-panel {
+    border-color: var(--so-border-soft);
+    box-shadow: 0 10px 28px rgb(0 0 0 / 26%);
+}
+
+.so-panel-title {
+    font-size: 0.96rem;
+    font-weight: 650;
+}
+
+.mud-button-root {
+    border-radius: 6px;
+    letter-spacing: 0;
+}
+
+.mud-input-control > .mud-input-control-input-container > .mud-input.mud-input-outlined > .mud-input-outlined-border {
+    border-radius: 6px;
+}
+
+.mud-table-root {
+    background: transparent;
+}
+
+.mud-table-head .mud-table-cell {
+    background: color-mix(in srgb, var(--so-bg-sunken) 74%, var(--so-surface));
+    color: var(--so-text-muted);
+    font-size: 0.72rem;
+    font-weight: 650;
+    text-transform: uppercase;
+}
+
+.mud-table-cell {
+    border-color: var(--so-border-soft);
+}
+
+.mud-dialog {
+    border: 1px solid var(--so-border);
+    border-radius: 8px;
+    box-shadow: 0 22px 58px rgb(0 0 0 / 34%);
+}
+
+.so-route-progress {
+    position: fixed;
+    top: 64px;
+    right: 0;
+    left: var(--mud-drawer-width-left);
+    z-index: 1090;
+    height: 4px;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 100ms ease;
+}
+
+.so-route-progress.is-active {
+    opacity: 1;
+}
+
+.so-route-progress-line {
+    position: absolute;
+    inset: 1px 0 auto;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--so-brand) 18%, var(--so-brand) 68%, transparent);
+    transform: scaleX(0);
+    transform-origin: left;
+}
+
+.so-route-progress.is-active .so-route-progress-line {
+    animation: so-route-line 900ms ease-out both;
+}
+
+.so-route-progress-plane {
+    position: absolute;
+    top: -7px;
+    left: -20px;
+    width: 20px;
+    height: 18px;
+    fill: var(--so-brand);
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 35%));
+}
+
+.so-route-progress.is-active .so-route-progress-plane {
+    animation: so-route-plane 1100ms ease-out both;
+}
+
+@keyframes so-route-line {
+    0% { transform: scaleX(0); opacity: 1; }
+    82% { transform: scaleX(0.9); opacity: 1; }
+    100% { transform: scaleX(1); opacity: 0.45; }
+}
+
+@keyframes so-route-plane {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(calc(100vw - var(--mud-drawer-width-left) + 20px)); }
+}
+
+@media (min-width: 1280px) {
+    .so-menu-button {
+        display: none;
+    }
+}
+
+@media (max-width: 1279px) {
+    .so-route-progress {
+        left: 0;
+    }
+}
+
+@media (max-width: 599px) {
+    .so-appbar .mud-toolbar-root {
+        padding-inline: 10px;
+    }
+
+    .so-brand {
+        gap: 8px;
+    }
+
+    .so-brand-mark img {
+        width: 30px;
+        height: 30px;
+    }
+
+    .so-brand-name-primary {
+        font-size: 0.9rem;
+    }
+
+    .so-brand-name-suffix {
+        display: none;
+    }
+
+    .so-page {
+        padding: 18px 12px 28px;
+    }
+
+    .so-panel {
+        padding: 15px;
+        border-radius: 6px;
+    }
+
+    .so-page-title {
+        font-size: 1.28rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .so-route-progress-line,
+    .so-route-progress-plane {
+        animation: none !important;
+    }
+
+    .so-route-progress.is-active .so-route-progress-line {
+        transform: scaleX(1);
+        opacity: 0.7;
+    }
+
+    .so-route-progress-plane {
+        left: 62%;
     }
 }

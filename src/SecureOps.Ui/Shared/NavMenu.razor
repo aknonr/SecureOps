@@ -17,12 +17,15 @@
 <MudNavMenu Dense="true" Class="so-nav">
     <AuthorizeView>
         <Authorized Context="signedIn">
-            @* Same route either way: the dashboard shows the management report to holders of
-               Reporting.ManagementView and the operator board to everyone else. Only the label
-               changes, so the entry matches what the page will actually be. *@
-            <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.SpaceDashboard">
-                @(Can(Capabilities.ManagementReportingView) ? "Yönetim Panosu" : "Genel Bakış")
-            </MudNavLink>
+            @* Management users receive the same route under RAPORLAMA below. Rendering it twice
+               makes two entries appear selected, so the ungrouped overview is for operators whose
+               dashboard is the operational board. *@
+            @if (!Can(Capabilities.ManagementReportingView))
+            {
+                <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.SpaceDashboard">
+                    Genel Bakış
+                </MudNavLink>
+            }
 
             @if (Can(Capabilities.OperationalRecordsView))
             {

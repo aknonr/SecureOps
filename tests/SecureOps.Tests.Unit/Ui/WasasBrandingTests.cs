@@ -120,6 +120,52 @@ public sealed class WasasBrandingTests
     }
 
     [Fact]
+    public void LoginVisualField_UsesLocalGeographyAndHasNoCityLabel()
+    {
+        string layout = File.ReadAllText(Path.Combine(UiRoot(), "Pages", "LoginLayout.cshtml"));
+        string css = File.ReadAllText(Path.Combine(UiRoot(), "wwwroot", "css", "secureops-theme.css"));
+
+        css.Should().Contain("brand/world-land.svg");
+        css.Should().Contain("brand/world-lights.svg");
+        css.Should().NotContain("brand/world-dots.svg");
+        File.Exists(Path.Combine(UiRoot(), "wwwroot", "brand", "world-land.svg")).Should().BeTrue();
+        File.Exists(Path.Combine(UiRoot(), "wwwroot", "brand", "world-lights.svg")).Should().BeTrue();
+
+        string renderedMarkup = Regex.Replace(layout, "@\\*.*?\\*@", string.Empty, RegexOptions.Singleline);
+        renderedMarkup.Should().NotContain("ANKARA");
+        renderedMarkup.Should().NotContain("ISTANBUL");
+        renderedMarkup.Should().NotContain("TÜRKİYE");
+    }
+
+    [Fact]
+    public void FlightLoading_UsesRealOperationMessageWithoutFakeProgress()
+    {
+        string loading = File.ReadAllText(
+            Path.Combine(UiRoot(), "Shared", "Components", "SoFlightLoading.razor"));
+
+        loading.Should().Contain("role=\"status\"");
+        loading.Should().Contain("aria-live=\"polite\"");
+        loading.Should().Contain("brand/world-land.svg");
+        loading.Should().Contain("Yükleniyor...");
+        loading.Should().Contain("@Message");
+        loading.Should().NotContain("Task.Delay");
+        loading.Should().NotContain("aria-valuenow");
+        loading.Should().NotContain("<progress");
+    }
+
+    [Fact]
+    public void RouteIndicator_FollowsNavigationLifecycleWithoutArtificialDelay()
+    {
+        string layout = File.ReadAllText(Path.Combine(UiRoot(), "Shared", "MainLayout.razor"));
+
+        layout.Should().Contain("<NavigationLock OnBeforeInternalNavigation=\"OnBeforeInternalNavigation\"");
+        layout.Should().Contain("so-route-progress");
+        layout.Should().Contain("_routeNavigating = true");
+        layout.Should().Contain("_routeNavigating = false");
+        layout.Should().NotContain("Task.Delay");
+    }
+
+    [Fact]
     public void FaviconAndTitle_AreWiredFromLocalAssets()
     {
         // No remote origin may serve application identity: a logo fetched at runtime is an external

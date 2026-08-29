@@ -1,9 +1,9 @@
-// Generates the dot-matrix world map used by the sign-in field and the flight loading card.
+// Generates the regional land and city-light masks used by the sign-in field and flight loading.
 //
 // Run from the repository root:
 //   node src/SecureOps.Ui/build/make-world-map.js
 //
-// Output: wwwroot/brand/world-dots.svg
+// Output: wwwroot/brand/world-land.svg and wwwroot/brand/world-lights.svg
 //
 // Why a generator rather than a hand-drawn SVG: the geography is authored below in longitude and
 // latitude, which is the only form a human can reason about and correct. Pixel path data for a
@@ -17,9 +17,26 @@
 const fs = require("fs");
 const path = require("path");
 
+// Natural Earth 1:110m land, public domain, vendored so generation is fully offline and runtime
+// never contacts an external map service. Source: nvkelso/natural-earth-vector/geojson.
+const naturalEarthPath = path.join(__dirname, "data", "ne_110m_land.geojson");
+const naturalEarth = JSON.parse(fs.readFileSync(naturalEarthPath, "utf8"));
+const naturalEarthPolygons = naturalEarth.features.flatMap(feature => {
+    if (feature.geometry.type === "Polygon") {
+        return [feature.geometry.coordinates];
+    }
+
+    if (feature.geometry.type === "MultiPolygon") {
+        return feature.geometry.coordinates;
+    }
+
+    return [];
+});
+const naturalEarthRings = naturalEarthPolygons.flatMap(polygon => polygon);
+
 // Equirectangular window: western Atlantic to the Pacific, Arctic to southern Africa. Chosen so
 // Türkiye — the hub every route radiates from — sits near the optical centre of the field.
-const LON_MIN = -25, LON_MAX = 155;
+const LON_MIN = -25, LON_MAX = 100;
 const LAT_MIN = -38, LAT_MAX = 72;
 const WIDTH = 1000, HEIGHT = 660;
 
@@ -123,27 +140,76 @@ const seas = Object.values(SEA);
 const isLand = (lon, lat) =>
     polygons.some(p => inside(lon, lat, p)) && !seas.some(s => inside(lon, lat, s));
 
-// Grid step in degrees. Finer than this and the SVG grows without reading any better; coarser and
-// the Mediterranean closes up.
-const STEP_LON = 1.6, STEP_LAT = 1.6;
+const polygonPath = polygon => polygon
+    .map(([lon, lat], index) => `${index === 0 ? "M" : "L"}${x(lon).toFixed(1)} ${y(lat).toFixed(1)}`)
+    .join("") + "Z";
 
-const dots = [];
-for (let lat = LAT_MAX; lat >= LAT_MIN; lat -= STEP_LAT) {
-    for (let lon = LON_MIN; lon <= LON_MAX; lon += STEP_LON) {
-        if (!isLand(lon, lat)) {
+// Even-odd turns interior rings into holes while keeping islands as separate filled subpaths.
+const landPath = naturalEarthRings.map(polygonPath).join("");
+const landSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" width="${WIDTH}" height="${HEIGHT}" role="presentation" aria-hidden="true" focusable="false"><path fill="#000" fill-rule="evenodd" d="${landPath}"/></svg>`;
+
+// Population centres and corridors: longitude, latitude, density, and spread in degrees.
+// These are visual anchors rather than a population dataset.
+const CENTRES = [
+    [-0.1, 51.5, 48, 2.2], [2.4, 48.9, 44, 2.0], [4.9, 52.4, 32, 1.8],
+    [9.2, 50.1, 56, 3.4], [13.4, 52.5, 34, 2.0], [12.5, 41.9, 34, 2.5],
+    [-3.7, 40.4, 30, 2.6], [23.7, 38.0, 24, 1.8], [29.0, 41.0, 48, 2.2],
+    [32.8, 39.9, 32, 2.5], [37.6, 55.8, 44, 3.0], [30.5, 50.5, 26, 2.6],
+    [44.8, 41.7, 22, 2.4], [51.4, 35.7, 30, 2.8], [55.3, 25.2, 32, 2.0],
+    [31.2, 30.0, 38, 2.5], [35.2, 31.8, 22, 1.7], [46.7, 24.7, 24, 2.0],
+    [72.9, 19.1, 46, 2.8], [77.2, 28.6, 52, 3.3], [88.4, 22.6, 38, 2.8],
+    [67.0, 39.6, 22, 3.0], [3.4, 6.5, 34, 3.0], [7.5, 9.1, 18, 3.4],
+    [31.2, -1.3, 22, 3.4], [36.8, -1.3, 22, 2.6], [28.0, -26.2, 28, 3.0],
+    [18.4, -33.9, 22, 2.4], [10.2, 36.8, 18, 2.0], [3.0, 36.7, 18, 2.0]
+];
+
+// Stable pseudo-randomness makes generator output reviewable and reproducible.
+let seed = 0x57415341;
+const random = () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let value = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    value ^= value + Math.imul(value ^ value >>> 7, 61 | value);
+    return ((value ^ value >>> 14) >>> 0) / 4294967296;
+};
+
+const gaussian = () => {
+    const a = Math.max(random(), Number.EPSILON);
+    return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * random());
+};
+
+const lights = [];
+for (const [centreLon, centreLat, density, spread] of CENTRES) {
+    for (let index = 0; index < density; index++) {
+        const lon = centreLon + gaussian() * spread;
+        const lat = centreLat + gaussian() * spread * 0.62;
+        if (lon < LON_MIN || lon > LON_MAX || lat < LAT_MIN || lat > LAT_MAX || !isLand(lon, lat)) {
             continue;
         }
-        dots.push([x(lon).toFixed(1), y(lat).toFixed(1)]);
+
+        const radius = 0.55 + random() * 1.05;
+        const opacity = 0.42 + random() * 0.58;
+        lights.push(`<circle cx="${x(lon).toFixed(1)}" cy="${y(lat).toFixed(1)}" r="${radius.toFixed(1)}" opacity="${opacity.toFixed(2)}"/>`);
     }
 }
 
-// One path of tiny squares rather than thousands of <circle> elements: roughly a third of the bytes
-// and one node for the renderer to deal with. At this size a square and a circle are the same dot.
-const r = 1.6;
-const d = dots.map(([cx, cy]) => `M${cx} ${cy}h${r}v${r}h-${r}z`).join("");
+// Sparse background lights keep inhabited land outside the named anchors from reading as empty.
+for (let index = 0; index < 280; index++) {
+    const lon = LON_MIN + random() * (LON_MAX - LON_MIN);
+    const lat = LAT_MIN + random() * (LAT_MAX - LAT_MIN);
+    if (isLand(lon, lat)) {
+        lights.push(`<circle cx="${x(lon).toFixed(1)}" cy="${y(lat).toFixed(1)}" r="${(0.45 + random() * 0.65).toFixed(1)}" opacity="${(0.2 + random() * 0.35).toFixed(2)}"/>`);
+    }
+}
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" width="${WIDTH}" height="${HEIGHT}" role="presentation" aria-hidden="true" focusable="false"><path fill="currentColor" d="${d}"/></svg>`;
+const lightsSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" width="${WIDTH}" height="${HEIGHT}" role="presentation" aria-hidden="true" focusable="false"><g fill="#000">${lights.join("")}</g></svg>`;
 
-const target = path.join(__dirname, "..", "wwwroot", "brand", "world-dots.svg");
-fs.writeFileSync(target, svg);
-console.log(`${dots.length} dots -> ${path.relative(process.cwd(), target)}  ${(svg.length / 1024).toFixed(1)} KB`);
+const brand = path.join(__dirname, "..", "wwwroot", "brand");
+const outputs = [
+    [path.join(brand, "world-land.svg"), landSvg],
+    [path.join(brand, "world-lights.svg"), lightsSvg]
+];
+
+for (const [target, svg] of outputs) {
+    fs.writeFileSync(target, svg);
+    console.log(`${path.relative(process.cwd(), target)}  ${(svg.length / 1024).toFixed(1)} KB`);
+}

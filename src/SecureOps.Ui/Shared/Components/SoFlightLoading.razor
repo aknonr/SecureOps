@@ -16,28 +16,56 @@
 *@
 
 <div class="so-flight @(Bare ? "so-flight--bare" : null)" role="status" aria-live="polite" aria-busy="true">
-    <svg class="so-flight-svg" viewBox="0 0 240 72" role="presentation" aria-hidden="true" focusable="false">
-        @* Two copies of one path: the neutral track, and the red flown portion revealed by a
-           dash offset. Identical geometry keeps them registered at every viewport width. *@
-        <path class="so-flight-track" d="@RoutePath" />
-        <path class="so-flight-flown" d="@RoutePath" />
+    <div class="so-flight-card">
+        <svg class="so-flight-svg" viewBox="0 0 520 190" role="presentation" aria-hidden="true" focusable="false">
+            <defs>
+                <radialGradient id="so-loading-hub" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#e8394e" stop-opacity="0.92" />
+                    <stop offset="100%" stop-color="#e8394e" stop-opacity="0" />
+                </radialGradient>
+                <linearGradient id="so-loading-aircraft" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#ffffff" />
+                    <stop offset="60%" stop-color="#e5eaf0" />
+                    <stop offset="100%" stop-color="#aeb9c6" />
+                </linearGradient>
+            </defs>
 
-        <circle class="so-flight-node" cx="16" cy="56" r="3" />
-        <circle class="so-flight-node so-flight-node--end" cx="224" cy="20" r="3" />
+            <image class="so-flight-map" href="brand/world-land.svg" x="20" y="6" width="480" height="165"
+                   preserveAspectRatio="xMidYMid meet" />
 
-        @* Rotated to sit along the route's tangent at the point it rides. *@
-        <g class="so-flight-plane">
-            <path d="M -7 0 L 5 0 L 9 -3 L 5 2 L 9 7 L 5 4 L -7 4 L -9 2 Z" transform="rotate(-14)" />
-        </g>
-    </svg>
+            <path class="so-flight-track" d="@RoutePath" />
+            <path class="so-flight-flown" d="@RoutePath" />
 
-    <p class="so-flight-message">@Message</p>
+            <circle class="so-flight-hub-glow" cx="246" cy="66" r="22" fill="url(#so-loading-hub)" />
+            <circle class="so-flight-node" cx="246" cy="66" r="4" />
+
+            <image class="so-flight-emblem" href="brand/approved/thy-emblem-256.png"
+                   x="326" y="28" width="46" height="46" />
+
+            <g class="so-flight-plane">
+                <g transform="scale(0.72)">
+                    <path class="so-flight-plane-shadow"
+                          d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
+                    <path fill="url(#so-loading-aircraft)"
+                          d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
+                    <path class="so-flight-plane-tail" d="M-30 -3 L-25 -14 L-19 -14 L-20 -3 Z" />
+                </g>
+            </g>
+        </svg>
+
+        <div class="so-flight-copy">
+            <p class="so-flight-title">Yükleniyor...</p>
+            <p class="so-flight-message">@Message</p>
+        </div>
+
+        <span class="so-flight-activity" aria-hidden="true"><span></span></span>
+    </div>
 </div>
 
 @code {
     // A single shallow arc. Deliberately gentle: a steep climb reads as a departure graphic, and
     // this is a progress indicator that happens to be aviation-shaped, not an illustration.
-    private const string RoutePath = "M 16 56 Q 120 4 224 20";
+    private const string RoutePath = "M 246 66 Q 340 142 468 82";
 
     /// <summary>Message describing what is being fetched.</summary>
     /// <remarks>

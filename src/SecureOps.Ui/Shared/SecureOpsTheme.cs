@@ -142,7 +142,7 @@ public static class SecureOpsTheme
         LayoutProperties = new LayoutProperties
         {
             DrawerWidthLeft = "248px",
-            DefaultBorderRadius = "10px"
+            DefaultBorderRadius = "8px"
         },
         Typography = new Typography
         {
@@ -151,11 +151,11 @@ public static class SecureOpsTheme
                 FontFamily = ["Segoe UI", "Segoe UI Variable", "system-ui", "Arial", "sans-serif"],
                 LetterSpacing = "0"
             },
-            H1 = new H1 { LetterSpacing = "-0.01em" },
-            H2 = new H2 { LetterSpacing = "-0.01em" },
-            H3 = new H3 { LetterSpacing = "-0.01em" },
-            H4 = new H4 { LetterSpacing = "-0.005em" },
-            H5 = new H5 { LetterSpacing = "-0.005em" },
+            H1 = new H1 { LetterSpacing = "0" },
+            H2 = new H2 { LetterSpacing = "0" },
+            H3 = new H3 { LetterSpacing = "0" },
+            H4 = new H4 { LetterSpacing = "0" },
+            H5 = new H5 { LetterSpacing = "0" },
             H6 = new H6 { LetterSpacing = "0" }
         }
     };
