@@ -34,7 +34,9 @@ public sealed record OperationalRecordResponse(
     bool JiraExists,
     string PresentationState = OperationalRecordPresentationStates.NeedsAttention,
     bool SimulationMode = false,
-    string? SimulationNotice = null);
+    string? SimulationNotice = null,
+    bool ReadOnlyIntegrationMode = false,
+    string? ReadOnlyNotice = null);
 
 /// <summary>Stable UI presentation categories derived from durable workflow states.</summary>
 public static class OperationalRecordPresentationStates

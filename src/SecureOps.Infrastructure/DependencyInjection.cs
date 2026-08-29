@@ -176,6 +176,7 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),
                 serviceProvider.GetRequiredService<ITuruncuHatSessionManager>(),
                 serviceProvider.GetRequiredService<IOptions<TuruncuHatOptions>>(),
+                serviceProvider.GetRequiredService<IOptions<OperationalRecordsOptions>>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationHealthState>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
                 serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<TuruncuHatOperationalRecordClient>>()));
@@ -203,6 +204,7 @@ public static class DependencyInjection
             services.AddSingleton<IJiraClient>(serviceProvider => new CorporateJiraClient(
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("CorporateJira"),
                 serviceProvider.GetRequiredService<IOptions<JiraIntegrationOptions>>(),
+                serviceProvider.GetRequiredService<IOptions<OperationalRecordsOptions>>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationHealthState>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
                 serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CorporateJiraClient>>()));

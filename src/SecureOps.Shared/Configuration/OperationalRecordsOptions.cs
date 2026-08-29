@@ -17,4 +17,7 @@ public sealed class OperationalRecordsOptions
 
     /// <summary>Bounded actor lease duration for Jira create/retry commands.</summary>
     public int ClaimLeaseSeconds { get; set; } = 120;
+
+    /// <summary>Allows corporate reads and preview while rejecting every external write path.</summary>
+    public bool ReadOnlyIntegrationMode { get; set; }
 }

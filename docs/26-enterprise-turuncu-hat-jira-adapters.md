@@ -4,8 +4,11 @@
 
 - `OperationalRecords:SourceProvider=Disabled|Fake|TuruncuHat`
 - `Jira:Provider=Disabled|Fake|Corporate`
+- `OperationalRecords:ReadOnlyIntegrationMode=true` for the TEST real-data/no-write gate
 
 `Fake` is permitted only in Development, Demo, or Test. Real provider selection is explicit and never falls back to synthetic behavior. Application defaults remain `Disabled`.
+
+In `Test`, selecting either corporate provider without `ReadOnlyIntegrationMode=true` fails startup. Read-only mode is accepted only with the complete `TuruncuHat` + `Corporate` pair. It permits source authentication/query and Jira requester-resolution reads, but rejects API create/retry before local workflow mutation and rejects Jira create/Turuncu Hat completion again inside the adapters before HTTP dispatch.
 
 ## Turuncu Hat Configuration
 
@@ -95,7 +98,7 @@ Jira user search uses the evidenced `/rest/api/2/user/search?username=...` endpo
 
 Source completion runs only after the Jira key is persisted. It requires exactly one activity and explicit update success. A failure leaves `JiraExists=true` and retries only source completion.
 
-`GET /api/v1/health/enterprise-integrations` is Admin-only and returns provider selection plus `Configured`, `Disabled`, or `Unavailable`. It returns no URL, credential, session, username, or remote response.
+`GET /api/v1/health/enterprise-integrations` is Admin-only and returns provider selection plus `Configured`, `Disabled`, or `Unavailable`. It also returns `readOnlyIntegrationMode` and the safe operator notice when that gate is active. It returns no URL, credential, session, username, or remote response.
 
 ## Sanitized Fixtures Required Before Real TEST
 

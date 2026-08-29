@@ -80,11 +80,21 @@ public sealed class JiraTransferService : IJiraTransferService
 
     /// <inheritdoc />
     public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
-        ExecuteCommandAsync(CreateCommand, id, context, ExecuteCreateClaimedAsync, cancellationToken);
+        _operationalOptions.ReadOnlyIntegrationMode
+            ? Task.FromResult(ExternalWritesDisabled())
+            : ExecuteCommandAsync(CreateCommand, id, context, ExecuteCreateClaimedAsync, cancellationToken);
 
     /// <inheritdoc />
     public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
-        ExecuteCommandAsync(RetryCommand, id, context, ExecuteRetryClaimedAsync, cancellationToken);
+        _operationalOptions.ReadOnlyIntegrationMode
+            ? Task.FromResult(ExternalWritesDisabled())
+            : ExecuteCommandAsync(RetryCommand, id, context, ExecuteRetryClaimedAsync, cancellationToken);
+
+    private static OperationalRecordResult<OperationalRecord> ExternalWritesDisabled() =>
+        OperationalRecordResult<OperationalRecord>.Fail(
+            OperationalErrorCodes.ExternalWritesDisabled,
+            "external-write-fence",
+            false);
 
     private async Task<OperationalRecordResult<OperationalRecord>> ExecuteCommandAsync(
         string commandName,

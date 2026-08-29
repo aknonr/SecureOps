@@ -192,6 +192,29 @@ public sealed class JiraTransferServiceTests
         second.Record!.MappingVersion.Should().Be("mapping-v1");
     }
 
+    [Fact]
+    public async Task ReadOnlyIntegrationMode_CreateAndRetryFailBeforeWorkflowOrProviderWrites()
+    {
+        TestFixture fixture = await TestFixture.CreateAsync(readOnlyIntegrationMode: true);
+
+        OperationalRecordResult<OperationalRecord> create = await fixture.Service.CreateAsync(
+            fixture.RecordId,
+            _context,
+            CancellationToken.None);
+        OperationalRecordResult<OperationalRecord> retry = await fixture.Service.RetryAsync(
+            fixture.RecordId,
+            _context,
+            CancellationToken.None);
+        OperationalRecord record = (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!;
+
+        create.Failure!.Code.Should().Be(OperationalErrorCodes.ExternalWritesDisabled);
+        create.Failure.Stage.Should().Be("external-write-fence");
+        retry.Failure!.Code.Should().Be(OperationalErrorCodes.ExternalWritesDisabled);
+        fixture.Jira.Calls.Should().Be(0);
+        fixture.Source.CloseCalls.Should().Be(0);
+        record.WorkflowState.Should().Be(OperationalRecordWorkflowState.Previewed);
+    }
+
     private sealed class TestFixture
     {
         private TestFixture(
@@ -217,7 +240,10 @@ public sealed class JiraTransferServiceTests
         public JiraTransferService Service { get; }
         public Guid RecordId { get; }
 
-        public static async Task<TestFixture> CreateAsync(CountingJiraClient? jira = null, CountingSourceClient? source = null)
+        public static async Task<TestFixture> CreateAsync(
+            CountingJiraClient? jira = null,
+            CountingSourceClient? source = null,
+            bool readOnlyIntegrationMode = false)
         {
             InMemoryOperationalRecordRepository repository = new();
             OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
@@ -240,7 +266,7 @@ public sealed class JiraTransferServiceTests
                 source,
                 new InMemoryCommandIdempotencyStore(TimeProvider.System),
                 audit,
-                Options.Create(new OperationalRecordsOptions()),
+                Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
                 Options.Create(new CommandIdempotencyOptions()),
                 NullLogger<JiraTransferService>.Instance);
             OperationalRecordResult<JiraIssueDraft> preview = await service.PreviewAsync(record.Id, _context, CancellationToken.None);

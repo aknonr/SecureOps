@@ -27,6 +27,7 @@ public sealed class OperationalRecordsController : ControllerBase
     private readonly CommandIdempotencyOptions _commandOptions;
     private readonly TimeProvider _timeProvider;
     private readonly bool _simulationMode;
+    private readonly bool _readOnlyIntegrationMode;
 
     /// <summary>Initializes the controller.</summary>
     public OperationalRecordsController(
@@ -41,6 +42,7 @@ public sealed class OperationalRecordsController : ControllerBase
         _transferService = transferService;
         _commandOptions = commandOptions.Value;
         _timeProvider = timeProvider;
+        _readOnlyIntegrationMode = operationalOptions.Value.ReadOnlyIntegrationMode;
         _simulationMode = string.Equals(
                 operationalOptions.Value.SourceProvider,
                 "Simulation",
@@ -104,7 +106,9 @@ public sealed class OperationalRecordsController : ControllerBase
             draft.Warnings,
             draft.AssigneeUsername,
             _simulationMode,
-            SimulationNotice()));
+            SimulationNotice(),
+            _readOnlyIntegrationMode,
+            ReadOnlyNotice()));
     }
 
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>
@@ -121,6 +125,11 @@ public sealed class OperationalRecordsController : ControllerBase
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
+        if (_readOnlyIntegrationMode)
+        {
+            return Failure<JiraTransferResponse>(ExternalWritesDisabled());
+        }
+
         if (!IsValidIdempotencyKey(idempotencyKey))
         {
             return Failure<JiraTransferResponse>(new OperationalRecordFailure(OperationalErrorCodes.InvalidIdempotencyKey, "idempotency", false));
@@ -145,6 +154,11 @@ public sealed class OperationalRecordsController : ControllerBase
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
+        if (_readOnlyIntegrationMode)
+        {
+            return Failure<JiraTransferResponse>(ExternalWritesDisabled());
+        }
+
         if (!IsValidIdempotencyKey(idempotencyKey))
         {
             return Failure<JiraTransferResponse>(new OperationalRecordFailure(OperationalErrorCodes.InvalidIdempotencyKey, "idempotency", false));
@@ -178,7 +192,8 @@ public sealed class OperationalRecordsController : ControllerBase
             OperationalErrorCodes.OperationalRecordAlreadyClaimed or
             OperationalErrorCodes.OperationalRecordChanged or
             OperationalErrorCodes.OperationalRecordNoLongerOpen or
-            OperationalErrorCodes.WorkflowAlreadyInProgress => StatusCodes.Status409Conflict,
+            OperationalErrorCodes.WorkflowAlreadyInProgress or
+            OperationalErrorCodes.ExternalWritesDisabled => StatusCodes.Status409Conflict,
             OperationalErrorCodes.InvalidIdempotencyKey => StatusCodes.Status400BadRequest,
             OperationalErrorCodes.JiraValidationFailed => StatusCodes.Status422UnprocessableEntity,
             OperationalErrorCodes.RequesterResolutionFailed => StatusCodes.Status422UnprocessableEntity,
@@ -201,6 +216,7 @@ public sealed class OperationalRecordsController : ControllerBase
         OperationalErrorCodes.WorkflowAlreadyInProgress => "The workflow is already in progress.",
         OperationalErrorCodes.InvalidIdempotencyKey => "The idempotency key is invalid.",
         OperationalErrorCodes.WorkflowConflict => "The workflow cannot proceed automatically.",
+        OperationalErrorCodes.ExternalWritesDisabled => "External writes are disabled for this integration mode.",
         _ => "The operational workflow could not be completed."
     };
 
@@ -235,7 +251,9 @@ public sealed class OperationalRecordsController : ControllerBase
         !string.IsNullOrWhiteSpace(record.JiraIssueKey),
         PresentationState(record),
         _simulationMode,
-        SimulationNotice());
+        SimulationNotice(),
+        _readOnlyIntegrationMode,
+        ReadOnlyNotice());
 
     private static bool IsRetryEligible(OperationalRecord record) =>
         !record.ReconciliationRequired
@@ -263,6 +281,12 @@ public sealed class OperationalRecordsController : ControllerBase
 
     private string? SimulationNotice() =>
         _simulationMode ? SimulationOperationalRecordClient.OperatorNotice : null;
+
+    private string? ReadOnlyNotice() =>
+        _readOnlyIntegrationMode ? ExternalIntegrationNotices.RealDataReadOnly : null;
+
+    private static OperationalRecordFailure ExternalWritesDisabled() =>
+        new(OperationalErrorCodes.ExternalWritesDisabled, "external-write-fence", false);
 
     private static string PresentationState(OperationalRecord record) => record.WorkflowState switch
     {

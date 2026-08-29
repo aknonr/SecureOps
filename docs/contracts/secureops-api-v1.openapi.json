@@ -5175,6 +5175,13 @@
           "simulationNotice": {
             "type": "string",
             "nullable": true
+          },
+          "readOnlyIntegrationMode": {
+            "type": "boolean"
+          },
+          "readOnlyNotice": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -5425,6 +5432,13 @@
             "type": "boolean"
           },
           "simulationNotice": {
+            "type": "string",
+            "nullable": true
+          },
+          "readOnlyIntegrationMode": {
+            "type": "boolean"
+          },
+          "readOnlyNotice": {
             "type": "string",
             "nullable": true
           }

@@ -21,6 +21,7 @@ ADR-0009 established the durable Operational Record to Jira workflow and deferre
 - After a confirmed Jira key is persisted, query exactly one configured BPM activity, update it, and require an evidenced `UpdateResult.Success=true`. Zero or multiple activities fail close-only completion without creating another Jira.
 - Preserve database command fencing, claims, source freshness, one transfer per OR, key-first persistence, close-only retry, and reconciliation from ADR-0009/0010.
 - Expose only `Configured`, `Disabled`, or `Unavailable` provider diagnostics to Admin. Do not expose URLs, credentials, sessions, usernames, or remote bodies.
+- For the real-data TEST read-only gate, require an explicit `OperationalRecords:ReadOnlyIntegrationMode=true` with the complete Turuncu Hat/Corporate pair. Block create/retry before workflow mutation and block both corporate write adapters before HTTP dispatch while preserving source reads, Jira user resolution, and preview.
 
 ## Activation Gate
 

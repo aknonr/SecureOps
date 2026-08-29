@@ -19,6 +19,7 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
     private readonly HttpClient _httpClient;
     private readonly ITuruncuHatSessionManager _sessions;
     private readonly TuruncuHatOptions _options;
+    private readonly OperationalRecordsOptions _operationalOptions;
     private readonly EnterpriseIntegrationHealthState _health;
     private readonly EnterpriseIntegrationTelemetry _telemetry;
     private readonly ILogger<TuruncuHatOperationalRecordClient> _logger;
@@ -28,6 +29,7 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         HttpClient httpClient,
         ITuruncuHatSessionManager sessions,
         IOptions<TuruncuHatOptions> options,
+        IOptions<OperationalRecordsOptions> operationalOptions,
         EnterpriseIntegrationHealthState health,
         EnterpriseIntegrationTelemetry telemetry,
         ILogger<TuruncuHatOperationalRecordClient> logger)
@@ -35,6 +37,7 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         _httpClient = httpClient;
         _sessions = sessions;
         _options = options.Value;
+        _operationalOptions = operationalOptions.Value;
         _health = health;
         _telemetry = telemetry;
         _logger = logger;
@@ -66,6 +69,11 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         string jiraIssueKey,
         CancellationToken cancellationToken)
     {
+        if (_operationalOptions.ReadOnlyIntegrationMode)
+        {
+            throw new ExternalIntegrationException(OperationalErrorCodes.ExternalWritesDisabled, retryable: false);
+        }
+
         if (!long.TryParse(sourceRecordId, NumberStyles.None, CultureInfo.InvariantCulture, out long sourceId)
             || sourceId <= 0)
         {

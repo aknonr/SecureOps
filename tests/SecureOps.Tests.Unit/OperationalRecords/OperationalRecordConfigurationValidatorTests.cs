@@ -79,6 +79,44 @@ public sealed class OperationalRecordConfigurationValidatorTests
     }
 
     [Fact]
+    public void Validate_WithCorporateProvidersInTestWithoutReadOnlyMode_FailsClosed()
+    {
+        Dictionary<string, string?> values = EnterpriseValues();
+        values["OperationalRecords:ReadOnlyIntegrationMode"] = "false";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*ReadOnlyIntegrationMode=true*");
+    }
+
+    [Fact]
+    public void Validate_WithReadOnlyModeAndNonCorporateProviders_FailsClosed()
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["OperationalRecords:ReadOnlyIntegrationMode"] = "true",
+            ["OperationalRecords:SourceProvider"] = "Fake",
+            ["Jira:Provider"] = "Fake"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*SourceProvider=TuruncuHat*Jira:Provider=Corporate*");
+    }
+
+    [Theory]
+    [InlineData("Pilot")]
+    [InlineData("Production")]
+    public void Validate_WithReadOnlyModeOutsideTest_FailsClosed(string environmentName)
+    {
+        Dictionary<string, string?> values = EnterpriseValues();
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), environmentName);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*permitted only in Test*");
+    }
+
+    [Fact]
     public void Validate_WithDisabledSourceInProduction_Succeeds()
     {
         IConfiguration configuration = Configuration(new Dictionary<string, string?>
@@ -225,6 +263,7 @@ public sealed class OperationalRecordConfigurationValidatorTests
     private static Dictionary<string, string?> EnterpriseValues() => new()
     {
         ["OperationalRecords:SourceProvider"] = "TuruncuHat",
+        ["OperationalRecords:ReadOnlyIntegrationMode"] = "true",
         ["Jira:Provider"] = "Corporate",
         ["TuruncuHat:BaseUrl"] = "https://source.invalid/",
         ["TuruncuHat:Authorization"] = "Sanitized runtime value",

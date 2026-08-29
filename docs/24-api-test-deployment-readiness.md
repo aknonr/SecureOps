@@ -74,6 +74,7 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED, TEST-ONLY | `PamProvider__Provider` / `PamProvider__TimeoutSeconds` | `Mock` / `3` |
 | REQUIRED | `OperationalRecords__SourceProvider` | paired `Simulation` for operator-visible deterministic TEST, legacy `Fake` for automated compatibility, `Disabled` for fail-closed runtime, or contract-gated `TuruncuHat` only after separate approval |
 | REQUIRED | `OperationalRecords__RepositoryProvider` / `OperationalRecords__MaxImportCount` / `OperationalRecords__ClaimLeaseSeconds` | `SqlServer` / `100` / `120` |
+| REQUIRED FOR REAL-DATA READ-ONLY TEST | `OperationalRecords__ReadOnlyIntegrationMode` | `true`; requires `TuruncuHat` + `Corporate` and blocks all external writes |
 | REQUIRED | `Jira__Provider` | `Disabled`, paired `Simulation` for operator-visible synthetic TEST, legacy `Fake` for automated compatibility, or contract-gated `Corporate` only after separate approval |
 | REQUIRED | `Jira__ProjectKey` / `Jira__IssueType` / `Jira__MappingVersion` | `<approved TEST project key>` / `<approved issue type>` / `<reviewed mapping version>` |
 | REQUIRED | `Jira__UnresolvedRequesterPolicy` / `Jira__SummaryMaxLength` | `Block` / `255` |
@@ -85,6 +86,8 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | CONDITIONAL | `ReverseProxy__ForwardedHeaders__TrustedProxyIps__0` | `<exact trusted API proxy IP>` only when forwarding is explicitly enabled |
 
 `Simulation` source records and `SIM-*` Jira keys are synthetic TEST evidence only. The provider has fixed scenarios, performs no network I/O, must be selected on both sides, and fails startup outside Development/Demo/Test. `Fake`/`FAKE-*` remains a legacy automated-test compatibility path.
+
+The UI process has its own server-owned Data Protection settings: `DataProtection__Mode=FileSystemDpapi`, `DataProtection__ApplicationName=SecureOps.Ui`, and `DataProtection__KeyRingPath=<absolute server-owned UI key-ring directory outside deployment>`. Keep API and UI rings separate and grant each App Pool identity read/write/create access only to its own ring.
 
 Do not configure SQL usernames/passwords. The Integrated Security identity is `DOMAIN\\WASAST_YONETIM`. File-audit keys are obsolete when SQL audit is selected. `IdentityLookup__RateLimit__*` is obsolete; the active keys are under `RateLimiting__*`.
 

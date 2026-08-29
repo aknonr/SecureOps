@@ -89,6 +89,28 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("Jira:Provider Simulation is permitted only in Development, Demo, or Test.");
         }
 
+        bool turuncuHatSource = string.Equals(operational.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase);
+        bool corporateJira = string.Equals(jira.Provider, "Corporate", StringComparison.OrdinalIgnoreCase);
+        if (operational.ReadOnlyIntegrationMode)
+        {
+            if (!string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("OperationalRecords:ReadOnlyIntegrationMode is permitted only in Test.");
+            }
+
+            if (!turuncuHatSource || !corporateJira)
+            {
+                throw new InvalidOperationException(
+                    "OperationalRecords:ReadOnlyIntegrationMode requires OperationalRecords:SourceProvider=TuruncuHat and Jira:Provider=Corporate.");
+            }
+        }
+        else if (string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase)
+                 && (turuncuHatSource || corporateJira))
+        {
+            throw new InvalidOperationException(
+                "Corporate providers in Test require OperationalRecords:ReadOnlyIntegrationMode=true so external writes fail closed.");
+        }
+
         if (string.IsNullOrWhiteSpace(jira.ProjectKey) || string.IsNullOrWhiteSpace(jira.IssueType) || string.IsNullOrWhiteSpace(jira.MappingVersion))
         {
             throw new InvalidOperationException("Jira project, issue type, and mapping version are required.");

@@ -10,7 +10,7 @@ public sealed class PersistentDataProtectionOptions
     public string Mode { get; set; } = "Ephemeral";
 
     /// <summary>Stable application discriminator shared by intended nodes only.</summary>
-    public string ApplicationName { get; set; } = "SecureOps.Api";
+    public string ApplicationName { get; set; } = string.Empty;
 
     /// <summary>Server-owned persistent key-ring directory.</summary>
     public string? KeyRingPath { get; set; }

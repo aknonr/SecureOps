@@ -73,7 +73,7 @@ public sealed class EnterpriseAdapterContractTests
             httpClient, Options.Create(options), TimeProvider.System, health, telemetry,
             NullLogger<TuruncuHatSessionManager>.Instance);
         TuruncuHatOperationalRecordClient client = new(
-            httpClient, manager, Options.Create(options), health, telemetry,
+            httpClient, manager, Options.Create(options), Options.Create(new OperationalRecordsOptions()), health, telemetry,
             NullLogger<TuruncuHatOperationalRecordClient>.Instance);
 
         IReadOnlyList<OperationalRecordSourceItem> records = await client.GetActiveAsync(10, CancellationToken.None);
@@ -441,6 +441,43 @@ public sealed class EnterpriseAdapterContractTests
         classifier.Classify(invalid).JiraEligible.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task JiraCreate_InReadOnlyIntegrationMode_IsBlockedBeforeNetworkDispatch()
+    {
+        ScriptedHandler handler = new();
+        CorporateJiraClient client = JiraClient(handler, readOnlyIntegrationMode: true);
+        JiraIssueDraft draft = new(
+            Guid.NewGuid(),
+            "OR-100",
+            "SAFE",
+            "Task",
+            "Summary",
+            "Description",
+            null,
+            "v1",
+            new string('a', 64),
+            []);
+
+        Func<Task> act = () => client.CreateIssueAsync(draft, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.ExternalWritesDisabled);
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SourceClose_InReadOnlyIntegrationMode_IsBlockedBeforeNetworkDispatch()
+    {
+        ScriptedHandler handler = new();
+        TuruncuHatOperationalRecordClient client = SourceClient(handler, readOnlyIntegrationMode: true);
+
+        Func<Task> act = () => client.CloseAsync("1001", "OR-100", "SAFE-123", CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.ExternalWritesDisabled);
+        handler.Requests.Should().BeEmpty();
+    }
+
     private static TuruncuHatSessionManager SessionManager(ScriptedHandler handler) => new(
         Client(handler, "https://source.invalid/"),
         Options.Create(TuruncuOptions()),
@@ -449,10 +486,13 @@ public sealed class EnterpriseAdapterContractTests
         new EnterpriseIntegrationTelemetry(),
         NullLogger<TuruncuHatSessionManager>.Instance);
 
-    private static TuruncuHatOperationalRecordClient SourceClient(HttpMessageHandler handler) => new(
+    private static TuruncuHatOperationalRecordClient SourceClient(
+        HttpMessageHandler handler,
+        bool readOnlyIntegrationMode = false) => new(
         Client(handler, "https://source.invalid/"),
         new FixedSessionManager(),
         Options.Create(TuruncuOptions()),
+        Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
         new EnterpriseIntegrationHealthState(),
         new EnterpriseIntegrationTelemetry(),
         NullLogger<TuruncuHatOperationalRecordClient>.Instance);
@@ -465,9 +505,12 @@ public sealed class EnterpriseAdapterContractTests
         new EnterpriseIntegrationTelemetry(),
         NullLogger<CorporateJiraRequesterResolver>.Instance);
 
-    private static CorporateJiraClient JiraClient(HttpMessageHandler handler) => new(
+    private static CorporateJiraClient JiraClient(
+        HttpMessageHandler handler,
+        bool readOnlyIntegrationMode = false) => new(
         Client(handler, "https://jira.invalid/"),
         Options.Create(JiraOptions()),
+        Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
         new EnterpriseIntegrationHealthState(),
         new EnterpriseIntegrationTelemetry(),
         NullLogger<CorporateJiraClient>.Instance);

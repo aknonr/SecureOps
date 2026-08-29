@@ -15,6 +15,7 @@ public sealed class CorporateJiraClient : IJiraClient
     private const string Provider = "Jira";
     private readonly HttpClient _httpClient;
     private readonly JiraIntegrationOptions _options;
+    private readonly OperationalRecordsOptions _operationalOptions;
     private readonly EnterpriseIntegrationHealthState _health;
     private readonly EnterpriseIntegrationTelemetry _telemetry;
     private readonly ILogger<CorporateJiraClient> _logger;
@@ -23,12 +24,14 @@ public sealed class CorporateJiraClient : IJiraClient
     public CorporateJiraClient(
         HttpClient httpClient,
         IOptions<JiraIntegrationOptions> options,
+        IOptions<OperationalRecordsOptions> operationalOptions,
         EnterpriseIntegrationHealthState health,
         EnterpriseIntegrationTelemetry telemetry,
         ILogger<CorporateJiraClient> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _operationalOptions = operationalOptions.Value;
         _health = health;
         _telemetry = telemetry;
         _logger = logger;
@@ -37,6 +40,11 @@ public sealed class CorporateJiraClient : IJiraClient
     /// <inheritdoc />
     public async Task<JiraIssueCreationResult> CreateIssueAsync(JiraIssueDraft draft, CancellationToken cancellationToken)
     {
+        if (_operationalOptions.ReadOnlyIntegrationMode)
+        {
+            throw new ExternalIntegrationException(OperationalErrorCodes.ExternalWritesDisabled, retryable: false);
+        }
+
         Dictionary<string, object?> fields = new(StringComparer.Ordinal)
         {
             ["project"] = new { key = draft.ProjectKey },

@@ -4,7 +4,7 @@
 
 `SessionSecurity` controls `IdleTimeoutMinutes` (default 30), `AbsoluteLifetimeHours` (default 12), `ActivityPersistenceIntervalMinutes` (default 5), `RepositoryProvider`, `CookieName`, and bounded administrative page size. The application-session cookie is an opaque protected handle only. Server state, current access status, and `AccessVersion` are authoritative.
 
-`DataProtection` controls `Mode`, `ApplicationName`, `KeyRingPath`, and optional `CertificateThumbprint`. Supported modes are `Ephemeral` for local Development/Demo/Test only, `FileSystemDpapi` for a single Windows node, and `FileSystemCertificate` for a shared future multi-node key ring. Pilot and Production reject ephemeral or incomplete configuration at startup. No key or certificate material belongs in Git.
+`DataProtection` controls `Mode`, `ApplicationName`, `KeyRingPath`, and optional `CertificateThumbprint` independently in the API and UI processes. Supported modes are `Ephemeral` for local Development/Demo/Test only, `FileSystemDpapi` for a single Windows node, and `FileSystemCertificate` for a shared future multi-node key ring. Pilot and Production reject ephemeral or incomplete configuration at startup. No key or certificate material belongs in Git.
 
 ## API Contract
 
@@ -19,7 +19,11 @@ Administrative listing now atomically marks previously unvisited idle/absolute e
 
 ## Data Protection Deployment
 
-For one pilot node, create a server-owned key-ring directory outside the deployment payload, grant the App Pool identity read/write/create access only to that directory, and select local-machine DPAPI protection. Back up the key ring under the same access and retention controls as other authentication material. For multiple nodes, use one access-controlled shared key ring and certificate protection where each node can read the private key; keep the same application name on all nodes.
+For one pilot node, create separate server-owned API and UI key-ring directories outside both deployment payloads. Grant each App Pool identity read/write/create access only to its own directory and select local-machine DPAPI protection. Use stable discriminators `SecureOps.Api` and `SecureOps.Ui`; changing either invalidates that application's protected payloads. Back up both key rings under the same access and retention controls as other authentication material.
+
+The UI ring protects its authentication ticket and antiforgery cookie. The API ring protects the application-session handle and directory continuation tokens. API persistence alone cannot prevent UI `Unprotect ticket failed` or antiforgery key-not-found errors. After replacing an ephemeral ring, pre-existing cookies are intentionally unreadable and must be cleared once.
+
+For multiple nodes, local-machine DPAPI cannot protect a shared ring. Use separate access-controlled shared rings with `FileSystemCertificate`, deploy the approved certificate/private key to every participating node, grant each App Pool only the required private-key access, and keep each application's discriminator stable across its nodes.
 
 ## Windows Authentication Boundary
 

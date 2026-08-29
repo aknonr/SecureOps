@@ -202,6 +202,14 @@ It **does not trust `X-Forwarded-Proto`**. The scheme is set to HTTPS only when 
 Any mismatch leaves the request as HTTP. Options are validated at startup, so a half-configured trust
 boundary stops the host rather than degrading silently.
 
+The UI explicitly binds the same `DataProtection` option names as the API. Controlled single-node
+hosting uses `DataProtection:Mode=FileSystemDpapi`, `DataProtection:ApplicationName=SecureOps.Ui`,
+and an absolute server-owned UI key-ring path outside the deployment. Its App Pool identity needs
+read/write/create access only to that directory. The UI authentication and antiforgery cookies use
+this ring; configuring only the API ring does not make UI cookies survive a recycle. Multi-node UI
+hosting requires `FileSystemCertificate`, a shared UI ring, and the same `SecureOps.Ui`
+discriminator on every UI node.
+
 **Trusted proxy IPs are server-owned.** Never widen them in application defaults, never trust a CIDR
 range, and confirm the authoritative LB SNAT/backend source set with the network owners rather than
 inferring it from observed traffic.

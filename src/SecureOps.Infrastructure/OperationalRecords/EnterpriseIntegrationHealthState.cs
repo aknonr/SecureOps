@@ -50,7 +50,9 @@ public sealed class EnterpriseIntegrationDiagnostics
             Provider("TuruncuHat", _operational.SourceProvider),
             Provider("Jira", _jira.Provider),
             simulation,
-            simulation ? SimulationOperationalRecordClient.OperatorNotice : null);
+            simulation ? SimulationOperationalRecordClient.OperatorNotice : null,
+            _operational.ReadOnlyIntegrationMode,
+            _operational.ReadOnlyIntegrationMode ? ExternalIntegrationNotices.RealDataReadOnly : null);
     }
 
     private IntegrationProviderHealthResponse Provider(string provider, string selection) =>

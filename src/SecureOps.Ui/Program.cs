@@ -12,6 +12,10 @@ using SecureOps.Ui.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+UiDataProtectionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName);
+builder.Services.AddSecureOpsUiDataProtection(builder.Configuration);
+builder.Services.AddHostedService<UiDataProtectionStartupValidationHostedService>();
+
 // WebApplication.CreateBuilder auto-loads the build output's static web assets manifest only in the
 // Development environment. When running locally in the Demo environment the manifest is otherwise
 // skipped, so Razor Class Library assets such as _content/MudBlazor/MudBlazor.min.js and .css would

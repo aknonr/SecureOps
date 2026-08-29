@@ -85,6 +85,8 @@ public static class OperationalErrorCodes
     public const string OperationalRecordActivityAmbiguous = "OperationalRecordActivityAmbiguous";
     /// <summary>Operational-record comment update failed.</summary>
     public const string OperationalRecordCommentUpdateFailed = "OperationalRecordCommentUpdateFailed";
+    /// <summary>The configured integration mode prohibits external writes.</summary>
+    public const string ExternalWritesDisabled = "ExternalWritesDisabled";
     /// <summary>Another workflow operation owns the record.</summary>
     public const string WorkflowConflict = "WorkflowConflict";
     /// <summary>The workflow already completed.</summary>

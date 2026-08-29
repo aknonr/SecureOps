@@ -34,6 +34,66 @@ public sealed class OperationalRecordsControllerTests
     }
 
     [Fact]
+    public async Task PreviewAsync_WhenRequesterResolutionFails_ReturnsObserved422Contract()
+    {
+        OperationalRecordsController controller = CreateController(
+            OperationalRecordResult<JiraIssueDraft>.Fail(
+                OperationalErrorCodes.RequesterResolutionFailed,
+                "requester-resolution",
+                false));
+
+        ActionResult<JiraPreviewResponse> result = await controller.PreviewAsync(Guid.NewGuid(), CancellationToken.None);
+
+        ObjectResult response = result.Result.Should().BeOfType<ObjectResult>().Subject;
+        response.StatusCode.Should().Be(StatusCodes.Status422UnprocessableEntity);
+        ProblemDetails problem = response.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Extensions["code"].Should().Be(OperationalErrorCodes.RequesterResolutionFailed);
+        problem.Extensions["stage"].Should().Be("requester-resolution");
+        problem.Extensions["retryable"].Should().Be(false);
+    }
+
+    [Fact]
+    public async Task WriteEndpoints_InReadOnlyIntegrationMode_ReturnStableConflictBeforeTransferService()
+    {
+        OperationalRecordsController controller = CreateController(Record(), readOnlyIntegrationMode: true);
+
+        ActionResult<JiraTransferResponse> create = await controller.CreateAsync(
+            Guid.NewGuid(),
+            null,
+            CancellationToken.None);
+        ActionResult<JiraTransferResponse> retry = await controller.RetryAsync(
+            Guid.NewGuid(),
+            null,
+            CancellationToken.None);
+
+        foreach (ObjectResult response in new[]
+                 {
+                     create.Result.Should().BeOfType<ObjectResult>().Subject,
+                     retry.Result.Should().BeOfType<ObjectResult>().Subject
+                 })
+        {
+            response.StatusCode.Should().Be(StatusCodes.Status409Conflict);
+            ProblemDetails problem = response.Value.Should().BeOfType<ProblemDetails>().Subject;
+            problem.Extensions["code"].Should().Be(OperationalErrorCodes.ExternalWritesDisabled);
+            problem.Extensions["stage"].Should().Be("external-write-fence");
+            problem.Extensions["retryable"].Should().Be(false);
+        }
+    }
+
+    [Fact]
+    public async Task GetAsync_InReadOnlyIntegrationMode_ExposesOperatorModeContract()
+    {
+        OperationalRecord record = Record();
+        OperationalRecordsController controller = CreateController(record, readOnlyIntegrationMode: true);
+
+        OperationalRecordResponse response = await GetResponseAsync(controller, record.Id);
+
+        response.ReadOnlyIntegrationMode.Should().BeTrue();
+        response.ReadOnlyNotice.Should().Be(ExternalIntegrationNotices.RealDataReadOnly);
+        response.SimulationMode.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task GetAsync_WithNoClaim_ProjectsUnclaimedState()
     {
         OperationalRecord record = Record();
@@ -129,14 +189,16 @@ public sealed class OperationalRecordsControllerTests
         };
     }
 
-    private static OperationalRecordsController CreateController(OperationalRecord record)
+    private static OperationalRecordsController CreateController(
+        OperationalRecord record,
+        bool readOnlyIntegrationMode = false)
     {
         DefaultHttpContext httpContext = new() { TraceIdentifier = "trace-operational-test" };
         return new OperationalRecordsController(
             new StubRecordService(record),
             new StubTransferService(OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.WorkflowConflict, "test", false)),
             Options.Create(new CommandIdempotencyOptions()),
-            Options.Create(new OperationalRecordsOptions()),
+            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
             Options.Create(new JiraIntegrationOptions()),
             new FixedTimeProvider(Now))
         {

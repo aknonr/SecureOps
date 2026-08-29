@@ -79,6 +79,7 @@ Non-secret keys:
 - `OperationalRecords:RepositoryProvider` (`InMemory` or `SqlServer`)
 - `OperationalRecords:MaxImportCount` (1-500)
 - `OperationalRecords:ClaimLeaseSeconds` (30-900)
+- `OperationalRecords:ReadOnlyIntegrationMode` (`true` only in `Test` with `TuruncuHat` + `Corporate`)
 - `CommandIdempotency:ExecutionLeaseSeconds` (30-900)
 - `CommandIdempotency:MaxKeyLength` (32-256)
 - `Jira:Provider` (`Disabled`, paired `Simulation` or legacy `Fake` only in Development/Demo/Test, or `Corporate`)
@@ -93,6 +94,8 @@ Non-secret keys:
 - `Jira:SummaryMaxLength` (32-255)
 
 Operator-visible TEST verification uses `Simulation` for both providers. Pairing is mandatory, it is rejected in Pilot/Production, it registers only in-process clients, and responses state that no real Jira issue will be created. Real providers require every validated option in `docs/26-enterprise-turuncu-hat-jira-adapters.md`; unsupported or incomplete selection fails startup and never falls back to synthetic data.
+
+The minimal real-data/no-write gate sets `ASPNETCORE_ENVIRONMENT=Test`, `OperationalRecords:SourceProvider=TuruncuHat`, `Jira:Provider=Corporate`, and `OperationalRecords:ReadOnlyIntegrationMode=true`. Source authentication/query, exact source re-read, Jira authentication/user search, and preview remain available. Create and retry return `ExternalWritesDisabled` at stage `external-write-fence` before command state changes; both corporate write adapters independently reject dispatch. Operational Record and preview responses expose `readOnlyIntegrationMode=true` and `readOnlyNotice="GERÇEK VERİ — YAZMA KAPALI"`.
 - `ConnectionStrings:SecureOpsDb` when SQL persistence is selected
 
 Integration authentication values are runtime-only server configuration. Controlled Jira evidence proves Basic authentication; the complete Basic Authorization value remains secret and server-owned. Turuncu Hat authentication scheme remains unproven.

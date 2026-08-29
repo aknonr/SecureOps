@@ -14,7 +14,7 @@ Negotiate currently authenticates each request and application access is revalid
 - Authoritative session state is server-side and records the SecureOps user, start/last-seen/absolute-expiry/end timestamps, end reason, authentication method, and access version.
 - Defaults are 30 minutes idle, 12 hours absolute lifetime, and five minutes between persisted activity updates. Activity never extends the absolute expiry.
 - Disabled access, changed access version, explicit logout, administrative revocation, idle expiry, and absolute expiry invalidate effective sessions. No heartbeat is audited.
-- In Pilot and Production, Data Protection must use an explicitly configured persistent key ring protected at rest. Local-machine DPAPI is the single-node option. A certificate-protected shared key ring is the future multi-node option.
+- In Pilot and Production, both API and UI Data Protection must use explicitly configured persistent key rings protected at rest. Local-machine DPAPI with separate API/UI rings is the single-node option. Certificate-protected shared rings are the multi-node option. Stable application discriminators isolate API and UI protected payloads.
 - Directory continuation tokens use a dedicated Data Protection purpose and retain operation, target hash, offset, and expiry binding. LDAP cookies and directory identities are never placed in the token.
 - Schema changes remain DBA-owned. Runtime receives only required `SELECT`, `INSERT`, and `UPDATE`; it receives no `DELETE`, DDL, or schema ownership.
 
