@@ -97,7 +97,7 @@
     private bool _isDesktop = true;
     private bool _routeNavigating;
 
-    // Dark and Night both drive MudBlazor's dark palette; the theme object decides which one.
+    // The dark choice drives MudBlazor's deep corporate palette.
     private bool IsDarkMode => _mode != AppearanceMode.Light;
 
     protected override void OnInitialized()
@@ -120,8 +120,8 @@
         {
             "light" => AppearanceMode.Light,
             "dark" => AppearanceMode.Dark,
-            "night" => AppearanceMode.Night,
-            _ => await _themeProvider.GetSystemPreference() ? AppearanceMode.Night : AppearanceMode.Light
+            "night" => AppearanceMode.Dark,
+            _ => await _themeProvider.GetSystemPreference() ? AppearanceMode.Dark : AppearanceMode.Light
         };
 
         await SyncThemeClassAsync();
@@ -190,7 +190,7 @@
     {
         await Js.InvokeVoidAsync("document.documentElement.classList.toggle", "so-dark", IsDarkMode);
         await Js.InvokeVoidAsync(
-            "document.documentElement.classList.toggle", "so-night", _mode == AppearanceMode.Night);
+            "document.documentElement.classList.toggle", "so-night", _mode == AppearanceMode.Dark);
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)

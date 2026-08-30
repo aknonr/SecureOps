@@ -430,6 +430,10 @@ body {
     border-radius: var(--so-radius-sm);
 }
 
+html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
+    outline: none;
+}
+
 .so-page-lead {
     margin: var(--so-space-2) 0 0;
     max-width: 68ch;
@@ -4213,19 +4217,19 @@ body {
 }
 
 html[data-so-appearance="dark"] .so-auth-body {
-    --so-auth-bg: #171c23;
-    --so-auth-surface: rgb(29 35 44 / 96%);
-    --so-auth-border: #3a4553;
-    --so-auth-text: #edf1f6;
-    --so-auth-muted: #aeb8c6;
-    --so-art-ocean: linear-gradient(145deg, #252e39 0%, #151b23 52%, #0d1218 100%);
-    --so-art-land: linear-gradient(135deg, #3b4b57 0%, #293843 46%, #4b4b43 100%);
-    --so-art-light: #e8c886;
-    --so-art-light-opacity: 0.34;
-    --so-art-route: rgb(193 205 219 / 38%);
-    --so-art-route-node: #9eabb9;
-    --so-art-text: #f1f4f8;
-    --so-art-muted: #aeb8c6;
+    --so-auth-bg: #050a11;
+    --so-auth-surface: rgb(16 25 38 / 96%);
+    --so-auth-border: #334052;
+    --so-auth-text: #f3f6fa;
+    --so-auth-muted: #9eacbf;
+    --so-art-ocean: linear-gradient(145deg, #0a1624 0%, #030914 55%, #01050b 100%);
+    --so-art-land: linear-gradient(135deg, #14283b 0%, #0d1b2b 48%, #1a2630 100%);
+    --so-art-light: #f4b56a;
+    --so-art-light-opacity: 0.88;
+    --so-art-route: rgb(169 187 209 / 34%);
+    --so-art-route-node: #b5c0cc;
+    --so-art-text: #ffffff;
+    --so-art-muted: #9eacbf;
 }
 
 html[data-so-appearance="night"] .so-auth-body {
@@ -4288,7 +4292,7 @@ html[data-so-appearance="night"] .so-auth-shell::before {
 .so-auth-map {
     z-index: 0;
     width: 62%;
-    transform: translateY(24.24%);
+    transform: translate(5%, 14.39%);
     background: var(--so-art-land);
     -webkit-mask-image: url("../brand/world-land.svg");
     mask-image: url("../brand/world-land.svg");
@@ -4305,7 +4309,7 @@ html[data-so-appearance="night"] .so-auth-shell::before {
 .so-auth-lights {
     z-index: 0;
     width: 62%;
-    transform: translateY(24.24%);
+    transform: translate(5%, 14.39%);
     background: var(--so-art-light);
     -webkit-mask-image: url("../brand/world-lights.svg");
     mask-image: url("../brand/world-lights.svg");
@@ -4321,13 +4325,14 @@ html[data-so-appearance="night"] .so-auth-shell::before {
 
 /* The photographic layer is presentation artwork. The generated vector geography and city lights
    remain directly beneath it, so a missing or undecodable image degrades to the local fallback
-   without changing route, aircraft, or card markup. */
+   without changing route, aircraft, or card markup. The current masters are panoramic (about
+   1672x466/468); native 1920x1080 or 2560x1440 sharpness requires a future asset-only replacement. */
 .so-auth-photo {
     z-index: 1;
     background-image: url("../brand/approved/wasas-earth-day.webp");
     background-repeat: no-repeat;
     background-size: auto 100%;
-    background-position: 50% center;
+    background-position: 48% center;
     filter: saturate(0.92) brightness(1.02) contrast(0.98);
 }
 
@@ -4346,13 +4351,13 @@ html[data-so-appearance="night"] .so-auth-photo {
 }
 
 html[data-so-appearance="dark"] .so-auth-photo {
-    filter: saturate(0.62) brightness(0.9) contrast(0.94);
+    filter: saturate(0.92) brightness(0.78) contrast(1.06);
 }
 
 html[data-so-appearance="dark"] .so-auth-photo::after {
     background:
-        linear-gradient(90deg, rgb(18 22 28 / 12%) 0 54%, rgb(23 28 35 / 42%) 76%, rgb(23 28 35 / 68%) 100%),
-        linear-gradient(180deg, rgb(20 24 30 / 8%), rgb(20 24 30 / 16%));
+        linear-gradient(90deg, rgb(1 8 17 / 10%) 0 54%, rgb(2 8 16 / 54%) 76%, rgb(2 8 16 / 84%) 100%),
+        linear-gradient(180deg, rgb(1 8 17 / 12%), rgb(1 8 17 / 24%));
 }
 
 html[data-so-appearance="night"] .so-auth-photo {
@@ -4522,9 +4527,9 @@ html[data-so-appearance="light"] .so-auth-card {
 
 .so-auth-plane {
     offset-path: path("M463 198 Q 350 82 199 123");
-    offset-distance: 56%;
+    offset-distance: 0%;
     offset-rotate: auto;
-    animation: so-plane-fly-reference 18s ease-in-out infinite;
+    animation: so-plane-fly-reference 14s linear infinite;
     filter: drop-shadow(0 4px 5px rgb(0 0 0 / 42%));
 }
 
@@ -4545,8 +4550,10 @@ html[data-so-appearance="light"] .so-auth-card {
 }
 
 @keyframes so-plane-fly-reference {
-    0%, 100% { offset-distance: 48%; }
-    50% { offset-distance: 66%; }
+    0%, 2% { offset-distance: 0%; opacity: 0; }
+    7% { offset-distance: 0%; opacity: 1; }
+    78% { offset-distance: 100%; opacity: 1; }
+    84%, 100% { offset-distance: 100%; opacity: 0; }
 }
 
 @media (max-width: 1099px) {
@@ -4756,10 +4763,10 @@ html[data-so-appearance="light"] .so-auth-card {
 
 .so-flight-plane {
     fill: initial;
-    offset-path: path("M 246 66 Q 340 142 468 82");
-    offset-distance: 60%;
+    offset-path: path("M 251 56 Q 350 140 464 84");
+    offset-distance: 0%;
     offset-rotate: auto;
-    animation: so-flight-travel-reference 2.8s ease-in-out infinite;
+    animation: so-flight-travel-reference 3.2s linear infinite;
     filter: drop-shadow(0 3px 4px rgb(0 0 0 / 48%));
 }
 
@@ -4816,8 +4823,10 @@ html[data-so-appearance="light"] .so-auth-card {
 }
 
 @keyframes so-flight-travel-reference {
-    0% { offset-distance: 0%; opacity: 1; }
-    72%, 100% { offset-distance: 100%; opacity: 1; }
+    0%, 3% { offset-distance: 0%; opacity: 0; }
+    9% { offset-distance: 0%; opacity: 1; }
+    72% { offset-distance: 100%; opacity: 1; }
+    82%, 100% { offset-distance: 100%; opacity: 0; }
 }
 
 @keyframes so-flight-activity {

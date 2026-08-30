@@ -33,9 +33,13 @@
         (function () {
             var mode = null;
             try { mode = localStorage.getItem("wasas.appearance"); } catch (e) { }
-            if (mode !== "light" && mode !== "dark" && mode !== "night") {
+            if (mode === "night") {
+                mode = "dark";
+                try { localStorage.setItem("wasas.appearance", mode); } catch (e) { }
+            }
+            if (mode !== "light" && mode !== "dark") {
                 mode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
-                    ? "night"
+                    ? "dark"
                     : "light";
             }
             document.documentElement.dataset.soAppearance = mode;
@@ -68,30 +72,21 @@
                 </linearGradient>
             </defs>
 
-            <g class="so-auth-network" transform="translate(0 160)">
+            <g class="so-auth-network" transform="translate(50 95)">
             @* Destinations reached from the Türkiye hub. Thin and low-contrast so the single red
                route reads as the subject rather than as one line among many. *@
             <g class="so-auth-routes" fill="none" stroke="var(--so-art-route)" stroke-width="1.05">
-                <path d="M463 198 Q 350 82 199 123" />
-                <path d="M463 198 Q 350 130 219 139" />
-                <path d="M463 198 Q 365 168 300 181" />
-                <path d="M463 198 Q 452 92 501 98" />
-                <path d="M463 198 Q 500 170 558 182" />
-                <path d="M463 198 Q 545 220 642 281" />
-                <path d="M463 198 Q 650 165 818 260" />
-                <path d="M463 198 Q 500 290 494 440" />
-                <path d="M463 198 Q 348 296 227 393" />
-                <path d="M463 198 Q 360 395 347 635" />
-                <path d="M463 198 Q 455 228 450 252" />
+                <path d="M463 198 Q 350 145 245 165" />
+                <path d="M463 198 Q 455 105 520 88" />
+                <path d="M463 198 Q 560 175 675 245" />
+                <path d="M463 198 Q 425 285 405 390" />
             </g>
 
             <g class="so-auth-destinations" fill="var(--so-art-route-node)">
-                <circle cx="199" cy="123" r="2.2" /><circle cx="219" cy="139" r="2.2" />
-                <circle cx="300" cy="181" r="2.2" /><circle cx="501" cy="98" r="2.2" />
-                <circle cx="558" cy="182" r="2.2" /><circle cx="642" cy="281" r="2.2" />
-                <circle cx="818" cy="260" r="2.2" /><circle cx="494" cy="440" r="2.2" />
-                <circle cx="227" cy="393" r="2.2" /><circle cx="347" cy="635" r="2.2" />
-                <circle cx="450" cy="252" r="2.2" />
+                <circle cx="245" cy="165" r="2.2" />
+                <circle cx="520" cy="88" r="2.2" />
+                <circle cx="675" cy="245" r="2.2" />
+                <circle cx="405" cy="390" r="2.2" />
             </g>
 
             @* The one highlighted route, drawn persistently so the page's signature element is never

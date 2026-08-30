@@ -178,16 +178,16 @@ public static class SecureOpsTheme
     public const string BrandRedOnDark = "#E8394E";
 
     /// <summary>
-    /// Night palette: the strongest expression of the corporate identity.
+    /// Deep dark palette: the strongest expression of the corporate identity.
     /// </summary>
     /// <remarks>
-    /// A deeper ground than Dark, closer to black with a navy cast, and cards that separate by
-    /// luminance rather than by heavy borders. Error is deliberately pushed well away from the brand
+    /// A near-black ground with a navy cast and cards that separate by luminance rather than by
+    /// heavy borders. Error is deliberately pushed well away from the brand
     /// red in luminance: once red is also the primary action colour, a failure that merely "looks
     /// red" is indistinguishable from a button, so the two must differ on more than hue — and every
     /// error surface additionally carries an icon and explicit text.
     /// </remarks>
-    private static readonly PaletteDark NightPalette = new()
+    private static readonly PaletteDark DeepDarkPalette = new()
     {
         Primary = BrandRedOnDark,
         PrimaryDarken = "#C90119",
@@ -229,17 +229,15 @@ public static class SecureOpsTheme
     /// <param name="mode">Selected appearance.</param>
     /// <returns>The theme whose dark palette matches the mode.</returns>
     /// <remarks>
-    /// MudBlazor carries one light and one dark palette per theme, so a third mode is expressed by
-    /// swapping which dark palette the theme holds rather than by inventing a third slot. Light and
-    /// Dark share the original theme; Night substitutes its own palette. All three keep the same
-    /// light palette, so switching away from Night and back does not change Light.
+    /// MudBlazor carries one light and one dark palette per theme. Light and Dark keep the same
+    /// light palette, so switching away from Dark and back does not change Light.
     /// </remarks>
-    public static MudTheme For(AppearanceMode mode) => mode == AppearanceMode.Night ? NightTheme : Theme;
+    public static MudTheme For(AppearanceMode mode) => mode == AppearanceMode.Dark ? DeepDarkTheme : Theme;
 
-    private static readonly MudTheme NightTheme = new()
+    private static readonly MudTheme DeepDarkTheme = new()
     {
         Palette = Theme.Palette,
-        PaletteDark = NightPalette,
+        PaletteDark = DeepDarkPalette,
         LayoutProperties = Theme.LayoutProperties,
         Typography = Theme.Typography
     };
@@ -258,9 +256,6 @@ public enum AppearanceMode
     /// <summary>Light surfaces with charcoal text.</summary>
     Light,
 
-    /// <summary>Neutral dark grey, tuned for long operational shifts.</summary>
-    Dark,
-
-    /// <summary>Near-black navy; the strongest corporate expression.</summary>
-    Night
+    /// <summary>Near-black navy; the deep corporate presentation.</summary>
+    Dark
 }

@@ -51,9 +51,33 @@
         // is told about, and never a cookie -- a cookie would travel on every request and belongs to
         // authentication, not to which palette somebody prefers.
         window.secureOpsAppearance = {
-            read: function () { try { return localStorage.getItem("wasas.appearance"); } catch (e) { return null; } },
-            write: function (v) { try { localStorage.setItem("wasas.appearance", v); } catch (e) { } }
+            read: function () {
+                try {
+                    var value = localStorage.getItem("wasas.appearance");
+                    if (value === "night") {
+                        localStorage.setItem("wasas.appearance", "dark");
+                        return "dark";
+                    }
+                    return value === "light" || value === "dark" ? value : null;
+                } catch (e) { return null; }
+            },
+            write: function (v) {
+                try { localStorage.setItem("wasas.appearance", v === "light" ? "light" : "dark"); }
+                catch (e) { }
+            }
         };
+
+        // FocusOnNavigate keeps page changes accessible. Track the initiating input so its heading
+        // ring is retained for keyboard navigation but suppressed after a pointer click.
+        document.documentElement.dataset.soInputModality = "pointer";
+        window.addEventListener("pointerdown", function () {
+            document.documentElement.dataset.soInputModality = "pointer";
+        }, true);
+        window.addEventListener("keydown", function (event) {
+            if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+                document.documentElement.dataset.soInputModality = "keyboard";
+            }
+        }, true);
 
         // Hands the operator a file the server produced. The bytes, the name, and the content type
         // all come from the API response; nothing is generated or reformatted here, which is what

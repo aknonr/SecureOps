@@ -10,7 +10,7 @@ using SecureOps.Ui.Shared;
 namespace SecureOps.Tests.Unit.Ui;
 
 /// <summary>
-/// Pins the three appearance modes and the brand/error colour separation.
+/// Pins the two appearance modes and the brand/error colour separation.
 /// </summary>
 /// <remarks>
 /// Once corporate red became the primary action colour it also stopped being a reliable signal for
@@ -48,8 +48,10 @@ public sealed class WasasAppearanceTests
     }
 
     [Fact]
-    public void ThreeModes_ResolveToATheme()
+    public void TwoModes_ResolveToATheme()
     {
+        Enum.GetValues<AppearanceMode>().Should().HaveCount(2);
+
         foreach (AppearanceMode mode in Enum.GetValues<AppearanceMode>())
         {
             SecureOpsTheme.For(mode).Should().NotBeNull();
@@ -57,21 +59,16 @@ public sealed class WasasAppearanceTests
     }
 
     [Fact]
-    public void NightUsesADeeperGroundThanDark()
+    public void DarkUsesTheDeepCorporateGround()
     {
-        // Night is the strongest corporate expression; if it were not darker than Dark the third
-        // mode would be decoration rather than a distinct appearance.
-        int night = Luminance(SecureOpsTheme.For(AppearanceMode.Night).PaletteDark.Background.Value);
-        int dark = Luminance(SecureOpsTheme.For(AppearanceMode.Dark).PaletteDark.Background.Value);
-
-        night.Should().BeLessThan(dark);
+        Rgb(SecureOpsTheme.For(AppearanceMode.Dark).PaletteDark.Background.Value).Should().Be("05080f");
     }
 
     [Fact]
     public void LightAndDarkShareOneLightPalette()
     {
-        // Switching to Night and back must not change what Light looks like.
-        SecureOpsTheme.For(AppearanceMode.Night).Palette.Primary.Value
+        // Switching to Dark and back must not change what Light looks like.
+        SecureOpsTheme.For(AppearanceMode.Dark).Palette.Primary.Value
             .Should().Be(SecureOpsTheme.For(AppearanceMode.Light).Palette.Primary.Value);
     }
 
@@ -82,7 +79,7 @@ public sealed class WasasAppearanceTests
         Rgb(SecureOpsTheme.For(AppearanceMode.Light).Palette.Primary.Value)
             .Should().Be(Rgb(SecureOpsTheme.BrandRed));
 
-        foreach (AppearanceMode mode in new[] { AppearanceMode.Dark, AppearanceMode.Night })
+        foreach (AppearanceMode mode in new[] { AppearanceMode.Dark })
         {
             Rgb(SecureOpsTheme.For(mode).PaletteDark.Primary.Value)
                 .Should().Be(Rgb(SecureOpsTheme.BrandRedOnDark));
@@ -98,7 +95,7 @@ public sealed class WasasAppearanceTests
         Luminance(light.Palette.Error.Value)
             .Should().BeLessThan(Luminance(light.Palette.Primary.Value));
 
-        foreach (AppearanceMode mode in new[] { AppearanceMode.Dark, AppearanceMode.Night })
+        foreach (AppearanceMode mode in new[] { AppearanceMode.Dark })
         {
             Palette dark = SecureOpsTheme.For(mode).PaletteDark;
             Luminance(dark.Error.Value).Should().BeGreaterThan(Luminance(dark.Primary.Value));
@@ -111,10 +108,17 @@ public sealed class WasasAppearanceTests
         // A cookie would travel on every request and belongs to authentication. The preference is
         // presentation only, so it stays in local storage under a non-identifying key.
         string host = File.ReadAllText(Path.Combine(UiRoot(), "Pages", "_Host.cshtml"));
+        string menu = File.ReadAllText(Path.Combine(UiRoot(), "Shared", "UserMenu.razor"));
 
         host.Should().Contain("wasas.appearance");
         host.Should().Contain("localStorage");
+        host.Should().Contain("value === \"night\"");
+        host.Should().Contain("localStorage.setItem(\"wasas.appearance\", \"dark\")");
         host.Should().NotContain("document.cookie");
+        menu.Should().Contain("Aydınlık");
+        menu.Should().Contain("Koyu");
+        menu.Should().NotContain("Gece");
+        menu.Should().NotContain("AppearanceMode.Night");
     }
 
     private static string Rgb(string hex) => hex.TrimStart('#')[..6].ToLowerInvariant();

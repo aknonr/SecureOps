@@ -56,8 +56,7 @@
 
         <MudDivider Class="my-1" />
 
-        @* Three deliberate appearances rather than a two-way toggle. Night is the strongest
-           corporate expression; Dark is the neutral one for long shifts. *@
+        @* Operators choose between the daytime and deep corporate presentations. *@
         <div class="so-appearance-label">Görünüm</div>
         @foreach ((AppearanceMode mode, string label, string icon) in Appearances)
         {
@@ -98,9 +97,8 @@
 
     private static readonly (AppearanceMode Mode, string Label, string Icon)[] Appearances =
     [
-        (AppearanceMode.Light, "Açık", Icons.Material.Filled.LightMode),
-        (AppearanceMode.Dark, "Koyu", Icons.Material.Filled.DarkMode),
-        (AppearanceMode.Night, "Gece", Icons.Material.Filled.Bedtime)
+        (AppearanceMode.Light, "Aydınlık", Icons.Material.Filled.LightMode),
+        (AppearanceMode.Dark, "Koyu", Icons.Material.Filled.DarkMode)
     ];
 
     private AccessSnapshot? _snapshot;

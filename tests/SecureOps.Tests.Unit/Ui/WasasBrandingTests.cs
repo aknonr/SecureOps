@@ -141,6 +141,14 @@ public sealed class WasasBrandingTests
         renderedMarkup.Should().NotContain("ANKARA");
         renderedMarkup.Should().NotContain("ISTANBUL");
         renderedMarkup.Should().NotContain("TÜRKİYE");
+
+        Match routes = Regex.Match(
+            renderedMarkup,
+            "<g class=\"so-auth-routes\".*?</g>",
+            RegexOptions.Singleline);
+        Regex.Matches(routes.Value, "<path ").Should().HaveCount(4);
+        css.Should().Contain("animation: so-plane-fly-reference 14s linear infinite");
+        css.Should().Contain("84%, 100% { offset-distance: 100%; opacity: 0; }");
     }
 
     [Fact]
@@ -154,21 +162,30 @@ public sealed class WasasBrandingTests
         loading.Should().Contain("brand/world-land.svg");
         loading.Should().Contain("Yükleniyor...");
         loading.Should().Contain("@Message");
+        loading.Should().Contain("M 251 56");
         loading.Should().NotContain("Task.Delay");
         loading.Should().NotContain("aria-valuenow");
         loading.Should().NotContain("<progress");
+
+        string css = File.ReadAllText(Path.Combine(UiRoot(), "wwwroot", "css", "secureops-theme.css"));
+        css.Should().Contain("animation: so-flight-travel-reference 3.2s linear infinite");
+        css.Should().NotContain("animation-direction: alternate");
     }
 
     [Fact]
     public void RouteIndicator_FollowsNavigationLifecycleWithoutArtificialDelay()
     {
         string layout = File.ReadAllText(Path.Combine(UiRoot(), "Shared", "MainLayout.razor"));
+        string host = File.ReadAllText(Path.Combine(UiRoot(), "Pages", "_Host.cshtml"));
+        string css = File.ReadAllText(Path.Combine(UiRoot(), "wwwroot", "css", "secureops-theme.css"));
 
         layout.Should().Contain("<NavigationLock OnBeforeInternalNavigation=\"OnBeforeInternalNavigation\"");
         layout.Should().Contain("so-route-progress");
         layout.Should().Contain("_routeNavigating = true");
         layout.Should().Contain("_routeNavigating = false");
         layout.Should().NotContain("Task.Delay");
+        host.Should().Contain("dataset.soInputModality");
+        css.Should().Contain("html[data-so-input-modality=\"pointer\"] [tabindex=\"-1\"]:focus");
     }
 
     [Fact]
