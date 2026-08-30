@@ -124,10 +124,16 @@ public sealed class WasasBrandingTests
     {
         string layout = File.ReadAllText(Path.Combine(UiRoot(), "Pages", "LoginLayout.cshtml"));
         string css = File.ReadAllText(Path.Combine(UiRoot(), "wwwroot", "css", "secureops-theme.css"));
+        string approvedBrandRoot = Path.Combine(UiRoot(), "wwwroot", "brand", "approved");
 
+        layout.Should().Contain("so-auth-photo");
+        css.Should().Contain("brand/approved/wasas-earth-day.webp");
+        css.Should().Contain("brand/approved/wasas-earth-night.webp");
         css.Should().Contain("brand/world-land.svg");
         css.Should().Contain("brand/world-lights.svg");
         css.Should().NotContain("brand/world-dots.svg");
+        File.Exists(Path.Combine(approvedBrandRoot, "wasas-earth-day.webp")).Should().BeTrue();
+        File.Exists(Path.Combine(approvedBrandRoot, "wasas-earth-night.webp")).Should().BeTrue();
         File.Exists(Path.Combine(UiRoot(), "wwwroot", "brand", "world-land.svg")).Should().BeTrue();
         File.Exists(Path.Combine(UiRoot(), "wwwroot", "brand", "world-lights.svg")).Should().BeTrue();
 

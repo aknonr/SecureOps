@@ -4271,12 +4271,13 @@ html[data-so-appearance="night"] .so-auth-shell::before {
 .so-auth-art {
     position: absolute;
     inset: 0 auto 0 0;
-    width: 62%;
+    width: 100%;
     overflow: hidden;
 }
 
 .so-auth-map,
 .so-auth-lights,
+.so-auth-photo,
 .so-auth-field {
     position: absolute;
     inset: 0;
@@ -4285,6 +4286,9 @@ html[data-so-appearance="night"] .so-auth-shell::before {
 }
 
 .so-auth-map {
+    z-index: 0;
+    width: 62%;
+    transform: translateY(24.24%);
     background: var(--so-art-land);
     -webkit-mask-image: url("../brand/world-land.svg");
     mask-image: url("../brand/world-land.svg");
@@ -4299,6 +4303,9 @@ html[data-so-appearance="night"] .so-auth-shell::before {
 }
 
 .so-auth-lights {
+    z-index: 0;
+    width: 62%;
+    transform: translateY(24.24%);
     background: var(--so-art-light);
     -webkit-mask-image: url("../brand/world-lights.svg");
     mask-image: url("../brand/world-lights.svg");
@@ -4312,11 +4319,59 @@ html[data-so-appearance="night"] .so-auth-shell::before {
     filter: drop-shadow(0 0 3px var(--so-art-light));
 }
 
+/* The photographic layer is presentation artwork. The generated vector geography and city lights
+   remain directly beneath it, so a missing or undecodable image degrades to the local fallback
+   without changing route, aircraft, or card markup. */
+.so-auth-photo {
+    z-index: 1;
+    background-image: url("../brand/approved/wasas-earth-day.webp");
+    background-repeat: no-repeat;
+    background-size: auto 100%;
+    background-position: 50% center;
+    filter: saturate(0.92) brightness(1.02) contrast(0.98);
+}
+
+.so-auth-photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(90deg, transparent 0 54%, rgb(220 239 250 / 12%) 70%, rgb(212 233 246 / 28%) 100%),
+        linear-gradient(180deg, rgb(8 32 55 / 7%), transparent 38%, rgb(8 32 55 / 4%));
+}
+
+html[data-so-appearance="dark"] .so-auth-photo,
+html[data-so-appearance="night"] .so-auth-photo {
+    background-image: url("../brand/approved/wasas-earth-night.webp");
+}
+
+html[data-so-appearance="dark"] .so-auth-photo {
+    filter: saturate(0.62) brightness(0.9) contrast(0.94);
+}
+
+html[data-so-appearance="dark"] .so-auth-photo::after {
+    background:
+        linear-gradient(90deg, rgb(18 22 28 / 12%) 0 54%, rgb(23 28 35 / 42%) 76%, rgb(23 28 35 / 68%) 100%),
+        linear-gradient(180deg, rgb(20 24 30 / 8%), rgb(20 24 30 / 16%));
+}
+
+html[data-so-appearance="night"] .so-auth-photo {
+    filter: saturate(0.92) brightness(0.78) contrast(1.06);
+}
+
+html[data-so-appearance="night"] .so-auth-photo::after {
+    background:
+        linear-gradient(90deg, rgb(1 8 17 / 10%) 0 54%, rgb(2 8 16 / 54%) 76%, rgb(2 8 16 / 84%) 100%),
+        linear-gradient(180deg, rgb(1 8 17 / 12%), rgb(1 8 17 / 24%));
+}
+
 html[data-so-appearance="light"] .so-auth-map {
     filter: drop-shadow(0 1px 1px rgb(26 73 104 / 18%));
 }
 
 .so-auth-field {
+    z-index: 2;
+    width: 62%;
     overflow: visible;
 }
 
@@ -4500,6 +4555,16 @@ html[data-so-appearance="light"] .so-auth-card {
         opacity: 0.76;
     }
 
+    .so-auth-map,
+    .so-auth-lights,
+    .so-auth-field {
+        width: 100%;
+    }
+
+    .so-auth-photo {
+        background-position: 36% center;
+    }
+
     .so-auth-stage {
         width: 100%;
         justify-content: flex-end;
@@ -4518,6 +4583,10 @@ html[data-so-appearance="light"] .so-auth-card {
 @media (max-width: 899px) {
     .so-auth-art {
         opacity: 0.46;
+    }
+
+    .so-auth-photo {
+        background-position: 38% center;
     }
 
     .so-auth-stage {
@@ -4540,6 +4609,10 @@ html[data-so-appearance="light"] .so-auth-card {
 }
 
 @media (max-width: 520px) {
+    .so-auth-photo {
+        background-position: 39% center;
+    }
+
     .so-auth-stage {
         align-items: flex-start;
         padding: 84px 14px 24px;

@@ -5,11 +5,10 @@
     never see navigation for pages they cannot open, and these pages must render even when no circuit
     can be established.
 
-    Composition: one full-bleed field carrying a dot-matrix world map, with the sign-in card floating
-    over its right side. The map is generated from longitude/latitude polygons rather than traced
-    from anyone else's artwork, applied as a CSS mask so the palette colours it, and shares its
-    coordinate system with the route overlay so the hub sits on Türkiye. No place names are drawn:
-    the geography carries the meaning.
+    Composition: one full-bleed photographic Earth field, with the sign-in card floating over its
+    right side. Generated local geography remains beneath the artwork as a graceful fallback. A
+    single dynamic route overlay carries the hub and aircraft in every appearance. No place names
+    are drawn: the geography carries the meaning.
 
     Below the split breakpoint the field stays as an atmospheric backdrop and the card becomes the
     page, because on a phone an illustration above the fold pushes the actual sign-in action off it.
@@ -47,10 +46,11 @@
 </head>
 <body class="so-auth-body">
     <div class="so-auth-shell">
-        @* Generated local masks: recognisable regional geography plus irregular inhabited lights. *@
+        @* Local vector geography remains beneath the photographic artwork as a graceful fallback. *@
         <div class="so-auth-art" aria-hidden="true">
         <div class="so-auth-map"></div>
         <div class="so-auth-lights"></div>
+        <div class="so-auth-photo"></div>
 
         @* The map and routes share longitude -25..100 and latitude 72..-38. The hub is Türkiye,
            expressed only by location art; no place label is rendered. *@
@@ -68,6 +68,7 @@
                 </linearGradient>
             </defs>
 
+            <g class="so-auth-network" transform="translate(0 160)">
             @* Destinations reached from the Türkiye hub. Thin and low-contrast so the single red
                route reads as the subject rather than as one line among many. *@
             <g class="so-auth-routes" fill="none" stroke="var(--so-art-route)" stroke-width="1.05">
@@ -112,6 +113,7 @@
                       d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
                 <path class="so-aircraft-tail" d="M-30 -3 L-25 -14 L-19 -14 L-20 -3 Z" />
                 <path class="so-aircraft-cabin" d="M-18 0 H27" />
+            </g>
             </g>
         </svg>
         </div>
