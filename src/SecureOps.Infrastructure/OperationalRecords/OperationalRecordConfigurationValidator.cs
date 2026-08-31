@@ -56,9 +56,14 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required when OperationalRecords:RepositoryProvider is SqlServer.");
         }
 
+        bool readOnlyEnterpriseMode = operational.ReadOnlyIntegrationMode;
         if (string.Equals(operational.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
         {
-            ValidateTuruncuHat(turuncuHat);
+            ValidateTuruncuHatReadConfiguration(turuncuHat);
+            if (!readOnlyEnterpriseMode)
+            {
+                ValidateTuruncuHatWriteConfiguration(turuncuHat);
+            }
         }
 
         if (!string.Equals(jira.Provider, "Disabled", StringComparison.OrdinalIgnoreCase)
@@ -122,7 +127,10 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("Jira:UnresolvedRequesterPolicy must be Block or ProceedUnassigned.");
         }
 
-        ValidateJiraIdentityPolicies(jira);
+        if (!readOnlyEnterpriseMode)
+        {
+            ValidateJiraIdentityPolicies(jira);
+        }
 
         if (jira.SummaryMaxLength is < 32 or > 255)
         {
@@ -140,32 +148,51 @@ public static class OperationalRecordConfigurationValidator
 
         if (string.Equals(jira.Provider, "Corporate", StringComparison.OrdinalIgnoreCase))
         {
-            ValidateHttpsBaseUrl(jira.BaseUrl, "Jira:BaseUrl");
-            RequireSecret(jira.Authorization, "Jira:Authorization");
-            if (!string.Equals(jira.AuthenticationMode, "Basic", StringComparison.OrdinalIgnoreCase)
-                || !IsValidBasicAuthorization(jira.Authorization))
+            ValidateCorporateJiraReadConfiguration(jira);
+            if (!readOnlyEnterpriseMode)
             {
-                throw new InvalidOperationException("Corporate Jira requires the reviewed Jira:AuthenticationMode Basic and a runtime Basic Authorization value.");
+                ValidateCorporateJiraWriteConfiguration(jira);
             }
-            if (string.IsNullOrWhiteSpace(jira.ProjectKey)
-                || string.IsNullOrWhiteSpace(jira.IssueTypeId)
-                || string.IsNullOrWhiteSpace(jira.TeamCustomField)
-                || string.IsNullOrWhiteSpace(jira.TeamValue)
-                || string.IsNullOrWhiteSpace(jira.RequesterWatcherCustomField)
-                || jira.Labels.Length == 0
-                || jira.Labels.Any(string.IsNullOrWhiteSpace)
-                || string.IsNullOrEmpty(jira.SummarySeparator)
-                || jira.SummarySeparator.Length > 10
-                || !IsSafeIdentifier(jira.ProjectKey)
-                || !long.TryParse(jira.IssueTypeId, out long issueTypeId)
-                || issueTypeId <= 0
-                || jira.TeamValue.Length > 256
-                || !IsSafeIdentifier(jira.TeamCustomField)
-                || !IsSafeIdentifier(jira.RequesterWatcherCustomField)
-                || jira.Labels.Any(label => label.Length > 128))
-            {
-                throw new InvalidOperationException("Corporate Jira mapping configuration is incomplete or invalid.");
-            }
+        }
+    }
+
+    private static void ValidateCorporateJiraReadConfiguration(JiraIntegrationOptions options)
+    {
+        ValidateHttpsBaseUrl(options.BaseUrl, "Jira:BaseUrl");
+        RequireSecret(options.Authorization, "Jira:Authorization");
+        if (!string.Equals(options.AuthenticationMode, "Basic", StringComparison.OrdinalIgnoreCase)
+            || !IsValidBasicAuthorization(options.Authorization))
+        {
+            throw new InvalidOperationException("Corporate Jira requires the reviewed Jira:AuthenticationMode Basic and a runtime Basic Authorization value.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.ProjectKey)
+            || string.IsNullOrWhiteSpace(options.IssueType)
+            || string.IsNullOrWhiteSpace(options.MappingVersion)
+            || string.IsNullOrEmpty(options.SummarySeparator)
+            || options.SummarySeparator.Length > 10
+            || !IsSafeIdentifier(options.ProjectKey))
+        {
+            throw new InvalidOperationException("Corporate Jira preview configuration is incomplete or invalid.");
+        }
+    }
+
+    private static void ValidateCorporateJiraWriteConfiguration(JiraIntegrationOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.IssueTypeId)
+            || string.IsNullOrWhiteSpace(options.TeamCustomField)
+            || string.IsNullOrWhiteSpace(options.TeamValue)
+            || string.IsNullOrWhiteSpace(options.RequesterWatcherCustomField)
+            || options.Labels.Length == 0
+            || options.Labels.Any(string.IsNullOrWhiteSpace)
+            || !long.TryParse(options.IssueTypeId, out long issueTypeId)
+            || issueTypeId <= 0
+            || options.TeamValue.Length > 256
+            || !IsSafeIdentifier(options.TeamCustomField)
+            || !IsSafeIdentifier(options.RequesterWatcherCustomField)
+            || options.Labels.Any(label => label.Length > 128))
+        {
+            throw new InvalidOperationException("Corporate Jira mapping configuration is incomplete or invalid.");
         }
     }
 
@@ -194,7 +221,7 @@ public static class OperationalRecordConfigurationValidator
         }
     }
 
-    private static void ValidateTuruncuHat(TuruncuHatOptions options)
+    private static void ValidateTuruncuHatReadConfiguration(TuruncuHatOptions options)
     {
         ValidateHttpsBaseUrl(options.BaseUrl, "TuruncuHat:BaseUrl");
         RequireSecret(options.Authorization, "TuruncuHat:Authorization");
@@ -204,17 +231,9 @@ public static class OperationalRecordConfigurationValidator
             || options.RelatedGroupId <= 0
             || options.ExcludedDccIds.Length == 0
             || options.ExcludedDccIds.Any(value => value <= 0)
-            || options.ActivityTaskModelId <= 0
-            || options.ActivityGroupId <= 0
-            || options.ActivityMainObjectTypeId <= 0
-            || options.CompletedStatusId <= 0
-            || string.IsNullOrWhiteSpace(options.CompletionCommentTemplate)
-            || !options.CompletionCommentTemplate.Contains("{JiraKey}", StringComparison.Ordinal)
-            || options.CompletionCommentTemplate.Length > 1000
-            || !IsSafeIdentifier(options.SourceBaseObject)
-            || !IsSafeIdentifier(options.ActivityBaseObject))
+            || !IsSafeIdentifier(options.SourceBaseObject))
         {
-            throw new InvalidOperationException("TuruncuHat business mapping configuration is incomplete or invalid.");
+            throw new InvalidOperationException("TuruncuHat source-read configuration is incomplete or invalid.");
         }
 
         if (options.SessionIdSegmentIndex < 0
@@ -225,6 +244,21 @@ public static class OperationalRecordConfigurationValidator
             || options.MaxDescriptionLength is < 1 or > 8000)
         {
             throw new InvalidOperationException("TuruncuHat session or HTTP bounds are invalid.");
+        }
+    }
+
+    private static void ValidateTuruncuHatWriteConfiguration(TuruncuHatOptions options)
+    {
+        if (options.ActivityTaskModelId <= 0
+            || options.ActivityGroupId <= 0
+            || options.ActivityMainObjectTypeId <= 0
+            || options.CompletedStatusId <= 0
+            || string.IsNullOrWhiteSpace(options.CompletionCommentTemplate)
+            || !options.CompletionCommentTemplate.Contains("{JiraKey}", StringComparison.Ordinal)
+            || options.CompletionCommentTemplate.Length > 1000
+            || !IsSafeIdentifier(options.ActivityBaseObject))
+        {
+            throw new InvalidOperationException("TuruncuHat close mapping configuration is incomplete or invalid.");
         }
     }
 

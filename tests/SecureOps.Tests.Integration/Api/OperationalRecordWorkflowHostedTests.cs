@@ -374,6 +374,17 @@ public sealed class OperationalRecordWorkflowHostedTests
     }
 
     [Fact]
+    public async Task ReadOnlyEnterpriseProviders_WithReadConfigurationOnly_Starts()
+    {
+        using WebApplicationFactory<Program> factory = CreateReadOnlyEnterpriseFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/health");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task OperationalRecordEnums_AreSerializedWithFrozenV1NumericValues()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
@@ -439,6 +450,39 @@ public sealed class OperationalRecordWorkflowHostedTests
             builder.UseSetting("OperationalRecords:SourceProvider", "Simulation");
             builder.UseSetting("OperationalRecords:RepositoryProvider", "InMemory");
             builder.UseSetting("Jira:Provider", "Simulation");
+            builder.UseSetting("RateLimiting:OperationalRecordRefresh:PermitLimit", "100");
+            builder.UseSetting("RateLimiting:JiraPreview:PermitLimit", "100");
+            builder.UseSetting("RateLimiting:JiraCreate:PermitLimit", "100");
+            builder.UseSetting("RateLimiting:WorkflowRetry:PermitLimit", "100");
+        });
+
+    private static WebApplicationFactory<Program> CreateReadOnlyEnterpriseFactory() => new WebApplicationFactory<Program>()
+        .WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Test");
+            builder.UseSetting("DemoAuth:Enabled", "true");
+            builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
+            builder.UseSetting("Access:DemoCompatibilityEnabled", "true");
+            builder.UseSetting("Access:RepositoryProvider", "InMemory");
+            builder.UseSetting("SessionSecurity:RepositoryProvider", "InMemory");
+            builder.UseSetting("DataProtection:Mode", "Ephemeral");
+            builder.UseSetting("Audit:Provider", "InMemory");
+            builder.UseSetting("IdentityLookup:Provider", "Mock");
+            builder.UseSetting("OperationalRecords:SourceProvider", "TuruncuHat");
+            builder.UseSetting("OperationalRecords:RepositoryProvider", "InMemory");
+            builder.UseSetting("OperationalRecords:ReadOnlyIntegrationMode", "true");
+            builder.UseSetting("Jira:Provider", "Corporate");
+            builder.UseSetting("TuruncuHat:BaseUrl", "https://source.invalid/");
+            builder.UseSetting("TuruncuHat:Authorization", "Sanitized runtime value");
+            builder.UseSetting("TuruncuHat:Username", "sanitized-user");
+            builder.UseSetting("TuruncuHat:Password", "sanitized-secret");
+            builder.UseSetting("TuruncuHat:TenantId", "218");
+            builder.UseSetting("TuruncuHat:SourceBaseObject", "SMSS_oRFF");
+            builder.UseSetting("TuruncuHat:RelatedGroupId", "68");
+            builder.UseSetting("TuruncuHat:ExcludedDccIds:0", "4241");
+            builder.UseSetting("TuruncuHat:SessionLifetimeSeconds", "60");
+            builder.UseSetting("Jira:BaseUrl", "https://jira.invalid/");
+            builder.UseSetting("Jira:Authorization", "Basic c2FuaXRpemVkOnNlY3JldA==");
             builder.UseSetting("RateLimiting:OperationalRecordRefresh:PermitLimit", "100");
             builder.UseSetting("RateLimiting:JiraPreview:PermitLimit", "100");
             builder.UseSetting("RateLimiting:JiraCreate:PermitLimit", "100");

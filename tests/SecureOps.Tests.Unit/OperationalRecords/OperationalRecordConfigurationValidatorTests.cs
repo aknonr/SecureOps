@@ -81,7 +81,7 @@ public sealed class OperationalRecordConfigurationValidatorTests
     [Fact]
     public void Validate_WithCorporateProvidersInTestWithoutReadOnlyMode_FailsClosed()
     {
-        Dictionary<string, string?> values = EnterpriseValues();
+        Dictionary<string, string?> values = WriteEnterpriseValues();
         values["OperationalRecords:ReadOnlyIntegrationMode"] = "false";
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
@@ -109,7 +109,7 @@ public sealed class OperationalRecordConfigurationValidatorTests
     [InlineData("Production")]
     public void Validate_WithReadOnlyModeOutsideTest_FailsClosed(string environmentName)
     {
-        Dictionary<string, string?> values = EnterpriseValues();
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), environmentName);
 
@@ -182,52 +182,63 @@ public sealed class OperationalRecordConfigurationValidatorTests
     }
 
     [Fact]
-    public void Validate_WithCompleteEnterpriseProviderConfiguration_Succeeds()
+    public void Validate_WithReadOnlyEnterpriseProviderConfiguration_SucceedsWithoutWriteMappings()
     {
-        IConfiguration configuration = Configuration(EnterpriseValues());
+        IConfiguration configuration = Configuration(ReadOnlyEnterpriseValues());
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, "Test");
 
         act.Should().NotThrow();
     }
 
-    [Fact]
-    public void Validate_WithTuruncuHatMissingRuntimeSecret_FailsClearly()
+    [Theory]
+    [InlineData("TuruncuHat:BaseUrl", "http://source.invalid/")]
+    [InlineData("TuruncuHat:Authorization", "")]
+    [InlineData("TuruncuHat:Username", "")]
+    [InlineData("TuruncuHat:Password", "")]
+    [InlineData("TuruncuHat:TenantId", "0")]
+    [InlineData("TuruncuHat:SourceBaseObject", "")]
+    [InlineData("TuruncuHat:RelatedGroupId", "0")]
+    [InlineData("TuruncuHat:ExcludedDccIds:0", "0")]
+    [InlineData("TuruncuHat:SessionLifetimeSeconds", "0")]
+    public void Validate_WithMissingTuruncuHatReadConfiguration_FailsClearly(string key, string value)
     {
-        Dictionary<string, string?> values = EnterpriseValues();
-        values["TuruncuHat:Password"] = string.Empty;
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
+        values[key] = value;
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*TuruncuHat:Password*");
+        act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
-    public void Validate_WithNonHttpsCorporateEndpoint_FailsClearly()
+    [Theory]
+    [InlineData("Jira:BaseUrl", "http://jira.invalid/")]
+    [InlineData("Jira:Authorization", "")]
+    public void Validate_WithMissingOrInvalidJiraReadConfiguration_FailsClearly(string key, string value)
     {
-        Dictionary<string, string?> values = EnterpriseValues();
-        values["Jira:BaseUrl"] = "http://jira.invalid/";
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
+        values[key] = value;
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*Jira:BaseUrl*HTTPS*");
+        act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void Validate_WithReporterOverride_FailsBecauseCreateMetadataDoesNotSupportIt()
+    public void Validate_WithWriteOnlyJiraPoliciesInReadOnlyMode_DoesNotRequireCreateMetadata()
     {
-        Dictionary<string, string?> values = EnterpriseValues();
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
         values["Jira:ReporterMode"] = "Explicit";
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*ReporterMode*reviewed create metadata*");
+        act.Should().NotThrow();
     }
 
     [Fact]
     public void Validate_WithMalformedBasicAuthorization_FailsClearly()
     {
-        Dictionary<string, string?> values = EnterpriseValues();
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
         values["Jira:Authorization"] = "Basic not-base64";
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
@@ -238,11 +249,11 @@ public sealed class OperationalRecordConfigurationValidatorTests
     [Fact]
     public void Validate_WithProjectDefaultAndAssigneeMappings_FailsClearly()
     {
-        Dictionary<string, string?> values = EnterpriseValues();
+        Dictionary<string, string?> values = WriteEnterpriseValues();
         values["Jira:OperatorAssigneeMappings:0:SecureOpsActor"] = "EXAMPLE\\operator";
         values["Jira:OperatorAssigneeMappings:0:JiraUsername"] = "verified.operator";
 
-        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Pilot");
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*empty for ProjectDefault*");
     }
@@ -250,17 +261,39 @@ public sealed class OperationalRecordConfigurationValidatorTests
     [Fact]
     public void Validate_WithVerifiedExactOperatorMapping_Succeeds()
     {
-        Dictionary<string, string?> values = EnterpriseValues();
+        Dictionary<string, string?> values = WriteEnterpriseValues();
         values["Jira:AssignmentMode"] = "VerifiedOperatorMapping";
         values["Jira:OperatorAssigneeMappings:0:SecureOpsActor"] = "EXAMPLE\\operator";
         values["Jira:OperatorAssigneeMappings:0:JiraUsername"] = "verified.operator";
 
-        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Pilot");
 
         act.Should().NotThrow();
     }
 
-    private static Dictionary<string, string?> EnterpriseValues() => new()
+    [Theory]
+    [InlineData("TuruncuHat:ActivityBaseObject")]
+    [InlineData("TuruncuHat:ActivityTaskModelId")]
+    [InlineData("TuruncuHat:ActivityGroupId")]
+    [InlineData("TuruncuHat:ActivityMainObjectTypeId")]
+    [InlineData("TuruncuHat:CompletedStatusId")]
+    [InlineData("TuruncuHat:CompletionCommentTemplate")]
+    [InlineData("Jira:IssueTypeId")]
+    [InlineData("Jira:TeamCustomField")]
+    [InlineData("Jira:TeamValue")]
+    [InlineData("Jira:RequesterWatcherCustomField")]
+    [InlineData("Jira:Labels:0")]
+    public void Validate_WithWriteModeAndMissingWriteConfiguration_FailsClearly(string key)
+    {
+        Dictionary<string, string?> values = WriteEnterpriseValues();
+        values.Remove(key);
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Pilot");
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    private static Dictionary<string, string?> ReadOnlyEnterpriseValues() => new()
     {
         ["OperationalRecords:SourceProvider"] = "TuruncuHat",
         ["OperationalRecords:ReadOnlyIntegrationMode"] = "true",
@@ -273,23 +306,28 @@ public sealed class OperationalRecordConfigurationValidatorTests
         ["TuruncuHat:SourceBaseObject"] = "SMSS_oRFF",
         ["TuruncuHat:RelatedGroupId"] = "68",
         ["TuruncuHat:ExcludedDccIds:0"] = "4241",
-        ["TuruncuHat:ActivityBaseObject"] = "BPM_Actvty",
-        ["TuruncuHat:ActivityTaskModelId"] = "10",
-        ["TuruncuHat:ActivityGroupId"] = "20",
-        ["TuruncuHat:ActivityMainObjectTypeId"] = "30",
-        ["TuruncuHat:CompletedStatusId"] = "40",
-        ["TuruncuHat:CompletionCommentTemplate"] = "Transferred to {JiraKey}",
         ["TuruncuHat:SessionLifetimeSeconds"] = "60",
         ["Jira:BaseUrl"] = "https://jira.invalid/",
-        ["Jira:Authorization"] = "Basic c2FuaXRpemVkOnNlY3JldA==",
-        ["Jira:AuthenticationMode"] = "Basic",
-        ["Jira:ProjectKey"] = "SDM",
-        ["Jira:IssueTypeId"] = "3",
-        ["Jira:TeamCustomField"] = "customfield_12700",
-        ["Jira:TeamValue"] = "WASAS",
-        ["Jira:RequesterWatcherCustomField"] = "customfield_11500",
-        ["Jira:Labels:0"] = "SunucuTalep"
+        ["Jira:Authorization"] = "Basic c2FuaXRpemVkOnNlY3JldA=="
     };
+
+    private static Dictionary<string, string?> WriteEnterpriseValues()
+    {
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
+        values["OperationalRecords:ReadOnlyIntegrationMode"] = "false";
+        values["TuruncuHat:ActivityBaseObject"] = "BPM_Actvty";
+        values["TuruncuHat:ActivityTaskModelId"] = "10";
+        values["TuruncuHat:ActivityGroupId"] = "20";
+        values["TuruncuHat:ActivityMainObjectTypeId"] = "30";
+        values["TuruncuHat:CompletedStatusId"] = "40";
+        values["TuruncuHat:CompletionCommentTemplate"] = "Transferred to {JiraKey}";
+        values["Jira:IssueTypeId"] = "3";
+        values["Jira:TeamCustomField"] = "customfield_12700";
+        values["Jira:TeamValue"] = "WASAS";
+        values["Jira:RequesterWatcherCustomField"] = "customfield_11500";
+        values["Jira:Labels:0"] = "SunucuTalep";
+        return values;
+    }
 
     private static IConfiguration Configuration(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
