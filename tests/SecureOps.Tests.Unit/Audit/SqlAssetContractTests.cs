@@ -1,4 +1,5 @@
 using FluentAssertions;
+using System.Text.RegularExpressions;
 
 namespace SecureOps.Tests.Unit.Audit;
 
@@ -35,6 +36,43 @@ public sealed class SqlAssetContractTests
             .And.NotContain("Password")
             .And.NotContain("ApiToken")
             .And.NotContain("AuthorizationHeader");
+    }
+
+    [Fact]
+    public void OperationalRecordMigration_UsesSqlServerValidUnicodeDescriptionAndEmptyOpsSchemaRecovery()
+    {
+        string root = FindRepositoryRoot();
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "002-operational-record-jira-workflow.sql"));
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "002-operational-record-jira-workflow.sql"));
+
+        schema.Should().Contain("Description nvarchar(max) NOT NULL")
+            .And.NotContain("Description nvarchar(8000)")
+            .And.Contain("IF SCHEMA_ID(N'ops') IS NULL")
+            .And.Contain("EXEC(N'CREATE SCHEMA ops');")
+            .And.Contain("CREATE TABLE ops.OperationalRecords")
+            .And.Contain("CREATE TABLE ops.JiraTransfers")
+            .And.Contain("CREATE TABLE ops.OperationalRecordWorkflowHistory");
+        migration.Should().Contain(":r ..\\schema\\002-operational-record-jira-workflow.sql");
+
+        string[] schemaNames = Directory.EnumerateFiles(Path.Combine(root, "sql", "schema"), "*.sql")
+            .Select(Path.GetFileName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray()!;
+        string[] migrationNames = Directory.EnumerateFiles(Path.Combine(root, "sql", "migrations"), "*.sql")
+            .Select(Path.GetFileName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray()!;
+        migrationNames.Should().Equal(schemaNames)
+            .And.HaveCount(7)
+            .And.NotContain(name => name!.StartsWith("008-", StringComparison.Ordinal));
+
+        IReadOnlyList<int> declaredLengths = Directory
+            .EnumerateFiles(Path.Combine(root, "sql", "schema"), "*.sql")
+            .SelectMany(path => Regex.Matches(File.ReadAllText(path), @"\bnvarchar\((\d+)\)", RegexOptions.IgnoreCase)
+                .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)))
+            .ToArray();
+
+        declaredLengths.Should().OnlyContain(length => length <= 4000);
     }
 
     [Fact]

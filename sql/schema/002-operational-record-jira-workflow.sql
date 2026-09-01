@@ -9,7 +9,7 @@ CREATE TABLE ops.OperationalRecords
     SourceRecordId nvarchar(128) NOT NULL,
     OrCode nvarchar(64) NOT NULL,
     Title nvarchar(500) NOT NULL,
-    Description nvarchar(8000) NOT NULL,
+    Description nvarchar(max) NOT NULL,
     Requester nvarchar(256) NULL,
     SourceCreatedAt datetimeoffset(7) NULL,
     EnvironmentName nvarchar(128) NULL,

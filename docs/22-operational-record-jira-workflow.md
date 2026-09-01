@@ -67,7 +67,7 @@ Import, classification, preview, create request/result, source-close request/res
 
 ## Persistence and DBA Review
 
-`sql/schema/002-operational-record-jira-workflow.sql` creates the base workflow tables. Offline migration 003 adds source/claim metadata and `ops.CommandExecutions`; migration 004 adds access mutation versions; migration 006 permits unknown source creation time. The application does not run migrations. DBA approval and execution of applicable ordered migrations are required before selecting `SqlServer`.
+`sql/schema/002-operational-record-jira-workflow.sql` creates the base workflow tables. `ops.OperationalRecords.Description` is `nvarchar(max)` because the application validates source descriptions to at most 8,000 Unicode characters while SQL Server limits sized `nvarchar(n)` declarations to 4,000 characters. Migration 002 creates `[ops]` only when it is absent, which permits the reviewed recovery state where a prior failure left an empty `[ops]` schema; its unguarded table creation remains fail-fast for conflicting objects. Offline migration 003 adds source/claim metadata and `ops.CommandExecutions`; migration 004 adds access mutation versions; migration 006 permits unknown source creation time. The application does not run migrations. DBA approval and execution of applicable ordered migrations are required before selecting `SqlServer`.
 
 Minimum runtime permissions are `SELECT`, `INSERT`, and `UPDATE` on these three `ops` tables; no `DELETE`, DDL, schema-owner, or migration permission is required. Audit-store permissions remain separate.
 
