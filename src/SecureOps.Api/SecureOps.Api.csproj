@@ -29,6 +29,7 @@
 
     <!-- Auth -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
 
     <!-- Hangfire client (enqueue from controllers) -->
     <PackageReference Include="Hangfire.AspNetCore" />

@@ -9,7 +9,7 @@ Negotiate currently authenticates each request and application access is revalid
 
 ## Decision
 
-- Corporate authentication remains independent: Negotiate is the interim provider and OIDC is the compatible future provider. LDAP password authentication is prohibited.
+- Corporate authentication remains independent: Negotiate is the interim provider and disabled-by-default OIDC readiness is the compatible replacement path. LDAP password authentication is prohibited.
 - SecureOps issues a Secure, HttpOnly, SameSite=Lax, browser-session cookie containing only a Data-Protection-protected opaque session identifier. The cookie is not an authentication or authorization authority.
 - Authoritative session state is server-side and records the SecureOps user, start/last-seen/absolute-expiry/end timestamps, end reason, authentication method, and access version.
 - Defaults are 30 minutes idle, 12 hours absolute lifetime, and five minutes between persisted activity updates. Activity never extends the absolute expiry.

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
+using SecureOps.Shared.Configuration;
 using SecureOps.Ui.Security;
 using SecureOps.Ui.Services;
 
@@ -18,20 +20,26 @@ namespace SecureOps.Ui.Pages;
 public sealed class LoginModel : PageModel
 {
     private readonly IDemoModeState _shellMode;
+    private readonly OidcOptions _oidc;
 
     /// <summary>
     /// Initializes a new login page model.
     /// </summary>
     /// <param name="shellMode">Effective shell mode.</param>
-    public LoginModel(IDemoModeState shellMode)
+    /// <param name="oidcOptions">Server-owned OIDC feature configuration.</param>
+    public LoginModel(IDemoModeState shellMode, IOptions<OidcOptions> oidcOptions)
     {
         _shellMode = shellMode;
+        _oidc = oidcOptions.Value;
     }
 
     /// <summary>
     /// Whether a session can currently be established from this page.
     /// </summary>
-    public bool SignInEnabled => _shellMode.MockAuthenticationEnabled;
+    public bool SignInEnabled => _oidc.Enabled || _shellMode.MockAuthenticationEnabled;
+
+    /// <summary>Whether the sign-in action invokes the configured corporate identity provider.</summary>
+    public bool OidcEnabled => _oidc.Enabled;
 
     /// <summary>
     /// Whether this host should name its environment at all.

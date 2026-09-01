@@ -2,6 +2,7 @@ using System.Net;
 using FluentAssertions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -9,7 +10,11 @@ using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using SecureOps.Shared.Auth;
 using SecureOps.Ui.Configuration;
 using SecureOps.Ui.Hosting;
 
@@ -134,6 +139,55 @@ public sealed class UiHttpsOffloadTests
     }
 
     [Fact]
+    public async Task OidcChallenge_WhenTrustedOffloadMatches_GeneratesPublicHttpsCallback()
+    {
+        Dictionary<string, string?> settings = EnabledSettings();
+        settings["Oidc:Enabled"] = "true";
+        settings["Oidc:Authority"] = "https://identity.example.test";
+        settings["Oidc:ClientId"] = "secureops-ui-test";
+        settings["Oidc:ClientAuthenticationMethod"] = "None";
+        settings["Oidc:ApiAudience"] = "secureops-api-test";
+        settings["Oidc:Scopes:0"] = "openid";
+        settings["Oidc:RequireHttpsMetadata"] = "true";
+        settings["Oidc:UsePkce"] = "true";
+        using OidcOffloadUiFactory factory = new(settings);
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri($"http://{ExpectedHost}"),
+            HandleCookies = false
+        });
+        HttpResponseMessage login = await client.GetAsync("/login");
+        string html = await login.Content.ReadAsStringAsync();
+        const string marker = "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"";
+        int start = html.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
+        string token = System.Net.WebUtility.HtmlDecode(html[start..html.IndexOf('"', start)]);
+
+        using HttpRequestMessage request = new(HttpMethod.Post, "/auth/sign-in")
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["returnUrl"] = string.Empty
+            })
+        };
+        request.Headers.Add(
+            "Cookie",
+            string.Join("; ", login.Headers.GetValues("Set-Cookie").Select(value => value.Split(';')[0])));
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        string redirectUri = response.Headers.Location!.Query
+            .TrimStart('?')
+            .Split('&')
+            .Select(part => part.Split('=', 2))
+            .Where(pair => Uri.UnescapeDataString(pair[0]) == "redirect_uri")
+            .Select(pair => Uri.UnescapeDataString(pair[1]))
+            .Single();
+        redirectUri.Should().Be($"https://{ExpectedHost}/signin-oidc");
+    }
+
+    [Fact]
     public void SecurityOptions_AlwaysRequireSecureCookies()
     {
         using WebApplicationFactory<DemoModeOptions> factory = CreateFactory(EnabledSettings());
@@ -188,6 +242,35 @@ public sealed class UiHttpsOffloadTests
                     services.PostConfigure<HttpsRedirectionOptions>(options => options.HttpsPort = 8443);
                 });
             });
+    }
+
+    private sealed class OidcOffloadUiFactory(IReadOnlyDictionary<string, string?> settings)
+        : WebApplicationFactory<DemoModeOptions>
+    {
+        protected override IHost CreateHost(IHostBuilder builder)
+        {
+            builder.UseEnvironment("Demo");
+            builder.ConfigureHostConfiguration(configuration =>
+                configuration.AddInMemoryCollection(settings));
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IStartupFilter>(new ConnectionInfoStartupFilter(
+                    IPAddress.Parse(TrustedProxyIp),
+                    ExpectedLocalPort));
+                services.PostConfigure<HttpsRedirectionOptions>(options => options.HttpsPort = 8443);
+                services.PostConfigure<OpenIdConnectOptions>(ExternalIdentityClaimTypes.OidcInteractiveScheme, options =>
+                {
+                    OpenIdConnectConfiguration configuration = new()
+                    {
+                        Issuer = "https://identity.example.test",
+                        AuthorizationEndpoint = "https://identity.example.test/authorize",
+                        TokenEndpoint = "https://identity.example.test/token"
+                    };
+                    options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
+                });
+            });
+            return base.CreateHost(builder);
+        }
     }
 
     private static Dictionary<string, string?> EnabledSettings()

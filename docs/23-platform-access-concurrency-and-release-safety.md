@@ -2,7 +2,7 @@
 
 ## Access and Session Boundary
 
-Negotiate authenticates the current corporate principal. `ICorporatePrincipalResolver` translates authentication data into a provider-neutral identifier; `IApplicationAccessService` then resolves `Pending`, `Approved`, or `Disabled` status, roles, and capabilities. New users are pending. `GET /api/v1/access/me` is available to authenticated users so a future UI can show that state. Approval, rejection, role replacement, and disable endpoints require explicit access capabilities.
+The configured authentication handler authenticates the current corporate principal. `ICorporatePrincipalResolver` translates authentication data into a provider-neutral identifier; `IApplicationAccessService` then resolves `Pending`, `Approved`, or `Disabled` status, roles, and capabilities. New users are pending. `GET /api/v1/access/me` exposes that state. Approval, rejection, role replacement, and disable endpoints require explicit access capabilities.
 
 Rejection is terminal for the current request. The user remains non-authorized `Pending`; `/access/me` exposes the latest request as `Rejected`, with no pending request ID, and does not create another request. Reapplication is intentionally unsupported until an explicit business policy defines initiation, cooling-off/reset, and authorization. Administrators retain the complete request history through the access-user read model.
 
@@ -12,9 +12,9 @@ Request decisions require the request `version`; role replacement and disable re
 
 The first Admin is an exact principal supplied through `Access:BootstrapAdministrators`; its automatic approval uses a system actor and audits both approval and role assignment. An empty database without that configured principal or the explicit Demo/Test compatibility bootstrap is a lockout condition. Remove the configured bootstrap after redundant persisted Admin assignments exist. Full deployment details are in `docs/24-api-test-deployment-readiness.md`.
 
-`SessionSecurity` governs a provider-neutral server-side SecureOps application session: 30-minute idle timeout, 12-hour absolute lifetime, and five-minute persisted-activity throttle by default. Its Secure, HttpOnly, SameSite=Lax cookie contains only a protected opaque handle and is never the corporate authentication or authorization source. Negotiate logout remains browser/host managed, while SecureOps logout ends the application session. OIDC can replace Negotiate without changing this boundary. Current access status and `AccessVersion` are revalidated, so disable/revocation invalidates effective sessions.
+`SessionSecurity` governs a provider-neutral server-side SecureOps application session: 30-minute idle timeout, 12-hour absolute lifetime, and five-minute persisted-activity throttle by default. Its Secure, HttpOnly, SameSite=Lax cookie contains only a protected opaque handle and is never the corporate authentication or authorization source. SecureOps logout ends the API application session first, then the local UI cookie, and invokes provider sign-out only when explicitly configured. Current access status and `AccessVersion` are revalidated, so disable/revocation invalidates effective sessions.
 
-OIDC authority, client ID, scopes, redirects, claims, signing, and logout are external inputs. No OIDC handler is enabled. The reserved `Access:OidcIssuerClaimType` and `Access:OidcSubjectClaimType` seam produces an opaque stable principal identifier when an approved handler supplies both claims.
+OIDC handlers are present but `Oidc:Enabled=false` by default. Enabling requires a validated authority, client ID, API audience, explicit `None` or `ClientSecretPost` client authentication, local callback paths, `openid` scope, HTTPS metadata, and PKCE. The interactive UI validates and normalizes the ID-token identity; the API independently validates the relayed access token. Both use bounded reviewed claim names and `issuer + sub` as the opaque persisted identity. `uygulama-role` is diagnostic evidence only.
 
 ## Capability Matrix
 

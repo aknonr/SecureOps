@@ -1,6 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
@@ -34,6 +32,7 @@ DataProtectionConfiguration.Validate(builder.Configuration, builder.Environment.
 bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
     builder.Environment.EnvironmentName,
     builder.Configuration);
+bool oidcEnabled = builder.Configuration.GetValue($"{OidcOptions.SectionName}:Enabled", false);
 
 builder.Services.Configure<DemoApiAuthOptions>(builder.Configuration.GetSection(DemoApiAuthOptions.SectionName));
 builder.Services.Configure<SwaggerOptions>(builder.Configuration.GetSection(SwaggerOptions.SectionName));
@@ -41,23 +40,9 @@ builder.Services.Configure<SessionSecurityOptions>(builder.Configuration.GetSect
 builder.Services.AddSecureOpsDataProtection(builder.Configuration);
 builder.Services.AddHostedService<DataProtectionStartupValidationHostedService>();
 
-AuthenticationBuilder authentication = builder.Services.AddAuthentication(options =>
-{
-    options.DefaultScheme = demoAuthEnabled
-        ? DemoApiAuthentication.SchemeName
-        : NegotiateDefaults.AuthenticationScheme;
-});
-
-if (demoAuthEnabled)
-{
-    authentication.AddScheme<AuthenticationSchemeOptions, DemoApiAuthenticationHandler>(
-        DemoApiAuthentication.SchemeName,
-        configureOptions: null);
-}
-else
-{
-    authentication.AddNegotiate();
-}
+builder.Services.AddSecureOpsApiAuthentication(
+    builder.Configuration,
+    builder.Environment.EnvironmentName);
 
 builder.Services.AddSecureOpsAuthorization(builder.Configuration, !builder.Environment.IsDevelopment());
 builder.Services.Configure<ForwardedHeadersOptions>(options => ReverseProxyConfiguration.Configure(options, builder.Configuration));
@@ -109,26 +94,29 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1",
         Description = "Internal SecureOps backend API."
     });
-    options.AddSecurityDefinition("WindowsAuth", new OpenApiSecurityScheme
+    if (!oidcEnabled)
     {
-        Type = SecuritySchemeType.Http,
-        Scheme = "negotiate",
-        Description = "Windows Integrated Authentication / Negotiate. Non-development environments require authentication for Swagger and API endpoints."
-    });
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+        options.AddSecurityDefinition("WindowsAuth", new OpenApiSecurityScheme
         {
-            new OpenApiSecurityScheme
+            Type = SecuritySchemeType.Http,
+            Scheme = "negotiate",
+            Description = "Windows Integrated Authentication / Negotiate. Non-development environments require authentication for Swagger and API endpoints."
+        });
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
             {
-                Reference = new OpenApiReference
+                new OpenApiSecurityScheme
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "WindowsAuth"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "WindowsAuth"
+                    }
+                },
+                Array.Empty<string>()
+            }
+        });
+    }
     if (demoAuthEnabled)
     {
         options.AddSecurityDefinition("DemoActor", new OpenApiSecurityScheme
@@ -144,6 +132,26 @@ builder.Services.AddSwaggerGen(options =>
                 new OpenApiSecurityScheme
                 {
                     Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "DemoActor" }
+                },
+                Array.Empty<string>()
+            }
+        });
+    }
+    if (oidcEnabled)
+    {
+        options.AddSecurityDefinition("OidcBearer", new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "Corporate OIDC access token. SecureOps persisted access remains authoritative."
+        });
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "OidcBearer" }
                 },
                 Array.Empty<string>()
             }

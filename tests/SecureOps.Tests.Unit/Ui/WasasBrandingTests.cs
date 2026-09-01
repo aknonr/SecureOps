@@ -109,14 +109,15 @@ public sealed class WasasBrandingTests
     }
 
     [Fact]
-    public void LoginCta_DoesNotClaimCorporateSsoWhileOnlyTestSignInExists()
+    public void LoginCta_ClaimsCorporateSsoOnlyWhenOidcIsEnabled()
     {
-        // The interim path establishes a local TEST session. Labelling it corporate SSO would tell
-        // an operator their corporate credentials had been verified when nothing checked them.
         string login = File.ReadAllText(Path.Combine(UiRoot(), "Pages", "Login.cshtml"));
+        using var appsettings = System.Text.Json.JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(UiRoot(), "appsettings.json")));
 
         login.Should().Contain("TEST Girişi");
-        login.Should().NotContain("Kurumsal SSO ile Giriş");
+        login.Should().Contain("@if (Model.OidcEnabled)").And.Contain("Kurumsal SSO ile Giriş");
+        appsettings.RootElement.GetProperty("Oidc").GetProperty("Enabled").GetBoolean().Should().BeFalse();
     }
 
     [Fact]

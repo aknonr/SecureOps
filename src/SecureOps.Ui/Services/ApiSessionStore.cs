@@ -42,6 +42,8 @@ public interface IApiSessionStore
 /// </summary>
 public sealed class BrowserApiSession : IDisposable
 {
+    private OidcApiAccessToken? _oidcAccessToken;
+
     /// <summary>Cookies the API has issued to this browser session.</summary>
     public CookieContainer Cookies { get; } = new();
 
@@ -55,9 +57,29 @@ public sealed class BrowserApiSession : IDisposable
     /// </remarks>
     public SemaphoreSlim FirstRequestGate { get; } = new(1, 1);
 
+    /// <summary>Stores a validated OIDC access token only in server process memory.</summary>
+    public void SetOidcAccessToken(string token, DateTimeOffset expiresAtUtc) =>
+        _oidcAccessToken = new OidcApiAccessToken(token, expiresAtUtc);
+
+    /// <summary>Returns a non-expired access token without logging or exposing it to browser state.</summary>
+    public string? GetOidcAccessToken(DateTimeOffset now)
+    {
+        OidcApiAccessToken? current = _oidcAccessToken;
+        if (current is null || current.ExpiresAtUtc <= now)
+        {
+            _oidcAccessToken = null;
+            return null;
+        }
+
+        return current.Value;
+    }
+
     /// <inheritdoc />
     public void Dispose() => FirstRequestGate.Dispose();
 }
+
+/// <summary>One server-memory-only API access token.</summary>
+internal sealed record OidcApiAccessToken(string Value, DateTimeOffset ExpiresAtUtc);
 
 /// <summary>
 /// Memory-cache backed <see cref="IApiSessionStore"/>.

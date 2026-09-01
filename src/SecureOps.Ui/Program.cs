@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MudBlazor.Services;
+using SecureOps.Shared.Auth;
+using SecureOps.Shared.Configuration;
 using SecureOps.Ui.Configuration;
 using SecureOps.Ui.Hosting;
 using SecureOps.Ui.Security;
@@ -71,41 +73,9 @@ builder.Services.AddAntiforgery(options =>
     options.FormFieldName = "__RequestVerificationToken";
 });
 
-builder.Services
-    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.Cookie.Name = "__Host-SecureOpsUi.Session";
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.LoginPath = "/login";
-        options.AccessDeniedPath = "/access-denied";
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.SlidingExpiration = true;
-
-        // Every authenticated browser session carries a correlation value used to pick its API
-        // cookie jar. Issuing it here rather than only at sign-in means a session established by
-        // any current or future authentication path gets one, and a cookie predating this change
-        // is upgraded on its next request instead of silently losing session reuse.
-        //
-        // It is a random value with no authority of its own, and it never leaves the server: the
-        // browser only ever sees it inside this encrypted cookie.
-        options.Events.OnValidatePrincipal = context =>
-        {
-            if (context.Principal?.Identity is ClaimsIdentity { IsAuthenticated: true } identity
-                && identity.FindFirst(SignedInUserService.BrowserSessionClaim) is null)
-            {
-                identity.AddClaim(new Claim(
-                    SignedInUserService.BrowserSessionClaim,
-                    Guid.NewGuid().ToString("N")));
-
-                context.ShouldRenew = true;
-            }
-
-            return Task.CompletedTask;
-        };
-    });
+builder.Services.AddSecureOpsUiAuthentication(
+    builder.Configuration,
+    builder.Environment.EnvironmentName);
 
 // No role or capability policies are registered here on purpose. Application authority lives in the
 // API's access store and is read through GET /api/v1/access/me; a second, cookie-derived policy set
@@ -118,10 +88,12 @@ builder.Services.AddScoped<ISignedInUserService, SignedInUserService>();
 builder.Services.AddScoped<ICurrentAccessProvider, CurrentAccessProvider>();
 
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddSingleton<IApiSessionStore, ApiSessionStore>();
 builder.Services.AddScoped<IApiSessionContext, ApiSessionContext>();
 
 builder.Services.AddTransient<DemoApiAuthHeaderHandler>();
+builder.Services.AddTransient<OidcApiAccessTokenHandler>();
 builder.Services.AddTransient<ApiSessionCookieHandler>();
 
 // One transport strategy for every SecureOps API client. Registering them through a single helper
@@ -200,17 +172,29 @@ app.UseAntiforgery();
 app.MapRazorPages();
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy", component = "SecureOps.Ui" }));
 
-// Interim sign-in. A single action with no profile or role selection: the session establishes only
-// who the operator is, and the API decides what they may do. When an identity provider is approved
-// this endpoint becomes a challenge/callback pair and the login page keeps its shape.
+// A single action with no profile or role selection: the session establishes only who the operator
+// is, and the API decides what they may do. Disabled OIDC retains the interim Demo/Test path;
+// enabled OIDC turns the same action into the reviewed challenge/callback flow.
 app.MapPost(
     "/auth/sign-in",
     async (
         HttpContext httpContext,
         [FromForm] string? returnUrl,
         ISignedInUserService users,
-        IDemoModeState shellMode) =>
+        IDemoModeState shellMode,
+        IOptions<OidcOptions> oidcOptions) =>
     {
+        if (oidcOptions.Value.Enabled)
+        {
+            return Results.Challenge(
+                new AuthenticationProperties
+                {
+                    IsPersistent = false,
+                    RedirectUri = BuildAppPath(httpContext, LocalReturnUrl.Sanitize(returnUrl))
+                },
+                [ExternalIdentityClaimTypes.OidcInteractiveScheme]);
+        }
+
         if (!shellMode.MockAuthenticationEnabled)
         {
             return RedirectToTrusted(httpContext, "login?error=sign-in-disabled");
@@ -244,7 +228,8 @@ app.MapGet(
         IAccessApiClient accessApi,
         IApiSessionContext sessionContext,
         IApiSessionStore sessionStore,
-        ILoggerFactory loggerFactory) =>
+        ILoggerFactory loggerFactory,
+        IOptions<OidcOptions> oidcOptions) =>
     {
         string? browserSessionKey = sessionContext.BrowserSessionKey;
         ILogger logger = loggerFactory.CreateLogger("SecureOps.Ui.SignOut");
@@ -277,6 +262,17 @@ app.MapGet(
             }
         }
 
+        bool oidcSession = string.Equals(
+            httpContext.User.FindFirst(SignedInUserService.AuthenticationSourceClaim)?.Value,
+            "oidc",
+            StringComparison.Ordinal);
+        if (oidcSession && oidcOptions.Value.Enabled && oidcOptions.Value.EnableRemoteSignOut)
+        {
+            return Results.SignOut(
+                new AuthenticationProperties { RedirectUri = BuildAppPath(httpContext, "signed-out?provider=oidc") },
+                [CookieAuthenticationDefaults.AuthenticationScheme, ExternalIdentityClaimTypes.OidcInteractiveScheme]);
+        }
+
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToTrusted(httpContext, "signed-out?provider=managed");
     })
@@ -300,6 +296,7 @@ static IHttpClientBuilder AddSecureOpsApiClient<TClient, TImplementation>(IServi
         .AddHttpClient<TClient, TImplementation>(ConfigureApiClient)
         .ConfigurePrimaryHttpMessageHandler(static () => new SocketsHttpHandler { UseCookies = false })
         .AddHttpMessageHandler<DemoApiAuthHeaderHandler>()
+        .AddHttpMessageHandler<OidcApiAccessTokenHandler>()
         .AddHttpMessageHandler<ApiSessionCookieHandler>();
 
 static void ConfigureApiClient(IServiceProvider serviceProvider, HttpClient client)

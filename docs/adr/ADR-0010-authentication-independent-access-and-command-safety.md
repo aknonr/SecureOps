@@ -13,7 +13,7 @@ Authorization follows this provider-neutral chain:
 
 `Authentication source -> Corporate principal -> SecureOps access approval -> Application role -> Capability`
 
-First-seen principals become `Pending` and receive no operational capabilities. Approved administrators decide requests, assign reviewed roles, and can disable access. Capability policies revalidate application status on every protected request. Demo compatibility requires explicit Demo/Test authentication and `Access:DemoCompatibilityEnabled=true`. OIDC is not implemented; a resolver accepts a future issuer/subject pair without changing access records or authorization policies.
+First-seen principals become `Pending` and receive no operational capabilities. Approved administrators decide requests, assign reviewed roles, and can disable access. Capability policies revalidate application status on every protected request. Demo compatibility requires explicit Demo/Test authentication and `Access:DemoCompatibilityEnabled=true`. OIDC readiness is specified by ADR-0016; it supplies a normalized issuer/subject principal without changing access records or authorization policies.
 
 A rejection is a durable terminal decision for its request. The user remains `Pending` and has no operational capabilities, but ordinary `GET /access/me` reconciliation returns the latest rejected request and never creates a replacement. No reapplication, cooling-off, or administrator-reset policy is approved; therefore no reapplication endpoint exists. A future reapplication mechanism requires an explicit policy and must preserve all prior requests and audit history.
 
@@ -26,8 +26,8 @@ Source refresh may update bounded source data but cannot reapply classification 
 ## Consequences
 
 - AD group claims no longer grant application capabilities directly.
-- Negotiate remains the production authentication handler; no application cookie is issued today.
-- Future OIDC must supply approved issuer/subject, cookie/logout, and claims contracts before implementation.
+- Authentication-provider activation remains deployment-owned and separate from authorization.
+- OIDC readiness is disabled by default and requires an approved issuer/client/token/logout contract before activation.
 - Disabled users lose protected capabilities on their next request.
 - SQL providers require offline migrations through `004-access-read-model-and-versioning.sql`; the application never applies them.
 - In-memory stores are deterministic local/Test substitutes only; restart durability requires SQL.

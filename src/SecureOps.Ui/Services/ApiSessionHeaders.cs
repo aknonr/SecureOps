@@ -55,4 +55,16 @@ public static class ApiSessionHeaders
 
         return string.IsNullOrWhiteSpace(key) ? null : key;
     }
+
+    /// <summary>Reads the correlation stamp without removing it.</summary>
+    public static string? ReadBrowserSessionKey(HttpRequestMessage request)
+    {
+        if (!request.Headers.TryGetValues(BrowserSession, out IEnumerable<string>? values))
+        {
+            return null;
+        }
+
+        string? key = values.FirstOrDefault();
+        return string.IsNullOrWhiteSpace(key) ? null : key;
+    }
 }

@@ -39,19 +39,33 @@
             @* Styled as the corporate sign-in action it will become, labelled as the thing it
                actually is today. The interim path establishes a local TEST session; naming it after
                corporate single sign-on would tell an operator their corporate credentials had been
-               checked when nothing checked them. Enabling OIDC later changes the label, the note,
-               and the form action — not this markup. *@
+               checked when nothing checked them. Enabling OIDC changes the label and note while
+               preserving the same single-action layout. *@
             <button type="submit" class="so-auth-submit">
                 <svg class="so-auth-submit-icon" viewBox="0 0 24 24" width="20" height="20"
                      role="presentation" aria-hidden="true" focusable="false">
                     <path fill="currentColor" d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Zm0 2a3 3 0 0 1 3 3v3H9V6a3 3 0 0 1 3-3Zm0 11a2 2 0 0 1 1 3.73V19a1 1 0 0 1-2 0v-1.27A2 2 0 0 1 12 14Z" />
                 </svg>
-                <span class="so-auth-submit-label">TEST Girişi</span>
+                @if (Model.OidcEnabled)
+                {
+                    <span class="so-auth-submit-label">Kurumsal SSO ile Giriş</span>
+                }
+                else
+                {
+                    <span class="so-auth-submit-label">TEST Girişi</span>
+                }
                 <span class="so-auth-submit-spinner" aria-hidden="true"></span>
             </button>
         </form>
 
-        <p class="so-auth-note">Bu ortamda kurumsal SSO henüz etkin değildir.</p>
+        @if (Model.OidcEnabled)
+        {
+            <p class="so-auth-note">Kurumsal kimlik sağlayıcısına güvenli şekilde yönlendirileceksiniz.</p>
+        }
+        else
+        {
+            <p class="so-auth-note">Bu ortamda kurumsal SSO henüz etkin değildir.</p>
+        }
 
         <div class="so-auth-divider" aria-hidden="true"></div>
 

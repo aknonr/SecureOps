@@ -32,7 +32,7 @@ The DBA migration identity needs controlled DDL authority to create schemas/tabl
 
 ## Bootstrap Administrator
 
-The bootstrap is configuration-based with persisted SQL access state. Negotiate principals are stored as the trimmed `ClaimsPrincipal.Identity.Name`, normally `DOMAIN\\account`, in `security.Users.CorporateIdentity`; matching is case-insensitive in application code. Future OIDC uses an opaque SHA256 of issuer plus subject.
+The bootstrap is configuration-based with persisted SQL access state. Negotiate principals are stored as the trimmed `ClaimsPrincipal.Identity.Name`, normally `DOMAIN\\account`, in `security.Users.CorporateIdentity`; matching is case-insensitive in application code. OIDC readiness uses an opaque SHA256 of issuer plus subject when separately activated.
 
 On first authenticated access, an unknown principal becomes `Pending` and receives one access request. An exact value in `Access__BootstrapAdministrators__N` is approved with `Admin` by `system:configured-bootstrap`. Demo/Test compatibility separately maps only `demo:platform-admin` to Admin and `demo:team-lead` to Lead when both Demo flags are enabled. Bootstrap approval and role assignment are audited.
 
@@ -52,7 +52,7 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED | `Access__AutoCreateRequest` | `true` |
 | REQUIRED, TEST-ONLY | `Access__DemoCompatibilityEnabled` | same enablement decision as `DemoAuth__Enabled` |
 | CONDITIONAL REQUIRED | `Access__BootstrapAdministrators__0` | `<DOMAIN\\approved-bootstrap-account>` when validating first Windows Admin against an empty database |
-| PRODUCTION-FUTURE | `Access__OidcSubjectClaimType` / `Access__OidcIssuerClaimType` | `sub` / `iss`; unused until approved OIDC |
+| ACTIVATION-PENDING | `Oidc__Enabled` | keep `false` until the approved IdP contract and deployment change are complete |
 | REQUIRED | `SessionSecurity__IdleTimeoutMinutes` / `SessionSecurity__AbsoluteLifetimeHours` / `SessionSecurity__ActivityPersistenceIntervalMinutes` | `30` / `12` / `5` |
 | REQUIRED | `SessionSecurity__RepositoryProvider` / `SessionSecurity__CookieName` / `SessionSecurity__MaxAdminPageSize` | `SqlServer` / `__Host-SecureOps.ApplicationSession` / `100` |
 | REQUIRED | `SessionSecurity__SecureCookie` / `SessionSecurity__HttpOnly` / `SessionSecurity__SameSite` / `SessionSecurity__RevalidateAccessOnEveryRequest` | `true` / `true` / `Lax` / `true` |
@@ -84,6 +84,12 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED, RUNTIME-ONLY | `ConnectionStrings__SecureOpsDb` | `Server=tcp:<SQL_FQDN>,<SQL_PORT>;Database=<DATABASE_NAME>;Integrated Security=True;Encrypt=True;TrustServerCertificate=False;Application Name=SecureOps.Api;Connect Timeout=15` |
 | REQUIRED CURRENT | `ReverseProxy__ForwardedHeaders__Enabled` | `false` until exact API proxy behavior and source IPs are confirmed |
 | CONDITIONAL | `ReverseProxy__ForwardedHeaders__TrustedProxyIps__0` | `<exact trusted API proxy IP>` only when forwarding is explicitly enabled |
+
+### OIDC Activation-Pending Values
+
+Keep `Oidc__Enabled=false` until the corporate contract is approved. At activation, the UI host requires `Oidc__Authority`, `Oidc__ClientId`, `Oidc__ClientAuthenticationMethod` (`None` or `ClientSecretPost`), conditional `Oidc__ClientSecret`, `Oidc__ApiAudience`, callback/signed-out callback paths, scopes including `openid`, `Oidc__RequireHttpsMetadata=true`, and `Oidc__UsePkce=true`. `Oidc__EnableRemoteSignOut` remains `false` unless provider metadata and operational testing approve logout.
+
+The API host requires only `Oidc__Authority`, `Oidc__ApiAudience`, and `Oidc__RequireHttpsMetadata=true`; do not copy the UI client secret to the API. Optional claim-name and bound overrides use `Oidc__IssuerClaimType`, `SubjectClaimType`, `LoginNameClaimType`, `DisplayNameClaimType`, `MailClaimType`, `UidClaimType`, `RoleEvidenceClaimType`, `MaxClaimCount`, `MaxClaimValueLength`, and `MaxRoleEvidenceCount` under the same section. Defaults map `iss`, `sub`, `loginname`, `displayname`, `mail`, `uid`, and `uygulama-role`.
 
 `Simulation` source records and `SIM-*` Jira keys are synthetic TEST evidence only. The provider has fixed scenarios, performs no network I/O, must be selected on both sides, and fails startup outside Development/Demo/Test. `Fake`/`FAKE-*` remains a legacy automated-test compatibility path.
 

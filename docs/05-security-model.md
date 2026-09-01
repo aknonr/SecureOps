@@ -19,11 +19,13 @@ Security is the defining constraint of this project. This document is the canoni
 
 ### Web UI and API
 
-- **Windows Authentication** via Active Directory.
-- Service principal: the IIS app pool runs under a domain-joined service account.
-- User identity flows through `HttpContext.User`.
-- No custom token issuance, no JWT in MVP.
-- Authentication establishes only a corporate principal. It does not directly grant an application role or capability.
+- Corporate OIDC readiness is implemented but disabled by default. Current Demo/Test authentication remains available until activation is separately approved.
+- The browser UI uses Authorization Code flow with PKCE. The UI stores the API access token only in its server-side browser-session store and relays it to the API as a bearer token.
+- The API validates issuer, signature, audience, and lifetime, then reduces the token to a bounded reviewed identity. SecureOps does not issue its own corporate identity token.
+- `issuer + sub` produces the opaque stable access identity. `loginname` is the operator/Jira-resolution identity; `displayname`, `mail`, and `uid` are optional profile claims.
+- `uygulama-role` is retained only as non-authoritative evidence. It never grants a SecureOps role or capability.
+- Authentication establishes only a corporate principal. Persisted SecureOps Access -> Role -> Capability remains the authorization authority, and unknown authenticated users remain pending.
+- SecureOps never requests or handles the user's LDAP/Jira password. The Jira integration credential remains only the REST technical identity.
 
 ### Webhook Endpoint
 
@@ -58,11 +60,11 @@ Management summary and paginated operator-activity reporting require the separat
 
 First-seen authenticated users are `Pending` and receive no operational capability. Administrators approve requests and assign persisted application roles. Disabled status is checked on each capability-protected request. Exact configured bootstrap administrators are an initialization mechanism, not a general AD-group authorization path.
 
-### Future Authentication and Role Strategy
+### Authentication and Role Strategy
 
-MVP authentication remains Windows Authentication. Future production UI options should prefer corporate SSO/OIDC if the organization standardizes it, or Windows Integrated Authentication/Kerberos for intranet IIS if approved. Direct LDAP/AD password login is not the preferred model because it would make SecureOps handle user passwords directly.
+OIDC activation remains server-owned and requires the approved corporate metadata/client contract. Direct LDAP/AD password login is prohibited because it would make SecureOps handle user passwords directly.
 
-The persisted SecureOps access record remains the authorization boundary regardless of authentication source. PAM/BeyondTrust may verify privileged sessions or supply metadata later, but it is not the normal application login mechanism. A future OIDC handler must resolve issuer/subject to the same corporate-principal boundary; it must not rewrite application authorization.
+The persisted SecureOps access record remains the authorization boundary regardless of authentication source. PAM/BeyondTrust may verify privileged sessions or supply metadata later, but it is not the normal application login mechanism. OIDC resolves issuer/subject to the same corporate-principal boundary and does not rewrite application authorization.
 
 Future role vocabulary, subject to ADR before implementation:
 

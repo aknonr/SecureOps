@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
+using SecureOps.Shared.Auth;
 using SecureOps.Ui.Configuration;
 
 namespace SecureOps.Ui.Services;
@@ -42,13 +43,16 @@ public sealed class SignedInUserService : ISignedInUserService
     /// <inheritdoc />
     public SignedInUser Describe(ClaimsPrincipal principal)
     {
-        string accountName = principal.FindFirstValue(ClaimTypes.Name)
+        string accountName = principal.FindFirstValue(ExternalIdentityClaimTypes.PrincipalName)
+            ?? principal.FindFirstValue(ClaimTypes.Name)
             ?? principal.Identity?.Name
             ?? "bilinmiyor";
 
         // A provider-supplied display name wins; otherwise the account name stands in. No placeholder
         // person is invented, so nothing on screen claims to be a real name that is not.
-        string displayName = principal.FindFirstValue(DisplayNameClaim) ?? accountName;
+        string displayName = principal.FindFirstValue(ExternalIdentityClaimTypes.DisplayName)
+            ?? principal.FindFirstValue(DisplayNameClaim)
+            ?? accountName;
 
         string authenticationSource = principal.FindFirstValue(AuthenticationSourceClaim)
             ?? principal.Identity?.AuthenticationType

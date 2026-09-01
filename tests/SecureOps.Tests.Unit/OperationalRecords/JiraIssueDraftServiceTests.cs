@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using SecureOps.Domain.OperationalRecords;
+using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Configuration;
@@ -94,6 +96,32 @@ public sealed class JiraIssueDraftServiceTests
         result.Value.ReporterUsername.Should().Be("jira-operator");
         result.Value.ReporterUsername.Should().NotBe(result.Value.RequesterAccountId);
         resolver.Identities.Should().Equal(record.Requester!, "operator.one");
+    }
+
+    [Fact]
+    public async Task BuildAsync_WithNormalizedOidcActor_UsesLoginNameForReporterResolution()
+    {
+        OidcExternalIdentityNormalizer normalizer = new(Options.Create(new OidcOptions()));
+        ClaimsPrincipal oidcPrincipal = normalizer.Normalize(new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("iss", "https://identity.example.test"),
+            new Claim("sub", "synthetic-subject-100"),
+            new Claim("loginname", "operator.oidc")
+        ], "synthetic-oidc"))).Principal!;
+        InMemoryOperationalRecordRepository repository = new();
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        StubResolver resolver = new(
+            RequesterResolutionResult.Found("jira-requester"),
+            RequesterResolutionResult.Found("jira-operator"));
+        JiraIssueDraftService service = CreateService(resolver, "Block", reporterMode: "AuthenticatedOperator");
+
+        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(
+            record,
+            oidcPrincipal.Identity!.Name!,
+            CancellationToken.None);
+
+        result.Value!.ReporterUsername.Should().Be("jira-operator");
+        resolver.Identities.Should().Equal(record.Requester!, "operator.oidc");
     }
 
     [Theory]

@@ -4,6 +4,8 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using SecureOps.Shared.Configuration;
 using SecureOps.Ui.Services;
 
 namespace SecureOps.Tests.Unit.Ui;
@@ -158,6 +160,48 @@ public sealed class ApiSessionTransportTests
     }
 
     [Fact]
+    public async Task OidcRelay_UsesOnlyTheCurrentServerSideBrowserToken()
+    {
+        IApiSessionStore store = NewStore();
+        store.GetOrCreate("browser-a").SetOidcAccessToken("token-a", DateTimeOffset.UtcNow.AddMinutes(5));
+        BearerRecordingHandler recording = new();
+        OidcApiAccessTokenHandler relay = new(
+            store,
+            Options.Create(new OidcOptions { Enabled = true }),
+            TimeProvider.System)
+        {
+            InnerHandler = recording
+        };
+        using HttpClient client = new(relay) { BaseAddress = new Uri("https://localhost/") };
+        ApiSessionHeaders.Attach(client, new FakeApiSessionContext("browser-a"));
+
+        await client.GetAsync("api/v1/access/me");
+
+        recording.Authorization.Should().Be("Bearer token-a");
+    }
+
+    [Fact]
+    public async Task OidcRelay_DisabledOrExpired_DoesNotSendBearerMaterial()
+    {
+        IApiSessionStore store = NewStore();
+        store.GetOrCreate("browser-a").SetOidcAccessToken("expired", DateTimeOffset.UtcNow.AddMinutes(-1));
+        BearerRecordingHandler recording = new();
+        OidcApiAccessTokenHandler relay = new(
+            store,
+            Options.Create(new OidcOptions { Enabled = true }),
+            TimeProvider.System)
+        {
+            InnerHandler = recording
+        };
+        using HttpClient client = new(relay) { BaseAddress = new Uri("https://localhost/") };
+        ApiSessionHeaders.Attach(client, new FakeApiSessionContext("browser-a"));
+
+        await client.GetAsync("api/v1/access/me");
+
+        recording.Authorization.Should().BeNull();
+    }
+
+    [Fact]
     public void EveryTypedApiClient_TakesTheBrowserSessionContext()
     {
         // The failure this guards against is silent. A new client that does not stamp its requests
@@ -248,6 +292,19 @@ public sealed class ApiSessionTransportTests
             }
 
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class BearerRecordingHandler : HttpMessageHandler
+    {
+        public string? Authorization { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Authorization = request.Headers.Authorization?.ToString();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
         }
     }
 }

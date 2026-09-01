@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Access;
+using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
@@ -129,6 +129,7 @@ public static class DependencyInjection
         services.AddSingleton<AuditHealthReporter>();
 
         services.AddSingleton<ICorporatePrincipalResolver, CorporatePrincipalResolver>();
+        services.AddSingleton<OidcExternalIdentityNormalizer>();
         services.AddScoped<IAccessIdentityProfileResolver, AccessIdentityProfileResolver>();
         if (string.Equals(configuration[$"{AccessOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {

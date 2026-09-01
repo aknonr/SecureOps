@@ -2,7 +2,7 @@
 
 ## Pilot Authentication and Persistence
 
-The interim corporate authentication path is IIS Windows Authentication -> ASP.NET Core Negotiate -> `ClaimsPrincipal.Identity.Name` -> `ICorporatePrincipalResolver` -> persisted SecureOps approval -> role -> capability. Do not add an LDAP password form. OIDC remains a future authentication provider behind the same application access model.
+The interim corporate authentication path is IIS Windows Authentication -> ASP.NET Core Negotiate -> `ClaimsPrincipal.Identity.Name` -> `ICorporatePrincipalResolver` -> persisted SecureOps approval -> role -> capability. Do not add an LDAP password form. OIDC readiness is implemented behind the same access model but remains disabled pending a separate activation decision.
 
 For first real-user TEST bootstrap, preserve the current server-owned configuration and apply these exact environment-variable decisions through the controlled deployment process:
 
