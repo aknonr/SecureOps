@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -25,24 +26,31 @@ namespace SecureOps.Tests.Integration.Ui;
 
 public sealed partial class UiOidcAuthenticationTests
 {
-    private static readonly SymmetricSecurityKey _signingKey = new(
-        Encoding.UTF8.GetBytes("synthetic-oidc-signing-key-with-at-least-32-bytes"));
+    private static readonly RsaSecurityKey _signingKey = new(RSA.Create(2048));
 
     [Fact]
     public async Task SignIn_UsesAuthorizationCodePkceAndPublicHttpsCallback()
     {
         using OidcUiFactory factory = new();
         using HttpClient client = CreateClient(factory);
+        using HttpClient secondClient = CreateClient(factory);
 
         HttpResponseMessage challenge = await ChallengeAsync(client);
+        HttpResponseMessage secondChallenge = await ChallengeAsync(secondClient);
 
         challenge.StatusCode.Should().Be(HttpStatusCode.Redirect);
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
+        Dictionary<string, string> secondQuery = Query(secondChallenge.Headers.Location!);
         query["response_type"].Should().Be("code");
         query["code_challenge"].Should().NotBeNullOrWhiteSpace();
         query["code_challenge_method"].Should().Be("S256");
         query["redirect_uri"].Should().Be("https://wasasyonetim.thy.com/signin-oidc");
         query["scope"].Split(' ').Should().Contain("openid");
+        query["scope"].Split(' ').Should().Contain(["profile", "email"]);
+        challenge.Headers.Location!.AbsolutePath.Should().Be("/idp/rest/authorize");
+        query["nonce"].Length.Should().BeGreaterThanOrEqualTo(32);
+        query["nonce"].Should().NotBe(secondQuery["nonce"]);
+        query["state"].Should().NotBe(secondQuery["state"]);
     }
 
     [Fact]
@@ -56,6 +64,7 @@ public sealed partial class UiOidcAuthenticationTests
         options.ResponseType.Should().Be(OpenIdConnectResponseType.Code);
         options.UsePkce.Should().BeTrue();
         options.SaveTokens.Should().BeFalse();
+        options.MetadataAddress.Should().EndWith("/.well-known/openid-configurations");
         options.CorrelationCookie.HttpOnly.Should().BeTrue();
         options.CorrelationCookie.SameSite.Should().Be(SameSiteMode.None);
         options.CorrelationCookie.SecurePolicy.Should().Be(CookieSecurePolicy.Always);
@@ -80,6 +89,12 @@ public sealed partial class UiOidcAuthenticationTests
         callback.Headers.GetValues("Set-Cookie").Should().Contain(value =>
             value.Contains("__Host-SecureOpsUi.Session", StringComparison.Ordinal));
         factory.Provider.TokenRequests.Should().Be(1);
+        factory.Provider.LastTokenRequest!["grant_type"].Should().Be("authorization_code");
+        factory.Provider.LastTokenContentType.Should().Be("application/json");
+        factory.Provider.LastTokenRequest["redirect_uri"].Should().Be("https://wasasyonetim.thy.com/signin-oidc");
+        factory.Provider.LastTokenRequest["client_id"].Should().Be("secureops-ui-test");
+        factory.Provider.LastTokenRequest["code"].Should().Be("synthetic-code");
+        factory.Provider.LastTokenRequest["code_verifier"].Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -117,6 +132,36 @@ public sealed partial class UiOidcAuthenticationTests
     }
 
     [Fact]
+    public async Task Callback_WithMismatchedNonce_FailsSafely()
+    {
+        using OidcUiFactory factory = new();
+        using HttpClient client = CreateClient(factory);
+        HttpResponseMessage challenge = await ChallengeAsync(client);
+        Dictionary<string, string> query = Query(challenge.Headers.Location!);
+        factory.Provider.Nonce = "different-nonce";
+
+        HttpResponseMessage callback = await client.GetAsync(
+            $"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+
+        callback.Headers.Location!.OriginalString.Should().Be("/login?error=sign-in-failed");
+    }
+
+    [Fact]
+    public async Task PkceDisabled_OmitsChallengeAndJsonCodeVerifier()
+    {
+        using OidcUiFactory factory = new(usePkce: false);
+        using HttpClient client = CreateClient(factory);
+        HttpResponseMessage challenge = await ChallengeAsync(client);
+        Dictionary<string, string> query = Query(challenge.Headers.Location!);
+        factory.Provider.Nonce = query["nonce"];
+
+        _ = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+
+        query.Should().NotContainKey("code_challenge");
+        factory.Provider.LastTokenRequest.Should().NotContainKey("code_verifier");
+    }
+
+    [Fact]
     public async Task Callback_MissingOptionalClaims_StillSucceeds()
     {
         using OidcUiFactory factory = new(includeOptionalClaims: false);
@@ -130,6 +175,28 @@ public sealed partial class UiOidcAuthenticationTests
         callback.StatusCode.Should().Be(HttpStatusCode.Redirect);
         callback.Headers.GetValues("Set-Cookie").Should().Contain(value =>
             value.Contains("__Host-SecureOpsUi.Session", StringComparison.Ordinal));
+        callback.Headers.GetValues("Set-Cookie").Should().NotContain(value =>
+            value.Contains("synthetic-access-token", StringComparison.Ordinal)
+            || value.Contains("synthetic-refresh-token", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task OptionalUserInfo_MapsOnlyTheConfiguredUsernameClaim()
+    {
+        using OidcUiFactory factory = new(
+            includeOptionalClaims: false,
+            getClaimsFromUserInfo: true,
+            loginNameClaimType: "username");
+        using HttpClient client = CreateClient(factory);
+        HttpResponseMessage challenge = await ChallengeAsync(client);
+        Dictionary<string, string> query = Query(challenge.Headers.Location!);
+        factory.Provider.Nonce = query["nonce"];
+
+        HttpResponseMessage callback = await client.GetAsync(
+            $"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+
+        callback.Headers.Location!.OriginalString.Should().Be("/dashboard");
+        factory.Provider.UserInfoRequests.Should().Be(1);
     }
 
     [Fact]
@@ -168,6 +235,7 @@ public sealed partial class UiOidcAuthenticationTests
         logout.Headers.Location!.Host.Should().Be("identity.example.test");
         Query(logout.Headers.Location!)["post_logout_redirect_uri"].Should().Be(
             "https://wasasyonetim.thy.com/signout-callback-oidc");
+        Query(logout.Headers.Location!)["id_token_hint"].Should().NotBeNullOrWhiteSpace();
     }
 
     private static HttpClient CreateClient(OidcUiFactory factory) =>
@@ -204,16 +272,25 @@ public sealed partial class UiOidcAuthenticationTests
     {
         private readonly IAccessApiClient? _accessApi;
         private readonly bool _enableRemoteSignOut;
+        private readonly bool _usePkce;
+        private readonly bool _getClaimsFromUserInfo;
+        private readonly string _loginNameClaimType;
 
         public OidcUiFactory(
             bool includeOptionalClaims = true,
             IAccessApiClient? accessApi = null,
             bool enableRemoteSignOut = false,
-            bool oversizedClaim = false)
+            bool oversizedClaim = false,
+            bool usePkce = true,
+            bool getClaimsFromUserInfo = false,
+            string loginNameClaimType = "loginname")
         {
             Provider = new FakeOidcProvider(includeOptionalClaims, oversizedClaim);
             _accessApi = accessApi;
             _enableRemoteSignOut = enableRemoteSignOut;
+            _usePkce = usePkce;
+            _getClaimsFromUserInfo = getClaimsFromUserInfo;
+            _loginNameClaimType = loginNameClaimType;
         }
 
         public FakeOidcProvider Provider { get; }
@@ -229,12 +306,18 @@ public sealed partial class UiOidcAuthenticationTests
                 ["ReverseProxy:HttpsOffload:Enabled"] = "false",
                 ["Oidc:Enabled"] = "true",
                 ["Oidc:Authority"] = "https://identity.example.test",
+                ["Oidc:MetadataAddress"] = "https://identity.example.test/idp/.well-known/openid-configurations",
                 ["Oidc:ClientId"] = "secureops-ui-test",
                 ["Oidc:ClientAuthenticationMethod"] = "None",
                 ["Oidc:ApiAudience"] = "secureops-api-test",
                 ["Oidc:Scopes:0"] = "openid",
+                ["Oidc:Scopes:1"] = "profile",
+                ["Oidc:Scopes:2"] = "email",
+                ["Oidc:TokenEndpointRequestFormat"] = "Json",
                 ["Oidc:RequireHttpsMetadata"] = "true",
-                ["Oidc:UsePkce"] = "true",
+                ["Oidc:UsePkce"] = _usePkce ? "true" : "false",
+                ["Oidc:GetClaimsFromUserInfoEndpoint"] = _getClaimsFromUserInfo ? "true" : "false",
+                ["Oidc:LoginNameClaim"] = _loginNameClaimType,
                 ["Oidc:EnableRemoteSignOut"] = _enableRemoteSignOut ? "true" : "false"
             }));
             builder.ConfigureServices(services =>
@@ -266,9 +349,10 @@ public sealed partial class UiOidcAuthenticationTests
             OpenIdConnectConfiguration configuration = new()
             {
                 Issuer = "https://identity.example.test",
-                AuthorizationEndpoint = "https://identity.example.test/authorize",
-                TokenEndpoint = "https://identity.example.test/token",
-                EndSessionEndpoint = "https://identity.example.test/logout"
+                AuthorizationEndpoint = "https://identity.example.test/idp/rest/authorize",
+                TokenEndpoint = "https://identity.example.test/idp/api/v1/auth/token/code2token",
+                UserInfoEndpoint = "https://identity.example.test/idp/api/v1/auth/token/userinfo",
+                EndSessionEndpoint = "https://identity.example.test/idp/logout"
             };
             configuration.SigningKeys.Add(_signingKey);
             ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
@@ -280,9 +364,35 @@ public sealed partial class UiOidcAuthenticationTests
 
         public int TokenRequests { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public int UserInfoRequests { get; private set; }
+
+        public Dictionary<string, string>? LastTokenRequest { get; private set; }
+
+        public string? LastTokenContentType { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.Method == HttpMethod.Get)
+            {
+                UserInfoRequests++;
+                string userInfo = JsonSerializer.Serialize(new
+                {
+                    sub = "synthetic-subject-100",
+                    username = "operator.userinfo",
+                    displayname = "UserInfo Operator",
+                    mail = "operator.userinfo@example.test",
+                    uid = "uid-userinfo"
+                });
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(userInfo, Encoding.UTF8, "application/json")
+                };
+            }
+
             TokenRequests++;
+            LastTokenContentType = request.Content!.Headers.ContentType?.MediaType;
+            LastTokenRequest = JsonSerializer.Deserialize<Dictionary<string, string>>(
+                await request.Content!.ReadAsStringAsync(cancellationToken));
             List<System.Security.Claims.Claim> claims =
             [
                 new("sub", "synthetic-subject-100"),
@@ -307,18 +417,19 @@ public sealed partial class UiOidcAuthenticationTests
                 claims: claims,
                 notBefore: DateTime.UtcNow.AddMinutes(-1),
                 expires: DateTime.UtcNow.AddMinutes(5),
-                signingCredentials: new SigningCredentials(_signingKey, SecurityAlgorithms.HmacSha256));
+                signingCredentials: new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256));
             string body = JsonSerializer.Serialize(new
             {
                 access_token = "synthetic-access-token",
+                refresh_token = "synthetic-refresh-token",
                 token_type = "Bearer",
                 expires_in = 300,
                 id_token = new JwtSecurityTokenHandler().WriteToken(token)
             });
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json")
-            });
+            };
         }
     }
 

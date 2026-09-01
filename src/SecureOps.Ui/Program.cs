@@ -232,6 +232,9 @@ app.MapGet(
         IOptions<OidcOptions> oidcOptions) =>
     {
         string? browserSessionKey = sessionContext.BrowserSessionKey;
+        string? idTokenHint = browserSessionKey is null
+            ? null
+            : sessionStore.GetOrCreate(browserSessionKey).GetOidcIdToken();
         ILogger logger = loggerFactory.CreateLogger("SecureOps.Ui.SignOut");
 
         try
@@ -268,8 +271,13 @@ app.MapGet(
             StringComparison.Ordinal);
         if (oidcSession && oidcOptions.Value.Enabled && oidcOptions.Value.EnableRemoteSignOut)
         {
+            AuthenticationProperties properties = new()
+            {
+                RedirectUri = BuildAppPath(httpContext, "signed-out?provider=oidc")
+            };
+            properties.SetParameter("secureops:id_token_hint", idTokenHint);
             return Results.SignOut(
-                new AuthenticationProperties { RedirectUri = BuildAppPath(httpContext, "signed-out?provider=oidc") },
+                properties,
                 [CookieAuthenticationDefaults.AuthenticationScheme, ExternalIdentityClaimTypes.OidcInteractiveScheme]);
         }
 

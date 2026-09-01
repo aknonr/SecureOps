@@ -24,11 +24,6 @@ public static class OidcConfigurationValidator
         ValidatePath(options.CallbackPath, "Oidc:CallbackPath");
         ValidatePath(options.SignedOutCallbackPath, "Oidc:SignedOutCallbackPath");
 
-        if (!options.UsePkce)
-        {
-            throw new InvalidOperationException("Oidc:UsePkce must be true for Authorization Code flow.");
-        }
-
         if (string.Equals(options.ClientAuthenticationMethod, "None", StringComparison.OrdinalIgnoreCase))
         {
             if (!string.IsNullOrEmpty(options.ClientSecret))
@@ -43,6 +38,12 @@ public static class OidcConfigurationValidator
         else
         {
             throw new InvalidOperationException("Oidc:ClientAuthenticationMethod must be None or ClientSecretPost after the IdP client contract is confirmed.");
+        }
+
+        if (!string.Equals(options.TokenEndpointRequestFormat, "Json", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(options.TokenEndpointRequestFormat, "FormUrlEncoded", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Oidc:TokenEndpointRequestFormat must be Json or FormUrlEncoded.");
         }
 
         string[] scopes = options.Scopes ?? [];
@@ -79,6 +80,16 @@ public static class OidcConfigurationValidator
             throw new InvalidOperationException("Oidc:Authority must be an absolute trusted authority without embedded credentials, query, or fragment.");
         }
 
+
+        if (!Uri.TryCreate(options.MetadataAddress, UriKind.Absolute, out Uri? metadataAddress)
+            || !string.Equals(metadataAddress.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrEmpty(metadataAddress.UserInfo)
+            || !string.IsNullOrEmpty(metadataAddress.Query)
+            || !string.IsNullOrEmpty(metadataAddress.Fragment))
+        {
+            throw new InvalidOperationException("Oidc:MetadataAddress must be an absolute HTTPS URL without embedded credentials, query, or fragment.");
+        }
+
         if (!options.RequireHttpsMetadata
             && !IsSyntheticEnvironment(environmentName))
         {
@@ -100,7 +111,12 @@ public static class OidcConfigurationValidator
             || options.MaxClaimCount is < 8 or > 256
             || options.MaxClaimValueLength is < 64 or > 8192
             || options.MaxRoleEvidenceCount is < 0 or > 32
-            || options.MaxAccessTokenLength is < 1024 or > 131_072)
+            || options.MaxAccessTokenLength is < 1024 or > 131_072
+            || options.MaxServerTokenLength is < 1024 or > 262_144
+            || options.BackchannelTimeoutSeconds is < 2 or > 60
+            || options.MaxBackchannelResponseBytes is < 1024 or > 1_048_576
+            || options.AccessTokenRefreshSkewSeconds is < 0 or > 300
+            || options.RefreshTokenLifetimeMinutes is < 15 or > 480)
         {
             throw new InvalidOperationException("OIDC claim names or bounds are incomplete or unsafe.");
         }

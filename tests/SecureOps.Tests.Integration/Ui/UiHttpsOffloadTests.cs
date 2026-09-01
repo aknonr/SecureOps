@@ -144,6 +144,7 @@ public sealed class UiHttpsOffloadTests
         Dictionary<string, string?> settings = EnabledSettings();
         settings["Oidc:Enabled"] = "true";
         settings["Oidc:Authority"] = "https://identity.example.test";
+        settings["Oidc:MetadataAddress"] = "https://identity.example.test/idp/.well-known/openid-configurations";
         settings["Oidc:ClientId"] = "secureops-ui-test";
         settings["Oidc:ClientAuthenticationMethod"] = "None";
         settings["Oidc:ApiAudience"] = "secureops-api-test";

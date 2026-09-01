@@ -10,34 +10,38 @@ public sealed class OidcApiAccessTokenHandler : DelegatingHandler
     private readonly IApiSessionStore _sessions;
     private readonly OidcOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly IOidcBackchannelClient _backchannel;
 
     /// <summary>Initializes the token relay.</summary>
     public OidcApiAccessTokenHandler(
         IApiSessionStore sessions,
         IOptions<OidcOptions> options,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IOidcBackchannelClient backchannel)
     {
         _sessions = sessions;
         _options = options.Value;
         _timeProvider = timeProvider;
+        _backchannel = backchannel;
     }
 
     /// <inheritdoc />
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         if (_options.Enabled)
         {
             string? browserSessionKey = ApiSessionHeaders.ReadBrowserSessionKey(request);
             if (browserSessionKey is not null)
             {
-                string? token = _sessions.GetOrCreate(browserSessionKey).GetOidcAccessToken(_timeProvider.GetUtcNow());
-                if (token is not null)
+                OidcAccessTokenResult result = await _sessions.GetOrCreate(browserSessionKey)
+                    .GetOidcAccessTokenAsync(_timeProvider.GetUtcNow(), _options, _backchannel, cancellationToken);
+                if (result.AccessToken is not null)
                 {
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", result.AccessToken);
                 }
             }
         }
 
-        return base.SendAsync(request, cancellationToken);
+        return await base.SendAsync(request, cancellationToken);
     }
 }

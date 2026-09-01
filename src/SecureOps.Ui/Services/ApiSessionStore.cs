@@ -1,5 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Ui.Services;
 
@@ -42,7 +44,8 @@ public interface IApiSessionStore
 /// </summary>
 public sealed class BrowserApiSession : IDisposable
 {
-    private OidcApiAccessToken? _oidcAccessToken;
+    private readonly object _tokenLock = new();
+    private OidcServerTokenSet? _oidcTokens;
 
     /// <summary>Cookies the API has issued to this browser session.</summary>
     public CookieContainer Cookies { get; } = new();
@@ -57,29 +60,194 @@ public sealed class BrowserApiSession : IDisposable
     /// </remarks>
     public SemaphoreSlim FirstRequestGate { get; } = new(1, 1);
 
+    /// <summary>Serializes refresh-token redemption for this browser authentication session.</summary>
+    public SemaphoreSlim TokenRefreshGate { get; } = new(1, 1);
+
     /// <summary>Stores a validated OIDC access token only in server process memory.</summary>
     public void SetOidcAccessToken(string token, DateTimeOffset expiresAtUtc) =>
-        _oidcAccessToken = new OidcApiAccessToken(token, expiresAtUtc);
+        SetOidcTokens(new OidcServerTokenSet(token, expiresAtUtc, null, null, null, null));
+
+    /// <summary>Atomically replaces all server-held OIDC token material.</summary>
+    public void SetOidcTokens(OidcServerTokenSet tokens)
+    {
+        ArgumentNullException.ThrowIfNull(tokens);
+        lock (_tokenLock)
+        {
+            _oidcTokens = tokens;
+        }
+    }
 
     /// <summary>Returns a non-expired access token without logging or exposing it to browser state.</summary>
     public string? GetOidcAccessToken(DateTimeOffset now)
     {
-        OidcApiAccessToken? current = _oidcAccessToken;
-        if (current is null || current.ExpiresAtUtc <= now)
+        lock (_tokenLock)
         {
-            _oidcAccessToken = null;
-            return null;
+            return _oidcTokens is { AccessTokenExpiresAtUtc: var expiry } current && expiry > now
+                ? current.AccessToken
+                : null;
+        }
+    }
+
+    /// <summary>Returns the server-held ID token for a standards-based logout hint.</summary>
+    public string? GetOidcIdToken()
+    {
+        lock (_tokenLock)
+        {
+            return _oidcTokens?.IdToken;
+        }
+    }
+
+    /// <summary>Returns or refreshes the server-held access token once for this operation.</summary>
+    public async Task<OidcAccessTokenResult> GetOidcAccessTokenAsync(
+        DateTimeOffset now,
+        OidcOptions options,
+        IOidcBackchannelClient backchannel,
+        CancellationToken cancellationToken)
+    {
+        OidcServerTokenSet? current = Snapshot();
+        if (IsUsable(current, now, options.AccessTokenRefreshSkewSeconds))
+        {
+            return new OidcAccessTokenResult(current!.AccessToken, false);
         }
 
-        return current.Value;
+        if (!CanRefresh(current, now))
+        {
+            ClearTokens();
+            return new OidcAccessTokenResult(null, true);
+        }
+
+        await TokenRefreshGate.WaitAsync(cancellationToken);
+        try
+        {
+            current = Snapshot();
+            if (IsUsable(current, now, options.AccessTokenRefreshSkewSeconds))
+            {
+                return new OidcAccessTokenResult(current!.AccessToken, false);
+            }
+
+            if (!CanRefresh(current, now))
+            {
+                ClearTokens();
+                return new OidcAccessTokenResult(null, true);
+            }
+
+            Dictionary<string, string> parameters = new(StringComparer.Ordinal)
+            {
+                ["grant_type"] = "refresh_token",
+                ["client_id"] = options.ClientId,
+                ["refresh_token"] = current!.RefreshToken!
+            };
+            if (string.Equals(options.ClientAuthenticationMethod, "ClientSecretPost", StringComparison.OrdinalIgnoreCase))
+            {
+                parameters["client_secret"] = options.ClientSecret;
+            }
+
+            OpenIdConnectMessage response = await backchannel.PostTokenAsync(
+                current.TokenEndpoint!,
+                parameters,
+                cancellationToken);
+            if (!TryCreateReplacement(response, current, now, options, out OidcServerTokenSet? replacement))
+            {
+                ClearTokens();
+                return new OidcAccessTokenResult(null, true);
+            }
+
+            SetOidcTokens(replacement!);
+            return new OidcAccessTokenResult(replacement!.AccessToken, false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            ClearTokens();
+            return new OidcAccessTokenResult(null, true);
+        }
+        finally
+        {
+            TokenRefreshGate.Release();
+        }
     }
 
     /// <inheritdoc />
-    public void Dispose() => FirstRequestGate.Dispose();
+    public void Dispose()
+    {
+        ClearTokens();
+        FirstRequestGate.Dispose();
+        TokenRefreshGate.Dispose();
+    }
+
+    private OidcServerTokenSet? Snapshot()
+    {
+        lock (_tokenLock)
+        {
+            return _oidcTokens;
+        }
+    }
+
+    private void ClearTokens()
+    {
+        lock (_tokenLock)
+        {
+            _oidcTokens = null;
+        }
+    }
+
+    private static bool IsUsable(OidcServerTokenSet? current, DateTimeOffset now, int skewSeconds) =>
+        current is not null && current.AccessTokenExpiresAtUtc > now.AddSeconds(skewSeconds);
+
+    private static bool CanRefresh(OidcServerTokenSet? current, DateTimeOffset now) =>
+        current is { RefreshToken: not null, RefreshTokenExpiresAtUtc: { } refreshExpiry, TokenEndpoint: not null }
+        && refreshExpiry > now;
+
+    private static bool TryCreateReplacement(
+        OpenIdConnectMessage response,
+        OidcServerTokenSet current,
+        DateTimeOffset now,
+        OidcOptions options,
+        out OidcServerTokenSet? replacement)
+    {
+        replacement = null;
+        if (string.IsNullOrWhiteSpace(response.AccessToken)
+            || response.AccessToken.Length > options.MaxAccessTokenLength
+            || !int.TryParse(response.ExpiresIn, out int expiresIn)
+            || expiresIn is < 30 or > 86_400)
+        {
+            return false;
+        }
+
+        string refreshToken = string.IsNullOrWhiteSpace(response.RefreshToken)
+            ? current.RefreshToken!
+            : response.RefreshToken;
+        string? idToken = current.IdToken;
+        if (refreshToken.Length > options.MaxServerTokenLength || idToken?.Length > options.MaxServerTokenLength)
+        {
+            return false;
+        }
+
+        replacement = new OidcServerTokenSet(
+            response.AccessToken,
+            now.AddSeconds(expiresIn),
+            refreshToken,
+            current.RefreshTokenExpiresAtUtc,
+            idToken,
+            current.TokenEndpoint);
+        return true;
+    }
 }
 
-/// <summary>One server-memory-only API access token.</summary>
-internal sealed record OidcApiAccessToken(string Value, DateTimeOffset ExpiresAtUtc);
+/// <summary>All OIDC token material retained only in server process memory.</summary>
+public sealed record OidcServerTokenSet(
+    string AccessToken,
+    DateTimeOffset AccessTokenExpiresAtUtc,
+    string? RefreshToken,
+    DateTimeOffset? RefreshTokenExpiresAtUtc,
+    string? IdToken,
+    Uri? TokenEndpoint);
+
+/// <summary>Result of one server-side access-token operation.</summary>
+public sealed record OidcAccessTokenResult(string? AccessToken, bool RequiresReauthentication);
 
 /// <summary>
 /// Memory-cache backed <see cref="IApiSessionStore"/>.

@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using NSubstitute;
 using SecureOps.Shared.Configuration;
 using SecureOps.Ui.Services;
 
@@ -168,7 +170,8 @@ public sealed class ApiSessionTransportTests
         OidcApiAccessTokenHandler relay = new(
             store,
             Options.Create(new OidcOptions { Enabled = true }),
-            TimeProvider.System)
+            TimeProvider.System,
+            Substitute.For<IOidcBackchannelClient>())
         {
             InnerHandler = recording
         };
@@ -189,7 +192,8 @@ public sealed class ApiSessionTransportTests
         OidcApiAccessTokenHandler relay = new(
             store,
             Options.Create(new OidcOptions { Enabled = true }),
-            TimeProvider.System)
+            TimeProvider.System,
+            Substitute.For<IOidcBackchannelClient>())
         {
             InnerHandler = recording
         };
@@ -199,6 +203,74 @@ public sealed class ApiSessionTransportTests
         await client.GetAsync("api/v1/access/me");
 
         recording.Authorization.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OidcSession_AfterFifteenMinuteAccessExpiry_RefreshesOnceAndReplacesTokens()
+    {
+        var issuedAt = DateTimeOffset.Parse("2026-09-01T08:00:00Z");
+        BrowserApiSession session = NewStore().GetOrCreate("browser-a");
+        session.SetOidcTokens(new OidcServerTokenSet(
+            "initial-access",
+            issuedAt.AddMinutes(15),
+            "initial-refresh",
+            issuedAt.AddHours(8),
+            "initial-id",
+            new Uri("https://identity.example.test/token")));
+        IOidcBackchannelClient backchannel = Substitute.For<IOidcBackchannelClient>();
+        backchannel.PostTokenAsync(Arg.Any<Uri>(), Arg.Any<IReadOnlyDictionary<string, string>>(), Arg.Any<CancellationToken>())
+            .Returns(new OpenIdConnectMessage
+            {
+                AccessToken = "refreshed-access",
+                RefreshToken = "rotated-refresh",
+                ExpiresIn = "900"
+            });
+        OidcOptions options = new()
+        {
+            ClientId = "runtime-client",
+            ClientAuthenticationMethod = "None",
+            AccessTokenRefreshSkewSeconds = 60
+        };
+
+        OidcAccessTokenResult result = await session.GetOidcAccessTokenAsync(
+            issuedAt.AddMinutes(15), options, backchannel, CancellationToken.None);
+
+        result.Should().Be(new OidcAccessTokenResult("refreshed-access", false));
+        await backchannel.Received(1).PostTokenAsync(
+            new Uri("https://identity.example.test/token"),
+            Arg.Is<IReadOnlyDictionary<string, string>>(values =>
+                values["grant_type"] == "refresh_token"
+                && values["client_id"] == "runtime-client"
+                && values["refresh_token"] == "initial-refresh"
+                && !values.ContainsKey("client_secret")),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task OidcSession_RefreshFailure_ClearsTokensAndRequiresReauthenticationWithoutRetryLoop()
+    {
+        var now = DateTimeOffset.Parse("2026-09-01T08:15:00Z");
+        BrowserApiSession session = NewStore().GetOrCreate("browser-a");
+        session.SetOidcTokens(new OidcServerTokenSet(
+            "expired-access",
+            now,
+            "refresh-token",
+            now.AddHours(7),
+            null,
+            new Uri("https://identity.example.test/token")));
+        IOidcBackchannelClient backchannel = Substitute.For<IOidcBackchannelClient>();
+        backchannel.PostTokenAsync(Arg.Any<Uri>(), Arg.Any<IReadOnlyDictionary<string, string>>(), Arg.Any<CancellationToken>())
+            .Returns<Task<OpenIdConnectMessage>>(_ => throw new InvalidOperationException("synthetic failure"));
+        OidcOptions options = new() { ClientId = "runtime-client", ClientAuthenticationMethod = "None" };
+
+        OidcAccessTokenResult first = await session.GetOidcAccessTokenAsync(now, options, backchannel, CancellationToken.None);
+        OidcAccessTokenResult second = await session.GetOidcAccessTokenAsync(now, options, backchannel, CancellationToken.None);
+
+        first.RequiresReauthentication.Should().BeTrue();
+        second.RequiresReauthentication.Should().BeTrue();
+        session.GetOidcAccessToken(now).Should().BeNull();
+        await backchannel.Received(1).PostTokenAsync(
+            Arg.Any<Uri>(), Arg.Any<IReadOnlyDictionary<string, string>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

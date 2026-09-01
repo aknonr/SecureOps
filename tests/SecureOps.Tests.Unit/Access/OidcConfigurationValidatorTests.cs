@@ -18,6 +18,7 @@ public sealed class OidcConfigurationValidatorTests
 
     [Theory]
     [InlineData("Oidc:Authority")]
+    [InlineData("Oidc:MetadataAddress")]
     [InlineData("Oidc:ClientId")]
     [InlineData("Oidc:ApiAudience")]
     public void EnabledOidc_RequiresRuntimeIdentityContract(string missingKey)
@@ -59,6 +60,7 @@ public sealed class OidcConfigurationValidatorTests
         {
             ["Oidc:Enabled"] = "true",
             ["Oidc:Authority"] = "https://identity.example.test",
+            ["Oidc:MetadataAddress"] = "https://identity.example.test/custom/.well-known/openid-configurations",
             ["Oidc:ApiAudience"] = "secureops-api-test"
         });
 
@@ -68,7 +70,6 @@ public sealed class OidcConfigurationValidatorTests
     }
 
     [Theory]
-    [InlineData("Oidc:UsePkce", "false")]
     [InlineData("Oidc:Scopes:0", "profile")]
     [InlineData("Oidc:CallbackPath", "https://example.test/signin-oidc")]
     [InlineData("Oidc:Authority", "http://identity.example.test")]
@@ -82,10 +83,24 @@ public sealed class OidcConfigurationValidatorTests
         act.Should().Throw<InvalidOperationException>();
     }
 
+    [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    public void EnabledOidc_AllowsExplicitPkceMode(string enabled)
+    {
+        Dictionary<string, string?> values = Valid();
+        values["Oidc:UsePkce"] = enabled;
+
+        Action act = () => OidcConfigurationValidator.Validate(Configuration(values), "Production");
+
+        act.Should().NotThrow();
+    }
+
     private static Dictionary<string, string?> Valid() => new()
     {
         ["Oidc:Enabled"] = "true",
         ["Oidc:Authority"] = "https://identity.example.test",
+        ["Oidc:MetadataAddress"] = "https://identity.example.test/custom/.well-known/openid-configurations",
         ["Oidc:ClientId"] = "secureops-ui-test",
         ["Oidc:ClientAuthenticationMethod"] = "None",
         ["Oidc:ApiAudience"] = "secureops-api-test",

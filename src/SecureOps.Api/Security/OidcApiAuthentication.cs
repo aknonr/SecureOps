@@ -91,6 +91,7 @@ public static class OidcApiAuthentication
     private static void ConfigureBearer(JwtBearerOptions options, OidcOptions configured)
     {
         options.Authority = configured.Authority.TrimEnd('/');
+        options.MetadataAddress = configured.MetadataAddress;
         options.Audience = configured.ApiAudience;
         options.RequireHttpsMetadata = configured.RequireHttpsMetadata;
         options.MapInboundClaims = false;
@@ -103,6 +104,13 @@ public static class OidcApiAuthentication
             ValidateLifetime = true,
             RequireExpirationTime = true,
             RequireSignedTokens = true,
+            ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
+            IssuerValidator = (issuer, _, _) => string.Equals(
+                issuer,
+                configured.Authority.TrimEnd('/'),
+                StringComparison.Ordinal)
+                ? issuer
+                : throw new SecurityTokenInvalidIssuerException("The OIDC token issuer did not match the configured authority."),
             ClockSkew = TimeSpan.FromMinutes(2),
             NameClaimType = configured.LoginNameClaimType,
             RoleClaimType = ClaimTypes.Role
