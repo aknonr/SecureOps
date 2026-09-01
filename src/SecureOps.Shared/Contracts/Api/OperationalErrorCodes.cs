@@ -67,12 +67,16 @@ public static class OperationalErrorCodes
     public const string RequesterResolutionFailed = "RequesterResolutionFailed";
     /// <summary>Requester resolution returned more than one exact match.</summary>
     public const string RequesterResolutionAmbiguous = "RequesterResolutionAmbiguous";
+    /// <summary>The authenticated operator could not be resolved to one exact Jira reporter.</summary>
+    public const string OperatorReporterResolutionFailed = "OperatorReporterResolutionFailed";
     /// <summary>Jira is unavailable.</summary>
     public const string JiraUnavailable = "JiraUnavailable";
     /// <summary>Jira rejected integration authorization.</summary>
     public const string JiraUnauthorized = "JiraUnauthorized";
     /// <summary>Jira rejected the proposed issue fields.</summary>
     public const string JiraValidationFailed = "JiraValidationFailed";
+    /// <summary>Jira rejected the verified authenticated operator as reporter.</summary>
+    public const string JiraReporterRejected = "JiraReporterRejected";
     /// <summary>Jira issue creation failed.</summary>
     public const string JiraCreateFailed = "JiraCreateFailed";
     /// <summary>A Jira issue is already persisted for the record and mapping.</summary>

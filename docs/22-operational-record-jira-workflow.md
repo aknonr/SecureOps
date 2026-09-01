@@ -15,7 +15,7 @@ No legacy Operational Record/Jira PowerShell script exists in this repository. S
 | Authenticate/query active records | `IOperationalRecordClient` |
 | Read bounded source fields | `OperationalRecordSourceItem` and `OperationalRecordService` |
 | Operator selects a record | typed GET endpoints; UI deferred |
-| Resolve requester | `IRequesterResolver.ResolveExactAsync` |
+| Resolve requester and authenticated reporter | `IJiraUserResolver.ResolveExactAsync` |
 | Apply fixed Jira mapping | `IJiraIssueDraftService` |
 | Review proposed fields | `POST .../{id}/jira-preview` |
 | Create Jira task | authorized `IJiraTransferService` plus `IJiraClient` |
@@ -46,7 +46,7 @@ A source refresh may update bounded source fields, but classification is reappli
 - Requester resolution is exact only. Ambiguous matches always fail closed.
 - Unresolved requesters are blocked by default; `ProceedUnassigned` must be an explicit approved policy.
 - Jira assignment defaults to `ProjectDefault`. Only an exact deployment-verified SecureOps actor mapping may emit `assignee`; no AD inference or fuzzy match is permitted.
-- Jira `reporter` is never emitted because it is absent from the reviewed create metadata. The Basic-authenticated integration identity remains separate from the SecureOps actor and source requester.
+- Jira reporter defaults to `ProjectDefault`. `AuthenticatedOperator` normalizes the server-authenticated actor with the existing exact identity rules, resolves exactly one Jira username, exposes it in preview, and emits it as `reporter` during create. Missing or ambiguous matches fail closed; the Basic-authenticated integration identity and source requester remain separate.
 - Jira creation and retry require server-side capability policies.
 - The working exact AD/PAM-style identity lookup provider is unchanged.
 - Real source close/update is a state-changing external integration and remains configuration-disabled until the external TEST activation gate is approved.
@@ -90,7 +90,7 @@ Non-secret keys:
 - `Jira:AuthenticationMode` (`Basic` for `Corporate`)
 - `Jira:AssignmentMode` (`ProjectDefault` or `VerifiedOperatorMapping`)
 - `Jira:OperatorAssigneeMappings:{n}:SecureOpsActor` and `JiraUsername`
-- `Jira:ReporterMode` (`ProjectDefault` only)
+- `Jira:ReporterMode` (`ProjectDefault` or `AuthenticatedOperator`)
 - `Jira:SummaryMaxLength` (32-255)
 
 Operator-visible TEST verification uses `Simulation` for both providers. Pairing is mandatory, it is rejected in Pilot/Production, it registers only in-process clients, and responses state that no real Jira issue will be created. Real providers require every validated option in `docs/26-enterprise-turuncu-hat-jira-adapters.md`; unsupported or incomplete selection fails startup and never falls back to synthetic data.

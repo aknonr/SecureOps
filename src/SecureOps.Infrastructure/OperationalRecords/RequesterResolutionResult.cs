@@ -1,6 +1,6 @@
 namespace SecureOps.Infrastructure.OperationalRecords;
 
-/// <summary>Exact requester resolution outcome.</summary>
+/// <summary>Exact Jira user resolution outcome.</summary>
 public sealed record RequesterResolutionResult(RequesterResolutionStatus Status, string? JiraAccountId)
 {
     /// <summary>Creates an exact unique match.</summary>
@@ -13,7 +13,7 @@ public sealed record RequesterResolutionResult(RequesterResolutionStatus Status,
     public static RequesterResolutionResult Failed() => new(RequesterResolutionStatus.Failed, null);
 }
 
-/// <summary>Requester resolution status.</summary>
+/// <summary>Exact Jira user resolution status.</summary>
 public enum RequesterResolutionStatus
 {
     /// <summary>One exact Jira account was found.</summary>

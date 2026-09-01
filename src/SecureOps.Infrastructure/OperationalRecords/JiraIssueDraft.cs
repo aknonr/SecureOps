@@ -12,7 +12,8 @@ public sealed record JiraIssueDraft(
     string MappingVersion,
     string IdempotencyKey,
     IReadOnlyList<string> Warnings,
-    string? AssigneeUsername = null);
+    string? AssigneeUsername = null,
+    string? ReporterUsername = null);
 
 /// <summary>Confirmed Jira issue creation result.</summary>
 public sealed record JiraIssueCreationResult(string IssueKey);

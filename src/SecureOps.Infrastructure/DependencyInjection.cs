@@ -221,6 +221,8 @@ public static class DependencyInjection
             services.AddSingleton<IJiraClient, DisabledJiraClient>();
             services.AddSingleton<IRequesterResolver, UnresolvedRequesterResolver>();
         }
+        services.AddSingleton<IJiraUserResolver>(serviceProvider =>
+            serviceProvider.GetRequiredService<IRequesterResolver>());
         if (string.Equals(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IOperationalRecordRepository, SqlOperationalRecordRepository>();

@@ -16,4 +16,5 @@ public sealed record JiraPreviewResponse(
     bool SimulationMode = false,
     string? SimulationNotice = null,
     bool ReadOnlyIntegrationMode = false,
-    string? ReadOnlyNotice = null);
+    string? ReadOnlyNotice = null,
+    string? ReporterUsername = null);

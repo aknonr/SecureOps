@@ -36,9 +36,9 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
     }
 
     /// <inheritdoc />
-    public async Task<RequesterResolutionResult> ResolveExactAsync(string requester, CancellationToken cancellationToken)
+    public async Task<RequesterResolutionResult> ResolveExactAsync(string identity, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(requester) || requester.Length > 256)
+        if (string.IsNullOrWhiteSpace(identity) || identity.Length > 256)
         {
             return RequesterResolutionResult.NotFound();
         }
@@ -50,7 +50,7 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
             {
                 using HttpRequestMessage request = new(
                     HttpMethod.Get,
-                    $"rest/api/2/user/search?username={Uri.EscapeDataString(requester)}");
+                    $"rest/api/2/user/search?username={Uri.EscapeDataString(identity)}");
                 ApplyAuthorization(request);
                 using HttpResponseMessage response = await SendAsync(request, cancellationToken);
                 if (!response.IsSuccessStatusCode)
@@ -70,7 +70,7 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
                     response.Content,
                     _options.MaxResponseBytes,
                     cancellationToken);
-                RequesterResolutionResult result = ParseExact(document.RootElement, requester);
+                RequesterResolutionResult result = ParseExact(document.RootElement, identity);
                 _health.MarkAvailable(Provider);
                 _telemetry.RecordOperation(Provider, "user-search", result.Status.ToString(), stopwatch.Elapsed);
                 return result;
@@ -94,14 +94,14 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
 
             _health.MarkUnavailable(Provider);
             _telemetry.RecordOperation(Provider, "user-search", "failure", stopwatch.Elapsed);
-            _logger.LogWarning("Jira requester resolution failed safely after {AttemptCount} attempts.", attempt);
+            _logger.LogWarning("Jira exact user resolution failed safely after {AttemptCount} attempts.", attempt);
             return RequesterResolutionResult.Failed();
         }
 
         return RequesterResolutionResult.Failed();
     }
 
-    internal static RequesterResolutionResult ParseExact(JsonElement root, string requester)
+    internal static RequesterResolutionResult ParseExact(JsonElement root, string identity)
     {
         if (root.ValueKind != JsonValueKind.Array)
         {
@@ -134,11 +134,11 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
         }
 
         (string Name, string DisplayName)[] exactName = candidates
-            .Where(candidate => string.Equals(candidate.Name, requester, StringComparison.OrdinalIgnoreCase))
+            .Where(candidate => string.Equals(candidate.Name, identity, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         (string Name, string DisplayName)[] exact = exactName.Length > 0
             ? exactName
-            : candidates.Where(candidate => string.Equals(candidate.DisplayName, requester, StringComparison.Ordinal)).ToArray();
+            : candidates.Where(candidate => string.Equals(candidate.DisplayName, identity, StringComparison.Ordinal)).ToArray();
         return exact.Length switch
         {
             0 => RequesterResolutionResult.NotFound(),

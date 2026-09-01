@@ -449,6 +449,13 @@ public static class UiProblemFactory
             ["Talep sahibini kaynak sistemde netleştirin.", ContactAdminStep],
             retryable: false, requiresRefresh: true),
 
+        OperationalErrorCodes.OperatorReporterResolutionFailed => Build(
+            UiProblemKind.Conflict, code,
+            "Jira raporlayıcısı doğrulanamadı",
+            "İşlemi yapan kullanıcı Jira üzerinde doğrulanamadığı için kayıt oluşturulmadı.",
+            ["Kurumsal oturum hesabınızın Jira kullanıcısıyla eşleştiğini doğrulayın.", ContactAdminStep],
+            retryable: false, requiresRefresh: true),
+
         // ---- Jira -----------------------------------------------------------------------------
         OperationalErrorCodes.JiraUnavailable => Build(
             UiProblemKind.UpstreamUnavailable, code,
@@ -469,6 +476,13 @@ public static class UiProblemFactory
             "Jira alanları kabul edilmedi",
             "Jira, önerilen kayıt alanlarını reddetti. Eşleme ile Jira proje yapılandırması uyuşmuyor olabilir.",
             ["Önizlemedeki alanları kontrol edin.", ReferenceStep, ContactAdminStep],
+            retryable: false, requiresRefresh: true),
+
+        OperationalErrorCodes.JiraReporterRejected => Build(
+            UiProblemKind.Validation, code,
+            "Jira raporlayıcıyı kabul etmedi",
+            "Doğrulanan kullanıcı raporlayıcı olarak Jira tarafından reddedildi. Entegrasyon hesabına raporlayıcıyı değiştirme yetkisi gerekebilir.",
+            [ReferenceStep, ContactAdminStep],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.JiraCreateFailed => Build(

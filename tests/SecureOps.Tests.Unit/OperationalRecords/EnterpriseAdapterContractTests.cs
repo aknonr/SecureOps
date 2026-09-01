@@ -367,6 +367,44 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
+    public async Task JiraCreate_EmitsVerifiedReporterSeparateFromRequesterAndIntegrationAuthorization()
+    {
+        ScriptedHandler handler = new(Response(HttpStatusCode.Created, "{\"key\":\"SAFE-123\"}"));
+        CorporateJiraClient client = JiraClient(handler);
+        JiraIssueDraft draft = new(
+            Guid.NewGuid(), "OR-100", "SDM", "Task", "Summary", "Description",
+            "jira-requester", "v1", new string('f', 64), [], ReporterUsername: "jira-operator");
+
+        _ = await client.CreateIssueAsync(draft, CancellationToken.None);
+
+        using var payload = JsonDocument.Parse(handler.Requests[0].Body);
+        JsonElement fields = payload.RootElement.GetProperty("fields");
+        fields.GetProperty("customfield_11500")[0].GetProperty("name").GetString().Should().Be("jira-requester");
+        fields.GetProperty("reporter").GetProperty("name").GetString().Should().Be("jira-operator");
+        handler.Requests[0].Authorization.Should().Be(JiraOptions().Authorization);
+        handler.Requests[0].Authorization.Should().NotContain("jira-operator");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task JiraCreate_WhenJiraRejectsVerifiedReporter_ReturnsStableActionableFailure(HttpStatusCode status)
+    {
+        ScriptedHandler handler = new(Response(status, "{}"));
+        JiraIssueDraft draft = new(
+            Guid.NewGuid(), "OR-100", "SDM", "Task", "Summary", "Description",
+            null, "v1", new string('f', 64), [], ReporterUsername: "jira-operator");
+
+        Func<Task> act = async () => await JiraClient(handler).CreateIssueAsync(draft, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.JiraReporterRejected
+                && !exception.Retryable
+                && !exception.OutcomeUnknown);
+        handler.Requests.Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task JiraCreate_ServerFailure_IsOutcomeUnknown_AndIsNotRetried()
     {
         ScriptedHandler handler = new(Response(HttpStatusCode.InternalServerError, "{}"));

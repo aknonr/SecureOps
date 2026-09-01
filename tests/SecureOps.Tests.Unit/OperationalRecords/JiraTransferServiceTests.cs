@@ -5,6 +5,7 @@ using SecureOps.Domain.OperationalRecords;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.OperationalRecords;
+using SecureOps.Infrastructure.Identity;
 using SecureOps.Shared.Audit;
 using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
@@ -252,6 +253,7 @@ public sealed class JiraTransferServiceTests
             InMemoryAuditWriter audit = new();
             JiraIssueDraftService draftService = new(
                 new ExactRequesterResolver(),
+                new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions())),
                 Options.Create(new JiraIntegrationOptions
                 {
                     ProjectKey = "TEST",

@@ -54,7 +54,7 @@ public sealed class JiraIntegrationOptions
     /// <summary>Exact deployment-owned SecureOps actor to Jira username mappings.</summary>
     public JiraOperatorAssigneeMappingOptions[] OperatorAssigneeMappings { get; set; } = [];
 
-    /// <summary>Reporter policy. Only ProjectDefault is supported by the reviewed create metadata.</summary>
+    /// <summary>Reporter policy: ProjectDefault or AuthenticatedOperator.</summary>
     public string ReporterMode { get; set; } = "ProjectDefault";
 
     /// <summary>Configured issue labels.</summary>

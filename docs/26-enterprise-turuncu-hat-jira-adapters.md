@@ -8,7 +8,7 @@
 
 `Fake` is permitted only in Development, Demo, or Test. Real provider selection is explicit and never falls back to synthetic behavior. Application defaults remain `Disabled`.
 
-In `Test`, selecting either corporate provider without `ReadOnlyIntegrationMode=true` fails startup. Read-only mode is accepted only with the complete `TuruncuHat` + `Corporate` pair. It permits source authentication/query and Jira requester-resolution reads, but rejects API create/retry before local workflow mutation and rejects Jira create/Turuncu Hat completion again inside the adapters before HTTP dispatch.
+In `Test`, selecting either corporate provider without `ReadOnlyIntegrationMode=true` fails startup. Read-only mode is accepted only with the complete `TuruncuHat` + `Corporate` pair. It permits source authentication/query and exact Jira requester/operator-resolution reads, but rejects API create/retry before local workflow mutation and rejects Jira create/Turuncu Hat completion again inside the adapters before HTTP dispatch.
 
 ## Turuncu Hat Configuration
 
@@ -53,7 +53,7 @@ Server-owned non-secret business configuration:
 - `Jira__AssignmentMode` (`ProjectDefault` or `VerifiedOperatorMapping`)
 - `Jira__OperatorAssigneeMappings__N__SecureOpsActor`
 - `Jira__OperatorAssigneeMappings__N__JiraUsername`
-- `Jira__ReporterMode` (`ProjectDefault` only)
+- `Jira__ReporterMode` (`ProjectDefault` or `AuthenticatedOperator`)
 - `Jira__Labels__N`
 - `Jira__SummarySeparator`
 - `Jira__SummaryMaxLength`
@@ -82,9 +82,9 @@ The Turuncu Hat Authorization value remains a complete runtime header because it
 | `customfield_11500` (`Takip Eden Kişiler`) | Optional multi-user picker; create operations `add`, `set`, `remove`; exact Turuncu Hat requester maps to `[{ "name": "<verified-jira-username>" }]` |
 | `labels` | Optional array containing `SunucuTalep` |
 | `assignee` | Optional; omitted in `ProjectDefault`; emitted only for one exact deployment-verified operator mapping |
-| `reporter` | Absent from create metadata for the authenticated integration identity; never emitted |
+| `reporter` | Omitted in `ProjectDefault`; in `AuthenticatedOperator`, emitted as the exact Jira username resolved from the server-authenticated SecureOps actor |
 
-The authenticated Jira API identity, SecureOps actor, Turuncu Hat requester, assignee, and reporter are separate identities. `VerifiedOperatorMapping` uses exact configured actor keys only; a missing mapping falls back visibly to project default. The effective assignee participates in the existing draft fingerprint, so a different mapped assignee after preview fails as a mapping conflict instead of changing the reviewed create payload. No AD-to-Jira inference, display-name assignment, or fuzzy matching is allowed. The deployment owner must verify every Jira username with exact user search before adding a mapping and increment `Jira__MappingVersion` whenever mappings change.
+The authenticated Jira API identity, SecureOps actor, Turuncu Hat requester, assignee, and reporter are separate identities. `VerifiedOperatorMapping` uses exact configured actor keys only; a missing mapping falls back visibly to project default. `AuthenticatedOperator` never accepts a browser-provided reporter and never falls back to the integration account or project default after resolution failure. The effective assignee and reporter participate in the existing draft fingerprint, so an identity change after preview fails as a mapping conflict instead of changing the reviewed create payload. No fuzzy match or first-result assignment is allowed.
 
 The controlled `/myself` response exposed `self`, `key`, `name`, `emailAddress`, `avatarUrls`, `displayName`, `active`, `deleted`, `timeZone`, `locale`, `groups`, `applicationRoles`, and `expand`. In one inspected existing issue, assignee and reporter both matched that authenticated API identity, but this is observation only: it does not prove either business-actor mapping or reporter create permission.
 
@@ -94,7 +94,7 @@ Framework HTTP-client request logging is removed for both real providers so base
 
 The source client owns all query grammar. Controlled evidence confirms `QueryResult` exposes `ErrorDescription`, `ErrorDetails`, `ErrorNo`, `TenantId`, `Items`, `MaxPages`, `PageNo`, and `RecordCount`, while cells expose `Key` and `Value`. When keys are present, parsing maps only the exact requested keys and rejects mixed, missing, duplicate, or unexpected keys; reordered keyed cells are safe. Legacy keyless fixtures retain exact-count positional parsing. The client HTML-decodes bounded content, excludes malformed/duplicate records, and computes the existing deterministic source fingerprint because no source ETag is proven. Exact real `Key` values still require validation before activation.
 
-Jira user search uses the evidenced `/rest/api/2/user/search?username=...` endpoint and accepts only one exact `name`, then one exact display-name fallback. Controlled success returned `name`, `key`, and `displayName`. No fuzzy match or first-result selection exists. Jira create is never automatically retried. Any ambiguous submission outcome enters existing reconciliation-required state.
+Jira user search uses the evidenced `/rest/api/2/user/search?username=...` endpoint for both requester and authenticated-operator resolution and accepts only one exact `name`, then one exact display-name fallback. Controlled success returned `name`, `key`, and `displayName`. No fuzzy match or first-result selection exists. Jira create is never automatically retried. Any ambiguous submission outcome enters existing reconciliation-required state. Jira rejection of an explicit reporter returns `JiraReporterRejected`; SecureOps never silently retries with the integration identity.
 
 Source completion runs only after the Jira key is persisted. It requires exactly one activity and explicit update success. A failure leaves `JiraExists=true` and retries only source completion.
 

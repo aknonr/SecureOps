@@ -127,9 +127,10 @@ public static class OperationalRecordConfigurationValidator
             throw new InvalidOperationException("Jira:UnresolvedRequesterPolicy must be Block or ProceedUnassigned.");
         }
 
+        ValidateJiraReporterPolicy(jira);
         if (!readOnlyEnterpriseMode)
         {
-            ValidateJiraIdentityPolicies(jira);
+            ValidateJiraAssignmentPolicy(jira);
         }
 
         if (jira.SummaryMaxLength is < 32 or > 255)
@@ -196,18 +197,23 @@ public static class OperationalRecordConfigurationValidator
         }
     }
 
-    private static void ValidateJiraIdentityPolicies(JiraIntegrationOptions options)
+    private static void ValidateJiraReporterPolicy(JiraIntegrationOptions options)
+    {
+        bool projectDefault = string.Equals(options.ReporterMode, "ProjectDefault", StringComparison.OrdinalIgnoreCase);
+        bool authenticatedOperator = string.Equals(options.ReporterMode, "AuthenticatedOperator", StringComparison.OrdinalIgnoreCase);
+        if (!projectDefault && !authenticatedOperator)
+        {
+            throw new InvalidOperationException("Jira:ReporterMode must be ProjectDefault or AuthenticatedOperator.");
+        }
+    }
+
+    private static void ValidateJiraAssignmentPolicy(JiraIntegrationOptions options)
     {
         bool projectDefault = string.Equals(options.AssignmentMode, "ProjectDefault", StringComparison.OrdinalIgnoreCase);
         bool verifiedMapping = string.Equals(options.AssignmentMode, "VerifiedOperatorMapping", StringComparison.OrdinalIgnoreCase);
         if (!projectDefault && !verifiedMapping)
         {
             throw new InvalidOperationException("Jira:AssignmentMode must be ProjectDefault or VerifiedOperatorMapping.");
-        }
-
-        if (!string.Equals(options.ReporterMode, "ProjectDefault", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Jira:ReporterMode must be ProjectDefault because reporter is absent from the reviewed create metadata.");
         }
 
         JiraOperatorAssigneeMappingOptions[] mappings = options.OperatorAssigneeMappings ?? [];

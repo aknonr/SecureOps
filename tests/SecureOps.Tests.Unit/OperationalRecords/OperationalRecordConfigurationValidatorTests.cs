@@ -225,12 +225,35 @@ public sealed class OperationalRecordConfigurationValidatorTests
     }
 
     [Fact]
-    public void Validate_WithWriteOnlyJiraPoliciesInReadOnlyMode_DoesNotRequireCreateMetadata()
+    public void Validate_WithUnsupportedReporterModeInReadOnlyMode_FailsClearly()
     {
         Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
         values["Jira:ReporterMode"] = "Explicit";
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*ProjectDefault or AuthenticatedOperator*");
+    }
+
+    [Fact]
+    public void Validate_WithAuthenticatedOperatorReporterInReadOnlyMode_SucceedsWithoutCreateMappings()
+    {
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
+        values["Jira:ReporterMode"] = "AuthenticatedOperator";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_WithAuthenticatedOperatorReporterInWriteMode_RemainsCompatibleWithStrictWriteValidation()
+    {
+        Dictionary<string, string?> values = WriteEnterpriseValues();
+        values["Jira:ReporterMode"] = "AuthenticatedOperator";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Pilot");
 
         act.Should().NotThrow();
     }

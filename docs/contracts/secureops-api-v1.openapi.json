@@ -5182,6 +5182,10 @@
           "readOnlyNotice": {
             "type": "string",
             "nullable": true
+          },
+          "reporterUsername": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

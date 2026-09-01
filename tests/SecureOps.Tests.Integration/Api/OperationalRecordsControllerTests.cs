@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -50,6 +51,86 @@ public sealed class OperationalRecordsControllerTests
         problem.Extensions["code"].Should().Be(OperationalErrorCodes.RequesterResolutionFailed);
         problem.Extensions["stage"].Should().Be("requester-resolution");
         problem.Extensions["retryable"].Should().Be(false);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_InReadOnlyMode_ExposesVerifiedAuthenticatedOperatorReporter()
+    {
+        JiraIssueDraft draft = new(
+            Guid.NewGuid(),
+            "OR-SYNTHETIC",
+            "SAFE",
+            "Task",
+            "Synthetic summary",
+            "Synthetic description",
+            "jira-requester",
+            "mapping-v1",
+            new string('a', 64),
+            [],
+            ReporterUsername: "jira-operator");
+        OperationalRecordsController controller = CreateController(
+            OperationalRecordResult<JiraIssueDraft>.Success(draft),
+            readOnlyIntegrationMode: true);
+
+        ActionResult<JiraPreviewResponse> result = await controller.PreviewAsync(draft.OperationalRecordId, CancellationToken.None);
+
+        JiraPreviewResponse response = result.Result.Should().BeOfType<OkObjectResult>().Subject.Value
+            .Should().BeOfType<JiraPreviewResponse>().Subject;
+        response.ReadOnlyIntegrationMode.Should().BeTrue();
+        response.ReporterUsername.Should().Be("jira-operator");
+        response.RequesterAccountId.Should().Be("jira-requester");
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenOperatorReporterResolutionFails_ReturnsStable422Contract()
+    {
+        OperationalRecordsController controller = CreateController(
+            OperationalRecordResult<JiraIssueDraft>.Fail(
+                OperationalErrorCodes.OperatorReporterResolutionFailed,
+                "operator-reporter-resolution",
+                false));
+
+        ActionResult<JiraPreviewResponse> result = await controller.PreviewAsync(Guid.NewGuid(), CancellationToken.None);
+
+        ObjectResult response = result.Result.Should().BeOfType<ObjectResult>().Subject;
+        response.StatusCode.Should().Be(StatusCodes.Status422UnprocessableEntity);
+        ProblemDetails problem = response.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Extensions["code"].Should().Be(OperationalErrorCodes.OperatorReporterResolutionFailed);
+        problem.Extensions["stage"].Should().Be("operator-reporter-resolution");
+    }
+
+    [Fact]
+    public async Task PreviewAsync_UsesAuthenticatedPrincipalAsAuthoritativeReporterInput()
+    {
+        JiraIssueDraft draft = new(
+            Guid.NewGuid(), "OR-SYNTHETIC", "SAFE", "Task", "Summary", "Description",
+            null, "mapping-v1", new string('a', 64), []);
+        CapturingTransferService transfer = new(OperationalRecordResult<JiraIssueDraft>.Success(draft));
+        DefaultHttpContext httpContext = new()
+        {
+            TraceIdentifier = "trace-operational-test",
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.Name, "SYNTHETIC\\operator.one")],
+                "Synthetic"))
+        };
+        OperationalRecordsController controller = new(
+            new EmptyRecordService(),
+            transfer,
+            Options.Create(new CommandIdempotencyOptions()),
+            Options.Create(new OperationalRecordsOptions()),
+            Options.Create(new JiraIntegrationOptions()),
+            new FixedTimeProvider(Now))
+        {
+            ControllerContext = new ControllerContext { HttpContext = httpContext }
+        };
+
+        _ = await controller.PreviewAsync(draft.OperationalRecordId, CancellationToken.None);
+
+        transfer.Context.Should().NotBeNull();
+        transfer.Context!.Actor.Should().Be("SYNTHETIC\\operator.one");
+        typeof(OperationalRecordsController).GetMethod(nameof(OperationalRecordsController.PreviewAsync))!
+            .GetParameters().Select(parameter => parameter.Name)
+            .Should().NotContain("reporterUsername");
     }
 
     [Fact]
@@ -174,14 +255,16 @@ public sealed class OperationalRecordsControllerTests
         response.JiraExists.Should().Be(jiraExists);
     }
 
-    private static OperationalRecordsController CreateController(OperationalRecordResult<JiraIssueDraft> previewResult)
+    private static OperationalRecordsController CreateController(
+        OperationalRecordResult<JiraIssueDraft> previewResult,
+        bool readOnlyIntegrationMode = false)
     {
         DefaultHttpContext httpContext = new() { TraceIdentifier = "trace-operational-test" };
         return new OperationalRecordsController(
             new EmptyRecordService(),
             new StubTransferService(previewResult),
             Options.Create(new CommandIdempotencyOptions()),
-            Options.Create(new OperationalRecordsOptions()),
+            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
             Options.Create(new JiraIntegrationOptions()),
             new FixedTimeProvider(Now))
         {
@@ -254,6 +337,26 @@ public sealed class OperationalRecordsControllerTests
         public Task<OperationalRecordResult<JiraIssueDraft>> PreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => Task.FromResult(previewResult);
         public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class CapturingTransferService(OperationalRecordResult<JiraIssueDraft> previewResult) : IJiraTransferService
+    {
+        public OperationalRecordCommandContext? Context { get; private set; }
+
+        public Task<OperationalRecordResult<JiraIssueDraft>> PreviewAsync(
+            Guid id,
+            OperationalRecordCommandContext context,
+            CancellationToken cancellationToken)
+        {
+            Context = context;
+            return Task.FromResult(previewResult);
+        }
+
+        public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 
 

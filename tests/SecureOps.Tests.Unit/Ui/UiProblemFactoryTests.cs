@@ -22,6 +22,8 @@ public sealed class UiProblemFactoryTests
     [InlineData(OperationalErrorCodes.OperationalRecordAlreadyClaimed, UiProblemKind.Conflict)]
     [InlineData(OperationalErrorCodes.OperationalRecordChanged, UiProblemKind.Conflict)]
     [InlineData(OperationalErrorCodes.JiraAlreadyCreated, UiProblemKind.Conflict)]
+    [InlineData(OperationalErrorCodes.OperatorReporterResolutionFailed, UiProblemKind.Conflict)]
+    [InlineData(OperationalErrorCodes.JiraReporterRejected, UiProblemKind.Validation)]
     [InlineData(OperationalErrorCodes.WorkflowAlreadyCompleted, UiProblemKind.Conflict)]
     public void FromResponse_ClassifiesKnownCodes(string code, UiProblemKind expected)
     {

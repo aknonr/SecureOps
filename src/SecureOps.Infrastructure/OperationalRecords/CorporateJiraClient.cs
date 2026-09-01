@@ -62,6 +62,10 @@ public sealed class CorporateJiraClient : IJiraClient
         {
             fields["assignee"] = new { name = draft.AssigneeUsername };
         }
+        if (!string.IsNullOrWhiteSpace(draft.ReporterUsername))
+        {
+            fields["reporter"] = new { name = draft.ReporterUsername };
+        }
 
         var stopwatch = Stopwatch.StartNew();
         using HttpRequestMessage request = new(HttpMethod.Post, "rest/api/2/issue")
@@ -74,7 +78,7 @@ public sealed class CorporateJiraClient : IJiraClient
             using HttpResponseMessage response = await SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                throw Failure(response.StatusCode);
+                throw Failure(response.StatusCode, draft.ReporterUsername is not null);
             }
 
             using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(
@@ -130,8 +134,10 @@ public sealed class CorporateJiraClient : IJiraClient
         _logger.LogWarning("Jira issue creation outcome is unknown; reconciliation is required.");
     }
 
-    private static ExternalIntegrationException Failure(HttpStatusCode statusCode) => statusCode switch
+    private static ExternalIntegrationException Failure(HttpStatusCode statusCode, bool reporterSpecified) => statusCode switch
     {
+        HttpStatusCode.BadRequest or HttpStatusCode.Forbidden when reporterSpecified =>
+            new(OperationalErrorCodes.JiraReporterRejected, false),
         HttpStatusCode.BadRequest => new(OperationalErrorCodes.JiraValidationFailed, false),
         HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => new(OperationalErrorCodes.JiraUnauthorized, false),
         HttpStatusCode.TooManyRequests => new(OperationalErrorCodes.JiraUnavailable, true),

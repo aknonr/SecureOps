@@ -108,7 +108,8 @@ public sealed class OperationalRecordsController : ControllerBase
             _simulationMode,
             SimulationNotice(),
             _readOnlyIntegrationMode,
-            ReadOnlyNotice()));
+            ReadOnlyNotice(),
+            draft.ReporterUsername));
     }
 
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>
@@ -195,8 +196,10 @@ public sealed class OperationalRecordsController : ControllerBase
             OperationalErrorCodes.WorkflowAlreadyInProgress or
             OperationalErrorCodes.ExternalWritesDisabled => StatusCodes.Status409Conflict,
             OperationalErrorCodes.InvalidIdempotencyKey => StatusCodes.Status400BadRequest,
-            OperationalErrorCodes.JiraValidationFailed => StatusCodes.Status422UnprocessableEntity,
-            OperationalErrorCodes.RequesterResolutionFailed => StatusCodes.Status422UnprocessableEntity,
+            OperationalErrorCodes.JiraValidationFailed or
+            OperationalErrorCodes.JiraReporterRejected or
+            OperationalErrorCodes.RequesterResolutionFailed or
+            OperationalErrorCodes.OperatorReporterResolutionFailed => StatusCodes.Status422UnprocessableEntity,
             _ => StatusCodes.Status503ServiceUnavailable
         };
         return OperationalProblemDetails.Create(status, failure.Code, SafeTitle(failure.Code), Context().CorrelationId, failure.Stage, failure.Retryable);
@@ -208,6 +211,8 @@ public sealed class OperationalRecordsController : ControllerBase
         OperationalErrorCodes.OperationalRecordInvalidState => "Operational record is not eligible for this operation.",
         OperationalErrorCodes.RequesterResolutionAmbiguous => "Requester resolution requires review.",
         OperationalErrorCodes.RequesterResolutionFailed => "Requester could not be resolved safely.",
+        OperationalErrorCodes.OperatorReporterResolutionFailed => "The authenticated operator could not be resolved safely as Jira reporter.",
+        OperationalErrorCodes.JiraReporterRejected => "Jira rejected the authenticated operator as reporter.",
         OperationalErrorCodes.JiraAlreadyCreated => "A Jira issue already exists for this workflow.",
         OperationalErrorCodes.WorkflowAlreadyCompleted => "The workflow is already complete.",
         OperationalErrorCodes.OperationalRecordAlreadyClaimed => "Another actor owns the active workflow claim.",
