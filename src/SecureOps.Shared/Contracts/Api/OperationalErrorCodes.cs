@@ -33,6 +33,8 @@ public static class OperationalErrorCodes
     public const string DirectoryQueryLimitExceeded = "DirectoryQueryLimitExceeded";
     /// <summary>The required audit store is unavailable.</summary>
     public const string AuditStoreUnavailable = "AuditStoreUnavailable";
+    /// <summary>Configured SQL persistence is unavailable.</summary>
+    public const string PersistenceUnavailable = "PersistenceUnavailable";
     /// <summary>The authenticated identity is awaiting access approval.</summary>
     public const string AccessPending = "AccessPending";
     /// <summary>The authenticated user's application access is disabled.</summary>

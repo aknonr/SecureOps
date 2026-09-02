@@ -3408,6 +3408,36 @@
         }
       }
     },
+    "/api/v1/health/persistence": {
+      "get": {
+        "tags": [
+          "SecureOps.Api"
+        ],
+        "operationId": "PersistenceHealth",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SqlPersistenceHealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SqlPersistenceHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health/identity-provider": {
       "get": {
         "tags": [
@@ -5814,6 +5844,23 @@
           "activityPersistenceIntervalMinutes": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SqlPersistenceHealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "sqlServerConfigured": {
+            "type": "boolean"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -48,6 +48,7 @@ Endpoints:
 - `GET /api/v1/identity/me` returns current caller metadata.
 - `GET /api/v1/identity/lookup/capabilities` returns lookup limits and returned-field metadata.
 - `GET /api/v1/health/audit-store` returns safe audit-store status.
+- `GET /api/v1/health/persistence` separately reports configured SQL readiness without returning connection or exception details.
 - `GET /api/v1/health/identity-provider` returns safe identity-provider status.
 - `GET /api/v1/health/enterprise-integrations` returns Admin-only provider selection and safe status without endpoint or credential detail.
 

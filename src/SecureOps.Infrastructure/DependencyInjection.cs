@@ -7,6 +7,7 @@ using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
+using SecureOps.Infrastructure.Persistence;
 using SecureOps.Infrastructure.Reporting;
 using SecureOps.Infrastructure.Sessions;
 using SecureOps.Shared.Configuration;
@@ -43,6 +44,8 @@ public static class DependencyInjection
         services.AddSingleton<EnterpriseIntegrationHealthState>();
         services.AddSingleton<EnterpriseIntegrationTelemetry>();
         services.AddSingleton<EnterpriseIntegrationDiagnostics>();
+        services.AddSingleton<ISqlPersistenceProbe, SqlPersistenceProbe>();
+        services.AddSingleton<SqlPersistenceHealthReporter>();
 
         services.AddHttpClient("TuruncuHat", (serviceProvider, client) =>
         {

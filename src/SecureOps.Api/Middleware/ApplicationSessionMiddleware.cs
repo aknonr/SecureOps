@@ -24,7 +24,8 @@ public sealed class ApplicationSessionMiddleware
         IApplicationSessionService sessionService,
         ApplicationSessionContext sessionContext)
     {
-        if (httpContext.User.Identity?.IsAuthenticated != true)
+        if (httpContext.User.Identity?.IsAuthenticated != true
+            || IsPersistenceIndependentHealthPath(httpContext.Request.Path))
         {
             await _next(httpContext);
             return;
@@ -78,4 +79,8 @@ public sealed class ApplicationSessionMiddleware
             unavailable,
             httpContext.RequestAborted);
     }
+
+    private static bool IsPersistenceIndependentHealthPath(PathString path) =>
+        path.Equals("/api/v1/health", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/api/v1/health/persistence", StringComparison.OrdinalIgnoreCase);
 }

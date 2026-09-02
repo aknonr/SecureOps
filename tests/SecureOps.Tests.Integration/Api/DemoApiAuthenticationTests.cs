@@ -5,12 +5,15 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using SecureOps.Api.Security;
+using SecureOps.Infrastructure.Persistence;
 using SecureOps.Shared.Contracts.Access;
+using SecureOps.Shared.Contracts.Api;
 
 namespace SecureOps.Tests.Integration.Api;
 
@@ -60,6 +63,34 @@ public sealed class DemoApiAuthenticationTests
         HttpResponseMessage response = await client.GetAsync("/api/v1/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Demo_PersistenceHealth_DistinguishesProcessFromUnconfiguredSql()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+
+        SqlPersistenceHealthResponse response = (await client.GetFromJsonAsync<SqlPersistenceHealthResponse>("/api/v1/health/persistence"))!;
+
+        response.Should().Be(new SqlPersistenceHealthResponse("NotConfigured", false, null));
+    }
+
+    [Fact]
+    public async Task Demo_SqlOutage_LeavesProcessLivenessIndependentFromPersistenceReadiness()
+    {
+        using WebApplicationFactory<Program> factory = CreateSqlOutageFactory();
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+
+        HttpResponseMessage process = await client.GetAsync("/api/v1/health");
+        HttpResponseMessage persistence = await client.GetAsync("/api/v1/health/persistence");
+        SqlPersistenceHealthResponse response = (await persistence.Content.ReadFromJsonAsync<SqlPersistenceHealthResponse>())!;
+
+        process.StatusCode.Should().Be(HttpStatusCode.OK);
+        persistence.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.Should().Be(new SqlPersistenceHealthResponse("Unhealthy", true, OperationalErrorCodes.PersistenceUnavailable));
     }
 
     [Fact]
@@ -248,6 +279,23 @@ public sealed class DemoApiAuthenticationTests
             });
     }
 
+    private static WebApplicationFactory<Program> CreateSqlOutageFactory() =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Demo");
+            builder.UseSetting("DemoAuth:Enabled", "true");
+            builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
+            builder.UseSetting("Audit:Provider", "InMemory");
+            builder.UseSetting("Access:RepositoryProvider", "SqlServer");
+            builder.UseSetting("SessionSecurity:RepositoryProvider", "SqlServer");
+            builder.UseSetting("ConnectionStrings:SecureOpsDb", "Server=sql.invalid;Database=SecureOps;Integrated Security=True;Connect Timeout=15");
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ISqlPersistenceProbe>();
+                services.AddSingleton<ISqlPersistenceProbe, UnavailableSqlPersistenceProbe>();
+            });
+        });
+
     private static async Task AssertProblemAsync(HttpResponseMessage response, HttpStatusCode status, string code, string stage, bool retryable)
     {
         response.StatusCode.Should().Be(status);
@@ -267,5 +315,11 @@ public sealed class DemoApiAuthenticationTests
         }
 
         return directory?.FullName ?? throw new DirectoryNotFoundException("Repository root was not found.");
+    }
+
+    private sealed class UnavailableSqlPersistenceProbe : ISqlPersistenceProbe
+    {
+        public Task ProbeAsync(CancellationToken cancellationToken) =>
+            Task.FromException(new InvalidOperationException("Synthetic unavailable SQL fixture."));
     }
 }

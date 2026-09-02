@@ -143,11 +143,27 @@ public sealed class ApplicationSessionServiceTests
         fixture.Audit.Events.Should().Contain(item => item.Action == AuditActions.ApplicationSessionIdleTimedOut);
     }
 
+    [Fact]
+    public async Task Start_WhenRequiredAuditFails_EndsPersistedSessionAndRequiresReauthentication()
+    {
+        Fixture fixture = new(auditWriter: new FailingAuditWriter());
+
+        ApplicationSessionResult result = await fixture.StartAsync();
+
+        result.Disposition.Should().Be(ApplicationSessionDisposition.AuditUnavailable);
+        result.ErrorCode.Should().Be(OperationalErrorCodes.AuditStoreUnavailable);
+        ApplicationSession persisted = (await fixture.Repository.GetAsync(
+            fixture.Repository.LastInsertedSessionId!.Value,
+            CancellationToken.None))!;
+        persisted.EndReason.Should().Be(SessionEndReason.AuditFailure);
+        persisted.IsActive.Should().BeFalse();
+    }
+
     private sealed class Fixture
     {
         private readonly IApplicationAccessService _access = Substitute.For<IApplicationAccessService>();
 
-        public Fixture(SessionSecurityOptions? options = null)
+        public Fixture(SessionSecurityOptions? options = null, IAuditWriter? auditWriter = null)
         {
             options ??= new SessionSecurityOptions();
             Time = new ManualTimeProvider(StartTime);
@@ -169,7 +185,7 @@ public sealed class ApplicationSessionServiceTests
             Service = new ApplicationSessionService(
                 _access,
                 Repository,
-                Audit,
+                auditWriter ?? Audit,
                 Options.Create(options),
                 Time,
                 NullLogger<ApplicationSessionService>.Instance);
@@ -188,11 +204,22 @@ public sealed class ApplicationSessionServiceTests
         public Task<ApplicationSessionResult> ValidateAsync(Guid sessionId) => Service.ValidateOrStartAsync(Principal, sessionId, Context, default);
     }
 
+    private sealed class FailingAuditWriter : IAuditWriter
+    {
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken) =>
+            Task.FromException(new AuditWriteUnavailableException("Synthetic audit failure."));
+    }
+
     private sealed class CountingRepository : IApplicationSessionRepository
     {
         private readonly InMemoryApplicationSessionRepository _inner = new();
         public int TouchCalls { get; private set; }
-        public Task InsertAsync(ApplicationSession session, CancellationToken cancellationToken) => _inner.InsertAsync(session, cancellationToken);
+        public Guid? LastInsertedSessionId { get; private set; }
+        public Task InsertAsync(ApplicationSession session, CancellationToken cancellationToken)
+        {
+            LastInsertedSessionId = session.SessionId;
+            return _inner.InsertAsync(session, cancellationToken);
+        }
         public Task<ApplicationSession?> GetAsync(Guid sessionId, CancellationToken cancellationToken) => _inner.GetAsync(sessionId, cancellationToken);
         public Task<bool> TouchAsync(Guid sessionId, DateTimeOffset lastSeenAtUtc, DateTimeOffset persistBeforeUtc, CancellationToken cancellationToken)
         {

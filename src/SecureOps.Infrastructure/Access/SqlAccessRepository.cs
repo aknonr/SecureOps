@@ -318,9 +318,9 @@ public sealed class SqlAccessRepository : IAccessRepository
     private const string ReadUserSql = """
         SELECT u.UserId AS Id, u.CorporateIdentity, u.AuthenticationSource, u.AccessStatus AS Status,
             u.FirstAuthenticatedAt, u.LastAuthenticatedAt, u.DisabledAt, u.AccessVersion AS Version,
-            STRING_AGG(CASE WHEN ra.RevokedAt IS NULL THEN r.RoleCode END, ',') AS Roles
+            STRING_AGG(r.RoleCode, ',') AS Roles
         FROM security.Users u
-        LEFT JOIN security.RoleAssignments ra ON ra.UserId = u.UserId
+        LEFT JOIN security.RoleAssignments ra ON ra.UserId = u.UserId AND ra.RevokedAt IS NULL
         LEFT JOIN security.Roles r ON r.RoleId = ra.RoleId
         """;
 

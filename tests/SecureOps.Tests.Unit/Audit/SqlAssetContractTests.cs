@@ -1,5 +1,5 @@
-using FluentAssertions;
 using System.Text.RegularExpressions;
+using FluentAssertions;
 
 namespace SecureOps.Tests.Unit.Audit;
 
@@ -180,6 +180,38 @@ public sealed class SqlAssetContractTests
             .And.NotContain("Retry");
         accessRepository.Should().Contain("LastAuthenticatedAt <= DATEADD(MINUTE, -@ActivityPersistenceIntervalMinutes")
             .And.NotContain("UPDATE security.Users SET LastAuthenticatedAt = SYSUTCDATETIME() WHERE UserId = @UserId;");
+    }
+
+    [Fact]
+    public void SqlRepositories_MatchInstalledSchemaAndConcurrencyContracts()
+    {
+        string root = FindRepositoryRoot();
+        string access = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Access", "SqlAccessRepository.cs"));
+        string sessions = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Sessions", "SqlApplicationSessionRepository.cs"));
+        string operational = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "OperationalRecords", "SqlOperationalRecordRepository.cs"));
+        string audit = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Audit", "SqlAuditWriter.cs"));
+
+        access.Should().Contain("IsolationLevel.Serializable")
+            .And.Contain("WITH (UPDLOCK, HOLDLOCK)")
+            .And.Contain("Version = Version + 1")
+            .And.Contain("AccessVersion = AccessVersion + 1")
+            .And.Contain("ra.RevokedAt IS NULL")
+            .And.Contain("transaction.CommitAsync(cancellationToken)")
+            .And.NotContain("DELETE FROM");
+        sessions.Should().Contain("WHERE SessionId = @SessionId AND EndedAtUtc IS NULL")
+            .And.Contain("AbsoluteExpiresAtUtc <= @NowUtc OR LastSeenAtUtc <= @IdleCutoffUtc")
+            .And.Contain("OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY")
+            .And.NotContain("DELETE FROM");
+        operational.Should().Contain("SourceCreatedAt AS CreatedAt")
+            .And.Contain("CONVERT(bigint, r.RowVersion) AS Version")
+            .And.Contain("OperationalRecordWorkflowHistory")
+            .And.Contain("IsolationLevel.Serializable")
+            .And.Contain("transaction.CommitAsync(cancellationToken)")
+            .And.NotContain("DELETE FROM");
+        audit.Should().Contain("INSERT INTO audit.AuditLog")
+            .And.Contain("commandTimeout: CommandTimeoutSeconds")
+            .And.NotContain("UPDATE audit.AuditLog")
+            .And.NotContain("DELETE FROM audit.AuditLog");
     }
 
     private static string FindRepositoryRoot()

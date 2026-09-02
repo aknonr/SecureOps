@@ -85,6 +85,8 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED CURRENT | `ReverseProxy__ForwardedHeaders__Enabled` | `false` until exact API proxy behavior and source IPs are confirmed |
 | CONDITIONAL | `ReverseProxy__ForwardedHeaders__TrustedProxyIps__0` | `<exact trusted API proxy IP>` only when forwarding is explicitly enabled |
 
+When any SQL provider is selected, startup requires Integrated Security without SQL login credentials and rejects malformed connection strings, missing server/database values, and `Connect Timeout` values outside 1-60 seconds. `GET /api/v1/health` remains process liveness; authenticated `GET /api/v1/health/persistence` performs a bounded read-only probe and returns only `NotConfigured`, `Healthy`, or `Unhealthy` plus a stable error code. Both paths bypass SQL-backed application-session creation after host authentication so SQL failure cannot hide process liveness or its own readiness result.
+
 ### OIDC Activation-Pending Values
 
 Keep `Oidc__Enabled=false` until the corporate contract is approved. At activation, the UI host requires `Oidc__Authority`, `Oidc__MetadataAddress`, `Oidc__ClientId`, `Oidc__ClientAuthenticationMethod` (`None` or `ClientSecretPost`), conditional `Oidc__ClientSecret`, `Oidc__TokenEndpointRequestFormat`, `Oidc__ApiAudience`, callback/signed-out callback paths, scopes including `openid`, `Oidc__RequireHttpsMetadata=true`, and explicit `Oidc__UsePkce`. `Oidc__EnableRemoteSignOut` remains `false` until operational testing approves logout parameters.

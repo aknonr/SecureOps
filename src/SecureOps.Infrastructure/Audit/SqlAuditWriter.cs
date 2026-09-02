@@ -10,6 +10,7 @@ namespace SecureOps.Infrastructure.Audit;
 /// </summary>
 public sealed class SqlAuditWriter : IAuditEventSink
 {
+    private const int CommandTimeoutSeconds = 15;
     private readonly string _connectionString;
 
     /// <summary>
@@ -53,6 +54,7 @@ public sealed class SqlAuditWriter : IAuditEventSink
                         : System.Text.Json.JsonSerializer.Serialize(auditEvent.Details, AuditJson.SerializerOptions),
                     auditEvent.SourceIp
                 },
+                commandTimeout: CommandTimeoutSeconds,
                 commandType: CommandType.Text,
                 cancellationToken: cancellationToken);
 

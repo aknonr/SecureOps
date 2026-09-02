@@ -13,6 +13,7 @@ using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
+using SecureOps.Infrastructure.Persistence;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
@@ -27,6 +28,7 @@ DirectoryExplorerConfigurationValidator.Validate(builder.Configuration);
 ReverseProxyConfiguration.Validate(builder.Configuration);
 OperationalRecordConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 PlatformSecurityConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
+SqlPersistenceConfigurationValidator.Validate(builder.Configuration);
 DataProtectionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 
 bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
@@ -212,6 +214,19 @@ RouteHandlerBuilder auditStoreHealthEndpoint = app.MapGet(
         (AuditHealthReporter reporter) => Results.Ok(reporter.GetHealth()))
     .WithName("AuditStoreHealth")
     .WithOpenApi();
+RouteHandlerBuilder persistenceHealthEndpoint = app.MapGet(
+        "/api/v1/health/persistence",
+        async (SqlPersistenceHealthReporter reporter, CancellationToken cancellationToken) =>
+        {
+            SqlPersistenceHealthResponse response = await reporter.GetHealthAsync(cancellationToken);
+            return string.Equals(response.Status, "Unhealthy", StringComparison.Ordinal)
+                ? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
+                : Results.Ok(response);
+        })
+    .WithName("PersistenceHealth")
+    .Produces<SqlPersistenceHealthResponse>(StatusCodes.Status200OK)
+    .Produces<SqlPersistenceHealthResponse>(StatusCodes.Status503ServiceUnavailable)
+    .WithOpenApi();
 RouteHandlerBuilder identityProviderHealthEndpoint = app.MapGet(
         "/api/v1/health/identity-provider",
         (Microsoft.Extensions.Options.IOptions<IdentityLookupOptions> options) =>
@@ -235,6 +250,7 @@ if (!app.Environment.IsDevelopment())
 {
     healthEndpoint.RequireAuthorization();
     auditStoreHealthEndpoint.RequireAuthorization();
+    persistenceHealthEndpoint.RequireAuthorization();
     identityProviderHealthEndpoint.RequireAuthorization();
 }
 

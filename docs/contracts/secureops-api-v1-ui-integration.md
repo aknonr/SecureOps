@@ -46,6 +46,7 @@ One browser authentication session must present one stable application-session h
 | `POST /api/v1/identity/bulk-lookup` | `Identity.Lookup` | `accounts` array plus optional purpose, maximum configured count | ordered `BulkIdentityLookupResponse` | `InvalidIdentityInput`, 429 |
 | `GET /api/v1/identity/lookup/cache-diagnostics` | `SystemDiagnostics` | none | aggregate counters without account labels | 403 |
 | `GET /api/v1/health/identity-provider` | Authenticated outside Development | none | provider name and real-provider flag | 401 |
+| `GET /api/v1/health/persistence` | Authenticated outside Development | none | `NotConfigured`, `Healthy`, or `Unhealthy` SQL readiness without connection details | 401, 503 |
 
 ## Directory Explorer
 
