@@ -31,6 +31,18 @@ public sealed class CorporatePrincipalResolver : ICorporatePrincipalResolver
         string? stableIdentifier = principal.FindFirst(ExternalIdentityClaimTypes.StableIdentifier)?.Value;
         if (!string.IsNullOrWhiteSpace(stableIdentifier))
         {
+            string? normalizedIssuer = principal.FindFirst(ExternalIdentityClaimTypes.Issuer)?.Value;
+            string? normalizedSubject = principal.FindFirst(ExternalIdentityClaimTypes.Subject)?.Value;
+            string? provider = principal.FindFirst(ExternalIdentityClaimTypes.AuthenticationProvider)?.Value;
+            if (!string.Equals(authenticationSource, "oidc", StringComparison.Ordinal)
+                || !string.Equals(provider, "OIDC", StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(normalizedIssuer)
+                || string.IsNullOrWhiteSpace(normalizedSubject)
+                || !string.Equals(stableIdentifier, OidcExternalIdentityNormalizer.StableIdentifier(normalizedIssuer, normalizedSubject), StringComparison.Ordinal))
+            {
+                return null;
+            }
+
             return new CorporatePrincipal(
                 stableIdentifier,
                 "oidc",
@@ -38,7 +50,9 @@ public sealed class CorporatePrincipalResolver : ICorporatePrincipalResolver
                 principal.FindFirst(ExternalIdentityClaimTypes.DisplayName)?.Value,
                 principal.FindFirst(ExternalIdentityClaimTypes.Mail)?.Value,
                 principal.FindFirst(ExternalIdentityClaimTypes.Uid)?.Value,
-                principal.FindAll(ExternalIdentityClaimTypes.RoleEvidence).Select(claim => claim.Value).ToArray());
+                principal.FindAll(ExternalIdentityClaimTypes.RoleEvidence).Select(claim => claim.Value).ToArray(),
+                normalizedIssuer,
+                normalizedSubject);
         }
 
         string? issuer = principal.FindFirst(_options.OidcIssuerClaimType)?.Value;

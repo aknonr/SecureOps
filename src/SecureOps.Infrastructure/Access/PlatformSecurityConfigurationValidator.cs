@@ -10,6 +10,9 @@ public static class PlatformSecurityConfigurationValidator
     public static void Validate(IConfiguration configuration, string? environmentName = null)
     {
         AccessOptions access = configuration.GetSection(AccessOptions.SectionName).Get<AccessOptions>() ?? new();
+        BootstrapAdminOptions bootstrap = configuration.GetSection(BootstrapAdminOptions.SectionName).Get<BootstrapAdminOptions>() ?? new();
+        OidcOptions oidc = configuration.GetSection(OidcOptions.SectionName).Get<OidcOptions>() ?? new();
+        AuditOptions audit = configuration.GetSection(AuditOptions.SectionName).Get<AuditOptions>() ?? new();
         SessionSecurityOptions session = configuration.GetSection(SessionSecurityOptions.SectionName).Get<SessionSecurityOptions>() ?? new();
         CommandIdempotencyOptions command = configuration.GetSection(CommandIdempotencyOptions.SectionName).Get<CommandIdempotencyOptions>() ?? new();
         RateLimitingOptions rateLimits = configuration.GetSection(RateLimitingOptions.SectionName).Get<RateLimitingOptions>() ?? new();
@@ -25,16 +28,14 @@ public static class PlatformSecurityConfigurationValidator
             throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required when Access:RepositoryProvider is SqlServer.");
         }
 
-        if (access.BootstrapAdministrators.Any(string.IsNullOrWhiteSpace)
-            || access.BootstrapAdministrators.Any(identifier => identifier.Trim().Length > 256)
-            || access.BootstrapAdministrators.Distinct(StringComparer.OrdinalIgnoreCase).Count() != access.BootstrapAdministrators.Length)
+        if (configuration.GetSection("Access:BootstrapAdministrators").GetChildren().Any())
         {
-            throw new InvalidOperationException("Access:BootstrapAdministrators must contain unique, non-empty identifiers no longer than 256 characters.");
+            throw new InvalidOperationException("Access:BootstrapAdministrators is retired; use the SQL-only BootstrapAdmin OIDC gate.");
         }
 
-        if (access.BootstrapAdministrators.Length > 0 && !access.AutoCreateRequest)
+        if (bootstrap.Enabled)
         {
-            throw new InvalidOperationException("Access:AutoCreateRequest must be true while configured bootstrap administrators are enabled.");
+            ValidateBootstrapAdmin(bootstrap, oidc, access, audit);
         }
 
         if (session.IdleTimeoutMinutes is < 1 or > 1440 || session.AbsoluteLifetimeHours is < 1 or > 168
@@ -96,6 +97,54 @@ public static class PlatformSecurityConfigurationValidator
             {
                 throw new InvalidOperationException("RateLimiting policy settings are outside safe bounds.");
             }
+        }
+    }
+
+    private static void ValidateBootstrapAdmin(
+        BootstrapAdminOptions bootstrap,
+        OidcOptions oidc,
+        AccessOptions access,
+        AuditOptions audit)
+    {
+        if (string.IsNullOrWhiteSpace(bootstrap.LoginName)
+            || bootstrap.LoginName.Length > 256
+            || !string.Equals(bootstrap.LoginName, bootstrap.LoginName.Trim(), StringComparison.Ordinal)
+            || bootstrap.LoginName.Any(char.IsControl))
+        {
+            throw new InvalidOperationException("BootstrapAdmin:LoginName is required and must be one bounded exact login name.");
+        }
+
+        if (!Uri.TryCreate(bootstrap.AllowedIssuer, UriKind.Absolute, out Uri? issuer)
+            || !string.Equals(issuer.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrEmpty(issuer.UserInfo)
+            || !string.IsNullOrEmpty(issuer.Query)
+            || !string.IsNullOrEmpty(issuer.Fragment)
+            || bootstrap.AllowedIssuer.Contains('*', StringComparison.Ordinal)
+            || !string.Equals(bootstrap.AllowedIssuer, bootstrap.AllowedIssuer.TrimEnd('/'), StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("BootstrapAdmin:AllowedIssuer must be one exact absolute HTTPS issuer without wildcard, credentials, query, fragment, or trailing slash.");
+        }
+
+        if (!oidc.Enabled
+            || !string.Equals(bootstrap.AllowedIssuer, oidc.Authority.TrimEnd('/'), StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("BootstrapAdmin requires enabled OIDC and an AllowedIssuer that exactly matches Oidc:Authority.");
+        }
+
+        if (!access.AutoCreateRequest
+            || !string.Equals(access.RepositoryProvider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("BootstrapAdmin requires Access:AutoCreateRequest=true and Access:RepositoryProvider=SqlServer.");
+        }
+
+        if (access.DemoCompatibilityEnabled)
+        {
+            throw new InvalidOperationException("BootstrapAdmin cannot be enabled with Access:DemoCompatibilityEnabled.");
+        }
+
+        if (!string.Equals(audit.Provider, "SqlServer", StringComparison.OrdinalIgnoreCase) || !audit.FailClosed)
+        {
+            throw new InvalidOperationException("BootstrapAdmin requires Audit:Provider=SqlServer and Audit:FailClosed=true for atomic audit persistence.");
         }
     }
 }

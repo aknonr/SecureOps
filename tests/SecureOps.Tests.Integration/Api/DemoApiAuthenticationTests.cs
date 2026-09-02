@@ -11,6 +11,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SecureOps.Api.Security;
+using SecureOps.Domain.Access;
+using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Persistence;
 using SecureOps.Shared.Contracts.Access;
 using SecureOps.Shared.Contracts.Api;
@@ -214,8 +216,8 @@ public sealed class DemoApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory(
             "Demo",
             demoAuthEnabled: true,
-            demoCompatibilityEnabled: false,
-            bootstrapAdministrator: "demo:platform-admin");
+            demoCompatibilityEnabled: false);
+        await SeedAdminAsync(factory, "demo:platform-admin", "demo-api-bridge");
         using HttpClient subject = factory.CreateClient();
         subject.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.TeamLeadActor);
         CurrentAccessResponse pending = (await subject.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
@@ -258,8 +260,7 @@ public sealed class DemoApiAuthenticationTests
         string environment,
         bool demoAuthEnabled,
         bool swaggerEnabled = false,
-        bool demoCompatibilityEnabled = true,
-        string? bootstrapAdministrator = null)
+        bool demoCompatibilityEnabled = true)
     {
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -268,15 +269,33 @@ public sealed class DemoApiAuthenticationTests
                 builder.UseSetting("DemoAuth:Enabled", demoAuthEnabled ? "true" : "false");
                 builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
                 builder.UseSetting("Access:DemoCompatibilityEnabled", demoCompatibilityEnabled ? "true" : "false");
-                if (bootstrapAdministrator is not null)
-                {
-                    builder.UseSetting("Access:BootstrapAdministrators:0", bootstrapAdministrator);
-                }
                 builder.UseSetting("Audit:Provider", "InMemory");
                 builder.UseSetting("IdentityLookup:Provider", "Mock");
                 builder.UseSetting("RateLimiting:IdentityLookup:PermitLimit", "100");
                 builder.UseSetting("Swagger:Enabled", swaggerEnabled ? "true" : "false");
             });
+    }
+
+    private static async Task SeedAdminAsync(
+        WebApplicationFactory<Program> factory,
+        string identity,
+        string authenticationSource)
+    {
+        using IServiceScope scope = factory.Services.CreateScope();
+        IAccessRepository repository = scope.ServiceProvider.GetRequiredService<IAccessRepository>();
+        EnsureAccessUserResult ensured = await repository.EnsureUserAsync(
+            new CorporatePrincipal(identity, authenticationSource),
+            createRequest: true,
+            TimeSpan.FromMinutes(5),
+            CancellationToken.None);
+        _ = await repository.DecideRequestAsync(
+            ensured.PendingRequest!.Id,
+            AccessRequestStatus.Approved,
+            ensured.PendingRequest.Version,
+            "system:test-seed",
+            ["Admin"],
+            "Synthetic persisted authorization fixture.",
+            CancellationToken.None);
     }
 
     private static WebApplicationFactory<Program> CreateSqlOutageFactory() =>

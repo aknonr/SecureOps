@@ -44,7 +44,8 @@ public sealed class OidcApiAuthenticationTests
     {
         const string subject = "synthetic-subject-authorized";
         string stableIdentifier = OidcExternalIdentityNormalizer.StableIdentifier(_issuer, subject);
-        using WebApplicationFactory<Program> factory = CreateFactory(stableIdentifier);
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        await SeedAdminAsync(factory, stableIdentifier, "oidc");
         using HttpClient client = Client(factory, Token(subject, "operator.authorized"));
 
         CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
@@ -121,9 +122,7 @@ public sealed class OidcApiAuthenticationTests
     private const string _issuer = "https://identity.example.test";
     private const string _audience = "secureops-api-test";
 
-    private static WebApplicationFactory<Program> CreateFactory(
-        string? bootstrapAdministrator = null,
-        bool demoEnabled = false) =>
+    private static WebApplicationFactory<Program> CreateFactory(bool demoEnabled = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Test");
@@ -136,10 +135,6 @@ public sealed class OidcApiAuthenticationTests
             builder.UseSetting("Audit:Provider", "InMemory");
             builder.UseSetting("IdentityLookup:Provider", "Mock");
             builder.UseSetting("Access:DemoCompatibilityEnabled", "false");
-            if (bootstrapAdministrator is not null)
-            {
-                builder.UseSetting("Access:BootstrapAdministrators:0", bootstrapAdministrator);
-            }
             builder.ConfigureServices(services =>
                 services.PostConfigure<JwtBearerOptions>(ExternalIdentityClaimTypes.OidcBearerScheme, options =>
                 {
@@ -148,6 +143,25 @@ public sealed class OidcApiAuthenticationTests
                     options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
                 }));
         });
+
+    private static async Task SeedAdminAsync(WebApplicationFactory<Program> factory, string identity, string authenticationSource)
+    {
+        using IServiceScope scope = factory.Services.CreateScope();
+        IAccessRepository repository = scope.ServiceProvider.GetRequiredService<IAccessRepository>();
+        EnsureAccessUserResult ensured = await repository.EnsureUserAsync(
+            new CorporatePrincipal(identity, authenticationSource),
+            createRequest: true,
+            TimeSpan.FromMinutes(5),
+            CancellationToken.None);
+        _ = await repository.DecideRequestAsync(
+            ensured.PendingRequest!.Id,
+            SecureOps.Domain.Access.AccessRequestStatus.Approved,
+            ensured.PendingRequest.Version,
+            "system:test-seed",
+            ["Admin"],
+            "Synthetic persisted authorization fixture.",
+            CancellationToken.None);
+    }
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string token)
     {

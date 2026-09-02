@@ -8,4 +8,6 @@ public sealed record CorporatePrincipal(
     string? DisplayName = null,
     string? Mail = null,
     string? Uid = null,
-    IReadOnlyList<string>? RoleEvidence = null);
+    IReadOnlyList<string>? RoleEvidence = null,
+    string? Issuer = null,
+    string? Subject = null);

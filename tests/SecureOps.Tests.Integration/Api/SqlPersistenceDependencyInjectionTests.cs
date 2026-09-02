@@ -38,6 +38,7 @@ public sealed class SqlPersistenceDependencyInjectionTests
         services.GetRequiredService<IAuditEventSink>().Should().BeOfType<SqlAuditWriter>();
         services.GetRequiredService<ISqlPersistenceProbe>().Should().BeOfType<SqlPersistenceProbe>();
         scope.ServiceProvider.GetRequiredService<IAccessRepository>().Should().BeOfType<SqlAccessRepository>();
+        scope.ServiceProvider.GetRequiredService<IFirstAdminBootstrapStore>().Should().BeOfType<SqlFirstAdminBootstrapStore>();
         scope.ServiceProvider.GetRequiredService<IApplicationSessionRepository>().Should().BeOfType<SqlApplicationSessionRepository>();
         scope.ServiceProvider.GetRequiredService<IOperationalRecordRepository>().Should().BeOfType<SqlOperationalRecordRepository>();
         scope.ServiceProvider.GetRequiredService<ICommandIdempotencyStore>().Should().BeOfType<SqlCommandIdempotencyStore>();

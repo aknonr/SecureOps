@@ -32,11 +32,13 @@ The DBA migration identity needs controlled DDL authority to create schemas/tabl
 
 ## Bootstrap Administrator
 
-The bootstrap is configuration-based with persisted SQL access state. Negotiate principals are stored as the trimmed `ClaimsPrincipal.Identity.Name`, normally `DOMAIN\\account`, in `security.Users.CorporateIdentity`; matching is case-insensitive in application code. OIDC readiness uses an opaque SHA256 of issuer plus subject when separately activated.
+Real first-Admin bootstrap is OIDC-only and disabled by default. The eligible OIDC principal is persisted under the existing opaque SHA256 identity derived from exact issuer plus subject; the configured login name is lookup evidence only. The legacy `Access:BootstrapAdministrators` setting is rejected at startup.
 
-On first authenticated access, an unknown principal becomes `Pending` and receives one access request. An exact value in `Access__BootstrapAdministrators__N` is approved with `Admin` by `system:configured-bootstrap`. Demo/Test compatibility separately maps only `demo:platform-admin` to Admin and `demo:team-lead` to Lead when both Demo flags are enabled. Bootstrap approval and role assignment are audited.
+On first authenticated access, an unknown principal becomes `Pending` and receives one access request. With the SQL-only bootstrap gate enabled, only the exact configured OIDC issuer and login name can attempt the first Admin grant. SQL serializes the check, treats every historical Admin assignment including revoked rows as permanent closure, and commits approval, assignment, and append-only audit evidence atomically. Demo/Test compatibility separately maps only `demo:platform-admin` to Admin and `demo:team-lead` to Lead when both Demo flags are enabled; it must be disabled for real bootstrap.
 
-An empty database with no configured bootstrap principal and Demo compatibility disabled is locked out. For the first Windows-authenticated TEST start, configure exactly one approved placeholder-replaced corporate principal and keep `Access__AutoCreateRequest=true`. After at least two reviewed, persisted Admin assignments exist, the bootstrap array can be removed and the app restarted; persisted roles remain. Disabled users are never re-bootstrapped.
+An empty database with the OIDC bootstrap disabled is locked out until an existing Admin approves access. For a controlled first OIDC TEST login, configure the three `BootstrapAdmin` keys, keep `Access__AutoCreateRequest=true`, use SQL access/session/audit providers, and disable Demo compatibility. Disable the bootstrap setting after success as operational cleanup; assignment history is the permanent security boundary. Revoking or disabling the only Admin never reopens bootstrap.
+
+Controlled TEST procedure: first have the DBA confirm that no historical Admin assignment exists, then configure only the approved runtime placeholders, keep both Demo switches false, enable OIDC and the bootstrap gate in the same controlled change, and let the designated user complete normal OIDC authentication. Verify the persisted Admin role through the normal access endpoint and verify `FirstAdminBootstrapped`, `AccessApproved`, and `RoleAssigned` audit evidence. Finally set `BootstrapAdmin__Enabled=false` and restart in a separate controlled change. If historical assignment evidence exists or any step fails, stop; do not delete history or substitute a Demo identity.
 
 ## Exact TEST Environment Variables
 
@@ -46,12 +48,14 @@ Values in angle brackets require controlled deployment input. All booleans are l
 |---|---|---|
 | REQUIRED | `ASPNETCORE_ENVIRONMENT` | `Test` |
 | REQUIRED, TEST-ONLY | `Swagger__Enabled` | `true` |
-| REQUIRED, TEST-ONLY | `DemoAuth__Enabled` | `true` for current compatibility; `false` for Windows-auth bootstrap validation |
+| REQUIRED, TEST-ONLY | `DemoAuth__Enabled` | `false` for real OIDC bootstrap; `true` only for separate synthetic Demo validation |
 | REQUIRED, TEST-ONLY | `DemoAuth__HeaderName` | `X-SecureOps-Demo-Actor` |
 | REQUIRED | `Access__RepositoryProvider` | `SqlServer` after migrations 001-007 |
 | REQUIRED | `Access__AutoCreateRequest` | `true` |
 | REQUIRED, TEST-ONLY | `Access__DemoCompatibilityEnabled` | same enablement decision as `DemoAuth__Enabled` |
-| CONDITIONAL REQUIRED | `Access__BootstrapAdministrators__0` | `<DOMAIN\\approved-bootstrap-account>` when validating first Windows Admin against an empty database |
+| CONDITIONAL REQUIRED | `BootstrapAdmin__Enabled` | `true` only during the controlled first OIDC Admin login; default and post-bootstrap value is `false` |
+| CONDITIONAL REQUIRED, RUNTIME-ONLY | `BootstrapAdmin__LoginName` | `<EXACT_APPROVED_OIDC_LOGIN_NAME>`; never commit a real identity |
+| CONDITIONAL REQUIRED | `BootstrapAdmin__AllowedIssuer` | `<EXACT_APPROVED_HTTPS_OIDC_ISSUER>`; must exactly equal `Oidc__Authority` |
 | ACTIVATION-PENDING | `Oidc__Enabled` | keep `false` until the approved IdP contract and deployment change are complete |
 | REQUIRED | `SessionSecurity__IdleTimeoutMinutes` / `SessionSecurity__AbsoluteLifetimeHours` / `SessionSecurity__ActivityPersistenceIntervalMinutes` | `30` / `12` / `5` |
 | REQUIRED | `SessionSecurity__RepositoryProvider` / `SessionSecurity__CookieName` / `SessionSecurity__MaxAdminPageSize` | `SqlServer` / `__Host-SecureOps.ApplicationSession` / `100` |

@@ -108,11 +108,11 @@ public sealed class CapabilityAuthorizationHandlerTests
     }
 
     [Fact]
-    public async Task ConfiguredBootstrapAdministrator_CanAccessAdministrationAndIsFullyAudited()
+    public async Task DemoPlatformAdministrator_RemainsConfinedToDemoCompatibilityPath()
     {
-        const string bootstrapIdentity = "CONTOSO\\bootstrap.admin";
-        Fixture fixture = new([bootstrapIdentity]);
-        ClaimsPrincipal principal = Principal(bootstrapIdentity);
+        const string bootstrapIdentity = "demo:platform-admin";
+        Fixture fixture = new(demoCompatibilityEnabled: true);
+        ClaimsPrincipal principal = Principal(bootstrapIdentity, "demo-api-bridge");
 
         AuthorizationHandlerContext authorization = await fixture.AuthorizeAsync(principal, Capabilities.AccessManageUsers);
         ApplicationUser user = (await fixture.Repository.GetUserAsync(bootstrapIdentity, CancellationToken.None))!;
@@ -120,8 +120,8 @@ public sealed class CapabilityAuthorizationHandlerTests
         authorization.HasSucceeded.Should().BeTrue();
         user.Status.Should().Be(AccessStatus.Approved);
         user.Roles.Should().ContainSingle("Admin");
-        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.AccessApproved && audit.Actor == "system:configured-bootstrap");
-        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.RoleAssigned && audit.Actor == "system:configured-bootstrap");
+        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.AccessApproved && audit.Actor == "system:demo-compatibility");
+        fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.RoleAssigned && audit.Actor == "system:demo-compatibility");
     }
 
     [Fact]
@@ -279,8 +279,10 @@ public sealed class CapabilityAuthorizationHandlerTests
         fixture.Audit.Events.Should().Contain(audit => audit.Action == AuditActions.AccessUsersViewed);
     }
 
-    private static ClaimsPrincipal Principal(string name) => new(new ClaimsIdentity(
-        [new Claim(ClaimTypes.Name, name)],
+    private static ClaimsPrincipal Principal(string name, string? authenticationSource = null) => new(new ClaimsIdentity(
+        authenticationSource is null
+            ? [new Claim(ClaimTypes.Name, name)]
+            : [new Claim(ClaimTypes.Name, name), new Claim("secureops:auth_source", authenticationSource)],
         "Negotiate",
         ClaimTypes.Name,
         ClaimTypes.Role));
@@ -299,21 +301,22 @@ public sealed class CapabilityAuthorizationHandlerTests
         private readonly InMemoryAuditWriter _audit = new();
         private readonly IHttpContextAccessor _accessor;
 
-        public Fixture(string[]? bootstrapAdministrators = null, IAccessIdentityProfileResolver? profileResolver = null)
+        public Fixture(IAccessIdentityProfileResolver? profileResolver = null, bool demoCompatibilityEnabled = false)
         {
             HttpContext = new DefaultHttpContext { TraceIdentifier = "trace-access-test" };
             _accessor = new HttpContextAccessor { HttpContext = HttpContext };
             IOptions<AccessOptions> options = Options.Create(new AccessOptions
             {
-                DemoCompatibilityEnabled = false,
-                BootstrapAdministrators = bootstrapAdministrators ?? []
+                DemoCompatibilityEnabled = demoCompatibilityEnabled
             });
             Service = new ApplicationAccessService(
                 new CorporatePrincipalResolver(options),
                 _repository,
+                new UnavailableFirstAdminBootstrapStore(),
                 profileResolver ?? new NullProfileResolver(),
                 _audit,
                 options,
+                Options.Create(new BootstrapAdminOptions()),
                 Options.Create(new SessionSecurityOptions()),
                 NullLogger<ApplicationAccessService>.Instance);
         }

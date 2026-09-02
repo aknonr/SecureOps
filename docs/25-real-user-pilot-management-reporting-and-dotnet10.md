@@ -2,7 +2,7 @@
 
 ## Pilot Authentication and Persistence
 
-The interim corporate authentication path is IIS Windows Authentication -> ASP.NET Core Negotiate -> `ClaimsPrincipal.Identity.Name` -> `ICorporatePrincipalResolver` -> persisted SecureOps approval -> role -> capability. Do not add an LDAP password form. OIDC readiness is implemented behind the same access model but remains disabled pending a separate activation decision.
+The corporate OIDC path is OIDC validation -> bounded normalized issuer/subject/login claims -> `ICorporatePrincipalResolver` -> persisted SecureOps approval -> role -> capability. Do not add an LDAP password form. Negotiate and Demo compatibility do not enter the real first-Admin bootstrap gate.
 
 For first real-user TEST bootstrap, preserve the current server-owned configuration and apply these exact environment-variable decisions through the controlled deployment process:
 
@@ -17,7 +17,9 @@ For first real-user TEST bootstrap, preserve the current server-owned configurat
 | `DataProtection__Mode` / `ApplicationName` | `FileSystemDpapi` / `SecureOps.Api` |
 | `DataProtection__KeyRingPath` | absolute server-owned key-ring path outside deployment payload |
 | `Access__AutoCreateRequest` | `true` |
-| `Access__BootstrapAdministrators__0` | one approved exact `DOMAIN\account` for bootstrap only |
+| `BootstrapAdmin__Enabled` | `true` only for the controlled first OIDC Admin login; otherwise `false` |
+| `BootstrapAdmin__LoginName` | one approved exact runtime-only OIDC login name |
+| `BootstrapAdmin__AllowedIssuer` | exact approved HTTPS issuer, equal to `Oidc__Authority` |
 | `Audit__Provider` | `SqlServer` |
 | `Audit__FailClosed` | `true` |
 | `Audit__RequirePersistentStoreInProduction` | `true` |
@@ -31,7 +33,7 @@ For first real-user TEST bootstrap, preserve the current server-owned configurat
 | `PamProvider__Provider` | `Mock`; this is pass-through metadata only and is not a real PAM connector |
 | `ConnectionStrings__SecureOpsDb` | server-owned `SecureOpsDb` connection string using Windows Integrated Security, `Encrypt=True`, `TrustServerCertificate=False` |
 
-The runtime identity remains `DOMAIN\WASAST_YONETIM`. Do not configure SQL credentials or KRON/AAPM for this connection. Migrations 001-007 and grants must be completed before SQL providers are selected. The App Pool identity needs read/write/create permission only on the configured Data Protection key-ring directory; no key material is deployed from Git. After at least two reviewed persisted Admin assignments exist, remove the bootstrap array and restart in a controlled window. Persisted access remains; disabled users are never bootstrapped again.
+The runtime identity remains `DOMAIN\WASAST_YONETIM`. Do not configure SQL credentials or KRON/AAPM for this connection. Migrations 001-007 and grants must be completed before SQL providers are selected. The App Pool identity needs read/write/create permission only on the configured Data Protection key-ring directory; no key material is deployed from Git. After the first audited OIDC Admin grant, set `BootstrapAdmin__Enabled=false` and restart in a controlled window. Historical Admin assignment rows permanently prevent reuse even if configuration is left enabled; revocation does not reopen bootstrap.
 
 ## Reporting API and Windows
 

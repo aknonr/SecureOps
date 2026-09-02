@@ -190,6 +190,7 @@ public sealed class SqlAssetContractTests
         string sessions = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Sessions", "SqlApplicationSessionRepository.cs"));
         string operational = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "OperationalRecords", "SqlOperationalRecordRepository.cs"));
         string audit = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Audit", "SqlAuditWriter.cs"));
+        string firstAdmin = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Access", "SqlFirstAdminBootstrapStore.cs"));
 
         access.Should().Contain("IsolationLevel.Serializable")
             .And.Contain("WITH (UPDLOCK, HOLDLOCK)")
@@ -212,6 +213,17 @@ public sealed class SqlAssetContractTests
             .And.Contain("commandTimeout: CommandTimeoutSeconds")
             .And.NotContain("UPDATE audit.AuditLog")
             .And.NotContain("DELETE FROM audit.AuditLog");
+        firstAdmin.Should().Contain("IsolationLevel.Serializable")
+            .And.Contain("SET XACT_ABORT ON")
+            .And.Contain("security.Roles WITH (UPDLOCK, HOLDLOCK)")
+            .And.Contain("security.RoleAssignments WITH (HOLDLOCK)")
+            .And.Contain("WHERE RoleId = @RoleId")
+            .And.NotContain("RevokedAt IS NULL")
+            .And.Contain("INSERT INTO audit.AuditLog")
+            .And.Contain("transaction.CommitAsync(cancellationToken)")
+            .And.Contain("transaction.RollbackAsync(cancellationToken)")
+            .And.NotContain("DELETE FROM")
+            .And.NotContain("UPDATE audit.AuditLog");
     }
 
     private static string FindRepositoryRoot()

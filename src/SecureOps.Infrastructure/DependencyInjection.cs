@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.Configure<JiraIntegrationOptions>(configuration.GetSection(JiraIntegrationOptions.SectionName));
         services.Configure<TuruncuHatOptions>(configuration.GetSection(TuruncuHatOptions.SectionName));
         services.Configure<AccessOptions>(configuration.GetSection(AccessOptions.SectionName));
+        services.Configure<BootstrapAdminOptions>(configuration.GetSection(BootstrapAdminOptions.SectionName));
         services.Configure<SessionSecurityOptions>(configuration.GetSection(SessionSecurityOptions.SectionName));
         services.Configure<RateLimitingOptions>(configuration.GetSection(RateLimitingOptions.SectionName));
         services.Configure<CommandIdempotencyOptions>(configuration.GetSection(CommandIdempotencyOptions.SectionName));
@@ -137,10 +138,12 @@ public static class DependencyInjection
         if (string.Equals(configuration[$"{AccessOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IAccessRepository, SqlAccessRepository>();
+            services.AddScoped<IFirstAdminBootstrapStore, SqlFirstAdminBootstrapStore>();
         }
         else
         {
             services.AddSingleton<IAccessRepository, InMemoryAccessRepository>();
+            services.AddSingleton<IFirstAdminBootstrapStore, UnavailableFirstAdminBootstrapStore>();
         }
 
         services.AddScoped<IApplicationAccessService, ApplicationAccessService>();

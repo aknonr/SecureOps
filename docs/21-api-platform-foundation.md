@@ -24,7 +24,7 @@ Do not run this from local development. Under explicit approval, confirm the app
 
 ## Authorization Migration
 
-Authentication is translated to a corporate principal, then persisted application status, roles, and capabilities determine access. Exact `Access:BootstrapAdministrators` values can initialize an Admin; ordinary first-seen users remain pending. Demo authentication remains an explicit Demo/Test compatibility path. Disabled-by-default OIDC readiness supplies only the principal and session handler; approval and capability authorization remain unchanged. See ADR-0010, ADR-0016, and `docs/23-platform-access-concurrency-and-release-safety.md`.
+Authentication is translated to a corporate principal, then persisted application status, roles, and capabilities determine access. The disabled-by-default `BootstrapAdmin` gate can initialize exactly one Admin only from a validated OIDC principal and SQL-backed assignment history; ordinary first-seen users remain pending. Demo authentication remains an explicit Demo/Test compatibility path and cannot enter the real bootstrap gate. See ADR-0010, ADR-0016, ADR-0017, and `docs/23-platform-access-concurrency-and-release-safety.md`.
 
 Operation limits use `RateLimiting:{IdentityLookup|BulkIdentityLookup|OperationalRecordRefresh|JiraPreview|JiraCreate|WorkflowRetry}:PermitLimit` and `WindowSeconds`. Session policy uses `SessionSecurity:*`; command leases use `CommandIdempotency:*`.
 

@@ -58,7 +58,7 @@ Phase 1A identity lookup requires the `Identity.Lookup` capability. Operators do
 
 Management summary and paginated operator-activity reporting require the separate `Reporting.ManagementView` capability, assigned only to Admin and Auditor. These privileged reads are themselves audited. Reports expose bounded process evidence and must not rank, compare, or score individuals.
 
-First-seen authenticated users are `Pending` and receive no operational capability. Administrators approve requests and assign persisted application roles. Disabled status is checked on each capability-protected request. Exact configured bootstrap administrators are an initialization mechanism, not a general AD-group authorization path.
+First-seen authenticated users are `Pending` and receive no operational capability. Administrators approve requests and assign persisted application roles. Disabled status is checked on each capability-protected request. The optional first-Admin bootstrap accepts only one exact server-configured login name from a validated OIDC issuer, requires SQL persistence, and permanently closes after any Admin assignment has ever existed. It is not an authentication-claim or AD-group authorization path.
 
 ### Authentication and Role Strategy
 

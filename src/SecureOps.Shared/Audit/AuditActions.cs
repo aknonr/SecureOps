@@ -110,6 +110,8 @@ public static class AuditActions
     public const string RoleAssigned = "RoleAssigned";
     /// <summary>An application role was removed.</summary>
     public const string RoleRemoved = "RoleRemoved";
+    /// <summary>The one-time validated OIDC first-Admin grant was committed.</summary>
+    public const string FirstAdminBootstrapped = "FirstAdminBootstrapped";
     /// <summary>An Operational Record workflow lease was acquired.</summary>
     public const string OperationalRecordClaimed = "OperationalRecordClaimed";
     /// <summary>An Operational Record workflow lease was released.</summary>

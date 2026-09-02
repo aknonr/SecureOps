@@ -14,9 +14,11 @@ public sealed class ApplicationAccessService : IApplicationAccessService
 {
     private readonly ICorporatePrincipalResolver _principalResolver;
     private readonly IAccessRepository _repository;
+    private readonly IFirstAdminBootstrapStore _firstAdminBootstrapStore;
     private readonly IAccessIdentityProfileResolver _profileResolver;
     private readonly IAuditWriter _auditWriter;
     private readonly AccessOptions _options;
+    private readonly BootstrapAdminOptions _bootstrapOptions;
     private readonly SessionSecurityOptions _sessionOptions;
     private readonly ILogger<ApplicationAccessService> _logger;
 
@@ -24,17 +26,21 @@ public sealed class ApplicationAccessService : IApplicationAccessService
     public ApplicationAccessService(
         ICorporatePrincipalResolver principalResolver,
         IAccessRepository repository,
+        IFirstAdminBootstrapStore firstAdminBootstrapStore,
         IAccessIdentityProfileResolver profileResolver,
         IAuditWriter auditWriter,
         IOptions<AccessOptions> options,
+        IOptions<BootstrapAdminOptions> bootstrapOptions,
         IOptions<SessionSecurityOptions> sessionOptions,
         ILogger<ApplicationAccessService> logger)
     {
         _principalResolver = principalResolver;
         _repository = repository;
+        _firstAdminBootstrapStore = firstAdminBootstrapStore;
         _profileResolver = profileResolver;
         _auditWriter = auditWriter;
         _options = options.Value;
+        _bootstrapOptions = bootstrapOptions.Value;
         _sessionOptions = sessionOptions.Value;
         _logger = logger;
     }
@@ -63,21 +69,21 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             return AccessServiceResult<EnsureAccessUserResult>.Fail(OperationalErrorCodes.AuditStoreUnavailable);
         }
 
-        (string SystemActor, string[] Roles)? bootstrap = ResolveBootstrap(corporatePrincipal);
-        if (ensured.User.Status == AccessStatus.Pending && ensured.PendingRequest is not null && bootstrap is not null)
+        (string SystemActor, string[] Roles)? demoBootstrap = ResolveDemoBootstrap(corporatePrincipal);
+        if (ensured.User.Status == AccessStatus.Pending && ensured.PendingRequest is not null && demoBootstrap is not null)
         {
             const string bootstrapReason = "Controlled authentication bootstrap.";
             AccessMutationResult mutation = await _repository.DecideRequestAsync(
                 ensured.PendingRequest.Id,
                 AccessRequestStatus.Approved,
                 ensured.PendingRequest.Version,
-                bootstrap.Value.SystemActor,
-                bootstrap.Value.Roles,
+                demoBootstrap.Value.SystemActor,
+                demoBootstrap.Value.Roles,
                 bootstrapReason,
                 cancellationToken);
             if (mutation.Disposition == AccessMutationDisposition.Applied)
             {
-                AccessOperationContext bootstrapContext = context with { Actor = bootstrap.Value.SystemActor };
+                AccessOperationContext bootstrapContext = context with { Actor = demoBootstrap.Value.SystemActor };
                 AccessServiceResult<AccessMutationResult> audited = await MapMutationAsync(
                     mutation,
                     AuditActions.AccessApproved,
@@ -90,6 +96,39 @@ public sealed class ApplicationAccessService : IApplicationAccessService
                 }
 
                 ensured = new EnsureAccessUserResult(mutation.User!, mutation.Request, ensured.UserCreated, ensured.RequestCreated);
+            }
+        }
+        else if (ensured.User.Status == AccessStatus.Pending
+            && ensured.PendingRequest is not null
+            && IsEligibleOidcBootstrapPrincipal(corporatePrincipal))
+        {
+            FirstAdminBootstrapDisposition disposition;
+            try
+            {
+                disposition = await _firstAdminBootstrapStore.TryGrantAsync(
+                    new FirstAdminBootstrapCommand(
+                        ensured.User.Id,
+                        ensured.PendingRequest.Id,
+                        ensured.PendingRequest.Version,
+                        corporatePrincipal.Identifier,
+                        context.CorrelationId,
+                        context.SourceIp),
+                    cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "First-Admin bootstrap persistence failed. CorrelationId: {CorrelationId}", context.CorrelationId);
+                return AccessServiceResult<EnsureAccessUserResult>.Fail(OperationalErrorCodes.PersistenceUnavailable);
+            }
+
+            if (disposition is FirstAdminBootstrapDisposition.Applied or FirstAdminBootstrapDisposition.AlreadyProvisioned)
+            {
+                EnsureAccessUserResult current = await _repository.EnsureUserAsync(
+                    corporatePrincipal,
+                    createRequest: false,
+                    TimeSpan.FromMinutes(_sessionOptions.ActivityPersistenceIntervalMinutes),
+                    cancellationToken);
+                ensured = new EnsureAccessUserResult(current.User, current.LatestRequest, ensured.UserCreated, ensured.RequestCreated);
             }
         }
 
@@ -293,13 +332,27 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         }
     }
 
-    private (string SystemActor, string[] Roles)? ResolveBootstrap(CorporatePrincipal principal)
+    private bool IsEligibleOidcBootstrapPrincipal(CorporatePrincipal principal)
     {
-        if (_options.BootstrapAdministrators.Contains(principal.Identifier, StringComparer.OrdinalIgnoreCase))
+        if (!_bootstrapOptions.Enabled
+            || !string.Equals(principal.AuthenticationSource, "oidc", StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(principal.Issuer)
+            || string.IsNullOrWhiteSpace(principal.Subject)
+            || string.IsNullOrWhiteSpace(principal.LoginName)
+            || !string.Equals(principal.Issuer, _bootstrapOptions.AllowedIssuer, StringComparison.Ordinal)
+            || !string.Equals(principal.LoginName, _bootstrapOptions.LoginName, StringComparison.OrdinalIgnoreCase))
         {
-            return ("system:configured-bootstrap", ["Admin"]);
+            return false;
         }
 
+        return string.Equals(
+            principal.Identifier,
+            OidcExternalIdentityNormalizer.StableIdentifier(principal.Issuer, principal.Subject),
+            StringComparison.Ordinal);
+    }
+
+    private (string SystemActor, string[] Roles)? ResolveDemoBootstrap(CorporatePrincipal principal)
+    {
         if (!_options.DemoCompatibilityEnabled || !string.Equals(principal.AuthenticationSource, "demo-api-bridge", StringComparison.OrdinalIgnoreCase))
         {
             return null;

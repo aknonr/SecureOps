@@ -231,6 +231,7 @@ public sealed class AccessController : ControllerBase
             OperationalErrorCodes.AccessUserInvalidState => (StatusCodes.Status409Conflict, "lifecycle", false),
             OperationalErrorCodes.AccessConcurrencyConflict => (StatusCodes.Status409Conflict, "concurrency", true),
             OperationalErrorCodes.AuditStoreUnavailable => (StatusCodes.Status503ServiceUnavailable, "audit", true),
+            OperationalErrorCodes.PersistenceUnavailable => (StatusCodes.Status503ServiceUnavailable, "persistence", true),
             OperationalErrorCodes.SessionStoreUnavailable => (StatusCodes.Status503ServiceUnavailable, "session-store", true),
             OperationalErrorCodes.SessionExpired => (StatusCodes.Status403Forbidden, "session", false),
             OperationalErrorCodes.SessionRevoked => (StatusCodes.Status403Forbidden, "session", false),
