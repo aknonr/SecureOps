@@ -4,6 +4,8 @@
 @inject IDemoModeState ShellMode
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject IApiSessionContext ApiSession
+@inject IApiSessionStore ApiSessions
 
 <MudThemeProvider @ref="_themeProvider" Theme="@SecureOpsTheme.For(_mode)" IsDarkMode="@IsDarkMode" />
 <MudDialogProvider />
@@ -96,6 +98,7 @@
     private AppearanceMode _mode = AppearanceMode.Dark;
     private bool _isDesktop = true;
     private bool _routeNavigating;
+    private int _redirectingForReauthentication;
 
     // The dark choice drives MudBlazor's deep corporate palette.
     private bool IsDarkMode => _mode != AppearanceMode.Light;
@@ -103,6 +106,14 @@
     protected override void OnInitialized()
     {
         Navigation.LocationChanged += OnLocationChanged;
+        ApiSessions.ReauthenticationRequired += OnReauthenticationRequired;
+
+        string? browserSessionKey = ApiSession.BrowserSessionKey;
+        if (browserSessionKey is not null
+            && ApiSessions.GetOrCreate(browserSessionKey).RequiresReauthentication)
+        {
+            OnReauthenticationRequired(browserSessionKey);
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -207,8 +218,28 @@
         InvokeAsync(StateHasChanged);
     }
 
+    private void OnReauthenticationRequired(string browserSessionKey)
+    {
+        if (!string.Equals(browserSessionKey, ApiSession.BrowserSessionKey, StringComparison.Ordinal)
+            || Interlocked.Exchange(ref _redirectingForReauthentication, 1) != 0)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            string current = Navigation.ToBaseRelativePath(Navigation.Uri);
+            string returnUrl = string.IsNullOrWhiteSpace(current) ? "dashboard" : current;
+            Navigation.NavigateTo(
+                $"session-expired?returnUrl={Uri.EscapeDataString(returnUrl)}",
+                forceLoad: true,
+                replace: true);
+        });
+    }
+
     public void Dispose()
     {
         Navigation.LocationChanged -= OnLocationChanged;
+        ApiSessions.ReauthenticationRequired -= OnReauthenticationRequired;
     }
 }

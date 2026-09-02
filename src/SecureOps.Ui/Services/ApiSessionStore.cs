@@ -21,6 +21,9 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public interface IApiSessionStore
 {
+    /// <summary>Raised when one browser session must leave its current authenticated circuit.</summary>
+    public event Action<string>? ReauthenticationRequired;
+
     /// <summary>
     /// Returns the jar for a browser session, creating it on first use.
     /// </summary>
@@ -37,6 +40,9 @@ public interface IApiSessionStore
     /// makes sure a later request cannot replay a handle that is no longer valid.
     /// </remarks>
     public void Remove(string browserSessionKey);
+
+    /// <summary>Marks one browser session as terminal without exposing its API handle.</summary>
+    public void RequireReauthentication(string browserSessionKey);
 }
 
 /// <summary>
@@ -46,6 +52,7 @@ public sealed class BrowserApiSession : IDisposable
 {
     private readonly object _tokenLock = new();
     private OidcServerTokenSet? _oidcTokens;
+    private int _requiresReauthentication;
 
     /// <summary>Cookies the API has issued to this browser session.</summary>
     public CookieContainer Cookies { get; } = new();
@@ -74,6 +81,13 @@ public sealed class BrowserApiSession : IDisposable
 
     /// <summary>Serializes refresh-token redemption for this browser authentication session.</summary>
     public SemaphoreSlim TokenRefreshGate { get; } = new(1, 1);
+
+    /// <summary>Whether this logical browser session must explicitly authenticate again.</summary>
+    public bool RequiresReauthentication => Volatile.Read(ref _requiresReauthentication) != 0;
+
+    /// <summary>Transitions this browser session to the terminal state once.</summary>
+    public bool TryRequireReauthentication() =>
+        Interlocked.Exchange(ref _requiresReauthentication, 1) == 0;
 
     /// <summary>Stores a validated OIDC access token only in server process memory.</summary>
     public void SetOidcAccessToken(string token, DateTimeOffset expiresAtUtc) =>
@@ -296,6 +310,9 @@ public sealed class ApiSessionStore : IApiSessionStore
     private readonly IMemoryCache _cache;
     private readonly object _cacheLock = new();
 
+    /// <inheritdoc />
+    public event Action<string>? ReauthenticationRequired;
+
     /// <summary>
     /// Initializes a new API session store.
     /// </summary>
@@ -330,6 +347,16 @@ public sealed class ApiSessionStore : IApiSessionStore
             {
                 _cache.Remove(CacheKey(browserSessionKey));
             }
+        }
+    }
+
+    /// <inheritdoc />
+    public void RequireReauthentication(string browserSessionKey)
+    {
+        BrowserApiSession session = GetOrCreate(browserSessionKey);
+        if (session.TryRequireReauthentication())
+        {
+            ReauthenticationRequired?.Invoke(browserSessionKey);
         }
     }
 

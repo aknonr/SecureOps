@@ -20,6 +20,8 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public sealed class ApiSessionCookieHandler : DelegatingHandler
 {
+    private const string ApplicationSessionCookieName = "__Host-SecureOps.ApplicationSession";
+
     /// <summary>Serializes creation of the first API session handle.</summary>
     /// <remarks>
     /// The outbound HttpClient timeout/cancellation bounds this wait. Proceeding without the gate
@@ -58,7 +60,7 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
 
         if (!string.IsNullOrEmpty(session.GetApiCookieHeader(uri)))
         {
-            return await SendWithJarAsync(request, session, uri, cancellationToken);
+            return await SendWithJarAsync(request, browserSessionKey, session, uri, cancellationToken);
         }
 
         // No cookie yet: serialize concurrent first requests so simultaneous tabs establish one
@@ -67,7 +69,7 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
 
         try
         {
-            return await SendWithJarAsync(request, session, uri, cancellationToken);
+            return await SendWithJarAsync(request, browserSessionKey, session, uri, cancellationToken);
         }
         finally
         {
@@ -77,6 +79,7 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
 
     private async Task<HttpResponseMessage> SendWithJarAsync(
         HttpRequestMessage request,
+        string browserSessionKey,
         BrowserApiSession session,
         Uri uri,
         CancellationToken cancellationToken)
@@ -89,11 +92,15 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
         }
 
         HttpResponseMessage response = await base.SendAsync(request, cancellationToken);
-        Capture(session, uri, response);
+        Capture(browserSessionKey, session, uri, response);
         return response;
     }
 
-    private void Capture(BrowserApiSession session, Uri uri, HttpResponseMessage response)
+    private void Capture(
+        string browserSessionKey,
+        BrowserApiSession session,
+        Uri uri,
+        HttpResponseMessage response)
     {
         if (!response.Headers.TryGetValues(HeaderNames.SetCookie, out IEnumerable<string>? setCookies))
         {
@@ -104,12 +111,17 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
         {
             try
             {
-                // A rejected/expired server session must keep presenting its dead protected handle
-                // until the UI authentication session is explicitly replaced. Applying the API's
-                // deletion header here would make the next request look like a first login and
-                // silently create a fresh privileged session without reauthentication.
-                if (!response.IsSuccessStatusCode && IsDeletion(setCookie))
+                // A terminal server session must keep presenting its dead protected handle until
+                // the UI authentication session is explicitly replaced. This also covers a
+                // successful self-revoke response: applying its deletion header would make the
+                // next request look like a first login and silently create a fresh session.
+                if (IsApplicationSessionDeletion(setCookie))
                 {
+                    if (!IsExplicitLogout(uri))
+                    {
+                        _store.RequireReauthentication(browserSessionKey);
+                    }
+
                     continue;
                 }
 
@@ -124,12 +136,16 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
         }
     }
 
-    private static bool IsDeletion(string setCookie) =>
+    private static bool IsApplicationSessionDeletion(string setCookie) =>
         Microsoft.Net.Http.Headers.SetCookieHeaderValue.TryParse(
             setCookie,
             out Microsoft.Net.Http.Headers.SetCookieHeaderValue? parsed)
+        && string.Equals(parsed.Name.Value, ApplicationSessionCookieName, StringComparison.Ordinal)
         && ((parsed.Expires is { } expires && expires <= DateTimeOffset.UnixEpoch)
             || (parsed.MaxAge is { } maxAge && maxAge <= TimeSpan.Zero));
+
+    private static bool IsExplicitLogout(Uri uri) =>
+        string.Equals(uri.AbsolutePath, "/api/v1/access/logout", StringComparison.OrdinalIgnoreCase);
 
     private static class HeaderNames
     {

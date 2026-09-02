@@ -164,6 +164,53 @@ public sealed class ApplicationSessionHostedTests
     }
 
     [Fact]
+    public async Task SelfRevoke_RetainsDeadBridgeUntilExplicitNewAuthentication()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        ApiSessionStore store = new(cache);
+        ApiSessionCookieHandler sessionHandler = new(store, NullLogger<ApiSessionCookieHandler>.Instance)
+        {
+            InnerHandler = factory.Server.CreateHandler()
+        };
+        using HttpClient browser = new(sessionHandler) { BaseAddress = new Uri("http://localhost/") };
+        browser.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+        browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "self-revoked-browser");
+
+        ApplicationSessionResponse current = (await (await browser.GetAsync("/api/v1/sessions/current")).Content
+            .ReadFromJsonAsync<ApplicationSessionResponse>())!;
+        HttpResponseMessage revoke = await browser.PostAsJsonAsync(
+            "/api/v1/sessions/revoke",
+            new RevokeApplicationSessionRequest(current.SessionId, "Approved synthetic self-revocation."));
+        HttpResponseMessage rejected = await browser.GetAsync("/api/v1/access/me");
+
+        IApplicationSessionRepository sessions = factory.Services.GetRequiredService<IApplicationSessionRepository>();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        IReadOnlyList<SecureOps.Domain.Sessions.ApplicationSession> active = await sessions.ListActiveAsync(
+            now,
+            now.AddMinutes(-30),
+            0,
+            100,
+            CancellationToken.None);
+        InMemoryAuditWriter audit = factory.Services.GetRequiredService<InMemoryAuditWriter>();
+
+        revoke.StatusCode.Should().Be(HttpStatusCode.OK);
+        await AssertProblemAsync(rejected, HttpStatusCode.Forbidden, "SessionRevoked");
+        active.Should().BeEmpty();
+        audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(1);
+        audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionRevoked).Should().Be(1);
+        store.GetOrCreate("self-revoked-browser").RequiresReauthentication.Should().BeTrue();
+
+        store.Remove("self-revoked-browser");
+        store.GetOrCreate("self-revoked-browser").RequiresReauthentication.Should().BeFalse();
+        ApplicationSessionResponse reauthenticated = (await (await browser.GetAsync("/api/v1/sessions/current")).Content
+            .ReadFromJsonAsync<ApplicationSessionResponse>())!;
+
+        reauthenticated.SessionId.Should().NotBe(current.SessionId);
+        audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(2);
+    }
+
+    [Fact]
     public async Task TamperedClientCookie_IsRejectedAndCannotBecomeAuthenticationProof()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();

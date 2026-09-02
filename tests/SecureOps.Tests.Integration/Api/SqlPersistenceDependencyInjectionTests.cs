@@ -44,4 +44,33 @@ public sealed class SqlPersistenceDependencyInjectionTests
         scope.ServiceProvider.GetRequiredService<ICommandIdempotencyStore>().Should().BeOfType<SqlCommandIdempotencyStore>();
         scope.ServiceProvider.GetRequiredService<IManagementReportingRepository>().Should().BeOfType<SqlManagementReportingRepository>();
     }
+
+    [Theory]
+    [InlineData("Audit:Provider")]
+    [InlineData("Access:RepositoryProvider")]
+    [InlineData("OperationalRecords:RepositoryProvider")]
+    public void PartialSqlProviderSelection_DoesNotFallBackToInMemoryReporting(string nonSqlSetting)
+    {
+        Dictionary<string, string?> settings = new()
+        {
+            ["Audit:Provider"] = "SqlServer",
+            ["Audit:Queue:Enabled"] = "true",
+            ["Access:RepositoryProvider"] = "SqlServer",
+            ["SessionSecurity:RepositoryProvider"] = "SqlServer",
+            ["OperationalRecords:RepositoryProvider"] = "SqlServer",
+            ["OperationalRecords:SourceProvider"] = "Disabled",
+            ["Jira:Provider"] = "Disabled",
+            ["ConnectionStrings:SecureOpsDb"] = "Server=sql.invalid;Database=SecureOps;Integrated Security=True;Connect Timeout=15"
+        };
+        settings[nonSqlSetting] = "InMemory";
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        ServiceCollection registrations = new();
+        registrations.AddSingleton(configuration);
+        registrations.AddLogging();
+        registrations.AddSecureOpsInfrastructure(configuration);
+        using ServiceProvider services = registrations.BuildServiceProvider();
+
+        services.GetRequiredService<IManagementReportingRepository>()
+            .Should().BeOfType<UnavailableManagementReportingRepository>();
+    }
 }

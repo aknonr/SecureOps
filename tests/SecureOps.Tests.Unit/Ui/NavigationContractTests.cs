@@ -65,6 +65,18 @@ public sealed class NavigationContractTests
             .And.Contain("Capabilities.AccessManageUsers");
     }
 
+    [Fact]
+    public void TerminalApiSession_ForcesOnlyItsBrowserCircuitThroughReauthentication()
+    {
+        string layout = Ui("Shared", "MainLayout.razor");
+
+        layout.Should().Contain("ApiSessions.ReauthenticationRequired += OnReauthenticationRequired")
+            .And.Contain("string.Equals(browserSessionKey, ApiSession.BrowserSessionKey, StringComparison.Ordinal)")
+            .And.Contain("session-expired?returnUrl=")
+            .And.Contain("forceLoad: true")
+            .And.Contain("ApiSessions.ReauthenticationRequired -= OnReauthenticationRequired");
+    }
+
     private static string NavMenu() => Ui("Shared", "NavMenu.razor");
 
     private static string Ui(params string[] relativePath) =>

@@ -187,7 +187,9 @@ public sealed class ApiSessionTransportTests
     [Fact]
     public async Task RejectedSession_DeletionIsNotConvertedIntoANewSession()
     {
-        (HttpClient client, RecordingHandler handler, _) = Create("browser-a", issueCookie: true);
+        (HttpClient client, RecordingHandler handler, IApiSessionStore store) = Create("browser-a", issueCookie: true);
+        string? reauthenticationKey = null;
+        store.ReauthenticationRequired += key => reauthenticationKey = key;
         await client.GetAsync("api/v1/access/me");
         handler.RejectExistingSession = true;
 
@@ -197,6 +199,43 @@ public sealed class ApiSessionTransportTests
         handler.SentCookies.Should().HaveCount(3);
         handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
         handler.SentCookies[2].Should().Contain(ApiCookie + "=session-1");
+        reauthenticationKey.Should().Be("browser-a");
+        store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SuccessfulSelfRevoke_DeletionIsNotConvertedIntoANewSession()
+    {
+        (HttpClient client, RecordingHandler handler, IApiSessionStore store) = Create("browser-a", issueCookie: true);
+        string? reauthenticationKey = null;
+        store.ReauthenticationRequired += key => reauthenticationKey = key;
+        await client.GetAsync("api/v1/access/me");
+        handler.DeleteExistingSession = true;
+
+        HttpResponseMessage revoke = await client.PostAsync("api/v1/sessions/revoke", content: null);
+        await client.GetAsync("api/v1/access/me");
+
+        revoke.StatusCode.Should().Be(HttpStatusCode.OK);
+        handler.SentCookies.Should().HaveCount(3);
+        handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
+        handler.SentCookies[2].Should().Contain(ApiCookie + "=session-1");
+        reauthenticationKey.Should().Be("browser-a");
+        store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExplicitLogout_UsesItsExistingSignOutFlowWithoutReauthenticationSignal()
+    {
+        (HttpClient client, RecordingHandler handler, IApiSessionStore store) = Create("browser-a", issueCookie: true);
+        string? reauthenticationKey = null;
+        store.ReauthenticationRequired += key => reauthenticationKey = key;
+        await client.GetAsync("api/v1/access/me");
+        handler.DeleteExistingSession = true;
+
+        await client.PostAsync("api/v1/access/logout", content: null);
+
+        reauthenticationKey.Should().BeNull();
+        store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeFalse();
     }
 
     [Fact]
@@ -420,6 +459,8 @@ public sealed class ApiSessionTransportTests
 
         public bool RejectExistingSession { get; set; }
 
+        public bool DeleteExistingSession { get; set; }
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -434,7 +475,7 @@ public sealed class ApiSessionTransportTests
                 ? HttpStatusCode.Forbidden
                 : HttpStatusCode.OK);
 
-            if (RejectExistingSession && SentCookies[^1] is not null)
+            if ((RejectExistingSession || DeleteExistingSession) && SentCookies[^1] is not null)
             {
                 response.Headers.TryAddWithoutValidation(
                     "Set-Cookie",

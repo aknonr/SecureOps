@@ -127,9 +127,9 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
                   AND ClaimedAt <= CompletedAt
             )
             SELECT [Key], COUNT_BIG(*) AS SampleCount,
-                MIN(DurationMilliseconds) / 1000.0 AS MinimumSeconds,
+                MIN(CONVERT(float, DurationMilliseconds)) / 1000.0 AS MinimumSeconds,
                 AVG(CONVERT(float, DurationMilliseconds)) / 1000.0 AS AverageSeconds,
-                MAX(DurationMilliseconds) / 1000.0 AS MaximumSeconds
+                MAX(CONVERT(float, DurationMilliseconds)) / 1000.0 AS MaximumSeconds
             FROM Durations
             GROUP BY [Key];
 
