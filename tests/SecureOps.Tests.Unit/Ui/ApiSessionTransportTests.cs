@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using NSubstitute;
 using SecureOps.Shared.Configuration;
+using SecureOps.Ui.Configuration;
 using SecureOps.Ui.Services;
 
 namespace SecureOps.Tests.Unit.Ui;
@@ -37,6 +38,67 @@ public sealed class ApiSessionTransportTests
 
         handler.SentCookies[0].Should().BeNull();
         handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
+    }
+
+    [Fact]
+    public async Task LoopbackHttp_SecondRequest_ReplaysTheSecureSessionCookie()
+    {
+        (HttpClient client, RecordingHandler handler, _) = Create(
+            "browser-a",
+            issueCookie: true,
+            baseAddress: new Uri("http://localhost:5000/"));
+
+        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me");
+
+        handler.SentCookies[0].Should().BeNull();
+        handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
+    }
+
+    [Fact]
+    public async Task TwentyOperations_InOneLogicalBrowser_IssueOneSessionHandle()
+    {
+        (HttpClient client, RecordingHandler handler, _) = Create(
+            "browser-a",
+            issueCookie: true,
+            baseAddress: new Uri("http://127.0.0.1:5000/"));
+
+        for (int operation = 0; operation < 20; operation++)
+        {
+            await client.GetAsync("api/v1/access/me");
+        }
+
+        handler.SentCookies.Should().HaveCount(20);
+        handler.SentCookies.Count(cookie => cookie is null).Should().Be(1);
+        handler.SentCookies.Skip(1).Should().OnlyContain(cookie =>
+            cookie!.Contains(ApiCookie + "=session-1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ConcurrentFirstRequests_ForOneBrowser_IssueOneSessionHandle()
+    {
+        IApiSessionStore store = NewStore();
+        (HttpClient first, RecordingHandler firstHandler, _) = Create("browser-a", true, store);
+        (HttpClient second, RecordingHandler secondHandler, _) = Create("browser-a", true, store);
+
+        await Task.WhenAll(
+            first.GetAsync("api/v1/access/me"),
+            second.GetAsync("api/v1/sessions/current"));
+
+        firstHandler.SentCookies.Concat(secondHandler.SentCookies)
+            .Count(cookie => cookie is null)
+            .Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("https://api.example.test/", true)]
+    [InlineData("http://localhost:5000/", true)]
+    [InlineData("http://127.0.0.1:5000/", true)]
+    [InlineData("http://api.example.test/", false)]
+    [InlineData("ftp://localhost/", false)]
+    public void ApiTransport_AllowsHttpsOrLoopbackHttpOnly(string value, bool expected)
+    {
+        IdentityLookupApiConfiguration.IsSecureTransport(new Uri(value)).Should().Be(expected);
     }
 
     [Fact]
@@ -120,6 +182,21 @@ public sealed class ApiSessionTransportTests
         HttpResponseMessage response = await client.GetAsync("api/v1/access/me");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task RejectedSession_DeletionIsNotConvertedIntoANewSession()
+    {
+        (HttpClient client, RecordingHandler handler, _) = Create("browser-a", issueCookie: true);
+        await client.GetAsync("api/v1/access/me");
+        handler.RejectExistingSession = true;
+
+        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me");
+
+        handler.SentCookies.Should().HaveCount(3);
+        handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
+        handler.SentCookies[2].Should().Contain(ApiCookie + "=session-1");
     }
 
     [Fact]
@@ -305,7 +382,8 @@ public sealed class ApiSessionTransportTests
     private static (HttpClient Client, RecordingHandler Handler, IApiSessionStore Store) Create(
         string? browserSessionKey,
         bool issueCookie,
-        IApiSessionStore? store = null)
+        IApiSessionStore? store = null,
+        Uri? baseAddress = null)
     {
         store ??= NewStore();
         RecordingHandler recording = new(issueCookie);
@@ -315,7 +393,10 @@ public sealed class ApiSessionTransportTests
             InnerHandler = recording
         };
 
-        HttpClient client = new(sessionHandler) { BaseAddress = new Uri("https://localhost:5001/") };
+        HttpClient client = new(sessionHandler)
+        {
+            BaseAddress = baseAddress ?? new Uri("https://localhost:5001/")
+        };
         ApiSessionHeaders.Attach(client, new FakeApiSessionContext(browserSessionKey));
 
         return (client, recording, store);
@@ -337,6 +418,8 @@ public sealed class ApiSessionTransportTests
 
         public bool MalformedSetCookie { get; set; }
 
+        public bool RejectExistingSession { get; set; }
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -347,9 +430,17 @@ public sealed class ApiSessionTransportTests
 
             SawCorrelationHeader |= request.Headers.Contains(ApiSessionHeaders.BrowserSession);
 
-            HttpResponseMessage response = new(HttpStatusCode.OK);
+            HttpResponseMessage response = new(RejectExistingSession && SentCookies[^1] is not null
+                ? HttpStatusCode.Forbidden
+                : HttpStatusCode.OK);
 
-            if (MalformedSetCookie)
+            if (RejectExistingSession && SentCookies[^1] is not null)
+            {
+                response.Headers.TryAddWithoutValidation(
+                    "Set-Cookie",
+                    ApiCookie + "=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; Secure; HttpOnly; SameSite=Lax");
+            }
+            else if (MalformedSetCookie)
             {
                 response.Headers.TryAddWithoutValidation("Set-Cookie", "=;;;");
             }

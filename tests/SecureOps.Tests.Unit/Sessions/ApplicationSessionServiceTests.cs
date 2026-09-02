@@ -95,6 +95,23 @@ public sealed class ApplicationSessionServiceTests
     }
 
     [Fact]
+    public async Task Validate_AccessVersionChangeEndsExistingSessionWithoutReplacement()
+    {
+        Fixture fixture = new();
+        ApplicationSessionResult started = await fixture.StartAsync();
+        fixture.User = fixture.User with { Version = fixture.User.Version + 1 };
+
+        ApplicationSessionResult result = await fixture.ValidateAsync(started.Session!.SessionId);
+
+        result.Disposition.Should().Be(ApplicationSessionDisposition.AccessChanged);
+        result.ErrorCode.Should().Be(OperationalErrorCodes.SessionRevoked);
+        (await fixture.Repository.GetAsync(started.Session.SessionId, default))!.EndReason
+            .Should().Be(SessionEndReason.AccessChanged);
+        fixture.Audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(1);
+        fixture.Audit.Events.Should().Contain(item => item.Action == AuditActions.ApplicationSessionAccessChanged);
+    }
+
+    [Fact]
     public async Task Revoke_EndsExactSessionAndDoesNotAuditRawReason()
     {
         Fixture fixture = new();

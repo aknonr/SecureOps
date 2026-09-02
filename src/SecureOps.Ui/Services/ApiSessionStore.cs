@@ -50,6 +50,18 @@ public sealed class BrowserApiSession : IDisposable
     /// <summary>Cookies the API has issued to this browser session.</summary>
     public CookieContainer Cookies { get; } = new();
 
+    /// <summary>Returns API cookies applicable to the outbound request.</summary>
+    /// <remarks>
+    /// Secure cookies are scoped against an HTTPS origin even when the server-to-server hop uses a
+    /// loopback HTTP binding. The handle never leaves the host in that topology. Remote cleartext
+    /// endpoints are rejected by startup validation rather than having Secure semantics bypassed.
+    /// </remarks>
+    public string GetApiCookieHeader(Uri requestUri) => Cookies.GetCookieHeader(CookieOrigin(requestUri));
+
+    /// <summary>Applies an API Set-Cookie header to this browser session's server-side jar.</summary>
+    public void SetApiCookies(Uri requestUri, string setCookie) =>
+        Cookies.SetCookies(CookieOrigin(requestUri), setCookie);
+
     /// <summary>
     /// Serializes requests made before this browser session has an application-session cookie.
     /// </summary>
@@ -178,6 +190,24 @@ public sealed class BrowserApiSession : IDisposable
         TokenRefreshGate.Dispose();
     }
 
+    private static Uri CookieOrigin(Uri requestUri)
+    {
+        ArgumentNullException.ThrowIfNull(requestUri);
+        if (string.Equals(requestUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return requestUri;
+        }
+
+        if (string.Equals(requestUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && requestUri.IsLoopback)
+        {
+            return new UriBuilder(requestUri) { Scheme = Uri.UriSchemeHttps }.Uri;
+        }
+
+        throw new InvalidOperationException(
+            "SecureOps API session transport requires HTTPS or a loopback HTTP endpoint.");
+    }
+
     private OidcServerTokenSet? Snapshot()
     {
         lock (_tokenLock)
@@ -264,6 +294,7 @@ public sealed class ApiSessionStore : IApiSessionStore
     public static readonly TimeSpan IdleRetention = TimeSpan.FromHours(13);
 
     private readonly IMemoryCache _cache;
+    private readonly object _cacheLock = new();
 
     /// <summary>
     /// Initializes a new API session store.
@@ -279,12 +310,15 @@ public sealed class ApiSessionStore : IApiSessionStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(browserSessionKey);
 
-        return _cache.GetOrCreate(CacheKey(browserSessionKey), entry =>
+        lock (_cacheLock)
         {
-            entry.SlidingExpiration = IdleRetention;
-            entry.RegisterPostEvictionCallback(static (_, value, _, _) => (value as BrowserApiSession)?.Dispose());
-            return new BrowserApiSession();
-        })!;
+            return _cache.GetOrCreate(CacheKey(browserSessionKey), entry =>
+            {
+                entry.SlidingExpiration = IdleRetention;
+                entry.RegisterPostEvictionCallback(static (_, value, _, _) => (value as BrowserApiSession)?.Dispose());
+                return new BrowserApiSession();
+            })!;
+        }
     }
 
     /// <inheritdoc />
@@ -292,7 +326,10 @@ public sealed class ApiSessionStore : IApiSessionStore
     {
         if (!string.IsNullOrWhiteSpace(browserSessionKey))
         {
-            _cache.Remove(CacheKey(browserSessionKey));
+            lock (_cacheLock)
+            {
+                _cache.Remove(CacheKey(browserSessionKey));
+            }
         }
     }
 

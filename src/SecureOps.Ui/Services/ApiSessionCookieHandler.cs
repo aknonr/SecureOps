@@ -20,15 +20,11 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public sealed class ApiSessionCookieHandler : DelegatingHandler
 {
-    /// <summary>
-    /// How long a request will wait for the first-request gate before proceeding without it.
-    /// </summary>
+    /// <summary>Serializes creation of the first API session handle.</summary>
     /// <remarks>
-    /// A stalled first request must not freeze every other tab. Proceeding ungated risks one extra
-    /// application session; blocking indefinitely would risk an unusable UI, which is worse.
+    /// The outbound HttpClient timeout/cancellation bounds this wait. Proceeding without the gate
+    /// would create a second logical session and is therefore not an acceptable fallback.
     /// </remarks>
-    private static readonly TimeSpan GateWait = TimeSpan.FromSeconds(10);
-
     private readonly IApiSessionStore _store;
     private readonly ILogger<ApiSessionCookieHandler> _logger;
 
@@ -60,14 +56,14 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
         BrowserApiSession session = _store.GetOrCreate(browserSessionKey);
         Uri uri = request.RequestUri;
 
-        if (!string.IsNullOrEmpty(session.Cookies.GetCookieHeader(uri)))
+        if (!string.IsNullOrEmpty(session.GetApiCookieHeader(uri)))
         {
             return await SendWithJarAsync(request, session, uri, cancellationToken);
         }
 
         // No cookie yet: serialize concurrent first requests so simultaneous tabs establish one
         // application session between them rather than one each.
-        bool gated = await session.FirstRequestGate.WaitAsync(GateWait, cancellationToken);
+        await session.FirstRequestGate.WaitAsync(cancellationToken);
 
         try
         {
@@ -75,10 +71,7 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
         }
         finally
         {
-            if (gated)
-            {
-                session.FirstRequestGate.Release();
-            }
+            session.FirstRequestGate.Release();
         }
     }
 
@@ -88,7 +81,7 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
         Uri uri,
         CancellationToken cancellationToken)
     {
-        string cookieHeader = session.Cookies.GetCookieHeader(uri);
+        string cookieHeader = session.GetApiCookieHeader(uri);
         if (!string.IsNullOrEmpty(cookieHeader))
         {
             request.Headers.Remove(HeaderNames.Cookie);
@@ -111,7 +104,16 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
         {
             try
             {
-                session.Cookies.SetCookies(uri, setCookie);
+                // A rejected/expired server session must keep presenting its dead protected handle
+                // until the UI authentication session is explicitly replaced. Applying the API's
+                // deletion header here would make the next request look like a first login and
+                // silently create a fresh privileged session without reauthentication.
+                if (!response.IsSuccessStatusCode && IsDeletion(setCookie))
+                {
+                    continue;
+                }
+
+                session.SetApiCookies(uri, setCookie);
             }
             catch (CookieException ex)
             {
@@ -121,6 +123,13 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
             }
         }
     }
+
+    private static bool IsDeletion(string setCookie) =>
+        Microsoft.Net.Http.Headers.SetCookieHeaderValue.TryParse(
+            setCookie,
+            out Microsoft.Net.Http.Headers.SetCookieHeaderValue? parsed)
+        && ((parsed.Expires is { } expires && expires <= DateTimeOffset.UnixEpoch)
+            || (parsed.MaxAge is { } maxAge && maxAge <= TimeSpan.Zero));
 
     private static class HeaderNames
     {

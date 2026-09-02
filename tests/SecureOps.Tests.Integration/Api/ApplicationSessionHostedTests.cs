@@ -5,8 +5,16 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using SecureOps.Api.Security;
+using SecureOps.Infrastructure.Audit;
+using SecureOps.Infrastructure.Sessions;
+using SecureOps.Shared.Audit;
+using SecureOps.Shared.Contracts.OperationalRecords;
 using SecureOps.Shared.Contracts.Sessions;
+using SecureOps.Ui.Services;
 
 namespace SecureOps.Tests.Integration.Api;
 
@@ -68,6 +76,57 @@ public sealed class ApplicationSessionHostedTests
     }
 
     [Fact]
+    public async Task OneLogicalUiSession_TwentyApiOperations_CreateExactlyOneActiveSession()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory(simulation: true);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        ApiSessionStore store = new(cache);
+        ApiSessionCookieHandler sessionHandler = new(store, NullLogger<ApiSessionCookieHandler>.Instance)
+        {
+            InnerHandler = factory.Server.CreateHandler()
+        };
+        using HttpClient browser = new(sessionHandler) { BaseAddress = new Uri("http://localhost/") };
+        browser.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+        browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "one-logical-browser-session");
+
+        HttpResponseMessage first = await browser.GetAsync("/api/v1/operational-records");
+        first.EnsureSuccessStatusCode();
+        OperationalRecordResponse record = (await first.Content.ReadFromJsonAsync<OperationalRecordResponse[]>())!
+            .Single(item => item.OrCode == "SIM-OR-100");
+
+        HttpResponseMessage preview = await browser.PostAsync(
+            $"/api/v1/operational-records/{record.Id}/jira-preview",
+            null);
+        preview.EnsureSuccessStatusCode();
+
+        for (int operation = 0; operation < 18; operation++)
+        {
+            string path = (operation % 3) switch
+            {
+                0 => "/api/v1/access/me",
+                1 => "/api/v1/sessions/current",
+                _ => "/api/v1/operational-records"
+            };
+            (await browser.GetAsync(path)).EnsureSuccessStatusCode();
+        }
+
+        IApplicationSessionRepository sessions = factory.Services.GetRequiredService<IApplicationSessionRepository>();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        IReadOnlyList<SecureOps.Domain.Sessions.ApplicationSession> active = await sessions.ListActiveAsync(
+            now,
+            now.AddMinutes(-30),
+            0,
+            100,
+            CancellationToken.None);
+        InMemoryAuditWriter audit = factory.Services.GetRequiredService<InMemoryAuditWriter>();
+
+        active.Should().ContainSingle();
+        active[0].LastSeenAtUtc.Should().Be(active[0].StartedAtUtc,
+            "activity is persisted only after the configured five-minute interval");
+        audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(1);
+    }
+
+    [Fact]
     public async Task Admin_CanListAndRevokeExactSession_WhileLeadCannotList()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
@@ -120,6 +179,23 @@ public sealed class ApplicationSessionHostedTests
     }
 
     [Fact]
+    public async Task SessionHandle_CannotBeReusedByAnotherAuthenticatedUser()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        (_, string adminCookie) = await StartAsync(admin);
+        using HttpRequestMessage crossUser = Request(
+            HttpMethod.Get,
+            "/api/v1/sessions/current",
+            adminCookie);
+
+        HttpResponseMessage response = await lead.SendAsync(crossUser);
+
+        await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionRevoked");
+    }
+
+    [Fact]
     public async Task Logout_EndsCurrentSessionClearsHandleAndExcludesItFromActiveList()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
@@ -144,7 +220,7 @@ public sealed class ApplicationSessionHostedTests
         active.Items.Select(item => item.SessionId).Should().Contain(current.SessionId).And.NotContain(ended.SessionId);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    private static WebApplicationFactory<Program> CreateFactory(bool simulation = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Test");
@@ -156,9 +232,11 @@ public sealed class ApplicationSessionHostedTests
             builder.UseSetting("DataProtection:Mode", "Ephemeral");
             builder.UseSetting("Audit:Provider", "InMemory");
             builder.UseSetting("IdentityLookup:Provider", "Mock");
-            builder.UseSetting("OperationalRecords:SourceProvider", "Disabled");
+            builder.UseSetting("OperationalRecords:SourceProvider", simulation ? "Simulation" : "Disabled");
             builder.UseSetting("OperationalRecords:RepositoryProvider", "InMemory");
-            builder.UseSetting("Jira:Provider", "Disabled");
+            builder.UseSetting("Jira:Provider", simulation ? "Simulation" : "Disabled");
+            builder.UseSetting("RateLimiting:OperationalRecordRefresh:PermitLimit", "100");
+            builder.UseSetting("RateLimiting:JiraPreview:PermitLimit", "100");
         });
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string? actor = null)

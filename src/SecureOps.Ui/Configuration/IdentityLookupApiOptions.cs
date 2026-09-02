@@ -83,4 +83,11 @@ public static class IdentityLookupApiConfiguration
 
         return uri;
     }
+
+    /// <summary>Whether the server-to-server API transport protects session credentials.</summary>
+    public static bool IsSecureTransport(Uri? uri) =>
+        uri is { IsAbsoluteUri: true }
+        && (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                && uri.IsLoopback));
 }

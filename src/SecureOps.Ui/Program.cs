@@ -59,6 +59,9 @@ builder.Services
         options => options.BaseAddress is { IsAbsoluteUri: true },
         $"{IdentityLookupApiOptions.SectionName}:BaseAddress must be an absolute URI ending with '/', "
             + "for example http://localhost:5000/.")
+    .Validate(
+        options => IdentityLookupApiConfiguration.IsSecureTransport(options.BaseAddress),
+        $"{IdentityLookupApiOptions.SectionName}:BaseAddress must use HTTPS, or HTTP only for a loopback endpoint.")
     .ValidateOnStart();
 
 builder.Services.AddRazorPages();
@@ -127,17 +130,14 @@ else
     app.Logger.LogInformation("SecureOps API base address: {BaseAddress}.", identityApiOptions.BaseAddress);
 }
 
-// The application-session cookie is __Host- prefixed, which means Secure, which means it is only
-// ever sent over HTTPS. Against a cleartext API address the UI therefore cannot replay it, and the
-// symptom is subtle: everything works, but every request opens another application session and the
-// Aktif Oturumlar page fills with duplicates. Said out loud at startup so it is diagnosable.
+// Loopback HTTP is supported for the local server-to-server hop without weakening the browser-facing
+// Secure cookie. Remote API traffic is HTTPS-only by startup validation above.
 if (identityApiOptions.BaseAddress is { IsAbsoluteUri: true } baseAddress
-    && !string.Equals(baseAddress.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+    && string.Equals(baseAddress.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
 {
-    app.Logger.LogWarning(
-        "SecureOps API base address {BaseAddress} is not HTTPS. The application-session cookie is "
-            + "Secure, so it cannot be replayed over this scheme and each request will establish a "
-            + "separate application session.",
+    app.Logger.LogInformation(
+        "SecureOps API base address {BaseAddress} uses a loopback HTTP binding. API session handles "
+            + "remain server-side and are not sent over a network hop.",
         baseAddress);
 }
 
