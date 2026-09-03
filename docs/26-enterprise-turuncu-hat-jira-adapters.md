@@ -5,10 +5,11 @@
 - `OperationalRecords:SourceProvider=Disabled|Fake|TuruncuHat`
 - `Jira:Provider=Disabled|Fake|Corporate`
 - `OperationalRecords:ReadOnlyIntegrationMode=true` for the TEST real-data/no-write gate
+- `OperationalRecords:ControlledTestWritesEnabled=true` only for a separately approved TEST write smoke
 
 `Fake` is permitted only in Development, Demo, or Test. Real provider selection is explicit and never falls back to synthetic behavior. Application defaults remain `Disabled`.
 
-In `Test`, selecting either corporate provider without `ReadOnlyIntegrationMode=true` fails startup. Read-only mode is accepted only with the complete `TuruncuHat` + `Corporate` pair. It permits source authentication/query and exact Jira requester/operator-resolution reads, but rejects API create/retry before local workflow mutation and rejects Jira create/Turuncu Hat completion again inside the adapters before HTTP dispatch.
+In `Test`, selecting either corporate provider without `ReadOnlyIntegrationMode=true` fails startup unless the separate disabled-by-default `ControlledTestWritesEnabled=true` gate is explicitly approved. Both modes require the complete `TuruncuHat` + `Corporate` pair. Read-only mode requires the complete future Jira field mapping so preview is exact, permits source authentication/query and exact Jira requester/operator-resolution reads, but rejects API create/retry before local workflow mutation and rejects Jira create/Turuncu Hat completion again inside the adapters before HTTP dispatch. The controlled-write gate is rejected outside `Test`, while read-only mode is active, or with an incomplete provider pair.
 
 ## Turuncu Hat Configuration
 
@@ -84,7 +85,9 @@ The Turuncu Hat Authorization value remains a complete runtime header because it
 | `assignee` | Optional; omitted in `ProjectDefault`; emitted only for one exact deployment-verified operator mapping |
 | `reporter` | Omitted in `ProjectDefault`; in `AuthenticatedOperator`, emitted as the exact Jira username resolved from the server-authenticated SecureOps actor |
 
-The authenticated Jira API identity, SecureOps actor, Turuncu Hat requester, assignee, and reporter are separate identities. `VerifiedOperatorMapping` uses exact configured actor keys only; a missing mapping falls back visibly to project default. `AuthenticatedOperator` never accepts a browser-provided reporter and never falls back to the integration account or project default after resolution failure. The effective assignee and reporter participate in the existing draft fingerprint, so an identity change after preview fails as a mapping conflict instead of changing the reviewed create payload. No fuzzy match or first-result assignment is allowed.
+The authenticated Jira API identity, SecureOps actor, Turuncu Hat requester, assignee, and reporter are separate identities. `VerifiedOperatorMapping` uses exact configured actor keys only; a missing mapping falls back visibly to project default. `AuthenticatedOperator` never accepts a browser-provided reporter and never falls back to the integration account or project default after resolution failure. Every emitted mapping field and the effective requester, assignee, and reporter participate in the draft fingerprint, so a payload change after preview fails as a mapping conflict instead of changing the reviewed create payload. No fuzzy match or first-result assignment is allowed.
+
+The preview returns every field above, including the custom-field identifiers. Jira create consumes that validated draft mapping; it does not take issue type, team, labels, or requester/watcher field from a second configuration snapshot. `Jira__MappingVersion` must change whenever an approved business mapping changes.
 
 The controlled `/myself` response exposed `self`, `key`, `name`, `emailAddress`, `avatarUrls`, `displayName`, `active`, `deleted`, `timeZone`, `locale`, `groups`, `applicationRoles`, and `expand`. In one inspected existing issue, assignee and reporter both matched that authenticated API identity, but this is observation only: it does not prove either business-actor mapping or reporter create permission.
 

@@ -25,6 +25,12 @@ public sealed class JiraIssueDraftServiceTests
         JiraIssueDraft draft = result.Value!;
         draft.RequesterAccountId.Should().Be("jira-account-100");
         draft.ProjectKey.Should().Be("TEST");
+        draft.FieldMapping.Should().BeEquivalentTo(new JiraIssueFieldMapping(
+            "3",
+            "customfield_team",
+            "WASAS",
+            "customfield_requester",
+            ["SunucuTalep"]));
         draft.IdempotencyKey.Should().HaveLength(64);
     }
 
@@ -186,20 +192,47 @@ public sealed class JiraIssueDraftServiceTests
         mapped.Value.IdempotencyKey.Should().NotBe(unknown.Value.IdempotencyKey);
     }
 
+    [Fact]
+    public async Task BuildAsync_WhenCreateMappingChanges_ChangesTransferFingerprint()
+    {
+        InMemoryOperationalRecordRepository repository = new();
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        JiraIssueDraftService original = CreateService(
+            new StubResolver(RequesterResolutionResult.Found("jira-requester")),
+            "Block",
+            teamValue: "WASAS");
+        JiraIssueDraftService changed = CreateService(
+            new StubResolver(RequesterResolutionResult.Found("jira-requester")),
+            "Block",
+            teamValue: "Different Reviewed Team");
+
+        JiraIssueDraft first = (await original.BuildAsync(record, "test:operator", CancellationToken.None)).Value!;
+        JiraIssueDraft second = (await changed.BuildAsync(record, "test:operator", CancellationToken.None)).Value!;
+
+        first.MappingVersion.Should().Be(second.MappingVersion);
+        first.IdempotencyKey.Should().NotBe(second.IdempotencyKey);
+    }
+
     private static JiraIssueDraftService CreateService(
         IJiraUserResolver resolver,
         string policy,
         string assignmentMode = "ProjectDefault",
         JiraOperatorAssigneeMappingOptions[]? mappings = null,
-        string reporterMode = "ProjectDefault") => new(
+        string reporterMode = "ProjectDefault",
+        string teamValue = "WASAS") => new(
         resolver,
         new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions())),
         Options.Create(new JiraIntegrationOptions
         {
             ProjectKey = "TEST",
             IssueType = "Task",
+            IssueTypeId = "3",
             MappingVersion = "mapping-v1",
             UnresolvedRequesterPolicy = policy,
+            TeamCustomField = "customfield_team",
+            TeamValue = teamValue,
+            RequesterWatcherCustomField = "customfield_requester",
+            Labels = ["SunucuTalep"],
             AssignmentMode = assignmentMode,
             OperatorAssigneeMappings = mappings ?? [],
             ReporterMode = reporterMode

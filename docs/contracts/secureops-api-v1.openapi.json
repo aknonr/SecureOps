@@ -5216,6 +5216,29 @@
           "reporterUsername": {
             "type": "string",
             "nullable": true
+          },
+          "issueTypeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "teamCustomField": {
+            "type": "string",
+            "nullable": true
+          },
+          "teamValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "requesterWatcherCustomField": {
+            "type": "string",
+            "nullable": true
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false

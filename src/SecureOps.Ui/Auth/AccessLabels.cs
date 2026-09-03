@@ -69,22 +69,22 @@ public static class AccessLabels
 
     private static readonly Dictionary<string, string> _roleLabels = new(StringComparer.Ordinal)
     {
-        [Roles.Admin] = "Platform Yöneticisi",
+        [Roles.Admin] = "Sistem Yöneticisi",
         [Roles.Lead] = "Takım Lideri",
-        [Roles.Operator] = "Operatör",
-        [Roles.JiraPublisher] = "Jira Yayınlayıcı",
-        [Roles.Auditor] = "Denetçi",
-        [Roles.ReadOnly] = "Salt Okunur"
+        [Roles.Operator] = "Operasyon Uzmanı",
+        [Roles.JiraPublisher] = "Jira İşlem Yetkilisi",
+        [Roles.Auditor] = "Denetim Görüntüleyicisi",
+        [Roles.ReadOnly] = "Sadece Görüntüleme"
     };
 
     private static readonly Dictionary<string, string> _roleDescriptions = new(StringComparer.Ordinal)
     {
-        [Roles.Admin] = "Erişim yönetimi dahil tüm yetkilere sahiptir.",
-        [Roles.Lead] = "Operasyonel akışları yürütür ve ekip taleplerini takip eder.",
-        [Roles.Operator] = "Vardiya işlerini yürütür; kimlik sorgulama ve kayıt akışlarını kullanır.",
-        [Roles.JiraPublisher] = "Operasyonel kayıtlardan Jira kaydı oluşturabilir.",
-        [Roles.Auditor] = "Denetim kanıtlarını görüntüler; operasyonel değişiklik yapmaz.",
-        [Roles.ReadOnly] = "Yalnızca görüntüleme yetkisine sahiptir."
+        [Roles.Admin] = "Erişim yönetimi, operasyonel akışlar, Jira işlemleri, raporlama ve tanılama dahil tüm yetkilere sahiptir.",
+        [Roles.Lead] = "Kimlik ve ekip bilgilerini görüntüler; operasyonel kayıtları yönetir, Jira işlemlerini yürütür ve tanılama yapar.",
+        [Roles.Operator] = "Ekip ve operasyonel kayıtları görüntüler; Jira önizlemesi hazırlar ancak Jira kaydı oluşturamaz.",
+        [Roles.JiraPublisher] = "Operasyonel kayıtları görüntüler, Jira önizlemesi hazırlar, Jira kaydı oluşturur ve başarısız aktarımı yeniden dener.",
+        [Roles.Auditor] = "Denetim, yönetim raporları ve operasyonel tanılama bilgilerini salt okunur olarak görüntüler.",
+        [Roles.ReadOnly] = "Yalnızca operasyonel kayıtları görüntüler."
     };
 
     private static readonly Dictionary<string, CapabilityDescriptor> _capabilities = new(StringComparer.Ordinal)

@@ -86,7 +86,44 @@ public sealed class OperationalRecordConfigurationValidatorTests
 
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*ReadOnlyIntegrationMode=true*");
+        act.Should().Throw<InvalidOperationException>().WithMessage("*ReadOnlyIntegrationMode=true*ControlledTestWritesEnabled=true*");
+    }
+
+    [Fact]
+    public void Validate_WithExplicitControlledTestWriteGateAndCompleteConfiguration_Succeeds()
+    {
+        Dictionary<string, string?> values = WriteEnterpriseValues();
+        values["OperationalRecords:ControlledTestWritesEnabled"] = "true";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("OperationalRecords:ReadOnlyIntegrationMode", "true")]
+    [InlineData("OperationalRecords:SourceProvider", "Disabled")]
+    [InlineData("Jira:Provider", "Disabled")]
+    public void Validate_WithControlledTestWriteGateAndUnsafeProviderState_FailsClosed(string key, string value)
+    {
+        Dictionary<string, string?> values = WriteEnterpriseValues();
+        values["OperationalRecords:ControlledTestWritesEnabled"] = "true";
+        values[key] = value;
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*ControlledTestWritesEnabled requires*");
+    }
+
+    [Fact]
+    public void Validate_WithControlledTestWriteGateOutsideTest_FailsClosed()
+    {
+        Dictionary<string, string?> values = WriteEnterpriseValues();
+        values["OperationalRecords:ControlledTestWritesEnabled"] = "true";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Pilot");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*ControlledTestWritesEnabled requires Test*");
     }
 
     [Fact]
@@ -182,7 +219,7 @@ public sealed class OperationalRecordConfigurationValidatorTests
     }
 
     [Fact]
-    public void Validate_WithReadOnlyEnterpriseProviderConfiguration_SucceedsWithoutWriteMappings()
+    public void Validate_WithReadOnlyEnterpriseProviderConfiguration_SucceedsWithPreviewMappings()
     {
         IConfiguration configuration = Configuration(ReadOnlyEnterpriseValues());
 
@@ -237,7 +274,7 @@ public sealed class OperationalRecordConfigurationValidatorTests
     }
 
     [Fact]
-    public void Validate_WithAuthenticatedOperatorReporterInReadOnlyMode_SucceedsWithoutCreateMappings()
+    public void Validate_WithAuthenticatedOperatorReporterInReadOnlyMode_SucceedsWithPreviewMappings()
     {
         Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
         values["Jira:ReporterMode"] = "AuthenticatedOperator";
@@ -256,6 +293,23 @@ public sealed class OperationalRecordConfigurationValidatorTests
         Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Pilot");
 
         act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("Jira:IssueTypeId")]
+    [InlineData("Jira:TeamCustomField")]
+    [InlineData("Jira:TeamValue")]
+    [InlineData("Jira:RequesterWatcherCustomField")]
+    [InlineData("Jira:Labels:0")]
+    public void Validate_WithReadOnlyCorporatePreviewAndMissingMapping_FailsClearly(string key)
+    {
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
+        values.Remove(key);
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Corporate Jira mapping configuration*");
     }
 
     [Fact]
@@ -331,7 +385,12 @@ public sealed class OperationalRecordConfigurationValidatorTests
         ["TuruncuHat:ExcludedDccIds:0"] = "4241",
         ["TuruncuHat:SessionLifetimeSeconds"] = "60",
         ["Jira:BaseUrl"] = "https://jira.invalid/",
-        ["Jira:Authorization"] = "Basic c2FuaXRpemVkOnNlY3JldA=="
+        ["Jira:Authorization"] = "Basic c2FuaXRpemVkOnNlY3JldA==",
+        ["Jira:IssueTypeId"] = "3",
+        ["Jira:TeamCustomField"] = "customfield_12700",
+        ["Jira:TeamValue"] = "WASAS",
+        ["Jira:RequesterWatcherCustomField"] = "customfield_11500",
+        ["Jira:Labels:0"] = "SunucuTalep"
     };
 
     private static Dictionary<string, string?> WriteEnterpriseValues()
@@ -344,11 +403,6 @@ public sealed class OperationalRecordConfigurationValidatorTests
         values["TuruncuHat:ActivityMainObjectTypeId"] = "30";
         values["TuruncuHat:CompletedStatusId"] = "40";
         values["TuruncuHat:CompletionCommentTemplate"] = "Transferred to {JiraKey}";
-        values["Jira:IssueTypeId"] = "3";
-        values["Jira:TeamCustomField"] = "customfield_12700";
-        values["Jira:TeamValue"] = "WASAS";
-        values["Jira:RequesterWatcherCustomField"] = "customfield_11500";
-        values["Jira:Labels:0"] = "SunucuTalep";
         return values;
     }
 

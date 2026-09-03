@@ -17,7 +17,7 @@ No legacy Operational Record/Jira PowerShell script exists in this repository. S
 | Operator selects a record | typed GET endpoints; UI deferred |
 | Resolve requester and authenticated reporter | `IJiraUserResolver.ResolveExactAsync` |
 | Apply fixed Jira mapping | `IJiraIssueDraftService` |
-| Review proposed fields | `POST .../{id}/jira-preview` |
+| Review the exact proposed create fields | `POST .../{id}/jira-preview` |
 | Create Jira task | authorized `IJiraTransferService` plus `IJiraClient` |
 | Persist Jira key | `IOperationalRecordRepository.RecordJiraCreatedAsync` |
 | Close/update source record | `IOperationalRecordClient.CloseAsync` after key persistence |
@@ -31,9 +31,9 @@ Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. Disabl
 
 ## Claims, Idempotency, Freshness, and Retry
 
-The transfer key is SHA256 over source-record identity plus mapping version. Create/retry also uses the caller `Idempotency-Key` or a deterministic actor/command/target fallback in `ops.CommandExecutions`. SQL permits exactly one transfer row per Operational Record and enforces unique source IDs, transfer keys, command scopes, and Jira issue keys. Once preview fixes a mapping version for a record, a different mapping/version pair fails with `WorkflowConflict`.
+The transfer key is SHA256 over source-record identity plus the complete normalized create mapping: mapping version, project, issue type, summary policy, team, labels, requester/watcher field and resolved account, assignee, and reporter. Create/retry also uses the caller `Idempotency-Key` or a deterministic actor/command/target fallback in `ops.CommandExecutions`. SQL permits exactly one transfer row per Operational Record and enforces unique source IDs, transfer keys, command scopes, and Jira issue keys. Once preview fixes a mapping fingerprint for a record, a different mapping or resolved identity fails with `WorkflowConflict`.
 
-Before create/retry, the API atomically acquires a bounded actor claim (`ClaimedBy`, `ClaimedAt`, `ClaimExpiresAt`). Another actor receives `OperationalRecordAlreadyClaimed`; active transition states receive `WorkflowAlreadyInProgress`. Expiry permits recovery after an abandoned client. Immediately before Jira create and again before source close, the source record is re-fetched and checked for existence, open state, and matching explicit version token or deterministic source-state hash. Changed/closed source data aborts before the external write.
+Before create/retry, the API atomically acquires a bounded actor claim (`ClaimedBy`, `ClaimedAt`, `ClaimExpiresAt`). Another actor receives `OperationalRecordAlreadyClaimed`; active transition states receive `WorkflowAlreadyInProgress`. Expiry permits recovery after an abandoned client. Immediately before Jira create and again before source close, the source record is re-fetched with an exact validated numeric source-ID filter and checked for existence, open state, and matching explicit version token or deterministic source-state hash. Changed/closed source data aborts before the external write.
 
 The Jira key is committed before the source close/update starts. A close failure therefore retries only the source stage. Concurrent, repeated, or completed create requests cannot call Jira twice. If a Jira call has an uncertain outcome, `ReconciliationRequired` blocks automatic retry. If the process stops while `CreatingJira` has no persisted key, retry also fails closed for manual reconciliation because remote Jira idempotency has not been proven.
 
@@ -47,6 +47,7 @@ A source refresh may update bounded source fields, but classification is reappli
 - Unresolved requesters are blocked by default; `ProceedUnassigned` must be an explicit approved policy.
 - Jira assignment defaults to `ProjectDefault`. Only an exact deployment-verified SecureOps actor mapping may emit `assignee`; no AD inference or fuzzy match is permitted.
 - Jira reporter defaults to `ProjectDefault`. `AuthenticatedOperator` normalizes the server-authenticated actor with the existing exact identity rules, resolves exactly one Jira username, exposes it in preview, and emits it as `reporter` during create. Missing or ambiguous matches fail closed; the Basic-authenticated integration identity and source requester remain separate.
+- Corporate preview includes project, issue type/name and ID, summary, description, team field/value, labels, requester/watcher field and resolved account, assignee, and reporter. The Jira adapter consumes this reviewed draft mapping instead of independently re-reading those create fields.
 - Jira creation and retry require server-side capability policies.
 - The working exact AD/PAM-style identity lookup provider is unchanged.
 - Real source close/update is a state-changing external integration and remains configuration-disabled until the external TEST activation gate is approved.
@@ -80,12 +81,18 @@ Non-secret keys:
 - `OperationalRecords:MaxImportCount` (1-500)
 - `OperationalRecords:ClaimLeaseSeconds` (30-900)
 - `OperationalRecords:ReadOnlyIntegrationMode` (`true` only in `Test` with `TuruncuHat` + `Corporate`)
+- `OperationalRecords:ControlledTestWritesEnabled` (defaults `false`; TEST writes require explicit `true`, read-only `false`, and the complete corporate provider pair)
 - `CommandIdempotency:ExecutionLeaseSeconds` (30-900)
 - `CommandIdempotency:MaxKeyLength` (32-256)
 - `Jira:Provider` (`Disabled`, paired `Simulation` or legacy `Fake` only in Development/Demo/Test, or `Corporate`)
 - `Jira:ProjectKey`
 - `Jira:IssueType`
+- `Jira:IssueTypeId`
 - `Jira:MappingVersion`
+- `Jira:TeamCustomField`
+- `Jira:TeamValue`
+- `Jira:RequesterWatcherCustomField`
+- `Jira:Labels:{n}`
 - `Jira:UnresolvedRequesterPolicy` (`Block` or `ProceedUnassigned`)
 - `Jira:AuthenticationMode` (`Basic` for `Corporate`)
 - `Jira:AssignmentMode` (`ProjectDefault` or `VerifiedOperatorMapping`)
@@ -95,7 +102,9 @@ Non-secret keys:
 
 Operator-visible TEST verification uses `Simulation` for both providers. Pairing is mandatory, it is rejected in Pilot/Production, it registers only in-process clients, and responses state that no real Jira issue will be created. Real providers require every validated option in `docs/26-enterprise-turuncu-hat-jira-adapters.md`; unsupported or incomplete selection fails startup and never falls back to synthetic data.
 
-The minimal real-data/no-write gate sets `ASPNETCORE_ENVIRONMENT=Test`, `OperationalRecords:SourceProvider=TuruncuHat`, `Jira:Provider=Corporate`, and `OperationalRecords:ReadOnlyIntegrationMode=true`. Source authentication/query, exact source re-read, Jira authentication/user search, and preview remain available. Create and retry return `ExternalWritesDisabled` at stage `external-write-fence` before command state changes; both corporate write adapters independently reject dispatch. Operational Record and preview responses expose `readOnlyIntegrationMode=true` and `readOnlyNotice="GERÇEK VERİ — YAZMA KAPALI"`.
+The minimal real-data/no-write gate sets `ASPNETCORE_ENVIRONMENT=Test`, `OperationalRecords:SourceProvider=TuruncuHat`, `Jira:Provider=Corporate`, and `OperationalRecords:ReadOnlyIntegrationMode=true`. Complete Jira field mapping is required at startup even in this mode so preview represents the future create payload. Source authentication/query, exact source re-read, Jira authentication/user search, and preview remain available. Create and retry return `ExternalWritesDisabled` at stage `external-write-fence` before command state changes; both corporate write adapters independently reject dispatch. Operational Record and preview responses expose `readOnlyIntegrationMode=true` and a safe write-disabled notice.
+
+Controlled TEST writes remain disabled by default. A later approved activation requires `OperationalRecords:ReadOnlyIntegrationMode=false` and `OperationalRecords:ControlledTestWritesEnabled=true` together with the complete Turuncu Hat activity-update and Jira create mapping. The TEST-only gate is rejected outside `Test`, with read-only mode, or without the exact `TuruncuHat` + `Corporate` pair.
 - `ConnectionStrings:SecureOpsDb` when SQL persistence is selected
 
 Integration authentication values are runtime-only server configuration. Controlled Jira evidence proves Basic authentication; the complete Basic Authorization value remains secret and server-owned. Turuncu Hat authentication scheme remains unproven.

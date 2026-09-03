@@ -107,6 +107,32 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
+    public async Task SourceClient_FreshnessReadAddsExactValidatedSourceIdToServerFilter()
+    {
+        const string response = "{\"QueryResult\":{\"Items\":[]}}";
+        ScriptedHandler handler = new(Response(HttpStatusCode.OK, response));
+        TuruncuHatOperationalRecordClient client = SourceClient(handler);
+
+        OperationalRecordSourceItem? record = await client.GetByIdAsync("1001", CancellationToken.None);
+
+        record.Should().BeNull();
+        handler.Requests.Should().ContainSingle();
+        handler.Requests[0].Body.Should().Contain("#%id%#=1001");
+    }
+
+    [Fact]
+    public async Task SourceClient_InvalidFreshnessIdentityFailsClosedWithoutNetworkDispatch()
+    {
+        ScriptedHandler handler = new();
+        TuruncuHatOperationalRecordClient client = SourceClient(handler);
+
+        OperationalRecordSourceItem? record = await client.GetByIdAsync("1001 OR 1=1", CancellationToken.None);
+
+        record.Should().BeNull();
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SourceClient_ExcludesEveryDuplicateIdentifierAsAmbiguous()
     {
         const string response = """
@@ -331,7 +357,7 @@ public sealed class EnterpriseAdapterContractTests
         CorporateJiraClient client = JiraClient(handler);
         JiraIssueDraft draft = new(
             Guid.NewGuid(), "OR-100", "SAFE", "Task", "OR-100 - Summary", "Description",
-            "exact.account", "v1", new string('a', 64), []);
+            "exact.account", "v1", new string('a', 64), [], FieldMapping: JiraMapping());
 
         JiraIssueCreationResult result = await client.CreateIssueAsync(draft, CancellationToken.None);
 
@@ -350,13 +376,56 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
+    public async Task JiraCreate_UsesTheReviewedDraftMappingInsteadOfReadingASecondRuntimeSnapshot()
+    {
+        ScriptedHandler handler = new(Response(HttpStatusCode.Created, "{\"key\":\"SAFE-124\"}"));
+        CorporateJiraClient client = JiraClient(handler);
+        JiraIssueDraft draft = new(
+            Guid.NewGuid(), "OR-101", "SDM", "Task", "Summary", "Description",
+            "jira-requester", "v2", new string('a', 64), [],
+            FieldMapping: new JiraIssueFieldMapping(
+                "10003",
+                "customfield_reviewed_team",
+                "Reviewed Team",
+                "customfield_reviewed_requester",
+                ["ReviewedLabel"]));
+
+        _ = await client.CreateIssueAsync(draft, CancellationToken.None);
+
+        using var payload = JsonDocument.Parse(handler.Requests[0].Body);
+        JsonElement fields = payload.RootElement.GetProperty("fields");
+        fields.GetProperty("issuetype").GetProperty("id").GetString().Should().Be("10003");
+        fields.GetProperty("customfield_reviewed_team").GetProperty("value").GetString().Should().Be("Reviewed Team");
+        fields.GetProperty("customfield_reviewed_requester")[0].GetProperty("name").GetString().Should().Be("jira-requester");
+        fields.GetProperty("labels")[0].GetString().Should().Be("ReviewedLabel");
+        fields.TryGetProperty("customfield_12700", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task JiraCreate_WithoutReviewedDraftMapping_FailsBeforeNetworkDispatch()
+    {
+        ScriptedHandler handler = new();
+        JiraIssueDraft draft = new(
+            Guid.NewGuid(), "OR-102", "SDM", "Task", "Summary", "Description",
+            null, "v1", new string('a', 64), [],
+            new JiraIssueFieldMapping(string.Empty, string.Empty, string.Empty, string.Empty, []));
+
+        Func<Task> act = () => JiraClient(handler).CreateIssueAsync(draft, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.JiraValidationFailed
+                && !exception.Retryable);
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task JiraCreate_EmitsOnlyVerifiedExplicitAssignee_AndNeverReporter()
     {
         ScriptedHandler handler = new(Response(HttpStatusCode.Created, "{\"key\":\"SAFE-123\"}"));
         CorporateJiraClient client = JiraClient(handler);
         JiraIssueDraft draft = new(
             Guid.NewGuid(), "OR-100", "SDM", "Task", "Summary", "Description",
-            null, "v1", new string('f', 64), [], "verified.operator");
+            null, "v1", new string('f', 64), [], JiraMapping(), AssigneeUsername: "verified.operator");
 
         _ = await client.CreateIssueAsync(draft, CancellationToken.None);
 
@@ -373,7 +442,7 @@ public sealed class EnterpriseAdapterContractTests
         CorporateJiraClient client = JiraClient(handler);
         JiraIssueDraft draft = new(
             Guid.NewGuid(), "OR-100", "SDM", "Task", "Summary", "Description",
-            "jira-requester", "v1", new string('f', 64), [], ReporterUsername: "jira-operator");
+            "jira-requester", "v1", new string('f', 64), [], JiraMapping(), ReporterUsername: "jira-operator");
 
         _ = await client.CreateIssueAsync(draft, CancellationToken.None);
 
@@ -393,7 +462,7 @@ public sealed class EnterpriseAdapterContractTests
         ScriptedHandler handler = new(Response(status, "{}"));
         JiraIssueDraft draft = new(
             Guid.NewGuid(), "OR-100", "SDM", "Task", "Summary", "Description",
-            null, "v1", new string('f', 64), [], ReporterUsername: "jira-operator");
+            null, "v1", new string('f', 64), [], JiraMapping(), ReporterUsername: "jira-operator");
 
         Func<Task> act = async () => await JiraClient(handler).CreateIssueAsync(draft, CancellationToken.None);
 
@@ -409,7 +478,7 @@ public sealed class EnterpriseAdapterContractTests
     {
         ScriptedHandler handler = new(Response(HttpStatusCode.InternalServerError, "{}"));
         CorporateJiraClient client = JiraClient(handler);
-        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SAFE", "Task", "Summary", "Description", null, "v1", new string('b', 64), []);
+        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SAFE", "Task", "Summary", "Description", null, "v1", new string('b', 64), [], FieldMapping: JiraMapping());
 
         Func<Task> act = async () => await client.CreateIssueAsync(draft, CancellationToken.None);
 
@@ -423,7 +492,7 @@ public sealed class EnterpriseAdapterContractTests
     {
         ScriptedHandler handler = new(Response(HttpStatusCode.Created, "{\"key\":\"SAFE-123\"}"));
         CorporateJiraClient client = JiraClient(handler);
-        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SAFE", "Task", "Summary", "Description", null, "v1", new string('c', 64), []);
+        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SAFE", "Task", "Summary", "Description", null, "v1", new string('c', 64), [], FieldMapping: JiraMapping());
 
         _ = await client.CreateIssueAsync(draft, CancellationToken.None);
 
@@ -442,7 +511,7 @@ public sealed class EnterpriseAdapterContractTests
         bool outcomeUnknown)
     {
         ScriptedHandler handler = new(Response(status, "{}"));
-        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SAFE", "Task", "Summary", "Description", null, "v1", new string('d', 64), []);
+        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SAFE", "Task", "Summary", "Description", null, "v1", new string('d', 64), [], FieldMapping: JiraMapping());
 
         Func<Task> act = async () => await JiraClient(handler).CreateIssueAsync(draft, CancellationToken.None);
 
@@ -460,7 +529,7 @@ public sealed class EnterpriseAdapterContractTests
     {
         Exception failure = timeout ? new OperationCanceledException() : new HttpRequestException("sanitized transport failure");
         CorporateJiraClient client = JiraClient(new ThrowingHandler(failure));
-        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SAFE", "Task", "Summary", "Description", null, "v1", new string('e', 64), []);
+        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SAFE", "Task", "Summary", "Description", null, "v1", new string('e', 64), [], FieldMapping: JiraMapping());
 
         Func<Task> act = async () => await client.CreateIssueAsync(draft, CancellationToken.None);
 
@@ -494,7 +563,8 @@ public sealed class EnterpriseAdapterContractTests
             null,
             "v1",
             new string('a', 64),
-            []);
+            [],
+            JiraMapping());
 
         Func<Task> act = () => client.CreateIssueAsync(draft, CancellationToken.None);
 
@@ -582,6 +652,13 @@ public sealed class EnterpriseAdapterContractTests
         Labels = ["SunucuTalep"],
         UserSearchRetryDelayMilliseconds = 0
     };
+
+    private static JiraIssueFieldMapping JiraMapping() => new(
+        "3",
+        "customfield_12700",
+        "WASAS",
+        "customfield_11500",
+        ["SunucuTalep"]);
 
     private static OperationalRecordSourceItem Source(string id, bool isOpen) => new(
         id, "OR-100", "Title", "Description", "Requester", null, null, null, null, isOpen, null, null);

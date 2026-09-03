@@ -374,7 +374,7 @@ public sealed class OperationalRecordWorkflowHostedTests
     }
 
     [Fact]
-    public async Task ReadOnlyEnterpriseProviders_WithReadConfigurationOnly_Starts()
+    public async Task ReadOnlyEnterpriseProviders_WithExactPreviewConfiguration_Starts()
     {
         using WebApplicationFactory<Program> factory = CreateReadOnlyEnterpriseFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
@@ -483,6 +483,11 @@ public sealed class OperationalRecordWorkflowHostedTests
             builder.UseSetting("TuruncuHat:SessionLifetimeSeconds", "60");
             builder.UseSetting("Jira:BaseUrl", "https://jira.invalid/");
             builder.UseSetting("Jira:Authorization", "Basic c2FuaXRpemVkOnNlY3JldA==");
+            builder.UseSetting("Jira:IssueTypeId", "3");
+            builder.UseSetting("Jira:TeamCustomField", "customfield_team");
+            builder.UseSetting("Jira:TeamValue", "WASAS");
+            builder.UseSetting("Jira:RequesterWatcherCustomField", "customfield_requester");
+            builder.UseSetting("Jira:Labels:0", "SunucuTalep");
             builder.UseSetting("RateLimiting:OperationalRecordRefresh:PermitLimit", "100");
             builder.UseSetting("RateLimiting:JiraPreview:PermitLimit", "100");
             builder.UseSetting("RateLimiting:JiraCreate:PermitLimit", "100");

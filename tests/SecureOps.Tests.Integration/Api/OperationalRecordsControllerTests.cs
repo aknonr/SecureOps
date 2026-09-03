@@ -67,6 +67,12 @@ public sealed class OperationalRecordsControllerTests
             "mapping-v1",
             new string('a', 64),
             [],
+            new JiraIssueFieldMapping(
+                "3",
+                "customfield_team",
+                "WASAS",
+                "customfield_requester",
+                ["SunucuTalep"]),
             ReporterUsername: "jira-operator");
         OperationalRecordsController controller = CreateController(
             OperationalRecordResult<JiraIssueDraft>.Success(draft),
@@ -79,6 +85,11 @@ public sealed class OperationalRecordsControllerTests
         response.ReadOnlyIntegrationMode.Should().BeTrue();
         response.ReporterUsername.Should().Be("jira-operator");
         response.RequesterAccountId.Should().Be("jira-requester");
+        response.IssueTypeId.Should().Be("3");
+        response.TeamCustomField.Should().Be("customfield_team");
+        response.TeamValue.Should().Be("WASAS");
+        response.RequesterWatcherCustomField.Should().Be("customfield_requester");
+        response.Labels.Should().Equal("SunucuTalep");
     }
 
     [Fact]
@@ -104,7 +115,8 @@ public sealed class OperationalRecordsControllerTests
     {
         JiraIssueDraft draft = new(
             Guid.NewGuid(), "OR-SYNTHETIC", "SAFE", "Task", "Summary", "Description",
-            null, "mapping-v1", new string('a', 64), []);
+            null, "mapping-v1", new string('a', 64), [],
+            new JiraIssueFieldMapping("3", "customfield_team", "WASAS", "customfield_requester", ["SunucuTalep"]));
         CapturingTransferService transfer = new(OperationalRecordResult<JiraIssueDraft>.Success(draft));
         DefaultHttpContext httpContext = new()
         {

@@ -21,5 +21,6 @@ Required examples:
 7. Jira create success with the complete status/body/headers; validation, authentication, rate-limit, server-error, and timeout outcomes.
 8. Jira remote idempotency and reconciliation lookup evidence.
 9. Confirmation that Jira `name` is an approved durable identity for watcher and assignee mappings.
+10. The exact business rule that determines when the configured `SunucuTalep` label applies; the current mapping treats configured labels as fixed for every eligible record.
 
 Do not infer retryability or write outcome from an undocumented body. Provider-specific error fixtures will be added only after these reviewed examples exist.

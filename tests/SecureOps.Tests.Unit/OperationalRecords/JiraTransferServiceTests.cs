@@ -35,6 +35,7 @@ public sealed class JiraTransferServiceTests
             AuditActions.OperationalRecordCloseRequested,
             AuditActions.WorkflowCompleted,
             AuditActions.JiraDuplicateCreatePrevented]);
+        fixture.Audit.Events.Should().OnlyContain(item => item.Actor == _context.Actor);
     }
 
     [Fact]
@@ -93,7 +94,7 @@ public sealed class JiraTransferServiceTests
     {
         TestFixture fixture = await TestFixture.CreateAsync();
         OperationalRecord record = (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!;
-        string idempotencyKey = OperationalRecordIdempotency.Create(record.SourceRecordId, "mapping-v1");
+        string idempotencyKey = record.IdempotencyKey!;
         _ = await fixture.Repository.TryClaimAsync(record.Id, _context.Actor, TimeSpan.FromMinutes(2), _context.CorrelationId, CancellationToken.None);
         _ = await fixture.Repository.TryAcquireCreateAsync(record.Id, "mapping-v1", idempotencyKey, _context.Actor, _context.CorrelationId, CancellationToken.None);
         _ = await fixture.Repository.RecordJiraCreatedAsync(record.Id, "TEST-200", _context.Actor, _context.CorrelationId, CancellationToken.None);

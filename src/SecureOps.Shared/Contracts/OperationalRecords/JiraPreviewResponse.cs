@@ -17,4 +17,9 @@ public sealed record JiraPreviewResponse(
     string? SimulationNotice = null,
     bool ReadOnlyIntegrationMode = false,
     string? ReadOnlyNotice = null,
-    string? ReporterUsername = null);
+    string? ReporterUsername = null,
+    string? IssueTypeId = null,
+    string? TeamCustomField = null,
+    string? TeamValue = null,
+    string? RequesterWatcherCustomField = null,
+    IReadOnlyList<string>? Labels = null);

@@ -20,4 +20,7 @@ public sealed class OperationalRecordsOptions
 
     /// <summary>Allows corporate reads and preview while rejecting every external write path.</summary>
     public bool ReadOnlyIntegrationMode { get; set; }
+
+    /// <summary>Explicit deployment-owned approval gate for corporate external writes in Test.</summary>
+    public bool ControlledTestWritesEnabled { get; set; }
 }

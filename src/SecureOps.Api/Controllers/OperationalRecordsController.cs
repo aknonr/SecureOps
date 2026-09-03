@@ -93,6 +93,7 @@ public sealed class OperationalRecordsController : ControllerBase
         }
 
         JiraIssueDraft draft = result.Value!;
+        JiraIssueFieldMapping mapping = draft.FieldMapping;
         return Ok(new JiraPreviewResponse(
             draft.OperationalRecordId,
             draft.OrCode,
@@ -109,7 +110,12 @@ public sealed class OperationalRecordsController : ControllerBase
             SimulationNotice(),
             _readOnlyIntegrationMode,
             ReadOnlyNotice(),
-            draft.ReporterUsername));
+            draft.ReporterUsername,
+            mapping.IssueTypeId,
+            mapping.TeamCustomField,
+            mapping.TeamValue,
+            mapping.RequesterWatcherCustomField,
+            mapping.Labels));
     }
 
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>

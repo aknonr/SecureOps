@@ -96,9 +96,17 @@ public static class OperationalRecordConfigurationValidator
 
         bool turuncuHatSource = string.Equals(operational.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase);
         bool corporateJira = string.Equals(jira.Provider, "Corporate", StringComparison.OrdinalIgnoreCase);
+        bool testEnvironment = string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase);
+        if (operational.ControlledTestWritesEnabled
+            && (!testEnvironment || operational.ReadOnlyIntegrationMode || !turuncuHatSource || !corporateJira))
+        {
+            throw new InvalidOperationException(
+                "OperationalRecords:ControlledTestWritesEnabled requires Test, ReadOnlyIntegrationMode=false, SourceProvider=TuruncuHat, and Jira:Provider=Corporate.");
+        }
+
         if (operational.ReadOnlyIntegrationMode)
         {
-            if (!string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase))
+            if (!testEnvironment)
             {
                 throw new InvalidOperationException("OperationalRecords:ReadOnlyIntegrationMode is permitted only in Test.");
             }
@@ -109,11 +117,12 @@ public static class OperationalRecordConfigurationValidator
                     "OperationalRecords:ReadOnlyIntegrationMode requires OperationalRecords:SourceProvider=TuruncuHat and Jira:Provider=Corporate.");
             }
         }
-        else if (string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase)
-                 && (turuncuHatSource || corporateJira))
+        else if (testEnvironment
+                 && (turuncuHatSource || corporateJira)
+                 && !operational.ControlledTestWritesEnabled)
         {
             throw new InvalidOperationException(
-                "Corporate providers in Test require OperationalRecords:ReadOnlyIntegrationMode=true so external writes fail closed.");
+                "Corporate providers in Test require ReadOnlyIntegrationMode=true or explicit ControlledTestWritesEnabled=true approval.");
         }
 
         if (string.IsNullOrWhiteSpace(jira.ProjectKey) || string.IsNullOrWhiteSpace(jira.IssueType) || string.IsNullOrWhiteSpace(jira.MappingVersion))
@@ -128,10 +137,7 @@ public static class OperationalRecordConfigurationValidator
         }
 
         ValidateJiraReporterPolicy(jira);
-        if (!readOnlyEnterpriseMode)
-        {
-            ValidateJiraAssignmentPolicy(jira);
-        }
+        ValidateJiraAssignmentPolicy(jira);
 
         if (jira.SummaryMaxLength is < 32 or > 255)
         {
@@ -150,10 +156,7 @@ public static class OperationalRecordConfigurationValidator
         if (string.Equals(jira.Provider, "Corporate", StringComparison.OrdinalIgnoreCase))
         {
             ValidateCorporateJiraReadConfiguration(jira);
-            if (!readOnlyEnterpriseMode)
-            {
-                ValidateCorporateJiraWriteConfiguration(jira);
-            }
+            ValidateCorporateJiraMappingConfiguration(jira);
         }
     }
 
@@ -178,7 +181,7 @@ public static class OperationalRecordConfigurationValidator
         }
     }
 
-    private static void ValidateCorporateJiraWriteConfiguration(JiraIntegrationOptions options)
+    private static void ValidateCorporateJiraMappingConfiguration(JiraIntegrationOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.IssueTypeId)
             || string.IsNullOrWhiteSpace(options.TeamCustomField)

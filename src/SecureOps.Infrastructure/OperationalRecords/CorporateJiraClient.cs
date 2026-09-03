@@ -45,18 +45,28 @@ public sealed class CorporateJiraClient : IJiraClient
             throw new ExternalIntegrationException(OperationalErrorCodes.ExternalWritesDisabled, retryable: false);
         }
 
+        JiraIssueFieldMapping mapping = draft.FieldMapping;
+        if (string.IsNullOrWhiteSpace(mapping.IssueTypeId)
+            || string.IsNullOrWhiteSpace(mapping.TeamCustomField)
+            || string.IsNullOrWhiteSpace(mapping.TeamValue)
+            || string.IsNullOrWhiteSpace(mapping.RequesterWatcherCustomField)
+            || mapping.Labels.Count == 0)
+        {
+            throw new ExternalIntegrationException(OperationalErrorCodes.JiraValidationFailed, retryable: false);
+        }
+
         Dictionary<string, object?> fields = new(StringComparer.Ordinal)
         {
             ["project"] = new { key = draft.ProjectKey },
-            ["issuetype"] = new { id = _options.IssueTypeId },
+            ["issuetype"] = new { id = mapping.IssueTypeId },
             ["summary"] = draft.Summary,
             ["description"] = draft.Description,
-            [_options.TeamCustomField] = new { value = _options.TeamValue },
-            ["labels"] = _options.Labels
+            [mapping.TeamCustomField] = new { value = mapping.TeamValue },
+            ["labels"] = mapping.Labels
         };
         if (!string.IsNullOrWhiteSpace(draft.RequesterAccountId))
         {
-            fields[_options.RequesterWatcherCustomField] = new[] { new { name = draft.RequesterAccountId } };
+            fields[mapping.RequesterWatcherCustomField] = new[] { new { name = draft.RequesterAccountId } };
         }
         if (!string.IsNullOrWhiteSpace(draft.AssigneeUsername))
         {

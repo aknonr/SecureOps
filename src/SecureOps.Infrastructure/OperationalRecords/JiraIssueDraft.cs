@@ -12,8 +12,17 @@ public sealed record JiraIssueDraft(
     string MappingVersion,
     string IdempotencyKey,
     IReadOnlyList<string> Warnings,
+    JiraIssueFieldMapping FieldMapping,
     string? AssigneeUsername = null,
     string? ReporterUsername = null);
+
+/// <summary>Validated create fields shared by the preview and Jira adapter.</summary>
+public sealed record JiraIssueFieldMapping(
+    string IssueTypeId,
+    string TeamCustomField,
+    string TeamValue,
+    string RequesterWatcherCustomField,
+    IReadOnlyList<string> Labels);
 
 /// <summary>Confirmed Jira issue creation result.</summary>
 public sealed record JiraIssueCreationResult(string IssueKey);

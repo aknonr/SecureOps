@@ -48,7 +48,7 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         int maximumCount,
         CancellationToken cancellationToken)
     {
-        ParsedSourceRecords parsed = await QuerySourceAsync(cancellationToken);
+        ParsedSourceRecords parsed = await QuerySourceAsync(sourceRecordId: null, cancellationToken);
         return parsed.Items.Take(maximumCount).ToArray();
     }
 
@@ -57,7 +57,13 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         string sourceRecordId,
         CancellationToken cancellationToken)
     {
-        ParsedSourceRecords parsed = await QuerySourceAsync(cancellationToken);
+        if (!long.TryParse(sourceRecordId, NumberStyles.None, CultureInfo.InvariantCulture, out long numericSourceRecordId)
+            || numericSourceRecordId <= 0)
+        {
+            return null;
+        }
+
+        ParsedSourceRecords parsed = await QuerySourceAsync(numericSourceRecordId, cancellationToken);
         return parsed.Items.SingleOrDefault(item =>
             string.Equals(item.SourceRecordId, sourceRecordId, StringComparison.Ordinal));
     }
@@ -109,12 +115,17 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         await UpdateActivityAsync(activityId, comment, cancellationToken);
     }
 
-    private async Task<ParsedSourceRecords> QuerySourceAsync(CancellationToken cancellationToken)
+    private async Task<ParsedSourceRecords> QuerySourceAsync(long? sourceRecordId, CancellationToken cancellationToken)
     {
         string excluded = string.Join(',', _options.ExcludedDccIds.Order());
         string filter =
             $"#%m_active%#='True' AND #%p_dcc%# NOT IN ({excluded}) "
             + $"AND #%p_rel_group%# IN ({_options.RelatedGroupId})";
+        if (sourceRecordId.HasValue)
+        {
+            filter += $" AND #%id%#={sourceRecordId.Value}";
+        }
+
         using JsonDocument response = await QueryAsync(
             _options.SourceBaseObject,
             [filter],

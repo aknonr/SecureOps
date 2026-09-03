@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SecureOps.Domain.OperationalRecords;
 using SecureOps.Infrastructure.Identity;
@@ -99,17 +100,24 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
         AppendReference(description, "Application", record.ApplicationReference);
 
         string? assigneeUsername = ResolveAssignee(actor, warnings);
-        List<string> idempotencyMappingParts = [_options.MappingVersion];
-        if (assigneeUsername is not null)
+        JiraIssueFieldMapping fieldMapping = new(
+            _options.IssueTypeId,
+            _options.TeamCustomField,
+            _options.TeamValue,
+            _options.RequesterWatcherCustomField,
+            Array.AsReadOnly((string[])_options.Labels.Clone()));
+        string idempotencyMapping = JsonSerializer.Serialize(new
         {
-            idempotencyMappingParts.Add($"assignee:{assigneeUsername}");
-        }
-        if (reporterUsername is not null)
-        {
-            idempotencyMappingParts.Add($"reporter:{reporterUsername}");
-        }
-
-        string idempotencyMapping = string.Join('\n', idempotencyMappingParts);
+            _options.MappingVersion,
+            _options.ProjectKey,
+            _options.IssueType,
+            _options.SummarySeparator,
+            _options.SummaryMaxLength,
+            FieldMapping = fieldMapping,
+            RequesterAccountId = requesterAccountId,
+            AssigneeUsername = assigneeUsername,
+            ReporterUsername = reporterUsername
+        });
         string idempotencyKey = OperationalRecordIdempotency.Create(record.SourceRecordId, idempotencyMapping);
         return OperationalRecordResult<JiraIssueDraft>.Success(new JiraIssueDraft(
             record.Id,
@@ -122,6 +130,7 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             _options.MappingVersion,
             idempotencyKey,
             warnings,
+            fieldMapping,
             assigneeUsername,
             reporterUsername));
     }
