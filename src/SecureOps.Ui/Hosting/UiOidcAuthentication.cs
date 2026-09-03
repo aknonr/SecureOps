@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -118,6 +119,7 @@ public static class UiOidcAuthentication
         options.ResponseType = OpenIdConnectResponseType.Code;
         options.ResponseMode = OpenIdConnectResponseMode.Query;
         options.UsePkce = configured.UsePkce;
+        options.ProtocolValidator = new CorporateNonceProtocolValidator();
         options.MapInboundClaims = false;
         options.GetClaimsFromUserInfoEndpoint = false;
         options.SaveTokens = false;
@@ -159,6 +161,11 @@ public static class UiOidcAuthentication
 
         options.Events = new OpenIdConnectEvents
         {
+            OnRedirectToIdentityProvider = context =>
+            {
+                context.ProtocolMessage.EnableTelemetryParameters = false;
+                return Task.CompletedTask;
+            },
             OnAuthorizationCodeReceived = context => RedeemCodeAsync(context, configured),
             OnTokenValidated = context => ValidateNormalizeAndStoreAsync(context, configured),
             OnRedirectToIdentityProviderForSignOut = context =>
@@ -399,5 +406,18 @@ public static class UiOidcAuthentication
         }
 
         return endpoint;
+    }
+
+    private sealed class CorporateNonceProtocolValidator : OpenIdConnectProtocolValidator
+    {
+        public CorporateNonceProtocolValidator()
+        {
+            RequireStateValidation = false;
+            NonceLifetime = TimeSpan.FromMinutes(15);
+            RequireTimeStampInNonce = false;
+        }
+
+        public override string GenerateNonce() =>
+            Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));
     }
 }

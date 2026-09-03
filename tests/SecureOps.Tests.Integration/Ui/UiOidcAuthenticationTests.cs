@@ -147,17 +147,40 @@ public sealed partial class UiOidcAuthenticationTests
     }
 
     [Fact]
-    public async Task PkceDisabled_OmitsChallengeAndJsonCodeVerifier()
+    public async Task PkceDisabled_MatchesCorporateAuthorizeContractAndOmitsCodeVerifier()
     {
         using OidcUiFactory factory = new(usePkce: false);
         using HttpClient client = CreateClient(factory);
+        using HttpClient secondClient = CreateClient(factory);
         HttpResponseMessage challenge = await ChallengeAsync(client);
+        HttpResponseMessage secondChallenge = await ChallengeAsync(secondClient);
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
+        Dictionary<string, string> secondQuery = Query(secondChallenge.Headers.Location!);
         factory.Provider.Nonce = query["nonce"];
 
         _ = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
 
+        challenge.Headers.Location!.AbsolutePath.Should().Be("/idp/rest/authorize");
+        query.Keys.Should().BeEquivalentTo(
+        [
+            "response_type",
+            "client_id",
+            "scope",
+            "state",
+            "redirect_uri",
+            "nonce"
+        ]);
+        query["response_type"].Should().Be("code");
+        query["client_id"].Should().Be("secureops-ui-test");
+        query["scope"].Should().Be("openid profile email");
+        query["redirect_uri"].Should().Be("https://wasasyonetim.thy.com/signin-oidc");
+        query["nonce"].Should().MatchRegex("^[A-Za-z0-9_-]+$");
+        Base64UrlEncoder.DecodeBytes(query["nonce"]).Should().HaveCount(32);
+        query["nonce"].Should().NotBe(secondQuery["nonce"]);
+        query["state"].Should().NotBe(secondQuery["state"]);
         query.Should().NotContainKey("code_challenge");
+        query.Should().NotContainKey("x-client-SKU");
+        query.Should().NotContainKey("x-client-ver");
         factory.Provider.LastTokenRequest.Should().NotContainKey("code_verifier");
     }
 
