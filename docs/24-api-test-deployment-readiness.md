@@ -15,15 +15,16 @@ Run the SQLCMD-mode entrypoints in exact order through the approved DBA process:
 | 5 | `sql/migrations/005-management-reporting-read-model.sql` | limited reporting views and supporting indexes | Yes for schema, views, and index presence; prerequisite audit and ops objects must exist. |
 | 6 | `sql/migrations/006-operational-record-source-created-at-nullable.sql` | preserves unavailable source-created time as nullable | Yes when the prerequisite Operational Record table exists. |
 | 7 | `sql/migrations/007-application-session-governance.sql` | authoritative application-session table, indexes, and limited reporting view | Yes for object presence/replacement; prerequisite access and reporting schemas must exist. |
+| 8 | `sql/migrations/008-oidc-user-profile.sql` | nullable bounded OIDC login name, display name, mail, uid, and profile-update timestamp on `security.Users` | Yes for column presence; prerequisite `security.Users` must exist. |
 
-The `:r` directives require SQLCMD mode and resolve files under `sql/schema`. Migrations 003-007 require successful prerequisites. None assumes empty tables, but 001 and 002 require the target object names to be absent. Existing rows are supported by defaults in 003 and 004; adding non-null columns can lock populated tables while SQL Server backfills defaults. Migrations 005 and 007 can add indexes and must be scheduled and reviewed by the DBA.
+The `:r` directives require SQLCMD mode and resolve files under `sql/schema`. Migrations 003-008 require successful prerequisites. None assumes empty tables, but 001 and 002 require the target object names to be absent. Existing rows are supported by defaults in 003 and 004; migration 008 adds nullable columns and does not invent profile values for existing users. Migrations 005 and 007 can add indexes and must be scheduled and reviewed by the DBA.
 
 There are no down migrations, migration-history table, encompassing transaction, or automatic rollback. A failure after a `GO` can leave a partially applied database. Before execution, the DBA must inventory schemas, tables, indexes, triggers, constraints, and seeded `RoleId`/`RoleCode` values, take an approved backup or recovery point, and stop on any collision. Do not re-run a failed batch without a DBA-authored corrective plan.
 
 ## Database Contract
 
 - `audit.AuditLog`; indexes `IX_AuditLog_OccurredAt`, `IX_AuditLog_CorrelationId`; append-only trigger.
-- `security.Users`, `Roles`, `RoleAssignments`, `AccessRequests`, `AccessRequestHistory`; active-role and pending-request unique indexes; status checks; no-self-approval and append-only triggers.
+- `security.Users`, `Roles`, `RoleAssignments`, `AccessRequests`, `AccessRequestHistory`; bounded nullable OIDC profile metadata; active-role and pending-request unique indexes; status checks; no-self-approval and append-only triggers.
 - `ops.OperationalRecords`, `JiraTransfers`, `OperationalRecordWorkflowHistory`, `CommandExecutions`; source/Jira/idempotency uniqueness; rowversion, source token, validation time, actor lease fields, status/claim checks, and workflow-history append-only trigger.
 - `reporting.ManagementAuditEvents`, `ManagementWorkflowEvents`, and `ManagementOperationalStatus`; limited read views plus reporting indexes on underlying tables.
 - `security.ApplicationSessions`; authoritative lifecycle timestamps/reasons, authentication method, access version, and active-session indexes. `reporting.ManagementSessionStatus` exposes limited aggregate fields.
@@ -50,7 +51,7 @@ Values in angle brackets require controlled deployment input. All booleans are l
 | REQUIRED, TEST-ONLY | `Swagger__Enabled` | `true` |
 | REQUIRED, TEST-ONLY | `DemoAuth__Enabled` | `false` for real OIDC bootstrap; `true` only for separate synthetic Demo validation |
 | REQUIRED, TEST-ONLY | `DemoAuth__HeaderName` | `X-SecureOps-Demo-Actor` |
-| REQUIRED | `Access__RepositoryProvider` | `SqlServer` after migrations 001-007 |
+| REQUIRED | `Access__RepositoryProvider` | `SqlServer` after migrations 001-008 |
 | REQUIRED | `Access__AutoCreateRequest` | `true` |
 | REQUIRED, TEST-ONLY | `Access__DemoCompatibilityEnabled` | same enablement decision as `DemoAuth__Enabled` |
 | CONDITIONAL REQUIRED | `BootstrapAdmin__Enabled` | `true` only during the controlled first OIDC Admin login; default and post-bootstrap value is `false` |
@@ -97,7 +98,7 @@ Keep `Oidc__Enabled=false` until the corporate contract is approved. At activati
 
 The authorization challenge uses a fresh 32-byte Base64URL nonce retained and validated by the ASP.NET Core protected nonce-cookie flow. IdentityModel client telemetry parameters are suppressed. With `Oidc__UsePkce=false`, the authorization request is limited to `response_type`, `client_id`, `scope`, `state`, `redirect_uri`, and `nonce`; enabling PKCE additionally emits the standard challenge parameters.
 
-The API host requires only `Oidc__Authority`, `Oidc__MetadataAddress`, `Oidc__ApiAudience`, and `Oidc__RequireHttpsMetadata=true`; do not copy the UI client secret to the API. Optional claim-name and bound overrides use `Oidc__IssuerClaimType`, `SubjectClaimType`, `LoginNameClaimType`, `DisplayNameClaimType`, `MailClaimType`, `UidClaimType`, `RoleEvidenceClaimType`, `MaxClaimCount`, `MaxClaimValueLength`, and `MaxRoleEvidenceCount` under the same section. Defaults map `iss`, `sub`, `loginname`, `displayname`, `mail`, `uid`, and `uygulama-role`.
+The API host requires only `Oidc__Authority`, `Oidc__MetadataAddress`, `Oidc__ApiAudience`, and `Oidc__RequireHttpsMetadata=true`; do not copy the UI client secret to the API. Optional claim-name and bound overrides use `Oidc__IssuerClaimType`, `SubjectClaimType`, `LoginNameClaimType`, `DisplayNameClaimType`, `MailClaimType`, `UidClaimType`, `RoleEvidenceClaimType`, `MaxClaimCount`, `MaxClaimValueLength`, and `MaxRoleEvidenceCount` under the same section. Defaults map `iss`, `sub`, `loginname`, `displayname`, `mail`, `uid`, and `uygulama-role`. Only claims in the validated OIDC principal can update the persisted profile; missing existing values are backfilled on the user's next successful OIDC authentication. Active Directory lookup is optional, uses the persisted login name, and falls back to persisted display name, login name, and mail when unavailable.
 
 `Simulation` source records and `SIM-*` Jira keys are synthetic TEST evidence only. The provider has fixed scenarios, performs no network I/O, must be selected on both sides, and fails startup outside Development/Demo/Test. `Fake`/`FAKE-*` remains a legacy automated-test compatibility path.
 
@@ -124,7 +125,7 @@ Only three older values and the working AD state are confirmed; all other existi
 
 ## Deployment and Rollback
 
-Exact order: verify ZIP SHA256 and payload manifest; take database recovery point; DBA preflight and run 001, 002, 003, 004, 005, 006, 007; verify objects/seeds/triggers/views; grant runtime permissions; provision and ACL the server-owned Data Protection key ring; preserve server `web.config` and `appsettings*.json`; back up current application payload; apply reviewed IIS environment-variable delta; replace application payload without flattening directories; start/recycle only in the approved window; run the read-only smoke script.
+Exact order: verify ZIP SHA256 and payload manifest; take database recovery point; DBA preflight and run 001, 002, 003, 004, 005, 006, 007, 008; verify objects/seeds/triggers/views/columns; grant runtime permissions; provision and ACL the server-owned Data Protection key ring; preserve server `web.config` and `appsettings*.json`; back up current application payload; apply reviewed IIS environment-variable delta; replace application payload without flattening directories; start/recycle only in the approved window; run the read-only smoke script.
 
 Application rollback restores the prior binaries and prior server configuration while leaving additive database objects in place. Database rollback has no scripted path: stop deployment and use the DBA-approved restore/corrective-migration process. Never drop audit or history data as an application rollback step.
 

@@ -17,17 +17,35 @@ public sealed class InMemoryAccessRepository : IAccessRepository
         try
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            bool oidcProfile = string.Equals(principal.AuthenticationSource, "oidc", StringComparison.Ordinal);
             bool userCreated = false;
             if (!_userIds.TryGetValue(principal.Identifier, out Guid userId))
             {
                 userId = Guid.NewGuid();
-                _users[userId] = new StoredUser(userId, principal.Identifier, principal.AuthenticationSource, AccessStatus.Pending, now, now, null, 1, []);
+                _users[userId] = new StoredUser(userId, principal.Identifier, principal.AuthenticationSource, AccessStatus.Pending, now, now, null, 1, [],
+                    oidcProfile ? principal.LoginName : null,
+                    oidcProfile ? principal.DisplayName : null,
+                    oidcProfile ? principal.Mail : null,
+                    oidcProfile ? principal.Uid : null,
+                    oidcProfile && HasProfile(principal) ? now : null);
                 _userIds[principal.Identifier] = userId;
                 userCreated = true;
             }
-            else if (now - _users[userId].LastAuthenticatedAt >= activityPersistenceInterval)
+            else
             {
-                _users[userId] = _users[userId] with { LastAuthenticatedAt = now };
+                StoredUser existing = _users[userId];
+                bool profileChanged = oidcProfile && ProfileChanged(existing, principal);
+                _users[userId] = existing with
+                {
+                    LastAuthenticatedAt = now - existing.LastAuthenticatedAt >= activityPersistenceInterval
+                        ? now
+                        : existing.LastAuthenticatedAt,
+                    LoginName = oidcProfile ? principal.LoginName ?? existing.LoginName : existing.LoginName,
+                    DisplayName = oidcProfile ? principal.DisplayName ?? existing.DisplayName : existing.DisplayName,
+                    Mail = oidcProfile ? principal.Mail ?? existing.Mail : existing.Mail,
+                    Uid = oidcProfile ? principal.Uid ?? existing.Uid : existing.Uid,
+                    ProfileUpdatedAt = profileChanged ? now : existing.ProfileUpdatedAt
+                };
             }
 
             StoredRequest? latest = _requests.Values
@@ -217,7 +235,12 @@ public sealed class InMemoryAccessRepository : IAccessRepository
         user.DisabledAt,
         user.Version,
         user.Roles,
-        AccessRoleCatalog.GetCapabilities(user.Roles));
+        AccessRoleCatalog.GetCapabilities(user.Roles),
+        user.LoginName,
+        user.DisplayName,
+        user.Mail,
+        user.Uid,
+        user.ProfileUpdatedAt);
 
     private ApplicationAccessRequest ToRequest(StoredRequest request)
     {
@@ -235,6 +258,15 @@ public sealed class InMemoryAccessRepository : IAccessRepository
         next.Except(previous, StringComparer.OrdinalIgnoreCase).ToArray(),
         previous.Except(next, StringComparer.OrdinalIgnoreCase).ToArray());
 
-    private sealed record StoredUser(Guid Id, string CorporateIdentity, string AuthenticationSource, AccessStatus Status, DateTimeOffset FirstAuthenticatedAt, DateTimeOffset LastAuthenticatedAt, DateTimeOffset? DisabledAt, long Version, IReadOnlyList<string> Roles);
+    private static bool HasProfile(CorporatePrincipal principal) =>
+        principal.LoginName is not null || principal.DisplayName is not null || principal.Mail is not null || principal.Uid is not null;
+
+    private static bool ProfileChanged(StoredUser user, CorporatePrincipal principal) =>
+        (principal.LoginName is not null && !string.Equals(principal.LoginName, user.LoginName, StringComparison.Ordinal))
+        || (principal.DisplayName is not null && !string.Equals(principal.DisplayName, user.DisplayName, StringComparison.Ordinal))
+        || (principal.Mail is not null && !string.Equals(principal.Mail, user.Mail, StringComparison.Ordinal))
+        || (principal.Uid is not null && !string.Equals(principal.Uid, user.Uid, StringComparison.Ordinal));
+
+    private sealed record StoredUser(Guid Id, string CorporateIdentity, string AuthenticationSource, AccessStatus Status, DateTimeOffset FirstAuthenticatedAt, DateTimeOffset LastAuthenticatedAt, DateTimeOffset? DisabledAt, long Version, IReadOnlyList<string> Roles, string? LoginName, string? DisplayName, string? Mail, string? Uid, DateTimeOffset? ProfileUpdatedAt);
     private sealed record StoredRequest(Guid Id, Guid UserId, AccessRequestStatus Status, DateTimeOffset RequestedAt, DateTimeOffset? DecidedAt, string? DecisionReason, string? DecidedByCorporateIdentity, long Version);
 }

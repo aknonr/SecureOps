@@ -40,4 +40,4 @@ TEST requires `ASPNETCORE_ENVIRONMENT=Test` or `Demo`, `Swagger__Enabled=true`, 
 
 ## Persistence
 
-The application never runs SQL migrations. DBA review/execution of migrations 001-007 is required before selecting SQL access, application-session, or Operational Record persistence. Migration 007 adds `security.ApplicationSessions` and a limited reporting view. Runtime needs only the documented object-level `SELECT`, `INSERT`, and `UPDATE` grants; no DDL or DELETE permission is required.
+The application never runs SQL migrations. DBA review/execution of migrations 001-008 is required before selecting SQL access, application-session, or Operational Record persistence. Migration 007 adds `security.ApplicationSessions` and a limited reporting view; migration 008 adds nullable OIDC profile metadata to `security.Users`. Runtime needs only the documented object-level `SELECT`, `INSERT`, and `UPDATE` grants; no DDL or DELETE permission is required.

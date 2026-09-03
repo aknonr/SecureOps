@@ -15,9 +15,11 @@ using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using SecureOps.Api.Security;
+using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Contracts.Access;
+using SecureOps.Shared.Contracts.Sessions;
 
 namespace SecureOps.Tests.Integration.Api;
 
@@ -119,6 +121,94 @@ public sealed class OidcApiAuthenticationTests
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task ValidatedOidcClaims_CreateAndUpdateProfileWithoutChangingStableIdentity()
+    {
+        const string subject = "synthetic-profile-subject";
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient first = Client(factory, Token(subject, "operator.one", displayName: "Operator One", mail: "one@example.test", uid: "uid-100"));
+
+        CurrentAccessResponse firstAccess = (await first.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        ApplicationUser persistedFirst = (await UsersAsync(factory)).Should().ContainSingle().Subject;
+
+        using HttpClient second = Client(factory, Token(subject, "operator.one", displayName: "Updated Operator", mail: "updated@example.test", uid: "uid-100"));
+        CurrentAccessResponse secondAccess = (await second.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        ApplicationUser persistedSecond = (await UsersAsync(factory)).Should().ContainSingle().Subject;
+
+        firstAccess.Profile.Should().Be(new AccessIdentityProfileResponse("Operator One", "operator.one", "one@example.test", null, null));
+        secondAccess.Profile.Should().Be(new AccessIdentityProfileResponse("Updated Operator", "operator.one", "updated@example.test", null, null));
+        persistedSecond.Id.Should().Be(persistedFirst.Id);
+        persistedSecond.CorporateIdentity.Should().Be(persistedFirst.CorporateIdentity)
+            .And.Be(OidcExternalIdentityNormalizer.StableIdentifier(_issuer, subject));
+        persistedSecond.Uid.Should().Be("uid-100");
+        persistedSecond.ProfileUpdatedAt.Should().NotBeNull().And.BeOnOrAfter(persistedFirst.ProfileUpdatedAt!.Value);
+    }
+
+    [Fact]
+    public async Task MissingLaterClaims_PreserveKnownProfileAndOpaqueUserBackfills()
+    {
+        const string subject = "synthetic-backfill-subject";
+        string stableIdentifier = OidcExternalIdentityNormalizer.StableIdentifier(_issuer, subject);
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using (IServiceScope scope = factory.Services.CreateScope())
+        {
+            IAccessRepository repository = scope.ServiceProvider.GetRequiredService<IAccessRepository>();
+            _ = await repository.EnsureUserAsync(new CorporatePrincipal(stableIdentifier, "oidc"), true, TimeSpan.Zero, CancellationToken.None);
+        }
+
+        using HttpClient profileClient = Client(factory, Token(subject, "operator.backfill", displayName: "Backfilled User", mail: "backfill@example.test", uid: "uid-backfill"));
+        _ = await profileClient.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
+        using HttpClient missingClaimsClient = Client(factory, Token(subject, loginName: null));
+        _ = await missingClaimsClient.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
+
+        ApplicationUser user = (await UsersAsync(factory)).Should().ContainSingle().Subject;
+        user.CorporateIdentity.Should().Be(stableIdentifier);
+        user.LoginName.Should().Be("operator.backfill");
+        user.DisplayName.Should().Be("Backfilled User");
+        user.Mail.Should().Be("backfill@example.test");
+        user.Uid.Should().Be("uid-backfill");
+    }
+
+    [Fact]
+    public async Task BrowserHeaders_CannotSpoofPersistedOidcProfile()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient client = Client(factory, Token("synthetic-spoof-subject", "operator.real", displayName: "Validated Name"));
+        client.DefaultRequestHeaders.Add("X-SecureOps-DisplayName", "Browser Supplied Admin");
+        client.DefaultRequestHeaders.Add("X-SecureOps-LoginName", "browser.admin");
+
+        _ = await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
+
+        ApplicationUser user = (await UsersAsync(factory)).Should().ContainSingle().Subject;
+        user.LoginName.Should().Be("operator.real");
+        user.DisplayName.Should().Be("Validated Name");
+    }
+
+    [Fact]
+    public async Task AdminAccessAndSessionProjections_UsePersistedHumanProfile()
+    {
+        const string userSubject = "synthetic-projection-user";
+        const string adminSubject = "synthetic-projection-admin";
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        await SeedAdminAsync(factory, OidcExternalIdentityNormalizer.StableIdentifier(_issuer, adminSubject), "oidc");
+        using HttpClient user = Client(factory, Token(userSubject, "requester.one", displayName: "Requester One", mail: "requester@example.test"));
+        CurrentAccessResponse requester = (await user.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        using HttpClient admin = Client(factory, Token(adminSubject, "admin.one", displayName: "Admin One", mail: "admin@example.test"));
+        _ = await admin.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
+
+        AccessRequestResponse[] requests = (await admin.GetFromJsonAsync<AccessRequestResponse[]>("/api/v1/access/requests"))!;
+        AccessUserResponse[] users = (await admin.GetFromJsonAsync<AccessUserResponse[]>("/api/v1/access/users"))!;
+        ActiveApplicationSessionsResponse sessions = (await admin.GetFromJsonAsync<ActiveApplicationSessionsResponse>("/api/v1/sessions/active"))!;
+
+        requests.Single(item => item.UserId == requester.UserId).Profile.Should().Be(
+            new AccessIdentityProfileResponse("Requester One", "requester.one", "requester@example.test", null, null));
+        users.Single(item => item.UserId == requester.UserId).Profile!.DisplayName.Should().Be("Requester One");
+        ApplicationSessionResponse session = sessions.Items.Single(item => item.UserId == requester.UserId);
+        session.DisplayName.Should().Be("Requester One");
+        session.Principal.Should().Be("requester.one");
+        session.NormalizedPrincipal.Should().StartWith("oidc:");
+    }
+
     private const string _issuer = "https://identity.example.test";
     private const string _audience = "secureops-api-test";
 
@@ -163,6 +253,12 @@ public sealed class OidcApiAuthenticationTests
             CancellationToken.None);
     }
 
+    private static async Task<IReadOnlyList<ApplicationUser>> UsersAsync(WebApplicationFactory<Program> factory)
+    {
+        using IServiceScope scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<IAccessRepository>().ListUsersAsync(CancellationToken.None);
+    }
+
     private static HttpClient Client(WebApplicationFactory<Program> factory, string token)
     {
         HttpClient client = factory.CreateClient();
@@ -172,16 +268,22 @@ public sealed class OidcApiAuthenticationTests
 
     private static string Token(
         string subject,
-        string loginName,
+        string? loginName,
         string? roleEvidence = null,
         string? audience = null,
-        string? issuer = null)
+        string? issuer = null,
+        string? displayName = null,
+        string? mail = null,
+        string? uid = null)
     {
         List<System.Security.Claims.Claim> claims =
         [
-            new("sub", subject),
-            new("loginname", loginName)
+            new("sub", subject)
         ];
+        AddClaim(claims, "loginname", loginName);
+        AddClaim(claims, "displayname", displayName);
+        AddClaim(claims, "mail", mail);
+        AddClaim(claims, "uid", uid);
         if (roleEvidence is not null)
         {
             claims.Add(new("uygulama-role", roleEvidence));
@@ -195,6 +297,14 @@ public sealed class OidcApiAuthenticationTests
             expires: DateTime.UtcNow.AddMinutes(5),
             signingCredentials: new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256));
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private static void AddClaim(List<System.Security.Claims.Claim> claims, string type, string? value)
+    {
+        if (value is not null)
+        {
+            claims.Add(new(type, value));
+        }
     }
 
     private static string HmacToken()

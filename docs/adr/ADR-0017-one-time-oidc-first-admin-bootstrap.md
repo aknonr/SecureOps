@@ -15,7 +15,7 @@ Only a normalized, validated OIDC principal containing issuer, subject, stable i
 
 The SQL bootstrap operation uses a serializable transaction and an update lock on the unique canonical Admin role row. While holding that lock it checks `security.RoleAssignments` without filtering revoked rows. If any Admin assignment has ever existed, bootstrap is permanently ineligible. Otherwise it validates the pending OIDC user/request, approves the request, inserts one Admin assignment, and inserts `FirstAdminBootstrapped`, `AccessApproved`, and `RoleAssigned` audit rows before committing. Any SQL or audit failure rolls back the transaction and returns a generic persistence failure.
 
-Migration 008 is not required. Migrations 001-007 already preserve revoked role-assignment rows, provide the unique canonical role, enforce one active user/role assignment, preserve request history, and protect audit rows from update/delete. Runtime access has no DELETE permission.
+The bootstrap mechanism itself requires no additional schema beyond migrations 001-007, which already preserve revoked role-assignment rows, provide the unique canonical role, enforce one active user/role assignment, preserve request history, and protect audit rows from update/delete. The later migration 008 adds only OIDC profile metadata and does not participate in bootstrap eligibility or authorization. Runtime access has no DELETE permission.
 
 ## Consequences
 

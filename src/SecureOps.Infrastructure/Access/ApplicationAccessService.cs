@@ -137,7 +137,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
 
     /// <inheritdoc />
     public Task<AccessIdentityProfile?> GetProfileAsync(ApplicationUser user, CancellationToken cancellationToken) =>
-        _profileResolver.ResolveAsync(user.CorporateIdentity, cancellationToken);
+        ResolveProfileAsync(user, cancellationToken);
 
     /// <inheritdoc />
     public async Task<AccessServiceResult<IReadOnlyList<AccessRequestReadModel>>> ListRequestsAsync(AccessRequestStatus? status, AccessOperationContext context, CancellationToken cancellationToken)
@@ -148,14 +148,18 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         }
 
         IReadOnlyList<ApplicationAccessRequest> requests = await _repository.ListRequestsAsync(status, cancellationToken);
+        IReadOnlyDictionary<Guid, ApplicationUser> users = (await _repository.ListUsersAsync(cancellationToken))
+            .ToDictionary(user => user.Id);
         List<AccessRequestReadModel> results = new(requests.Count);
-        Dictionary<string, AccessIdentityProfile?> profiles = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<Guid, AccessIdentityProfile?> profiles = [];
         foreach (ApplicationAccessRequest request in requests)
         {
-            if (!profiles.TryGetValue(request.CorporateIdentity, out AccessIdentityProfile? profile))
+            if (!profiles.TryGetValue(request.UserId, out AccessIdentityProfile? profile))
             {
-                profile = await _profileResolver.ResolveAsync(request.CorporateIdentity, cancellationToken);
-                profiles[request.CorporateIdentity] = profile;
+                profile = users.TryGetValue(request.UserId, out ApplicationUser? user)
+                    ? await ResolveProfileAsync(user, cancellationToken)
+                    : null;
+                profiles[request.UserId] = profile;
             }
 
             results.Add(new AccessRequestReadModel(request, profile));
@@ -177,7 +181,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         List<AccessUserReadModel> results = new(users.Count);
         foreach (ApplicationUser user in users)
         {
-            AccessIdentityProfile? profile = await _profileResolver.ResolveAsync(user.CorporateIdentity, cancellationToken);
+            AccessIdentityProfile? profile = await ResolveProfileAsync(user, cancellationToken);
             results.Add(new AccessUserReadModel(
                 user,
                 profile,
@@ -201,7 +205,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             return AccessServiceResult<AccessUserReadModel>.Fail(OperationalErrorCodes.AccessRecordNotFound);
         }
 
-        AccessIdentityProfile? profile = await _profileResolver.ResolveAsync(user.CorporateIdentity, cancellationToken);
+        AccessIdentityProfile? profile = await ResolveProfileAsync(user, cancellationToken);
         IReadOnlyList<ApplicationAccessRequest> requests = await _repository.ListRequestsForUserAsync(userId, cancellationToken);
         return AccessServiceResult<AccessUserReadModel>.Success(new AccessUserReadModel(user, profile, requests));
     }
@@ -350,6 +354,40 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             OidcExternalIdentityNormalizer.StableIdentifier(principal.Issuer, principal.Subject),
             StringComparison.Ordinal);
     }
+
+    private async Task<AccessIdentityProfile?> ResolveProfileAsync(ApplicationUser user, CancellationToken cancellationToken)
+    {
+        AccessIdentityProfile? persisted = HasPersistedProfile(user)
+            ? new AccessIdentityProfile(user.DisplayName, user.LoginName, user.Mail, null, null)
+            : null;
+        string? lookupIdentity = user.LoginName;
+        if (string.IsNullOrWhiteSpace(lookupIdentity)
+            && !string.Equals(user.AuthenticationSource, "oidc", StringComparison.Ordinal))
+        {
+            lookupIdentity = user.CorporateIdentity;
+        }
+
+        if (string.IsNullOrWhiteSpace(lookupIdentity))
+        {
+            return persisted;
+        }
+
+        AccessIdentityProfile? directory = await _profileResolver.ResolveAsync(lookupIdentity, cancellationToken);
+        if (directory is null)
+        {
+            return persisted;
+        }
+
+        return new AccessIdentityProfile(
+            persisted?.DisplayName ?? directory.DisplayName,
+            persisted?.Account ?? directory.Account,
+            persisted?.Email ?? directory.Email,
+            directory.Department,
+            directory.Title);
+    }
+
+    private static bool HasPersistedProfile(ApplicationUser user) =>
+        user.LoginName is not null || user.DisplayName is not null || user.Mail is not null;
 
     private (string SystemActor, string[] Roles)? ResolveDemoBootstrap(CorporatePrincipal principal)
     {

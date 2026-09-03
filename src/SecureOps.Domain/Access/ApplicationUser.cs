@@ -11,4 +11,9 @@ public sealed record ApplicationUser(
     DateTimeOffset? DisabledAt,
     long Version,
     IReadOnlyList<string> Roles,
-    IReadOnlyList<string> Capabilities);
+    IReadOnlyList<string> Capabilities,
+    string? LoginName = null,
+    string? DisplayName = null,
+    string? Mail = null,
+    string? Uid = null,
+    DateTimeOffset? ProfileUpdatedAt = null);

@@ -131,9 +131,9 @@ public sealed class SessionsController : ControllerBase
         session.AbsoluteExpiresAtUtc,
         session.AuthenticationMethod,
         session.AccessVersion,
+        user?.LoginName ?? user?.CorporateIdentity,
         user?.CorporateIdentity,
-        user?.CorporateIdentity,
-        DisplayName: null,
+        DisplayName: user?.DisplayName,
         AuthenticationProvider: user?.AuthenticationSource,
         IsCurrent: isCurrent);
 }

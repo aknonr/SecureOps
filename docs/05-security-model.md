@@ -22,7 +22,7 @@ Security is the defining constraint of this project. This document is the canoni
 - Corporate OIDC readiness is implemented but disabled by default. Current Demo/Test authentication remains available until activation is separately approved.
 - The browser UI uses Authorization Code flow with PKCE. The UI stores the API access token only in its server-side browser-session store and relays it to the API as a bearer token.
 - The API validates issuer, signature, audience, and lifetime, then reduces the token to a bounded reviewed identity. SecureOps does not issue its own corporate identity token.
-- `issuer + sub` produces the opaque stable access identity. `loginname` is the operator/Jira-resolution identity; `displayname`, `mail`, and `uid` are optional profile claims.
+- `issuer + sub` produces the opaque stable access identity. Validated `loginname`, `displayname`, `mail`, and `uid` claims are stored as bounded nullable profile metadata; changing them does not change access identity or authorization. `loginname` remains the exact Jira and optional Active Directory lookup identity.
 - `uygulama-role` is retained only as non-authoritative evidence. It never grants a SecureOps role or capability.
 - Authentication establishes only a corporate principal. Persisted SecureOps Access -> Role -> Capability remains the authorization authority, and unknown authenticated users remain pending.
 - SecureOps never requests or handles the user's LDAP/Jira password. The Jira integration credential remains only the REST technical identity.

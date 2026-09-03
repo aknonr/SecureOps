@@ -164,6 +164,15 @@ public sealed class AccessIdentityDisplayTests
     }
 
     [Fact]
+    public void Name_UsesExactAccountBeforeOpaquePrincipal()
+    {
+        var profile = new AccessIdentityProfileResponse(null, "operator.one", null, null, null);
+
+        Assert.Equal("operator.one", AccessIdentityDisplay.Name(profile, "oidc:opaque"));
+        Assert.True(AccessIdentityDisplay.HasName(profile));
+    }
+
+    [Fact]
     public void HasName_IsFalse_WhenOnlyOtherFieldsResolved()
     {
         // A profile carrying an e-mail but no name must not suppress the identifier line.

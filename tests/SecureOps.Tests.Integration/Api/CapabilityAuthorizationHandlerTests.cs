@@ -254,6 +254,59 @@ public sealed class CapabilityAuthorizationHandlerTests
     }
 
     [Fact]
+    public async Task OidcProfile_UsesPersistedLoginNameForOptionalDirectoryEnrichment()
+    {
+        var resolver = new RecordingProfileResolver();
+        Fixture fixture = new(profileResolver: resolver);
+        EnsureAccessUserResult ensured = await fixture.Repository.EnsureUserAsync(
+            new CorporatePrincipal(
+                "oidc:opaque-profile",
+                "oidc",
+                LoginName: "operator.one",
+                DisplayName: "Persisted Operator",
+                Mail: "persisted@example.test",
+                Uid: "uid-100"),
+            createRequest: true,
+            TimeSpan.Zero,
+            CancellationToken.None);
+
+        AccessIdentityProfile? profile = await fixture.Service.GetProfileAsync(ensured.User, CancellationToken.None);
+
+        resolver.RequestedIdentity.Should().Be("operator.one");
+        profile.Should().Be(new AccessIdentityProfile(
+            "Persisted Operator",
+            "operator.one",
+            "persisted@example.test",
+            "Operations",
+            "Engineer"));
+    }
+
+    [Fact]
+    public async Task OidcProfile_FallsBackToPersistedClaimsWhenDirectoryIsUnavailable()
+    {
+        Fixture fixture = new();
+        EnsureAccessUserResult ensured = await fixture.Repository.EnsureUserAsync(
+            new CorporatePrincipal(
+                "oidc:opaque-fallback",
+                "oidc",
+                LoginName: "operator.fallback",
+                DisplayName: "Fallback Operator",
+                Mail: "fallback@example.test"),
+            createRequest: true,
+            TimeSpan.Zero,
+            CancellationToken.None);
+
+        AccessIdentityProfile? profile = await fixture.Service.GetProfileAsync(ensured.User, CancellationToken.None);
+
+        profile.Should().Be(new AccessIdentityProfile(
+            "Fallback Operator",
+            "operator.fallback",
+            "fallback@example.test",
+            null,
+            null));
+    }
+
+    [Fact]
     public async Task AdministrativeList_DistinguishesApprovedDisabledAndRejectedPendingState()
     {
         Fixture fixture = new();
@@ -293,6 +346,22 @@ public sealed class CapabilityAuthorizationHandlerTests
             Task.FromResult(string.Equals(identity, corporateIdentity, StringComparison.OrdinalIgnoreCase)
                 ? new AccessIdentityProfile("Resolved User", "profile.user", "resolved.user@contoso.invalid", "Operations", "Engineer")
                 : null);
+    }
+
+    private sealed class RecordingProfileResolver : IAccessIdentityProfileResolver
+    {
+        public string? RequestedIdentity { get; private set; }
+
+        public Task<AccessIdentityProfile?> ResolveAsync(string corporateIdentity, CancellationToken cancellationToken)
+        {
+            RequestedIdentity = corporateIdentity;
+            return Task.FromResult<AccessIdentityProfile?>(new(
+                "Directory Operator",
+                corporateIdentity,
+                "directory@example.test",
+                "Operations",
+                "Engineer"));
+        }
     }
 
     private sealed class Fixture

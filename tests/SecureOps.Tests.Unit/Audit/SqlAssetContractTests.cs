@@ -63,8 +63,8 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(7)
-            .And.NotContain(name => name!.StartsWith("008-", StringComparison.Ordinal));
+            .And.HaveCount(8)
+            .And.ContainSingle(name => name!.StartsWith("008-", StringComparison.Ordinal));
 
         IReadOnlyList<int> declaredLengths = Directory
             .EnumerateFiles(Path.Combine(root, "sql", "schema"), "*.sql")
@@ -73,6 +73,28 @@ public sealed class SqlAssetContractTests
             .ToArray();
 
         declaredLengths.Should().OnlyContain(length => length <= 4000);
+    }
+
+    [Fact]
+    public void OidcUserProfileMigration_UpgradesInstalledUsersWithoutChangingStableIdentity()
+    {
+        string root = FindRepositoryRoot();
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "008-oidc-user-profile.sql"));
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "008-oidc-user-profile.sql"));
+
+        migration.Should().Contain(":r ..\\schema\\008-oidc-user-profile.sql");
+        schema.Should().Contain("COL_LENGTH(N'security.Users', N'LoginName') IS NULL")
+            .And.Contain("LoginName nvarchar(256) NULL")
+            .And.Contain("DisplayName nvarchar(256) NULL")
+            .And.Contain("Mail nvarchar(320) NULL")
+            .And.Contain("Uid nvarchar(256) NULL")
+            .And.Contain("ProfileUpdatedAt datetimeoffset(7) NULL")
+            .And.NotContain("CorporateIdentity =")
+            .And.NotContain("AuthenticationSource =")
+            .And.NotContain("AccessStatus =")
+            .And.NotContain("AccessVersion =")
+            .And.NotContain("Password")
+            .And.NotContain("Token");
     }
 
     [Fact]
@@ -199,6 +221,10 @@ public sealed class SqlAssetContractTests
             .And.Contain("WITH (UPDLOCK, HOLDLOCK)")
             .And.Contain("Version = Version + 1")
             .And.Contain("AccessVersion = AccessVersion + 1")
+            .And.Contain("LoginName, DisplayName, Mail, Uid, ProfileUpdatedAt")
+            .And.Contain("LoginName = COALESCE(@LoginName, LoginName)")
+            .And.Contain("ProfileUpdatedAt = CASE WHEN")
+            .And.Contain("CONVERT(varbinary(max), LoginName)")
             .And.Contain("ra.RevokedAt IS NULL")
             .And.Contain("transaction.CommitAsync(cancellationToken)")
             .And.NotContain("DELETE FROM");

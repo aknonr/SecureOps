@@ -33,7 +33,7 @@ For first real-user TEST bootstrap, preserve the current server-owned configurat
 | `PamProvider__Provider` | `Mock`; this is pass-through metadata only and is not a real PAM connector |
 | `ConnectionStrings__SecureOpsDb` | server-owned `SecureOpsDb` connection string using Windows Integrated Security, `Encrypt=True`, `TrustServerCertificate=False` |
 
-The runtime identity remains `DOMAIN\WASAST_YONETIM`. Do not configure SQL credentials or KRON/AAPM for this connection. Migrations 001-007 and grants must be completed before SQL providers are selected. The App Pool identity needs read/write/create permission only on the configured Data Protection key-ring directory; no key material is deployed from Git. After the first audited OIDC Admin grant, set `BootstrapAdmin__Enabled=false` and restart in a controlled window. Historical Admin assignment rows permanently prevent reuse even if configuration is left enabled; revocation does not reopen bootstrap.
+The runtime identity remains `DOMAIN\WASAST_YONETIM`. Do not configure SQL credentials or KRON/AAPM for this connection. Migrations 001-008 and grants must be completed before SQL providers are selected. The App Pool identity needs read/write/create permission only on the configured Data Protection key-ring directory; no key material is deployed from Git. After the first audited OIDC Admin grant, set `BootstrapAdmin__Enabled=false` and restart in a controlled window. Historical Admin assignment rows permanently prevent reuse even if configuration is left enabled; revocation does not reopen bootstrap.
 
 ## Reporting API and Windows
 

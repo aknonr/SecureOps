@@ -25,21 +25,26 @@ public static class AccessIdentityDisplay
     /// </summary>
     /// <param name="profile">Nullable enrichment.</param>
     /// <param name="corporateIdentity">Principal identifier, always present.</param>
-    /// <returns><c>DisplayName</c> when resolvable, otherwise the principal identifier.</returns>
+    /// <returns><c>DisplayName</c>, then the exact account name, then the principal identifier.</returns>
     public static string Name(AccessIdentityProfileResponse? profile, string corporateIdentity) =>
-        string.IsNullOrWhiteSpace(profile?.DisplayName) ? corporateIdentity : profile!.DisplayName!;
+        !string.IsNullOrWhiteSpace(profile?.DisplayName)
+            ? profile.DisplayName
+            : !string.IsNullOrWhiteSpace(profile?.Account)
+                ? profile.Account
+                : corporateIdentity;
 
     /// <summary>
     /// Whether a name distinct from the principal identifier was resolved.
     /// </summary>
     /// <param name="profile">Nullable enrichment.</param>
-    /// <returns><c>true</c> when a display name is available.</returns>
+    /// <returns><c>true</c> when a display name or exact account name is available.</returns>
     /// <remarks>
     /// Used to decide whether to show the identifier as a secondary line. When the name <i>is</i> the
     /// identifier, printing it twice looks like a rendering fault.
     /// </remarks>
     public static bool HasName(AccessIdentityProfileResponse? profile) =>
-        !string.IsNullOrWhiteSpace(profile?.DisplayName);
+        !string.IsNullOrWhiteSpace(profile?.DisplayName)
+        || !string.IsNullOrWhiteSpace(profile?.Account);
 
     /// <summary>
     /// Whether any enrichment field at all was resolved.

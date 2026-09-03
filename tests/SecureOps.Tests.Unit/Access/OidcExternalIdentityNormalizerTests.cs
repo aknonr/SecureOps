@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
@@ -100,6 +101,35 @@ public sealed class OidcExternalIdentityNormalizerTests
 
         normalizer.Normalize(tooMany).ErrorCode.Should().Be("OidcClaimsOutOfBounds");
         normalizer.Normalize(tooLarge).ErrorCode.Should().Be("OidcClaimsOutOfBounds");
+    }
+
+    [Theory]
+    [InlineData("loginname", ApplicationUserProfileLimits.LoginName)]
+    [InlineData("displayname", ApplicationUserProfileLimits.DisplayName)]
+    [InlineData("mail", ApplicationUserProfileLimits.Mail)]
+    [InlineData("uid", ApplicationUserProfileLimits.Uid)]
+    public void PersistedProfileClaimBeyondSemanticBound_FailsClosed(string claimType, int maximumLength)
+    {
+        OidcOptions options = new() { MaxClaimValueLength = 8192 };
+        OidcExternalIdentityNormalizationResult result = new OidcExternalIdentityNormalizer(Options.Create(options)).Normalize(Principal(
+            new("iss", "https://identity.example.test"),
+            new("sub", "subject-100"),
+            new(claimType, new string('x', maximumLength + 1))));
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorCode.Should().Be("OidcClaimsOutOfBounds");
+    }
+
+    [Fact]
+    public void PersistedProfileClaimWithControlCharacter_FailsClosed()
+    {
+        OidcExternalIdentityNormalizationResult result = Create().Normalize(Principal(
+            new("iss", "https://identity.example.test"),
+            new("sub", "subject-100"),
+            new("displayname", "Unsafe\nName")));
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorCode.Should().Be("OidcClaimsOutOfBounds");
     }
 
     [Fact]

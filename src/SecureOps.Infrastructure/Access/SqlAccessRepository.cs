@@ -23,6 +23,11 @@ public sealed class SqlAccessRepository : IAccessRepository
     /// <inheritdoc />
     public async Task<EnsureAccessUserResult> EnsureUserAsync(CorporatePrincipal principal, bool createRequest, TimeSpan activityPersistenceInterval, CancellationToken cancellationToken)
     {
+        bool oidcProfile = string.Equals(principal.AuthenticationSource, "oidc", StringComparison.Ordinal);
+        string? loginName = oidcProfile ? principal.LoginName : null;
+        string? displayName = oidcProfile ? principal.DisplayName : null;
+        string? mail = oidcProfile ? principal.Mail : null;
+        string? uid = oidcProfile ? principal.Uid : null;
         const string select = "SELECT UserId FROM security.Users WITH (UPDLOCK, HOLDLOCK) WHERE CorporateIdentity = @CorporateIdentity;";
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
@@ -34,23 +39,57 @@ public sealed class SqlAccessRepository : IAccessRepository
             userId = Guid.NewGuid();
             const string insertUser = """
                 INSERT INTO security.Users
-                    (UserId, CorporateIdentity, AuthenticationSource, AccessStatus, FirstAuthenticatedAt, LastAuthenticatedAt)
-                VALUES (@UserId, @CorporateIdentity, @AuthenticationSource, 'Pending', SYSUTCDATETIME(), SYSUTCDATETIME());
+                    (UserId, CorporateIdentity, AuthenticationSource, AccessStatus, FirstAuthenticatedAt, LastAuthenticatedAt,
+                     LoginName, DisplayName, Mail, Uid, ProfileUpdatedAt)
+                VALUES (@UserId, @CorporateIdentity, @AuthenticationSource, 'Pending', SYSUTCDATETIME(), SYSUTCDATETIME(),
+                        @LoginName, @DisplayName, @Mail, @Uid,
+                        CASE WHEN @LoginName IS NULL AND @DisplayName IS NULL AND @Mail IS NULL AND @Uid IS NULL
+                             THEN NULL ELSE SYSUTCDATETIME() END);
                 """;
-            await connection.ExecuteAsync(Command(insertUser, new { UserId = userId.Value, CorporateIdentity = principal.Identifier, principal.AuthenticationSource }, transaction, cancellationToken));
+            await connection.ExecuteAsync(Command(insertUser, new
+            {
+                UserId = userId.Value,
+                CorporateIdentity = principal.Identifier,
+                principal.AuthenticationSource,
+                LoginName = loginName,
+                DisplayName = displayName,
+                Mail = mail,
+                Uid = uid
+            }, transaction, cancellationToken));
         }
         else
         {
             const string updateSeen = """
+                DECLARE @Now datetimeoffset(7) = SYSUTCDATETIME();
                 UPDATE security.Users
-                SET LastAuthenticatedAt = SYSUTCDATETIME()
+                SET LastAuthenticatedAt = CASE
+                        WHEN LastAuthenticatedAt <= DATEADD(MINUTE, -@ActivityPersistenceIntervalMinutes, @Now)
+                        THEN @Now ELSE LastAuthenticatedAt END,
+                    LoginName = COALESCE(@LoginName, LoginName),
+                    DisplayName = COALESCE(@DisplayName, DisplayName),
+                    Mail = COALESCE(@Mail, Mail),
+                    Uid = COALESCE(@Uid, Uid),
+                    ProfileUpdatedAt = CASE WHEN
+                        (@LoginName IS NOT NULL AND (LoginName IS NULL OR CONVERT(varbinary(max), LoginName) <> CONVERT(varbinary(max), @LoginName))) OR
+                        (@DisplayName IS NOT NULL AND (DisplayName IS NULL OR CONVERT(varbinary(max), DisplayName) <> CONVERT(varbinary(max), @DisplayName))) OR
+                        (@Mail IS NOT NULL AND (Mail IS NULL OR CONVERT(varbinary(max), Mail) <> CONVERT(varbinary(max), @Mail))) OR
+                        (@Uid IS NOT NULL AND (Uid IS NULL OR CONVERT(varbinary(max), Uid) <> CONVERT(varbinary(max), @Uid)))
+                        THEN @Now ELSE ProfileUpdatedAt END
                 WHERE UserId = @UserId
-                  AND LastAuthenticatedAt <= DATEADD(MINUTE, -@ActivityPersistenceIntervalMinutes, SYSUTCDATETIME());
+                  AND (LastAuthenticatedAt <= DATEADD(MINUTE, -@ActivityPersistenceIntervalMinutes, @Now) OR
+                       (@LoginName IS NOT NULL AND (LoginName IS NULL OR CONVERT(varbinary(max), LoginName) <> CONVERT(varbinary(max), @LoginName))) OR
+                       (@DisplayName IS NOT NULL AND (DisplayName IS NULL OR CONVERT(varbinary(max), DisplayName) <> CONVERT(varbinary(max), @DisplayName))) OR
+                       (@Mail IS NOT NULL AND (Mail IS NULL OR CONVERT(varbinary(max), Mail) <> CONVERT(varbinary(max), @Mail))) OR
+                       (@Uid IS NOT NULL AND (Uid IS NULL OR CONVERT(varbinary(max), Uid) <> CONVERT(varbinary(max), @Uid))));
                 """;
             await connection.ExecuteAsync(Command(updateSeen, new
             {
                 UserId = userId.GetValueOrDefault(),
-                ActivityPersistenceIntervalMinutes = (int)activityPersistenceInterval.TotalMinutes
+                ActivityPersistenceIntervalMinutes = (int)activityPersistenceInterval.TotalMinutes,
+                LoginName = loginName,
+                DisplayName = displayName,
+                Mail = mail,
+                Uid = uid
             }, transaction, cancellationToken));
         }
 
@@ -306,7 +345,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     private static ApplicationUser Map(UserRow row)
     {
         string[] roles = string.IsNullOrWhiteSpace(row.Roles) ? [] : row.Roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return new ApplicationUser(row.Id, row.CorporateIdentity, row.AuthenticationSource, Enum.Parse<AccessStatus>(row.Status, true), row.FirstAuthenticatedAt, row.LastAuthenticatedAt, row.DisabledAt, row.Version, roles, AccessRoleCatalog.GetCapabilities(roles));
+        return new ApplicationUser(row.Id, row.CorporateIdentity, row.AuthenticationSource, Enum.Parse<AccessStatus>(row.Status, true), row.FirstAuthenticatedAt, row.LastAuthenticatedAt, row.DisabledAt, row.Version, roles, AccessRoleCatalog.GetCapabilities(roles), row.LoginName, row.DisplayName, row.Mail, row.Uid, row.ProfileUpdatedAt);
     }
 
     private static ApplicationAccessRequest Map(RequestRow row) => new(row.Id, row.UserId, row.CorporateIdentity, Enum.Parse<AccessRequestStatus>(row.Status, true), row.RequestedAt, row.DecidedAt, row.DecisionReason, row.DecidedByCorporateIdentity, row.Version);
@@ -318,6 +357,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     private const string ReadUserSql = """
         SELECT u.UserId AS Id, u.CorporateIdentity, u.AuthenticationSource, u.AccessStatus AS Status,
             u.FirstAuthenticatedAt, u.LastAuthenticatedAt, u.DisabledAt, u.AccessVersion AS Version,
+            u.LoginName, u.DisplayName, u.Mail, u.Uid, u.ProfileUpdatedAt,
             STRING_AGG(r.RoleCode, ',') AS Roles
         FROM security.Users u
         LEFT JOIN security.RoleAssignments ra ON ra.UserId = u.UserId AND ra.RevokedAt IS NULL
@@ -331,7 +371,7 @@ public sealed class SqlAccessRepository : IAccessRepository
         JOIN security.Users u ON u.UserId = ar.UserId
         """;
 
-    private const string UserGroupBy = "GROUP BY u.UserId, u.CorporateIdentity, u.AuthenticationSource, u.AccessStatus, u.FirstAuthenticatedAt, u.LastAuthenticatedAt, u.DisabledAt, u.AccessVersion";
+    private const string UserGroupBy = "GROUP BY u.UserId, u.CorporateIdentity, u.AuthenticationSource, u.AccessStatus, u.FirstAuthenticatedAt, u.LastAuthenticatedAt, u.DisabledAt, u.AccessVersion, u.LoginName, u.DisplayName, u.Mail, u.Uid, u.ProfileUpdatedAt";
 
     private sealed class UserRow
     {
@@ -344,6 +384,11 @@ public sealed class SqlAccessRepository : IAccessRepository
         public DateTimeOffset? DisabledAt { get; init; }
         public long Version { get; init; }
         public string? Roles { get; init; }
+        public string? LoginName { get; init; }
+        public string? DisplayName { get; init; }
+        public string? Mail { get; init; }
+        public string? Uid { get; init; }
+        public DateTimeOffset? ProfileUpdatedAt { get; init; }
     }
 
     private sealed class RequestRow

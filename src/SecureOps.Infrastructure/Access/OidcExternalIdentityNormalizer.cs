@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
+using SecureOps.Domain.Access;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
 
@@ -55,6 +56,14 @@ public sealed class OidcExternalIdentityNormalizer
             || !TrySingle(claims, _options.UidClaimType, required: false, out string? uid))
         {
             return Invalid("OidcClaimsInvalid");
+        }
+
+        if (!IsSafeProfileValue(loginName, ApplicationUserProfileLimits.LoginName)
+            || !IsSafeProfileValue(displayName, ApplicationUserProfileLimits.DisplayName)
+            || !IsSafeProfileValue(mail, ApplicationUserProfileLimits.Mail)
+            || !IsSafeProfileValue(uid, ApplicationUserProfileLimits.Uid))
+        {
+            return Invalid("OidcClaimsOutOfBounds");
         }
 
         string[] roleEvidence = claims
@@ -130,6 +139,9 @@ public sealed class OidcExternalIdentityNormalizer
             claims.Add(new Claim(type, value));
         }
     }
+
+    private static bool IsSafeProfileValue(string? value, int maximumLength) =>
+        value is null || (value.Length <= maximumLength && !value.Any(char.IsControl));
 
     private static OidcExternalIdentityNormalizationResult Invalid(string code) =>
         new(false, null, null, code);
