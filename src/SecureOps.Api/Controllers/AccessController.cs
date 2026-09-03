@@ -267,7 +267,7 @@ public sealed class AccessController : ControllerBase
 
     private static AccessIdentityProfileResponse? ToResponse(AccessIdentityProfile? profile) => profile is null
         ? null
-        : new AccessIdentityProfileResponse(profile.DisplayName, profile.Account, profile.Email, profile.Department, profile.Title);
+        : new AccessIdentityProfileResponse(profile.DisplayName, profile.Account, profile.Email, profile.Department, profile.Title, profile.Uid);
 
     private static AccessUserResponse ToResponse(AccessUserReadModel model) => new(
         model.User.Id,

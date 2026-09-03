@@ -196,6 +196,13 @@ public sealed class SqlAccessRepository : IAccessRepository
             return new AccessMutationResult(AccessMutationDisposition.ConcurrencyConflict, currentUser, Map(request), [], []);
         }
 
+        ApplicationUser targetUser = await GetUserWithinTransactionAsync(connection, transaction, request.UserId, cancellationToken);
+        if (decision == AccessRequestStatus.Approved && targetUser.Status == AccessStatus.Disabled)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new AccessMutationResult(AccessMutationDisposition.UserInvalidState, targetUser, Map(request), [], []);
+        }
+
         if (decision == AccessRequestStatus.Approved && string.Equals(request.CorporateIdentity, actor, StringComparison.OrdinalIgnoreCase))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -274,7 +281,7 @@ public sealed class SqlAccessRepository : IAccessRepository
             return Missing();
         }
 
-        if (current.Status == AccessStatus.Disabled)
+        if (current.Status != AccessStatus.Approved)
         {
             await transaction.RollbackAsync(cancellationToken);
             return new AccessMutationResult(AccessMutationDisposition.UserInvalidState, current, null, [], []);

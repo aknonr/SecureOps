@@ -3778,6 +3778,10 @@
           "title": {
             "type": "string",
             "nullable": true
+          },
+          "uid": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3982,6 +3986,10 @@
           },
           "isCurrent": {
             "type": "boolean"
+          },
+          "uid": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

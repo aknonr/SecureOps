@@ -13,7 +13,8 @@ public sealed record ApplicationSessionResponse(
     string? NormalizedPrincipal = null,
     string? DisplayName = null,
     string? AuthenticationProvider = null,
-    bool IsCurrent = false);
+    bool IsCurrent = false,
+    string? Uid = null);
 
 /// <summary>Bounded active-session administrative page.</summary>
 public sealed record ActiveApplicationSessionsResponse(

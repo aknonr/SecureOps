@@ -2,85 +2,66 @@ using SecureOps.Shared.Contracts.Access;
 
 namespace SecureOps.Ui.Services;
 
-/// <summary>
-/// Turns nullable directory enrichment into something safe to put on screen.
-/// </summary>
-/// <remarks>
-/// Every field of <see cref="AccessIdentityProfileResponse"/> is nullable, and the whole object is
-/// nullable, because the provider resolves what it can and reports nothing for what it cannot. The
-/// demo bridge resolves nothing at all, so "absent" is the normal case rather than an edge one.
-/// <para>
-/// The rule this type exists to enforce: <b>fall back to the principal identifier, never to a
-/// placeholder</b>. An invented name, a blank line where a name belongs, or an em dash standing in
-/// for an e-mail all read as data. On a screen where an administrator grants authority, a
-/// fabricated person is a safety problem, not a cosmetic one — so an unresolvable profile shows the
-/// raw identifier the API actually gave us, and the caller states plainly that enrichment is
-/// unavailable.
-/// </para>
-/// </remarks>
+/// <summary>Builds safe human-facing labels from persisted profile data.</summary>
 public static class AccessIdentityDisplay
 {
-    /// <summary>
-    /// The best available name for a principal.
-    /// </summary>
-    /// <param name="profile">Nullable enrichment.</param>
-    /// <param name="corporateIdentity">Principal identifier, always present.</param>
-    /// <returns><c>DisplayName</c>, then the exact account name, then the principal identifier.</returns>
+    /// <summary>Primary label for an OIDC user whose profile has not been backfilled.</summary>
+    public const string ProfilePending = "OIDC profil bilgisi bekleniyor";
+
+    /// <summary>Explains how an existing opaque-only OIDC user obtains profile data.</summary>
+    public const string ProfileRefreshNotice = "Profil, kullanıcının sonraki başarılı OIDC girişinde güncellenir.";
+
+    /// <summary>Display name, then exact account name, then a bounded fallback.</summary>
     public static string Name(AccessIdentityProfileResponse? profile, string corporateIdentity) =>
         !string.IsNullOrWhiteSpace(profile?.DisplayName)
-            ? profile.DisplayName
+            ? profile.DisplayName.Trim()
             : !string.IsNullOrWhiteSpace(profile?.Account)
-                ? profile.Account
-                : corporateIdentity;
+                ? profile.Account.Trim()
+                : IsOidc(corporateIdentity)
+                    ? ProfilePending
+                    : corporateIdentity;
 
-    /// <summary>
-    /// Whether a name distinct from the principal identifier was resolved.
-    /// </summary>
-    /// <param name="profile">Nullable enrichment.</param>
-    /// <returns><c>true</c> when a display name or exact account name is available.</returns>
-    /// <remarks>
-    /// Used to decide whether to show the identifier as a secondary line. When the name <i>is</i> the
-    /// identifier, printing it twice looks like a rendering fault.
-    /// </remarks>
+    /// <summary>Exact account name shown below a distinct display name.</summary>
+    public static string? SecondaryAccount(AccessIdentityProfileResponse? profile) =>
+        !string.IsNullOrWhiteSpace(profile?.DisplayName) && !string.IsNullOrWhiteSpace(profile.Account)
+            ? profile.Account.Trim()
+            : null;
+
+    /// <summary>Persisted corporate employee number used only as profile metadata.</summary>
+    public static string? Uid(AccessIdentityProfileResponse? profile) =>
+        string.IsNullOrWhiteSpace(profile?.Uid) ? null : profile.Uid.Trim();
+
+    /// <summary>Whether an opaque-only OIDC record is waiting for profile backfill.</summary>
+    public static bool NeedsProfileBackfill(AccessIdentityProfileResponse? profile, string corporateIdentity) =>
+        !HasAny(profile) && IsOidc(corporateIdentity);
+
+    /// <summary>Whether a display name or exact account name is available.</summary>
     public static bool HasName(AccessIdentityProfileResponse? profile) =>
         !string.IsNullOrWhiteSpace(profile?.DisplayName)
         || !string.IsNullOrWhiteSpace(profile?.Account);
 
-    /// <summary>
-    /// Whether any enrichment field at all was resolved.
-    /// </summary>
-    /// <param name="profile">Nullable enrichment.</param>
-    /// <returns><c>true</c> when at least one field carries a value.</returns>
+    /// <summary>Whether any profile or directory field carries a value.</summary>
     public static bool HasAny(AccessIdentityProfileResponse? profile) =>
         profile is not null
         && (!string.IsNullOrWhiteSpace(profile.DisplayName)
             || !string.IsNullOrWhiteSpace(profile.Account)
             || !string.IsNullOrWhiteSpace(profile.Email)
             || !string.IsNullOrWhiteSpace(profile.Department)
-            || !string.IsNullOrWhiteSpace(profile.Title));
+            || !string.IsNullOrWhiteSpace(profile.Title)
+            || !string.IsNullOrWhiteSpace(profile.Uid));
 
-    // Separators used when deriving initials. (char)92 is a backslash, written this way so no
-    // literal backslash appears in the source.
-    private static readonly char[] Separators =
-        [' ', '.', '-', '_', ':', '/', (char)92];
+    private static readonly char[] Separators = [' ', '.', '-', '_', ':', '/', (char)92];
 
-    /// <summary>
-    /// Initials for an avatar, derived from whatever name is actually shown.
-    /// </summary>
-    /// <param name="profile">Nullable enrichment.</param>
-    /// <param name="corporateIdentity">Principal identifier.</param>
-    /// <returns>One or two uppercase letters.</returns>
+    /// <summary>One or two initials derived from the human-facing label.</summary>
     public static string Initials(AccessIdentityProfileResponse? profile, string corporateIdentity)
     {
         string source = Name(profile, corporateIdentity);
+        if (string.Equals(source, ProfilePending, StringComparison.Ordinal))
+        {
+            return "?";
+        }
 
-        // A principal identifier is commonly "demo:team-lead" or "DOMAIN\user"; splitting on those
-        // separators as well as whitespace keeps the initials meaningful when no real name exists.
-        // Separators live in a field because a backslash char literal here was mangled
-        // by the tooling chain; (char)92 avoids writing one at all.
-        string[] parts = source
-            .Split(Separators, StringSplitOptions.RemoveEmptyEntries);
-
+        string[] parts = source.Split(Separators, StringSplitOptions.RemoveEmptyEntries);
         return parts.Length switch
         {
             0 => "?",
@@ -88,4 +69,7 @@ public static class AccessIdentityDisplay
             _ => (parts[0][..1] + parts[^1][..1]).ToUpperInvariant()
         };
     }
+
+    private static bool IsOidc(string corporateIdentity) =>
+        corporateIdentity.StartsWith("oidc:", StringComparison.OrdinalIgnoreCase);
 }

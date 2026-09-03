@@ -104,11 +104,17 @@
                                     <span class="so-user-row-name">
                                         @AccessIdentityDisplay.Name(user.Profile, user.CorporateIdentity)
                                     </span>
-                                    @* Shown only when a real name resolved; otherwise the name above
-                                       already is the identifier and repeating it reads as a fault. *@
-                                    @if (AccessIdentityDisplay.HasName(user.Profile))
+                                    @if (AccessIdentityDisplay.SecondaryAccount(user.Profile) is { } account)
                                     {
-                                        <span class="so-user-row-meta">@user.CorporateIdentity</span>
+                                        <span class="so-user-row-meta">@account</span>
+                                    }
+                                    @if (AccessIdentityDisplay.Uid(user.Profile) is { } uid)
+                                    {
+                                        <span class="so-user-row-meta">Sicil No: @uid</span>
+                                    }
+                                    @if (user.Profile?.Email is { Length: > 0 } email)
+                                    {
+                                        <span class="so-user-row-meta">@email</span>
                                     }
                                     @if (user.Roles.Count > 0)
                                     {
@@ -116,6 +122,9 @@
                                             @string.Join(", ", user.Roles.Select(AccessLabels.RoleLabel))
                                         </span>
                                     }
+                                    <span class="so-user-row-meta">
+                                        @user.AuthenticationSource · Son giriş: @user.LastAuthenticatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    </span>
                                 </span>
 
                                 <span class="so-user-row-status">

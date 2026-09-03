@@ -135,8 +135,8 @@ public sealed class OidcApiAuthenticationTests
         CurrentAccessResponse secondAccess = (await second.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
         ApplicationUser persistedSecond = (await UsersAsync(factory)).Should().ContainSingle().Subject;
 
-        firstAccess.Profile.Should().Be(new AccessIdentityProfileResponse("Operator One", "operator.one", "one@example.test", null, null));
-        secondAccess.Profile.Should().Be(new AccessIdentityProfileResponse("Updated Operator", "operator.one", "updated@example.test", null, null));
+        firstAccess.Profile.Should().Be(new AccessIdentityProfileResponse("Operator One", "operator.one", "one@example.test", null, null, "uid-100"));
+        secondAccess.Profile.Should().Be(new AccessIdentityProfileResponse("Updated Operator", "operator.one", "updated@example.test", null, null, "uid-100"));
         persistedSecond.Id.Should().Be(persistedFirst.Id);
         persistedSecond.CorporateIdentity.Should().Be(persistedFirst.CorporateIdentity)
             .And.Be(OidcExternalIdentityNormalizer.StableIdentifier(_issuer, subject));
@@ -191,7 +191,7 @@ public sealed class OidcApiAuthenticationTests
         const string adminSubject = "synthetic-projection-admin";
         using WebApplicationFactory<Program> factory = CreateFactory();
         await SeedAdminAsync(factory, OidcExternalIdentityNormalizer.StableIdentifier(_issuer, adminSubject), "oidc");
-        using HttpClient user = Client(factory, Token(userSubject, "requester.one", displayName: "Requester One", mail: "requester@example.test"));
+        using HttpClient user = Client(factory, Token(userSubject, "requester.one", displayName: "Requester One", mail: "requester@example.test", uid: "uid-requester"));
         CurrentAccessResponse requester = (await user.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
         using HttpClient admin = Client(factory, Token(adminSubject, "admin.one", displayName: "Admin One", mail: "admin@example.test"));
         _ = await admin.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
@@ -201,12 +201,13 @@ public sealed class OidcApiAuthenticationTests
         ActiveApplicationSessionsResponse sessions = (await admin.GetFromJsonAsync<ActiveApplicationSessionsResponse>("/api/v1/sessions/active"))!;
 
         requests.Single(item => item.UserId == requester.UserId).Profile.Should().Be(
-            new AccessIdentityProfileResponse("Requester One", "requester.one", "requester@example.test", null, null));
+            new AccessIdentityProfileResponse("Requester One", "requester.one", "requester@example.test", null, null, "uid-requester"));
         users.Single(item => item.UserId == requester.UserId).Profile!.DisplayName.Should().Be("Requester One");
         ApplicationSessionResponse session = sessions.Items.Single(item => item.UserId == requester.UserId);
         session.DisplayName.Should().Be("Requester One");
         session.Principal.Should().Be("requester.one");
         session.NormalizedPrincipal.Should().StartWith("oidc:");
+        session.Uid.Should().Be("uid-requester");
     }
 
     private const string _issuer = "https://identity.example.test";

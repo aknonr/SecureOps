@@ -127,6 +127,11 @@ public sealed class InMemoryAccessRepository : IAccessRepository
                 return Conflict(AccessMutationDisposition.ConcurrencyConflict, user, request);
             }
 
+            if (decision == AccessRequestStatus.Approved && user.Status == AccessStatus.Disabled)
+            {
+                return Conflict(AccessMutationDisposition.UserInvalidState, user, request);
+            }
+
             if (decision == AccessRequestStatus.Approved && string.Equals(user.CorporateIdentity, actor, StringComparison.OrdinalIgnoreCase))
             {
                 return new AccessMutationResult(AccessMutationDisposition.SelfApprovalDenied, ToUser(user), ToRequest(request), [], []);
@@ -191,7 +196,7 @@ public sealed class InMemoryAccessRepository : IAccessRepository
                 return Missing();
             }
 
-            if (user.Status == AccessStatus.Disabled)
+            if (user.Status != AccessStatus.Approved)
             {
                 return Conflict(AccessMutationDisposition.UserInvalidState, user, null);
             }

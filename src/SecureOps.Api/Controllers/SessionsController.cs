@@ -131,9 +131,15 @@ public sealed class SessionsController : ControllerBase
         session.AbsoluteExpiresAtUtc,
         session.AuthenticationMethod,
         session.AccessVersion,
-        user?.LoginName ?? user?.CorporateIdentity,
+        DisplayPrincipal(user),
         user?.CorporateIdentity,
         DisplayName: user?.DisplayName,
         AuthenticationProvider: user?.AuthenticationSource,
-        IsCurrent: isCurrent);
+        IsCurrent: isCurrent,
+        Uid: user?.Uid);
+
+    private static string? DisplayPrincipal(ApplicationUser? user) =>
+        user?.LoginName ?? (string.Equals(user?.AuthenticationSource, "oidc", StringComparison.Ordinal)
+            ? null
+            : user?.CorporateIdentity);
 }

@@ -87,6 +87,30 @@ public sealed class CapabilityAuthorizationHandlerTests
     }
 
     [Fact]
+    public async Task PendingUser_CannotEnterDisabledStateWithAnApprovableRequest()
+    {
+        Fixture fixture = new();
+        ClaimsPrincipal principal = Principal("CONTOSO\\pending.disable");
+        AccessServiceResult<EnsureAccessUserResult> current = await fixture.Service.GetCurrentAsync(
+            principal,
+            Fixture.UserContext,
+            CancellationToken.None);
+
+        AccessServiceResult<AccessMutationResult> disable = await fixture.Service.DisableAsync(
+            current.Value!.User.Id,
+            "Synthetic pending-disable rejection.",
+            current.Value.User.Version,
+            Fixture.AdminContext,
+            CancellationToken.None);
+
+        disable.ErrorCode.Should().Be(OperationalErrorCodes.AccessUserInvalidState);
+        (await fixture.Repository.GetUserAsync(current.Value.User.Id, CancellationToken.None))!.Status
+            .Should().Be(AccessStatus.Pending);
+        (await fixture.Repository.GetPendingRequestAsync(current.Value.User.Id, CancellationToken.None))
+            .Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Administrator_CanApprovePendingRequest()
     {
         Fixture fixture = new();
@@ -278,7 +302,8 @@ public sealed class CapabilityAuthorizationHandlerTests
             "operator.one",
             "persisted@example.test",
             "Operations",
-            "Engineer"));
+            "Engineer",
+            "uid-100"));
     }
 
     [Fact]

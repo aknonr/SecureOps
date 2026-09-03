@@ -119,10 +119,10 @@
                         <thead>
                             <tr>
                                 <th scope="col">Kullanıcı</th>
+                                <th scope="col">Kimlik Doğrulama</th>
                                 <th scope="col">Oturum Başlangıcı</th>
                                 <th scope="col">Son Aktivite</th>
                                 <th scope="col">Bitiş / Süre</th>
-                                <th scope="col">Kimlik Doğrulama</th>
                                 <th scope="col">Durum</th>
                                 <th scope="col"><span class="sr-only">İşlem</span></th>
                             </tr>
@@ -133,6 +133,7 @@
                                 ApplicationSessionResponse captured = session;
                                 bool mine = IsMine(session);
                                 string? account = SessionView.Account(session);
+                                string? uid = SessionView.Uid(session);
 
                                 <tr class="@(mine ? "so-row--self" : null)">
                                     <th scope="row">
@@ -143,15 +144,19 @@
                                             {
                                                 <span class="so-session-account">@account</span>
                                             }
+                                            @if (uid is not null)
+                                            {
+                                                <span class="so-session-account">Sicil No: @uid</span>
+                                            }
                                         </span>
                                     </th>
+                                    <td>@SessionView.Authentication(session)</td>
                                     <td>@SessionView.Local(session.StartedAtUtc)</td>
                                     <td>@SessionView.Local(session.LastSeenAtUtc)</td>
                                     <td>
                                         <span class="so-session-expiry">@SessionView.Local(session.AbsoluteExpiresAtUtc)</span>
                                         <span class="so-session-remaining">@SessionView.Remaining(session, Now)</span>
                                     </td>
-                                    <td>@SessionView.Authentication(session)</td>
                                     <td>
                                         @* isCurrent is server-authoritative. Marking the row the
                                            administrator is sitting in prevents the single most
@@ -191,6 +196,7 @@
                             <thead>
                                 <tr>
                                     <th scope="col">Kullanıcı</th>
+                                    <th scope="col">Kurumsal Teknik Kimlik</th>
                                     <th scope="col">Oturum kaydı</th>
                                     <th scope="col">Kullanıcı kaydı</th>
                                     <th scope="col" class="so-num">Erişim sürümü</th>
@@ -201,6 +207,7 @@
                                 {
                                     <tr>
                                         <th scope="row">@SessionView.Name(session)</th>
+                                        <td><code class="so-code so-code--sm">@session.NormalizedPrincipal</code></td>
                                         <td><code class="so-code so-code--sm">@session.SessionId</code></td>
                                         <td><code class="so-code so-code--sm">@session.UserId</code></td>
                                         <td class="so-num">@session.AccessVersion</td>

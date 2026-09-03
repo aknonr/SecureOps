@@ -6,4 +6,5 @@ public sealed record AccessIdentityProfileResponse(
     string? Account,
     string? Email,
     string? Department,
-    string? Title);
+    string? Title,
+    string? Uid = null);

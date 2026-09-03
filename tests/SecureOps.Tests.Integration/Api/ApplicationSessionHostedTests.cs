@@ -12,6 +12,7 @@ using SecureOps.Api.Security;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Sessions;
 using SecureOps.Shared.Audit;
+using SecureOps.Shared.Contracts.Access;
 using SecureOps.Shared.Contracts.OperationalRecords;
 using SecureOps.Shared.Contracts.Sessions;
 using SecureOps.Ui.Services;
@@ -161,6 +162,35 @@ public sealed class ApplicationSessionHostedTests
         revokeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         await AssertProblemAsync(replayResponse, HttpStatusCode.Forbidden, "SessionRevoked");
         afterRevoke.Items.Select(item => item.SessionId).Should().NotContain(leadState.LeadSession.SessionId);
+    }
+
+    [Fact]
+    public async Task DisableUser_EndsExistingSessionsAndBlocksFurtherAccess()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse LeadSession, string LeadCookie) leadState = await StartAsync(lead);
+        (ApplicationSessionResponse AdminSession, string AdminCookie) adminState = await StartAsync(admin);
+
+        using HttpRequestMessage usersRequest = Request(HttpMethod.Get, "/api/v1/access/users", adminState.AdminCookie);
+        AccessUserResponse[] users = (await (await admin.SendAsync(usersRequest)).Content
+            .ReadFromJsonAsync<AccessUserResponse[]>())!;
+        AccessUserResponse target = users.Single(user => user.UserId == leadState.LeadSession.UserId);
+        using HttpRequestMessage disable = Request(HttpMethod.Post, $"/api/v1/access/users/{target.UserId}/disable", adminState.AdminCookie);
+        disable.Content = JsonContent.Create(new DisableAccessRequest("Approved synthetic access-disable test.", target.Version));
+
+        HttpResponseMessage disableResponse = await admin.SendAsync(disable);
+        using HttpRequestMessage blocked = Request(HttpMethod.Get, "/api/v1/access/me", leadState.LeadCookie);
+        HttpResponseMessage blockedResponse = await lead.SendAsync(blocked);
+        using HttpRequestMessage relist = Request(HttpMethod.Get, "/api/v1/sessions/active", adminState.AdminCookie);
+        ActiveApplicationSessionsResponse active = (await (await admin.SendAsync(relist)).Content
+            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>())!;
+
+        disableResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await AssertProblemAsync(blockedResponse, HttpStatusCode.Forbidden, "AccessDisabled");
+        active.Items.Select(item => item.SessionId).Should().NotContain(leadState.LeadSession.SessionId);
+        active.Items.Select(item => item.SessionId).Should().Contain(adminState.AdminSession.SessionId);
     }
 
     [Fact]

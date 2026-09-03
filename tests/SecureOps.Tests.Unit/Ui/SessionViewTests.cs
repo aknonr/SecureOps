@@ -34,10 +34,16 @@ public sealed class SessionViewTests
     }
 
     [Fact]
-    public void Name_FallsBackToTheNormalizedPrincipalWhenThatIsAllThereIs()
+    public void OpaqueOidcIdentity_IsNotUsedAsThePrimarySessionLabel()
     {
-        SessionView.Name(Session(displayName: null, principal: null, normalized: "ayilmaz"))
-            .Should().Be("ayilmaz");
+        ApplicationSessionResponse session = Session(
+            displayName: null,
+            principal: null,
+            normalized: "oidc:opaque-stable-identity",
+            provider: "oidc");
+
+        SessionView.Name(session).Should().Be(SessionView.ProfilePending);
+        SessionView.Name(session).Should().NotContain(session.NormalizedPrincipal!);
     }
 
     [Fact]
@@ -79,6 +85,12 @@ public sealed class SessionViewTests
     }
 
     [Fact]
+    public void Uid_IsTrimmedForSicilPresentation()
+    {
+        SessionView.Uid(Session(uid: " 12345 ")).Should().Be("12345");
+    }
+
+    [Fact]
     public void ExpiredSession_IsNotListedAsActive()
     {
         // A session past its absolute lifetime must not be offered with a "Sonlandır" button; the
@@ -102,7 +114,8 @@ public sealed class SessionViewTests
         string? principal = "CONTOSO\\ayilmaz",
         string? normalized = "ayilmaz",
         string? provider = "Windows",
-        TimeSpan? expiresIn = null) =>
+        TimeSpan? expiresIn = null,
+        string? uid = null) =>
         new(
             SessionId: Guid.Parse("11111111-1111-1111-1111-111111111111"),
             UserId: Guid.Parse("22222222-2222-2222-2222-222222222222"),
@@ -115,5 +128,6 @@ public sealed class SessionViewTests
             NormalizedPrincipal: normalized,
             DisplayName: displayName,
             AuthenticationProvider: provider,
-            IsCurrent: false);
+            IsCurrent: false,
+            Uid: uid);
 }

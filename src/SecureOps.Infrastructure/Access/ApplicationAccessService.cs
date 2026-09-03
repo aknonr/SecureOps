@@ -358,7 +358,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
     private async Task<AccessIdentityProfile?> ResolveProfileAsync(ApplicationUser user, CancellationToken cancellationToken)
     {
         AccessIdentityProfile? persisted = HasPersistedProfile(user)
-            ? new AccessIdentityProfile(user.DisplayName, user.LoginName, user.Mail, null, null)
+            ? new AccessIdentityProfile(user.DisplayName, user.LoginName, user.Mail, null, null, user.Uid)
             : null;
         string? lookupIdentity = user.LoginName;
         if (string.IsNullOrWhiteSpace(lookupIdentity)
@@ -383,11 +383,12 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             persisted?.Account ?? directory.Account,
             persisted?.Email ?? directory.Email,
             directory.Department,
-            directory.Title);
+            directory.Title,
+            persisted?.Uid);
     }
 
     private static bool HasPersistedProfile(ApplicationUser user) =>
-        user.LoginName is not null || user.DisplayName is not null || user.Mail is not null;
+        user.LoginName is not null || user.DisplayName is not null || user.Mail is not null || user.Uid is not null;
 
     private (string SystemActor, string[] Roles)? ResolveDemoBootstrap(CorporatePrincipal principal)
     {

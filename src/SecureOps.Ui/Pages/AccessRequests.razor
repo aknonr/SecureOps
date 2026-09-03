@@ -16,9 +16,8 @@
     holding two versions for two different records on one screen, and submitting the wrong one
     produces a conflict that looks like someone else edited the record.
 
-    Requests carry nullable profile enrichment. Where the directory resolves a name it is shown with
-    the principal identifier beneath; where it does not, the identifier stands alone rather than
-    being padded with placeholders.
+    Requests carry nullable persisted OIDC profile data and optional directory enrichment. Human
+    values lead the row; opaque corporate identity remains available only under technical details.
 *@
 
 <div class="so-page">
@@ -189,9 +188,17 @@
                                         <span class="so-request-name">
                                             @AccessIdentityDisplay.Name(request.Profile, request.CorporateIdentity)
                                         </span>
-                                        @if (AccessIdentityDisplay.HasName(request.Profile))
+                                        @if (AccessIdentityDisplay.SecondaryAccount(request.Profile) is { } account)
                                         {
-                                            <span class="so-request-meta">@request.CorporateIdentity</span>
+                                            <span class="so-request-meta">@account</span>
+                                        }
+                                        @if (request.Profile?.Email is { Length: > 0 } email)
+                                        {
+                                            <span class="so-request-meta">@email</span>
+                                        }
+                                        @if (AccessIdentityDisplay.Uid(request.Profile) is { } uid)
+                                        {
+                                            <span class="so-request-meta">Sicil No: @uid</span>
                                         }
                                         <span class="so-request-meta">
                                             Talep: @request.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
@@ -218,9 +225,9 @@
                     <h2 class="so-panel-title">
                         @AccessIdentityDisplay.Name(_selected.Profile, _selected.CorporateIdentity)
                     </h2>
-                    @if (AccessIdentityDisplay.HasName(_selected.Profile))
+                    @if (AccessIdentityDisplay.SecondaryAccount(_selected.Profile) is { } account)
                     {
-                        <p class="so-panel-text so-panel-text--sm">@_selected.CorporateIdentity</p>
+                        <p class="so-panel-text so-panel-text--sm">@account</p>
                     }
 
                     <SoFieldGrid MinColumnWidth="220px">
@@ -237,9 +244,6 @@
                                 @decidedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
                             </SoField>
                         }
-                        <SoField Label="Kullanıcı kimliği">
-                            <code class="so-code">@_selected.UserId</code>
-                        </SoField>
                     </SoFieldGrid>
 
                     @if (!string.IsNullOrWhiteSpace(_selected.DecisionReason))
@@ -256,6 +260,10 @@
                             {
                                 <SoField Label="E-posta">@email</SoField>
                             }
+                            @if (AccessIdentityDisplay.Uid(_selected.Profile) is { } uid)
+                            {
+                                <SoField Label="Sicil No">@uid</SoField>
+                            }
                             @if (_selected.Profile.Department is { Length: > 0 } department)
                             {
                                 <SoField Label="Departman">@department</SoField>
@@ -271,11 +279,24 @@
                         <p class="so-panel-note">
                             <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" />
                             <span>
-                                Dizin sağlayıcısı bu kullanıcı için ad, e-posta veya departman
-                                döndürmedi. Yalnızca kurumsal kimlik gösterilebiliyor.
+                                @(AccessIdentityDisplay.NeedsProfileBackfill(_selected.Profile, _selected.CorporateIdentity)
+                                    ? AccessIdentityDisplay.ProfileRefreshNotice
+                                    : "Bu kullanıcı için ek profil bilgisi bulunmuyor.")
                             </span>
                         </p>
                     }
+
+                    <details class="so-technical">
+                        <summary>Teknik ayrıntılar</summary>
+                        <SoFieldGrid MinColumnWidth="220px">
+                            <SoField Label="Kurumsal Teknik Kimlik">
+                                <code class="so-code">@_selected.CorporateIdentity</code>
+                            </SoField>
+                            <SoField Label="Kullanıcı kaydı">
+                                <code class="so-code">@_selected.UserId</code>
+                            </SoField>
+                        </SoFieldGrid>
+                    </details>
 
                     <div class="so-panel-actions so-panel-actions--wrap">
                         @if (IsPending(_selected))
@@ -439,7 +460,10 @@
         DialogParameters parameters = new()
         {
             { nameof(AccessActionDialog.Action), action },
-            { nameof(AccessActionDialog.SubjectLabel), target.CorporateIdentity }
+            {
+                nameof(AccessActionDialog.SubjectLabel),
+                AccessIdentityDisplay.Name(target.Profile, target.CorporateIdentity)
+            }
         };
 
         IDialogReference dialog = await Dialogs.ShowAsync<AccessActionDialog>(
@@ -494,7 +518,7 @@
 
     private static ActionResult Describe(string title, AccessRequestResponse request) => new(
         title,
-        $"{request.CorporateIdentity} · karar {request.DecidedAt?.ToLocalTime():dd.MM.yyyy HH:mm}",
+        $"{AccessIdentityDisplay.Name(request.Profile, request.CorporateIdentity)} · karar {request.DecidedAt?.ToLocalTime():dd.MM.yyyy HH:mm}",
         Access: null);
 
     private static SoStatusBadge.BadgeTone ToneForRequest(string status) => status switch

@@ -119,9 +119,9 @@
                         <h2 class="so-panel-title">
                             @AccessIdentityDisplay.Name(_user.Profile, _user.CorporateIdentity)
                         </h2>
-                        @if (AccessIdentityDisplay.HasName(_user.Profile))
+                        @if (AccessIdentityDisplay.SecondaryAccount(_user.Profile) is { } account)
                         {
-                            <p class="so-panel-text so-panel-text--sm">@_user.CorporateIdentity</p>
+                            <p class="so-panel-text so-panel-text--sm">@account</p>
                         }
                     </div>
                     <SoStatusBadge Label="@AccessUserView.StatusLabel(_user)"
@@ -163,6 +163,18 @@
                     }
                     <SoField Label="Kimlik doğrulama kaynağı">@_user.AuthenticationSource</SoField>
                 </SoFieldGrid>
+
+                <details class="so-technical">
+                    <summary>Teknik ayrıntılar</summary>
+                    <SoFieldGrid MinColumnWidth="220px">
+                        <SoField Label="Kurumsal Teknik Kimlik">
+                            <code class="so-code">@_user.CorporateIdentity</code>
+                        </SoField>
+                        <SoField Label="Kullanıcı kaydı">
+                            <code class="so-code">@_user.UserId</code>
+                        </SoField>
+                    </SoFieldGrid>
+                </details>
             </section>
 
             <section class="so-panel">
@@ -172,8 +184,8 @@
                    words rather than left as blank fields that look like a loading failure. *@
                 @if (!AccessIdentityDisplay.HasAny(_user.Profile))
                 {
-                    <SoEmptyState Title="Profil bilgisi yok"
-                                  Description="Dizin sağlayıcısı bu kullanıcı için ad, e-posta veya departman döndürmedi. Yalnızca kurumsal kimlik gösterilebiliyor."
+                    <SoEmptyState Title="@(AccessIdentityDisplay.NeedsProfileBackfill(_user.Profile, _user.CorporateIdentity) ? AccessIdentityDisplay.ProfilePending : "Profil bilgisi yok")"
+                                  Description="@(AccessIdentityDisplay.NeedsProfileBackfill(_user.Profile, _user.CorporateIdentity) ? AccessIdentityDisplay.ProfileRefreshNotice : "Bu kullanıcı için ek profil bilgisi bulunmuyor.")"
                                   Icon="@Icons.Material.Outlined.Badge" />
                 }
                 else
@@ -190,6 +202,10 @@
                         @if (_user.Profile.Email is { Length: > 0 } email)
                         {
                             <SoField Label="E-posta">@email</SoField>
+                        }
+                        @if (AccessIdentityDisplay.Uid(_user.Profile) is { } uid)
+                        {
+                            <SoField Label="Sicil No">@uid</SoField>
                         }
                         @if (_user.Profile.Department is { Length: > 0 } department)
                         {
@@ -253,7 +269,7 @@
                     {
                         <MudButton Variant="Variant.Text" Color="Color.Error"
                                    StartIcon="@Icons.Material.Filled.Block"
-                                   Disabled="@(_busy || AccessUserView.IsDisabled(_user))"
+                                   Disabled="@(_busy || !AccessUserView.IsApproved(_user))"
                                    OnClick="DisableAsync">
                             Erişimi kapat
                         </MudButton>
@@ -304,11 +320,14 @@
                                     {
                                         <p class="so-history-line">
                                             Karar: @decidedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
-                                            @if (!string.IsNullOrWhiteSpace(request.DecidedByCorporateIdentity))
-                                            {
-                                                <span> · @request.DecidedByCorporateIdentity</span>
-                                            }
                                         </p>
+                                        @if (!string.IsNullOrWhiteSpace(request.DecidedByCorporateIdentity))
+                                        {
+                                            <details class="so-technical">
+                                                <summary>Karar veren teknik kimliği</summary>
+                                                <code class="so-code">@request.DecidedByCorporateIdentity</code>
+                                            </details>
+                                        }
                                     }
                                     @if (!string.IsNullOrWhiteSpace(request.DecisionReason))
                                     {

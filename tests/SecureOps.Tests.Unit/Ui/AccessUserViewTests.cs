@@ -139,6 +139,19 @@ public sealed class AccessUserViewTests
 public sealed class AccessIdentityDisplayTests
 {
     [Fact]
+    public void OpaqueOidcIdentity_UsesProfilePendingInsteadOfFullTechnicalIdentity()
+    {
+        const string corporateIdentity = "oidc:opaque-stable-identity";
+
+        string result = AccessIdentityDisplay.Name(null, corporateIdentity);
+
+        Assert.Equal(AccessIdentityDisplay.ProfilePending, result);
+        Assert.DoesNotContain(corporateIdentity, result, StringComparison.Ordinal);
+        Assert.True(AccessIdentityDisplay.NeedsProfileBackfill(null, corporateIdentity));
+        Assert.Equal("?", AccessIdentityDisplay.Initials(null, corporateIdentity));
+    }
+
+    [Fact]
     public void Name_FallsBackToPrincipal_WhenProfileIsNull()
     {
         Assert.Equal("demo:team-lead", AccessIdentityDisplay.Name(null, "demo:team-lead"));
@@ -161,6 +174,23 @@ public sealed class AccessIdentityDisplayTests
         var profile = new AccessIdentityProfileResponse("Example Admin", null, null, null, null);
 
         Assert.Equal("Example Admin", AccessIdentityDisplay.Name(profile, "demo:platform-admin"));
+    }
+
+    [Fact]
+    public void DisplayName_ShowsLoginNameAsSecondaryIdentity()
+    {
+        var profile = new AccessIdentityProfileResponse("Example Admin", "operator.one", null, null, null);
+
+        Assert.Equal("operator.one", AccessIdentityDisplay.SecondaryAccount(profile));
+    }
+
+    [Fact]
+    public void Uid_IsTrimmedAndRemainsProfileMetadata()
+    {
+        var profile = new AccessIdentityProfileResponse("Example Admin", "operator.one", null, null, null, "  12345  ");
+
+        Assert.Equal("12345", AccessIdentityDisplay.Uid(profile));
+        Assert.True(AccessIdentityDisplay.HasAny(profile));
     }
 
     [Fact]
