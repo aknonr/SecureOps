@@ -93,15 +93,30 @@ internal static class TuruncuHatQueryParser
             throw new InvalidDataException("Turuncu Hat query response did not match the reviewed contract.");
         }
 
-        if (HasTextError(queryResult, "ErrorDescription")
-            || HasTextError(queryResult, "ErrorDetails")
-            || HasNumericError(queryResult, "ErrorNo"))
+        bool hasErrorDescription = HasTextError(queryResult, "ErrorDescription");
+        bool hasErrorDetails = HasTextError(queryResult, "ErrorDetails");
+        int? errorNo = ReadOptionalInt(queryResult, "ErrorNo");
+        bool hasItems = queryResult.TryGetProperty("Items", out JsonElement items)
+            && items.ValueKind == JsonValueKind.Array;
+        int? recordCount = ReadOptionalInt(queryResult, "RecordCount");
+        int? tenantMetadata = ReadOptionalInt(queryResult, "TenantId");
+        int? pageNo = ReadOptionalInt(queryResult, "PageNO", "PageNo");
+        int? maxPages = ReadOptionalInt(queryResult, "MaxPages");
+
+        if (hasErrorDescription || hasErrorDetails || errorNo.GetValueOrDefault() != 0)
         {
-            throw new TuruncuHatQueryResultException();
+            throw new TuruncuHatQueryResultException(
+                errorNo,
+                hasErrorDescription,
+                hasErrorDetails,
+                hasItems,
+                recordCount,
+                tenantMetadata,
+                pageNo,
+                maxPages);
         }
 
-        if (!queryResult.TryGetProperty("Items", out JsonElement items)
-            || items.ValueKind != JsonValueKind.Array)
+        if (!hasItems)
         {
             throw new InvalidDataException("Turuncu Hat query response did not match the reviewed contract.");
         }
@@ -124,23 +139,33 @@ internal static class TuruncuHatQueryParser
         };
     }
 
-    private static bool HasNumericError(JsonElement queryResult, string propertyName)
+    private static int? ReadOptionalInt(JsonElement queryResult, params string[] propertyNames)
     {
-        if (!queryResult.TryGetProperty(propertyName, out JsonElement value)
-            || value.ValueKind == JsonValueKind.Null)
+        JsonElement value = default;
+        bool found = false;
+        foreach (string propertyName in propertyNames)
         {
-            return false;
+            if (queryResult.TryGetProperty(propertyName, out value))
+            {
+                found = true;
+                break;
+            }
         }
 
-        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out long numeric))
+        if (!found || value.ValueKind == JsonValueKind.Null)
         {
-            return numeric != 0;
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int numeric))
+        {
+            return numeric;
         }
 
         if (value.ValueKind == JsonValueKind.String
-            && long.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out numeric))
+            && int.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out numeric))
         {
-            return numeric != 0;
+            return numeric;
         }
 
         throw new InvalidDataException("Turuncu Hat query error metadata had an invalid type.");
@@ -245,8 +270,33 @@ internal sealed record ParsedSourceRecords(IReadOnlyList<OperationalRecordSource
 
 internal sealed class TuruncuHatQueryResultException : Exception
 {
-    public TuruncuHatQueryResultException()
+    public TuruncuHatQueryResultException(
+        int? errorNo,
+        bool hasErrorDescription,
+        bool hasErrorDetails,
+        bool hasItems,
+        int? recordCount,
+        int? tenantMetadata,
+        int? pageNo,
+        int? maxPages)
         : base("Turuncu Hat reported a query application error.")
     {
+        ErrorNo = errorNo;
+        HasErrorDescription = hasErrorDescription;
+        HasErrorDetails = hasErrorDetails;
+        HasItems = hasItems;
+        RecordCount = recordCount;
+        TenantMetadata = tenantMetadata;
+        PageNo = pageNo;
+        MaxPages = maxPages;
     }
+
+    public int? ErrorNo { get; }
+    public bool HasErrorDescription { get; }
+    public bool HasErrorDetails { get; }
+    public bool HasItems { get; }
+    public int? RecordCount { get; }
+    public int? TenantMetadata { get; }
+    public int? PageNo { get; }
+    public int? MaxPages { get; }
 }

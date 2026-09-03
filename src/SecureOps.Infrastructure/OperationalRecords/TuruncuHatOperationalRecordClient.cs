@@ -140,13 +140,19 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
                 _options.MaxDescriptionLength,
                 _sourceSelects);
         }
-        catch (TuruncuHatQueryResultException)
+        catch (TuruncuHatQueryResultException exception)
         {
             _health.MarkUnavailable(Provider);
             _logger.LogWarning(
-                "Turuncu Hat source query reported an application error. BaseObject: {BaseObject}. SelectCount: {SelectCount}. FilterCount: 1.",
-                _options.SourceBaseObject,
-                _sourceSelects.Length);
+                "Turuncu Hat source query reported an application error. ErrorNo: {ErrorNo}. HasErrorDescription: {HasErrorDescription}. HasErrorDetails: {HasErrorDetails}. HasItems: {HasItems}. RecordCount: {RecordCount}. TenantMetadata: {TenantMetadata}. PageNo: {PageNo}. MaxPages: {MaxPages}.",
+                exception.ErrorNo,
+                exception.HasErrorDescription,
+                exception.HasErrorDetails,
+                exception.HasItems,
+                exception.RecordCount,
+                exception.TenantMetadata,
+                exception.PageNo,
+                exception.MaxPages);
             throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordQueryFailed, false);
         }
         catch (Exception exception) when (exception is InvalidDataException or JsonException)

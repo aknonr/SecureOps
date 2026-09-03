@@ -132,14 +132,15 @@ public sealed class TuruncuHatSessionManager : ITuruncuHatSessionManager
                 throw Failure(OperationalErrorCodes.OperationalSourceAuthenticationFailed, false);
             }
 
-            string[] segments = (resultElement.GetString() ?? string.Empty).Split('|');
+            string loginResult = resultElement.GetString() ?? string.Empty;
+            string[] segments = loginResult.Split('|');
             if (_options.SessionIdSegmentIndex >= segments.Length
                 || segments[_options.SessionIdSegmentIndex].Trim().Length <= 1)
             {
                 throw Failure(OperationalErrorCodes.OperationalSourceAuthenticationFailed, false);
             }
 
-            string session = segments[_options.SessionIdSegmentIndex].Trim();
+            string session = loginResult;
             _health.MarkAvailable(Provider);
             _telemetry.RecordOperation(Provider, "login", "success", stopwatch.Elapsed);
             _logger.LogInformation("Turuncu Hat login succeeded.");

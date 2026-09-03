@@ -22,7 +22,7 @@ public sealed class EnterpriseAdapterContractTests
         string first = await manager.GetSessionAsync(CancellationToken.None);
         string second = await manager.GetSessionAsync(CancellationToken.None);
 
-        first.Should().Be("sanitized-session");
+        first.Should().Be("ok|sanitized-session");
         second.Should().Be(first);
         handler.Requests.Should().ContainSingle();
         handler.Requests[0].Path.Should().Be("/login");
@@ -136,7 +136,7 @@ public sealed class EnterpriseAdapterContractTests
     public async Task SourceClient_ParsesRealCorporateFourItemNestedProjection_WithEmptyErrors()
     {
         const string response = """
-            {"QueryResult":{"ErrorDescription":"","ErrorDetails":"","Items":[
+            {"QueryResult":{"ErrorDescription":null,"ErrorDetails":null,"ErrorNo":0,"TenantId":0,"MaxPages":0,"PageNO":0,"RecordCount":4,"Items":[
               [[{"Value":"1001"}],[{"Value":"OR-100"}],[{"Value":"One"}],[{"Value":"Description 1"}],[{"Value":"Requester 1"}]],
               [[{"Value":"1002"}],[{"Value":"OR-200"}],[{"Value":"Two"}],[{"Value":"Description 2"}],[{"Value":"Requester 2"}]],
               [[{"Value":"1003"}],[{"Value":"OR-300"}],[{"Value":"Three"}],[{"Value":"Description 3"}],[{"Value":"Requester 3"}]],
@@ -149,6 +149,30 @@ public sealed class EnterpriseAdapterContractTests
 
         records.Should().HaveCount(4);
         records.Select(record => record.SourceRecordId).Should().Equal("1001", "1002", "1003", "1004");
+    }
+
+    [Fact]
+    public async Task SessionManager_PreservesCompleteLoginResultInQuerySessionId()
+    {
+        string loginResult = "abc|" + new string('s', 64);
+        ScriptedHandler handler = new(
+            Response(HttpStatusCode.OK, $"{{\"LoginResult\":\"{loginResult}\"}}"),
+            Response(HttpStatusCode.OK, "{\"QueryResult\":{\"Items\":[]}}"));
+        TuruncuHatOptions options = TuruncuOptions();
+        HttpClient httpClient = Client(handler, "https://source.invalid/");
+        EnterpriseIntegrationHealthState health = new();
+        EnterpriseIntegrationTelemetry telemetry = new();
+        TuruncuHatSessionManager manager = new(
+            httpClient, Options.Create(options), TimeProvider.System, health, telemetry,
+            NullLogger<TuruncuHatSessionManager>.Instance);
+        TuruncuHatOperationalRecordClient client = new(
+            httpClient, manager, Options.Create(options), Options.Create(new OperationalRecordsOptions()), health, telemetry,
+            NullLogger<TuruncuHatOperationalRecordClient>.Instance);
+
+        _ = await client.GetActiveAsync(10, CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.Requests[1].Body);
+        body.RootElement.GetProperty("req").GetProperty("SessionID").GetString().Should().Be(loginResult);
     }
 
     [Theory]
@@ -171,6 +195,17 @@ public sealed class EnterpriseAdapterContractTests
     {
         Func<Task> act = async () => await SourceClient(
             new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        ExternalIntegrationException exception = (await act.Should().ThrowAsync<ExternalIntegrationException>()).Which;
+        exception.ErrorCode.Should().Be(OperationalErrorCodes.OperationalRecordQueryFailed);
+    }
+
+    [Fact]
+    public async Task SourceClient_MissingItemsIsRejected()
+    {
+        Func<Task> act = async () => await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, "{\"QueryResult\":{\"ErrorNo\":0}}")))
+            .GetActiveAsync(10, CancellationToken.None);
 
         ExternalIntegrationException exception = (await act.Should().ThrowAsync<ExternalIntegrationException>()).Which;
         exception.ErrorCode.Should().Be(OperationalErrorCodes.OperationalRecordQueryFailed);
@@ -300,6 +335,30 @@ public sealed class EnterpriseAdapterContractTests
             .And.NotContain("sanitized-user")
             .And.NotContain("sanitized-secret")
             .And.NotContain("sanitized-session");
+    }
+
+    [Fact]
+    public async Task SourceClient_ApplicationErrorDiagnosticsContainOnlySanitizedMetadata()
+    {
+        CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+        const string response = "{\"QueryResult\":{\"ErrorNo\":1,\"ErrorDescription\":\"secret remote text\",\"ErrorDetails\":\"secret details\",\"TenantId\":0,\"MaxPages\":0,\"PageNO\":0,\"RecordCount\":4,\"Items\":[]}}";
+
+        Func<Task> act = async () => await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response)), logger: logger)
+            .GetActiveAsync(10, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>();
+        string messages = string.Join(' ', logger.Messages);
+        messages.Should().Contain("ErrorNo: 1")
+            .And.Contain("HasErrorDescription: True")
+            .And.Contain("HasErrorDetails: True")
+            .And.Contain("HasItems: True")
+            .And.Contain("TenantMetadata: 0")
+            .And.Contain("PageNo: 0")
+            .And.Contain("MaxPages: 0")
+            .And.Contain("RecordCount: 4")
+            .And.NotContain("secret remote text")
+            .And.NotContain("secret details");
     }
 
     [Theory]
