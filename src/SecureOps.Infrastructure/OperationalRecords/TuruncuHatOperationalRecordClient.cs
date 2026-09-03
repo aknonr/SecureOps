@@ -140,9 +140,22 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
                 _options.MaxDescriptionLength,
                 _sourceSelects);
         }
+        catch (TuruncuHatQueryResultException)
+        {
+            _health.MarkUnavailable(Provider);
+            _logger.LogWarning(
+                "Turuncu Hat source query reported an application error. BaseObject: {BaseObject}. SelectCount: {SelectCount}. FilterCount: 1.",
+                _options.SourceBaseObject,
+                _sourceSelects.Length);
+            throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordQueryFailed, false);
+        }
         catch (Exception exception) when (exception is InvalidDataException or JsonException)
         {
             _health.MarkUnavailable(Provider);
+            _logger.LogWarning(
+                "Turuncu Hat source query response parsing failed. BaseObject: {BaseObject}. SelectCount: {SelectCount}. FilterCount: 1.",
+                _options.SourceBaseObject,
+                _sourceSelects.Length);
             throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordQueryFailed, false);
         }
 
@@ -178,6 +191,13 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    _logger.LogWarning(
+                        "Turuncu Hat query HTTP failure. Operation: {Operation}. BaseObject: {BaseObject}. FilterCount: {FilterCount}. SelectCount: {SelectCount}. StatusCode: {StatusCode}.",
+                        operation,
+                        baseObject,
+                        filters.Count,
+                        selects.Count,
+                        (int)response.StatusCode);
                     throw QueryFailure(response.StatusCode);
                 }
 
@@ -199,18 +219,36 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
             {
                 _health.MarkUnavailable(Provider);
                 _telemetry.RecordOperation(Provider, operation, "timeout", stopwatch.Elapsed);
+                _logger.LogWarning(
+                    "Turuncu Hat query timed out. Operation: {Operation}. BaseObject: {BaseObject}. FilterCount: {FilterCount}. SelectCount: {SelectCount}.",
+                    operation,
+                    baseObject,
+                    filters.Count,
+                    selects.Count);
                 throw new ExternalIntegrationException(OperationalErrorCodes.OperationalSourceUnavailable, true);
             }
             catch (HttpRequestException)
             {
                 _health.MarkUnavailable(Provider);
                 _telemetry.RecordOperation(Provider, operation, "unavailable", stopwatch.Elapsed);
+                _logger.LogWarning(
+                    "Turuncu Hat query transport failed. Operation: {Operation}. BaseObject: {BaseObject}. FilterCount: {FilterCount}. SelectCount: {SelectCount}.",
+                    operation,
+                    baseObject,
+                    filters.Count,
+                    selects.Count);
                 throw new ExternalIntegrationException(OperationalErrorCodes.OperationalSourceUnavailable, true);
             }
             catch (Exception exception) when (exception is JsonException or InvalidDataException)
             {
                 _health.MarkUnavailable(Provider);
                 _telemetry.RecordOperation(Provider, operation, "invalid-response", stopwatch.Elapsed);
+                _logger.LogWarning(
+                    "Turuncu Hat query returned invalid JSON or exceeded response bounds. Operation: {Operation}. BaseObject: {BaseObject}. FilterCount: {FilterCount}. SelectCount: {SelectCount}.",
+                    operation,
+                    baseObject,
+                    filters.Count,
+                    selects.Count);
                 throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordQueryFailed, false);
             }
         }

@@ -9,7 +9,7 @@ Evidence source: sanitized legacy contract evidence supplied on 2026-08-23. The 
 | One login per script run | `TuruncuHatSessionManager` | Improved | Thread-safe bounded cache and single-flight refresh avoid per-record login | `EnterpriseAdapterContractTests` |
 | Query `SMSS_oRFF` active records excluding configured DCC and requiring configured group | `TuruncuHatOperationalRecordClient` | Retained as configuration | Base object and numeric values are mutable options | `EnterpriseAdapterContractTests` |
 | Select id/code/name/description/requester from `Key`/`Value` cells | `TuruncuHatQueryParser` | Retained and hardened | Keyed rows map exact requested names independent of order and reject mixed/unknown/duplicate keys; exact-count positional fallback preserves legacy evidence | `EnterpriseAdapterContractTests` |
-| Read the evidenced query envelope | `TuruncuHatQueryParser` | Added validation | A partially present `ErrorDescription`, `ErrorDetails`, `ErrorNo`, `TenantId`, `MaxPages`, `PageNo`, `RecordCount` envelope fails closed | `EnterpriseAdapterContractTests` |
+| Read the evidenced query envelope | `TuruncuHatQueryParser` | Corrected from real TEST evidence | `Items` is required; optional metadata may be absent independently; empty/null error text and zero error number succeed; actual application errors fail closed | `EnterpriseAdapterContractTests` |
 | HTML-decode title and description | `TuruncuHatQueryParser` | Retained | Uses platform HTML decoding after bounded parsing | `EnterpriseAdapterContractTests` |
 | Legacy query has no source-created timestamp | Nullable `CreatedAt` contract | Intentionally changed | Unknown remains null; no fabricated timestamp | API and repository regression tests |
 | Malformed query item abort behavior not evidenced | `TuruncuHatQueryParser` | Improved | Malformed/oversized records are skipped and counted; valid batch items continue | `EnterpriseAdapterContractTests` |
@@ -32,4 +32,4 @@ Evidence source: sanitized legacy contract evidence supplied on 2026-08-23. The 
 
 ## Not Proven by Legacy Evidence
 
-No parity claim is made for complete error envelopes, pagination, session-expiry markers, source ETags/conditional update, BPM update outcomes, Jira create outcomes, Jira remote idempotency, provider correlation headers, or Jira account stability. Required fixtures are maintained in `docs/26-enterprise-turuncu-hat-jira-adapters.md`.
+No parity claim is made for pagination, session-expiry markers, source ETags/conditional update, BPM update outcomes, Jira create outcomes, Jira remote idempotency, provider correlation headers, or Jira account stability. Required fixtures are maintained in `docs/26-enterprise-turuncu-hat-jira-adapters.md`.

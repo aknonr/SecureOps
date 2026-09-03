@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SecureOps.Infrastructure.OperationalRecords;
@@ -107,6 +108,75 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
+    public async Task SourceClient_UsesExactKnownGoodCorporateQueryContract()
+    {
+        ScriptedHandler handler = new(Response(HttpStatusCode.OK, "{\"QueryResult\":{\"Items\":[]}}"));
+
+        _ = await SourceClient(handler).GetActiveAsync(10, CancellationToken.None);
+
+        handler.Requests.Should().ContainSingle();
+        CapturedRequest request = handler.Requests[0];
+        request.Path.Should().Be("/query");
+        request.ContentType.Should().StartWith("application/json");
+        using var body = JsonDocument.Parse(request.Body);
+        body.RootElement.EnumerateObject().Select(property => property.Name).Should().Equal("req");
+        JsonElement req = body.RootElement.GetProperty("req");
+        req.EnumerateObject().Select(property => property.Name).Should().Equal(
+            "BaseObject", "Filters", "Selects", "SessionID", "TenantId");
+        req.GetProperty("BaseObject").GetString().Should().Be("SMSS_oRFF");
+        req.GetProperty("Filters").EnumerateArray().Select(value => value.GetString()).Should().Equal(
+            "#%m_active%#='True' AND #%p_dcc%# NOT IN (4241) AND #%p_rel_group%# IN (68)");
+        req.GetProperty("Selects").EnumerateArray().Select(value => value.GetString()).Should().Equal(
+            "id", "p_code", "p_name", "p_description", "p_rel_requester");
+        req.GetProperty("SessionID").GetString().Should().Be("sanitized-session");
+        req.GetProperty("TenantId").GetInt32().Should().Be(218);
+    }
+
+    [Fact]
+    public async Task SourceClient_ParsesRealCorporateFourItemNestedProjection_WithEmptyErrors()
+    {
+        const string response = """
+            {"QueryResult":{"ErrorDescription":"","ErrorDetails":"","Items":[
+              [[{"Value":"1001"}],[{"Value":"OR-100"}],[{"Value":"One"}],[{"Value":"Description 1"}],[{"Value":"Requester 1"}]],
+              [[{"Value":"1002"}],[{"Value":"OR-200"}],[{"Value":"Two"}],[{"Value":"Description 2"}],[{"Value":"Requester 2"}]],
+              [[{"Value":"1003"}],[{"Value":"OR-300"}],[{"Value":"Three"}],[{"Value":"Description 3"}],[{"Value":"Requester 3"}]],
+              [[{"Value":"1004"}],[{"Value":"OR-400"}],[{"Value":"Four"}],[{"Value":"Description 4"}],[{"Value":"Requester 4"}]]
+            ]}}
+            """;
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().HaveCount(4);
+        records.Select(record => record.SourceRecordId).Should().Equal("1001", "1002", "1003", "1004");
+    }
+
+    [Theory]
+    [InlineData("{\"QueryResult\":{\"ErrorDescription\":null,\"ErrorDetails\":null,\"Items\":[]}}")]
+    [InlineData("{\"QueryResult\":{\"ErrorDescription\":\"\",\"ErrorDetails\":\"\",\"Items\":[]}}")]
+    [InlineData("{\"QueryResult\":{\"ErrorNo\":0,\"Items\":[]}}")]
+    public async Task SourceClient_AcceptsIndependentlyOptionalEmptyOrNullErrorMetadata(string response)
+    {
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("{\"QueryResult\":{\"ErrorDescription\":\"Rejected\",\"Items\":[]}}")]
+    [InlineData("{\"QueryResult\":{\"ErrorDetails\":\"Rejected\",\"Items\":[]}}")]
+    [InlineData("{\"QueryResult\":{\"ErrorNo\":1,\"Items\":[]}}")]
+    public async Task SourceClient_RejectsCorporateQueryResultErrors(string response)
+    {
+        Func<Task> act = async () => await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        ExternalIntegrationException exception = (await act.Should().ThrowAsync<ExternalIntegrationException>()).Which;
+        exception.ErrorCode.Should().Be(OperationalErrorCodes.OperationalRecordQueryFailed);
+    }
+
+    [Fact]
     public async Task SourceClient_FreshnessReadAddsExactValidatedSourceIdToServerFilter()
     {
         const string response = "{\"QueryResult\":{\"Items\":[]}}";
@@ -118,6 +188,17 @@ public sealed class EnterpriseAdapterContractTests
         record.Should().BeNull();
         handler.Requests.Should().ContainSingle();
         handler.Requests[0].Body.Should().Contain("#%id%#=1001");
+    }
+
+    [Fact]
+    public async Task SourceClient_NormalActiveReadDoesNotAddExactSourceIdFilter()
+    {
+        ScriptedHandler handler = new(Response(HttpStatusCode.OK, "{\"QueryResult\":{\"Items\":[]}}"));
+
+        _ = await SourceClient(handler).GetActiveAsync(10, CancellationToken.None);
+
+        handler.Requests.Should().ContainSingle();
+        handler.Requests[0].Body.Should().NotContain("#%id%#");
     }
 
     [Fact]
@@ -182,15 +263,43 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
-    public async Task SourceClient_PartialEvidencedEnvelope_FailsClosed()
+    public async Task SourceClient_AppliesMaximumCountAfterValidatingCorporateResponse()
     {
-        const string response = "{\"QueryResult\":{\"ErrorNo\":0,\"Items\":[]}}";
+        const string response = """
+            {"QueryResult":{"Items":[
+              [[{"Value":"1001"}],[{"Value":"OR-100"}],[{"Value":"One"}],[{"Value":"Description"}],[]],
+              [[{"Value":"1002"}],[{"Value":"OR-200"}],[{"Value":"Two"}],[{"Value":"Description"}],[]],
+              [[{"Value":"1003"}],[{"Value":"OR-300"}],[{"Value":"Three"}],[{"Value":"Description"}],[]]
+            ]}}
+            """;
 
-        Func<Task> act = async () => await SourceClient(
-            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+        ScriptedHandler handler = new(Response(HttpStatusCode.OK, response));
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(handler).GetActiveAsync(2, CancellationToken.None);
 
-        ExternalIntegrationException exception = (await act.Should().ThrowAsync<ExternalIntegrationException>()).Which;
-        exception.ErrorCode.Should().Be(OperationalErrorCodes.OperationalRecordQueryFailed);
+        records.Select(record => record.SourceRecordId).Should().Equal("1001", "1002");
+        using var request = JsonDocument.Parse(handler.Requests[0].Body);
+        request.RootElement.GetProperty("req").EnumerateObject().Select(property => property.Name)
+            .Should().NotContain(name => name.Contains("Page", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Count", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Limit", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task SourceClient_DiagnosticsNeverContainCredentialsOrSessionIdentifier()
+    {
+        CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+        ScriptedHandler handler = new(Response(HttpStatusCode.BadRequest, "{}"));
+
+        Func<Task> act = async () => await SourceClient(handler, logger: logger)
+            .GetActiveAsync(10, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>();
+        string messages = string.Join(' ', logger.Messages);
+        messages.Should().Contain("HTTP failure");
+        messages.Should().NotContain("Sanitized runtime value")
+            .And.NotContain("sanitized-user")
+            .And.NotContain("sanitized-secret")
+            .And.NotContain("sanitized-session");
     }
 
     [Theory]
@@ -596,14 +705,15 @@ public sealed class EnterpriseAdapterContractTests
 
     private static TuruncuHatOperationalRecordClient SourceClient(
         HttpMessageHandler handler,
-        bool readOnlyIntegrationMode = false) => new(
+        bool readOnlyIntegrationMode = false,
+        ILogger<TuruncuHatOperationalRecordClient>? logger = null) => new(
         Client(handler, "https://source.invalid/"),
         new FixedSessionManager(),
         Options.Create(TuruncuOptions()),
         Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
         new EnterpriseIntegrationHealthState(),
         new EnterpriseIntegrationTelemetry(),
-        NullLogger<TuruncuHatOperationalRecordClient>.Instance);
+        logger ?? NullLogger<TuruncuHatOperationalRecordClient>.Instance);
 
     private static CorporateJiraRequesterResolver JiraResolver(ScriptedHandler handler) => new(
         Client(handler, "https://jira.invalid/"),
@@ -691,6 +801,7 @@ public sealed class EnterpriseAdapterContractTests
             Requests.Add(new CapturedRequest(
                 request.RequestUri!.PathAndQuery,
                 body,
+                request.Content?.Headers.ContentType?.ToString(),
                 request.Headers.TryGetValues("Authorization", out IEnumerable<string>? authorization) ? authorization.Single() : null,
                 request.Headers.ToDictionary(header => header.Key, header => string.Join(',', header.Value), StringComparer.OrdinalIgnoreCase)));
             return _responses.Dequeue();
@@ -706,6 +817,23 @@ public sealed class EnterpriseAdapterContractTests
     private sealed record CapturedRequest(
         string Path,
         string Body,
+        string? ContentType,
         string? Authorization,
         IReadOnlyDictionary<string, string> Headers);
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
+    }
 }

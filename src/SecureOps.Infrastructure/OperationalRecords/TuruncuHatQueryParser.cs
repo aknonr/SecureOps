@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 
@@ -6,9 +7,6 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Strict parser for evidenced keyed and legacy positional Turuncu Hat query projections.</summary>
 internal static class TuruncuHatQueryParser
 {
-    private static readonly string[] _envelopeProperties =
-        ["ErrorDescription", "ErrorDetails", "ErrorNo", "TenantId", "MaxPages", "PageNo", "RecordCount"];
-
     public static ParsedSourceRecords ParseSource(
         JsonElement root,
         int maximumDescriptionLength,
@@ -90,21 +88,62 @@ internal static class TuruncuHatQueryParser
     private static JsonElement GetItems(JsonElement root)
     {
         if (!root.TryGetProperty("QueryResult", out JsonElement queryResult)
-            || queryResult.ValueKind != JsonValueKind.Object
-            || !queryResult.TryGetProperty("Items", out JsonElement items)
+            || queryResult.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException("Turuncu Hat query response did not match the reviewed contract.");
+        }
+
+        if (HasTextError(queryResult, "ErrorDescription")
+            || HasTextError(queryResult, "ErrorDetails")
+            || HasNumericError(queryResult, "ErrorNo"))
+        {
+            throw new TuruncuHatQueryResultException();
+        }
+
+        if (!queryResult.TryGetProperty("Items", out JsonElement items)
             || items.ValueKind != JsonValueKind.Array)
         {
             throw new InvalidDataException("Turuncu Hat query response did not match the reviewed contract.");
         }
 
-        int evidencedEnvelopePropertyCount = _envelopeProperties.Count(property =>
-            queryResult.TryGetProperty(property, out _));
-        if (evidencedEnvelopePropertyCount != 0 && evidencedEnvelopePropertyCount != _envelopeProperties.Length)
+        return items;
+    }
+
+    private static bool HasTextError(JsonElement queryResult, string propertyName)
+    {
+        if (!queryResult.TryGetProperty(propertyName, out JsonElement value))
         {
-            throw new InvalidDataException("Turuncu Hat query response contained an incomplete evidenced envelope.");
+            return false;
         }
 
-        return items;
+        return value.ValueKind switch
+        {
+            JsonValueKind.Null => false,
+            JsonValueKind.String => !string.IsNullOrWhiteSpace(value.GetString()),
+            _ => throw new InvalidDataException("Turuncu Hat query error metadata had an invalid type.")
+        };
+    }
+
+    private static bool HasNumericError(JsonElement queryResult, string propertyName)
+    {
+        if (!queryResult.TryGetProperty(propertyName, out JsonElement value)
+            || value.ValueKind == JsonValueKind.Null)
+        {
+            return false;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out long numeric))
+        {
+            return numeric != 0;
+        }
+
+        if (value.ValueKind == JsonValueKind.String
+            && long.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out numeric))
+        {
+            return numeric != 0;
+        }
+
+        throw new InvalidDataException("Turuncu Hat query error metadata had an invalid type.");
     }
 
     private static bool TryProjection(
@@ -203,3 +242,11 @@ internal static class TuruncuHatQueryParser
 }
 
 internal sealed record ParsedSourceRecords(IReadOnlyList<OperationalRecordSourceItem> Items, int MalformedCount);
+
+internal sealed class TuruncuHatQueryResultException : Exception
+{
+    public TuruncuHatQueryResultException()
+        : base("Turuncu Hat reported a query application error.")
+    {
+    }
+}
