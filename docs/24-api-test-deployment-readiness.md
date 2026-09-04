@@ -131,16 +131,39 @@ Application rollback restores the prior binaries and prior server configuration 
 
 ## Deployed TEST Evidence Record
 
-This section is intentionally blank until an operator completes a deployment. Package creation, build output, or a release-candidate directory is not deployment evidence.
+An authorized operator completed the API deployment and real Turuncu Hat read-only smoke test for source `0ec037632e44c84f65c813c611486b1f4cc67f56`. The evidence below is sanitized and records counts and state only. It contains no corporate record content, personal information, credentials, authorization values, sessions, or internal secret values.
 
 | Evidence | Operator-recorded value |
 |---|---|
-| API source SHA | `<not deployed/recorded>` |
-| UI source SHA | `<not deployed/recorded>` |
-| API package SHA256 | `<not deployed/recorded>` |
-| UI package SHA256 | `<not deployed/recorded>` |
-| Deployed timestamp (UTC) | `<not deployed/recorded>` |
-| Server / environment | `<not deployed/recorded>` |
-| Server-owned configuration baseline ID | `<not deployed/recorded>` |
-| Rollback package / baseline | `<not deployed/recorded>` |
-| Read-only smoke-test result and evidence reference | `<not deployed/recorded>` |
+| API source SHA | `0ec037632e44c84f65c813c611486b1f4cc67f56` |
+| UI source SHA | Not applicable; no UI deployment was required |
+| API package | Fresh API-only, framework-dependent .NET 8 package produced and validated |
+| API package SHA256 | Exact deployed archive association requires operator confirmation |
+| UI package SHA256 | Not applicable; no UI package was deployed for this change |
+| Deployed timestamp (UTC) | Not supplied; evidence recorded on 2026-09-04 |
+| Server / environment | Authorized TEST IIS environment; server identity intentionally omitted |
+| Server-owned configuration baseline ID | Not supplied; verified security values are recorded below |
+| Rollback package / baseline | Not supplied |
+| Read-only smoke-test result and evidence reference | PASS; sanitized result recorded in this section |
+
+### Turuncu Hat Read-Only Smoke Result
+
+- Phase 1 - Real Turuncu Hat read-only import: **COMPLETED AND VERIFIED IN TEST**.
+- The deployed API queried the real Turuncu Hat read-only source and received four records.
+- Each observed corporate row contained seven direct `Key`/`Value` cells.
+- The API logged `Turuncu Hat source query completed. Records: 4. MalformedOrAmbiguous: 0.`
+- The UI displayed four real Operational Records. No UI deployment was required for this verification.
+- All four records remained `NeedsManualReview`; `JiraEligible` remained `false`, and the Jira-transferable counter remained zero.
+- Synthetic records were not displayed while the corporate source provider was active.
+- The UI continued to identify real data as active and external writes as disabled.
+- `OperationalRecords__ReadOnlyIntegrationMode=true` and `OperationalRecords__ControlledTestWritesEnabled=false` remained the TEST security state.
+- No Jira create, Turuncu Hat update, or BPM close was performed.
+- No SQL migration was required.
+
+### Release Directory Association
+
+Local release metadata under `C:\SecureOpsBuild\release\<release-name>` was inspected. No release metadata or artifact name in that tree associates source `0ec0376` with one exact deployed release directory. The source SHA and TEST smoke result are verified, but the deployed release-directory and archive-hash association requires operator confirmation. A rejected RID-specific packaging attempt is not deployable evidence and is excluded from this record.
+
+### Next Development Milestone
+
+Next development milestone: **Deterministic SDM-candidate classification rules and Action Center design.** This milestone is not implemented or activated by the read-only smoke verification. External writes remain disabled.

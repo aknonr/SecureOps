@@ -4,7 +4,7 @@ Current backend TEST deployment readiness, migrations, bootstrap access, exact r
 
 An enterprise Windows operations platform that receives monitoring alarms, runs read-only diagnostics, captures structured audit data, and surfaces actionable findings to shift engineers.
 
-> **Status:** Backend TEST release controls and the management reporting read model are implemented; controlled database and application deployment remains pending.
+> **Status:** The real Turuncu Hat read-only import is deployed and verified in TEST at source `0ec0376`; external writes remain disabled, and deterministic SDM classification plus the broader controlled pilot remain pending.
 > **Owner:** CONTOSO Turkish Technology (placeholder)
 > **Stack:** .NET 8, Blazor Server, SQL Server, PowerShell Remoting + JEA
 > **MVP timeline:** 6–8 weeks
@@ -35,7 +35,7 @@ Later phases add rule-based analysis, private AI-assisted summarization, and app
 
 ## Getting Started
 
-This repo contains documentation, agent rules, a .NET solution, working Phase 1A IdentityLookup backend code, provider-neutral access approval, audit persistence hardening, the durable Operational Record to Jira backend foundation, and backend-authoritative management reporting. Real OIDC, Operational Record/Jira adapters, and approved classification rules remain deferred; local tests use fakes only.
+This repo contains documentation, agent rules, a .NET solution, working Phase 1A IdentityLookup backend code, provider-neutral access approval, audit persistence hardening, the durable Operational Record to Jira backend foundation, and backend-authoritative management reporting. The corporate Turuncu Hat read-only import is verified in TEST; Jira creation, Turuncu Hat completion, and approved deterministic classification rules remain deferred. Local automated tests continue to use deterministic substitutes rather than corporate endpoints.
 
 ### For AI coding agents
 

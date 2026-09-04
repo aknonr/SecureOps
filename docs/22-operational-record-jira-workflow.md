@@ -4,7 +4,7 @@
 
 The backend foundation is implemented for TEST validation. Codex owns API, services, integration boundaries, persistence, SQL, authorization, audit, release packaging, and backend tests. Claude owns all Blazor/Razor/CSS/UI work and does not need to change this module.
 
-Typed Turuncu Hat and corporate Jira adapters are implemented behind the existing boundaries and remain disabled by default. Paired `Simulation` selects the explicit deterministic no-network Development/Demo/Test workflow harness; legacy `Fake` remains for compatibility. Real external TEST activation remains blocked until the sanitized samples in `docs/integrations/turuncu-hat-jira-contract-gaps.md` are reviewed.
+Typed Turuncu Hat and corporate Jira adapters are implemented behind the existing boundaries and remain disabled by default. Paired `Simulation` selects the explicit deterministic no-network Development/Demo/Test workflow harness; legacy `Fake` remains for compatibility. The real Turuncu Hat read-only path is deployed and verified in TEST at source `0ec0376`; Jira creation and Turuncu Hat completion remain blocked until their separate write contracts and activation gate are approved. The canonical deployed evidence is recorded in `docs/24-api-test-deployment-readiness.md`.
 
 ## Legacy Workflow Replacement
 
@@ -111,7 +111,7 @@ Integration authentication values are runtime-only server configuration. Control
 
 ## TEST Validation
 
-Before enabling a real adapter: approve the outstanding sanitized HTTP samples, review mappings, apply SQL through the DBA process, configure capability groups, and validate service-account permissions. TEST must exercise preview, one create, partial source-close failure, close-only retry, concurrent submission, audit evidence, and manual reconciliation using synthetic/non-sensitive records.
+Before enabling real external writes: approve the outstanding sanitized HTTP samples, review mappings, apply SQL through the DBA process, configure capability groups, and validate service-account permissions. Write-enabled TEST must exercise preview, one create, partial source-close failure, close-only retry, concurrent submission, audit evidence, and manual reconciliation using synthetic/non-sensitive records.
 
 The simulation source exposes only fixed non-corporate records for happy/idempotent replay, stale-before-create, Jira failure, unknown Jira outcome, and source-close failure/close-only retry. Claim ownership, transfer completion, and reconciliation are durable workflow transitions exercised against those records rather than fabricated source fields. A real source adapter still requires approved base URL and authentication, bounded list/detail schemas, exact requester fields, status mapping, version/ETag semantics, close/update contract, error/retry semantics, and ownership approval.
 

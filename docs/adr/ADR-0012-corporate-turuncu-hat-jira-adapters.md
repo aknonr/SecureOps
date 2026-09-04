@@ -1,6 +1,6 @@
 # ADR-0012: Corporate Turuncu Hat and Jira Adapters
 
-**Status:** Accepted for disabled-by-default implementation; real TEST activation remains contract-gated
+**Status:** Accepted; real read-only TEST source activation verified, external writes remain contract-gated
 **Date:** 2026-08-23
 
 ## Context
@@ -25,7 +25,7 @@ ADR-0009 established the durable Operational Record to Jira workflow and deferre
 
 ## Activation Gate
 
-The code can be tested against deterministic sanitized fixtures. Real external TEST remains blocked until the samples listed in `docs/26-enterprise-turuncu-hat-jira-adapters.md` are reviewed. Unknown remote idempotency means reconciliation remains manual after an ambiguous Jira create.
+The code can be tested against deterministic sanitized fixtures. Operator evidence recorded on 2026-09-04 verifies the real Turuncu Hat read-only source/query path at source `0ec0376`. Jira creation and Turuncu Hat completion remain blocked until the outstanding samples and separate write activation approval are complete. Unknown remote idempotency means reconciliation remains manual after an ambiguous Jira create.
 
 ## Rejected Alternatives
 

@@ -11,6 +11,10 @@
 
 In `Test`, selecting either corporate provider without `ReadOnlyIntegrationMode=true` fails startup unless the separate disabled-by-default `ControlledTestWritesEnabled=true` gate is explicitly approved. Both modes require the complete `TuruncuHat` + `Corporate` pair. Read-only mode requires the complete future Jira field mapping so preview is exact, permits source authentication/query and exact Jira requester/operator-resolution reads, but rejects API create/retry before local workflow mutation and rejects Jira create/Turuncu Hat completion again inside the adapters before HTTP dispatch. The controlled-write gate is rejected outside `Test`, while read-only mode is active, or with an incomplete provider pair.
 
+## Verified TEST Read-Only Activation
+
+At source `0ec037632e44c84f65c813c611486b1f4cc67f56`, an authorized operator deployed the API-only package to TEST and verified the real Turuncu Hat read-only path. Four seven-cell corporate rows parsed successfully with `Records: 4` and `MalformedOrAmbiguous: 0`; the UI displayed four real records, all remained `NeedsManualReview`, `JiraEligible=false`, the Jira-transferable count remained zero, and synthetic records were absent. External writes remained disabled and no Jira create, Turuncu Hat update, or BPM close was performed. The canonical sanitized deployment evidence and release-directory uncertainty are recorded in `docs/24-api-test-deployment-readiness.md`.
+
 ## Turuncu Hat Configuration
 
 Server-owned non-secret business configuration:
@@ -108,7 +112,7 @@ Source completion runs only after the Jira key is persisted. It requires exactly
 
 `GET /api/v1/health/enterprise-integrations` is Admin-only and returns provider selection plus `Configured`, `Disabled`, or `Unavailable`. It also returns `readOnlyIntegrationMode` and the safe operator notice when that gate is active. It returns no URL, credential, session, username, or remote response.
 
-## Sanitized Fixtures Required Before Real TEST
+## Sanitized Fixtures Required Before Real TEST Writes
 
 Provide property names, nesting, HTTP status, and relevant non-secret header names for:
 
@@ -121,4 +125,4 @@ Provide property names, nesting, HTTP status, and relevant non-secret header nam
 7. Jira remote idempotency support and reconciliation lookup contract.
 8. Confirmation that Jira `name` is an approved durable identity field for assignment and watcher use.
 
-Exact sample templates are tracked in `docs/integrations/turuncu-hat-jira-contract-gaps.md`. Until those fixtures are approved, real external TEST is blocked even though deterministic local adapter tests can run.
+Exact sample templates are tracked in `docs/integrations/turuncu-hat-jira-contract-gaps.md`. The real read-only source/query path is verified in TEST. Real external writes remain blocked until the outstanding write fixtures, deterministic eligibility rules, and separate activation approval are complete.

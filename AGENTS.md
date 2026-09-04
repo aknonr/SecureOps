@@ -2,8 +2,8 @@
 
 **Project:** Secure Ops Automation & AI Analysis Hub
 **Owner organization placeholder:** CONTOSO Turkish Technology
-**Status:** IdentityLookup works in TEST; provider-neutral access, hardened Operational Record/Jira backend, and TEST release controls are implemented. Controlled TEST deployment remains pending.
-**Last updated:** 2026-08
+**Status:** IdentityLookup works in TEST; the real Turuncu Hat read-only import is deployed and verified in TEST at source `0ec0376`; external writes, deterministic SDM classification, and the broader controlled pilot remain pending.
+**Last updated:** 2026-09
 
 ---
 
