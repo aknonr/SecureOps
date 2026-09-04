@@ -2,7 +2,7 @@ using SecureOps.Domain.OperationalRecords;
 
 namespace SecureOps.Infrastructure.OperationalRecords;
 
-/// <summary>Classifies records returned by the reviewed legacy source filter.</summary>
+/// <summary>Keeps real source records in manual review until a Jira-eligibility rule is approved.</summary>
 public sealed class TuruncuHatOperationalRecordClassifier : IOperationalRecordClassifier
 {
     /// <inheritdoc />
@@ -15,14 +15,11 @@ public sealed class TuruncuHatOperationalRecordClassifier : IOperationalRecordCl
             && !string.IsNullOrWhiteSpace(source.Title)
             && !string.IsNullOrWhiteSpace(source.Description);
 
-        return valid
-            ? new OperationalRecordClassificationResult(
-                OperationalRecordClassification.OperationalSupport,
-                true,
-                "Eligible under the reviewed legacy source filter.")
-            : new OperationalRecordClassificationResult(
-                OperationalRecordClassification.NeedsManualReview,
-                false,
-                "The source projection is invalid or no longer active.");
+        return new OperationalRecordClassificationResult(
+            OperationalRecordClassification.NeedsManualReview,
+            false,
+            valid
+                ? "The real source record requires operator review before Jira eligibility is established."
+                : "The source projection is invalid or no longer active.");
     }
 }

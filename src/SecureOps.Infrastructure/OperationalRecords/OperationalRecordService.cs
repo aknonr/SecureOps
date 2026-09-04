@@ -54,7 +54,9 @@ public sealed class OperationalRecordService : IOperationalRecordService
             return OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Fail(OperationalErrorCodes.OperationalRecordQueryFailed, "source-query", true);
         }
 
-        if (sourceItems.Count > _options.MaxImportCount || sourceItems.Any(item => !IsValid(item)))
+        bool corporateSource = string.Equals(_options.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase);
+        if (sourceItems.Count > _options.MaxImportCount
+            || sourceItems.Any(item => !IsValid(item) || (corporateSource && IsSynthetic(item.SourceRecordId, item.OrCode))))
         {
             return OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Fail(OperationalErrorCodes.OperationalRecordQueryFailed, "source-validation", false);
         }
@@ -77,7 +79,15 @@ public sealed class OperationalRecordService : IOperationalRecordService
             }
         }
 
-        return OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success(await _repository.ListAsync(cancellationToken));
+        IReadOnlyList<OperationalRecord> records = await _repository.ListAsync(cancellationToken);
+        if (corporateSource)
+        {
+            records = records
+                .Where(record => !IsSynthetic(record.SourceRecordId, record.OrCode))
+                .ToArray();
+        }
+
+        return OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success(records);
     }
 
     /// <inheritdoc />
@@ -85,6 +95,8 @@ public sealed class OperationalRecordService : IOperationalRecordService
     {
         OperationalRecord? record = await _repository.GetAsync(id, cancellationToken);
         return record is null
+            || (string.Equals(_options.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase)
+                && IsSynthetic(record.SourceRecordId, record.OrCode))
             ? OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false)
             : OperationalRecordResult<OperationalRecord>.Success(record);
     }
@@ -134,4 +146,8 @@ public sealed class OperationalRecordService : IOperationalRecordService
         && (item.Environment?.Length ?? 0) <= 128
         && (item.ServerReference?.Length ?? 0) <= 255
         && (item.ApplicationReference?.Length ?? 0) <= 255;
+
+    private static bool IsSynthetic(string sourceRecordId, string orCode) =>
+        sourceRecordId.StartsWith("synthetic-", StringComparison.OrdinalIgnoreCase)
+        || orCode.StartsWith("SYN-OR-", StringComparison.OrdinalIgnoreCase);
 }

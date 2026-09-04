@@ -51,7 +51,7 @@ public sealed class JiraTransferService : IJiraTransferService
     public async Task<OperationalRecordResult<JiraIssueDraft>> PreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken)
     {
         OperationalRecord? record = await _repository.GetAsync(id, cancellationToken);
-        if (record is null)
+        if (record is null || IsSyntheticCorporateRecord(record))
         {
             return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
         }
@@ -103,17 +103,17 @@ public sealed class JiraTransferService : IJiraTransferService
         Func<Guid, OperationalRecordCommandContext, CancellationToken, Task<OperationalRecordResult<OperationalRecord>>> operation,
         CancellationToken cancellationToken)
     {
+        OperationalRecord? targetRecord = await _repository.GetAsync(id, cancellationToken);
+        if (targetRecord is null || IsSyntheticCorporateRecord(targetRecord))
+        {
+            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
+        }
+
         string targetId = id.ToString("D");
         string? key = context.IdempotencyKey;
         if (key is null && string.Equals(commandName, RetryCommand, StringComparison.Ordinal))
         {
-            OperationalRecord? retryRecord = await _repository.GetAsync(id, cancellationToken);
-            if (retryRecord is null)
-            {
-                return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
-            }
-
-            key = CommandIdempotency.Create(context.Actor, commandName, $"{targetId}:{retryRecord.Version}");
+            key = CommandIdempotency.Create(context.Actor, commandName, $"{targetId}:{targetRecord.Version}");
         }
 
         key ??= CommandIdempotency.Create(context.Actor, commandName, targetId);
@@ -188,6 +188,11 @@ public sealed class JiraTransferService : IJiraTransferService
 
         return result;
     }
+
+    private bool IsSyntheticCorporateRecord(OperationalRecord record) =>
+        string.Equals(_operationalOptions.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase)
+        && (record.SourceRecordId.StartsWith("synthetic-", StringComparison.OrdinalIgnoreCase)
+            || record.OrCode.StartsWith("SYN-OR-", StringComparison.OrdinalIgnoreCase));
 
     private async Task<OperationalRecordResult<OperationalRecord>> ExecuteClaimedAsync(
         Guid id,

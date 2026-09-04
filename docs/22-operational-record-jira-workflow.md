@@ -27,7 +27,7 @@ No legacy Operational Record/Jira PowerShell script exists in this repository. S
 
 `Imported -> Classified -> NeedsManualReview | Eligible -> Previewed -> CreateRequested -> CreatingJira -> JiraCreated -> ClosingOperationalRecord -> Completed`
 
-Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. Disabled mode classifies records for manual review. The Turuncu Hat provider makes only valid active records already returned by the reviewed legacy source filter eligible; malformed projections remain manual review. The synthetic source retains its synthetic-only classifier.
+Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. Disabled mode classifies records for manual review. A successfully imported Turuncu Hat record remains `NeedsManualReview` until a separately approved deterministic Jira-eligibility rule exists; source-scope membership alone does not authorize publishing. Synthetic classifiers remain restricted to their explicit synthetic providers, and synthetic rows are unavailable to list, detail, preview, create, and retry paths while the Turuncu Hat provider is active.
 
 ## Claims, Idempotency, Freshness, and Retry
 

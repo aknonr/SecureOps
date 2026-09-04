@@ -6,6 +6,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using SecureOps.Domain.OperationalRecords;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
@@ -89,11 +90,11 @@ public sealed class EnterpriseAdapterContractTests
     {
         const string response = """
             {"QueryResult":{"ErrorDescription":"","ErrorDetails":"","ErrorNo":0,"TenantId":218,
-              "Items":[[[{"Key":"p_description","Value":"Detail &lt;encoded&gt;"}],
-                         [{"Key":"id","Value":"1001"}],
-                         [{"Key":"p_rel_requester","Value":"Exact Requester"}],
-                         [{"Key":"p_name","Value":"Short &amp; safe"}],
-                         [{"Key":"p_code","Value":"OR-100"}]]],
+              "Items":[[{"Key":"id","Value":"1001"},
+                         {"Key":"p_code","Value":"OR-100"},
+                         {"Key":"p_name","Value":"Short &amp; safe"},
+                         {"Key":"p_description","Value":"Detail &lt;encoded&gt;"},
+                         {"Key":"p_rel_requester","Value":"Exact Requester"}]],
               "MaxPages":1,"PageNo":1,"RecordCount":1}}
             """;
         ScriptedHandler handler = new(Response(HttpStatusCode.OK, response));
@@ -106,6 +107,85 @@ public sealed class EnterpriseAdapterContractTests
         records[0].Description.Should().Be("Detail <encoded>");
         records[0].CreatedAt.Should().BeNull();
         handler.Requests[0].Body.Should().Contain("SMSS_oRFF").And.Contain("p_rel_group");
+    }
+
+    [Fact]
+    public async Task SourceClient_ParsesFourDirectCorporateKeyValueRecordsWithoutMalformedRows()
+    {
+        const string response = """
+            {"QueryResult":{"ErrorDescription":null,"ErrorDetails":null,"ErrorNo":0,"TenantId":0,"MaxPages":0,"PageNO":0,"RecordCount":4,"Items":[
+              [{"Key":"id","Value":"1683742"},{"Key":"p_code","Value":"OR-00668218"},{"Key":"p_name","Value":"safe title 1"},{"Key":"p_description","Value":"safe description 1"},{"Key":"p_rel_requester","Value":"safe requester 1"}],
+              [{"Key":"id","Value":"1682619"},{"Key":"p_code","Value":"OR-00667092"},{"Key":"p_name","Value":"safe title 2"},{"Key":"p_description","Value":"safe description 2"},{"Key":"p_rel_requester","Value":"safe requester 2"}],
+              [{"Key":"id","Value":"1676990"},{"Key":"p_code","Value":"OR-00661461"},{"Key":"p_name","Value":"safe title 3"},{"Key":"p_description","Value":"safe description 3"},{"Key":"p_rel_requester","Value":"safe requester 3"}],
+              [{"Key":"id","Value":"1668538"},{"Key":"p_code","Value":"OR-00653003"},{"Key":"p_name","Value":"safe title 4"},{"Key":"p_description","Value":"safe description 4"},{"Key":"p_rel_requester","Value":"safe requester 4"}]
+            ]}}
+            """;
+        CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response)),
+            logger: logger).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().HaveCount(4);
+        records.Select(record => record.SourceRecordId).Should().Equal("1683742", "1682619", "1676990", "1668538");
+        records.Select(record => record.OrCode).Should().Equal("OR-00668218", "OR-00667092", "OR-00661461", "OR-00653003");
+        records[0].Title.Should().Be("safe title 1");
+        records[0].Description.Should().Be("safe description 1");
+        records[0].Requester.Should().Be("safe requester 1");
+        string.Join(' ', logger.Messages).Should()
+            .Contain("Records: 4")
+            .And.Contain("MalformedOrAmbiguous: 0")
+            .And.NotContain("safe description")
+            .And.NotContain("safe requester");
+    }
+
+    [Fact]
+    public async Task SourceClient_RejectsConflictingIncompleteOrUnboundedDirectProjections()
+    {
+        (string Name, string Record)[] rejected =
+        [
+            ("wrong key at position", """[{"Key":"p_code","Value":"1001"},{"Key":"id","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"},{"Key":"p_rel_requester","Value":"Requester"}]"""),
+            ("duplicate conflicting key", """[{"Key":"id","Value":"1001"},{"Key":"id","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"},{"Key":"p_rel_requester","Value":"Requester"}]"""),
+            ("missing field", """[{"Key":"id","Value":"1001"},{"Key":"p_code","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"}]"""),
+            ("null required value", """[{"Key":"id","Value":"1001"},{"Key":"p_code","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":null},{"Key":"p_rel_requester","Value":"Requester"}]"""),
+            ("extra unknown field", """[{"Key":"id","Value":"1001"},{"Key":"p_code","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"},{"Key":"p_rel_requester","Value":"Requester"},{"Key":"unknown","Value":"extra"}]"""),
+            ("mixed direct and nested shapes", """[{"Key":"id","Value":"1001"},[{"Key":"p_code","Value":"OR-100"}],{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"},{"Key":"p_rel_requester","Value":"Requester"}]""")
+        ];
+
+        foreach ((string name, string record) in rejected)
+        {
+            CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+            string response = "{\"QueryResult\":{\"Items\":[" + record + "]}}";
+
+            IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+                new ScriptedHandler(Response(HttpStatusCode.OK, response)),
+                logger: logger).GetActiveAsync(10, CancellationToken.None);
+
+            records.Should().BeEmpty(name);
+            string.Join(' ', logger.Messages).Should().Contain("MalformedOrAmbiguous: 1", name);
+        }
+    }
+
+    [Fact]
+    public async Task SourceClient_AllowsEmptyOptionalRequesterInDirectProjection()
+    {
+        const string response = """
+            {"QueryResult":{"Items":[[
+              {"Key":"id","Value":"1001"},
+              {"Key":"p_code","Value":"OR-100"},
+              {"Key":"p_name","Value":"Title"},
+              {"Key":"p_description","Value":"Description"},
+              {"Key":"p_rel_requester","Value":""}
+            ]]}}
+            """;
+        CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response)),
+            logger: logger).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().ContainSingle().Which.Requester.Should().BeNull();
+        string.Join(' ', logger.Messages).Should().Contain("MalformedOrAmbiguous: 0");
     }
 
     [Fact]
@@ -155,6 +235,25 @@ public sealed class EnterpriseAdapterContractTests
 
         records.Should().HaveCount(4);
         records.Select(record => record.SourceRecordId).Should().Equal("1001", "1002", "1003", "1004");
+    }
+
+    [Fact]
+    public async Task SourceClient_PreservesLegacyNestedProjectionWhenKeysMatchPositions()
+    {
+        const string response = """
+            {"QueryResult":{"Items":[[
+              [{"Key":"id","Value":"1001"}],
+              [{"Key":"p_code","Value":"OR-100"}],
+              [{"Key":"p_name","Value":"Title"}],
+              [{"Key":"p_description","Value":"Description"}],
+              [{"Key":"p_rel_requester","Value":"Requester"}]
+            ]]}}
+            """;
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().ContainSingle().Which.OrCode.Should().Be("OR-100");
     }
 
     [Fact]
@@ -783,13 +882,15 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
-    public void TuruncuClassifier_AcceptsOnlyValidReviewedSourceProjection()
+    public void TuruncuClassifier_RequiresManualReviewEvenForValidSourceProjection()
     {
         TuruncuHatOperationalRecordClassifier classifier = new();
         OperationalRecordSourceItem valid = Source("1001", true);
         OperationalRecordSourceItem invalid = Source("not-numeric", true);
 
-        classifier.Classify(valid).JiraEligible.Should().BeTrue();
+        OperationalRecordClassificationResult validResult = classifier.Classify(valid);
+        validResult.Classification.Should().Be(OperationalRecordClassification.NeedsManualReview);
+        validResult.JiraEligible.Should().BeFalse();
         classifier.Classify(invalid).JiraEligible.Should().BeFalse();
     }
 

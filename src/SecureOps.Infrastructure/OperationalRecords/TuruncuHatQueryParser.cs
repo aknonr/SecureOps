@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace SecureOps.Infrastructure.OperationalRecords;
 
-/// <summary>Strict parser for evidenced keyed and legacy positional Turuncu Hat query projections.</summary>
+/// <summary>Strict parser for direct keyed and legacy nested Turuncu Hat query projections.</summary>
 internal static class TuruncuHatQueryParser
 {
     public static ParsedSourceRecords ParseSource(
@@ -182,62 +182,73 @@ internal static class TuruncuHatQueryParser
             return false;
         }
 
-        List<(string? Key, string? Value)> cells = [];
+        List<string?> projected = [];
+        HashSet<string> suppliedKeys = new(StringComparer.Ordinal);
+        JsonValueKind? cellShape = null;
+        int position = 0;
         foreach (JsonElement cell in item.EnumerateArray())
         {
-            if (cell.ValueKind != JsonValueKind.Array || cell.GetArrayLength() > 1)
+            if (cell.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)
+                || (cellShape is not null && cellShape != cell.ValueKind))
             {
                 return false;
             }
 
-            if (cell.GetArrayLength() == 0)
+            cellShape ??= cell.ValueKind;
+            JsonElement valueObject;
+            if (cell.ValueKind == JsonValueKind.Array)
             {
-                cells.Add((null, null));
-                continue;
+                if (cell.GetArrayLength() > 1)
+                {
+                    return false;
+                }
+
+                if (cell.GetArrayLength() == 0)
+                {
+                    projected.Add(null);
+                    position++;
+                    continue;
+                }
+
+                valueObject = cell[0];
+            }
+            else
+            {
+                valueObject = cell;
             }
 
-            JsonElement first = cell[0];
-            if (first.ValueKind != JsonValueKind.Object
-                || !first.TryGetProperty("Value", out JsonElement valueElement)
+            if (valueObject.ValueKind != JsonValueKind.Object
+                || !valueObject.TryGetProperty("Value", out JsonElement valueElement)
                 || !TryAsString(valueElement, out string? value))
             {
                 return false;
             }
 
-            string? key = first.TryGetProperty("Key", out JsonElement keyElement)
-                && keyElement.ValueKind == JsonValueKind.String
-                ? keyElement.GetString()
-                : null;
-            cells.Add((string.IsNullOrWhiteSpace(key) ? null : key, value));
-        }
+            string? key = null;
+            if (valueObject.TryGetProperty("Key", out JsonElement keyElement))
+            {
+                if (keyElement.ValueKind == JsonValueKind.String)
+                {
+                    key = keyElement.GetString();
+                }
+                else if (keyElement.ValueKind != JsonValueKind.Null)
+                {
+                    return false;
+                }
+            }
 
-        int keyedCount = cells.Count(cell => cell.Key is not null);
-        if (keyedCount == 0)
-        {
-            values = cells.Select(cell => cell.Value).ToArray();
-            return true;
-        }
-
-        if (keyedCount != expectedKeys.Count)
-        {
-            return false;
-        }
-
-        Dictionary<string, string?> keyed = new(StringComparer.OrdinalIgnoreCase);
-        foreach ((string? key, string? value) in cells)
-        {
-            if (!keyed.TryAdd(key!, value))
+            if (!string.IsNullOrWhiteSpace(key)
+                && (!suppliedKeys.Add(key)
+                    || !string.Equals(key, expectedKeys[position], StringComparison.Ordinal)))
             {
                 return false;
             }
+
+            projected.Add(value);
+            position++;
         }
 
-        if (keyed.Count != expectedKeys.Count || expectedKeys.Any(key => !keyed.ContainsKey(key)))
-        {
-            return false;
-        }
-
-        values = expectedKeys.Select(key => keyed[key]).ToArray();
+        values = projected;
         return true;
     }
 

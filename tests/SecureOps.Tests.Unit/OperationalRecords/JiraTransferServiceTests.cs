@@ -217,6 +217,30 @@ public sealed class JiraTransferServiceTests
         record.WorkflowState.Should().Be(OperationalRecordWorkflowState.Previewed);
     }
 
+    [Fact]
+    public async Task TuruncuHatProvider_RejectsPersistedSyntheticRecordBeforePreviewOrWriteWorkflow()
+    {
+        TestFixture fixture = await TestFixture.CreateAsync(
+            sourceItem: TestRecord.SourceItem("synthetic-old-record", "SYN-OR-OLD"),
+            sourceProvider: "TuruncuHat",
+            initializePreview: false);
+
+        OperationalRecordResult<JiraIssueDraft> preview = await fixture.Service.PreviewAsync(
+            fixture.RecordId,
+            _context,
+            CancellationToken.None);
+        OperationalRecordResult<OperationalRecord> create = await fixture.Service.CreateAsync(
+            fixture.RecordId,
+            _context,
+            CancellationToken.None);
+
+        preview.Failure!.Code.Should().Be(OperationalErrorCodes.OperationalRecordNotFound);
+        create.Failure!.Code.Should().Be(OperationalErrorCodes.OperationalRecordNotFound);
+        fixture.Jira.Calls.Should().Be(0);
+        fixture.Source.CloseCalls.Should().Be(0);
+        fixture.Audit.Events.Should().BeEmpty();
+    }
+
     private sealed class TestFixture
     {
         private TestFixture(
@@ -245,10 +269,27 @@ public sealed class JiraTransferServiceTests
         public static async Task<TestFixture> CreateAsync(
             CountingJiraClient? jira = null,
             CountingSourceClient? source = null,
-            bool readOnlyIntegrationMode = false)
+            bool readOnlyIntegrationMode = false,
+            OperationalRecordSourceItem? sourceItem = null,
+            string sourceProvider = "Disabled",
+            bool initializePreview = true)
         {
             InMemoryOperationalRecordRepository repository = new();
-            OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+            OperationalRecord record;
+            if (sourceItem is null)
+            {
+                record = await TestRecord.SeedEligibleAsync(repository);
+            }
+            else
+            {
+                OperationalRecord imported = await repository.UpsertImportedAsync(sourceItem, "correlation-seed", CancellationToken.None);
+                record = await repository.SetClassificationAsync(
+                    imported.Id,
+                    new OperationalRecordClassificationResult(OperationalRecordClassification.OperationalSupport, true, "Approved test rule."),
+                    "correlation-seed",
+                    CancellationToken.None);
+            }
+
             jira ??= new CountingJiraClient();
             source ??= new CountingSourceClient();
             InMemoryAuditWriter audit = new();
@@ -269,11 +310,19 @@ public sealed class JiraTransferServiceTests
                 source,
                 new InMemoryCommandIdempotencyStore(TimeProvider.System),
                 audit,
-                Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
+                Options.Create(new OperationalRecordsOptions
+                {
+                    ReadOnlyIntegrationMode = readOnlyIntegrationMode,
+                    SourceProvider = sourceProvider
+                }),
                 Options.Create(new CommandIdempotencyOptions()),
                 NullLogger<JiraTransferService>.Instance);
-            OperationalRecordResult<JiraIssueDraft> preview = await service.PreviewAsync(record.Id, _context, CancellationToken.None);
-            preview.IsSuccess.Should().BeTrue();
+            if (initializePreview)
+            {
+                OperationalRecordResult<JiraIssueDraft> preview = await service.PreviewAsync(record.Id, _context, CancellationToken.None);
+                preview.IsSuccess.Should().BeTrue();
+            }
+
             return new TestFixture(repository, jira, source, audit, service, record.Id);
         }
     }
