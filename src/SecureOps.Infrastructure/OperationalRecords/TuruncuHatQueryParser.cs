@@ -7,6 +7,16 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Strict parser for direct keyed and legacy nested Turuncu Hat query projections.</summary>
 internal static class TuruncuHatQueryParser
 {
+    private const int MaxSourceProjectionCellCount = 32;
+    private const int MaxProjectionKeyLength = 128;
+    private const string SourceIdKey = "SET.id";
+    private const string OrCodeKey = "SET.p_code";
+    private const string TitleKey = "SET.p_name";
+    private const string DescriptionKey = "SET.p_description";
+    private const string RequesterDisplayKey = "KEY.p_rel_requester";
+    private const string RequesterInternalKey = "SET.p_rel_requester";
+    private const string RowNumberKey = "num";
+
     public static ParsedSourceRecords ParseSource(
         JsonElement root,
         int maximumDescriptionLength,
@@ -17,7 +27,7 @@ internal static class TuruncuHatQueryParser
         int malformed = 0;
         foreach (JsonElement item in items.EnumerateArray())
         {
-            if (!TryProjection(item, expectedKeys, out IReadOnlyList<string?> values)
+            if (!TrySourceProjection(item, expectedKeys, out IReadOnlyList<string?> values)
                 || string.IsNullOrWhiteSpace(values[0])
                 || string.IsNullOrWhiteSpace(values[1])
                 || string.IsNullOrWhiteSpace(values[2])
@@ -182,10 +192,113 @@ internal static class TuruncuHatQueryParser
             return false;
         }
 
-        List<string?> projected = [];
+        if (!TryReadProjectionCells(item, expectedKeys.Count, out IReadOnlyList<ProjectionCell> cells))
+        {
+            return false;
+        }
+
+        List<string?> projected = new(expectedKeys.Count);
         HashSet<string> suppliedKeys = new(StringComparer.Ordinal);
-        JsonValueKind? cellShape = null;
         int position = 0;
+        foreach (ProjectionCell cell in cells)
+        {
+            if (cell.Key is not null
+                && (!suppliedKeys.Add(cell.Key)
+                    || !string.Equals(cell.Key, expectedKeys[position], StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            projected.Add(cell.Value);
+            position++;
+        }
+
+        values = projected;
+        return true;
+    }
+
+    private static bool TrySourceProjection(
+        JsonElement item,
+        IReadOnlyList<string> expectedKeys,
+        out IReadOnlyList<string?> values)
+    {
+        values = [];
+        if (!TryReadProjectionCells(item, MaxSourceProjectionCellCount, out IReadOnlyList<ProjectionCell> cells))
+        {
+            return false;
+        }
+
+        bool hasKeyedCells = cells.Any(cell => cell.Key is not null);
+        if (!hasKeyedCells)
+        {
+            if (cells.Count != expectedKeys.Count)
+            {
+                return false;
+            }
+
+            values = cells.Select(cell => cell.Value).ToArray();
+            return true;
+        }
+
+        if (cells.Any(cell => cell.Key is null))
+        {
+            return false;
+        }
+
+        Dictionary<string, string?> keyedValues = new(StringComparer.Ordinal);
+        foreach (ProjectionCell cell in cells)
+        {
+            string key = cell.Key!;
+            if (key.Length > MaxProjectionKeyLength)
+            {
+                return false;
+            }
+
+            if (!keyedValues.TryAdd(key, cell.Value))
+            {
+                if (IsRecognizedSourceKey(key)
+                    || !string.Equals(keyedValues[key], cell.Value, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+        }
+
+        if (!keyedValues.ContainsKey(SourceIdKey)
+            || !keyedValues.ContainsKey(OrCodeKey)
+            || !keyedValues.ContainsKey(TitleKey)
+            || !keyedValues.ContainsKey(DescriptionKey))
+        {
+            return false;
+        }
+
+        keyedValues.TryGetValue(RequesterDisplayKey, out string? requester);
+        values =
+        [
+            keyedValues[SourceIdKey],
+            keyedValues[OrCodeKey],
+            keyedValues[TitleKey],
+            keyedValues[DescriptionKey],
+            requester
+        ];
+        return true;
+    }
+
+    private static bool TryReadProjectionCells(
+        JsonElement item,
+        int maximumCellCount,
+        out IReadOnlyList<ProjectionCell> cells)
+    {
+        cells = [];
+        if (item.ValueKind != JsonValueKind.Array
+            || item.GetArrayLength() == 0
+            || item.GetArrayLength() > maximumCellCount)
+        {
+            return false;
+        }
+
+        List<ProjectionCell> parsed = new(item.GetArrayLength());
+        JsonValueKind? cellShape = null;
         foreach (JsonElement cell in item.EnumerateArray())
         {
             if (cell.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)
@@ -205,8 +318,7 @@ internal static class TuruncuHatQueryParser
 
                 if (cell.GetArrayLength() == 0)
                 {
-                    projected.Add(null);
-                    position++;
+                    parsed.Add(new ProjectionCell(null, null));
                     continue;
                 }
 
@@ -219,38 +331,45 @@ internal static class TuruncuHatQueryParser
 
             if (valueObject.ValueKind != JsonValueKind.Object
                 || !valueObject.TryGetProperty("Value", out JsonElement valueElement)
-                || !TryAsString(valueElement, out string? value))
+                || !TryAsString(valueElement, out string? value)
+                || !TryReadKey(valueObject, out string? key))
             {
                 return false;
             }
 
-            string? key = null;
-            if (valueObject.TryGetProperty("Key", out JsonElement keyElement))
-            {
-                if (keyElement.ValueKind == JsonValueKind.String)
-                {
-                    key = keyElement.GetString();
-                }
-                else if (keyElement.ValueKind != JsonValueKind.Null)
-                {
-                    return false;
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(key)
-                && (!suppliedKeys.Add(key)
-                    || !string.Equals(key, expectedKeys[position], StringComparison.Ordinal)))
-            {
-                return false;
-            }
-
-            projected.Add(value);
-            position++;
+            parsed.Add(new ProjectionCell(key, value));
         }
 
-        values = projected;
+        cells = parsed;
         return true;
     }
+
+    private static bool TryReadKey(JsonElement valueObject, out string? key)
+    {
+        key = null;
+        if (!valueObject.TryGetProperty("Key", out JsonElement keyElement)
+            || keyElement.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (keyElement.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        key = keyElement.GetString();
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = null;
+        }
+
+        return true;
+    }
+
+    private static bool IsRecognizedSourceKey(string key) => key is
+        SourceIdKey or OrCodeKey or TitleKey or DescriptionKey or RequesterDisplayKey
+        or RequesterInternalKey or RowNumberKey;
 
     private static bool TryAsString(JsonElement element, out string? value)
     {
@@ -275,6 +394,8 @@ internal static class TuruncuHatQueryParser
         .Where(group => group.Count() > 1)
         .Select(group => group.Key)
         .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private sealed record ProjectionCell(string? Key, string? Value);
 }
 
 internal sealed record ParsedSourceRecords(IReadOnlyList<OperationalRecordSourceItem> Items, int MalformedCount);

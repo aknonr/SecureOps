@@ -6,14 +6,14 @@ Controlled evidence received through 2026-09-04 resolves Jira Basic authenticati
 
 - Jira Basic `/rest/api/2/myself`, exact `username` search, Task ID `3`, required/optional create fields, multi-user watcher, cascading group, optional assignee, and absent reporter metadata.
 - Existing Jira issue presence for assignee, reporter, `customfield_11500`, `customfield_12700`, and `SunucuTalep`; observed assignee/reporter identity equality is not treated as create policy.
-- String `LoginResult` with two observed pipe segments; exact `SMSS_oRFF` active/group/DCC request; successful nested-array `QueryResult.Items`; independently optional empty/null query error fields; `Key`/`Value` cell properties; and exactly one controlled BPM query match. Observed segment lengths are not invariants.
+- String `LoginResult` with two observed pipe segments; exact `SMSS_oRFF` active/group/DCC request; successful nested-array `QueryResult.Items`; independently optional empty/null query error fields; exact seven-cell source keys (`SET.id`, `SET.p_code`, `SET.p_name`, `SET.p_description`, `KEY.p_rel_requester`, `SET.p_rel_requester`, and `num`); and exactly one controlled BPM query match. Observed segment lengths are not invariants.
 
 ## Open Evidence
 
 Required examples:
 
 1. Turuncu Hat invalid-credential and expired-session responses.
-2. One sanitized Operational Record row showing the exact `Key` string for every requested select; empty result; application error; HTTP error; and pagination/truncation behavior. The successful four-row keyless projection and exact no-pagination request are resolved.
+2. Turuncu Hat empty result, application error, HTTP error, and pagination/truncation behavior. The exact seven-cell Operational Record row, successful four-row response, and exact no-pagination request are resolved.
 3. BPM activity query with zero and multiple rows, including exact returned `Key` strings.
 4. BPM update success with the complete `UpdateResult`, plus business and HTTP failures.
 5. Source version/ETag/conditional-update semantics and provider correlation headers, if supported.

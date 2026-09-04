@@ -90,11 +90,13 @@ public sealed class EnterpriseAdapterContractTests
     {
         const string response = """
             {"QueryResult":{"ErrorDescription":"","ErrorDetails":"","ErrorNo":0,"TenantId":218,
-              "Items":[[{"Key":"id","Value":"1001"},
-                         {"Key":"p_code","Value":"OR-100"},
-                         {"Key":"p_name","Value":"Short &amp; safe"},
-                         {"Key":"p_description","Value":"Detail &lt;encoded&gt;"},
-                         {"Key":"p_rel_requester","Value":"Exact Requester"}]],
+              "Items":[[{"Key":"SET.id","Value":"1001"},
+                         {"Key":"SET.p_code","Value":"OR-100"},
+                         {"Key":"SET.p_name","Value":"Short &amp; safe"},
+                         {"Key":"SET.p_description","Value":"Detail &lt;encoded&gt;"},
+                         {"Key":"KEY.p_rel_requester","Value":"Exact Requester"},
+                         {"Key":"SET.p_rel_requester","Value":"12345"},
+                         {"Key":"num","Value":"1"}]],
               "MaxPages":1,"PageNo":1,"RecordCount":1}}
             """;
         ScriptedHandler handler = new(Response(HttpStatusCode.OK, response));
@@ -110,14 +112,45 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
+    public async Task SourceClient_MapsExactCorporateRelationalProjectionWithoutAmbiguity()
+    {
+        const string response = """
+            {"QueryResult":{"Items":[[
+              {"Key":"SET.id","Value":"1683742"},
+              {"Key":"SET.p_code","Value":"OR-00668218"},
+              {"Key":"SET.p_name","Value":"safe title"},
+              {"Key":"SET.p_description","Value":"safe description"},
+              {"Key":"KEY.p_rel_requester","Value":"SAFE USER DISPLAY NAME"},
+              {"Key":"SET.p_rel_requester","Value":"12345"},
+              {"Key":"num","Value":"1"}
+            ]]}}
+            """;
+        CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response)),
+            logger: logger).GetActiveAsync(10, CancellationToken.None);
+
+        OperationalRecordSourceItem record = records.Should().ContainSingle().Which;
+        record.SourceRecordId.Should().Be("1683742");
+        record.OrCode.Should().Be("OR-00668218");
+        record.Title.Should().Be("safe title");
+        record.Description.Should().Be("safe description");
+        record.Requester.Should().Be("SAFE USER DISPLAY NAME");
+        string.Join(' ', logger.Messages).Should()
+            .Contain("Records: 1")
+            .And.Contain("MalformedOrAmbiguous: 0");
+    }
+
+    [Fact]
     public async Task SourceClient_ParsesFourDirectCorporateKeyValueRecordsWithoutMalformedRows()
     {
         const string response = """
             {"QueryResult":{"ErrorDescription":null,"ErrorDetails":null,"ErrorNo":0,"TenantId":0,"MaxPages":0,"PageNO":0,"RecordCount":4,"Items":[
-              [{"Key":"id","Value":"1683742"},{"Key":"p_code","Value":"OR-00668218"},{"Key":"p_name","Value":"safe title 1"},{"Key":"p_description","Value":"safe description 1"},{"Key":"p_rel_requester","Value":"safe requester 1"}],
-              [{"Key":"id","Value":"1682619"},{"Key":"p_code","Value":"OR-00667092"},{"Key":"p_name","Value":"safe title 2"},{"Key":"p_description","Value":"safe description 2"},{"Key":"p_rel_requester","Value":"safe requester 2"}],
-              [{"Key":"id","Value":"1676990"},{"Key":"p_code","Value":"OR-00661461"},{"Key":"p_name","Value":"safe title 3"},{"Key":"p_description","Value":"safe description 3"},{"Key":"p_rel_requester","Value":"safe requester 3"}],
-              [{"Key":"id","Value":"1668538"},{"Key":"p_code","Value":"OR-00653003"},{"Key":"p_name","Value":"safe title 4"},{"Key":"p_description","Value":"safe description 4"},{"Key":"p_rel_requester","Value":"safe requester 4"}]
+              [{"Key":"SET.id","Value":"1683742"},{"Key":"SET.p_code","Value":"OR-00668218"},{"Key":"SET.p_name","Value":"safe title 1"},{"Key":"SET.p_description","Value":"safe description 1"},{"Key":"KEY.p_rel_requester","Value":"safe requester 1"},{"Key":"SET.p_rel_requester","Value":"12345"},{"Key":"num","Value":"1"}],
+              [{"Key":"SET.id","Value":"1682619"},{"Key":"SET.p_code","Value":"OR-00667092"},{"Key":"SET.p_name","Value":"safe title 2"},{"Key":"SET.p_description","Value":"safe description 2"},{"Key":"KEY.p_rel_requester","Value":"safe requester 2"},{"Key":"SET.p_rel_requester","Value":"23456"},{"Key":"num","Value":"2"}],
+              [{"Key":"SET.id","Value":"1676990"},{"Key":"SET.p_code","Value":"OR-00661461"},{"Key":"SET.p_name","Value":"safe title 3"},{"Key":"SET.p_description","Value":"safe description 3"},{"Key":"KEY.p_rel_requester","Value":"safe requester 3"},{"Key":"SET.p_rel_requester","Value":"34567"},{"Key":"num","Value":"3"}],
+              [{"Key":"SET.id","Value":"1668538"},{"Key":"SET.p_code","Value":"OR-00653003"},{"Key":"SET.p_name","Value":"safe title 4"},{"Key":"SET.p_description","Value":"safe description 4"},{"Key":"KEY.p_rel_requester","Value":"safe requester 4"},{"Key":"SET.p_rel_requester","Value":"45678"},{"Key":"num","Value":"4"}]
             ]}}
             """;
         CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
@@ -144,12 +177,12 @@ public sealed class EnterpriseAdapterContractTests
     {
         (string Name, string Record)[] rejected =
         [
-            ("wrong key at position", """[{"Key":"p_code","Value":"1001"},{"Key":"id","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"},{"Key":"p_rel_requester","Value":"Requester"}]"""),
-            ("duplicate conflicting key", """[{"Key":"id","Value":"1001"},{"Key":"id","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"},{"Key":"p_rel_requester","Value":"Requester"}]"""),
-            ("missing field", """[{"Key":"id","Value":"1001"},{"Key":"p_code","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"}]"""),
-            ("null required value", """[{"Key":"id","Value":"1001"},{"Key":"p_code","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":null},{"Key":"p_rel_requester","Value":"Requester"}]"""),
-            ("extra unknown field", """[{"Key":"id","Value":"1001"},{"Key":"p_code","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"},{"Key":"p_rel_requester","Value":"Requester"},{"Key":"unknown","Value":"extra"}]"""),
-            ("mixed direct and nested shapes", """[{"Key":"id","Value":"1001"},[{"Key":"p_code","Value":"OR-100"}],{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"},{"Key":"p_rel_requester","Value":"Requester"}]""")
+            ("unprefixed scalar keys", """[{"Key":"id","Value":"1001"},{"Key":"p_code","Value":"OR-100"},{"Key":"p_name","Value":"Title"},{"Key":"p_description","Value":"Description"}]"""),
+            ("duplicate required key", """[{"Key":"SET.id","Value":"1001"},{"Key":"SET.id","Value":"1001"},{"Key":"SET.p_code","Value":"OR-100"},{"Key":"SET.p_name","Value":"Title"},{"Key":"SET.p_description","Value":"Description"}]"""),
+            ("conflicting duplicate metadata", """[{"Key":"SET.id","Value":"1001"},{"Key":"SET.p_code","Value":"OR-100"},{"Key":"SET.p_name","Value":"Title"},{"Key":"SET.p_description","Value":"Description"},{"Key":"unknown","Value":"one"},{"Key":"unknown","Value":"two"}]"""),
+            ("missing required field", """[{"Key":"SET.id","Value":"1001"},{"Key":"SET.p_code","Value":"OR-100"},{"Key":"SET.p_name","Value":"Title"},{"Key":"KEY.p_rel_requester","Value":"Requester"}]"""),
+            ("null required value", """[{"Key":"SET.id","Value":"1001"},{"Key":"SET.p_code","Value":"OR-100"},{"Key":"SET.p_name","Value":"Title"},{"Key":"SET.p_description","Value":null}]"""),
+            ("mixed direct and nested shapes", """[{"Key":"SET.id","Value":"1001"},[{"Key":"SET.p_code","Value":"OR-100"}],{"Key":"SET.p_name","Value":"Title"},{"Key":"SET.p_description","Value":"Description"}]""")
         ];
 
         foreach ((string name, string record) in rejected)
@@ -171,11 +204,13 @@ public sealed class EnterpriseAdapterContractTests
     {
         const string response = """
             {"QueryResult":{"Items":[[
-              {"Key":"id","Value":"1001"},
-              {"Key":"p_code","Value":"OR-100"},
-              {"Key":"p_name","Value":"Title"},
-              {"Key":"p_description","Value":"Description"},
-              {"Key":"p_rel_requester","Value":""}
+              {"Key":"SET.id","Value":"1001"},
+              {"Key":"SET.p_code","Value":"OR-100"},
+              {"Key":"SET.p_name","Value":"Title"},
+              {"Key":"SET.p_description","Value":"Description"},
+              {"Key":"KEY.p_rel_requester","Value":""},
+              {"Key":"SET.p_rel_requester","Value":"12345"},
+              {"Key":"num","Value":"1"}
             ]]}}
             """;
         CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
@@ -186,6 +221,67 @@ public sealed class EnterpriseAdapterContractTests
 
         records.Should().ContainSingle().Which.Requester.Should().BeNull();
         string.Join(' ', logger.Messages).Should().Contain("MalformedOrAmbiguous: 0");
+    }
+
+    [Fact]
+    public async Task SourceClient_DoesNotUseInternalRequesterWhenDisplayCellIsAbsent()
+    {
+        const string response = """
+            {"QueryResult":{"Items":[[
+              {"Key":"SET.id","Value":"1001"},
+              {"Key":"SET.p_code","Value":"OR-100"},
+              {"Key":"SET.p_name","Value":"Title"},
+              {"Key":"SET.p_description","Value":"Description"},
+              {"Key":"SET.p_rel_requester","Value":"12345"},
+              {"Key":"num","Value":"1"}
+            ]]}}
+            """;
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().ContainSingle().Which.Requester.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SourceClient_IgnoresBoundedNonConflictingUnknownMetadataIndependentOfPosition()
+    {
+        const string response = """
+            {"QueryResult":{"Items":[[
+              {"Key":"unknown","Value":"bounded metadata"},
+              {"Key":"SET.p_description","Value":"Description"},
+              {"Key":"SET.p_name","Value":"Title"},
+              {"Key":"SET.p_code","Value":"OR-100"},
+              {"Key":"SET.id","Value":"1001"},
+              {"Key":"unknown","Value":"bounded metadata"}
+            ]]}}
+            """;
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response))).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().ContainSingle().Which.OrCode.Should().Be("OR-100");
+    }
+
+    [Fact]
+    public async Task SourceClient_RejectsSourceProjectionAboveCellBound()
+    {
+        string extras = string.Join(',', Enumerable.Range(0, 29)
+            .Select(index => $"{{\"Key\":\"unknown-{index}\",\"Value\":\"metadata\"}}"));
+        string response = "{\"QueryResult\":{\"Items\":[["
+            + "{\"Key\":\"SET.id\",\"Value\":\"1001\"},"
+            + "{\"Key\":\"SET.p_code\",\"Value\":\"OR-100\"},"
+            + "{\"Key\":\"SET.p_name\",\"Value\":\"Title\"},"
+            + "{\"Key\":\"SET.p_description\",\"Value\":\"Description\"},"
+            + extras + "]]}}";
+        CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.OK, response)),
+            logger: logger).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().BeEmpty();
+        string.Join(' ', logger.Messages).Should().Contain("MalformedOrAmbiguous: 1");
     }
 
     [Fact]
@@ -238,15 +334,15 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
-    public async Task SourceClient_PreservesLegacyNestedProjectionWhenKeysMatchPositions()
+    public async Task SourceClient_PreservesLegacyKeylessNestedProjection()
     {
         const string response = """
             {"QueryResult":{"Items":[[
-              [{"Key":"id","Value":"1001"}],
-              [{"Key":"p_code","Value":"OR-100"}],
-              [{"Key":"p_name","Value":"Title"}],
-              [{"Key":"p_description","Value":"Description"}],
-              [{"Key":"p_rel_requester","Value":"Requester"}]
+              [{"Value":"1001"}],
+              [{"Value":"OR-100"}],
+              [{"Value":"Title"}],
+              [{"Value":"Description"}],
+              [{"Value":"Requester"}]
             ]]}}
             """;
 
@@ -387,12 +483,12 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
-    public async Task SourceClient_KeyedProjection_RejectsUnexpectedOrDuplicateKeys()
+    public async Task SourceClient_KeyedProjection_RejectsUnprefixedOrDuplicateRequiredKeys()
     {
         const string response = """
             {"QueryResult":{"Items":[
               [[{"Key":"id","Value":"1001"}],[{"Key":"p_code","Value":"OR-100"}],[{"Key":"p_name","Value":"Title"}],[{"Key":"p_description","Value":"Description"}],[{"Key":"unexpected","Value":"Requester"}]],
-              [[{"Key":"id","Value":"1002"}],[{"Key":"p_code","Value":"OR-200"}],[{"Key":"p_name","Value":"Title"}],[{"Key":"p_name","Value":"Description"}],[{"Key":"p_rel_requester","Value":"Requester"}]]
+              [[{"Key":"SET.id","Value":"1002"}],[{"Key":"SET.p_code","Value":"OR-200"}],[{"Key":"SET.p_name","Value":"Title"}],[{"Key":"SET.p_name","Value":"Title"}],[{"Key":"SET.p_description","Value":"Description"}]]
             ]}}
             """;
 
