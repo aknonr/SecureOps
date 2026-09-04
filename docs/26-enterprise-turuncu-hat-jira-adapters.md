@@ -32,6 +32,7 @@ Server-owned non-secret business configuration:
 - `TuruncuHat__RequestTimeoutSeconds`
 - `TuruncuHat__MaxResponseBytes`
 - `TuruncuHat__MaxDescriptionLength`
+- `TuruncuHat__DiagnosticContractLogging` (defaults `false`; temporary secret-free contract metadata logging, accepted only in `Test`)
 
 Runtime secrets, supplied only through controlled server configuration or an approved secret store:
 
@@ -96,6 +97,8 @@ Framework HTTP-client request logging is removed for both real providers so base
 ## Safe Runtime Behavior
 
 The source client owns all query grammar. Real TEST evidence confirms `POST /query` accepts the configured base object, one legacy filter string, the five reviewed selects, `SessionID`, and numeric `TenantId` without pagination or limit fields. The session manager validates the configured non-empty `LoginResult` segment but preserves the complete pipe-delimited `LoginResult` unchanged as `req.SessionID`. `QueryResult.Items` is required. `ErrorDescription`, `ErrorDetails`, `ErrorNo`, `TenantId`, `MaxPages`, `PageNO`, and `RecordCount` are independently optional metadata: absent, null, or empty/zero error fields are successful, while a non-empty description/details or non-zero error number fails closed without logging the returned text. Tenant and pagination metadata are informational only and are never compared to request values or used as authorization evidence. When cell keys are present, parsing maps only the exact requested keys and rejects mixed, missing, duplicate, or unexpected keys; reordered keyed cells are safe. Legacy keyless nested-array projections retain exact-count positional parsing. The client HTML-decodes bounded content, excludes malformed/duplicate records, applies the configured import count after response validation, and computes the existing deterministic source fingerprint because no source ETag is proven. Exact real `Key` values still require validation before controlled writes.
+
+`TuruncuHat__DiagnosticContractLogging=true` is a temporary TEST-only diagnostic. It logs the endpoint path, configured query grammar, select names, tenant, request/response byte counts, session presence and length structure, and sanitized `QueryResult` metadata. It never logs the session value, authorization, username, password, record descriptions, or returned error text. Startup rejects the switch outside `Test`; it should return to `false` after the controlled comparison is captured.
 
 Jira user search uses the evidenced `/rest/api/2/user/search?username=...` endpoint for both requester and authenticated-operator resolution and accepts only one exact `name`, then one exact display-name fallback. Controlled success returned `name`, `key`, and `displayName`. No fuzzy match or first-result selection exists. Jira create is never automatically retried. Any ambiguous submission outcome enters existing reconciliation-required state. Jira rejection of an explicit reporter returns `JiraReporterRejected`; SecureOps never silently retries with the integration identity.
 

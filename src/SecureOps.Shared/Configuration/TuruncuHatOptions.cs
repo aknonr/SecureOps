@@ -46,4 +46,6 @@ public sealed class TuruncuHatOptions
     public int MaxResponseBytes { get; set; } = 1_048_576;
     /// <summary>Maximum accepted decoded description length.</summary>
     public int MaxDescriptionLength { get; set; } = 8000;
+    /// <summary>Enables bounded, secret-free wire-contract metadata logging in TEST only.</summary>
+    public bool DiagnosticContractLogging { get; set; }
 }

@@ -144,7 +144,8 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         {
             _health.MarkUnavailable(Provider);
             _logger.LogWarning(
-                "Turuncu Hat source query reported an application error. ErrorNo: {ErrorNo}. HasErrorDescription: {HasErrorDescription}. HasErrorDetails: {HasErrorDetails}. HasItems: {HasItems}. RecordCount: {RecordCount}. TenantMetadata: {TenantMetadata}. PageNo: {PageNo}. MaxPages: {MaxPages}.",
+                "Turuncu Hat source query reported an application error. FailureConditions: {FailureConditions}. ErrorNo: {ErrorNo}. HasErrorDescription: {HasErrorDescription}. HasErrorDetails: {HasErrorDetails}. HasItems: {HasItems}. RecordCount: {RecordCount}. TenantMetadata: {TenantMetadata}. PageNo: {PageNo}. MaxPages: {MaxPages}.",
+                ApplicationErrorConditions(exception),
                 exception.ErrorNo,
                 exception.HasErrorDescription,
                 exception.HasErrorDetails,
@@ -187,7 +188,17 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
             using HttpRequestMessage request = CreateQueryRequest(baseObject, filters, selects, session);
             try
             {
+                if (_options.DiagnosticContractLogging)
+                {
+                    await LogQueryRequestContractAsync(request, baseObject, filters, selects, session, cancellationToken);
+                }
+
                 using HttpResponseMessage response = await SendAsync(request, cancellationToken);
+                if (_options.DiagnosticContractLogging && !response.IsSuccessStatusCode)
+                {
+                    await LogQueryFailureResponseContractAsync(response, cancellationToken);
+                }
+
                 if ((response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden) && attempt == 0)
                 {
                     _sessions.Invalidate(session);
@@ -207,10 +218,16 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
                     throw QueryFailure(response.StatusCode);
                 }
 
-                JsonDocument document = await BoundedJsonHttpContent.ReadAsync(
+                BoundedJsonReadResult readResult = await BoundedJsonHttpContent.ReadWithLengthAsync(
                     response.Content,
                     _options.MaxResponseBytes,
                     cancellationToken);
+                JsonDocument document = readResult.Document;
+                if (_options.DiagnosticContractLogging)
+                {
+                    LogQueryResponseContract(response.StatusCode, readResult.ByteLength, document.RootElement);
+                }
+
                 _health.MarkAvailable(Provider);
                 _telemetry.RecordOperation(Provider, operation, "success", stopwatch.Elapsed);
                 return document;
@@ -361,6 +378,143 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         };
         TuruncuHatSessionManager.ApplyHeaders(request, _options.Authorization);
         return request;
+    }
+
+    private async Task LogQueryRequestContractAsync(
+        HttpRequestMessage request,
+        string baseObject,
+        IReadOnlyList<string> filters,
+        IReadOnlyList<string> selects,
+        string session,
+        CancellationToken cancellationToken)
+    {
+        byte[] serializedRequest = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
+        string[] segments = session.Length == 0 ? [] : session.Split('|');
+        Uri endpoint = request.RequestUri!.IsAbsoluteUri
+            ? request.RequestUri
+            : new Uri(_httpClient.BaseAddress!, request.RequestUri);
+
+        _logger.LogInformation(
+            "Turuncu Hat query contract outbound. EndpointPath: {EndpointPath}. BaseObject: {BaseObject}. FilterExpressions: {FilterExpressions}. SelectNames: {SelectNames}. TenantId: {TenantId}. SessionIdPresent: {SessionIdPresent}. SessionIdTotalLength: {SessionIdTotalLength}. SessionIdSegmentCount: {SessionIdSegmentCount}. SessionIdSegmentLengths: {SessionIdSegmentLengths}. SerializedRequestByteLength: {SerializedRequestByteLength}.",
+            endpoint.AbsolutePath,
+            baseObject,
+            string.Join(" || ", filters),
+            string.Join(',', selects),
+            _options.TenantId,
+            session.Length != 0,
+            session.Length,
+            segments.Length,
+            string.Join(',', segments.Select(segment => segment.Length)),
+            serializedRequest.Length);
+    }
+
+    private void LogQueryResponseContract(HttpStatusCode statusCode, int responseByteLength, JsonElement root)
+    {
+        bool queryResultExists = root.TryGetProperty("QueryResult", out JsonElement queryResult)
+            && queryResult.ValueKind == JsonValueKind.Object;
+        int? errorNo = queryResultExists ? ReadDiagnosticInt(queryResult, "ErrorNo") : null;
+        bool hasErrorDescription = queryResultExists && HasDiagnosticText(queryResult, "ErrorDescription");
+        bool hasErrorDetails = queryResultExists && HasDiagnosticText(queryResult, "ErrorDetails");
+        JsonElement items = default;
+        bool hasItems = queryResultExists
+            && queryResult.TryGetProperty("Items", out items)
+            && items.ValueKind == JsonValueKind.Array;
+
+        _logger.LogInformation(
+            "Turuncu Hat query contract inbound. HttpStatus: {HttpStatus}. ResponseByteLength: {ResponseByteLength}. QueryResultExists: {QueryResultExists}. ErrorNo: {ErrorNo}. HasErrorDescription: {HasErrorDescription}. HasErrorDetails: {HasErrorDetails}. HasItems: {HasItems}. ItemCount: {ItemCount}. TenantMetadata: {TenantMetadata}. PageNo: {PageNo}. MaxPages: {MaxPages}. RecordCount: {RecordCount}. ApplicationErrorConditions: {ApplicationErrorConditions}.",
+            (int)statusCode,
+            responseByteLength,
+            queryResultExists,
+            errorNo,
+            hasErrorDescription,
+            hasErrorDetails,
+            hasItems,
+            hasItems ? items.GetArrayLength() : null,
+            queryResultExists ? ReadDiagnosticInt(queryResult, "TenantId") : null,
+            queryResultExists ? ReadDiagnosticInt(queryResult, "PageNO", "PageNo") : null,
+            queryResultExists ? ReadDiagnosticInt(queryResult, "MaxPages") : null,
+            queryResultExists ? ReadDiagnosticInt(queryResult, "RecordCount") : null,
+            ApplicationErrorConditions(errorNo, hasErrorDescription, hasErrorDetails));
+    }
+
+    private async Task LogQueryFailureResponseContractAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            BoundedJsonReadResult readResult = await BoundedJsonHttpContent.ReadWithLengthAsync(
+                response.Content,
+                _options.MaxResponseBytes,
+                cancellationToken);
+            using JsonDocument document = readResult.Document;
+            LogQueryResponseContract(response.StatusCode, readResult.ByteLength, document.RootElement);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException)
+        {
+            _logger.LogInformation(
+                "Turuncu Hat query contract inbound. HttpStatus: {HttpStatus}. ResponseByteLength: {ResponseByteLength}. QueryResultExists: Unknown. ResponseMetadataReadable: False.",
+                (int)response.StatusCode,
+                response.Content.Headers.ContentLength);
+        }
+    }
+
+    private static string ApplicationErrorConditions(TuruncuHatQueryResultException exception) =>
+        ApplicationErrorConditions(exception.ErrorNo, exception.HasErrorDescription, exception.HasErrorDetails);
+
+    private static string ApplicationErrorConditions(
+        int? errorNo,
+        bool hasErrorDescription,
+        bool hasErrorDetails)
+    {
+        List<string> conditions = [];
+        if (errorNo.GetValueOrDefault() != 0)
+        {
+            conditions.Add("ErrorNo");
+        }
+
+        if (hasErrorDescription)
+        {
+            conditions.Add("ErrorDescription");
+        }
+
+        if (hasErrorDetails)
+        {
+            conditions.Add("ErrorDetails");
+        }
+
+        return conditions.Count == 0 ? "None" : string.Join(',', conditions);
+    }
+
+    private static bool HasDiagnosticText(JsonElement parent, string propertyName) =>
+        parent.TryGetProperty(propertyName, out JsonElement value)
+        && value.ValueKind == JsonValueKind.String
+        && !string.IsNullOrWhiteSpace(value.GetString());
+
+    private static int? ReadDiagnosticInt(JsonElement parent, params string[] propertyNames)
+    {
+        foreach (string propertyName in propertyNames)
+        {
+            if (!parent.TryGetProperty(propertyName, out JsonElement value))
+            {
+                continue;
+            }
+
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int numeric))
+            {
+                return numeric;
+            }
+
+            if (value.ValueKind == JsonValueKind.String
+                && int.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out numeric))
+            {
+                return numeric;
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

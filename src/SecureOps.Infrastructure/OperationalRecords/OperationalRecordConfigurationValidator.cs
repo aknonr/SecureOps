@@ -13,6 +13,12 @@ public static class OperationalRecordConfigurationValidator
         JiraIntegrationOptions jira = configuration.GetSection(JiraIntegrationOptions.SectionName).Get<JiraIntegrationOptions>() ?? new();
         TuruncuHatOptions turuncuHat = configuration.GetSection(TuruncuHatOptions.SectionName).Get<TuruncuHatOptions>() ?? new();
 
+        if (turuncuHat.DiagnosticContractLogging
+            && !string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("TuruncuHat:DiagnosticContractLogging is permitted only in Test.");
+        }
+
         if (!string.Equals(operational.SourceProvider, "Disabled", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(operational.SourceProvider, "Fake", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(operational.SourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase)

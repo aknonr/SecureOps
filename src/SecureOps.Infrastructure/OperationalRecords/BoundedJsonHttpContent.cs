@@ -10,6 +10,15 @@ internal static class BoundedJsonHttpContent
         int maximumBytes,
         CancellationToken cancellationToken)
     {
+        BoundedJsonReadResult result = await ReadWithLengthAsync(content, maximumBytes, cancellationToken);
+        return result.Document;
+    }
+
+    public static async Task<BoundedJsonReadResult> ReadWithLengthAsync(
+        HttpContent content,
+        int maximumBytes,
+        CancellationToken cancellationToken)
+    {
         if (content.Headers.ContentLength > maximumBytes)
         {
             throw new InvalidDataException("Dependency response exceeded the configured limit.");
@@ -37,12 +46,15 @@ internal static class BoundedJsonHttpContent
         }
 
         destination.Position = 0;
-        return await JsonDocument.ParseAsync(
+        JsonDocument document = await JsonDocument.ParseAsync(
             destination,
             new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Disallow, MaxDepth = 64 },
             cancellationToken);
+        return new BoundedJsonReadResult(document, total);
     }
 }
+
+internal readonly record struct BoundedJsonReadResult(JsonDocument Document, int ByteLength);
 
 /// <summary>Preserves the reviewed legacy property casing instead of web camel-casing.</summary>
 internal static class LegacyContractJson

@@ -7,6 +7,34 @@ namespace SecureOps.Tests.Unit.OperationalRecords;
 public sealed class OperationalRecordConfigurationValidatorTests
 {
     [Fact]
+    public void Validate_WithContractDiagnosticInTest_Succeeds()
+    {
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
+        values["TuruncuHat:DiagnosticContractLogging"] = "true";
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Demo")]
+    [InlineData("Pilot")]
+    [InlineData("Production")]
+    public void Validate_WithContractDiagnosticOutsideTest_FailsStartup(string environmentName)
+    {
+        IConfiguration configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["TuruncuHat:DiagnosticContractLogging"] = "true"
+        });
+
+        Action act = () => OperationalRecordConfigurationValidator.Validate(configuration, environmentName);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*DiagnosticContractLogging*only in Test*");
+    }
+
+    [Fact]
     public void Validate_WithUnsupportedLiveProvider_FailsClearly()
     {
         IConfiguration configuration = Configuration(new Dictionary<string, string?>

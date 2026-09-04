@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -110,6 +111,7 @@ public sealed class EnterpriseAdapterContractTests
     [Fact]
     public async Task SourceClient_UsesExactKnownGoodCorporateQueryContract()
     {
+        const string legacyContract = "{\"req\":{\"BaseObject\":\"SMSS_oRFF\",\"Filters\":[\"#%m_active%#='True' AND #%p_dcc%# NOT IN (4241) AND #%p_rel_group%# IN (68)\"],\"Selects\":[\"id\",\"p_code\",\"p_name\",\"p_description\",\"p_rel_requester\"],\"SessionID\":\"<session>\",\"TenantId\":218}}";
         ScriptedHandler handler = new(Response(HttpStatusCode.OK, "{\"QueryResult\":{\"Items\":[]}}"));
 
         _ = await SourceClient(handler).GetActiveAsync(10, CancellationToken.None);
@@ -118,6 +120,10 @@ public sealed class EnterpriseAdapterContractTests
         CapturedRequest request = handler.Requests[0];
         request.Path.Should().Be("/query");
         request.ContentType.Should().StartWith("application/json");
+        var actualContract = JsonNode.Parse(request.Body);
+        var expectedContract = JsonNode.Parse(
+            legacyContract.Replace("<session>", "sanitized-session", StringComparison.Ordinal));
+        JsonNode.DeepEquals(actualContract, expectedContract).Should().BeTrue();
         using var body = JsonDocument.Parse(request.Body);
         body.RootElement.EnumerateObject().Select(property => property.Name).Should().Equal("req");
         JsonElement req = body.RootElement.GetProperty("req");
@@ -338,6 +344,28 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
+    public async Task SourceClient_TestContractDiagnostic_LogsBoundedHttpFailureMetadata()
+    {
+        const string response = "{}";
+        CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+
+        Func<Task> act = async () => await SourceClient(
+            new ScriptedHandler(Response(HttpStatusCode.BadRequest, response)),
+            logger: logger,
+            diagnosticContractLogging: true).GetActiveAsync(10, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>();
+        string messages = string.Join(' ', logger.Messages);
+        messages.Should().Contain("query contract inbound")
+            .And.Contain("HttpStatus: 400")
+            .And.Contain($"ResponseByteLength: {Encoding.UTF8.GetByteCount(response)}")
+            .And.Contain("QueryResultExists: False")
+            .And.NotContain("sanitized-session")
+            .And.NotContain("Sanitized runtime value")
+            .And.NotContain("sanitized-secret");
+    }
+
+    [Fact]
     public async Task SourceClient_ApplicationErrorDiagnosticsContainOnlySanitizedMetadata()
     {
         CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
@@ -349,7 +377,8 @@ public sealed class EnterpriseAdapterContractTests
 
         await act.Should().ThrowAsync<ExternalIntegrationException>();
         string messages = string.Join(' ', logger.Messages);
-        messages.Should().Contain("ErrorNo: 1")
+        messages.Should().Contain("FailureConditions: ErrorNo,ErrorDescription,ErrorDetails")
+            .And.Contain("ErrorNo: 1")
             .And.Contain("HasErrorDescription: True")
             .And.Contain("HasErrorDetails: True")
             .And.Contain("HasItems: True")
@@ -359,6 +388,54 @@ public sealed class EnterpriseAdapterContractTests
             .And.Contain("RecordCount: 4")
             .And.NotContain("secret remote text")
             .And.NotContain("secret details");
+    }
+
+    [Fact]
+    public async Task SourceClient_TestContractDiagnostic_LogsExactSafeRequestAndResponseMetadata()
+    {
+        string loginResult = "abc|" + new string('s', 64);
+        const string response = "{\"QueryResult\":{\"ErrorDescription\":null,\"ErrorDetails\":null,\"ErrorNo\":0,\"TenantId\":0,\"MaxPages\":0,\"PageNO\":0,\"RecordCount\":1,\"Items\":[[[{\"Value\":\"1001\"}],[{\"Value\":\"OR-100\"}],[{\"Value\":\"One\"}],[{\"Value\":\"private description\"}],[{\"Value\":\"Requester\"}]]]}}";
+        CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
+        ScriptedHandler handler = new(Response(HttpStatusCode.OK, response));
+
+        IReadOnlyList<OperationalRecordSourceItem> records = await SourceClient(
+            handler,
+            logger: logger,
+            diagnosticContractLogging: true,
+            session: loginResult).GetActiveAsync(10, CancellationToken.None);
+
+        records.Should().ContainSingle();
+        string messages = string.Join(' ', logger.Messages);
+        messages.Should().Contain("query contract outbound")
+            .And.Contain("EndpointPath: /query")
+            .And.Contain("BaseObject: SMSS_oRFF")
+            .And.Contain("#%m_active%#='True' AND #%p_dcc%# NOT IN (4241) AND #%p_rel_group%# IN (68)")
+            .And.Contain("id,p_code,p_name,p_description,p_rel_requester")
+            .And.Contain("TenantId: 218")
+            .And.Contain("SessionIdPresent: True")
+            .And.Contain("SessionIdTotalLength: 68")
+            .And.Contain("SessionIdSegmentCount: 2")
+            .And.Contain("SessionIdSegmentLengths: 3,64")
+            .And.Contain($"SerializedRequestByteLength: {Encoding.UTF8.GetByteCount(handler.Requests[0].Body)}")
+            .And.Contain("query contract inbound")
+            .And.Contain("HttpStatus: 200")
+            .And.Contain($"ResponseByteLength: {Encoding.UTF8.GetByteCount(response)}")
+            .And.Contain("QueryResultExists: True")
+            .And.Contain("ErrorNo: 0")
+            .And.Contain("HasErrorDescription: False")
+            .And.Contain("HasErrorDetails: False")
+            .And.Contain("HasItems: True")
+            .And.Contain("ItemCount: 1")
+            .And.Contain("TenantMetadata: 0")
+            .And.Contain("PageNo: 0")
+            .And.Contain("MaxPages: 0")
+            .And.Contain("RecordCount: 1")
+            .And.Contain("ApplicationErrorConditions: None")
+            .And.NotContain(loginResult)
+            .And.NotContain("Sanitized runtime value")
+            .And.NotContain("sanitized-user")
+            .And.NotContain("sanitized-secret")
+            .And.NotContain("private description");
     }
 
     [Theory]
@@ -765,14 +842,21 @@ public sealed class EnterpriseAdapterContractTests
     private static TuruncuHatOperationalRecordClient SourceClient(
         HttpMessageHandler handler,
         bool readOnlyIntegrationMode = false,
-        ILogger<TuruncuHatOperationalRecordClient>? logger = null) => new(
-        Client(handler, "https://source.invalid/"),
-        new FixedSessionManager(),
-        Options.Create(TuruncuOptions()),
-        Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
-        new EnterpriseIntegrationHealthState(),
-        new EnterpriseIntegrationTelemetry(),
-        logger ?? NullLogger<TuruncuHatOperationalRecordClient>.Instance);
+        ILogger<TuruncuHatOperationalRecordClient>? logger = null,
+        bool diagnosticContractLogging = false,
+        string session = "sanitized-session")
+    {
+        TuruncuHatOptions options = TuruncuOptions();
+        options.DiagnosticContractLogging = diagnosticContractLogging;
+        return new TuruncuHatOperationalRecordClient(
+            Client(handler, "https://source.invalid/"),
+            new FixedSessionManager(session),
+            Options.Create(options),
+            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
+            new EnterpriseIntegrationHealthState(),
+            new EnterpriseIntegrationTelemetry(),
+            logger ?? NullLogger<TuruncuHatOperationalRecordClient>.Instance);
+    }
 
     private static CorporateJiraRequesterResolver JiraResolver(ScriptedHandler handler) => new(
         Client(handler, "https://jira.invalid/"),
@@ -843,9 +927,9 @@ public sealed class EnterpriseAdapterContractTests
         Content = new StringContent(json, Encoding.UTF8, "application/json")
     };
 
-    private sealed class FixedSessionManager : ITuruncuHatSessionManager
+    private sealed class FixedSessionManager(string session = "sanitized-session") : ITuruncuHatSessionManager
     {
-        public Task<string> GetSessionAsync(CancellationToken cancellationToken) => Task.FromResult("sanitized-session");
+        public Task<string> GetSessionAsync(CancellationToken cancellationToken) => Task.FromResult(session);
         public void Invalidate(string rejectedSession) { }
     }
 
