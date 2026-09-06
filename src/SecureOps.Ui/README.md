@@ -438,9 +438,48 @@ the standard foreground Demo profile and existing API connection were used, then
 stopped. No corporate call, SQL operation, IIS change or deployment occurred.
 MudBlazor/.NET and Bitbucket remain separate follow-up milestones.
 
-The release source/hash association and actual push result are recorded below
-after packaging. The Turkish operator sequence is in
-`docs/24-api-test-deployment-readiness.md`, SDM/resource milestone runbook section.
+**Final source/release association:** backend hardening is
+`bdcdce033702bab5f7fc9ec3147dee05a09d9574`; the exact paired API/UI build source is
+`de6e5381bd3d7e053f2e9c1c6b07e93283f55ca7`. Packaging tooling is committed as
+`6e039e2c8ca19c929345ed3ede107d96efa9a81d`. Later handoff-only commits do not
+change the package source SHA. Both DLL ProductVersion values contain that exact
+build SHA; the shared Infrastructure assembly is byte-identical in both packages.
+
+Release root: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.10`.
+
+| Artifact relative to release root | SHA-256 |
+|---|---|
+| `API/secureops-api-TEST-de6e538.zip` | `542DD21F081BFE557DC9B87EC45A9F9BB8A827FF566050C4BC765731EB3F0661` |
+| `UI/secureops-ui-TEST-de6e538.zip` | `3AA2226C3E492482149EFD2624CDD1B20EFDC208810093CF2C4EAD30530F81CA` |
+| `DBA/secureops-database-001-010-TEST-rc6.10.zip` | `8EC5D20BB6517017801EB0D31EFA15E1576EFFCC851412AEAD22CBFD4F9440E8` |
+
+The release includes `release-readiness.md`, `release-metadata.json`,
+`release-artifacts.sha256`, per-archive/per-file hashes and `operator-runbook-tr.md`.
+API 238 entries, UI 252 entries and DBA 22 files passed exact path/hash checks.
+API AD runtime and offline Test Swagger gates passed. UI packaging also proved
+refusal to overwrite an existing archive without changing its hash. Server-owned
+configuration/secrets and PDB/source/log files are outside application ZIPs.
+
+Final source builds/publishes passed with zero warnings/errors. After the full
+1,020 + 242 test run, 499 UI tests passed and the final nine publication-client
+tests passed after the known-transient distinction; these overlapping runs are
+not summed as independent totals. SQL tests use the isolated local owner; actual
+corporate runtime grants/ownership-chain validation is still a DBA gate. No
+repository-wide formatting cleanup was attempted; build analyzers and diff checks
+passed for the changes. All task additions were below 1,000 lines at final review;
+the authorized scoped exception was recorded but no permanent rule was changed.
+
+**Push outcome:** normal push to the configured origin branch was attempted and
+failed: Git could not obtain credentials with interactive prompting disabled.
+Remote URL/upstream configuration is verified; live remote SHA is **not verified**.
+The cached tracking SHA remains the starting `0276bf1`, not evidence of the current
+remote. No force push, merge, branch deletion or credential-store inspection.
+All milestone commits remain local until normal repository authentication works.
+
+The Turkish operator sequence is in `docs/24-api-test-deployment-readiness.md`,
+SDM/resource runbook section, and exported into the release. First manual TEST
+step: record the actual targets, current API/UI/schema and verified backup/rollback
+references using read-only inventory under the separate TEST change approval.
 
 ### Resource backend prerequisites
 

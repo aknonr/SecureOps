@@ -1,5 +1,29 @@
 # Decisions Log
 
+## 2026-09-07 - SDM workflow, management and read-only TEST delivery
+
+The task authorizes cross-layer implementation, coherent commits and normal push,
+plus a task-only size exception without changing the permanent cap. Source-bound
+drafts and uncertain-result handling are hardened; no positive SDM/approval policy,
+corporate writes, Jira reconciliation lookup or source-close activation is invented.
+The existing sanitized script parity/contract-gap documents remain the evidence
+boundary because no original script/access path exists in the repository.
+
+Paired API/UI package source is `de6e5381bd3d7e053f2e9c1c6b07e93283f55ca7`;
+release root is `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.10`, required
+schema 001-010. API/UI/DBA ZIP entries/hashes and source versions were verified.
+No migration file changed. Full local tests passed 1,020 unit + 242 integration,
+including eight isolated SQL tests; subsequent UI/client checks and browser
+limitations are recorded without double-counting or claiming corporate activation.
+
+No most-active-user ranking or new usage collection was added. Existing UTC
+event/session aggregates are adoption evidence, not productivity; review-age and
+resource-adoption metrics were not invented. Framework and Bitbucket follow-ups
+remain deferred. The normal push failed on unavailable non-interactive Git
+credentials; current remote SHA could not be verified. Canonical continuation:
+`src/SecureOps.Ui/README.md`, "SDM, Management and TEST Delivery Handoff, 2026-09-07".
+Operator runbook: `docs/24-api-test-deployment-readiness.md` and the release export.
+
 ## 2026-05-16 — PAM pre-review meeting focus
 
 **What we discussed:** Bilgi Güvenliği ve Siber Güvenlik ön incelemeleri politika, risk ve kontrol çerçevesi üretirken PAM görüşmesinin doğası daha operasyoneldir. PAM ekibi için asıl değer, servis hesabı, parola rotasyonu, secret retrieval yöntemi, Phase 4 read-only session correlation erişimi ve gelecek faz bağımlılıklarının somut ticket/request çıktısına dönüşmesidir.
