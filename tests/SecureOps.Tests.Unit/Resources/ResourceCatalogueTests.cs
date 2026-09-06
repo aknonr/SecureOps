@@ -13,7 +13,7 @@ using SecureOps.Shared.Contracts.Resources;
 
 namespace SecureOps.Tests.Unit.Resources;
 
-public sealed class ResourceCatalogueTests
+public sealed partial class ResourceCatalogueTests
 {
     private static readonly ClaimsPrincipal _principal = new(new ClaimsIdentity([new Claim(ClaimTypes.Name, "synthetic")], "test"));
     private static readonly AccessOperationContext _context = new("synthetic", "resource-test", null);
@@ -184,6 +184,40 @@ public sealed class ResourceCatalogueTests
 
     internal static SaveResourceLinkRequest Link(Guid category) => new(category, "Synthetic dashboard", "https://example.invalid/dashboard?orgId=1",
         "Synthetic purpose", Environment: "Test", Location: "Lab", Tags: ["sample"]);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LegacySetSave_OmittedMembersSurviveArchiveAndRestorationBetweenReadAndWrite(bool restoreBeforeSave)
+    {
+        var repository = new InMemoryResourceRepository(new InMemoryAuditWriter());
+        ResourceCatalogueService admin = Service(repository, "Admin");
+        ResourceCatalogueService owner = Service(repository, "Operator");
+        ResourceCategory category = (await admin.SaveCategoryAsync(_principal, _context, Guid.Empty, new("Synthetic integrity"), true, _token)).Value!;
+        ResourceLink first = (await admin.SaveLinkAsync(_principal, _context, Guid.Empty, Link(category.Id), true, _token)).Value!;
+        ResourceLink hidden = (await admin.SaveLinkAsync(_principal, _context, Guid.Empty, Link(category.Id), true, _token)).Value!;
+        ResourceLink last = (await admin.SaveLinkAsync(_principal, _context, Guid.Empty, Link(category.Id), true, _token)).Value!;
+        ResourcePreferencesResponse personal = (await owner.SaveSetAsync(_principal, _context, Guid.Empty,
+            new("Original", [first.Id, hidden.Id, last.Id]), true, _token)).Value!;
+        Guid setId = personal.Sets.Single().Id;
+        await admin.SaveLinkAsync(_principal, _context, hidden.Id, Link(category.Id) with { Archived = true, ExpectedVersion = 1 }, false, _token);
+        personal = (await owner.PreferencesAsync(_principal, _context, _token)).Value!;
+        personal.Sets.Single().Links.Select(l => l.Id).Should().Equal(first.Id, last.Id);
+        JsonSerializer.Serialize(personal).Should().NotContain(hidden.Id.ToString());
+        if (restoreBeforeSave)
+        {
+            await admin.SaveLinkAsync(_principal, _context, hidden.Id, Link(category.Id) with { ExpectedVersion = 2 }, false, _token);
+        }
+        personal = (await owner.SaveSetAsync(_principal, _context, setId,
+            new("Renamed", [last.Id, first.Id], true, personal.Version), false, _token)).Value!;
+        if (!restoreBeforeSave)
+        {
+            await admin.SaveLinkAsync(_principal, _context, hidden.Id, Link(category.Id) with { ExpectedVersion = 2 }, false, _token);
+        }
+        personal = (await owner.PreferencesAsync(_principal, _context, _token)).Value!;
+        personal.Sets.Single().Links.Select(l => l.Id).Should().Equal(last.Id, hidden.Id, first.Id);
+        personal.DefaultSetId.Should().Be(setId);
+    }
 
     [Fact]
     public async Task FutureExpectedVersion_CannotOverwriteStateBuiltFromAnOlderSnapshot()

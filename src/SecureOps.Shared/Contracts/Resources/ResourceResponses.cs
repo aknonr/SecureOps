@@ -10,4 +10,7 @@ public sealed record ShiftSetResponse(Guid Id, string Name, IReadOnlyList<Resour
 
 /// <summary>Current owner-only preferences. Version guards all favourite/set mutations.</summary>
 public sealed record ResourcePreferencesResponse(long Version, IReadOnlyList<ResourceLink> Favourites,
-    IReadOnlyList<ShiftSetResponse> Sets, Guid? DefaultSetId);
+    IReadOnlyList<ShiftSetResponse> Sets, Guid? DefaultSetId, bool GuideDismissed = false);
+
+/// <summary>At most 100 permitted environment values; refine search when HasMore is true.</summary>
+public sealed record ResourceEnvironmentOptions(IReadOnlyList<string> Values, bool HasMore);

@@ -89,5 +89,8 @@ public static class ResourceValidation
     /// <summary>Validates one private set; empty sets are valid.</summary>
     public static bool Set(SaveShiftSetRequest value) => Text(value.Name, 80, true) && value.ExpectedVersion is >= 0 and < long.MaxValue
         && value.LinkIds is not null && value.LinkIds.Count <= 100 && value.LinkIds.All(id => id != Guid.Empty)
-        && value.LinkIds.Distinct().Count() == value.LinkIds.Count;
+        && value.LinkIds.Distinct().Count() == value.LinkIds.Count
+        && (value.RemoveLinkIds is null || value.RemoveLinkIds.Count <= 100
+            && value.RemoveLinkIds.All(id => id != Guid.Empty && !value.LinkIds.Contains(id))
+            && value.RemoveLinkIds.Distinct().Count() == value.RemoveLinkIds.Count);
 }

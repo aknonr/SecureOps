@@ -79,12 +79,44 @@ public sealed class ResourcesApiTests
                 count++;
             }
         }
-        count.Should().Be(13);
+        count.Should().Be(15);
         JsonElement schemas = root.GetProperty("components").GetProperty("schemas");
         schemas.GetProperty("ResourcePreferencesResponse").GetProperty("properties").GetProperty("defaultSetId")
             .GetProperty("nullable").GetBoolean().Should().BeTrue();
         schemas.GetProperty("ResourceLink").GetProperty("properties").GetProperty("notes")
             .GetProperty("nullable").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AdditiveContracts_LegacyOmissionsRetainMembersAndExplicitRemovalsRemainOwnerScoped()
+    {
+        using WebApplicationFactory<Program> factory = Factory();
+        using HttpClient admin = Client(factory, "platform-admin");
+        using HttpClient owner = Client(factory, "team-lead");
+        ResourceCategory category = await ReadAsync<ResourceCategory>(await admin.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Synthetic contract")));
+        var request = new SaveResourceLinkRequest(category.Id, "Synthetic", "https://example.invalid/contract", "Synthetic", Environment: "Pilot");
+        ResourceLink link = await ReadAsync<ResourceLink>(await admin.PostAsJsonAsync("/api/v1/resources/links", request));
+        ResourcePreferencesResponse personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PostAsJsonAsync("/api/v1/resources/me/sets", new SaveShiftSetRequest("Original", [link.Id])));
+        Guid id = personal.Sets.Single().Id;
+        await admin.PutAsJsonAsync($"/api/v1/resources/links/{link.Id}", request with { Archived = true, ExpectedVersion = 1 });
+        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}",
+            new { name = "Legacy rename", linkIds = Array.Empty<Guid>(), isDefault = true, expectedVersion = personal.Version }));
+        personal.Sets.Single().Links.Should().BeEmpty();
+        personal.DefaultSetId.Should().Be(id);
+        (await ReadAsync<ResourceEnvironmentOptions>(await owner.GetAsync("/api/v1/resources/environments"))).Values.Should().BeEmpty();
+        (await owner.GetAsync("/api/v1/resources/environments?includeArchived=true")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await admin.PutAsJsonAsync($"/api/v1/resources/links/{link.Id}", request with { ExpectedVersion = 2 });
+        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.GetAsync("/api/v1/resources/me"));
+        personal.Sets.Single().Links.Single().Id.Should().Be(link.Id);
+        (await ReadAsync<ResourceEnvironmentOptions>(await owner.GetAsync("/api/v1/resources/environments?search=pilot"))).Values.Should().Equal("Pilot");
+        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync("/api/v1/resources/me/guide", new DismissResourceGuideRequest(personal.Version)));
+        personal.GuideDismissed.Should().BeTrue();
+        (await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me"))).GuideDismissed.Should().BeFalse();
+        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}",
+            new SaveShiftSetRequest("Removed", [], true, personal.Version, [link.Id])));
+        personal.Sets.Single().Links.Should().BeEmpty();
+        (await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}", new SaveShiftSetRequest("Stale", [], ExpectedVersion: 1)))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     private static WebApplicationFactory<Program> Factory() => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

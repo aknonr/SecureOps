@@ -22,6 +22,18 @@ namespace SecureOps.Api.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class ResourcesController(ResourceCatalogueService service) : ControllerBase
 {
+    /// <summary>Looks up at most 100 permitted environment values independently of link pagination.</summary>
+    [HttpGet("environments")]
+    [ProducesResponseType(typeof(ResourceEnvironmentOptions), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ResourceEnvironmentOptions>> EnvironmentsAsync([FromQuery] ResourceEnvironmentQuery query, CancellationToken cancellationToken) =>
+        Reply(await service.EnvironmentsAsync(User, Context(), query, cancellationToken));
+
+    /// <summary>Dismisses only the caller's first-use resource guide invitation.</summary>
+    [HttpPut("me/guide")]
+    [ProducesResponseType(typeof(ResourcePreferencesResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ResourcePreferencesResponse>> DismissGuideAsync(DismissResourceGuideRequest request, CancellationToken cancellationToken) =>
+        Reply(await service.DismissGuideAsync(User, Context(), request, cancellationToken));
+
     /// <summary>Lists permitted categories; includeArchived is manager-only.</summary>
     [HttpGet("categories")]
     [ProducesResponseType(typeof(IReadOnlyList<ResourceCategory>), StatusCodes.Status200OK)]
@@ -86,7 +98,7 @@ public sealed class ResourcesController(ResourceCatalogueService service) : Cont
     public async Task<ActionResult<ResourcePreferencesResponse>> CreateSetAsync(SaveShiftSetRequest request, CancellationToken cancellationToken) =>
         Reply(await service.SaveSetAsync(User, Context(), Guid.Empty, request, true, cancellationToken));
 
-    /// <summary>Replaces an owned set atomically; cross-user IDs return not found.</summary>
+    /// <summary>Merges an owned set atomically, retaining omitted references; cross-user IDs return not found.</summary>
     [HttpPut("me/sets/{id:guid}")]
     [ProducesResponseType(typeof(ResourcePreferencesResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<ResourcePreferencesResponse>> SaveSetAsync(Guid id, SaveShiftSetRequest request, CancellationToken cancellationToken) =>

@@ -37,9 +37,17 @@ public sealed record ResourceQuery(
 /// <summary>Idempotent favourite membership intent guarded by the personal aggregate version.</summary>
 public sealed record SaveFavouriteRequest(bool Favourite, [Range(0, long.MaxValue)] long ExpectedVersion);
 
-/// <summary>Whole personal-set replacement; duplicates are invalid and at most 100 links are accepted.</summary>
+/// <summary>Ordered additions plus explicit removals. Omitted saved references are always retained.</summary>
 public sealed record SaveShiftSetRequest(
     [Required, StringLength(80)] string Name,
     [Required, MaxLength(100)] IReadOnlyList<Guid> LinkIds,
     bool IsDefault = false,
-    [Range(0, long.MaxValue)] long ExpectedVersion = 0);
+    [Range(0, long.MaxValue)] long ExpectedVersion = 0,
+    [MaxLength(100)] IReadOnlyList<Guid>? RemoveLinkIds = null);
+
+/// <summary>Bounded environment lookup, independent of the current catalogue page.</summary>
+public sealed record ResourceEnvironmentQuery(
+    [StringLength(40)] string? Search = null, Guid? CategoryId = null, bool IncludeArchived = false);
+
+/// <summary>Dismisses the first-use invitation; replay remains available. No training activity is recorded.</summary>
+public sealed record DismissResourceGuideRequest([Range(0, long.MaxValue)] long ExpectedVersion);

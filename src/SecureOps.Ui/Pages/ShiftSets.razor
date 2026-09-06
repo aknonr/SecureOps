@@ -372,7 +372,7 @@
         ClearResolved();
         return MutateAsync(preferences => ResourceApi.SaveSetAsync(
             set.Id,
-            new SaveShiftSetRequest(set.Name, remaining, set.IsDefault, preferences.Version),
+            new SaveShiftSetRequest(set.Name, remaining, set.IsDefault, preferences.Version, [link.Id]),
             CancellationToken.None));
     }
 

@@ -24,6 +24,13 @@ public sealed class ResourceCatalogueService(IResourceRepository repository, IAp
             ResourceValidation.Query(query) ? new(await repository.QueryAsync(query, Manager(user), cancellationToken))
                 : ResourceResult<ResourcePage>.Fail(ResourceErrors.Invalid), cancellationToken);
 
+    /// <summary>Returns searchable bounded filter values from the caller's permitted catalogue.</summary>
+    public Task<ResourceResult<ResourceEnvironmentOptions>> EnvironmentsAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        ResourceEnvironmentQuery query, CancellationToken cancellationToken) => ExecuteAsync(principal, context, query.IncludeArchived, async user =>
+            ResourceValidation.Text(query.Search, 40) && query.CategoryId != Guid.Empty
+                ? new(await repository.EnvironmentsAsync(query, Manager(user), cancellationToken))
+                : ResourceResult<ResourceEnvironmentOptions>.Fail(ResourceErrors.Invalid), cancellationToken);
+
     /// <summary>Reads a direct ID with the same visibility predicate as search and sets.</summary>
     public Task<ResourceResult<ResourceLink>> GetAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id,
         bool includeArchived, CancellationToken cancellationToken) => ExecuteAsync(principal, context, includeArchived, async user =>
@@ -94,11 +101,23 @@ public sealed class ResourceCatalogueService(IResourceRepository repository, IAp
             return await SavePersonalAsync(current with { FavouriteIds = ids }, request.ExpectedVersion, user, context, cancellationToken);
         }, cancellationToken);
 
-    /// <summary>Atomically creates/replaces a personal set, its order, and optional default selection.</summary>
+    /// <summary>Dismisses only the caller's guide invitation with the same personal concurrency and audit guarantees.</summary>
+    public Task<ResourceResult<ResourcePreferencesResponse>> DismissGuideAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        DismissResourceGuideRequest request, CancellationToken cancellationToken) => ExecuteAsync(principal, context, false, async user =>
+        {
+            if (request.ExpectedVersion is < 0 or long.MaxValue)
+            {
+                return ResourceResult<ResourcePreferencesResponse>.Fail(ResourceErrors.Invalid);
+            }
+            ResourcePreferences current = await repository.PreferencesAsync(user.Id, cancellationToken);
+            return await SavePersonalAsync(current with { GuideDismissed = true }, request.ExpectedVersion, user, context, cancellationToken);
+        }, cancellationToken);
+
+    /// <summary>Atomically merges ordered membership and explicit removals; omissions never delete saved references.</summary>
     public Task<ResourceResult<ResourcePreferencesResponse>> SaveSetAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id,
         SaveShiftSetRequest request, bool create, CancellationToken cancellationToken) => ExecuteAsync(principal, context, false, async user =>
         {
-            if (!ResourceValidation.Set(request))
+            if (!ResourceValidation.Set(request) || create && request.RemoveLinkIds is { Count: > 0 })
             {
                 return ResourceResult<ResourcePreferencesResponse>.Fail(ResourceErrors.Invalid);
             }
@@ -119,14 +138,27 @@ public sealed class ResourceCatalogueService(IResourceRepository repository, IAp
                 return ResourceResult<ResourcePreferencesResponse>.Fail(ResourceErrors.Invalid);
             }
 
-            IReadOnlyList<ResourceLink> visible = await repository.ResolveAsync([.. request.LinkIds], Manager(user), cancellationToken);
-            if (visible.Count != request.LinkIds.Count)
+            if (current.Version != request.ExpectedVersion)
+            {
+                return ResourceResult<ResourcePreferencesResponse>.Fail(ResourceErrors.Conflict);
+            }
+
+            IReadOnlyList<Guid> removed = request.RemoveLinkIds ?? [];
+            IReadOnlyList<Guid> savedIds = create ? [] : current.Sets.Single(s => s.Id == id).LinkIds;
+            Guid[] requestedIds = [.. request.LinkIds.Concat(removed)];
+            IReadOnlyList<ResourceLink> visible = await repository.ResolveAsync(requestedIds, Manager(user), cancellationToken);
+            if (visible.Count != requestedIds.Length || removed.Any(linkId => !savedIds.Contains(linkId)))
             {
                 return ResourceResult<ResourcePreferencesResponse>.Fail(ResourceErrors.NotFound);
             }
 
+            Guid[] merged = ResourceSetMembership.Merge(savedIds, request.LinkIds, removed);
+            if (merged.Length > 100)
+            {
+                return ResourceResult<ResourcePreferencesResponse>.Fail(ResourceErrors.Limit);
+            }
             Guid setId = create ? Guid.NewGuid() : id;
-            ShiftStartSet next = new(setId, request.Name.Trim(), [.. request.LinkIds]);
+            ShiftStartSet next = new(setId, request.Name.Trim(), merged);
             ShiftStartSet[] sets = [.. current.Sets.Where(s => s.Id != setId).Append(next).OrderBy(s => s.Id.ToString("D"), StringComparer.Ordinal)];
             Guid? defaultId = request.IsDefault ? setId : current.DefaultSetId == setId ? null : current.DefaultSetId;
             return await SavePersonalAsync(current with { Sets = sets, DefaultSetId = defaultId }, request.ExpectedVersion, user, context, cancellationToken);
@@ -172,7 +204,7 @@ public sealed class ResourceCatalogueService(IResourceRepository repository, IAp
         var byId = links.ToDictionary(l => l.Id);
         ResourceLink[] Resolve(IEnumerable<Guid> references) => [.. references.Where(byId.ContainsKey).Select(id => byId[id])];
         return new(value.Version, Resolve(value.FavouriteIds), [.. value.Sets.Select(s => new ShiftSetResponse(s.Id, s.Name,
-            Resolve(s.LinkIds), s.Id == value.DefaultSetId))], value.DefaultSetId);
+            Resolve(s.LinkIds), s.Id == value.DefaultSetId))], value.DefaultSetId, value.GuideDismissed);
     }
 
     private async Task<ResourceResult<T>> ExecuteAsync<T>(ClaimsPrincipal principal, AccessOperationContext context, bool manage,

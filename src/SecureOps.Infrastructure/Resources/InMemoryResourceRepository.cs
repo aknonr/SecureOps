@@ -105,6 +105,18 @@ public sealed class InMemoryResourceRepository(IAuditWriter auditWriter) : IReso
         _categories.TryGetValue(l.CategoryId, out ResourceCategory? category) && (manager || !category.ManagersOnly)
         && (manager && archived || l.Active && !l.Archived && !category.Archived));
 
+    /// <inheritdoc />
+    public Task<ResourceEnvironmentOptions> EnvironmentsAsync(ResourceEnvironmentQuery query, bool manager, CancellationToken cancellationToken) => LockedAsync(() =>
+    {
+        string[] values = [.. Visible(manager, query.IncludeArchived)
+            .Where(l => query.CategoryId is null || l.CategoryId == query.CategoryId)
+            .Select(l => l.Environment).OfType<string>()
+            .Where(e => !string.IsNullOrWhiteSpace(e) && (string.IsNullOrWhiteSpace(query.Search)
+                || e.Contains(query.Search.Trim(), StringComparison.OrdinalIgnoreCase)))
+            .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).Take(101)];
+        return Task.FromResult(new ResourceEnvironmentOptions([.. values.Take(100)], values.Length > 100));
+    }, cancellationToken);
+
     private static bool Match(string? actual, string? filter) => string.IsNullOrWhiteSpace(filter)
         || string.Equals(actual, filter.Trim(), StringComparison.OrdinalIgnoreCase);
 

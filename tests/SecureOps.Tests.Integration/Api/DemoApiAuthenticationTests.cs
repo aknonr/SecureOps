@@ -167,7 +167,13 @@ public sealed class DemoApiAuthenticationTests
         using HttpClient client = factory.CreateClient();
 
         string actualJson = await client.GetStringAsync("/swagger/v1/swagger.json");
-        string expectedJson = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "docs", "contracts", "secureops-api-v1.openapi.json"));
+        string snapshotPath = Path.Combine(FindRepositoryRoot(), "docs", "contracts", "secureops-api-v1.openapi.json");
+        if (Environment.GetEnvironmentVariable("SECUREOPS_UPDATE_OPENAPI") == "1")
+        {
+            // Explicit local generation from the same deterministic host used by the compatibility gate.
+            await File.WriteAllTextAsync(snapshotPath, actualJson);
+        }
+        string expectedJson = File.ReadAllText(snapshotPath);
 
         JsonNode.DeepEquals(JsonNode.Parse(actualJson), JsonNode.Parse(expectedJson)).Should().BeTrue();
     }

@@ -139,6 +139,20 @@ public sealed class ResourceApiClient : IResourceApiClient
 
     private static System.Text.Json.JsonSerializerOptions JsonOptions => ApiResponseReader.JsonOptions;
 
+    /// <inheritdoc />
+    public Task<ResourceEnvironmentOptions> GetEnvironmentsAsync(ResourceEnvironmentQuery query, CancellationToken cancellationToken)
+    {
+        string search = Uri.EscapeDataString(query.Search?.Trim() ?? string.Empty);
+        string category = query.CategoryId is { } id ? $"&categoryId={id}" : string.Empty;
+        return SendAsync<ResourceEnvironmentOptions>(() => _httpClient.GetAsync(
+            $"{Root}/environments?search={search}{category}&includeArchived={Bool(query.IncludeArchived)}", cancellationToken), cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<ResourcePreferencesResponse> DismissGuideAsync(long expectedVersion, CancellationToken cancellationToken) =>
+        SendAsync<ResourcePreferencesResponse>(() => _httpClient.PutAsJsonAsync($"{Root}/me/guide",
+            new DismissResourceGuideRequest(expectedVersion), JsonOptions, cancellationToken), cancellationToken);
+
     private static string Bool(bool value) => value ? "true" : "false";
 
     /// <summary>

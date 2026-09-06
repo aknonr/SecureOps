@@ -25,6 +25,15 @@ ID, not titles, URLs, set names, link selections or query values. No browsing
 telemetry is added. Repeated accepted intents can create another version; stale
 requests create no resource audit. Audit failure rolls back SQL state.
 
+Personal-set PUT is a non-destructive merge: omitted IDs survive, including with
+legacy requests and archive/restoration races. RemoveLinkIds explicitly removes
+currently visible owned members. ResourceSetMembership preserves omitted ordered
+slots; the service enforces capacity after merging. GuideDismissed is an optional
+boolean in existing personal JSON, using the same version/audit transaction.
+Environment lookup queries at most 101 distinct authorized values to return a
+100-value page plus HasMore, with bounded search and no catalogue download.
+No migration or new runtime grant is required for these corrections.
+
 See ADR-0019, docs/contracts/secureops-api-v1-ui-integration.md and
 docs/24-api-test-deployment-readiness.md for the contract, migration gates and
 isolated SQL verification commands. No corporate validation is implied.

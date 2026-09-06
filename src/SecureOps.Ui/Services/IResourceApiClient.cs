@@ -40,6 +40,12 @@ public interface IResourceApiClient
     /// <summary>Queries permitted links with bounded pagination.</summary>
     public Task<ResourcePage> QueryLinksAsync(ResourceQuery query, CancellationToken cancellationToken);
 
+    /// <summary>Finds bounded permitted environment values independently of catalogue pagination.</summary>
+    public Task<ResourceEnvironmentOptions> GetEnvironmentsAsync(ResourceEnvironmentQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Dismisses the owner-only first-use guide invitation at the current aggregate version.</summary>
+    public Task<ResourcePreferencesResponse> DismissGuideAsync(long expectedVersion, CancellationToken cancellationToken);
+
     /// <summary>Reads one link under the same visibility rules.</summary>
     public Task<ResourceLink> GetLinkAsync(Guid id, bool includeArchived, CancellationToken cancellationToken);
 
@@ -67,7 +73,7 @@ public interface IResourceApiClient
         SaveShiftSetRequest request,
         CancellationToken cancellationToken);
 
-    /// <summary>Replaces a personal set in full, including its opening order.</summary>
+    /// <summary>Merges ordered membership and explicit removals, preserving omitted saved references.</summary>
     public Task<ResourcePreferencesResponse> SaveSetAsync(
         Guid id,
         SaveShiftSetRequest request,

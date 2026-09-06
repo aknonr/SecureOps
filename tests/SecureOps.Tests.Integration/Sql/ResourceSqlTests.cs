@@ -12,7 +12,7 @@ using SecureOps.Shared.Contracts.Resources;
 
 namespace SecureOps.Tests.Integration.Sql;
 
-public sealed class ResourceSqlTests
+public sealed partial class ResourceSqlTests
 {
     private static readonly CancellationToken _token = CancellationToken.None;
 

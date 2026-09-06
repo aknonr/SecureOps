@@ -45,3 +45,36 @@ not concealment of total size. Final totals and SQL execution evidence belong in
 
 The SDM positive-policy and approval milestones remain pending. Turuncu Hat/Jira
 read-only fences remain true/false respectively; no deployment is implied.
+
+## Resource Experience and Integrity Milestone
+
+The owner authorized Codex UI work and narrowly required backend/contracts/tests,
+normal push to the verified existing branch, and a milestone-only 1,000-line
+exception on 2026-09-06. Baseline: `e05977d158bfd533aa71caa0ac60f276bbc9ef37`,
+branch `feature/sql-runtime-hardening-20260902`. Permanent ownership and size
+rules remain unchanged. No deployment or corporate operations are authorized.
+
+The existing personal-set PUT must no longer interpret omissions as deletions:
+the response is a visibility-filtered projection, not a complete editable snapshot.
+`linkIds` supplies additions and relative order; additive `removeLinkIds` supplies
+explicit removals of currently visible members. Both lists must be unique and
+disjoint. Every omitted saved reference survives, even if visibility changes
+between reading the projection and saving. This also protects legacy callers.
+After explicit removals, requested members occupy their existing ordered slots;
+unmentioned members retain their relative positions, and surplus requested members
+append. Archive/restoration and capability changes never erase membership.
+Deleting the entire owned group is the explicit way to discard all references.
+No hidden IDs, names, counts or URLs are returned. The aggregate limit, ownership,
+optimistic version check and transactional audit still apply to the merged state.
+
+Environment options are queried server-side from permitted links, independently
+of catalogue pagination. A bounded searchable result returns at most 100 values
+and a truncation flag; users can refine the search. Manager archive inclusion is
+explicitly authorized. No client downloads the catalogue to derive facets.
+
+The lightweight resource guide stores only an invitation-dismissed boolean in the
+existing owner-scoped preference JSON, under the same version/audit boundary.
+No migration, browser storage, browsing telemetry or training-progress system is
+introduced. Turkish presentation uses application links and personal link groups;
+stable API/DTO/database names are unchanged. The canonical UI README handoff is
+updated with actual local verification and remaining TEST gates at completion.

@@ -98,6 +98,25 @@ public sealed partial class SqlResourceRepository(IConfiguration configuration) 
     }
 
     private static string? Filter(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <inheritdoc />
+    public async Task<ResourceEnvironmentOptions> EnvironmentsAsync(ResourceEnvironmentQuery query, bool manager, CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = new(_connectionString);
+        string sql = "SELECT DISTINCT TOP (101) l.Environment COLLATE Latin1_General_100_CI_AS_SC AS Value"
+            + " FROM resources.Links l JOIN resources.Categories c ON c.Id = l.CategoryId WHERE " + _visibility + """
+             AND l.Environment IS NOT NULL AND LEN(l.Environment) > 0
+             AND (@CategoryId IS NULL OR l.CategoryId = @CategoryId)
+             AND (@Search IS NULL OR CHARINDEX(@Search, l.Environment COLLATE Latin1_General_100_CI_AS_SC) > 0)
+             ORDER BY Value;
+            """;
+        string[] values = [.. await connection.QueryAsync<string>(Command(sql, new
+        {
+            Manager = manager, IncludeArchived = manager && query.IncludeArchived,
+            query.CategoryId, Search = Filter(query.Search)
+        }, cancellationToken))];
+        return new([.. values.Take(100)], values.Length > 100);
+    }
     private static CommandDefinition Command(string sql, object? parameters, CancellationToken cancellationToken, SqlTransaction? transaction = null) =>
         new(sql, parameters, transaction, commandTimeout: 15, cancellationToken: cancellationToken);
     private static ResourceLink Map(LinkRow row) => new(row.Id, row.CategoryId, row.Name, row.Url, row.Purpose, row.Notes, row.Environment,

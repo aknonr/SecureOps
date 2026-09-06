@@ -247,11 +247,19 @@ review blocked the task-local API-proxy override), timed idle/absolute expiry, m
 browser popup policies, and screen-reader verification. Cancellation/timeout and stale-response
 guards were checked in tests/code; this is not complete UI or corporate TEST sign-off.
 
-**Backend contract gaps:** personal projections omit hidden IDs, but PUT replaces all set membership.
-Renaming, setting a default, reordering or adding a link can therefore discard unavailable saved
-references. A backend operation that preserves hidden membership is needed; the UI cannot invent
-those IDs. No complete environment-facet endpoint exists either, so the filter currently offers only
-values seen on the returned page. Neither gap is changed by this correction.
+**2026-09-06 experience milestone handoff (in progress):** Baseline
+`e05977d158bfd533aa71caa0ac60f276bbc9ef37`, branch
+`feature/sql-runtime-hardening-20260902`. The owner authorized Codex UI/backend work,
+normal push and a task-scoped size exception; permanent ownership/rules are unchanged.
+The hidden-membership gap is corrected at the existing PUT: omissions retain saved
+references, and `removeLinkIds` explicitly removes visible members. Environment
+options now have a bounded authorization-aware `/resources/environments` endpoint.
+`PUT /resources/me/guide` persists an invitation-dismissed boolean in existing JSON.
+No migration or new grant. Details: ADR-0019 and the resource API contract above.
+Local integrity gates: 45 resource service unit tests, five API/OpenAPI checks and
+six actual isolated LocalDB tests passed; migration 001-010 upgrade passed in the
+new `SecureOps_ResourcesV1_Experience20260906` database. SQL evidence is distinct from
+InMemory/browser evidence. UX, guide integration and final verification are next.
 
 ### Backend baseline required
 
