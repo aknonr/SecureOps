@@ -43,15 +43,15 @@ public static class UiProblemFactory
         // "the outcome of a Jira create is unknown". Only the stage separates them, and they
         // demand opposite responses — wait and retry, versus stop and reconcile by hand. Getting
         // this wrong turns a duplicate-issue risk into a retry button.
-        if (string.Equals(code, OperationalErrorCodes.WorkflowConflict, StringComparison.Ordinal)
-            && string.Equals(stage, ReconciliationStage, StringComparison.Ordinal))
+        if (string.Equals(stage, ReconciliationStage, StringComparison.Ordinal))
         {
-            mapped = ReconciliationRequired(code!);
+            mapped = ReconciliationRequired(code ?? OperationalErrorCodes.WorkflowConflict);
         }
 
         // The API's own retryable flag wins when present: it reflects server-side knowledge of whether
         // the durable workflow can safely accept the same command again.
-        bool retryable = payload?.Retryable ?? mapped.Retryable;
+        bool retryable = !string.Equals(stage, ReconciliationStage, StringComparison.Ordinal)
+            && (payload?.Retryable ?? mapped.Retryable);
 
         return mapped with
         {
@@ -99,6 +99,14 @@ public static class UiProblemFactory
     /// </summary>
     internal const string ReconciliationStage = "jira-reconciliation";
 
+    /// <summary>Preserves support metadata while explaining an unacknowledged publication.</summary>
+    public static UiProblem UncertainPublication(UiProblem problem) => ReconciliationRequired(problem.Code) with
+    {
+        CorrelationId = problem.CorrelationId,
+        StatusCode = problem.StatusCode,
+        Stage = ReconciliationStage
+    };
+
     /// <summary>
     /// The unknown-outcome state, which must never be presented as an ordinary retryable failure.
     /// </summary>
@@ -116,7 +124,7 @@ public static class UiProblemFactory
         "Bu kayıt için bir Jira oluşturma denemesi başlatıldı, ancak sonucu doğrulanamadı. "
         + "Jira kaydı oluşmuş olabilir de olmayabilir de.",
         ["Jira'da bu operasyonel kayda ait bir kayıt olup olmadığını elle kontrol edin.",
-         "Kayıt oluştuysa Jira anahtarını platform yöneticisine bildirin; oluşmadıysa aktarım yeniden başlatılabilir.",
+         "Kontrol sonucunu destek referansıyla platform yöneticisine bildirin. Yeniden başlatma için doğrulanmış mutabakat gerekir.",
          "Doğrulama yapılmadan yeni bir Jira kaydı oluşturmayın; mükerrer kayıt riski vardır."],
         retryable: false, requiresRefresh: true);
 
@@ -490,7 +498,7 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, code,
             "Jira kaydı oluşturulamadı",
             "Jira kaydı oluşturma işlemi tamamlanamadı. Kaydın oluşup oluşmadığı doğrulanmalıdır.",
-            [RefreshStep, "Durum netleşmezse yeniden deneyin; mükerrer kayıt koruması etkindir.", ReferenceStep],
+            [RefreshStep, "Yalnızca sunucu güncel durumda yeniden denemeye izin veriyorsa devam edin.", ReferenceStep],
             retryable: true, requiresRefresh: true),
 
         OperationalErrorCodes.JiraAlreadyCreated => Build(
@@ -575,8 +583,7 @@ public static class UiProblemFactory
         OperationalErrorCodes.ReportingPersistenceNotConfigured => Build(
             UiProblemKind.NotConfigured, code,
             "Yönetim raporlaması henüz etkin değil",
-            "Bu ekran kalıcı SQL raporlama verisi etkinleştirildiğinde gerçek kullanım ve operasyon "
-                + "metriklerini gösterecektir.",
+            "Bu ortamda doğrulanmış raporlama verisi henüz kullanılamıyor. Kullanım ve operasyon metrikleri gösterilemiyor.",
             ["Raporlamanın etkinleştirilmesi için platform yöneticinize başvurun."],
             retryable: false, requiresRefresh: false),
 

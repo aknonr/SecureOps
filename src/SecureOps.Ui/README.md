@@ -372,7 +372,77 @@ MudBlazor stays at 6.16.0; the boundedness assessment and exact application-wide
 are above. Local success is not TEST sign-off. Resume from this entry and `docs/decisions-log.md`,
 not the historical blocker list above; the hidden-membership and environment contract blockers are resolved.
 
-### Backend baseline required
+### SDM, Management and TEST Delivery Handoff, 2026-09-07
+
+Starting branch/HEAD were verified as `feature/sql-runtime-hardening-20260902` /
+`0276bf173705fa5919b1d2f665a2f0d182534b99`, matching the requested baseline.
+Only the existing untracked `.vscode/` was present and is excluded. This task
+authorizes Codex cross-layer changes, coherent commits/normal push and a scoped
+size-cap exception; permanent rules are preserved. Source and release evidence
+below do not change the previous four-record corporate TEST verification.
+
+| Evidence class | Current milestone |
+|---|---|
+| Implemented and locally verified | Source-bound preview fingerprint, absent/empty requester Block policy, bounded key persistence after Jira success, restart-safe rejection after uncertain SQL persistence, actionable SDM evidence UI, complete reviewed preview fields, duplicate-dialog guard, distinct publication error semantics, dashboard loading/ARIA correction and resource entry point |
+| Existing verification reused | Resource hidden membership, filtering, curator/ordinary/denied authorization and draft/guide behavior; previous ordinary/curator/denied desktop/mobile light/dark journeys above remain the baseline for unchanged resource code |
+| Implemented but not corporate-verified | Corporate Jira create/source update adapters; their sanitized contract tests prove local mapping only. Native conditional source writes, remote duplicate lookup and remote idempotency are not proven |
+| Missing implementation and blocked policy | Human approval workflow, positive SDM category/label policy, structured per-record group/DCC/category/infrastructure evidence and authoritative remote reconciliation contract. No eligibility/approval is inferred from imported scope |
+| Missing source evidence | Original organization Jira script: absent from repository, with no documented accessible location. Comparison is limited to `docs/integrations/turuncu-hat-jira-legacy-parity.md` and the exact open samples in `turuncu-hat-jira-contract-gaps.md` |
+
+**Publication boundaries:** candidate recommendation, publication eligibility,
+confirmed Jira key and completed source close remain separate. No approval route,
+source update/BPM activation or remote lookup was added. Old persisted preview
+fingerprints conflict after this upgrade and are not reset. A successful Jira
+create with failed local acknowledgement remains reconciliation-required; no
+exactly-once claim is made. Known pre-dispatch outages remain distinct from
+transport loss or an unreadable publication response. Safe support references
+survive error presentation. The original write fences remain unchanged.
+
+**Management:** use existing backend counts and UTC half-open reporting windows.
+Active users count distinct actors with a recorded session start or catalogued
+business event; they are not concurrent sessions or employee productivity. Reloads,
+polling, report reads and LastAuthenticatedAt are not new usage events. Resource
+adoption is not currently measured by that catalog. No most-active-user ranking,
+new surveillance collection, invented savings, review-age KPI or trend was added.
+Current reports count transitions during the chosen period, not the current total
+backlog; source creation time may be unknown. Broader backlog/age and resource
+adoption metrics require a separately defined trustworthy read model.
+
+**Local verification:** the full Release run passed 1,020 unit and 242 integration
+tests, zero failures/skips; eight were real LocalDB SQL cases. Subsequent changed
+UI/client tests extend that evidence without relabelling InMemory as SQL. The
+001-010 representative upgrade passed in isolated `SecureOpsResourcesV1` /
+`SecureOps_ResourcesV1_SdmMilestone20260907`. New SQL checks cover concurrent owners,
+durable command replay and a Jira-key/history transaction failure followed by a
+fresh service instance and blocked retry/new-key create. No migration changed.
+OpenAPI snapshot/permission gates passed in the full run. The vulnerability scan
+reported no vulnerable direct/transitive packages across eight projects.
+
+**Browser evidence:** `tests/browser/resource-ui.cjs` passed all six existing
+regression cases against the updated UI using synthetic loopback data. New
+`tests/browser/sdm-milestone.cjs` checks the interactive management period picker
+and captures resource/group/management empty states, SDM source-unavailable and
+reporting-unavailable states at 1440x900 and 390x844 with no horizontal overflow.
+Images and TRX files are under ignored `artifacts/sdm-milestone-20260907/`.
+`sdm-synthetic-component-*.png` renders the real Razor component with deterministic
+synthetic evaluation evidence and actual theme styles; it is static component
+visual verification, not an interactive publication journey. Populated resource
+screenshots from the unchanged baseline remain linked above.
+
+The existing Demo API has reporting/source disabled. A populated SQL-backed
+dashboard, publisher confirmation, corporate browser policies, timed expiry and
+screen-reader journeys were not browser-verified in this task. Hosted tests cover
+publisher/manager/denied API paths. No rejected proxy override was retried.
+Automatic review also rejected background host startup with `blocked by policy`;
+the standard foreground Demo profile and existing API connection were used, then
+stopped. No corporate call, SQL operation, IIS change or deployment occurred.
+MudBlazor/.NET and Bitbucket remain separate follow-up milestones.
+
+The release source/hash association and actual push result are recorded below
+after packaging. The Turkish operator sequence is in
+`docs/24-api-test-deployment-readiness.md`, SDM/resource milestone runbook section.
+
+### Resource backend prerequisites
 
 Migrations 001-010 and the reviewed object grants must be applied, and an API build containing
 `ResourcesController` deployed, before these routes work against corporate TEST. Neither has

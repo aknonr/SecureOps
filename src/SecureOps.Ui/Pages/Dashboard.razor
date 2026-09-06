@@ -98,7 +98,7 @@
         {
             <SoProblemPanel Problem="_reportProblem" OnRetry="ReloadReportAsync" RetryLabel="Yeniden yükle" />
         }
-        else if (_report is null || _coverage is null)
+        else if (_reportLoading || _report is null || _coverage is null)
         {
             <SoLoading Message="Rapor hazırlanıyor…" Variant="SoLoading.LoadingVariant.Block" />
         }
@@ -132,7 +132,7 @@
                               Tone="SoMetric.MetricTone.Lead" />
                     <SoMetric Label="Etkin operatör"
                               Value="@ManagementReportView.Count(_report.PlatformAdoption.UniqueActiveUsersInWindow)"
-                              Hint="Aralıkta işlem yapan"
+                              Hint="Oturum başlatan veya kayıtlı işlem yapan"
                               Tone="SoMetric.MetricTone.Lead" />
                     <SoMetric Label="Jira kaydı oluşturuldu"
                               Value="@ManagementReportView.Count(_report.OperationalWorkflow.JiraCreated)"
@@ -755,6 +755,15 @@
                 "Kaynak kayıtları inceleyin ve uygun olanları Jira'ya aktarın.",
                 "operational-records",
                 Icons.Material.Filled.Assignment));
+        }
+
+        if (snapshot.Can(Capabilities.ResourcesView))
+        {
+            tasks.Add(new OperatorTask(
+                "Uygulama Bağlantıları",
+                "Bağlantılarınız ve kişisel bağlantı gruplarınız.",
+                "resources",
+                Icons.Material.Filled.Link));
         }
 
         return tasks;

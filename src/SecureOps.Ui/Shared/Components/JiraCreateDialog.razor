@@ -54,10 +54,25 @@
             <SoFieldGrid MinColumnWidth="180px">
                 <SoField Label="Proje">@Preview.ProjectKey</SoField>
                 <SoField Label="Kayıt tipi">@Preview.IssueType</SoField>
+                <SoField Label="Raporlayıcı">@(Preview.ReporterUsername ?? "Proje varsayılanı")</SoField>
+                <SoField Label="Atanacak kişi">@(Preview.AssigneeUsername ?? "Proje varsayılanı")</SoField>
+                <SoField Label="Takip eden kişi">@(Preview.RequesterAccountId ?? "Eşleme yok")</SoField>
+                @if (!string.IsNullOrWhiteSpace(Preview.TeamValue))
+                {
+                    <SoField Label="İlgili grup">@Preview.TeamValue</SoField>
+                }
+                @if (Preview.Labels is { Count: > 0 })
+                {
+                    <SoField Label="Etiketler">@string.Join(", ", Preview.Labels)</SoField>
+                }
             </SoFieldGrid>
 
             <p class="so-dialog-summary-label">Özet</p>
             <p class="so-dialog-summary">@Preview.Summary</p>
+            <details class="so-technical">
+                <summary>Aktarılacak açıklama</summary>
+                <pre class="so-preview-body">@Preview.Description</pre>
+            </details>
 
             @if (string.IsNullOrWhiteSpace(Preview.RequesterAccountId))
             {

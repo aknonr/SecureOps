@@ -19,7 +19,7 @@
                 <button type="button"
                         role="tab"
                         class="so-tab @(preset == Preset ? "so-tab--active" : null)"
-                        aria-selected="@(preset == Preset)"
+                        aria-selected="@(preset == Preset ? "true" : "false")"
                         disabled="@Busy"
                         @onclick="() => SelectAsync(captured)">
                     @ReportingWindowSelection.Label(preset)

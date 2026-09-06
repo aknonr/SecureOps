@@ -43,34 +43,44 @@ public sealed class OperationalRecordApiClient : IOperationalRecordApiClient
     /// <inheritdoc />
     public Task<JiraTransferResponse> CreateJiraAsync(Guid id, CancellationToken cancellationToken) =>
         // No Idempotency-Key header on purpose — see IOperationalRecordApiClient.
-        SendAsync<JiraTransferResponse>(
+        SendPublicationAsync(
             () => _httpClient.PostAsync($"{Root}/{id}/jira", content: null, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<JiraTransferResponse> RetryAsync(Guid id, CancellationToken cancellationToken) =>
-        SendAsync<JiraTransferResponse>(
+        SendPublicationAsync(
             () => _httpClient.PostAsync($"{Root}/{id}/retry", content: null, cancellationToken),
             cancellationToken);
+
+    private static async Task<JiraTransferResponse> SendPublicationAsync(
+        Func<Task<HttpResponseMessage>> send,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await SendAsync<JiraTransferResponse>(send, cancellationToken);
+        }
+        catch (SecureOpsApiException ex) when (ex.Problem.Kind is UiProblemKind.Network or UiProblemKind.Timeout or UiProblemKind.Unexpected
+            || (ex.Problem.StatusCode >= 500 && ex.Problem.Stage is not
+                ("source-validation" or "requester-resolution" or "operator-reporter-resolution" or "jira-create" or "source-close")))
+        {
+            throw new SecureOpsApiException(UiProblemFactory.UncertainPublication(ex.Problem));
+        }
+    }
 
     private static async Task<T> SendAsync<T>(
         Func<Task<HttpResponseMessage>> send,
         CancellationToken cancellationToken)
     {
-        HttpResponseMessage response;
-
         try
         {
-            response = await send();
+            using HttpResponseMessage response = await send();
+            return await ApiResponseReader.ReadOrThrowAsync<T>(response, cancellationToken);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
         {
             throw ApiResponseReader.ToTransportException(ex, cancellationToken);
-        }
-
-        using (response)
-        {
-            return await ApiResponseReader.ReadOrThrowAsync<T>(response, cancellationToken);
         }
     }
 }

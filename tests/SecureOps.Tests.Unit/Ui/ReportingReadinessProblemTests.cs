@@ -23,8 +23,7 @@ public sealed class ReportingReadinessProblemTests
         problem.Kind.Should().Be(UiProblemKind.NotConfigured);
         problem.Title.Should().Be("Yönetim raporlaması henüz etkin değil");
         problem.Explanation.Should().Be(
-            "Bu ekran kalıcı SQL raporlama verisi etkinleştirildiğinde gerçek kullanım ve operasyon "
-            + "metriklerini gösterecektir.");
+            "Bu ortamda doğrulanmış raporlama verisi henüz kullanılamıyor. Kullanım ve operasyon metrikleri gösterilemiyor.");
     }
 
     [Fact]

@@ -98,6 +98,16 @@ display this evidence but cannot infer approval or enable corporate publication.
 
 The UI must refresh authoritative record state after 409, 422, or command completion. It must not infer claim ownership, retry safety, Jira success, or source-close success from local state. Preserve and show the returned correlation ID for support diagnostics without exposing raw external responses.
 
+`stage=jira-reconciliation` takes precedence over every error code and retry hint.
+An unacknowledged create/retry (transport loss, timeout, unreadable success or
+unclassified server failure) is also presented as uncertain until a fresh state
+read resolves it. Never resubmit automatically. Preview fingerprints bind exact
+source content; a changed source invalidates the locally held preview. Persisted
+older fingerprints fail closed and are never reset by the UI. The SDM detail
+renders `reasonCodes`/`blockingConditions` as Turkish guidance, separately from
+candidate recommendation, Jira eligibility and external-write eligibility.
+No approval action or new API route is introduced.
+
 `OperatorReporterResolutionFailed` is a non-create outcome: show "İşlemi yapan kullanıcı Jira üzerinde doğrulanamadığı için kayıt oluşturulmadı." `JiraReporterRejected` means Jira rejected the verified reporter field or the integration account lacks reporter-change permission; do not suggest falling back to the integration identity.
 
 `OperationalRecordResponse.claimed` means the stored claim expiry is later than server time. `claimedBy`, `claimedAt`, and `claimExpiresAt` are the authoritative lease metadata; an expired lease can retain historical owner/timestamps while `claimed=false`. `version` changes with persisted workflow mutations. `reconciliationRequired=true` means an unknown Jira-create outcome blocks automatic retry. `jiraExists=true` means a trusted Jira key is persisted. `retryEligible=true` means the current durable state is one the retry endpoint can safely resume; it is always false while reconciliation is required.

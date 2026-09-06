@@ -1,5 +1,37 @@
 # API TEST Deployment Readiness
 
+## SDM/Resources TEST Operator Runbook, 2026-09-07
+
+Bu teslimat yerel doğrulama ve paket hazırlığıdır; TEST kurulumu veya SDM yazma
+aktivasyonu değildir. Paket kökü mevcut standarda göre
+`C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.10` olur. Kesin kaynak SHA ve
+arşiv/per-file SHA-256 değerleri bu dizinin `release-readiness.md` dosyasındadır.
+Sunucu adları, kurumsal mevcut şema ve rollback sürümü doğrulanmış değildir.
+
+| Adım / makine | Tür | Önkoşul, beklenen sonuç ve durma koşulu |
+|---|---|---|
+| 1. Yetkili TEST operatörü, kendi yönetim istasyonu | Salt okunur | Değişiklik kaydına gerçek API/UI hedeflerini, mevcut binary/config sürümlerini, DBA tarafından doğrulanmış şema seviyesini ve geri dönüş paketini kaydedin. Bilgi veya ayrı kurulum onayı eksikse durun. Bu ilk manuel TEST adımıdır. |
+| 2. Build istasyonu / paket teslim alan istasyon | Salt okunur | `Get-FileHash -Algorithm SHA256 -LiteralPath <arşiv>` sonuçlarını `release-artifacts.sha256` ile karşılaştırın. API/UI aynı build kaynak SHA'sını taşımalı; eksik manifest veya hash farkında durun. Paketleri eski dizinlerin üzerine yazmayın. |
+| 3. TEST operatörü ve DBA | Değiştirici, ayrı onaylı hazırlık | Mevcut API/UI binary ve server-owned config yedeklerinin yolunu, SHA'sını, tarihini ve geri dönüş sürümünü değişiklik kaydına yazın. DBA geri yüklenebilir SQL yedeğinin referansını ve geri yükleme sorumlusunu doğrulasın. Gizli config/değerler teslimat paketine veya bu belgeye konmaz. Doğrulanmış geri dönüş tabanı yoksa durun. |
+| 4. DBA, doğrulanmış TEST SQL hedefi | Değiştirici, ayrı DBA onayı | Gerekli seviye 001-010'dur. Önceden uygulanmış migration dosyaları değiştirilmez ve tüm zincir körlemesine yeniden çalıştırılmaz. Onaylı mevcut seviyeden yalnızca eksik migration'ları sıra ile uygulayın. 009 değerlendirme kanıtı, 010 kaynak kataloğudur. 001/002 idempotent değildir; kayıtlı migration-history tablosu yoktur. Şema belirsizse durun. |
+| 5. DBA, aynı SQL hedefi | Değiştirici grants; ardından salt okunur kontrol | DDL/migration kimliği ile runtime kimliğini ayırın. Mevcut nesne grant listesi aşağıdaki Database Contract bölümündedir. Ek olarak runtime için `resources.Categories`, `resources.Links`, `resources.PersonalPreferences` üzerinde SELECT/INSERT/UPDATE ve mevcut `audit.AuditLog` üzerinde INSERT gerekir. DELETE, DDL, db_owner verilmez. Gerçek runtime principal ve ownership-chain doğrulanmadan durun. |
+| 6. TEST API operatörü, doğrulanmış API makinesi | Değiştirici, ayrı kurulum onayı | Şema ve grants tamamlandıktan sonra eşleşen API paketini mevcut dağıtım yöntemiyle kurun. `web.config`, `appsettings*.json`, Data Protection dizini, loglar ve sunucuya ait sırlar korunur. ReadOnlyIntegrationMode=true, ControlledTestWritesEnabled=false kalır. Jira/source/BPM yazıları açılmaz. Sağlık veya sürüm kontrolü başarısızsa UI adımına geçmeyin. |
+| 7. TEST UI operatörü, doğrulanmış UI makinesi | Değiştirici, ayrı kurulum onayı | Aynı kaynak SHA'lı UI paketini kurun; server-owned API adresini, auth/offload ayarlarını ve UI key-ring yolunu koruyun. LB/IIS/binding ayarlarını bu teslimatla değiştirmeyin. Uyumlu API veya kalıcı UI key ring doğrulanamıyorsa durun. |
+| 8. Yetkili kullanıcılar, kurumsal TEST tarayıcısı | Salt okunur doğrulama; yerel uygulama kayıtları için ayrıca onaylı UAT | Admin sağlık/sürüm bilgisi; ordinary kullanıcının bağlantı arama/grupları; curator yetkisiyle kontrollü katalog taslağı; manager tarih/boş/hata ekranı ve yetkisiz doğrudan erişim kontrolü. Publisher mevcut gerçek kayıtlarda SDM engellerini ve yazma kapalı açıklamasını doğrular, create/retry çalıştırmaz. Kaynak yenileme/AD/Jira çözümleme çağrıları kurumsal erişim olduğundan ayrı smoke onayı gerektirir. Beklenmeyen gerçek yazma, sentetik kaydın corporate listede görünmesi veya yanlış yetkide durun. |
+
+**Geri dönüş:** binary rollback, kayıtlı önceki API/UI paket ve kontrollü
+konfigürasyonlarının geri yüklenmesidir. Additive 009/010 tabloları/kolonları ve
+append-only kanıtlar silinmez; eski binary'nin uyumu önceden doğrulanır. SQL
+yedeğinden geri yükleme ayrı DBA kararıdır; yeni işlem/audit verisini kaybettirebilir.
+Binary rollback, dış sistemde oluşmuş Jira kaydını geri almaz. Belirsiz Jira
+sonucunda yeniden create, transfer satırı silme veya kanıtsız SQL düzeltmesi yapılmaz.
+
+**Aktivasyon engelleri:** özgün betik veya erişilebilir sanitized kopyası, pozitif
+SDM kategori/etiket politikası, kayıt bazlı kapsam/altyapı kanıtı, requester/reporter
+eşleme ve yetki sözleşmesi, insan onay süreci, Jira create hata/başarı ve mutabakat
+arama/idempotency sözleşmesi gerekir. Turuncu Hat update/BPM close sözleşmesi ve
+onayı ayrıca gereklidir. Mevcut servis hesabı bunların yerine geçmez.
+
 This is the general controlled deployment contract. The authoritative 2026-08-23 TEST/Pilot release-candidate manifests are under `docs/release-candidates/2026-08-23-api-test-pilot-rc/`. The application never executes SQL or edits IIS configuration. Server-owned `web.config` and `appsettings*.json` files are excluded from the deployment ZIP.
 
 ## Migration Review

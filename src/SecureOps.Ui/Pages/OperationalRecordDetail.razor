@@ -170,6 +170,8 @@ OperationalRecordView.Ownership owner =
             </section>
         }
 
+        <SoSdmEvidence Record="_record" />
+
         <div class="so-detail-grid">
             @* ---------------------------------------------------------------- SOURCE *@
             <section class="so-panel">
@@ -367,7 +369,9 @@ OperationalRecordView.Ownership owner =
                 }
                 else
                 {
-                    <p class="so-field-empty">Henüz Jira kaydı oluşturulmadı.</p>
+                    <p class="so-field-empty">@(OperationalRecordView.OutcomeUnknown(_record)
+                        ? "Doğrulanmış bir Jira anahtarı henüz yok."
+                        : "Henüz Jira kaydı oluşturulmadı.")</p>
                 }
 
                 @* Error codes, mapping versions, and record identifiers are support material. They
@@ -411,7 +415,20 @@ OperationalRecordView.Ownership owner =
                     <SoFieldGrid MinColumnWidth="200px">
                         <SoField Label="Proje">@_preview.ProjectKey</SoField>
                         <SoField Label="Kayıt tipi">@_preview.IssueType</SoField>
-                        <SoField Label="Talep eden hesabı">
+                        @if (!string.IsNullOrWhiteSpace(_preview.IssueTypeId))
+                        {
+                            <SoField Label="Kayıt tipi kimliği">@_preview.IssueTypeId</SoField>
+                        }
+                        <SoField Label="Raporlayıcı">@(_preview.ReporterUsername ?? "Proje varsayılanı")</SoField>
+                        @if (!string.IsNullOrWhiteSpace(_preview.TeamValue))
+                        {
+                            <SoField Label="İlgili grup">@_preview.TeamValue (@_preview.TeamCustomField)</SoField>
+                        }
+                        @if (_preview.Labels is { Count: > 0 })
+                        {
+                            <SoField Label="Etiketler">@string.Join(", ", _preview.Labels)</SoField>
+                        }
+                        <SoField Label="Takip eden kişi (kaynak talep sahibi)">
                             @if (string.IsNullOrWhiteSpace(_preview.RequesterAccountId))
                             {
                                 <span class="so-field-empty">Çözümlenemedi</span>
@@ -421,10 +438,11 @@ OperationalRecordView.Ownership owner =
                                 @_preview.RequesterAccountId
                             }
                         </SoField>
-                        @if (!string.IsNullOrWhiteSpace(_preview.AssigneeUsername))
+                        @if (!string.IsNullOrWhiteSpace(_preview.RequesterWatcherCustomField))
                         {
-                            <SoField Label="Atanacak kişi">@_preview.AssigneeUsername</SoField>
+                            <SoField Label="Takip eden kişi alanı">@_preview.RequesterWatcherCustomField</SoField>
                         }
+                        <SoField Label="Atanacak kişi">@(_preview.AssigneeUsername ?? "Proje varsayılanı")</SoField>
                     </SoFieldGrid>
 
                     <h4 class="so-subhead">Özet</h4>
@@ -494,6 +512,11 @@ OperationalRecordView.Ownership owner =
                 @if (actions.WriteFenceReason is { Length: > 0 } fenced)
                 {
                     <p class="so-panel-text so-panel-text--sm">@fenced</p>
+                }
+
+                @if (!_access.Can(Capabilities.OperationalRecordsCreateJira))
+                {
+                    <p class="so-panel-text so-panel-text--sm">Jira yayımlama yetkiniz yok. Gerekiyorsa yetkili yöneticinizden erişim talep edin.</p>
                 }
 
                 @if (actions.BlockedReason is { Length: > 0 } blocked)
@@ -603,12 +626,18 @@ if (_access.Can(Capabilities.OperationalRecordsView))
 
         try
         {
-            _record = await Records.GetAsync(RecordId, CancellationToken.None);
+            OperationalRecordResponse latest = await Records.GetAsync(RecordId, CancellationToken.None);
+            if (_record is not null && !SdmEvidenceView.SameSource(_record, latest))
+            {
+                _preview = null;
+            }
+            _record = latest;
         }
         catch (SecureOpsApiException ex)
         {
             _loadProblem = ex.Problem;
             _record = null;
+            _preview = null;
         }
         finally
         {
@@ -656,6 +685,8 @@ if (_access.Can(Capabilities.OperationalRecordsView))
             return;
         }
 
+        _busy = true;
+        _busyMessage = "Yayımlama kararı bekleniyor…";
         DialogParameters parameters = new()
         {
             { nameof(JiraCreateDialog.Record), _record },
@@ -671,6 +702,7 @@ if (_access.Can(Capabilities.OperationalRecordsView))
 
         if (outcome is null || outcome.Canceled)
         {
+            _busy = false;
             return;
         }
 
