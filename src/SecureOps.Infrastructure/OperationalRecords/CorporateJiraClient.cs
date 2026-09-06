@@ -95,7 +95,8 @@ public sealed class CorporateJiraClient : IJiraClient
                 response.Content,
                 _options.MaxResponseBytes,
                 cancellationToken);
-            if (!document.RootElement.TryGetProperty("key", out JsonElement keyElement)
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("key", out JsonElement keyElement)
                 || keyElement.ValueKind != JsonValueKind.String
                 || string.IsNullOrWhiteSpace(keyElement.GetString()))
             {

@@ -1,5 +1,19 @@
 # Decisions Log
 
+## 2026-09-07 - Original OR-to-Jira source review
+
+Original-script discovery is resolved by the externally supplied local file;
+the parity document records its exact provenance/hash and line-274 syntax defect.
+It was parsed only, never executed or committed raw. The script proves request
+construction, constant label and operator confirmation, not native watchers,
+explicit operator reporter, positive eligibility or a separate approver workflow.
+Existing safer policies remain. Malformed BPM results, contradictory update
+success and non-object provider JSON now fail safely, with sanitized regressions.
+The earlier local-only Git status below is historical: the browser milestone and
+four earlier commits were pushed and live remote HEAD was verified as `1665685`
+at this task's start. Current delivery and package association remain canonical
+in `src/SecureOps.Ui/README.md`.
+
 ## 2026-09-07 - SDM workflow, management and read-only TEST delivery
 
 The task authorizes cross-layer implementation, coherent commits and normal push,

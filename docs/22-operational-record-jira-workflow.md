@@ -8,7 +8,12 @@ Typed Turuncu Hat and corporate Jira adapters are implemented behind the existin
 
 ## Legacy Workflow Replacement
 
-No legacy Operational Record/Jira PowerShell script exists in this repository. Sanitized legacy contract evidence defines only the retained behaviors documented in `docs/integrations/turuncu-hat-jira-legacy-parity.md`; the API never launches PowerShell.
+The original Operational Record/Jira PowerShell script was supplied outside the
+repository and reviewed as source on 2026-09-07. Discovery is resolved; provenance,
+the supplied copy's syntax defect and sanitized parity findings are recorded in
+`docs/integrations/turuncu-hat-jira-legacy-parity.md`. The raw script is not committed
+and the API never launches PowerShell. Historical request construction does not
+approve eligibility, current remote field acceptance or a separate approver flow.
 
 | Legacy step | SecureOps backend component |
 |---|---|
@@ -46,8 +51,8 @@ Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. Disabl
 The task explicitly authorizes cross-layer implementation, normal branch push and a
 task-scoped exception to the 1,000-line change cap. Permanent ownership and size
 rules remain unchanged. Corporate calls, deployment and external-write activation
-are excluded. The original script has no documented accessible location; the
-sanitized parity table remains the limit of script evidence.
+are excluded. Script discovery was unresolved at that milestone; the subsequent
+source-only review above supersedes that evidence gap, not the activation fences.
 
 Preview fingerprints now bind the source concurrency token and exact summary and
 description as well as configured mapping and resolved identities. A refreshed

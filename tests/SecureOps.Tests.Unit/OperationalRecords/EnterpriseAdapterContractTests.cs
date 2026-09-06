@@ -701,6 +701,89 @@ public sealed class EnterpriseAdapterContractTests
         exception.ErrorCode.Should().Be(OperationalErrorCodes.OperationalRecordActivityNotFound);
     }
 
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("[[{\"Value\":\"9002\"}]]")]
+    [InlineData("[{\"Key\":\"wrong.id\",\"Value\":\"9002\"},{\"Key\":\"m_created_dt\",\"Value\":\"ignored\"}]")]
+    [InlineData("[{\"Key\":\"id\",\"Value\":\"9002\"},{\"Value\":\"ignored\"}]")]
+    public async Task SourceClose_ValidAndMalformedActivities_NeverManufacturesUniqueMatch(string malformed)
+    {
+        string json = "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"9001\"}],[{\"Value\":\"ignored\"}]]," + malformed + "]}}";
+        ScriptedHandler handler = new(Response(HttpStatusCode.OK, json));
+
+        Func<Task> act = () => SourceClient(handler).CloseAsync("1001", "OR-100", "SAFE-123", CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.OperationalRecordActivityAmbiguous);
+        handler.Requests.Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("{\"QueryResult\":{\"Items\":null}}")]
+    [InlineData("{\"QueryResult\":{\"Items\":[],\"ErrorDescription\":\"synthetic failure\"}}")]
+    public async Task SourceClose_InvalidActivityEnvelope_ReturnsSafeFailureWithoutUpdate(string json)
+    {
+        ScriptedHandler handler = new(Response(HttpStatusCode.OK, json));
+
+        Func<Task> act = () => SourceClient(handler).CloseAsync("1001", "OR-100", "SAFE-123", CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>();
+        handler.Requests.Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    public async Task SourceClient_NonObjectSuccess_ReturnsSafeQueryFailure(string json)
+    {
+        ScriptedHandler handler = new(Response(HttpStatusCode.OK, json));
+
+        Func<Task> act = () => SourceClient(handler).GetActiveAsync(10, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.OperationalRecordQueryFailed);
+        handler.Requests.Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("{\"Success\":true,\"ErrorDescription\":\"synthetic failure\"}")]
+    [InlineData("{\"Success\":true,\"ErrorDetails\":\"synthetic failure\"}")]
+    [InlineData("{\"Success\":true,\"ErrorNo\":1}")]
+    [InlineData("{\"Success\":true,\"ErrorDetails\":{}}")]
+    [InlineData("{\"Success\":\"true\"}")]
+    [InlineData("{}")]
+    [InlineData("null")]
+    public async Task SourceClose_ContradictoryOrInvalidSuccess_FailsSafely(string updateResult)
+    {
+        ScriptedHandler handler = new(
+            Response(HttpStatusCode.OK, "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"9001\"}],[{\"Value\":\"ignored\"}]]]}}"),
+            Response(HttpStatusCode.OK, "{\"UpdateResult\":" + updateResult + "}"));
+
+        Func<Task> act = () => SourceClient(handler).CloseAsync("1001", "OR-100", "SAFE-123", CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.OperationalRecordCloseFailed);
+        handler.Requests.Should().HaveCount(2);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    public async Task SourceClose_NonObjectUpdateResponse_FailsSafely(string json)
+    {
+        ScriptedHandler handler = new(
+            Response(HttpStatusCode.OK, "{\"QueryResult\":{\"Items\":[[[{\"Value\":\"9001\"}],[{\"Value\":\"ignored\"}]]]}}"),
+            Response(HttpStatusCode.OK, json));
+
+        Func<Task> act = () => SourceClient(handler).CloseAsync("1001", "OR-100", "SAFE-123", CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.OperationalRecordCloseFailed);
+        handler.Requests.Should().HaveCount(2);
+    }
+
     [Fact]
     public async Task SourceClose_ExplicitUpdateFailure_RemainsRetryableCloseOnlyFailure()
     {
@@ -796,7 +879,7 @@ public sealed class EnterpriseAdapterContractTests
         ScriptedHandler handler = new(Response(HttpStatusCode.Created, "{\"key\":\"SAFE-123\"}"));
         CorporateJiraClient client = JiraClient(handler);
         JiraIssueDraft draft = new(
-            Guid.NewGuid(), "OR-100", "SAFE", "Task", "OR-100 - Summary", "Description",
+            Guid.NewGuid(), "OR-100", "SDM", "Unverified display name", "OR-100 - Summary", "Description",
             "exact.account", "v1", new string('a', 64), [], FieldMapping: JiraMapping());
 
         JiraIssueCreationResult result = await client.CreateIssueAsync(draft, CancellationToken.None);
@@ -806,7 +889,11 @@ public sealed class EnterpriseAdapterContractTests
         handler.Requests[0].Path.Should().Be("/rest/api/2/issue");
         using var payload = JsonDocument.Parse(handler.Requests[0].Body);
         JsonElement fields = payload.RootElement.GetProperty("fields");
+        fields.GetProperty("project").GetProperty("key").GetString().Should().Be("SDM");
+        fields.GetProperty("summary").GetString().Should().Be("OR-100 - Summary");
+        fields.GetProperty("description").GetString().Should().Be("Description");
         fields.GetProperty("issuetype").GetProperty("id").GetString().Should().Be("3");
+        fields.GetProperty("issuetype").TryGetProperty("name", out _).Should().BeFalse();
         fields.GetProperty("customfield_12700").GetProperty("value").GetString().Should().Be("WASAS");
         fields.GetProperty("customfield_11500")[0].GetProperty("name").GetString().Should().Be("exact.account");
         fields.GetProperty("labels")[0].GetString().Should().Be("SunucuTalep");
@@ -927,6 +1014,25 @@ public sealed class EnterpriseAdapterContractTests
         handler.Requests.Should().ContainSingle();
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("{\"key\":null}")]
+    [InlineData("{\"key\":123}")]
+    [InlineData("{\"key\":\" \"}")]
+    public async Task JiraCreate_InvalidSuccess_IsUnknownAndNeverRetried(string json)
+    {
+        ScriptedHandler handler = new(Response(HttpStatusCode.Created, json));
+        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SDM", "Task", "Summary", "Description",
+            null, "v1", new string('b', 64), [], FieldMapping: JiraMapping());
+
+        Func<Task> act = () => JiraClient(handler).CreateIssueAsync(draft, CancellationToken.None);
+
+        await act.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.OutcomeUnknown && !exception.Retryable);
+        handler.Requests.Should().ContainSingle();
+    }
+
     [Fact]
     public async Task JiraCreate_OmitsRequesterFieldWhenNoExactAccountWasResolved()
     {
@@ -936,7 +1042,8 @@ public sealed class EnterpriseAdapterContractTests
 
         _ = await client.CreateIssueAsync(draft, CancellationToken.None);
 
-        handler.Requests[0].Body.Should().NotContain("customfield_requester");
+        using var payload = JsonDocument.Parse(handler.Requests[0].Body);
+        payload.RootElement.GetProperty("fields").TryGetProperty("customfield_11500", out _).Should().BeFalse();
     }
 
     [Theory]

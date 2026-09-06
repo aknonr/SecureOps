@@ -4,7 +4,16 @@ Controlled evidence received through 2026-09-04 resolves Jira Basic authenticati
 
 ## Resolved Evidence
 
-- Jira Basic `/rest/api/2/myself`, exact `username` search, Task ID `3`, required/optional create fields, multi-user watcher, cascading group, optional assignee, and absent reporter metadata.
+- Original script discovery and historical request construction are resolved by the
+  2026-09-07 source-only review and hash in `turuncu-hat-jira-legacy-parity.md`.
+  The supplied copy has a line-274 string defect; no repaired file was substituted.
+  ID `3`, constant label and optional custom-field array are established, but
+  neither a current issue-type name, native watchers nor a separate approver flow
+  can be inferred from that script.
+- Earlier controlled Jira Basic `/rest/api/2/myself`, exact `username` search,
+  metadata identifying ID `3` as Task at that time, required/optional create
+  fields, multi-user custom field, cascading group, optional assignee, and absent
+  reporter metadata. These are separate from original-script evidence.
 - Existing Jira issue presence for assignee, reporter, `customfield_11500`, `customfield_12700`, and `SunucuTalep`; observed assignee/reporter identity equality is not treated as create policy.
 - String `LoginResult` with two observed pipe segments; exact `SMSS_oRFF` active/group/DCC request; successful nested-array `QueryResult.Items`; independently optional empty/null query error fields; exact seven-cell source keys (`SET.id`, `SET.p_code`, `SET.p_name`, `SET.p_description`, `KEY.p_rel_requester`, `SET.p_rel_requester`, and `num`); and exactly one controlled BPM query match. Observed segment lengths are not invariants.
 
@@ -20,7 +29,12 @@ Required examples:
 6. Jira user-search no match, ambiguity, authentication failure, and rate limit.
 7. Jira create success with the complete status/body/headers; validation, authentication, rate-limit, server-error, and timeout outcomes.
 8. Jira remote idempotency and reconciliation lookup evidence.
-9. Confirmation that Jira `name` is an approved durable identity for watcher and assignee mappings.
-10. The exact business rule that determines when the configured `SunucuTalep` label applies; the current mapping treats configured labels as fixed for every eligible record.
+9. Current field/issue-type metadata and permissions; approved durability of Jira
+   `name`; requester custom-field semantics versus native watchers; explicit
+   assignee/reporter policy. Existing issue equality is not create authorization.
+10. Positive SDM eligibility/category policy and required per-record attestations.
+    The script applies `SunucuTalep` to every manually selected record, not through
+    a classifier. Decide whether publisher confirmation suffices or a separate
+    approval process is required; the script proves only the former.
 
 Do not infer retryability or write outcome from an undocumented body. Provider-specific error fixtures will be added only after these reviewed examples exist.

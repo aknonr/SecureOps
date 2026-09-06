@@ -1,6 +1,43 @@
 # Turuncu Hat to Jira Legacy Parity
 
-Evidence source: sanitized legacy contract evidence supplied on 2026-08-23. The original PowerShell file and complete external API contracts are not in the repository. Parity is claimed only for behaviors explicitly evidenced below.
+## Original Source Review, 2026-09-07
+
+Original-script discovery is resolved. The actual task attachment resolves to
+`C:\Users\dmtak\Desktop\jira kaydı açan script.txt`, not the `(2)` filename in
+the task prose. This external file was inspected as source only, never executed
+or copied into Git. SHA-256:
+`768D3646A152A046CD2FA6338FFC6B65DF1CBAB0C91D92D287D69B19A23AAF68`.
+
+Windows PowerShell `Parser.ParseFile` reported four errors; explicit UTF-8
+`Parser.ParseInput` reported eight cascading errors. Line 274 ends the user-search
+URL string with `%22` instead of a closing quote. Replacing only that suffix in
+an in-memory UTF-8 diagnostic copy yields zero parser errors. This establishes a
+syntax/copy defect in the supplied file, not a repaired original or evidence that
+the historical operational copy failed. The file and its hash remain unchanged.
+No credentials, headers, session values or raw responses are reproduced here.
+
+The following request construction is established by source inspection. It does
+not establish current remote acceptance. Earlier controlled metadata/query
+evidence remains separately described in the contract-gap document.
+
+| Script behavior (original line) | Application behavior / evidence | Required action |
+|---|---|---|
+| `SMSS_oRFF`; active=true, DCC NOT IN (4241), group IN (68); selects exactly `id,p_code,p_name,p_description,p_rel_requester` (58-62) | Same configurable grammar and selects; `EnterpriseAdapterContractTests` | Preserve source scope; not positive classification |
+| Positional extraction and HTML decode (88-92) | Exact `SET.*`/`KEY.p_rel_requester` parsing from later real TEST evidence, bounded keyless fallback | Preserve semantic keys and duplicate rejection; do not revert to positional corporate parsing |
+| Operator chooses one record, sees description and confirms OK (178,204,242-244) | Authorized, source-bound preview and confirmation; prior interactive SQL/Simulation browser evidence | No separate legacy approver is established |
+| `project.key=SDM`, `issuetype.id="3"` (298-299) | Draft mapping already emits configured key and ID; adapter contract tests | The unused `Task` variable does not establish the current name of ID 3 |
+| Summary `OR code + " - " + decoded title`; decoded description (300-301) | Draft service, bounded summary and full reviewed description | Existing mapping retained |
+| `customfield_12700={value:"WASAS"}`; constant `labels=["SunucuTalep"]` (302-303) | Same reviewed draft mapping | Static label is not a category/eligibility rule |
+| Search encoded requester; first `displayName -eq` match; returned `name` (274-278); up to three attempts | Unique exact name first, then unique ordinal display name; bounded safe-read retries | Keep safer ambiguity and authentication/contract failure handling; legacy PowerShell `-eq` is case-insensitive |
+| Optional `customfield_11500=[{name:resolvedName}]` (305-306); unresolved lookup permits creation | Same wire shape, but default unresolved-requester policy blocks preview/create | Preserve Block policy; field is not proven to be native Jira watchers |
+| No explicit `assignee` or `reporter` in create payload (297-307) | ProjectDefault omits both; separately configured verified policies exist | Correct former claim that operator reporter was legacy parity; owner decision still required |
+| BPM query after Jira POST: task model 103652, status 1, source ID, group 68, main-object type 106684, active true; selects `id,m_created_dt` (319-322) | Same configurable filter; source freshness re-read and durable Jira key precede close | Keep numeric IDs in controlled configuration, not new production defaults |
+| First activity value without count/key validation (329) | Exactly one valid activity required; malformed rows now invalidate the entire activity result | No zero/multiple or malformed-row fallback; exact remote BPM key spellings still need evidence |
+| Flat update: `m_status,"100056",m_comments,comment`, filtered only by activity ID (334-336) | Same configurable flat update; no invented conditional update | Read-before-write does not make this atomic; remote conditional-write contract remains unknown |
+| Comment: `{JiraKey} ile kaydi takip edebilirsiniz.Kayda izleyici olarak eklendiniz.` (336) | Configurable `{JiraKey}` substitution; test template makes no watcher claim | Do not activate legacy watcher sentence without established field semantics and successful operation evidence |
+| Checks non-null error description/details; `Success` appears only in a commented diagnostic (342-346) | Requires boolean true and no contradictory error metadata | Correct former parity claim; synthetic response tests do not prove remote update outcomes |
+
+## Retained Safety and Earlier Evidence
 
 | Legacy behavior | SecureOps component | Disposition | Rationale | Automated coverage |
 |---|---|---|---|---|
@@ -20,13 +57,13 @@ Evidence source: sanitized legacy contract evidence supplied on 2026-08-23. The 
 | Jira project, issue type, summary, description, team field/value, labels, requester field | `JiraIssueDraftService` and `CorporateJiraClient` | Retained as configuration | Preview exposes the complete validated create mapping and the adapter consumes that same draft | `JiraIssueDraftServiceTests`, `EnterpriseAdapterContractTests`, `OperationalRecordsControllerTests` |
 | Omit requester custom field when unresolved | `CorporateJiraClient` | Retained | Field is emitted only for a unique resolved identifier | `EnterpriseAdapterContractTests` |
 | Leave Jira assignment to project default | `JiraIssueDraftService` and `CorporateJiraClient` | Explicit policy | Default emits no assignee; exact configured operator mapping is the only supported override | `JiraIssueDraftServiceTests`, `EnterpriseAdapterContractTests` |
-| Authenticated WASAS operator is Jira Reporter | `JiraIssueDraftService` and `CorporateJiraClient` | Retained behind explicit policy | `AuthenticatedOperator` resolves the server-authenticated login name exactly and never falls back to the integration identity | `JiraIssueDraftServiceTests`, `EnterpriseAdapterContractTests`, configuration tests |
+| No explicit reporter in original payload | `JiraIssueDraftService` and `CorporateJiraClient` | Separate application policy | `AuthenticatedOperator` is not established by the script; project default preserves omission | `JiraIssueDraftServiceTests`, `EnterpriseAdapterContractTests`, configuration tests |
 | POST Jira create and read response `key` | `CorporateJiraClient` | Retained and hardened | Bounded response; raw body is never surfaced | `EnterpriseAdapterContractTests` |
 | Retry semantics after uncertain Jira create not evidenced | Existing reconciliation workflow | Intentionally changed | No create retry; ambiguous transport/5xx/invalid-success outcome blocks recreation | `EnterpriseAdapterContractTests`, existing workflow tests |
 | Query configured `BPM_Actvty` after confirmed Jira creation | `TuruncuHatOperationalRecordClient.CloseAsync` | Retained | Uses evidenced backend-owned filter and selected activity fields | `EnterpriseAdapterContractTests` |
 | Select first BPM activity | `TuruncuHatOperationalRecordClient.CloseAsync` | Improved | Exactly one required; zero/multiple fail safely | `EnterpriseAdapterContractTests` |
 | Update status/comment with Jira key | `TuruncuHatOperationalRecordClient.CloseAsync` | Retained as configuration | Flat update list and comment template follow evidence | `EnterpriseAdapterContractTests` |
-| Inspect `UpdateResult.Success` | `TuruncuHatOperationalRecordClient.CloseAsync` | Retained | Only explicit `true` completes; descriptions/details are not exposed | `EnterpriseAdapterContractTests` |
+| Reject non-null update error fields; no Success check | `TuruncuHatOperationalRecordClient.CloseAsync` | Hardened | Boolean true and no contradictory error metadata required; remote success envelope still unverified | `EnterpriseAdapterContractTests` |
 | Create then source update | `JiraTransferService` | Improved | Jira key is durable before close; close failure retries only close | Existing `JiraTransferServiceTests` and hosted workflow tests |
 | Multiple operators not addressed | Existing claims/fencing/idempotency | Improved | One backend owner; SignalR is not a correctness dependency | Existing concurrency tests |
 

@@ -85,11 +85,13 @@ internal static class TuruncuHatQueryParser
         List<string> ids = [];
         foreach (JsonElement item in items.EnumerateArray())
         {
-            if (TryProjection(item, expectedKeys, out IReadOnlyList<string?> values)
-                && !string.IsNullOrWhiteSpace(values[0]))
+            if (!TryProjection(item, expectedKeys, out IReadOnlyList<string?> values)
+                || string.IsNullOrWhiteSpace(values[0]))
             {
-                ids.Add(values[0]!.Trim());
+                throw new InvalidDataException("Turuncu Hat activity projection was invalid.");
             }
+
+            ids.Add(values[0]!.Trim());
         }
 
         return ids;
@@ -97,7 +99,8 @@ internal static class TuruncuHatQueryParser
 
     private static JsonElement GetItems(JsonElement root)
     {
-        if (!root.TryGetProperty("QueryResult", out JsonElement queryResult)
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("QueryResult", out JsonElement queryResult)
             || queryResult.ValueKind != JsonValueKind.Object)
         {
             throw new InvalidDataException("Turuncu Hat query response did not match the reviewed contract.");
@@ -133,6 +136,16 @@ internal static class TuruncuHatQueryParser
 
         return items;
     }
+
+    internal static bool IsSuccessfulUpdate(JsonElement root) =>
+        root.ValueKind == JsonValueKind.Object
+        && root.TryGetProperty("UpdateResult", out JsonElement result)
+        && result.ValueKind == JsonValueKind.Object
+        && result.TryGetProperty("Success", out JsonElement success)
+        && success.ValueKind == JsonValueKind.True
+        && !HasTextError(result, "ErrorDescription")
+        && !HasTextError(result, "ErrorDetails")
+        && ReadOptionalInt(result, "ErrorNo").GetValueOrDefault() == 0;
 
     private static bool HasTextError(JsonElement queryResult, string propertyName)
     {
@@ -193,6 +206,11 @@ internal static class TuruncuHatQueryParser
         }
 
         if (!TryReadProjectionCells(item, expectedKeys.Count, out IReadOnlyList<ProjectionCell> cells))
+        {
+            return false;
+        }
+
+        if (cells.Any(cell => cell.Key is not null) && cells.Any(cell => cell.Key is null))
         {
             return false;
         }

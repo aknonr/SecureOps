@@ -374,6 +374,54 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
+**Original-script review update:** start here for contract discovery; the browser
+and rc6.10 evidence below is retained, not rerun or overwritten. Starting local
+and independently queried remote HEAD both matched
+`1665685b488165ee62bbe9437e0b6b55993cf73d` on the existing feature branch, with
+only untracked `.vscode/` preserved.
+
+The original file supplied by the task is now reviewed as source only. Its actual
+attachment path, SHA-256, original line references, UTF-8 parser results and
+sanitized parity matrix are in
+`docs/integrations/turuncu-hat-jira-legacy-parity.md`. Script discovery is resolved.
+The line-274 `%22` string defect is in the supplied copy; an in-memory diagnostic
+repair parses cleanly but was neither saved nor substituted for the original.
+No script execution, corporate call, credentials output or raw-script commit.
+
+Mapping already matches the historical SDM / issue-type ID 3 / WASAS custom field /
+SunucuTalep / optional user-custom-field payload. Corrected documentation no longer
+attributes operator reporter, native watchers, an actual Success check or separate
+approver flow to the script. Existing Block requester policy and approval/eligibility
+fences remain unchanged. A static label is not a positive classification rule.
+
+Backend fixes reject malformed/mixed BPM projections without silently discarding
+rows, normalize activity application errors, reject contradictory update success,
+and safely classify non-object source/update/Jira success JSON. Exact corporate
+SET/KEY semantics, source-bound preview, authorization, durable ambiguity handling,
+Jira-key-first persistence and separate source-close recovery remain unchanged.
+No migration, UI runtime code, policy or provider activation changed.
+
+Verification: Release build has zero warnings/errors. The full checkpoint passed
+1,055 unit and 234 integration tests; eight opt-in SQL tests were skipped, not
+reported as SQL execution. After final error-normalization changes, all 90 adapter
+contract cases (24 new cases in this task) and 38 affected hosted/API/OpenAPI cases
+passed. Counts overlap and must not be added. TRX evidence is in ignored
+`artifacts/script-contract-review-20260907/`. Vulnerability scan found no known
+vulnerable packages in eight projects; diff check passed. Repository-wide format
+verification still fails on pre-existing whitespace/naming diagnostics. Existing
+LocalDB and desktop/mobile browser evidence below is reused for unchanged behavior.
+
+Activation still requires current field metadata/permissions and durable identity
+decisions, positive SDM policy/attestations, a decision on operator confirmation
+versus separate approval, remote write success/failure evidence and authoritative
+reconciliation/conditional-write semantics. No approval subsystem is inferred.
+Exact next action: complete verified source delivery and the authorized new paired
+API/UI package in a fresh release root, then obtain only these remaining owner
+inputs. Deployment and corporate writes remain separately gated. rc6.10 retains
+source `de6e538` and its original hashes; these runtime fixes are not in rc6.10.
+
+#### Prior SQL and Browser Milestone
+
 **Resume update, 02:38 TRT:** resume from this update; the rc6.10 milestone below
 is historical evidence. The checkout matched branch
 `feature/sql-runtime-hardening-20260902` and HEAD

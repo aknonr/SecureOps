@@ -96,9 +96,19 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
             _activitySelects,
             "activity-query",
             cancellationToken);
-        IReadOnlyList<string> activityIds = TuruncuHatQueryParser.ParseActivityIds(
-            activityResponse.RootElement,
-            _activitySelects);
+        IReadOnlyList<string> activityIds;
+        try
+        {
+            activityIds = TuruncuHatQueryParser.ParseActivityIds(activityResponse.RootElement, _activitySelects);
+        }
+        catch (TuruncuHatQueryResultException)
+        {
+            throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordQueryFailed, false);
+        }
+        catch (InvalidDataException)
+        {
+            throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordActivityAmbiguous, false);
+        }
         if (activityIds.Count == 0)
         {
             throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordActivityNotFound, false);
@@ -316,11 +326,7 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
                 response.Content,
                 _options.MaxResponseBytes,
                 cancellationToken);
-            if (!document.RootElement.TryGetProperty("UpdateResult", out JsonElement updateResult)
-                || updateResult.ValueKind != JsonValueKind.Object
-                || !updateResult.TryGetProperty("Success", out JsonElement success)
-                || success.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
-                || !success.GetBoolean())
+            if (!TuruncuHatQueryParser.IsSuccessfulUpdate(document.RootElement))
             {
                 throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordCloseFailed, true);
             }

@@ -26,9 +26,11 @@ yedeğinden geri yükleme ayrı DBA kararıdır; yeni işlem/audit verisini kayb
 Binary rollback, dış sistemde oluşmuş Jira kaydını geri almaz. Belirsiz Jira
 sonucunda yeniden create, transfer satırı silme veya kanıtsız SQL düzeltmesi yapılmaz.
 
-**Aktivasyon engelleri:** özgün betik veya erişilebilir sanitized kopyası, pozitif
-SDM kategori/etiket politikası, kayıt bazlı kapsam/altyapı kanıtı, requester/reporter
-eşleme ve yetki sözleşmesi, insan onay süreci, Jira create hata/başarı ve mutabakat
+**Aktivasyon engelleri:** özgün betik 2026-09-07 tarihinde kaynak olarak incelendi;
+keşif engeli kapandı (parity belgesinde hash ve sözdizimi kusuru kayıtlı).
+Pozitif SDM kategori politikası, kayıt bazlı kapsam/altyapı kanıtı, requester/reporter
+eşleme ve yetki sözleşmesi, operatör teyidinin yeterliliği veya ayrı onay kararı,
+Jira create hata/başarı ve mutabakat
 arama/idempotency sözleşmesi gerekir. Turuncu Hat update/BPM close sözleşmesi ve
 onayı ayrıca gereklidir. Mevcut servis hesabı bunların yerine geçmez.
 

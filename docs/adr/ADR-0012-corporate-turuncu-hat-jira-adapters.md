@@ -25,6 +25,15 @@ ADR-0009 established the durable Operational Record to Jira workflow and deferre
 
 ## Activation Gate
 
+The 2026-09-07 original-script source review resolves script discovery, not write
+activation. It confirms no explicit reporter/assignee, no separate approver, and
+no native watcher operation. Existing explicit reporter policy is governed by
+ADR-0009; the original omission remains ProjectDefault. Activity validation must
+reject malformed rows without discarding them before uniqueness checks. Update
+success must not override contradictory error metadata, and malformed success
+JSON must produce a sanitized provider failure. No conditional remote update or
+automatic uncertain-create retry is introduced.
+
 The code can be tested against deterministic sanitized fixtures. Operator evidence recorded on 2026-09-04 verifies the real Turuncu Hat read-only source/query path at source `0ec0376`. Jira creation and Turuncu Hat completion remain blocked until the outstanding samples and separate write activation approval are complete. Unknown remote idempotency means reconciliation remains manual after an ambiguous Jira create.
 
 ## Rejected Alternatives

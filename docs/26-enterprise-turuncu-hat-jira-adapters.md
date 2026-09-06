@@ -78,6 +78,12 @@ The Turuncu Hat Authorization value remains a complete runtime header because it
 
 ## Reviewed Jira Contract
 
+The original script is now located and reviewed without execution; provenance,
+its syntax defect and request-only conclusions are in the legacy parity document.
+The table below also uses earlier controlled metadata, not just that script.
+`customfield_11500` is a multi-user custom field, not proven native watchers.
+Neither a successful create nor a configured comment proves watcher addition.
+
 | Jira field | Reviewed create behavior |
 |---|---|
 | Project | Configured key; controlled evidence is SDM |
@@ -108,7 +114,14 @@ The corporate API may expand the five selects into a seven-cell direct `{ "Key",
 
 Jira user search uses the evidenced `/rest/api/2/user/search?username=...` endpoint for both requester and authenticated-operator resolution and accepts only one exact `name`, then one exact display-name fallback. Controlled success returned `name`, `key`, and `displayName`. No fuzzy match or first-result selection exists. Jira create is never automatically retried. Any ambiguous submission outcome enters existing reconciliation-required state. Jira rejection of an explicit reporter returns `JiraReporterRejected`; SecureOps never silently retries with the integration identity.
 
-Source completion runs only after the Jira key is persisted. It requires exactly one activity and explicit update success. A failure leaves `JiraExists=true` and retries only source completion.
+Source completion runs only after the Jira key is persisted. It requires exactly
+one activity with a valid exact projection; a malformed row cannot be dropped to
+manufacture uniqueness. An explicit boolean update success is required, with no
+non-empty error description/details or non-zero error number. Invalid JSON roots
+fail safely. These are conservative local validations, not invented remote
+response fixtures. A failure leaves `JiraExists=true` and permits only source-stage
+recovery; it never creates Jira again. A source re-read plus activity query is not
+an atomic conditional update. Remote response-loss reconciliation remains open.
 
 `GET /api/v1/health/enterprise-integrations` is Admin-only and returns provider selection plus `Configured`, `Disabled`, or `Unavailable`. It also returns `readOnlyIntegrationMode` and the safe operator notice when that gate is active. It returns no URL, credential, session, username, or remote response.
 
