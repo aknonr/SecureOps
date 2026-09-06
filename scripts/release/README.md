@@ -7,3 +7,11 @@ Before packaging, `Test-ApiReleasePayload.ps1` rejects PDB, source, project, tes
 `Validate-ApiAdRuntimeDependencies.ps1` then verifies that the manifest exactly represents the publish tree, ZIP paths and hashes match the manifest, required API/runtime files are present, API and Infrastructure assemblies share the expected dependency graph, and the complete `System.DirectoryServices.AccountManagement` runtime dependency closure is represented by the `.deps.json` and package assets.
 
 These scripts do not publish, deploy, or modify server configuration. A package is not release-ready unless validation succeeds.
+
+`New-UiDeploymentPackage.ps1` applies the same payload/secret scan and configuration
+exclusions to a completed UI publish. It validates the UI runtime/dependency and
+static-asset presence, preserves relative paths, verifies every ZIP entry hash,
+writes a per-file SHA256 manifest, and refuses existing output files. It does not
+claim API AD-runtime validation for UI binaries. API and UI packages for a paired
+release must name the same exact build source SHA and required schema level in
+the existing release-directory readiness manifest.
