@@ -65,14 +65,14 @@
         <section class="so-panel so-search-panel">
             <div class="so-resource-filters">
                 <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync"
-                              Label="Ara" Placeholder="Bağlantı adı, amaç veya etiket"
+                              Label="Ara" aria-label="Ara" Placeholder="Bağlantı adı, amaç veya etiket"
                               HelperText="Ad, amaç ve etiketlerde birebir metin araması yapılır."
                               Immediate="true" DebounceInterval="350" MaxLength="100"
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                               Variant="Variant.Outlined" Clearable="true" Class="so-resource-search" />
 
                 <MudSelect T="Guid?" Value="_categoryId" ValueChanged="CategoryChangedAsync"
-                           Label="Kategori" Dense="true" Margin="Margin.Dense"
+                           Label="Kategori" aria-label="Kategori" Dense="true" Margin="Margin.Dense"
                            Variant="Variant.Outlined" Clearable="true" Class="so-resource-filter">
                     <MudSelectItem T="Guid?" Value="@((Guid?)null)">Tümü</MudSelectItem>
                     @foreach (ResourceCategory category in _categories)
@@ -82,7 +82,7 @@
                 </MudSelect>
 
                 <MudSelect T="string" Value="_environment" ValueChanged="EnvironmentChangedAsync"
-                           Label="Ortam" Dense="true" Margin="Margin.Dense"
+                           Label="Ortam" aria-label="Ortam" Dense="true" Margin="Margin.Dense"
                            Variant="Variant.Outlined" Clearable="true" Class="so-resource-filter">
                     <MudSelectItem T="string" Value="@(string.Empty)">Tümü</MudSelectItem>
                     @foreach (string environment in _environments)
@@ -92,7 +92,7 @@
                 </MudSelect>
 
                 <MudSelect T="int" Value="_pageSize" ValueChanged="PageSizeChangedAsync"
-                           Label="Sayfa boyutu" Dense="true" Margin="Margin.Dense"
+                           Label="Sayfa boyutu" aria-label="Sayfa boyutu" Dense="true" Margin="Margin.Dense"
                            Variant="Variant.Outlined" Class="so-page-size">
                     @foreach (int size in ResourceView.PageSizes)
                     {
@@ -107,6 +107,14 @@
             @* Kept apart from the list problem: a failed favourite or set edit must survive the
                refresh that follows it, or the list reloads and the operator assumes it worked. *@
             <SoProblemPanel Problem="_actionProblem" />
+        }
+        @if (_preferencesProblem is not null)
+        {
+            <SoProblemPanel Problem="_preferencesProblem" OnRetry="ReloadAsync" />
+        }
+        @if (_categoriesProblem is not null)
+        {
+            <SoProblemPanel Problem="_categoriesProblem" OnRetry="ReloadAsync" />
         }
 
         <section class="so-panel">
@@ -191,7 +199,7 @@
                                     <MudIconButton Icon="@(favourite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
                                                    Color="@(favourite ? Color.Primary : Color.Default)"
                                                    Size="Size.Small"
-                                                   Disabled="@_busy"
+                                                   Disabled="@(_busy || _preferences is null)"
                                                    aria-label="@(favourite ? $"{link.Name} favorilerden çıkar" : $"{link.Name} favorilere ekle")"
                                                    OnClick="@(() => ToggleFavouriteAsync(captured, !favourite))" />
                                 </MudTooltip>
@@ -246,6 +254,9 @@
 
     private UiProblem? _listProblem;
     private UiProblem? _actionProblem;
+    private UiProblem? _preferencesProblem;
+    private UiProblem? _categoriesProblem;
+    private CancellationTokenSource? _searchCancellation;
     private bool _loading;
     private bool _busy;
 
@@ -302,11 +313,13 @@
         try
         {
             _categories = await ResourceApi.GetCategoriesAsync(false, CancellationToken.None);
+            _categoriesProblem = null;
         }
         catch (SecureOpsApiException ex)
         {
             // Non-fatal: the list still works, the category filter is simply unavailable.
             _categories = [];
+            _categoriesProblem = ex.Problem;
             Logger.LogDebug("Resource categories unavailable. Code: {Code}.", ex.Problem.Code);
         }
     }
@@ -316,10 +329,12 @@
         try
         {
             _preferences = await ResourceApi.GetPreferencesAsync(CancellationToken.None);
+            _preferencesProblem = null;
         }
         catch (SecureOpsApiException ex)
         {
             _preferences = null;
+            _preferencesProblem = ex.Problem;
             Logger.LogDebug("Resource preferences unavailable. Code: {Code}.", ex.Problem.Code);
         }
     }
@@ -361,6 +376,10 @@
     private async Task SearchAsync()
     {
         int id = ++_requestId;
+        _searchCancellation?.Cancel();
+        _searchCancellation?.Dispose();
+        _searchCancellation = new CancellationTokenSource();
+        CancellationToken token = _searchCancellation.Token;
 
         _loading = true;
         _listProblem = null;
@@ -378,7 +397,7 @@
 
         try
         {
-            ResourcePage page = await ResourceApi.QueryLinksAsync(query, CancellationToken.None);
+            ResourcePage page = await ResourceApi.QueryLinksAsync(query, token);
 
             if (id != _requestId)
             {
@@ -390,6 +409,10 @@
             _page = page;
             _pageNumber = page.Page;
             RefreshEnvironments(page);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Superseded searches do not publish a failure.
         }
         catch (SecureOpsApiException ex)
         {
@@ -520,7 +543,17 @@
         }
     }
 
-    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        StateHasChanged();
+    });
 
-    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+    public void Dispose()
+    {
+        AccessProvider.Changed -= OnAccessChanged;
+        ++_requestId;
+        _searchCancellation?.Cancel();
+        _searchCancellation?.Dispose();
+    }
 }

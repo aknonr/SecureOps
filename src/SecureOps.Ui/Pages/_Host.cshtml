@@ -88,8 +88,8 @@
         // involved and the browser handles them natively. This exists only because opening several
         // tabs requires several window.open calls inside one user gesture, which markup cannot do.
         //
-        // It must be called synchronously from a click handler. Anything awaited first spends the
-        // user activation and every browser then blocks the whole batch.
+        // Dispatch in the browser click handler: Blazor Server interop requires a round trip and
+        // cannot guarantee that transient user activation is still available on arrival.
         //
         // noopener,noreferrer on every call: the opened page gets no window.opener handle back into
         // WASAS and no Referer header. No cookie, token, or header is passed — window.open cannot
@@ -115,6 +115,33 @@
                 return withoutHandle;
             }
         };
+
+        document.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-so-open-links]');
+            if (!button || !event.isTrusted) { return; }
+            var panel = button.closest('.so-set-resolved');
+            var urls = Array.from(panel.querySelectorAll('a.so-resource-name'))
+                .map(function (link) { return link.href; });
+            window.secureOpsLinks.openMany(urls);
+            panel.querySelector('[data-so-open-status]').hidden = false;
+        });
+
+        // MudBlazor 6 puts select attributes on a hidden input, not its keyboard target.
+        // Transfer resource field names to that target without replacing its keyboard behavior.
+        function labelResourceSelects() {
+            document.querySelectorAll('.so-resource-filters .mud-select, .so-resource-dialog .mud-select')
+                .forEach(function (select) {
+                    var input = select.querySelector('input[aria-label]');
+                    var target = select.querySelector('div.mud-input-slot[tabindex="0"]');
+                    if (input && target) {
+                        target.setAttribute('aria-label', input.getAttribute('aria-label'));
+                        target.setAttribute('role', 'button');
+                        target.setAttribute('aria-haspopup', 'listbox');
+                    }
+                });
+        }
+        new MutationObserver(labelResourceSelects).observe(document.body, { childList: true, subtree: true });
+        labelResourceSelects();
 
         window.secureOpsDownload = function (fileName, contentType, base64) {
             var binary = atob(base64);

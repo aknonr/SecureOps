@@ -31,14 +31,14 @@
         }
         else
         {
-            <MudList T="ShiftSetResponse" Clickable="true" Dense="true">
+            <div>
                 @foreach (ShiftSetResponse set in Preferences.Sets)
                 {
                     ShiftSetResponse captured = set;
                     bool already = ResourceView.Contains(set, Link.Id);
                     bool full = set.Links.Count >= ResourceView.MaxLinksPerSet;
 
-                    <MudListItem T="ShiftSetResponse"
+                    <MudButton FullWidth="true" Variant="Variant.Text" Color="Color.Default"
                                  Disabled="@(already || full)"
                                  OnClick="@(() => Choose(captured))">
                         <div class="so-set-option">
@@ -64,9 +64,9 @@
                                 }
                             </span>
                         </div>
-                    </MudListItem>
+                    </MudButton>
                 }
-            </MudList>
+            </div>
         }
     </DialogContent>
 

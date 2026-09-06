@@ -7,7 +7,6 @@
 @inject IResourceApiClient ResourceApi
 @inject ICurrentAccessProvider AccessProvider
 @inject IDialogService Dialogs
-@inject IJSRuntime Js
 @inject ILogger<ShiftSets> Logger
 
 <PageTitle>Mesai Setlerim · @WasasBrand.Name</PageTitle>
@@ -28,7 +27,7 @@
     Nothing here opens a tab on load, on render, or on refresh.
 *@
 
-<div class="so-page so-page--wide">
+<div class="so-page so-page--wide so-shift-sets">
     <SoPageHeader Title="Mesai Setlerim"
                   Lead="Vardiya başında birlikte açtığınız bağlantıları adlandırılmış setler hâlinde saklayın ve sıralayın.">
         <Actions>
@@ -44,7 +43,7 @@
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Add"
-                       Disabled="@(_busy || !ResourceView.CanCreateSet(_preferences))"
+                       Disabled="@(_busy || _preferences is null || _access?.Can(Capabilities.ResourcesView) != true || !ResourceView.CanCreateSet(_preferences))"
                        OnClick="CreateSetAsync">
                 Yeni Set
             </MudButton>
@@ -76,11 +75,11 @@
             <SoProblemPanel Problem="_problem" OnRetry="LoadPreferencesAsync" RetryLabel="Yeniden yükle" />
         }
 
-        @if (_preferences is null)
+        @if (_preferences is null && _problem is null)
         {
             <SoFlightLoading Message="Setleriniz getiriliyor…" Bare="true" />
         }
-        else if (_preferences.Sets.Count == 0)
+        else if (_preferences?.Sets.Count == 0)
         {
             <SoEmptyState Title="Henüz bir setiniz yok"
                           Description="Vardiya başında birlikte açtığınız bağlantıları bir sette toplayabilirsiniz."
@@ -95,7 +94,7 @@
                 </Actions>
             </SoEmptyState>
         }
-        else
+        else if (_preferences is not null)
         {
             @foreach (ShiftSetResponse set in _preferences.Sets)
             {
@@ -228,27 +227,23 @@
                                     @* A separate click on purpose: resolution already spent the
                                        activation from the first one, and browsers block a batch
                                        opened after an await. *@
-                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                                               StartIcon="@Icons.Material.Filled.OpenInNew"
-                                               OnClick="OpenResolvedAsync">
+                                    <button type="button" data-so-open-links
+                                            class="mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-small">
                                         @_resolved.Links.Count Bağlantıyı Aç
-                                    </MudButton>
+                                    </button>
                                     <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                                OnClick="ClearResolved">
                                         Kapat
                                     </MudButton>
                                 </div>
 
-                                @if (_openAttempted)
-                                {
                                     @* Deliberately not "opened successfully". A window-opening
                                        attempt is not proof the destination loaded, and blocked-tab
                                        detection is not reliable enough to assert either way. *@
-                                    <p class="so-panel-text so-panel-text--sm" role="status">
+                                    <p class="so-panel-text so-panel-text--sm" role="status" data-so-open-status hidden>
                                         Açma isteği gönderildi. Sekmeler açılmadıysa tarayıcınızın açılır
                                         pencere engelini kontrol edip bağlantıları tek tek açın.
                                     </p>
-                                }
 
                                 <ul class="so-resource-list so-resource-list--compact">
                                     @foreach (ResourceLink link in _resolved.Links)
@@ -288,7 +283,6 @@
 
     private ShiftSetResponse? _resolved;
     private Guid? _resolvedSetId;
-    private bool _openAttempted;
 
     protected override async Task OnInitializedAsync()
     {
@@ -315,6 +309,7 @@
     {
         _busy = true;
         _problem = null;
+        ClearResolved();
         StateHasChanged();
 
         try
@@ -332,47 +327,9 @@
         }
     }
 
-    private async Task CreateSetAsync()
-    {
-        string? name = await PromptNameAsync("Yeni set", null);
+    private Task CreateSetAsync() => PromptNameAsync(null);
 
-        if (name is null || _preferences is null)
-        {
-            return;
-        }
-
-        string? invalid = ResourceView.ValidateSet(name, [], _preferences.Sets, null);
-        if (invalid is not null)
-        {
-            _problem = UiProblemFactory.FromResponse(400, null) with { Explanation = invalid };
-            return;
-        }
-
-        await MutateAsync(preferences => ResourceApi.CreateSetAsync(
-            new SaveShiftSetRequest(name, [], false, preferences.Version), CancellationToken.None));
-    }
-
-    private async Task RenameSetAsync(ShiftSetResponse set)
-    {
-        string? name = await PromptNameAsync("Seti yeniden adlandır", set.Name);
-
-        if (name is null || _preferences is null)
-        {
-            return;
-        }
-
-        string? invalid = ResourceView.ValidateSet(name, ResourceView.LinkIds(set), _preferences.Sets, set.Id);
-        if (invalid is not null)
-        {
-            _problem = UiProblemFactory.FromResponse(400, null) with { Explanation = invalid };
-            return;
-        }
-
-        await MutateAsync(preferences => ResourceApi.SaveSetAsync(
-            set.Id,
-            new SaveShiftSetRequest(name, ResourceView.LinkIds(set), set.IsDefault, preferences.Version),
-            CancellationToken.None));
-    }
+    private Task RenameSetAsync(ShiftSetResponse set) => PromptNameAsync(set);
 
     private async Task DeleteSetAsync(ShiftSetResponse set)
     {
@@ -422,30 +379,31 @@
     // Every personal mutation goes through here so the version guard, the refreshed state and the
     // conflict recovery are written once. A rejected stale request changes nothing server-side, so
     // the only correct response is to re-read before the operator tries again.
-    private async Task MutateAsync(Func<ResourcePreferencesResponse, Task<ResourcePreferencesResponse>> mutate)
+    private async Task<UiProblem?> MutateAsync(Func<ResourcePreferencesResponse, Task<ResourcePreferencesResponse>> mutate)
     {
         if (_preferences is null || _busy)
         {
-            return;
+            return UiProblemFactory.FromResponse(409, null);
         }
 
         _busy = true;
         _problem = null;
+        ClearResolved();
         StateHasChanged();
 
         try
         {
             _preferences = await mutate(_preferences);
+            return null;
         }
         catch (SecureOpsApiException ex)
         {
             _problem = ex.Problem;
             Logger.LogDebug("Personal set update failed. Code: {Code}.", ex.Problem.Code);
 
-            if (ex.Problem.RequiresRefresh)
-            {
-                await LoadPreferencesAsync();
-            }
+            await LoadPreferencesAsync();
+            _problem = ex.Problem;
+            return ex.Problem;
         }
         finally
         {
@@ -453,29 +411,48 @@
         }
     }
 
-    private async Task<string?> PromptNameAsync(string title, string? current)
+    private async Task PromptNameAsync(ShiftSetResponse? set)
     {
+        if (_busy || _preferences is null)
+        {
+            return;
+        }
+        string title = set is null ? "Yeni set" : "Seti yeniden adlandır";
+        long version = _preferences.Version;
         DialogParameters parameters = new()
         {
             { nameof(ShiftSetNameDialog.Title), title },
-            { nameof(ShiftSetNameDialog.Name), current ?? string.Empty }
+            { nameof(ShiftSetNameDialog.Name), set?.Name ?? string.Empty },
+            { nameof(ShiftSetNameDialog.Save), (Func<string, Task<UiProblem?>>)(async name =>
+                {
+                    IReadOnlyList<Guid> ids = set is null ? [] : ResourceView.LinkIds(set);
+                    string? invalid = ResourceView.ValidateSet(name, ids, _preferences.Sets, set?.Id);
+                    if (invalid is not null)
+                    {
+                        return UiProblemFactory.FromResponse(400, null) with { Explanation = invalid };
+                    }
+                    SaveShiftSetRequest request = new(name, ids, set?.IsDefault ?? false, version);
+                    return await MutateAsync(_ => set is null
+                        ? ResourceApi.CreateSetAsync(request, CancellationToken.None)
+                        : ResourceApi.SaveSetAsync(set.Id, request, CancellationToken.None));
+                }) }
         };
 
         IDialogReference dialog = await Dialogs.ShowAsync<ShiftSetNameDialog>(
-            title, parameters, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
-
-        DialogResult? result = await dialog.Result;
-
-        return result is null || result.Canceled || result.Data is not string name ? null : name;
+            title, parameters, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+        await dialog.Result;
     }
 
     // Resolution happens on its own click. The result is what the server says is openable right now,
     // which can be shorter than what was saved; the opening button then works from that list only.
     private async Task PrepareOpenAsync(ShiftSetResponse set)
     {
+        if (_busy)
+        {
+            return;
+        }
         _busy = true;
         _problem = null;
-        _openAttempted = false;
         _resolved = null;
         _resolvedSetId = set.Id;
         StateHasChanged();
@@ -496,39 +473,17 @@
         }
     }
 
-    // Called straight from the click with no await before the interop call, so the browser still
-    // sees the user activation that lets a batch through.
-    private async Task OpenResolvedAsync()
-    {
-        if (_resolved is null || _resolved.Links.Count == 0)
-        {
-            return;
-        }
-
-        string[] urls = _resolved.Links.Select(link => link.Url).ToArray();
-
-        try
-        {
-            await Js.InvokeAsync<int>("secureOpsLinks.openMany", urls);
-        }
-        catch (JSException ex)
-        {
-            Logger.LogWarning(ex, "Batch link opening could not be dispatched.");
-        }
-
-        // Records only that opening was attempted. The count of handles the browser withheld is
-        // not reliable enough to report as blocked, and no attempt proves a destination loaded.
-        _openAttempted = true;
-    }
-
     private void ClearResolved()
     {
         _resolved = null;
         _resolvedSetId = null;
-        _openAttempted = false;
     }
 
-    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        StateHasChanged();
+    });
 
     public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
 }

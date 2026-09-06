@@ -205,8 +205,8 @@ problem on screen; it never resubmits over the edit that won.
 
 **Opening links.** Single links are ordinary anchors with `target="_blank" rel="noopener noreferrer"`.
 A set is resolved through `GET /resources/me/sets/{id}/resolve` on its own click, and only the
-returned links are offered — resolution is asynchronous and spends the browser user activation, so
-opening them is a second explicit click that calls `window.secureOpsLinks.openMany` synchronously.
+returned links are offered. Opening is a second explicit browser click or keyboard activation;
+its native handler calls `window.secureOpsLinks.openMany` without a Blazor Server round trip.
 The UI reports that opening was *attempted* and always keeps the individual links visible; it never
 claims a destination loaded or authenticated, and blocked-tab detection is not treated as reliable.
 No tab is opened during load, render, or refresh. No WASAS cookie, token, or header reaches a target.
@@ -223,9 +223,35 @@ not), server-side 403 on both management write and `includeArchived` read for Le
 real catalogue data. Automated coverage is in `ResourceViewTests` and `ResourceApiClientTests`, plus
 the route rows in `UiErrorRoutingTests`.
 
-**Not verified:** interactive browser behaviour — dialogs, reordering, batch opening, and
-popup-block fallback — because the local Puppeteer harness is no longer installed and this task does
-not permit adding packages. Those paths need a manual pass before TEST sign-off.
+**2026-09-06 correction verification:** Chrome 152 against the existing loopback Development hosts
+and synthetic InMemory data exercised ordinary-user search, category/environment filters, paging,
+page size, favourites and denied management; set create/rename/default/delete, keyboard membership
+selection and reordering; manager create/edit/archive and real stale-version conflicts; failed-save
+draft retention; partial resolution after archive/restoration; single/batch opening to an intercepted
+harmless local page; and server session
+revocation followed by reauthentication back to `/resources`. Layouts were checked at 1440x900,
+1366x768 and 390x844, including a dark narrow view and long text.
+
+Corrections keep dialogs open until saves succeed, preserve conflict messages after rereads, clear
+resolved opening candidates on refresh/mutation, cancel superseded searches, surface personal/category
+load failures, and provide accessible field names and keyboard set choices. Missing popup handles
+still do not mean blocked tabs. Opening attempts do not prove target authentication or loading.
+
+Replayable regression: `node tests/browser/resource-ui.cjs <playwright-core path> <UI URL> <API URL>`.
+Supply the task-local driver, loopback HTTPS UI and loopback API with synthetic InMemory data;
+the script refuses non-loopback hostnames and creates/archives its own catalogue fixtures.
+Screenshots and local journey results: ignored `artifacts/resource-ui-20260906/`.
+
+**Still pending:** injected 503/transport-loss and delayed-response browser cases (automatic policy
+review blocked the task-local API-proxy override), timed idle/absolute expiry, managed corporate
+browser popup policies, and screen-reader verification. Cancellation/timeout and stale-response
+guards were checked in tests/code; this is not complete UI or corporate TEST sign-off.
+
+**Backend contract gaps:** personal projections omit hidden IDs, but PUT replaces all set membership.
+Renaming, setting a default, reordering or adding a link can therefore discard unavailable saved
+references. A backend operation that preserves hidden membership is needed; the UI cannot invent
+those IDs. No complete environment-facet endpoint exists either, so the filter currently offers only
+values seen on the returned page. Neither gap is changed by this correction.
 
 ### Backend baseline required
 

@@ -194,20 +194,18 @@ public sealed class ResourceApiClient : IResourceApiClient
         Func<Task<HttpResponseMessage>> send,
         CancellationToken cancellationToken)
     {
-        HttpResponseMessage response;
-
         try
         {
-            response = await send();
+            using HttpResponseMessage response = await send();
+            return await ApiResponseReader.ReadOrThrowAsync<T>(response, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
             throw ApiResponseReader.ToTransportException(ex, cancellationToken);
-        }
-
-        using (response)
-        {
-            return await ApiResponseReader.ReadOrThrowAsync<T>(response, cancellationToken);
         }
     }
 }

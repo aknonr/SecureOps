@@ -159,7 +159,7 @@
                 </h2>
                 <div class="so-panel-head-actions">
                     <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync"
-                                  Label="Ara" Immediate="true" DebounceInterval="350" MaxLength="100"
+                                  Label="Ara" aria-label="Ara" Immediate="true" DebounceInterval="350" MaxLength="100"
                                   Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
                                   Class="so-resource-search" />
@@ -273,6 +273,7 @@
     private string _search = string.Empty;
     private int _pageNumber = 1;
     private int _requestId;
+    private CancellationTokenSource? _searchCancellation;
 
     private int TotalPages =>
         _page is null || _page.PageSize <= 0 ? 1 : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_page.PageSize));
@@ -300,6 +301,7 @@
 
     private async Task ReloadAsync()
     {
+        _problem = null;
         await LoadCategoriesAsync();
         await LoadLinksAsync();
     }
@@ -320,6 +322,10 @@
     private async Task LoadLinksAsync()
     {
         int id = ++_requestId;
+        _searchCancellation?.Cancel();
+        _searchCancellation?.Dispose();
+        _searchCancellation = new CancellationTokenSource();
+        CancellationToken token = _searchCancellation.Token;
         _busy = true;
         StateHasChanged();
 
@@ -331,7 +337,7 @@
                     IncludeArchived: _includeArchived,
                     Page: _pageNumber,
                     PageSize: 50),
-                CancellationToken.None);
+                token);
 
             if (id != _requestId)
             {
@@ -340,6 +346,10 @@
 
             _page = page;
             _pageNumber = page.Page;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Superseded searches do not publish a failure.
         }
         catch (SecureOpsApiException ex)
         {
@@ -384,82 +394,55 @@
     private string CategoryName(Guid id) =>
         _categories.FirstOrDefault(category => category.Id == id)?.Name ?? "—";
 
-    private async Task CreateCategoryAsync()
-    {
-        SaveResourceCategoryRequest? request = await ShowCategoryDialogAsync(null);
+    private Task CreateCategoryAsync() => ShowCategoryDialogAsync(null);
 
-        if (request is not null)
+    private Task EditCategoryAsync(ResourceCategory category) => ShowCategoryDialogAsync(category);
+
+    private async Task ShowCategoryDialogAsync(ResourceCategory? category)
+    {
+        DialogParameters parameters = new()
         {
-            await SaveAsync(() => ResourceApi.CreateCategoryAsync(request, CancellationToken.None));
-        }
-    }
-
-    private async Task EditCategoryAsync(ResourceCategory category)
-    {
-        SaveResourceCategoryRequest? request = await ShowCategoryDialogAsync(category);
-
-        if (request is not null)
-        {
-            await SaveAsync(() => ResourceApi.SaveCategoryAsync(category.Id, request, CancellationToken.None));
-        }
-    }
-
-    private async Task<SaveResourceCategoryRequest?> ShowCategoryDialogAsync(ResourceCategory? category)
-    {
-        DialogParameters parameters = new() { { nameof(ResourceCategoryDialog.Category), category } };
+            { nameof(ResourceCategoryDialog.Category), category },
+            { nameof(ResourceCategoryDialog.Save), (Func<SaveResourceCategoryRequest, Task<UiProblem?>>)(request =>
+                SaveAsync(() => category is null
+                    ? ResourceApi.CreateCategoryAsync(request, CancellationToken.None)
+                    : ResourceApi.SaveCategoryAsync(category.Id, request, CancellationToken.None))) }
+        };
 
         IDialogReference dialog = await Dialogs.ShowAsync<ResourceCategoryDialog>(
-            "Kategori", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-
-        DialogResult? result = await dialog.Result;
-
-        return result is null || result.Canceled ? null : result.Data as SaveResourceCategoryRequest;
+            "Kategori", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+        await dialog.Result;
     }
 
-    private async Task CreateLinkAsync()
-    {
-        SaveResourceLinkRequest? request = await ShowLinkDialogAsync(null);
+    private Task CreateLinkAsync() => ShowLinkDialogAsync(null);
 
-        if (request is not null)
-        {
-            await SaveAsync(() => ResourceApi.CreateLinkAsync(request, CancellationToken.None));
-        }
-    }
+    private Task EditLinkAsync(ResourceLink link) => ShowLinkDialogAsync(link);
 
-    private async Task EditLinkAsync(ResourceLink link)
-    {
-        SaveResourceLinkRequest? request = await ShowLinkDialogAsync(link);
-
-        if (request is not null)
-        {
-            await SaveAsync(() => ResourceApi.SaveLinkAsync(link.Id, request, CancellationToken.None));
-        }
-    }
-
-    private async Task<SaveResourceLinkRequest?> ShowLinkDialogAsync(ResourceLink? link)
+    private async Task ShowLinkDialogAsync(ResourceLink? link)
     {
         DialogParameters parameters = new()
         {
             { nameof(ResourceLinkDialog.Link), link },
-            { nameof(ResourceLinkDialog.Categories), _categories }
+            { nameof(ResourceLinkDialog.Categories), _categories },
+            { nameof(ResourceLinkDialog.Save), (Func<SaveResourceLinkRequest, Task<UiProblem?>>)(request =>
+                SaveAsync(() => link is null
+                    ? ResourceApi.CreateLinkAsync(request, CancellationToken.None)
+                    : ResourceApi.SaveLinkAsync(link.Id, request, CancellationToken.None))) }
         };
 
         IDialogReference dialog = await Dialogs.ShowAsync<ResourceLinkDialog>(
-            "Bağlantı", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
-
-        DialogResult? result = await dialog.Result;
-
-        return result is null || result.Canceled ? null : result.Data as SaveResourceLinkRequest;
+            "Bağlantı", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+        await dialog.Result;
     }
 
     // One place for every catalogue write. On a version conflict the current state is reloaded and
     // the problem stays on screen: the operator sees what somebody else saved before deciding
     // whether to reapply their change, and nothing is resubmitted automatically.
-    private async Task SaveAsync(Func<Task> save)
+    private async Task<UiProblem?> SaveAsync(Func<Task> save)
     {
         if (_busy)
         {
-            return;
+            return UiProblemFactory.FromResponse(409, null);
         }
 
         _busy = true;
@@ -470,6 +453,7 @@
         {
             await save();
             await ReloadAsync();
+            return null;
         }
         catch (SecureOpsApiException ex)
         {
@@ -479,10 +463,9 @@
                 ex.Problem.Code,
                 ex.Problem.CorrelationId);
 
-            if (ex.Problem.RequiresRefresh)
-            {
-                await ReloadAsync();
-            }
+            await ReloadAsync();
+            _problem = ex.Problem;
+            return ex.Problem;
         }
         finally
         {
@@ -490,7 +473,17 @@
         }
     }
 
-    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        StateHasChanged();
+    });
 
-    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+    public void Dispose()
+    {
+        AccessProvider.Changed -= OnAccessChanged;
+        ++_requestId;
+        _searchCancellation?.Cancel();
+        _searchCancellation?.Dispose();
+    }
 }

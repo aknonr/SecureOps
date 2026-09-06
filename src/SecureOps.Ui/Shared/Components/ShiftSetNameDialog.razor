@@ -6,7 +6,7 @@
     per owner and case-insensitive there, and this dialog does not attempt to prove it.
 *@
 
-<MudDialog Class="so-dialog">
+<MudDialog Class="so-dialog" DefaultFocus="DefaultFocus.FirstChild">
     <TitleContent>
         <div class="so-dialog-title">
             <span class="so-dialog-icon" aria-hidden="true">
@@ -19,6 +19,7 @@
     <DialogContent>
         <MudTextField @bind-Value="_name"
                       Label="Set adı"
+                      aria-label="Set adı"
                       HelperText="En fazla 80 karakter. Yalnızca siz görürsünüz."
                       Required="true"
                       Immediate="true"
@@ -26,12 +27,11 @@
                       Error="@(_error is not null)"
                       ErrorText="@_error"
                       Variant="Variant.Outlined"
-                      autofocus="true" />
+                      AutoFocus="true" />
     </DialogContent>
 
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
-        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary">Kaydet</MudButton>
+        <ResourceSaveActions Save="ConfirmAsync" />
     </DialogActions>
 </MudDialog>
 
@@ -47,23 +47,26 @@
     [Parameter]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Validates and saves the personal set without dismissing a failed edit.</summary>
+    [Parameter, EditorRequired] public Func<string, Task<UiProblem?>> Save { get; set; } = default!;
+
     private string _name = string.Empty;
     private string? _error;
 
     protected override void OnInitialized() => _name = Name;
 
-    private void Confirm()
+    private Task<UiProblem?> ConfirmAsync()
     {
         string trimmed = _name.Trim();
 
         if (trimmed.Length == 0)
         {
             _error = "Set adı zorunludur.";
-            return;
+            return Task.FromResult<UiProblem?>(UiProblemFactory.FromResponse(400, null) with { Explanation = _error });
         }
 
         _error = null;
-        Dialog.Close(DialogResult.Ok(trimmed));
+        return Save(trimmed);
     }
 
     private void Cancel() => Dialog.Cancel();

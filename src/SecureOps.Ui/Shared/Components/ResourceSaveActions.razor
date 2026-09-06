@@ -1,0 +1,48 @@
+@* Keep the form and its values until the server confirms the write. *@
+<div class="so-resource-save">
+    @if (_problem is not null)
+    {
+        <SoProblemPanel Problem="_problem" />
+        @if (_problem.Kind != UiProblemKind.Validation)
+        {
+            <p class="so-panel-text">Kapatıp güncel kaydı inceleyin; işlem otomatik tekrarlanmaz.</p>
+        }
+    }
+    <MudButton OnClick="Cancel" Disabled="@_saving" Variant="Variant.Text">Vazgeç</MudButton>
+    <MudButton OnClick="ConfirmAsync" Disabled="@(_saving || (_problem is not null && _problem.Kind != UiProblemKind.Validation))"
+               Variant="Variant.Filled" Color="Color.Primary">Kaydet</MudButton>
+</div>
+
+@code {
+    [CascadingParameter] private MudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Saves current form values; null means the server confirmed success.</summary>
+    [Parameter, EditorRequired] public Func<Task<UiProblem?>> Save { get; set; } = default!;
+
+    private bool _saving;
+    private UiProblem? _problem;
+
+    private async Task ConfirmAsync()
+    {
+        if (_saving || (_problem is not null && _problem.Kind != UiProblemKind.Validation))
+        {
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            _problem = await Save();
+            if (_problem is null)
+            {
+                Dialog.Close(DialogResult.Ok(true));
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

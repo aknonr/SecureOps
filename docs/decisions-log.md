@@ -73,6 +73,43 @@ authenticated, and does not treat a missing window handle as reliable blocked-ta
 
 **What remains open:** Migrations 009-010 and the reviewed grants are not applied to corporate SQL,
 and no API build containing `ResourcesController` is deployed to TEST, so these routes cannot work
-there yet. Interactive browser verification — dialogs, reordering, batch opening and popup-block
-fallback — was not performed because the local Puppeteer harness is no longer installed and this
-task did not permit adding packages; it needs a manual pass before TEST sign-off.
+there yet.
+
+**2026-09-06 targeted correction and verification:** Started at
+`f5ed367d9e61ba0097e67a65d13bdb3508973fba`, branch
+`feature/sql-runtime-hardening-20260902`, clean tracked worktree; untracked `.vscode/` preserved.
+The owner explicitly overrode UI ownership for this task only. The correction remains below the
+1,000-line hard cap; the earlier implementation exception was not reused.
+
+- P1: batch interop expanded `string[]` into individual arguments; `openMany` received a string,
+  attempted zero opens, and the UI reported an attempt. A native browser activation handler now
+  dispatches the resolved array in order without a server round trip. Chrome showed activation on
+  the first attempt, opener isolation, and null handles without false popup-block assertions.
+- P2: set rereads retained old resolved links and erased concurrency errors. Refresh/mutations now
+  clear opening candidates, and conflict recovery retains the error. Failed forms now retain drafts
+  until confirmed success; stale/unknown outcomes require closing and inspecting the refreshed state.
+- P2: set-picker rows ignored Enter; inputs lacked accessible names and select attributes landed on
+  hidden inputs. Native choice buttons, field names and a resource-scoped MudBlazor label bridge fix
+  those cases. Long text wraps; catalogue navigation no longer highlights both resource routes.
+- P2: superseded searches used uncancelled requests; both resource searches now cancel and keep their
+  existing sequence guards. Personal/category load failures are visible; unavailable preferences
+  disable favourite actions. Client caller cancellation remains cancellation rather than a network error.
+
+Real Chrome 152 journeys and remaining limits are recorded in `src/SecureOps.Ui/README.md`.
+Evidence is local and ignored: `artifacts/resource-ui-20260906/` includes `browser-results.json`,
+`ordinary-results.json`, `manager-results.json`, screenshots and TRX results. The small replayable
+regression script is `tests/browser/resource-ui.cjs`; its driver/profile stays outside the repository.
+No HTTP page response was counted as browser interaction.
+
+Validation: full Debug solution build, zero warnings/errors; 987 unit and 233 integration tests passed,
+four opt-in LocalDB tests skipped. Final affected resource tests: 25 passed. Release UI build passed
+with zero warnings/errors. A full Release solution build was blocked by running local API DLL locks.
+Repository-wide format verification failed on existing whitespace/naming/encoding debt; scoped C#
+formatting was applied, with the pre-existing `ResourceApiClient.Root` naming diagnostic still reported.
+No corporate endpoints, SQL, IIS, deployment, packaging, framework/dependency or lockfile changes.
+
+Contract blockers: hidden membership cannot survive full replacement from a filtered personal
+projection; no environment-facet route supplies values beyond a returned page. Both need backend
+contract decisions. Injected 503/delayed-response browser cases remain pending because automatic
+approval review rejected the task-local API-proxy override. Corporate migrations/grants, resource API
+and UI deployment, actual authentication and managed-browser checks remain TEST gates.

@@ -14,7 +14,7 @@
     URL policy, which is far stricter than a length check can express.
 *@
 
-<MudDialog Class="so-dialog">
+<MudDialog Class="so-dialog so-resource-dialog" DefaultFocus="DefaultFocus.FirstChild">
     <TitleContent>
         <div class="so-dialog-title">
             <span class="so-dialog-icon" aria-hidden="true">
@@ -26,7 +26,7 @@
 
     <DialogContent>
         <div class="so-form-grid">
-            <MudSelect T="Guid" @bind-Value="_categoryId" Label="Kategori" Required="true"
+            <MudSelect T="Guid" @bind-Value="_categoryId" Label="Kategori" aria-label="Kategori" Required="true"
                        Variant="Variant.Outlined" Dense="true"
                        HelperText="Arşivlenmemiş bir kategori seçin.">
                 @foreach (ResourceCategory category in Categories.Where(c => !c.Archived))
@@ -35,32 +35,32 @@
                 }
             </MudSelect>
 
-            <MudTextField @bind-Value="_name" Label="Ad" Required="true" MaxLength="120"
+            <MudTextField @bind-Value="_name" Label="Ad" aria-label="Ad" Required="true" MaxLength="120"
                           Immediate="true" Variant="Variant.Outlined"
                           HelperText="Operatörün listede göreceği ad. En fazla 120 karakter." />
 
-            <MudTextField @bind-Value="_url" Label="Adres (URL)" Required="true" MaxLength="2048"
+            <MudTextField @bind-Value="_url" Label="Adres (URL)" aria-label="Adres (URL)" Required="true" MaxLength="2048"
                           Immediate="true" Variant="Variant.Outlined"
                           HelperText="Yalnızca https:// ile başlayan tam adres kabul edilir." />
 
-            <MudTextField @bind-Value="_purpose" Label="Amaç" Required="true" MaxLength="300"
+            <MudTextField @bind-Value="_purpose" Label="Amaç" aria-label="Amaç" Required="true" MaxLength="300"
                           Immediate="true" Lines="2" Variant="Variant.Outlined"
                           HelperText="Bu bağlantının ne işe yaradığı. En fazla 300 karakter." />
 
-            <MudTextField @bind-Value="_environment" Label="Ortam" MaxLength="40"
+            <MudTextField @bind-Value="_environment" Label="Ortam" aria-label="Ortam" MaxLength="40"
                           Variant="Variant.Outlined" HelperText="İsteğe bağlı. Örnek: Test, Pilot." />
 
-            <MudTextField @bind-Value="_location" Label="Konum" MaxLength="40"
+            <MudTextField @bind-Value="_location" Label="Konum" aria-label="Konum" MaxLength="40"
                           Variant="Variant.Outlined" HelperText="İsteğe bağlı." />
 
-            <MudTextField @bind-Value="_tags" Label="Etiketler" MaxLength="330"
+            <MudTextField @bind-Value="_tags" Label="Etiketler" aria-label="Etiketler" MaxLength="330"
                           Variant="Variant.Outlined"
                           HelperText="Virgülle ayırın. En fazla 10 etiket, her biri 30 karakter." />
 
-            <MudNumericField @bind-Value="_displayOrder" Label="Sıra" Min="0" Max="100000"
+            <MudNumericField @bind-Value="_displayOrder" Label="Sıra" aria-label="Sıra" Min="0" Max="100000"
                              Variant="Variant.Outlined" HelperText="Küçük değer önce listelenir." />
 
-            <MudTextField @bind-Value="_notes" Label="Erişim notu" MaxLength="1000" Lines="3"
+            <MudTextField @bind-Value="_notes" Label="Erişim notu" aria-label="Erişim notu" MaxLength="1000" Lines="3"
                           Variant="Variant.Outlined"
                           HelperText="İsteğe bağlı. Parola veya kimlik bilgisi yazmayın." />
         </div>
@@ -85,11 +85,7 @@
     </DialogContent>
 
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
-        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary"
-                   Disabled="@_submitting">
-            Kaydet
-        </MudButton>
+        <ResourceSaveActions Save="ConfirmAsync" />
     </DialogActions>
 </MudDialog>
 
@@ -100,6 +96,9 @@
     /// <summary>Link being edited, or <see langword="null"/> when creating.</summary>
     [Parameter]
     public ResourceLink? Link { get; set; }
+
+    /// <summary>Submits the versioned form to the catalogue page.</summary>
+    [Parameter, EditorRequired] public Func<SaveResourceLinkRequest, Task<UiProblem?>> Save { get; set; } = default!;
 
     /// <summary>Categories the link may belong to.</summary>
     [Parameter, EditorRequired]
@@ -117,7 +116,6 @@
     private bool _active = true;
     private bool _archived;
     private string? _error;
-    private bool _submitting;
 
     protected override void OnInitialized()
     {
@@ -140,16 +138,14 @@
         _archived = Link.Archived;
     }
 
-    private void Confirm()
+    private Task<UiProblem?> ConfirmAsync()
     {
         _error = Validate();
 
         if (_error is not null)
         {
-            return;
+            return Task.FromResult<UiProblem?>(UiProblemFactory.FromResponse(400, null) with { Explanation = _error });
         }
-
-        _submitting = true;
 
         // Version zero creates; the exact current version replaces. Anything else is rejected
         // server-side, which is what makes a concurrent edit visible instead of silently lost.
@@ -167,7 +163,7 @@
             _archived,
             Link?.Version ?? 0);
 
-        Dialog.Close(DialogResult.Ok(request));
+        return Save(request);
     }
 
     private string? Validate()

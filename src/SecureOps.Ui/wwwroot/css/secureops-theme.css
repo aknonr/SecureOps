@@ -5215,6 +5215,7 @@ html[data-so-appearance="light"] .so-auth-card {
 
 .so-resource-main {
     min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .so-resource-head {
@@ -5268,6 +5269,13 @@ html[data-so-appearance="light"] .so-auth-card {
 }
 
 /* -- shift sets ---------------------------------------------------------- */
+
+.so-shift-sets .so-panel-title {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    flex-wrap: wrap;
+}
 
 .so-set-list {
     margin: 0;
@@ -5329,6 +5337,9 @@ html[data-so-appearance="light"] .so-auth-card {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    width: 100%;
+    text-align: left;
+    text-transform: none;
 }
 
 .so-set-option-name {
@@ -5336,6 +5347,13 @@ html[data-so-appearance="light"] .so-auth-card {
     align-items: center;
     gap: var(--so-space-2);
     font-weight: 600;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    flex-wrap: wrap;
+}
+
+.so-set-body .so-resource-name {
+    display: block;
 }
 
 .so-set-option-meta {

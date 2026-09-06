@@ -168,6 +168,37 @@ public sealed class ResourceApiClientTests
 
     private static ResourcePage Page() => new([], 1, 50, 0);
 
+    [Fact]
+    public async Task Query_CallerCancellation_RemainsCancellation()
+    {
+        using CancellationTokenSource cancellation = new();
+        using HttpClient http = new(new InterruptedHandler(cancellation)) { BaseAddress = new Uri("https://localhost/") };
+        ResourceApiClient client = new(http, new FakeApiSessionContext());
+        Func<Task> act = () => client.QueryLinksAsync(new ResourceQuery(), cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task Query_TransportTimeout_RemainsAnOperatorProblem()
+    {
+        using HttpClient http = new(new InterruptedHandler(null)) { BaseAddress = new Uri("https://localhost/") };
+        ResourceApiClient client = new(http, new FakeApiSessionContext());
+        Func<Task> act = () => client.QueryLinksAsync(new ResourceQuery(), CancellationToken.None);
+
+        SecureOpsApiException error = (await act.Should().ThrowAsync<SecureOpsApiException>()).Which;
+        error.Problem.Should().BeEquivalentTo(UiProblemFactory.TimedOut());
+    }
+
+    private sealed class InterruptedHandler(CancellationTokenSource? cancellation) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellation?.Cancel();
+            throw new TaskCanceledException();
+        }
+    }
+
     private static ResourcePreferencesResponse Preferences() => new(0, [], [], null);
 
     private static (ResourceApiClient Client, RecordingHandler Handler) Create(
