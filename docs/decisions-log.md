@@ -113,3 +113,52 @@ projection; no environment-facet route supplies values beyond a returned page. B
 contract decisions. Injected 503/delayed-response browser cases remain pending because automatic
 approval review rejected the task-local API-proxy override. Corporate migrations/grants, resource API
 and UI deployment, actual authentication and managed-browser checks remain TEST gates.
+
+**2026-09-07 resource experience and integrity completion:** This supersedes the two contract
+blockers above, not the historical verification record. Starting SHA was
+`e05977d158bfd533aa71caa0ac60f276bbc9ef37`; verified implementation is
+`8ef13d45912a66abad6cc04242bc6608ef0e9ed4` on `feature/sql-runtime-hardening-20260902`.
+Integrity commit: `10fe8a47c98834390c273cedfe8ed0c6c5a0be2a`. The owner explicitly authorized
+Codex UI/backend work, a new milestone-only size exception and normal push to the existing origin
+branch. Integrity changed 24 files (+910/-28); UX changed 25 files (+1,772/-1,327), with shared files
+between those commits. This final documentation-only handoff is additional. No permanent rule changed.
+
+- P1 confirmed data loss: visibility-filtered personal projections previously replaced hidden saved
+  membership. Omission now always retains saved references, including legacy callers; explicit
+  `removeLinkIds` removes only currently visible members. Ordered merge preserves omitted slots,
+  including archive/restoration. Ownership, versions, limits and transactional audit remain intact;
+  no hidden IDs, names, counts or URLs are disclosed. No migration or SQL object change.
+- P2 confirmed filter defect: environment options came from one result page. A bounded, searchable,
+  authorization-aware environment endpoint now supplies them independently of paging.
+- The three screens now use Uygulama Bağlantıları, Bağlantı Gruplarım and Bağlantı Yönetimi. Personal
+  defaults use a pin, not the favourite star, and never open tabs automatically. The guide has a
+  non-blocking first-use invitation, persistent replay, keyboard/focus handling and server-side
+  dismissal only. Management navigation requires server View and Manage; Lead title is insufficient.
+- Confirmed accessibility defects found during the milestone: Mud 6 autocomplete semantics, numeric
+  stepper button names/keyboard access, muted-label/badge contrast, and closed popovers causing narrow
+  overflow. Scoped fixes passed keyboard checks and 16 resource/dialog axe scans, zero violations.
+  Fresh resolution followed by an explicit native opening gesture remains intact, with individual
+  fallback and no claim of loaded/authenticated destinations or reliable blocked-tab detection.
+
+Final full Release build: zero warnings/errors. Full Release tests: 1,009 unit + 240 integration
+passed, zero skipped, including six actual isolated LocalDB tests and separate migration 001-010
+upgrade evidence. Forty affected UI/client tests and six browser regression cases passed after the
+last accessibility fixes. OpenAPI/API checks preserve 52 operations and 478 existing schema properties
+with additive contracts. Scoped formatting, diff checks and vulnerability scan passed; repository-wide
+formatting was not repeated because of known unrelated debt. No corporate endpoints or operations.
+
+Chrome 152 ordinary/curator/denied journeys covered discovery, guide, groups, retention, opening,
+conflicts and real session revocation/reauthentication at desktop/narrow widths and light/dark themes.
+Automated axe checks are not screen-reader verification. Injected browser failures/delays, timed
+expiration and managed-browser popup variants remain explicit gaps; deterministic handler/state tests
+cover failure/delay paths without repeating the rejected proxy override. Corporate TEST deployment,
+SQL/grants and real authentication remain separate gates. MudBlazor 6.16.0 is retained; official
+9.9.0 migration spans shared theme, dialogs and account menu, so follow-up scope is recorded, not
+partially migrated. No dependency, lockfile or framework changes.
+
+Canonical handoff, permission matrix, before/after evidence paths, replay and next action:
+`src/SecureOps.Ui/README.md`, section "Resource Experience Handoff, 2026-09-07". Contract semantics:
+`docs/adr/ADR-0019-resource-catalogue-and-personal-shift-sets.md` and
+`docs/contracts/secureops-api-v1-ui-integration.md`, resource handoff section. Evidence remains local
+under `artifacts/resource-experience-20260906/`; durable summaries and both browser harnesses are
+committed. No temporary profiles, runtime data or large logs are included; `.vscode/` is preserved.

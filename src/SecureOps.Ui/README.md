@@ -278,19 +278,99 @@ review blocked the task-local API-proxy override), timed idle/absolute expiry, m
 browser popup policies, and screen-reader verification. Cancellation/timeout and stale-response
 guards were checked in tests/code; this is not complete UI or corporate TEST sign-off.
 
-**2026-09-06 experience milestone handoff (in progress):** Baseline
-`e05977d158bfd533aa71caa0ac60f276bbc9ef37`, branch
-`feature/sql-runtime-hardening-20260902`. The owner authorized Codex UI/backend work,
-normal push and a task-scoped size exception; permanent ownership/rules are unchanged.
-The hidden-membership gap is corrected at the existing PUT: omissions retain saved
-references, and `removeLinkIds` explicitly removes visible members. Environment
-options now have a bounded authorization-aware `/resources/environments` endpoint.
-`PUT /resources/me/guide` persists an invitation-dismissed boolean in existing JSON.
-No migration or new grant. Details: ADR-0019 and the resource API contract above.
-Local integrity gates: 45 resource service unit tests, five API/OpenAPI checks and
-six actual isolated LocalDB tests passed; migration 001-010 upgrade passed in the
-new `SecureOps_ResourcesV1_Experience20260906` database. SQL evidence is distinct from
-InMemory/browser evidence. UX, guide integration and final verification are next.
+### Resource Experience Handoff, 2026-09-07
+
+**Verdict:** implemented and locally verified, with the explicit browser/TEST limits below.
+Starting SHA: `e05977d158bfd533aa71caa0ac60f276bbc9ef37`. Verified implementation SHA:
+`8ef13d45912a66abad6cc04242bc6608ef0e9ed4`, including integrity commit
+`10fe8a47c98834390c273cedfe8ed0c6c5a0be2a`. Branch:
+`feature/sql-runtime-hardening-20260902`; upstream is the same branch on `origin`
+(`https://github.com/aknonr/SecureOps.git`). This entry is finalized in a subsequent
+documentation-only commit; use branch HEAD for that handoff commit, not as a different runtime build.
+The owner authorized Codex UI/backend work, normal push and a new task-scoped size exception.
+Permanent ownership/rules are unchanged. No deployment, corporate SQL or framework changes.
+
+**Contracts:** the existing personal PUT now retains every omitted saved reference, including
+legacy callers and visibility changes between read and save. `removeLinkIds` explicitly removes
+currently visible members; rename/default requests do not replace membership. Requested ordering
+uses existing slots and appends surplus additions; archive/restoration preserves omitted slots.
+No hidden identifiers, names, counts or URLs are exposed. Ownership, merged aggregate limits,
+optimistic concurrency and transactional audit remain enforced. Bounded, authorization-aware
+`GET /api/v1/resources/environments` fixes options beyond page one; `PUT /api/v1/resources/me/guide`
+persists invitation dismissal in existing personal JSON. No migration or new grant.
+Exact semantics: `docs/adr/ADR-0019-resource-catalogue-and-personal-shift-sets.md`,
+`docs/contracts/secureops-api-v1-ui-integration.md` (Resource Catalogue and Shift Start Sets:
+Claude Handoff), and `src/SecureOps.Infrastructure/Resources/README.md`.
+
+**Verified permission matrix:** server-capability checks, not an Admin screenshot or job title.
+
+| Synthetic actor | Links and own groups | Management menu, direct route and API | Another user's preferences |
+|---|---|---|---|
+| Ordinary Lead, `Resources.View` only | Allowed | Denied; menu absent | Denied |
+| ResourceCurator, View and Manage | Allowed | Allowed | No personal ownership override |
+| Disabled actor | Session gate denies all three routes; resource API 403 | Denied | Denied |
+| Admin | Own preferences only | Existing capability policy | Cross-owner group resolution returned 404 |
+
+**Local gates:** final full Release solution build passed, zero warnings/errors, using isolated
+build output to avoid unrelated host locks. One full Release test run passed 1,009 unit and 240
+integration tests, zero failed/skipped (1,249 total). This includes six actual SQL persistence tests
+on LocalDB `SecureOpsResourcesV1`, database `SecureOps_ResourcesV1_Experience20260906`; the approved
+001-010 migration upgrade harness also passed there. SQL tests cover hidden membership, restoration,
+ordering, explicit removal, default/guide persistence, ownership, versions, audit rollback and bounded
+authorized environments. No InMemory result is presented as SQL evidence. After the final accessibility
+fixes, 40 affected UI/client tests, the full Release build and the six-case browser regression passed.
+OpenAPI snapshot/API checks passed; semantic comparison preserves all 52 existing operations and 478
+existing schema properties, with additive contracts only. Vulnerability scan found no known vulnerable
+packages. Scoped C# formatting and `git diff --check` passed. Repository-wide format was not rerun:
+the earlier unrelated formatting debt remains; the touched client naming diagnostic is now fixed.
+
+**Interactive Chrome 152:** ordinary, ResourceCurator and denied journeys ran separately against
+the existing loopback Demo hosts and synthetic InMemory data. Actual browser input/circuit interaction
+covered first-use invitation/replay, guide next/back/skip/close/Escape and focus, page-two search,
+favourites and environment selection, first-group creation from the picker, membership/order/default/
+rename/delete, archive/restoration retention, native keyboard-initiated batch opening and individual
+fallback, management creation/edit/archive/restore, validation, real 409 draft retention and cancel,
+capability-gated navigation/direct access, real session revocation and reauthentication. Desktop
+1440x900 and narrow 390x844 layouts passed in light/dark themes, with reduced motion and no horizontal
+overflow. Sixteen resource-surface/dialog axe WCAG A/AA scans reported zero violations. These are
+automated accessibility checks plus keyboard tests, not screen-reader testing. Null popup handles did
+not produce false blocked messages; opening attempts do not prove destination loading/authentication.
+Navigation targets were harmless locally fulfilled pages, never corporate sites.
+
+**Evidence index:** small representative screenshots remain in the established ignored artifact
+workflow; this durable summary and replayable harnesses are committed. Paths are repository-relative.
+
+| View | Before | After |
+|---|---|---|
+| Links | `artifacts/resource-experience-20260906/before-links-desktop.png` | `artifacts/resource-experience-20260906/after-links-light-desktop.png` |
+| Groups | `artifacts/resource-experience-20260906/before-groups-desktop.png` | `artifacts/resource-experience-20260906/demo-groups-desktop.png` |
+| Management | `artifacts/resource-experience-20260906/before-management-desktop.png` | `artifacts/resource-experience-20260906/after-management-light-desktop.png` |
+
+Narrow/dark samples: `demo-groups-mobile.png`, `demo-groups-dark-mobile.png`, `demo-guide-mobile.png`,
+`after-links-dark-mobile.png`, `after-management-form-mobile.png` under the same directory.
+Journey summaries: `browser-ordinary.json`, `browser-manager.json`, `browser-denied.json`.
+Full test TRX: `final-tests/dmtak_DEMET_2026-09-06_22_35_06.trx` and
+`final-tests/dmtak_DEMET_2026-09-06_22_35_06[1].trx` under that directory.
+No browser profiles, credentials, runtime fixtures or diagnostic logs are committed.
+
+**Replay:** `tests/browser/resource-experience.cjs` accepts an existing task-local `playwright-core`
+path, loopback UI URL, loopback API URL, actor mode, evidence directory and optional `axe-core` path.
+Use the existing Demo profiles, API `Access__DemoCompatibilityEnabled=true`, and UI process-local
+`DemoMode__ApiDemoActor=team-lead`. Run ordinary, then manager, then denied LAST (it disables that
+synthetic actor). Use fresh synthetic InMemory state for first-use invitation assertions. The older
+six-case `tests/browser/resource-ui.cjs` uses the default `platform-admin` UI actor. Both refuse
+non-loopback hosts. Driver/axe installations stay outside project dependencies. No API proxy override
+was retried. Failure/delayed-response coverage uses deterministic `ResourceExperienceTests`,
+`ResourceApiClientTests` and existing error-routing tests, not injected browser traffic.
+
+**Remaining gates / next action:** obtain separate corporate TEST approval for migrations 009-010
+on the required 001-010 baseline, reviewed grants, API/UI deployment and actual AD/Windows/session/
+IIS/F5 behavior. Managed-browser popup policy variants, real screen-reader use and timed idle/absolute
+expiration remain untested locally. Injected 503/transport-loss/delayed-response browser scenarios
+remain pending after the earlier proxy rejection; deterministic handler/state tests cover these paths.
+MudBlazor stays at 6.16.0; the boundedness assessment and exact application-wide migration follow-up
+are above. Local success is not TEST sign-off. Resume from this entry and `docs/decisions-log.md`,
+not the historical blocker list above; the hidden-membership and environment contract blockers are resolved.
 
 ### Backend baseline required
 
