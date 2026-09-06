@@ -1,10 +1,10 @@
----
-description: Backend rules for .NET 8, ASP.NET Core API, Hangfire, EF Core.
-globs: src/SecureOps.Api/**/*.cs, src/SecureOps.Infrastructure/**/*.cs, src/SecureOps.Domain/**/*.cs, src/SecureOps.Shared/**/*.cs
-alwaysApply: false
----
-
 # 020 — Backend .NET Rules
+
+## Applicability
+
+- **Purpose:** Backend rules for .NET 8, ASP.NET Core API, Hangfire, and EF Core.
+- **Applies to:** `src/SecureOps.Api/**/*.cs`, `src/SecureOps.Infrastructure/**/*.cs`, `src/SecureOps.Domain/**/*.cs`, and `src/SecureOps.Shared/**/*.cs`.
+- **Loading:** Routed explicitly from `AGENTS.md` or `docs/agent-guides/README.md`; do not assume automatic discovery.
 
 ## Language and Framework
 

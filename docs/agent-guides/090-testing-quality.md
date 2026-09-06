@@ -1,10 +1,10 @@
----
-description: Testing, build, and quality rules. Read every time code changes.
-globs: src/**/*.cs, tests/**/*.cs
-alwaysApply: true
----
-
 # 090 — Testing and Quality Rules (Always Apply)
+
+## Applicability
+
+- **Purpose:** Testing, build, and quality rules. Read every time code changes.
+- **Applies to:** Every task; its code and test requirements apply when `src/**/*.cs` or `tests/**/*.cs` is changed.
+- **Loading:** Routed explicitly from `AGENTS.md`; do not assume automatic discovery.
 
 ## Test Frameworks
 

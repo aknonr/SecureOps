@@ -5,7 +5,7 @@
     Pure C# domain model. NO external dependencies allowed.
     No EF Core, no ASP.NET, no HTTP, no SQL, no PowerShell.
 
-    See: docs/03-architecture.md, .cursor/rules/010-architecture-rules.mdc
+    See: docs/03-architecture.md, docs/agent-guides/010-architecture.md
   -->
 
   <PropertyGroup>

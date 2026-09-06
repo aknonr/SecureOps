@@ -144,6 +144,6 @@ Rejected for MVP because:
 ## References
 
 - `docs/03-architecture.md`
-- `.cursor/rules/010-architecture-rules.mdc`
-- `.cursor/rules/020-backend-dotnet-rules.mdc`
+- `docs/agent-guides/010-architecture.md`
+- `docs/agent-guides/020-backend-dotnet.md`
 - `ADR-0007-iis-hosting-model.md`

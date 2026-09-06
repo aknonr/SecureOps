@@ -1,10 +1,10 @@
----
-description: Authoritative project context, decisions, and non-negotiable rules. Read first.
-globs:
-alwaysApply: true
----
-
 # 000 — Project Context (Always Apply)
+
+## Applicability
+
+- **Purpose:** Authoritative project context, decisions, and non-negotiable rules. Read first.
+- **Applies to:** Every task.
+- **Loading:** Routed explicitly from `AGENTS.md`; do not assume automatic discovery.
 
 You are working on **Secure Ops Automation & AI Analysis Hub**, an enterprise Windows operations platform owned by CONTOSO Turkish Technology (placeholder).
 

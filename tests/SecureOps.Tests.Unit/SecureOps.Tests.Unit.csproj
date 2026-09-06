@@ -5,7 +5,7 @@
     xUnit unit tests. Domain logic, application services with mocked infrastructure.
     No SQL, no PowerShell, no real external systems.
 
-    See: .cursor/rules/090-testing-and-quality-rules.mdc
+    See: docs/agent-guides/090-testing-quality.md
   -->
 
   <PropertyGroup>

@@ -304,4 +304,4 @@ The backend replacement for the legacy operator-driven workflow is documented in
 
 - `contracts/schemas/` — JSON schemas for all payloads
 - `contracts/examples/` — sample payloads
-- `.cursor/rules/030-worker-service-rules.mdc` — Worker-side patterns
+- `docs/agent-guides/030-worker-service.md` — Worker-side patterns

@@ -52,7 +52,7 @@ dotnet test SecureOps.sln --collect:"XPlat Code Coverage"
 
 ## Rules
 
-See `.cursor/rules/090-testing-and-quality-rules.mdc`:
+See `docs/agent-guides/090-testing-quality.md`:
 - No `Thread.Sleep` waits.
 - No real external services in unit tests.
 - No hard-coded user paths.

@@ -1,10 +1,10 @@
----
-description: Architecture rules — module boundaries, dependency direction, layering.
-globs: src/**/*.cs, tests/**/*.cs
-alwaysApply: false
----
-
 # 010 — Architecture Rules
+
+## Applicability
+
+- **Purpose:** Module boundaries, dependency direction, and layering.
+- **Applies to:** `src/**/*.cs` and `tests/**/*.cs`, plus architecture or project-boundary changes.
+- **Loading:** Routed explicitly from `AGENTS.md` or `docs/agent-guides/README.md`; do not assume automatic discovery.
 
 ## Solution Layout
 

@@ -1,6 +1,6 @@
 # 10 — AI / RAG Strategy (Phase 7)
 
-This document defines the Phase 7 AI/RAG plan. **AI work does not start until all Phase 7 pre-conditions are met.** See `.cursor/rules/080-ai-rag-future-phase-rules.mdc` for the agent-enforcement version.
+This document defines the Phase 7 AI/RAG plan. **AI work does not start until all Phase 7 pre-conditions are met.** See `docs/agent-guides/080-ai-rag-future-phase.md` for the agent-enforcement version.
 
 ## Why AI Is Phase 7, Not Earlier
 
@@ -278,7 +278,7 @@ Possible Phase 7+ extensions (each its own ADR):
 
 ## Reference
 
-- `.cursor/rules/080-ai-rag-future-phase-rules.mdc`
+- `docs/agent-guides/080-ai-rag-future-phase.md`
 - `docs/05-security-model.md` (masking)
 - `docs/08-audit-model.md` (AI audit table)
 - `docs/adr/ADR-0005-ai-rag-later-phase.md`

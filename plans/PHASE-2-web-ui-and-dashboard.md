@@ -74,7 +74,7 @@
 
 ## UI Constraints (Reaffirm)
 
-From `.cursor/rules/060-ui-rules.mdc` and `docs/05-security-model.md`:
+From `docs/agent-guides/060-ui.md` and `docs/05-security-model.md`:
 
 - No leaderboards.
 - No "fastest responder" widgets.

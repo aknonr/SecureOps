@@ -30,7 +30,7 @@ scripts/
 
 ## Rules
 
-See `.cursor/rules/040-automation-ansible-powershell-rules.mdc` for the full ruleset. Highlights:
+See `docs/agent-guides/040-automation-ansible-powershell.md` for the full ruleset. Highlights:
 
 - Read-only cmdlets only (MVP).
 - Full cmdlet names; no aliases.

@@ -5,7 +5,7 @@
     .NET Worker Service registered as a Windows Service.
     Hosts the Hangfire job server, executes diagnostic modules via JEA.
 
-    See: docs/03-architecture.md, .cursor/rules/030-worker-service-rules.mdc
+    See: docs/03-architecture.md, docs/agent-guides/030-worker-service.md
   -->
 
   <PropertyGroup>

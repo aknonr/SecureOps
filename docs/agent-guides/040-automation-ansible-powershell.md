@@ -1,10 +1,10 @@
----
-description: PowerShell, JEA, and Ansible rules. MVP is PowerShell-only; Ansible is Phase 6+.
-globs: scripts/**/*.ps1, scripts/**/*.psd1, scripts/**/*.psm1, scripts/**/*.yml, scripts/**/*.yaml
-alwaysApply: false
----
-
 # 040 — Automation Rules: PowerShell & Ansible
+
+## Applicability
+
+- **Purpose:** PowerShell, JEA, and Ansible rules. MVP is PowerShell-only; Ansible is Phase 6+.
+- **Applies to:** `scripts/**/*.ps1`, `scripts/**/*.psd1`, `scripts/**/*.psm1`, `scripts/**/*.yml`, and `scripts/**/*.yaml`.
+- **Loading:** Routed explicitly from `AGENTS.md` or `docs/agent-guides/README.md`; do not assume automatic discovery.
 
 ## MVP Position
 

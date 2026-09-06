@@ -1,10 +1,10 @@
----
-description: Rule-based analysis layer (Phase 6) — before AI. SQL/Python first.
-globs: src/SecureOps.Infrastructure/Analysis/**/*.cs, sql/analysis/**/*.sql, scripts/python/**/*.py
-alwaysApply: false
----
-
 # 070 — Analysis Rules (Phase 6 — Before AI)
+
+## Applicability
+
+- **Purpose:** Rule-based analysis layer for Phase 6, before AI. SQL/Python first.
+- **Applies to:** `src/SecureOps.Infrastructure/Analysis/**/*.cs`, `sql/analysis/**/*.sql`, and `scripts/python/**/*.py`.
+- **Loading:** Routed explicitly from `AGENTS.md` or `docs/agent-guides/README.md`; do not assume automatic discovery.
 
 ## Position in the Roadmap
 

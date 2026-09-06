@@ -7,7 +7,7 @@
     Depends on: Domain, Shared.
     Does NOT contain: ASP.NET pipeline, Blazor components.
 
-    See: docs/03-architecture.md, .cursor/rules/010-architecture-rules.mdc
+    See: docs/03-architecture.md, docs/agent-guides/010-architecture.md
   -->
 
   <PropertyGroup>

@@ -104,7 +104,7 @@ When Phase 7 starts, separate ADRs will record:
 
 ## Implementation Notes
 
-- `.cursor/rules/080-ai-rag-future-phase-rules.mdc` enforces the boundaries for agent-assisted development.
+- `docs/agent-guides/080-ai-rag-future-phase.md` enforces the boundaries for agent-assisted development.
 - `docs/10-ai-rag-strategy.md` is the full strategy document.
 - `docs/05-security-model.md` defines the masking requirements.
 
@@ -112,4 +112,4 @@ When Phase 7 starts, separate ADRs will record:
 
 - `docs/10-ai-rag-strategy.md`
 - `docs/05-security-model.md`
-- `.cursor/rules/080-ai-rag-future-phase-rules.mdc`
+- `docs/agent-guides/080-ai-rag-future-phase.md`

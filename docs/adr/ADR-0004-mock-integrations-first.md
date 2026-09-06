@@ -96,4 +96,4 @@ Rejected:
 ## References
 
 - `docs/06-integrations.md`
-- `.cursor/rules/030-worker-service-rules.mdc`
+- `docs/agent-guides/030-worker-service.md`

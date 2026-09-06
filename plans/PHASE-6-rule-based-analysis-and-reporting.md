@@ -66,7 +66,7 @@ The backend-authoritative management reporting read model in ADR-0011 is an earl
 
 **Total Phase 6 estimate:** ~85 hours, ~5 weeks at 18h/week.
 
-## Constraints (Reaffirm from `.cursor/rules/070-analysis-rules.mdc`)
+## Constraints (Reaffirm from `docs/agent-guides/070-analysis.md`)
 
 - All outputs deterministic.
 - No machine learning.

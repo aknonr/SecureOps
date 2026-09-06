@@ -256,7 +256,7 @@ theme class.
 
 ## Forbidden in this project
 
-See `.cursor/rules/060-ui-rules.mdc`. Highlights:
+See `docs/agent-guides/060-ui.md`. Highlights:
 
 - No `localStorage` / `sessionStorage` — state is server-side.
 - No direct DbContext injection in `.razor`; the UI calls the API.

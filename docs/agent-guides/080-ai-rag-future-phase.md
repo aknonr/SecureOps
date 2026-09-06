@@ -1,10 +1,10 @@
----
-description: AI/RAG rules — Phase 7 only, self-hosted only. Read before any AI work.
-globs: src/SecureOps.Infrastructure/Ai/**/*.cs, scripts/python/ai/**/*.py
-alwaysApply: false
----
-
 # 080 — AI / RAG Rules (Phase 7 — Future Phase)
+
+## Applicability
+
+- **Purpose:** AI/RAG rules for Phase 7 only. Self-hosted only; read before any AI work.
+- **Applies to:** `src/SecureOps.Infrastructure/Ai/**/*.cs` and `scripts/python/ai/**/*.py`, plus any AI design or proposal.
+- **Loading:** Routed explicitly from `AGENTS.md` or `docs/agent-guides/README.md`; do not assume automatic discovery.
 
 ## Hard Pre-Conditions
 

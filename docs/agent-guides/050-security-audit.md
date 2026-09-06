@@ -1,10 +1,10 @@
----
-description: Security and audit rules — non-negotiable. Read every time.
-globs:
-alwaysApply: true
----
-
 # 050 — Security and Audit Rules (Always Apply)
+
+## Applicability
+
+- **Purpose:** Non-negotiable security and audit rules. Read every time.
+- **Applies to:** Every task.
+- **Loading:** Routed explicitly from `AGENTS.md`; do not assume automatic discovery.
 
 ## Hard Boundaries
 

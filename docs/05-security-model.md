@@ -244,7 +244,7 @@ To add a cmdlet:
 2. Get Bilgi Güvenliği approval (recorded in the ADR).
 3. Update `SecureOpsDiagnosticRole.psrc`.
 4. Update this whitelist section.
-5. Update `.cursor/rules/050-security-audit-rules.mdc`.
+5. Update `docs/agent-guides/050-security-audit.md`.
 6. Redeploy the JEA endpoint to all target servers.
 
 ## Service Account
@@ -385,6 +385,6 @@ If a security issue is detected:
 
 ## References
 
-- `.cursor/rules/050-security-audit-rules.mdc` — agent enforcement rules
+- `docs/agent-guides/050-security-audit.md` — agent enforcement rules
 - `docs/08-audit-model.md` — audit specification
 - `docs/10-ai-rag-strategy.md` — AI-specific security (Phase 7)

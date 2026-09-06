@@ -1,10 +1,10 @@
----
-description: Worker Service rules — Hangfire jobs, PowerShell invocation, resilience.
-globs: src/SecureOps.Worker/**/*.cs
-alwaysApply: false
----
-
 # 030 — Worker Service Rules
+
+## Applicability
+
+- **Purpose:** Worker Service rules for Hangfire jobs, PowerShell invocation, and resilience.
+- **Applies to:** `src/SecureOps.Worker/**/*.cs`.
+- **Loading:** Routed explicitly from `AGENTS.md` or `docs/agent-guides/README.md`; do not assume automatic discovery.
 
 ## Hosting Model
 

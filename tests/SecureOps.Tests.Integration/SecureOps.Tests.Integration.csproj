@@ -5,7 +5,7 @@
     xUnit integration tests. Current tests use the in-process Web API host
     (Microsoft.AspNetCore.Mvc.Testing) and deterministic backend fakes only.
 
-    See: .cursor/rules/090-testing-and-quality-rules.mdc
+    See: docs/agent-guides/090-testing-quality.md
   -->
 
   <PropertyGroup>

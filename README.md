@@ -58,7 +58,7 @@ This repo contains documentation, agent rules, a .NET solution, working Phase 1A
 | `docs/` | Project memory. Architecture, security, integrations, diagnostics, AI strategy, ADRs. |
 | `plans/` | Phase-by-phase implementation plans with task breakdown. |
 | `contracts/` | JSON schemas and example payloads for cross-component contracts. |
-| `.cursor/rules/` | Cursor agent rules. Also useful as reference for any agent. |
+| `docs/agent-guides/` | Portable detailed agent guidance, routed from `AGENTS.md` and `CLAUDE.md`. |
 | `src/` | .NET solution: Api, Worker, Ui, Domain, Infrastructure, Shared. Phase 1A code currently lives mainly in Api, Infrastructure, and Shared. |
 | `tests/` | Unit and integration test projects. Current tests cover Phase 1A identity lookup, audit hardening, authorization, validation, correlation, and rate-limit metadata. |
 | `scripts/powershell/` | Empty diagnostic and JEA script folders reserved for Phase 1. |

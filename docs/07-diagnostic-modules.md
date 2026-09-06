@@ -253,5 +253,5 @@ Steps:
 ## Reference
 
 - `contracts/schemas/diagnostic-result.schema.json`
-- `.cursor/rules/030-worker-service-rules.mdc`
-- `.cursor/rules/040-automation-ansible-powershell-rules.mdc`
+- `docs/agent-guides/030-worker-service.md`
+- `docs/agent-guides/040-automation-ansible-powershell.md`

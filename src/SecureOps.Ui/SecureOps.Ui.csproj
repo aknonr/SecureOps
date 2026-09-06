@@ -5,7 +5,7 @@
     Blazor Server + MudBlazor. Hosted on IIS in-process.
     Phase 2 deliverable; minimal status page in Phase 1.
 
-    See: docs/03-architecture.md, .cursor/rules/060-ui-rules.mdc
+    See: docs/03-architecture.md, docs/agent-guides/060-ui.md
   -->
 
   <PropertyGroup>

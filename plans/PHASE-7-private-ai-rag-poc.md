@@ -93,7 +93,7 @@ Out of scope: agentic loops, tool use, autonomous diagnostics, decision making.
 
 **Total Phase 7 estimate:** ~170 hours, ~10 weeks at 18h/week. (Plus procurement lead time.)
 
-## Hard Boundaries (From `.cursor/rules/080-ai-rag-future-phase-rules.mdc`)
+## Hard Boundaries (From `docs/agent-guides/080-ai-rag-future-phase.md`)
 
 - Self-hosted only. No OpenAI, Anthropic, Google, Cohere endpoints.
 - Data masking before any LLM call.

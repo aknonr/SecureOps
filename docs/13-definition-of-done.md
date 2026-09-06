@@ -23,7 +23,7 @@ A code change (PR, commit set, or single edit) is "done" when **all** are true:
 - [ ] No swallowed exceptions (catch must log and decide).
 - [ ] No hardcoded secrets, paths, or magic numbers without explanation.
 - [ ] Public APIs have XML doc comments.
-- [ ] Naming follows `.cursor/rules/020-backend-dotnet-rules.mdc`.
+- [ ] Naming follows `docs/agent-guides/020-backend-dotnet.md`.
 
 ### Security
 
@@ -43,7 +43,7 @@ A code change (PR, commit set, or single edit) is "done" when **all** are true:
 
 - [ ] Behavior changes are reflected in the relevant `docs/*.md`.
 - [ ] Architecturally significant decisions are recorded in `docs/adr/`.
-- [ ] If a `.cursor/rules/*.mdc` rule changes, this is intentional and reviewed.
+- [ ] If a `docs/agent-guides/*.md` guide changes, this is intentional and reviewed.
 - [ ] README updated if user-facing surface changed.
 
 ### Scope
