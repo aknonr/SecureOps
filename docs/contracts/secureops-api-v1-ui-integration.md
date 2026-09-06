@@ -71,6 +71,19 @@ Group and member DTOs now return nullable `lookupKey`. When present it is the se
 
 ## Operational Records
 
+Additive SDM response fields (ADR-0018): `recommendedClassification` is a nullable
+frozen numeric classification; `ruleSetVersion` and `evaluatedAt` are nullable
+string/UTC timestamp. Null means unevaluated. `reasonCodes` and
+`blockingConditions` are non-null ordinal-sorted unique string arrays (empty
+when unevaluated). `sdmCandidateRecommended` and `externalWriteEligible` are
+non-null booleans, always false in v1. `evaluationStale` defaults true when
+unevaluated; `sourceChanged` defaults false and latches true on observed change.
+`CategorySupported` denotes a recognized enum, not an approved SDM policy;
+`CategoryPolicyPending` remains a blocker. No approval fields or endpoint exist.
+Render recommendation separately from durable workflow state, preserve reason
+order, and localize stable codes without parsing source text. Action Center may
+display this evidence but cannot infer approval or enable corporate publication.
+
 `GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `Simulation` and legacy `Fake` are Development/Demo/Test-only, `Disabled` fails closed, and `TuruncuHat` is a typed real adapter whose external TEST activation remains contract-gated. `createdAt` is nullable because the reviewed legacy projection does not supply a source timestamp.
 
 `GET /api/v1/health/enterprise-integrations` is Admin-only and exposes only provider selection and safe status; it never exposes URLs, credentials, sessions, identities, or remote payloads.

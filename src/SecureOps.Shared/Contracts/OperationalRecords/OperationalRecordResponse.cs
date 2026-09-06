@@ -36,7 +36,27 @@ public sealed record OperationalRecordResponse(
     bool SimulationMode = false,
     string? SimulationNotice = null,
     bool ReadOnlyIntegrationMode = false,
-    string? ReadOnlyNotice = null);
+    string? ReadOnlyNotice = null)
+{
+    /// <summary>Nullable recommendation; null means no durable SDM evaluation.</summary>
+    public OperationalRecordClassification? RecommendedClassification { get; init; }
+    /// <summary>Always false until a positive category policy is approved.</summary>
+    public bool SdmCandidateRecommended { get; init; }
+    /// <summary>Nullable immutable evaluation policy identifier.</summary>
+    public string? RuleSetVersion { get; init; }
+    /// <summary>Unique stable reason identifiers in ordinal order; never localized.</summary>
+    public IReadOnlyList<string> ReasonCodes { get; init; } = [];
+    /// <summary>Nullable UTC evidence recording time, outside the pure decision.</summary>
+    public DateTimeOffset? EvaluatedAt { get; init; }
+    /// <summary>True for absent or invalidated evaluation evidence.</summary>
+    public bool EvaluationStale { get; init; } = true;
+    /// <summary>Whether an observed source change invalidated evaluation.</summary>
+    public bool SourceChanged { get; init; }
+    /// <summary>Unique publication blockers in ordinal order.</summary>
+    public IReadOnlyList<string> BlockingConditions { get; init; } = [];
+    /// <summary>Evaluation never grants permission to perform an external write.</summary>
+    public bool ExternalWriteEligible { get; init; }
+}
 
 /// <summary>Stable UI presentation categories derived from durable workflow states.</summary>
 public static class OperationalRecordPresentationStates

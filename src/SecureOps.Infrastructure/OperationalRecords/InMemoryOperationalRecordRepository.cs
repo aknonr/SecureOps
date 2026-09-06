@@ -5,6 +5,27 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Concurrency-safe local repository used only when durable SQL persistence is not selected.</summary>
 public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepository
 {
+    /// <inheritdoc />
+    public async Task<OperationalRecord> EvaluateAsync(Guid id, SdmEvaluationInput input, OperationalRecordCommandContext context,
+        SecureOps.Infrastructure.Audit.IAuditWriter auditWriter, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            OperationalRecord current = Required(id);
+            OperationalRecord evaluated = SdmEvaluationEvidence.Apply(current, input, _timeProvider.GetUtcNow());
+            if (ReferenceEquals(current, evaluated))
+            {
+                return current;
+            }
+
+            await auditWriter.WriteAsync(SdmEvaluationEvidence.Audit(evaluated, context), cancellationToken);
+            _records[id] = evaluated;
+            return evaluated;
+        }
+        finally { _gate.Release(); }
+    }
+
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<Guid, OperationalRecord> _records = [];
     private readonly Dictionary<string, Guid> _sourceIds = new(StringComparer.OrdinalIgnoreCase);

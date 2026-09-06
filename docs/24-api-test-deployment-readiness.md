@@ -16,6 +16,7 @@ Run the SQLCMD-mode entrypoints in exact order through the approved DBA process:
 | 6 | `sql/migrations/006-operational-record-source-created-at-nullable.sql` | preserves unavailable source-created time as nullable | Yes when the prerequisite Operational Record table exists. |
 | 7 | `sql/migrations/007-application-session-governance.sql` | authoritative application-session table, indexes, and limited reporting view | Yes for object presence/replacement; prerequisite access and reporting schemas must exist. |
 | 8 | `sql/migrations/008-oidc-user-profile.sql` | nullable bounded OIDC login name, display name, mail, uid, and profile-update timestamp on `security.Users` | Yes for column presence; prerequisite `security.Users` must exist. |
+| 9 | `sql/migrations/009-sdm-evaluation-foundation.sql` | nullable bounded SDM evidence on operational records/history and validation constraints | Guarded column/constraint creation; requires 001-008. DBA execution before SDM binary upgrade. |
 
 The `:r` directives require SQLCMD mode and resolve files under `sql/schema`. Migrations 003-008 require successful prerequisites. None assumes empty tables, but 001 and 002 require the target object names to be absent. Existing rows are supported by defaults in 003 and 004; migration 008 adds nullable columns and does not invent profile values for existing users. Migrations 005 and 007 can add indexes and must be scheduled and reviewed by the DBA.
 
@@ -166,4 +167,9 @@ Local release metadata under `C:\SecureOpsBuild\release\<release-name>` was insp
 
 ### Next Development Milestone
 
-Next development milestone: **Deterministic SDM-candidate classification rules and Action Center design.** This milestone is not implemented or activated by the read-only smoke verification. External writes remain disabled.
+The deterministic SDM evaluation foundation is implemented in source under
+ADR-0018, separately from the deployed smoke evidence above. Migration 009 has
+not been applied by this task. Next: Action Center integration with the additive
+contract, followed by approved structured source/category policy and a separate
+human-approval milestone. External writes remain disabled; no new deployment or
+release package is implied.

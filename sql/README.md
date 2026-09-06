@@ -21,6 +21,7 @@ sql/
 | 005 | Management reporting views and supporting indexes |
 | 006 | Preserve unknown Operational Record source creation timestamps as NULL |
 | 007 | Authoritative application sessions, lifecycle indexes, and limited reporting view |
+| 009 | Bounded nullable SDM evaluation evidence on OperationalRecords and append-only workflow history; requires 001-008 |
 
 The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded; 004-007 guard or replace their objects. No down scripts or migration-history table exists. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
 
@@ -48,6 +49,13 @@ The Operational Record/Jira workflow uses `schema/002-operational-record-jira-wo
 Application-session governance uses `schema/007-application-session-governance.sql`. Runtime requires `SELECT`, `INSERT`, and `UPDATE` on `security.ApplicationSessions` and `SELECT` on `reporting.ManagementSessionStatus`. It requires no `DELETE`, DDL, schema ownership, or migration permission.
 
 ## Test Harness
+
+Migration 009 adds `SdmEvaluationJson nvarchar(4000) NULL` to the record and
+history. SQL JSON/shape checks enforce safe evaluation defaults; existing rows
+remain unevaluated. The repository commits evaluation plus history/audit in one
+serializable transaction. Existing object-level grants suffice, including INSERT
+on `audit.AuditLog`; no approval actor/time/reason columns or new permissions are
+introduced. Apply through the DBA process before upgrading SQL-backed binaries.
 
 SQL integration tests must use an explicitly supplied `SECUREOPS_SQL_TEST_CONNECTION` environment variable and must reject empty values. No source-controlled connection string is permitted. Offline schema contract tests do not connect to SQL Server.
 

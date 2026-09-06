@@ -20,4 +20,6 @@ Pure C# domain model. **No external dependencies.**
 
 ## Phase
 
-Populated incrementally during Phase 1. The Operational Record/Jira aggregate is documented in `docs/22-operational-record-jira-workflow.md`; approved classification rules and real external adapters remain deferred.
+The Operational Record/Jira aggregate and pure SDM v1 evaluator are documented
+in `docs/22-operational-record-jira-workflow.md` and ADR-0018. Positive SDM policy
+remains deferred; evaluation receives identity-free facts and has no I/O or clock.

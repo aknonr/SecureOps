@@ -5506,6 +5506,53 @@
           "readOnlyNotice": {
             "type": "string",
             "nullable": true
+          },
+          "recommendedClassification": {
+            "enum": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              null
+            ],
+            "type": "integer",
+            "nullable": true
+          },
+          "sdmCandidateRecommended": {
+            "type": "boolean"
+          },
+          "ruleSetVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "evaluationStale": {
+            "type": "boolean"
+          },
+          "sourceChanged": {
+            "type": "boolean"
+          },
+          "blockingConditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "externalWriteEligible": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

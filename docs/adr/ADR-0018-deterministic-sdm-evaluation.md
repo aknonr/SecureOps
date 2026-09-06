@@ -1,0 +1,39 @@
+# ADR-0018: Deterministic SDM Evaluation Foundation
+
+**Status:** Accepted for the explicitly authorized backend foundation
+**Date:** 2026-09-06
+
+## Decision
+
+`WASAS-SDM-2026.09-v1` separates recommendation, human approval, Jira publication readiness, and external-write eligibility. This bounded Operational Record milestone does not activate the Phase 6 analysis engine.
+
+V1 has no positive category policy. Current seven-cell corporate records remain `NeedsManualReview`, `JiraEligible=false`, and `SdmCandidateRecommended=false`. Existing enums and workflow states stay frozen. `CategorySupported` means a recognized category enum, not approved SDM policy; `CategoryPolicyPending` always blocks publication.
+
+The pure Domain evaluator accepts validation/attestation facts, never source prose, requester identities, localized labels, relation IDs, availability, credentials, or a clock. Missing group/DCC/category attestation stays unknown. Infrastructure references are supporting evidence only. Requester/reporter and approval readiness are separate blockers; evaluation never resolves identities or calls source/Jira clients. Runtime approval remains absent.
+
+Migration 009 adds bounded nullable evaluation evidence to the current record and append-only workflow history. Existing rows mean unevaluated. SQL serializes evaluation with workflow transitions and commits evidence, history, and audit together. Unchanged canonical input preserves the timestamp and emits no evaluation history/audit. InMemory is a local substitute only. Progressed, transferred, and reconciliation workflow states are preserved.
+
+## Canonicalization Contract
+
+The input hash is lowercase framework SHA-256 with no new package. Canonical input is a compact UTF-8 JSON array, in this fixed position order:
+
+1. Ruleset, source fingerprint, synthetic, contradictory, provider supported.
+2. Active, group attestation, DCC attestation, ID/code/title/description validity.
+3. Category, server/IP presence, requester presence/resolved/ambiguous, reporter resolved.
+4. Approval granted, writes disabled, already transferred, reconciliation, source changed, evaluation stale.
+
+Booleans are JSON booleans; unknown attestation is null; category is its frozen integer or null. No culture, time, random value, actor, correlation ID, collection ordering, or raw source text enters the evaluation input. Fingerprints accept exactly 64 lowercase hex characters. Invalid fingerprints become null plus contradictory evidence in the hash; arbitrary text cannot enter it.
+
+The source fingerprint is lowercase SHA-256 of the UTF-8 existing source concurrency token. Explicit tokens use the existing `source:` prefix and trimmed token. Otherwise the source freshness boundary hashes compact UTF-8 JSON in fixed order: `source-state-v2`, source ID, OR code, title, description, requester, UTC created time, environment, server, application, open boolean, UTC modified time. That token retains the `sha256:` prefix. Null stays null; strings use framework JSON escaping; timestamps use framework UTC DateTimeOffset serialization. This replaces ambiguous newline joins. Only digests leave that boundary, never a duplicate canonical input or raw payload. Old fallback tokens require refresh after binary upgrade and fail closed on mismatch.
+
+Reason codes and blocker subsets are unique and ordinal-sorted, independent of traversal order. Source ID validation requires positive Int64 with ASCII digits and invariant parsing. OR code is `OR-` plus ASCII digits, bounded to 64 characters. Title/description must be nonblank and bounded to 500/8000 characters. Unexpected control characters invalidate text; CR/LF/tab remain permitted.
+
+Observed fingerprint changes latch `sourceChanged` and `evaluationStale` until a future explicitly designed reevaluation/approval milestone. Refresh cannot clear the latch or authorize Jira. New semantics require a new reviewed ruleset identifier.
+
+If refresh outruns evaluation persistence, API reads overlay stale/source-changed flags and ordered blockers on the prior evidence. Its original input hash/time remain unchanged; the read does not fabricate a new evaluation or audit event.
+
+## Consequences and Deferred Work
+
+DBA review/execution of migration 009 is required before SQL-backed binary upgrade. Its nullable fields are additive and old binaries can ignore them. Existing migrations, append-only triggers, grants, runtime settings, and deployed TEST state remain unchanged. SQL tests are offline contracts; they do not prove live constraint or transaction behavior.
+
+Native ETag/conditional updates, positive category policy, structured attestations, human approval endpoint/persistence, and external-write activation remain pending. Action Center consumes additive evidence and cannot infer approval from reason text. Synthetic provider harnesses remain separate from corporate evaluation and cannot supply corporate eligibility evidence.

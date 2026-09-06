@@ -14,6 +14,34 @@ namespace SecureOps.Tests.Integration.Api;
 
 public sealed class OperationalRecordsControllerTests
 {
+    [Fact]
+    public async Task GetAsync_SdmEvaluation_ExposesAdditiveNumericContractAndSafeDefaults()
+    {
+        OperationalRecord record = Record();
+        OperationalRecordResponse absent = await GetResponseAsync(CreateController(record), record.Id);
+        absent.RecommendedClassification.Should().BeNull();
+        absent.RuleSetVersion.Should().BeNull();
+        absent.EvaluatedAt.Should().BeNull();
+        absent.EvaluationStale.Should().BeTrue();
+        absent.ExternalWriteEligible.Should().BeFalse();
+        record = SdmEvaluationEvidence.Apply(record, new SdmEvaluationInput(new string('a', 64),
+            ProviderSupported: true, Active: true, ValidId: true, ValidCode: true, ValidTitle: true, ValidDescription: true), Now);
+        OperationalRecordResponse response = await GetResponseAsync(CreateController(record, true), record.Id);
+        response.RuleSetVersion.Should().Be(SdmEvaluator.RuleSetVersion);
+        response.ReasonCodes.Should().Equal(record.SdmEvaluation!.Result.ReasonCodes);
+        response.BlockingConditions.Should().Equal(record.SdmEvaluation.Result.BlockingConditions);
+        response.EvaluatedAt.Should().Be(Now);
+        response.ReadOnlyIntegrationMode.Should().BeTrue();
+        response.SdmCandidateRecommended.Should().BeFalse();
+        response.JiraEligible.Should().BeFalse();
+        System.Text.Json.JsonSerializerOptions options = new(System.Text.Json.JsonSerializerDefaults.Web);
+        string json = System.Text.Json.JsonSerializer.Serialize(response, options);
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        document.RootElement.GetProperty("recommendedClassification").GetInt32().Should().Be(6);
+        document.RootElement.GetProperty("externalWriteEligible").GetBoolean().Should().BeFalse();
+        System.Text.Json.JsonSerializer.Deserialize<OperationalRecordResponse>(json, options).Should().BeEquivalentTo(response);
+    }
+
     private static readonly DateTimeOffset Now = new(2026, 8, 21, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]

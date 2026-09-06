@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using System.Text;
+using System.Text.Json;
 
 namespace SecureOps.Infrastructure.OperationalRecords;
 
@@ -14,18 +14,21 @@ public static class OperationalRecordSourceConcurrency
             return $"source:{item.VersionToken.Trim()}";
         }
 
-        string canonical = string.Join('\n',
+        byte[] canonical = JsonSerializer.SerializeToUtf8Bytes(new object?[]
+        {
+            "source-state-v2",
             item.SourceRecordId,
             item.OrCode,
             item.Title,
             item.Description,
-            item.Requester ?? string.Empty,
-            item.CreatedAt?.ToUniversalTime().ToString("O") ?? string.Empty,
-            item.Environment ?? string.Empty,
-            item.ServerReference ?? string.Empty,
-            item.ApplicationReference ?? string.Empty,
-            item.IsOpen ? "open" : "closed",
-            item.LastModifiedAt?.ToUniversalTime().ToString("O") ?? string.Empty);
-        return $"sha256:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant()}";
+            item.Requester,
+            item.CreatedAt?.ToUniversalTime(),
+            item.Environment,
+            item.ServerReference,
+            item.ApplicationReference,
+            item.IsOpen,
+            item.LastModifiedAt?.ToUniversalTime()
+        });
+        return $"sha256:{Convert.ToHexString(SHA256.HashData(canonical)).ToLowerInvariant()}";
     }
 }

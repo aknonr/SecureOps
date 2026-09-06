@@ -66,6 +66,22 @@ public sealed class OperationalRecordService : IOperationalRecordService
             .Select(group => group.First()))
         {
             OperationalRecord imported = await _repository.UpsertImportedAsync(sourceItem, context.CorrelationId, cancellationToken);
+            if (corporateSource)
+            {
+                try
+                {
+                    await _repository.EvaluateAsync(imported.Id,
+                        SdmEvaluationEvidence.FromSource(sourceItem, true,
+                            _options.ReadOnlyIntegrationMode || !_options.ControlledTestWritesEnabled),
+                        context, _auditWriter, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError("SDM evidence persistence failed. CorrelationId: {CorrelationId}", context.CorrelationId);
+                    return OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Fail(OperationalErrorCodes.AuditStoreUnavailable, "audit", true);
+                }
+                continue;
+            }
             if (!await TryAuditAsync(AuditActions.OperationalRecordImported, imported, context, "Imported", null, cancellationToken))
             {
                 return OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Fail(OperationalErrorCodes.AuditStoreUnavailable, "audit", true);
@@ -87,7 +103,7 @@ public sealed class OperationalRecordService : IOperationalRecordService
                 .ToArray();
         }
 
-        return OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success(records);
+        return OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success(records.Select(SdmEvaluationEvidence.Project).ToArray());
     }
 
     /// <inheritdoc />
@@ -98,7 +114,7 @@ public sealed class OperationalRecordService : IOperationalRecordService
             || (string.Equals(_options.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase)
                 && IsSynthetic(record.SourceRecordId, record.OrCode))
             ? OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false)
-            : OperationalRecordResult<OperationalRecord>.Success(record);
+            : OperationalRecordResult<OperationalRecord>.Success(SdmEvaluationEvidence.Project(record));
     }
 
     private async Task<bool> TryAuditAsync(
@@ -148,6 +164,5 @@ public sealed class OperationalRecordService : IOperationalRecordService
         && (item.ApplicationReference?.Length ?? 0) <= 255;
 
     private static bool IsSynthetic(string sourceRecordId, string orCode) =>
-        sourceRecordId.StartsWith("synthetic-", StringComparison.OrdinalIgnoreCase)
-        || orCode.StartsWith("SYN-OR-", StringComparison.OrdinalIgnoreCase);
+        SdmEvaluationEvidence.IsSynthetic(sourceRecordId) || SdmEvaluationEvidence.IsSynthetic(orCode);
 }

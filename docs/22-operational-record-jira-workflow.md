@@ -25,6 +25,16 @@ No legacy Operational Record/Jira PowerShell script exists in this repository. S
 
 ## Workflow
 
+Corporate refresh now records deterministic SDM evidence under ADR-0018 rather
+than repeatedly emitting legacy classification events. Recommendation, human
+approval, publication readiness, and external-write eligibility are separate.
+V1 has no positive category policy; current corporate rows remain manual review
+and publication-blocked. Unchanged evaluation input preserves its timestamp and
+adds no evaluation history/audit. Source changes latch stale evidence. Evaluation
+never calls Jira, resolves requester/reporter identities, or changes terminal or
+reconciliation state. Synthetic workflows remain an explicitly separate harness.
+SQL requires additive migration 009; application startup never applies it.
+
 `Imported -> Classified -> NeedsManualReview | Eligible -> Previewed -> CreateRequested -> CreatingJira -> JiraCreated -> ClosingOperationalRecord -> Completed`
 
 Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. Disabled mode classifies records for manual review. A successfully imported Turuncu Hat record remains `NeedsManualReview` until a separately approved deterministic Jira-eligibility rule exists; source-scope membership alone does not authorize publishing. Synthetic classifiers remain restricted to their explicit synthetic providers, and synthetic rows are unavailable to list, detail, preview, create, and retry paths while the Turuncu Hat provider is active.

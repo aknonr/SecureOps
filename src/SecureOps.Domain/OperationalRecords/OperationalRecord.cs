@@ -59,4 +59,6 @@ public sealed record OperationalRecord
     public DateTimeOffset? ClaimExpiresAt { get; init; }
     /// <summary>Persistence concurrency version.</summary>
     public long Version { get; init; }
+    /// <summary>Nullable durable SDM evidence; absence means unevaluated.</summary>
+    public SdmEvaluationSnapshot? SdmEvaluation { get; init; }
 }

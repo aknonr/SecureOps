@@ -9,3 +9,9 @@ The Disabled and TuruncuHat classifiers return `NeedsManualReview`; source-scope
 Source refresh cannot reclassify a workflow after it advances beyond initial classification states. Automated failure and concurrency scenarios replace `IJiraClient` only inside the integration-test host; runtime providers expose no failure-injection controls. `FakeJiraClient` returns synthetic `FAKE-*` keys only.
 
 See `docs/22-operational-record-jira-workflow.md` for configuration, state transitions, authorization, DBA prerequisites, and TEST validation.
+
+Corporate refresh uses the pure Domain SDM evaluator (ADR-0018); it does not
+resolve Jira users or call external write clients. SQL migration 009 persists
+bounded evidence with atomic append-only history/audit and unchanged-input
+idempotency. Current corporate evidence remains manual-review-only. Fake and
+Simulation classifiers remain isolated compatibility harnesses.

@@ -191,8 +191,7 @@ public sealed class JiraTransferService : IJiraTransferService
 
     private bool IsSyntheticCorporateRecord(OperationalRecord record) =>
         string.Equals(_operationalOptions.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase)
-        && (record.SourceRecordId.StartsWith("synthetic-", StringComparison.OrdinalIgnoreCase)
-            || record.OrCode.StartsWith("SYN-OR-", StringComparison.OrdinalIgnoreCase));
+        && (SdmEvaluationEvidence.IsSynthetic(record.SourceRecordId) || SdmEvaluationEvidence.IsSynthetic(record.OrCode));
 
     private async Task<OperationalRecordResult<OperationalRecord>> ExecuteClaimedAsync(
         Guid id,

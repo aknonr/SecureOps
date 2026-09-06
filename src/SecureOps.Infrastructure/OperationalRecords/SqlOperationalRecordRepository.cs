@@ -8,7 +8,7 @@ using SecureOps.Infrastructure.Audit;
 namespace SecureOps.Infrastructure.OperationalRecords;
 
 /// <summary>SQL Server repository with transactional workflow acquisition and database idempotency.</summary>
-public sealed class SqlOperationalRecordRepository : IOperationalRecordRepository
+public sealed partial class SqlOperationalRecordRepository : IOperationalRecordRepository
 {
     private const int CommandTimeoutSeconds = 15;
     private readonly string _connectionString;
@@ -549,7 +549,9 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
         ClaimedBy = row.ClaimedBy,
         ClaimedAt = row.ClaimedAt,
         ClaimExpiresAt = row.ClaimExpiresAt,
-        Version = row.Version
+        Version = row.Version,
+        SdmEvaluation = row.SdmEvaluationJson is null ? null
+            : System.Text.Json.JsonSerializer.Deserialize<SdmEvaluationSnapshot>(row.SdmEvaluationJson)
     };
 
     private static OperationalRecordWorkflowState ParseState(string value) => Enum.Parse<OperationalRecordWorkflowState>(value, true);
@@ -568,7 +570,8 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
             r.ApplicationReference, r.Classification, r.JiraEligible, r.EligibilityReason, r.WorkflowState,
             r.LastErrorCode, r.CorrelationId, r.RetryCount, r.UpdatedAt, r.SourceConcurrencyToken,
             r.LastSourceValidationAt, r.ClaimedBy, r.ClaimedAt, r.ClaimExpiresAt, CONVERT(bigint, r.RowVersion) AS Version,
-            transfer.MappingVersion, transfer.IdempotencyKey, transfer.JiraIssueKey, transfer.ReconciliationRequired
+            transfer.MappingVersion, transfer.IdempotencyKey, transfer.JiraIssueKey, transfer.ReconciliationRequired,
+            r.SdmEvaluationJson
         FROM ops.OperationalRecords r
         LEFT JOIN ops.JiraTransfers transfer ON transfer.OperationalRecordId = r.OperationalRecordId
         """;
@@ -603,6 +606,7 @@ public sealed class SqlOperationalRecordRepository : IOperationalRecordRepositor
         public DateTimeOffset? ClaimedAt { get; init; }
         public DateTimeOffset? ClaimExpiresAt { get; init; }
         public long Version { get; init; }
+        public string? SdmEvaluationJson { get; init; }
     }
 
     private sealed record MergeResult(Guid Id, string MergeAction);

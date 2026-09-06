@@ -264,7 +264,18 @@ public sealed class OperationalRecordsController : ControllerBase
         _simulationMode,
         SimulationNotice(),
         _readOnlyIntegrationMode,
-        ReadOnlyNotice());
+        ReadOnlyNotice())
+    {
+        RecommendedClassification = record.SdmEvaluation?.Result.RecommendedClassification,
+        SdmCandidateRecommended = false,
+        RuleSetVersion = record.SdmEvaluation?.Result.RuleSetVersion,
+        ReasonCodes = record.SdmEvaluation?.Result.ReasonCodes ?? [],
+        EvaluatedAt = record.SdmEvaluation?.EvaluatedAt,
+        EvaluationStale = record.SdmEvaluation?.Result.EvaluationStale ?? true,
+        SourceChanged = record.SdmEvaluation?.Result.SourceChanged ?? false,
+        BlockingConditions = record.SdmEvaluation?.Result.BlockingConditions ?? [],
+        ExternalWriteEligible = false
+    };
 
     private static bool IsRetryEligible(OperationalRecord record) =>
         !record.ReconciliationRequired

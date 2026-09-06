@@ -106,6 +106,15 @@ Serialized to JSON for `DetailsJson` column (see `docs/04-domain-model.md` for t
 
 ## DetailsJson Conventions
 
+`OperationalRecordSdmEvaluated` contains internal operational-record ID, frozen
+classification value, Jira eligibility, and bounded safe evaluation evidence:
+ruleset, ordered reason/blocker codes, input/source digests, recommendation,
+stale/source-changed flags, and evaluated-at metadata. Actor is
+`system:sdm-evaluator`; no requester, employee, raw source prose, or session data
+is copied. SQL commits record evidence, append-only workflow history, and the
+audit insert atomically. Unchanged input emits no evaluation event. Minimum
+36-month audit retention and existing history triggers remain unchanged.
+
 Each action defines its own `Details` shape:
 
 ```json
