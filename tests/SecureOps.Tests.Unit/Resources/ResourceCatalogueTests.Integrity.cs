@@ -47,6 +47,32 @@ public sealed partial class ResourceCatalogueTests
     }
 
     [Fact]
+    public async Task HiddenMembership_StillCountsTowardTheAggregateLimitWithoutBeingDisclosed()
+    {
+        var repository = new InMemoryResourceRepository(new InMemoryAuditWriter());
+        ResourceCatalogueService admin = Service(repository, "Admin");
+        ResourceCatalogueService owner = Service(repository, "Operator");
+        ResourceCategory category = (await admin.SaveCategoryAsync(_principal, _context, Guid.Empty, new("Synthetic limit"), true, _token)).Value!;
+        List<Guid> ids = [];
+        for (int i = 0; i < 100; i++)
+        {
+            ids.Add((await admin.SaveLinkAsync(_principal, _context, Guid.Empty, Link(category.Id), true, _token)).Value!.Id);
+        }
+        ResourcePreferencesResponse saved = (await owner.SaveSetAsync(_principal, _context, Guid.Empty, new("Full", ids), true, _token)).Value!;
+        Guid groupId = saved.Sets.Single().Id;
+        await admin.SaveCategoryAsync(_principal, _context, category.Id, new("Restricted", ManagersOnly: true, ExpectedVersion: category.Version), false, _token);
+        ResourceCategory visible = (await admin.SaveCategoryAsync(_principal, _context, Guid.Empty, new("Public"), true, _token)).Value!;
+        ResourceLink addition = (await admin.SaveLinkAsync(_principal, _context, Guid.Empty, Link(visible.Id), true, _token)).Value!;
+        (await owner.SaveSetAsync(_principal, _context, groupId, new("Full", [addition.Id], ExpectedVersion: saved.Version), false, _token))
+            .ErrorCode.Should().Be(ResourceErrors.Limit);
+        ResourcePreferencesResponse unchanged = (await owner.PreferencesAsync(_principal, _context, _token)).Value!;
+        unchanged.Version.Should().Be(saved.Version);
+        unchanged.Sets.Single().Links.Should().BeEmpty();
+        await admin.SaveCategoryAsync(_principal, _context, category.Id, new("Restored", ExpectedVersion: category.Version + 1), false, _token);
+        (await owner.ResolveSetAsync(_principal, _context, groupId, _token)).Value!.Links.Select(link => link.Id).Should().Equal(ids);
+    }
+
+    [Fact]
     public void MembershipOrdering_PreservesUnmentionedSlotsAndRejectsAmbiguousRequests()
     {
         Guid a = Guid.NewGuid(), hidden = Guid.NewGuid(), b = Guid.NewGuid(), added = Guid.NewGuid();

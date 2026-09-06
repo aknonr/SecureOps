@@ -169,6 +169,52 @@ public sealed class ResourceApiClientTests
     private static ResourcePage Page() => new([], 1, 50, 0);
 
     [Fact]
+    public async Task EnvironmentOptions_UseTheBoundedRouteAndEscapedAuthorizedFilters()
+    {
+        var category = Guid.NewGuid();
+        (ResourceApiClient client, RecordingHandler handler) = Create(new ResourceEnvironmentOptions(["Lab & Pilot"], false));
+
+        ResourceEnvironmentOptions result = await client.GetEnvironmentsAsync(
+            new ResourceEnvironmentQuery("Lab & Pilot", category, true), CancellationToken.None);
+
+        handler.LastUri!.AbsolutePath.Should().Be("/api/v1/resources/environments");
+        handler.LastUri.Query.Should().Contain("search=Lab%20%26%20Pilot")
+            .And.Contain($"categoryId={category}").And.Contain("includeArchived=true");
+        result.Values.Should().Equal("Lab & Pilot");
+    }
+
+    [Fact]
+    public async Task SaveSet_SendsExplicitRemovalsSeparatelyFromOrderedMembers()
+    {
+        var removed = Guid.NewGuid();
+        var retained = Guid.NewGuid();
+        (ResourceApiClient client, RecordingHandler handler) = Create(Preferences());
+
+        await client.SaveSetAsync(Guid.NewGuid(), new("Synthetic", [retained], true, 19, [removed]), CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.Body!);
+        body.RootElement.GetProperty("removeLinkIds").EnumerateArray().Single().GetGuid().Should().Be(removed);
+        body.RootElement.GetProperty("linkIds").EnumerateArray().Single().GetGuid().Should().Be(retained);
+        body.RootElement.GetProperty("expectedVersion").GetInt64().Should().Be(19);
+        body.RootElement.TryGetProperty("ownerId", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Guide_DismissalUsesCurrentOwnerAndAggregateVersion()
+    {
+        (ResourceApiClient client, RecordingHandler handler) = Create(Preferences() with { GuideDismissed = true });
+
+        ResourcePreferencesResponse result = await client.DismissGuideAsync(23, CancellationToken.None);
+
+        handler.LastUri!.AbsolutePath.Should().Be("/api/v1/resources/me/guide");
+        handler.LastMethod.Should().Be(HttpMethod.Put);
+        using var body = JsonDocument.Parse(handler.Body!);
+        body.RootElement.GetProperty("expectedVersion").GetInt64().Should().Be(23);
+        body.RootElement.EnumerateObject().Should().HaveCount(1);
+        result.GuideDismissed.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Query_CallerCancellation_RemainsCancellation()
     {
         using CancellationTokenSource cancellation = new();

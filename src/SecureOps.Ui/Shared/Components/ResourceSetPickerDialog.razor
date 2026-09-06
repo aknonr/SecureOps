@@ -1,93 +1,54 @@
 @using SecureOps.Domain.Resources
 @using SecureOps.Shared.Contracts.Resources
 
-@*
-    Chooses which personal set a link is added to.
-
-    Sets already containing the link are listed but not selectable: the contract rejects duplicate
-    IDs rather than collapsing them, so offering the choice would produce a validation error the
-    operator did not cause. Saying why here is more useful than failing after the click.
-*@
-
-<MudDialog Class="so-dialog">
-    <TitleContent>
-        <div class="so-dialog-title">
-            <span class="so-dialog-icon" aria-hidden="true">
-                <MudIcon Icon="@Icons.Material.Filled.PlaylistAdd" />
-            </span>
-            <span>Sete ekle</span>
-        </div>
-    </TitleContent>
-
+<MudDialog Class="so-dialog so-resource-dialog" DefaultFocus="DefaultFocus.FirstChild">
+    <TitleContent><div class="so-dialog-title"><MudIcon Icon="@Icons.Material.Filled.PlaylistAdd" /><span>Gruba ekle</span></div></TitleContent>
     <DialogContent>
-        <div class="so-dialog-subject">
-            <span class="so-dialog-subject-label">Eklenecek bağlantı</span>
-            <span class="so-dialog-subject-value">@Link.Name</span>
+        <div class="so-dialog-subject"><span class="so-dialog-subject-label">Eklenecek bağlantı</span><strong>@Link.Name</strong></div>
+        <p class="so-panel-text">Gruplar yalnızca size ait sıralı bağlantı koleksiyonlarıdır.</p>
+        <div class="so-group-choices" role="group" aria-label="Kişisel grup seçimi">
+            @foreach (ShiftSetResponse set in Preferences.Sets.OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name))
+            {
+                bool already = ResourceView.Contains(set, Link.Id);
+                <MudButton FullWidth="true" Variant="Variant.Outlined" aria-pressed="@(!_create && _selectedId == set.Id)"
+                           Disabled="@(already || set.Links.Count >= ResourceView.MaxLinksPerSet)"
+                           OnClick="@(() => Select(set.Id))" Class="@(!_create && _selectedId == set.Id ? "is-selected" : null)">
+                    <div class="so-set-option">
+                        <span class="so-set-option-name">@set.Name</span>
+                        <span class="so-set-option-meta">@(already ? "Bu bağlantı grupta zaten var" : set.IsDefault ? "Varsayılan grup" : "Kişisel grup")</span>
+                    </div>
+                </MudButton>
+            }
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" OnClick="Create"
+                       Disabled="@(!ResourceView.CanCreateSet(Preferences))" aria-pressed="@_create">Yeni grup</MudButton>
         </div>
-
-        @if (Preferences.Sets.Count == 0)
+        @if (_create)
         {
-            <p class="so-panel-text">Henüz bir mesai setiniz yok.</p>
-        }
-        else
-        {
-            <div>
-                @foreach (ShiftSetResponse set in Preferences.Sets)
-                {
-                    ShiftSetResponse captured = set;
-                    bool already = ResourceView.Contains(set, Link.Id);
-                    bool full = set.Links.Count >= ResourceView.MaxLinksPerSet;
-
-                    <MudButton FullWidth="true" Variant="Variant.Text" Color="Color.Default"
-                                 Disabled="@(already || full)"
-                                 OnClick="@(() => Choose(captured))">
-                        <div class="so-set-option">
-                            <span class="so-set-option-name">
-                                @set.Name
-                                @if (set.IsDefault)
-                                {
-                                    <span class="so-chip so-chip--quiet">Varsayılan</span>
-                                }
-                            </span>
-                            <span class="so-set-option-meta">
-                                @if (already)
-                                {
-                                    @:Bu bağlantı sette zaten var
-                                }
-                                else if (full)
-                                {
-                                    @:Set dolu (@ResourceView.MaxLinksPerSet bağlantı)
-                                }
-                                else
-                                {
-                                    @(set.Links.Count) @:bağlantı
-                                }
-                            </span>
-                        </div>
-                    </MudButton>
-                }
-            </div>
+            <MudTextField @bind-Value="_name" Label="Grup adı" aria-label="Grup adı" Variant="Variant.Outlined"
+                          Required="true" Immediate="true" MaxLength="80" AutoFocus="true" />
         }
     </DialogContent>
-
-    <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
-    </DialogActions>
+    <DialogActions><ResourceSaveActions Save="ConfirmAsync" SubmitLabel="@(_create ? "Oluştur ve ekle" : "Gruba ekle")" /></DialogActions>
 </MudDialog>
 
 @code {
-    [CascadingParameter]
-    private MudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public ResourceLink Link { get; set; } = default!;
+    [Parameter, EditorRequired] public ResourcePreferencesResponse Preferences { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<Guid?, SaveShiftSetRequest, Task<UiProblem?>> Save { get; set; } = default!;
+    private Guid? _selectedId;
+    private bool _create;
+    private string _name = string.Empty;
+    protected override void OnInitialized() => _create = Preferences.Sets.Count == 0;
+    private void Create() { _create = true; _selectedId = null; }
+    private void Select(Guid id) { _selectedId = id; _create = false; }
 
-    /// <summary>Link the operator is placing into a set.</summary>
-    [Parameter, EditorRequired]
-    public ResourceLink Link { get; set; } = default!;
-
-    /// <summary>Current personal state, supplying the caller's own sets only.</summary>
-    [Parameter, EditorRequired]
-    public ResourcePreferencesResponse Preferences { get; set; } = default!;
-
-    private void Choose(ShiftSetResponse set) => Dialog.Close(DialogResult.Ok(set));
-
-    private void Cancel() => Dialog.Cancel();
+    private Task<UiProblem?> ConfirmAsync()
+    {
+        ShiftSetResponse? selected = _create ? null : Preferences.Sets.FirstOrDefault(s => s.Id == _selectedId);
+        string? invalid = _create ? ResourceView.ValidateSet(_name, [Link.Id], Preferences.Sets, null)
+            : selected is null ? "Bir grup seçin veya yeni grup oluşturun." : null;
+        if (invalid is not null) return Task.FromResult<UiProblem?>(UiProblemFactory.FromResponse(400, null) with { Explanation = invalid });
+        IReadOnlyList<Guid> ids = selected is null ? [Link.Id] : [.. ResourceView.LinkIds(selected), Link.Id];
+        return Save(selected?.Id, new(selected?.Name ?? _name.Trim(), ids, selected?.IsDefault ?? false, Preferences.Version));
+    }
 }

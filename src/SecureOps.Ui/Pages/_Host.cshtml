@@ -92,8 +92,8 @@
         // cannot guarantee that transient user activation is still available on arrival.
         //
         // noopener,noreferrer on every call: the opened page gets no window.opener handle back into
-        // WASAS and no Referer header. No cookie, token, or header is passed — window.open cannot
-        // carry any, and nothing here tries.
+        // WASAS and no Referer header. This handler attaches no credential or authorization header.
+        // Normal destination cookie and authentication behavior belongs to the browser and target.
         //
         // The returned count is attempts that came back without a handle. It is a hint, not proof:
         // a browser may block silently and still return an object, or return null for reasons
@@ -118,13 +118,41 @@
 
         document.addEventListener('click', function (event) {
             var button = event.target.closest('[data-so-open-links]');
-            if (!button || !event.isTrusted) { return; }
+            if (!button || button.disabled || !event.isTrusted) { return; }
             var panel = button.closest('.so-set-resolved');
-            var urls = Array.from(panel.querySelectorAll('a.so-resource-name'))
-                .map(function (link) { return link.href; });
+            if (!panel) { return; }
+            var urls = Array.from(panel.querySelectorAll('[data-so-open-choice]:checked'))
+                .map(function (choice) { return choice.closest('li').querySelector('[data-so-open-url]').href; });
+            if (!urls.length) { return; }
             window.secureOpsLinks.openMany(urls);
             panel.querySelector('[data-so-open-status]').hidden = false;
         });
+
+        document.addEventListener('change', function (event) {
+            if (!event.target.matches('[data-so-open-choice]')) { return; }
+            var panel = event.target.closest('.so-set-resolved');
+            panel.querySelector('[data-so-open-links]').disabled = !panel.querySelector('[data-so-open-choice]:checked');
+        });
+
+        window.secureOpsResourceGuide = {
+            clear: function (restoreFocus) {
+                document.querySelectorAll('.so-guide-target').forEach(function (element) { element.classList.remove('so-guide-target'); });
+                if (restoreFocus) { document.getElementById('resource-guide-replay')?.focus(); }
+            },
+            show: function (name) {
+                this.clear(false);
+                var target = Array.from(document.querySelectorAll('[data-guide]')).find(function (element) {
+                    var rect = element.getBoundingClientRect();
+                    return element.dataset.guide === name && !element.disabled && !element.closest('[aria-hidden="true"]')
+                        && rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.left < innerWidth
+                        && rect.bottom > 0 && rect.top < innerHeight
+                        && getComputedStyle(element).visibility !== 'hidden';
+                });
+                if (!target) { return false; }
+                target.classList.add('so-guide-target');
+                return true;
+            }
+        };
 
         // MudBlazor 6 puts select attributes on a hidden input, not its keyboard target.
         // Transfer resource field names to that target without replacing its keyboard behavior.
@@ -139,8 +167,43 @@
                         target.setAttribute('aria-haspopup', 'listbox');
                     }
                 });
+            document.querySelectorAll('.so-resource-dialog button svg[aria-label="Increment"], .so-resource-dialog button svg[aria-label="Decrement"]')
+                .forEach(function (icon) {
+                    // The library labels an aria-hidden icon instead of the actual spin button.
+                    var button = icon.closest('button');
+                    var field = button.closest('.mud-input-control')?.querySelector('input[aria-label]');
+                    var label = (field?.getAttribute('aria-label') || 'Değer') + (icon.getAttribute('aria-label') === 'Increment' ? ': Artır' : ': Azalt');
+                    button.setAttribute('aria-label', label);
+                    button.setAttribute('title', label);
+                    button.setAttribute('tabindex', '0');
+                });
+            // MudBlazor 6 autocomplete has native keyboard navigation but omits combobox semantics.
+            var input = document.querySelector('.so-resource-environment-filter input');
+            if (!input) { return; }
+            var list = document.querySelector('.mud-popover-open .so-resource-environment-options');
+            input.setAttribute('role', 'combobox');
+            input.setAttribute('aria-autocomplete', 'list');
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('aria-expanded', list ? 'true' : 'false');
+            input.setAttribute('maxlength', '40');
+            if (list) {
+                list.id = 'so-resource-environment-options';
+                list.setAttribute('role', 'listbox');
+                list.setAttribute('aria-label', 'Ortamlar');
+                input.setAttribute('aria-controls', list.id);
+                list.querySelectorAll('.mud-list-item').forEach(function (item) {
+                    item.setAttribute('role', 'option');
+                    item.setAttribute('aria-selected', item.classList.contains('mud-selected-item') ? 'true' : 'false');
+                });
+                var selected = list.querySelector('.mud-selected-item');
+                if (selected) { input.setAttribute('aria-activedescendant', selected.id); }
+                else { input.removeAttribute('aria-activedescendant'); }
+            } else {
+                input.removeAttribute('aria-controls');
+                input.removeAttribute('aria-activedescendant');
+            }
         }
-        new MutationObserver(labelResourceSelects).observe(document.body, { childList: true, subtree: true });
+        new MutationObserver(labelResourceSelects).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         labelResourceSelects();
 
         window.secureOpsDownload = function (fileName, contentType, base64) {

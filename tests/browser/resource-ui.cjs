@@ -23,7 +23,7 @@ async function navigate(page, route) {
     // Wait for circuit JS traffic, not merely the prerendered HTTP response.
     const connected = new Promise((resolve, reject) => {
         const deadline = setTimeout(() => reject(new Error('Blazor circuit did not become interactive')), 10000);
-        page.once('websocket', socket => {
+        page.on('websocket', socket => {
         socket.on('framereceived', ({ payload }) => {
             if (payload.toString().includes('JS.BeginInvokeJS')) {
                 clearTimeout(deadline);
@@ -70,12 +70,15 @@ async function navigate(page, route) {
         console.log('PASS: visible select keyboard target has an accessible name');
         await navigate(page, 'resources/sets');
         assert.equal(await page.locator('a[href="resources"].active').count(), 0);
-        const section = page.locator('section').filter({ has: page.locator('h2').filter({ hasText: setName }) });
+        await page.locator('.so-group-choices button').filter({ hasText: setName }).click();
+        const section = page.locator('.so-group-detail');
         await page.setViewportSize({ width: 390, height: 844 });
+        await page.waitForTimeout(800);
         assert.ok(await section.locator('h2').evaluate(element => element.getBoundingClientRect().width < innerWidth));
         await page.setViewportSize({ width: 1440, height: 900 });
+        await page.waitForTimeout(800);
         console.log('PASS: maximum-length set title fits the narrow layout');
-        await section.getByRole('button', { name: 'Vardiyayı Başlat' }).click();
+        await section.getByRole('button', { name: 'Bağlantıları hazırla' }).click();
         await section.locator('[data-so-open-links]').waitFor();
         await page.evaluate(() => {
             window.openCalls = [];
@@ -101,8 +104,8 @@ async function navigate(page, route) {
         assert.equal(await section.locator('.so-set-item').count(), 1);
         console.log('PASS: refresh invalidates archived opening candidates');
 
-        await section.getByRole('button', { name: 'Yeniden Adlandır' }).click();
-        await page.getByLabel('Set adı', { exact: true }).fill(label + ' draft');
+        await section.getByRole('button', { name: 'Yeniden adlandır' }).click();
+        await page.getByLabel('Grup adı', { exact: true }).fill(label + ' draft');
         preferences = await api('resources/me');
         await api('resources/me/favourites/' + links[0].id, 'PUT', {
             favourite: true, expectedVersion: preferences.version
@@ -110,13 +113,14 @@ async function navigate(page, route) {
         await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
         const dialog = page.locator('.mud-dialog');
         await dialog.getByText('Kayıt siz düzenlerken değişti', { exact: true }).waitFor();
-        assert.equal(await page.getByLabel('Set adı', { exact: true }).inputValue(), label + ' draft');
+        assert.equal(await page.getByLabel('Grup adı', { exact: true }).inputValue(), label + ' draft');
         assert.ok(await dialog.getByRole('button', { name: 'Kaydet', exact: true }).isDisabled());
         await dialog.getByRole('button', { name: 'Vazgeç', exact: true }).click();
         console.log('PASS: conflict survives refresh, retains draft and blocks stale resubmission');
 
         await navigate(page, 'admin/resources');
-        await page.getByRole('button', { name: 'Yeni Kategori' }).click();
+        await page.getByRole('button', { name: 'Kategoriler', exact: true }).click();
+        await page.getByRole('button', { name: 'Yeni kategori', exact: true }).click();
         await page.getByLabel('Ad', { exact: true }).fill('Invalid <fixture>');
         await dialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
         await dialog.locator('.so-problem').waitFor();

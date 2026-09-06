@@ -43,19 +43,13 @@
                 <div class="so-nav-group">KAYNAKLAR</div>
 
                 <MudNavLink Href="resources" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Link">
-                    Bağlantılarım
+                    Uygulama Bağlantıları
                 </MudNavLink>
 
                 <MudNavLink Href="resources/sets" Icon="@Icons.Material.Filled.PlaylistPlay">
-                    Mesai Setlerim
+                    Bağlantı Gruplarım
                 </MudNavLink>
 
-                @if (Can(Capabilities.ResourcesManage))
-                {
-                    <MudNavLink Href="admin/resources" Icon="@Icons.Material.Filled.FolderSpecial">
-                        Katalog Yönetimi
-                    </MudNavLink>
-                }
             }
 
             @if (CanAnyDirectory)
@@ -96,7 +90,14 @@
 
             @if (CanAnyAdministration)
             {
-                <div class="so-nav-group">ERİŞİM VE OTURUM</div>
+                <div class="so-nav-group">YÖNETİM</div>
+
+                @if (Can(Capabilities.ResourcesView) && Can(Capabilities.ResourcesManage))
+                {
+                    <MudNavLink Href="admin/resources" Icon="@Icons.Material.Filled.FolderSpecial" data-guide="management-link">
+                        Bağlantı Yönetimi
+                    </MudNavLink>
+                }
 
                 @if (Can(Capabilities.AccessApproveRequests))
                 {
@@ -153,7 +154,11 @@
         _snapshot = await AccessProvider.GetAsync();
     }
 
-    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        _snapshot = await AccessProvider.GetAsync();
+        StateHasChanged();
+    });
 
     private bool Can(string capability) => _snapshot?.Can(capability) == true;
 
@@ -161,7 +166,8 @@
         Can(Capabilities.IdentityLookup) || Can(Capabilities.DirectoryGroupsView);
 
     private bool CanAnyAdministration =>
-        Can(Capabilities.AccessApproveRequests) || Can(Capabilities.AccessManageUsers);
+        Can(Capabilities.AccessApproveRequests) || Can(Capabilities.AccessManageUsers)
+        || Can(Capabilities.ResourcesView) && Can(Capabilities.ResourcesManage);
 
     public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
 }

@@ -18,8 +18,8 @@
 
     <DialogContent>
         <MudTextField @bind-Value="_name"
-                      Label="Set adı"
-                      aria-label="Set adı"
+                      Label="Grup adı"
+                      aria-label="Grup adı"
                       HelperText="En fazla 80 karakter. Yalnızca siz görürsünüz."
                       Required="true"
                       Immediate="true"
@@ -41,7 +41,7 @@
 
     /// <summary>Dialog heading.</summary>
     [Parameter]
-    public string Title { get; set; } = "Set";
+    public string Title { get; set; } = "Grup";
 
     /// <summary>Current name when renaming; empty when creating.</summary>
     [Parameter]
@@ -61,7 +61,7 @@
 
         if (trimmed.Length == 0)
         {
-            _error = "Set adı zorunludur.";
+            _error = "Grup adı zorunludur.";
             return Task.FromResult<UiProblem?>(UiProblemFactory.FromResponse(400, null) with { Explanation = _error });
         }
 

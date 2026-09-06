@@ -1,16 +1,16 @@
 @* Keep the form and its values until the server confirms the write. *@
 <div class="so-resource-save">
-    @if (_problem is not null)
+    @if (_state.Problem is { } problem)
     {
-        <SoProblemPanel Problem="_problem" />
-        @if (_problem.Kind != UiProblemKind.Validation)
+        <SoProblemPanel Problem="problem" />
+        @if (problem.Kind != UiProblemKind.Validation)
         {
             <p class="so-panel-text">Kapatıp güncel kaydı inceleyin; işlem otomatik tekrarlanmaz.</p>
         }
     }
-    <MudButton OnClick="Cancel" Disabled="@_saving" Variant="Variant.Text">Vazgeç</MudButton>
-    <MudButton OnClick="ConfirmAsync" Disabled="@(_saving || (_problem is not null && _problem.Kind != UiProblemKind.Validation))"
-               Variant="Variant.Filled" Color="Color.Primary">Kaydet</MudButton>
+    <MudButton OnClick="Cancel" Disabled="@_state.Saving" Variant="Variant.Text">Vazgeç</MudButton>
+    <MudButton OnClick="ConfirmAsync" Disabled="@(!_state.CanSubmit)"
+               Variant="Variant.Filled" Color="Color.Primary">@(_state.Saving ? "Kaydediliyor…" : SubmitLabel)</MudButton>
 </div>
 
 @code {
@@ -18,31 +18,21 @@
 
     /// <summary>Saves current form values; null means the server confirmed success.</summary>
     [Parameter, EditorRequired] public Func<Task<UiProblem?>> Save { get; set; } = default!;
+    /// <summary>Names the explicit command for the current form.</summary>
+    [Parameter] public string SubmitLabel { get; set; } = "Kaydet";
 
-    private bool _saving;
-    private UiProblem? _problem;
+    private readonly ResourceSaveState _state = new();
 
     private async Task ConfirmAsync()
     {
-        if (_saving || (_problem is not null && _problem.Kind != UiProblemKind.Validation))
+        if (await _state.TrySaveAsync(Save))
         {
-            return;
-        }
-
-        _saving = true;
-        try
-        {
-            _problem = await Save();
-            if (_problem is null)
-            {
-                Dialog.Close(DialogResult.Ok(true));
-            }
-        }
-        finally
-        {
-            _saving = false;
+            Dialog.Close(DialogResult.Ok(true));
         }
     }
 
-    private void Cancel() => Dialog.Cancel();
+    private void Cancel()
+    {
+        if (!_state.Saving) Dialog.Cancel();
+    }
 }

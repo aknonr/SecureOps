@@ -90,9 +90,9 @@ have to be invented.
 | `/access/users/{id}` | User detail, role editor, disable | `Access.ManageUsers` |
 | `/operational-records` | OR → Jira workspace, grouped by attention | `OperationalRecords.View` |
 | `/operational-records/{id}` | Source, workflow, and Jira transfer | `OperationalRecords.View` |
-| `/resources` | Bağlantılarım — catalogue search, favourites, add-to-set | `Resources.View` |
-| `/resources/sets` | Mesai Setlerim — personal ordered sets, default, opening | `Resources.View` |
-| `/admin/resources` | Katalog Yönetimi — categories and links | `Resources.Manage` |
+| `/resources` | Uygulama Bağlantıları: search, favourites, add to a personal group | `Resources.View` |
+| `/resources/sets` | Bağlantı Gruplarım: personal ordered groups, preferred group, opening | `Resources.View` |
+| `/admin/resources` | Bağlantı Yönetimi: shared categories and links | `Resources.View` and `Resources.Manage` |
 | `/audit-compliance`, `/diagnostics-readonly` | Future-phase placeholders | authenticated |
 
 Interim auth endpoints: `POST /auth/sign-in`, `GET /auth/sign-out`. They establish identity only.
@@ -190,8 +190,9 @@ Three routes over `/api/v1/resources`, implemented against the "Resource Catalog
 Sets: Claude Handoff" section of `docs/contracts/secureops-api-v1-ui-integration.md`.
 
 **Journeys.** An operator with `Resources.View` searches the catalogue, toggles favourites, and adds
-a permitted link to one of their own sets; manages those sets — create, rename, delete, reorder,
-choose a default; and starts a shift from a set. An operator with `Resources.Manage` additionally
+a permitted link to one of their own groups, including creating the first group in that dialog;
+manages those groups (create, rename, delete, reorder, choose a default), then prepares and opens
+selected links. A default is a preference, never automatic opening. An operator with `Resources.Manage` additionally
 creates and edits categories and links, and archives them. Everyone else sees an explanation on
 `/admin/resources` rather than a redirect.
 
@@ -209,10 +210,40 @@ returned links are offered. Opening is a second explicit browser click or keyboa
 its native handler calls `window.secureOpsLinks.openMany` without a Blazor Server round trip.
 The UI reports that opening was *attempted* and always keeps the individual links visible; it never
 claims a destination loaded or authenticated, and blocked-tab detection is not treated as reliable.
-No tab is opened during load, render, or refresh. No WASAS cookie, token, or header reaches a target.
+No tab is opened during load, render, or refresh. The client does not forward WASAS credentials or
+authorization headers; normal destination cookie handling remains the browser's responsibility.
 
 **Search.** Server-side and debounced, with a monotonic request guard so a slower earlier response
-cannot overwrite a later one.
+cannot overwrite a later one, including stale errors from a transport that ignores cancellation.
+Environment autocomplete uses the bounded, authorization-aware environment endpoint, never the
+current result page or a downloaded catalogue. The favourite view filters the already bounded personal
+projection (at most 200 favourites); mutations replace that projection with the server response.
+
+**Kullanım Rehberi.** A non-blocking first-use invitation offers Başla and Daha sonra. Both persist
+only `guideDismissed` through the versioned personal API. No browser storage or training history is
+introduced. Nasıl kullanılır? always replays the task-based guide. Next/back/finish/skip/close and
+Escape are keyboard-operable; heading focus moves with the step and returns to replay on close.
+The inline panel adapts to narrow layouts and reduced motion. Highlighting never activates a control;
+missing/hidden targets fall back to working route links. Management instructions require the actual
+server capability. A guide never modifies links/groups/favourites or opens destination sites.
+
+**MudBlazor assessment, 2026-09-06.** Keep central `6.16.0` for this milestone. The latest stable
+[9.9.0 package](https://www.nuget.org/packages/MudBlazor/9.9.0) targets .NET 8 (as well as later
+frameworks), so .NET 10 is not required. Version 6 support has ended; this deferral is not an
+endorsement of indefinite support. The migration is application-wide, not a resource-only update:
+
+- [v7 migration](https://github.com/MudBlazor/MudBlazor/issues/8447): `MudTheme.Palette` changes to
+  `PaletteLight`, grey CSS variables become gray, and popover/negative-parameter changes affect
+  `Shared/SecureOpsTheme.cs`, `Shared/MainLayout.razor`, theme CSS and existing dialogs.
+- [v8 migration](https://github.com/MudBlazor/MudBlazor/issues/9953): `MudDialogInstance` becomes
+  `IMudDialogInstance`; dialog options become immutable. Affected shared components include
+  `AccessActionDialog.razor`, `JiraCreateDialog.razor` and `SessionRevokeDialog.razor`, not only resources.
+- [v9 migration](https://github.com/MudBlazor/MudBlazor/issues/12666): the custom account menu in
+  `Shared/UserMenu.razor` must explicitly invoke `MenuContext` activation; message-box APIs also change.
+  Compilation alone cannot validate these interactions. Follow-up scope: shared shell/theme/providers,
+  all dialogs and form APIs, removal/revalidation of the Mud 6 resource accessibility bridge, then
+  keyboard/theme/mobile regression of account, access, sessions and operational-record/Jira UI with
+  fake external adapters. No dependency, lockfile or framework version is changed here.
 
 ### Verified
 

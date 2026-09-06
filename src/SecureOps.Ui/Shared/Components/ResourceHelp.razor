@@ -1,0 +1,120 @@
+@using SecureOps.Shared.Contracts.Resources
+@implements IAsyncDisposable
+@inject IResourceApiClient ResourceApi
+@inject IJSRuntime Js
+
+<div class="so-resource-help">
+    @if (Preferences is { GuideDismissed: false } && !_open)
+    {
+        <div class="so-guide-invitation" data-guide-invitation>
+            <MudIcon Icon="@Icons.Material.Outlined.Explore" />
+            <span><strong>Bağlantılarınızı düzenlemeye başlayın</strong><br />Kısa Kullanım Rehberi ile arama, favori ve grupları keşfedin.</span>
+            <div class="so-inline-actions">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="StartAsync" Disabled="@(_saving || Disabled)">Başla</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="DismissAsync" Disabled="@(_saving || Disabled)">Daha sonra</MudButton>
+            </div>
+        </div>
+    }
+    <div class="so-guide-replay">
+        <MudButton id="resource-guide-replay" Variant="Variant.Text" Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.HelpOutline" OnClick="StartAsync"
+                   Disabled="@(_saving || Disabled)">Nasıl kullanılır?</MudButton>
+    </div>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    @if (_open)
+    {
+        ResourceGuideStep step = Steps[_index];
+        <aside class="so-resource-guide" aria-label="Kullanım Rehberi" @onkeydown="KeyDownAsync">
+            <div class="so-guide-heading">
+                <span class="so-eyebrow">Kullanım Rehberi · @(_index + 1) / @Steps.Count</span>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Rehberi kapat" Size="Size.Small" OnClick="CloseAsync" />
+            </div>
+            <h2 @ref="_heading" tabindex="-1">@step.Title</h2>
+            <p>@step.Description</p>
+            @if (_missing) { <p class="so-panel-text so-panel-text--sm">Bu adımın kontrolü şu anda görünmüyor; ilgili sayfaya geçebilir veya adımı atlayabilirsiniz.</p> }
+            <MudLink Href="@step.Href">@step.LinkLabel</MudLink>
+            <div class="so-guide-controls">
+                <MudButton StartIcon="@Icons.Material.Filled.ChevronLeft" Disabled="@(_index == 0)" OnClick="Back">Geri</MudButton>
+                <MudButton OnClick="CloseAsync">Atla</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ChevronRight"
+                           OnClick="NextAsync">@(_index == Steps.Count - 1 ? "Bitir" : "İleri")</MudButton>
+            </div>
+        </aside>
+    }
+</div>
+
+@code {
+    [Parameter] public string Surface { get; set; } = "links";
+    [Parameter] public bool CanManage { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public ResourcePreferencesResponse? Preferences { get; set; }
+    [Parameter] public EventCallback<ResourcePreferencesResponse> PreferencesChanged { get; set; }
+    private IReadOnlyList<ResourceGuideStep> Steps => ResourceGuideSteps.For(Surface, CanManage);
+    private ElementReference _heading;
+    private bool _open, _saving, _pendingTarget, _missing, _interactive;
+    private int _index;
+    private UiProblem? _problem;
+
+    protected override void OnParametersSet() => _index = Math.Min(_index, Steps.Count - 1);
+
+    private async Task DismissAsync()
+    {
+        if (_saving || Preferences is null || Preferences.GuideDismissed) return;
+        _saving = true;
+        _problem = null;
+        try
+        {
+            ResourcePreferencesResponse saved = await ResourceApi.DismissGuideAsync(Preferences.Version, CancellationToken.None);
+            await PreferencesChanged.InvokeAsync(saved);
+        }
+        catch (SecureOpsApiException exception)
+        {
+            _problem = exception.Problem;
+            try { await PreferencesChanged.InvokeAsync(await ResourceApi.GetPreferencesAsync(CancellationToken.None)); }
+            catch (SecureOpsApiException refresh) { _problem = refresh.Problem; }
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task StartAsync()
+    {
+        await DismissAsync();
+        _index = 0;
+        _open = true;
+        _pendingTarget = true;
+    }
+
+    private void Back() { _index = Math.Max(0, _index - 1); _pendingTarget = true; }
+    private async Task NextAsync()
+    {
+        if (_index == Steps.Count - 1) await CloseAsync();
+        else { ++_index; _pendingTarget = true; }
+    }
+
+    private async Task CloseAsync()
+    {
+        _open = false;
+        await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", true);
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? CloseAsync() : Task.CompletedTask;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _interactive = true;
+        if (_open && _pendingTarget)
+        {
+            _pendingTarget = false;
+            _missing = !await Js.InvokeAsync<bool>("secureOpsResourceGuide.show", Steps[_index].Target);
+            await _heading.FocusAsync(preventScroll: true);
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_interactive) return;
+        try { await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", false); }
+        catch (JSDisconnectedException) { /* The circuit ended; there is no browser focus to restore. */ }
+    }
+}

@@ -10,7 +10,7 @@ namespace SecureOps.Ui.Services;
 /// </summary>
 public sealed class ResourceApiClient : IResourceApiClient
 {
-    private const string Root = "api/v1/resources";
+    private const string _root = "api/v1/resources";
 
     private readonly HttpClient _httpClient;
 
@@ -31,7 +31,7 @@ public sealed class ResourceApiClient : IResourceApiClient
         CancellationToken cancellationToken) =>
         SendAsync<IReadOnlyList<ResourceCategory>>(
             () => _httpClient.GetAsync(
-                $"{Root}/categories?includeArchived={Bool(includeArchived)}",
+                $"{_root}/categories?includeArchived={Bool(includeArchived)}",
                 cancellationToken),
             cancellationToken);
 
@@ -40,7 +40,7 @@ public sealed class ResourceApiClient : IResourceApiClient
         SaveResourceCategoryRequest request,
         CancellationToken cancellationToken) =>
         SendAsync<ResourceCategory>(
-            () => _httpClient.PostAsJsonAsync($"{Root}/categories", request, JsonOptions, cancellationToken),
+            () => _httpClient.PostAsJsonAsync($"{_root}/categories", request, JsonOptions, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
@@ -49,20 +49,20 @@ public sealed class ResourceApiClient : IResourceApiClient
         SaveResourceCategoryRequest request,
         CancellationToken cancellationToken) =>
         SendAsync<ResourceCategory>(
-            () => _httpClient.PutAsJsonAsync($"{Root}/categories/{id}", request, JsonOptions, cancellationToken),
+            () => _httpClient.PutAsJsonAsync($"{_root}/categories/{id}", request, JsonOptions, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<ResourcePage> QueryLinksAsync(ResourceQuery query, CancellationToken cancellationToken) =>
         SendAsync<ResourcePage>(
-            () => _httpClient.GetAsync($"{Root}/links{ToQueryString(query)}", cancellationToken),
+            () => _httpClient.GetAsync($"{_root}/links{ToQueryString(query)}", cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<ResourceLink> GetLinkAsync(Guid id, bool includeArchived, CancellationToken cancellationToken) =>
         SendAsync<ResourceLink>(
             () => _httpClient.GetAsync(
-                $"{Root}/links/{id}?includeArchived={Bool(includeArchived)}",
+                $"{_root}/links/{id}?includeArchived={Bool(includeArchived)}",
                 cancellationToken),
             cancellationToken);
 
@@ -71,7 +71,7 @@ public sealed class ResourceApiClient : IResourceApiClient
         SaveResourceLinkRequest request,
         CancellationToken cancellationToken) =>
         SendAsync<ResourceLink>(
-            () => _httpClient.PostAsJsonAsync($"{Root}/links", request, JsonOptions, cancellationToken),
+            () => _httpClient.PostAsJsonAsync($"{_root}/links", request, JsonOptions, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
@@ -80,13 +80,13 @@ public sealed class ResourceApiClient : IResourceApiClient
         SaveResourceLinkRequest request,
         CancellationToken cancellationToken) =>
         SendAsync<ResourceLink>(
-            () => _httpClient.PutAsJsonAsync($"{Root}/links/{id}", request, JsonOptions, cancellationToken),
+            () => _httpClient.PutAsJsonAsync($"{_root}/links/{id}", request, JsonOptions, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<ResourcePreferencesResponse> GetPreferencesAsync(CancellationToken cancellationToken) =>
         SendAsync<ResourcePreferencesResponse>(
-            () => _httpClient.GetAsync($"{Root}/me", cancellationToken),
+            () => _httpClient.GetAsync($"{_root}/me", cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
@@ -97,7 +97,7 @@ public sealed class ResourceApiClient : IResourceApiClient
         CancellationToken cancellationToken) =>
         SendAsync<ResourcePreferencesResponse>(
             () => _httpClient.PutAsJsonAsync(
-                $"{Root}/me/favourites/{linkId}",
+                $"{_root}/me/favourites/{linkId}",
                 new SaveFavouriteRequest(favourite, expectedVersion),
                 JsonOptions,
                 cancellationToken),
@@ -108,7 +108,7 @@ public sealed class ResourceApiClient : IResourceApiClient
         SaveShiftSetRequest request,
         CancellationToken cancellationToken) =>
         SendAsync<ResourcePreferencesResponse>(
-            () => _httpClient.PostAsJsonAsync($"{Root}/me/sets", request, JsonOptions, cancellationToken),
+            () => _httpClient.PostAsJsonAsync($"{_root}/me/sets", request, JsonOptions, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
@@ -117,7 +117,7 @@ public sealed class ResourceApiClient : IResourceApiClient
         SaveShiftSetRequest request,
         CancellationToken cancellationToken) =>
         SendAsync<ResourcePreferencesResponse>(
-            () => _httpClient.PutAsJsonAsync($"{Root}/me/sets/{id}", request, JsonOptions, cancellationToken),
+            () => _httpClient.PutAsJsonAsync($"{_root}/me/sets/{id}", request, JsonOptions, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
@@ -127,14 +127,14 @@ public sealed class ResourceApiClient : IResourceApiClient
         CancellationToken cancellationToken) =>
         SendAsync<ResourcePreferencesResponse>(
             () => _httpClient.DeleteAsync(
-                $"{Root}/me/sets/{id}?expectedVersion={expectedVersion.ToString(CultureInfo.InvariantCulture)}",
+                $"{_root}/me/sets/{id}?expectedVersion={expectedVersion.ToString(CultureInfo.InvariantCulture)}",
                 cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<ShiftSetResponse> ResolveSetAsync(Guid id, CancellationToken cancellationToken) =>
         SendAsync<ShiftSetResponse>(
-            () => _httpClient.GetAsync($"{Root}/me/sets/{id}/resolve", cancellationToken),
+            () => _httpClient.GetAsync($"{_root}/me/sets/{id}/resolve", cancellationToken),
             cancellationToken);
 
     private static System.Text.Json.JsonSerializerOptions JsonOptions => ApiResponseReader.JsonOptions;
@@ -145,12 +145,12 @@ public sealed class ResourceApiClient : IResourceApiClient
         string search = Uri.EscapeDataString(query.Search?.Trim() ?? string.Empty);
         string category = query.CategoryId is { } id ? $"&categoryId={id}" : string.Empty;
         return SendAsync<ResourceEnvironmentOptions>(() => _httpClient.GetAsync(
-            $"{Root}/environments?search={search}{category}&includeArchived={Bool(query.IncludeArchived)}", cancellationToken), cancellationToken);
+            $"{_root}/environments?search={search}{category}&includeArchived={Bool(query.IncludeArchived)}", cancellationToken), cancellationToken);
     }
 
     /// <inheritdoc />
     public Task<ResourcePreferencesResponse> DismissGuideAsync(long expectedVersion, CancellationToken cancellationToken) =>
-        SendAsync<ResourcePreferencesResponse>(() => _httpClient.PutAsJsonAsync($"{Root}/me/guide",
+        SendAsync<ResourcePreferencesResponse>(() => _httpClient.PutAsJsonAsync($"{_root}/me/guide",
             new DismissResourceGuideRequest(expectedVersion), JsonOptions, cancellationToken), cancellationToken);
 
     private static string Bool(bool value) => value ? "true" : "false";

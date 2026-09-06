@@ -39,12 +39,12 @@ public static class ResourceView
     /// restricted entry. This states the one thing that is both true and useful.
     /// </remarks>
     public const string PartialSetNotice =
-        "Bu setteki bazı bağlantılar şu anda kullanılamıyor. Arşivlenmiş, kaldırılmış veya "
+        "Bu gruptaki bazı bağlantılar şu anda kullanılamıyor. Arşivlenmiş, kaldırılmış veya "
         + "görüntüleme kapsamınız dışında olabilir. Aşağıda yalnızca şu anda açılabilen bağlantılar listelenir.";
 
     /// <summary>Shown when a resolved set has nothing openable at all.</summary>
     public const string EmptySetNotice =
-        "Bu sette şu anda açılabilecek bağlantı yok. Kayıtlı seçimleriniz korunur; bağlantılar "
+        "Bu grupta şu anda açılabilecek bağlantı yok. Kayıtlı seçimleriniz korunur; bağlantılar "
         + "yeniden kullanılabilir olduğunda burada görünür.";
 
     /// <summary>
@@ -122,29 +122,29 @@ public static class ResourceView
 
         if (trimmed.Length == 0)
         {
-            return "Set adı zorunludur.";
+            return "Grup adı zorunludur.";
         }
 
         if (trimmed.Length > 80)
         {
-            return "Set adı en fazla 80 karakter olabilir.";
+            return "Grup adı en fazla 80 karakter olabilir.";
         }
 
         // Ordinal case-insensitive, matching the documented per-owner uniqueness rule.
         if (existing.Any(set => set.Id != editingId
             && string.Equals(set.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
         {
-            return "Bu adda bir setiniz zaten var.";
+            return "Bu adda bir grubunuz zaten var.";
         }
 
         if (linkIds.Count > MaxLinksPerSet)
         {
-            return $"Bir sette en fazla {MaxLinksPerSet} bağlantı bulunabilir.";
+            return $"Bir grupta en fazla {MaxLinksPerSet} bağlantı bulunabilir.";
         }
 
         if (linkIds.Distinct().Count() != linkIds.Count)
         {
-            return "Aynı bağlantı bir sette birden fazla kez yer alamaz.";
+            return "Aynı bağlantı bir grupta birden fazla kez yer alamaz.";
         }
 
         return null;
@@ -189,4 +189,20 @@ public static class ResourceView
     /// </remarks>
     public static string? Host(ResourceLink link) =>
         Uri.TryCreate(link.Url, UriKind.Absolute, out Uri? uri) ? uri.Host : null;
+
+    /// <summary>Filters the already bounded owner projection, never downloading the catalogue.</summary>
+    public static ResourcePage? FavouritePage(ResourcePreferencesResponse? preferences, ResourceQuery query)
+    {
+        if (preferences is null)
+        {
+            return null;
+        }
+        string search = query.Search?.Trim() ?? string.Empty;
+        ResourceLink[] matching = [.. preferences.Favourites
+            .Where(l => query.CategoryId is null || l.CategoryId == query.CategoryId)
+            .Where(l => string.IsNullOrWhiteSpace(query.Environment) || string.Equals(l.Environment, query.Environment.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Where(l => search.Length == 0 || l.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || l.Purpose.Contains(search, StringComparison.OrdinalIgnoreCase) || l.Tags.Any(t => t.Contains(search, StringComparison.OrdinalIgnoreCase)))];
+        return new([.. matching.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)], query.Page, query.PageSize, matching.Length);
+    }
 }

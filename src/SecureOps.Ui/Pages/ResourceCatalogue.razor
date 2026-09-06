@@ -9,257 +9,128 @@
 @inject IDialogService Dialogs
 @inject ILogger<ResourceCatalogue> Logger
 
-<PageTitle>Katalog Yönetimi · @WasasBrand.Name</PageTitle>
+<PageTitle>Bağlantı Yönetimi · @WasasBrand.Name</PageTitle>
 
-@*
-    Catalogue administration.
-
-    Visibility here follows the capability the API reports, never a role name and never "looks like a
-    lead": the contract gives Resources.Manage to Admin and to the separately assigned
-    ResourceCurator only. Hiding these controls is a courtesy — every call is re-checked server-side.
-
-    Archiving is the only retirement path; there is no hard delete in the contract, and the forms say
-    so rather than offering a Sil button that would fail.
-
-    Every save carries the exact version it was loaded with. A stale one is refused, and the refusal
-    is surfaced with the current state reloaded rather than retried over somebody else's edit.
-*@
-
-<div class="so-page so-page--wide">
-    <SoPageHeader Title="Katalog Yönetimi"
-                  Lead="Operatörlerin gördüğü bağlantı kataloğunu ve kategorilerini yönetin.">
+<div class="so-page so-page--wide so-resource-page so-resource-management">
+    <SoPageHeader Title="Bağlantı Yönetimi" Lead="Ortak uygulama bağlantılarını yayımlayın, kategorileri düzenleyin ve kullanım dışı kayıtları arşivleyin.">
         <Actions>
-            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Refresh"
-                       Disabled="@_busy"
-                       OnClick="ReloadAsync">
-                Yenile
-            </MudButton>
+            <MudButton Href="resources" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Link">Uygulama Bağlantıları</MudButton>
+            <MudTooltip Text="Yenile"><MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="Yenile"
+                Disabled="_busy" OnClick="ReloadAsync" /></MudTooltip>
         </Actions>
     </SoPageHeader>
-
-    @if (_access is null)
+    @if (_access is null) { <SoLoading Message="Yetkileriniz doğrulanıyor…" /> }
+    else if (!_access.IsResolved) { <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" /> }
+    else if (!_access.Can(Capabilities.ResourcesManage) || !_access.Can(Capabilities.ResourcesView))
     {
-        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
-    }
-    else if (!_access.IsResolved)
-    {
-        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
-    }
-    else if (!_access.Can(Capabilities.ResourcesManage))
-    {
-        @* Explained rather than redirected, so an operator learns what is missing and where to ask.
-           Job title and Lead membership grant nothing here. *@
         <section class="so-panel so-panel--blocked">
             <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
-            <p class="so-panel-text">
-                Katalog yönetimi için <code class="so-code">@Capabilities.ResourcesManage</code>
-                yetkisi gerekir. Bu yetki yalnızca yöneticilere ve ayrıca atanmış katalog
-                sorumlularına verilir. Hesabınızda tanımlı yetkileri
-                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
-            </p>
-            <div class="so-panel-actions">
-                <MudButton Href="resources" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
-                    Bağlantılarım
-                </MudButton>
-            </div>
+            <p class="so-panel-text">Bağlantı yönetimi ayrıca atanmış yetki gerektirir. Unvan tek başına bu yetkiyi sağlamaz. <MudLink Href="access/me">Erişimim</MudLink> sayfasından mevcut yetkilerinizi kontrol edin.</p>
         </section>
     }
     else
     {
-        @if (_problem is not null)
+        <ResourceHelp Surface="management" CanManage="true" Preferences="_guidePreferences"
+                      PreferencesChanged="GuidePreferencesChanged" Disabled="_busy" />
+        @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="ReloadAsync" RetryLabel="Güncel kayıtları yükle" /> }
+        <div class="so-management-toolbar">
+            <div class="so-resource-tabs" role="group" aria-label="Yönetim görünümü" data-guide="management-tabs">
+                <MudButton StartIcon="@Icons.Material.Filled.Link" Class="@(!_showCategories ? "is-selected" : null)"
+                           aria-pressed="@(!_showCategories)" OnClick="@(() => _showCategories = false)">Bağlantılar</MudButton>
+                <MudButton StartIcon="@Icons.Material.Outlined.Folder" Class="@(_showCategories ? "is-selected" : null)"
+                           aria-pressed="@_showCategories" OnClick="@(() => _showCategories = true)">Kategoriler</MudButton>
+            </div>
+            <div data-guide="archive-filter">
+                <MudCheckBox T="bool" Value="_includeArchived" ValueChanged="ToggleArchivedAsync" Label="Arşivlenenleri göster" Dense="true" />
+            </div>
+        </div>
+        @if (_showCategories)
         {
-            <SoProblemPanel Problem="_problem" OnRetry="ReloadAsync" RetryLabel="Yeniden yükle" />
+            <section aria-label="Kategori yönetimi">
+                <div class="so-resource-results-head">
+                    <h2>Kategoriler <span class="so-count-chip">@_categories.Count</span></h2>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                               data-guide="new-entry" OnClick="CreateCategoryAsync" Disabled="_busy">Yeni kategori</MudButton>
+                </div>
+                @if (_busy && _categories.Count == 0) { <SoLoading Message="Kategoriler yükleniyor…" /> }
+                else if (_categories.Count == 0) { <SoEmptyState Title="Henüz kategori yok" Description="Bağlantılarınızı düzenlemek için ilk kategoriyi oluşturun." Icon="@Icons.Material.Outlined.FolderOpen" /> }
+                else
+                {
+                    <div class="so-table-scroll">
+                        <table class="so-plain-table so-management-table">
+                            <caption class="sr-only">Ortak bağlantı kategorileri</caption>
+                            <thead><tr><th scope="col">Kategori</th><th scope="col" class="so-management-secondary">Sıra</th><th scope="col">Görünürlük</th><th scope="col">Durum</th><th scope="col"><span class="sr-only">İşlem</span></th></tr></thead>
+                            <tbody>
+                                @foreach (ResourceCategory category in _categories)
+                                {
+                                    <tr>
+                                        <th scope="row">@category.Name</th>
+                                        <td class="so-management-secondary">@category.DisplayOrder</td>
+                                        <td>@(category.ManagersOnly ? "Yönetim yetkisi olanlar" : "Tüm yetkili kullanıcılar")</td>
+                                        <td><SoStatusBadge Label="@(category.Archived ? "Arşivlenmiş" : "Etkin")" Tone="@(category.Archived ? SoStatusBadge.BadgeTone.Neutral : SoStatusBadge.BadgeTone.Positive)" /></td>
+                                        <td><MudButton StartIcon="@Icons.Material.Outlined.Edit" Size="Size.Small" Disabled="_busy"
+                                            aria-label="@($"{category.Name}: Düzenle")" OnClick="@(() => EditCategoryAsync(category))">Düzenle</MudButton></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
         }
-
-        <section class="so-panel">
-            <div class="so-panel-head">
-                <h2 class="so-panel-title">
-                    Kategoriler
-                    <span class="so-count-chip">@_categories.Count</span>
-                </h2>
-                <div class="so-panel-head-actions">
-                    <MudCheckBox T="bool" Value="_includeArchived" ValueChanged="ToggleArchivedAsync"
-                                 Label="Arşivlenenleri göster" Dense="true" />
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.Add"
-                               Disabled="@_busy"
-                               OnClick="CreateCategoryAsync">
-                        Yeni Kategori
-                    </MudButton>
+        else
+        {
+            <section aria-label="Bağlantı yönetimi">
+                <div class="so-management-search">
+                    <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Label="Bağlantı ara" aria-label="Bağlantı ara"
+                                  Immediate="true" DebounceInterval="350" MaxLength="100" Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Clearable="true" Class="so-resource-search" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" data-guide="new-entry"
+                               OnClick="CreateLinkAsync" Disabled="@(_busy || !_categories.Any(c => !c.Archived))">Yeni bağlantı</MudButton>
                 </div>
-            </div>
-
-            @if (_categories.Count == 0)
-            {
-                <SoEmptyState Title="Kategori yok"
-                              Description="Bağlantı eklemeden önce en az bir kategori oluşturun."
-                              Icon="@Icons.Material.Outlined.FolderOff" />
-            }
-            else
-            {
-                <div class="so-table-scroll">
-                    <table class="so-plain-table">
-                        <thead>
-                            <tr>
-                                <th scope="col">Kategori</th>
-                                <th scope="col" class="so-num">Sıra</th>
-                                <th scope="col">Görünürlük</th>
-                                <th scope="col">Durum</th>
-                                <th scope="col"><span class="sr-only">İşlem</span></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (ResourceCategory category in _categories)
-                            {
-                                ResourceCategory captured = category;
-                                <tr>
-                                    <th scope="row">@category.Name</th>
-                                    <td class="so-num">@category.DisplayOrder</td>
-                                    <td>
-                                        @if (category.ManagersOnly)
-                                        {
-                                            <SoStatusBadge Label="Yalnızca yöneticiler"
-                                                           Tone="SoStatusBadge.BadgeTone.Caution" />
-                                        }
-                                        else
-                                        {
-                                            <span class="so-unknown">Tüm operatörler</span>
-                                        }
-                                    </td>
-                                    <td>
-                                        <SoStatusBadge Label="@(category.Archived ? "Arşivlenmiş" : "Etkin")"
-                                                       Tone="@(category.Archived
-                                                           ? SoStatusBadge.BadgeTone.Neutral
-                                                           : SoStatusBadge.BadgeTone.Positive)" />
-                                    </td>
-                                    <td>
-                                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
-                                                   Disabled="@_busy"
-                                                   OnClick="@(() => EditCategoryAsync(captured))">
-                                            Düzenle
-                                        </MudButton>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </section>
-
-        <section class="so-panel">
-            <div class="so-panel-head">
-                <h2 class="so-panel-title">
-                    Bağlantılar
-                    @if (_page is not null)
+                @if (!_categories.Any(c => !c.Archived) && !_busy)
+                {
+                    <p class="so-panel-text">Bağlantı eklemek için etkin bir kategori gerekir.</p>
+                    <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="CreateCategoryAsync">Kategori oluştur</MudButton>
+                }
+                @if (_page is null && _problem is null) { <SoLoading Message="Bağlantılar yükleniyor…" /> }
+                else if (_page is { Items.Count: 0 }) { <SoEmptyState Title="Bağlantı bulunamadı" Description="Aramanızı değiştirin veya yeni bağlantı ekleyin." Icon="@Icons.Material.Outlined.LinkOff" /> }
+                else if (_page is not null)
+                {
+                    <div class="so-resource-results-head"><span role="status">@_page.Total bağlantı @(_busy ? "· Güncelleniyor…" : null)</span></div>
+                    <div class="so-table-scroll">
+                        <table class="so-plain-table so-management-table">
+                            <caption class="sr-only">Ortak uygulama bağlantıları</caption>
+                            <thead><tr><th scope="col">Bağlantı</th><th scope="col" class="so-management-secondary">Kategori</th><th scope="col" class="so-management-secondary">Ortam</th><th scope="col">Durum</th><th scope="col"><span class="sr-only">İşlem</span></th></tr></thead>
+                            <tbody>
+                                @foreach (ResourceLink link in _page.Items)
+                                {
+                                    <tr>
+                                        <th scope="row"><span class="so-set-body"><strong>@link.Name</strong><span class="so-resource-host">@ResourceView.Host(link)</span></span></th>
+                                        <td class="so-management-secondary">@CategoryName(link.CategoryId)</td>
+                                        <td class="so-management-secondary">@(ResourceView.Placement(link) ?? "Belirtilmedi")</td>
+                                        <td><SoStatusBadge Label="@(link.Archived ? "Arşivlenmiş" : link.Active ? "Etkin" : "Pasif")"
+                                            Tone="@(link.Archived ? SoStatusBadge.BadgeTone.Neutral : link.Active ? SoStatusBadge.BadgeTone.Positive : SoStatusBadge.BadgeTone.Caution)" /></td>
+                                        <td><MudButton StartIcon="@Icons.Material.Outlined.Edit" Size="Size.Small" Disabled="_busy"
+                                            aria-label="@($"{link.Name}: Düzenle")" OnClick="@(() => EditLinkAsync(link))">Düzenle</MudButton></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (TotalPages > 1 || _page.Page > 1)
                     {
-                        <span class="so-count-chip">@_page.Total</span>
+                        <div class="so-pager">
+                            <MudButton StartIcon="@Icons.Material.Filled.ChevronLeft" Disabled="@(_busy || _page.Page <= 1)" OnClick="@(() => GoToPageAsync(_page.Page - 1))">Önceki</MudButton>
+                            <span class="so-pager-state">Sayfa @_page.Page / @TotalPages</span>
+                            <MudButton EndIcon="@Icons.Material.Filled.ChevronRight" Disabled="@(_busy || _page.Page >= TotalPages)" OnClick="@(() => GoToPageAsync(_page.Page + 1))">Sonraki</MudButton>
+                        </div>
                     }
-                </h2>
-                <div class="so-panel-head-actions">
-                    <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync"
-                                  Label="Ara" aria-label="Ara" Immediate="true" DebounceInterval="350" MaxLength="100"
-                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
-                                  Class="so-resource-search" />
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.Add"
-                               Disabled="@(_busy || !_categories.Any(c => !c.Archived))"
-                               OnClick="CreateLinkAsync">
-                        Yeni Bağlantı
-                    </MudButton>
-                </div>
-            </div>
-
-            @if (_page is null)
-            {
-                <SoFlightLoading Message="Katalog getiriliyor…" Bare="true" />
-            }
-            else if (_page.Items.Count == 0)
-            {
-                <SoEmptyState Title="Bağlantı yok"
-                              Description="Arama ölçütünü değiştirin veya yeni bir bağlantı ekleyin."
-                              Icon="@Icons.Material.Outlined.LinkOff" />
-            }
-            else
-            {
-                <div class="so-table-scroll">
-                    <table class="so-plain-table">
-                        <thead>
-                            <tr>
-                                <th scope="col">Bağlantı</th>
-                                <th scope="col">Kategori</th>
-                                <th scope="col">Ortam / Konum</th>
-                                <th scope="col">Durum</th>
-                                <th scope="col"><span class="sr-only">İşlem</span></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (ResourceLink link in _page.Items)
-                            {
-                                ResourceLink captured = link;
-                                <tr>
-                                    <th scope="row">
-                                        <span class="so-session-user">
-                                            <span class="so-session-name">@link.Name</span>
-                                            @if (ResourceView.Host(link) is { } host)
-                                            {
-                                                <span class="so-session-account">@host</span>
-                                            }
-                                        </span>
-                                    </th>
-                                    <td>@CategoryName(link.CategoryId)</td>
-                                    <td>@(ResourceView.Placement(link) ?? "—")</td>
-                                    <td>
-                                        @if (link.Archived)
-                                        {
-                                            <SoStatusBadge Label="Arşivlenmiş" Tone="SoStatusBadge.BadgeTone.Neutral" />
-                                        }
-                                        else if (!link.Active)
-                                        {
-                                            <SoStatusBadge Label="Pasif" Tone="SoStatusBadge.BadgeTone.Caution" />
-                                        }
-                                        else
-                                        {
-                                            <SoStatusBadge Label="Etkin" Tone="SoStatusBadge.BadgeTone.Positive" />
-                                        }
-                                    </td>
-                                    <td>
-                                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
-                                                   Disabled="@_busy"
-                                                   OnClick="@(() => EditLinkAsync(captured))">
-                                            Düzenle
-                                        </MudButton>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="so-pager">
-                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.ChevronLeft"
-                               Disabled="@(_busy || _page.Page <= 1)"
-                               OnClick="@(() => GoToPageAsync(_page.Page - 1))">
-                        Önceki
-                    </MudButton>
-                    <span class="so-pager-state">Sayfa @_page.Page / @TotalPages</span>
-                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
-                               EndIcon="@Icons.Material.Filled.ChevronRight"
-                               Disabled="@(_busy || _page.Page >= TotalPages)"
-                               OnClick="@(() => GoToPageAsync(_page.Page + 1))">
-                        Sonraki
-                    </MudButton>
-                </div>
-            }
-
-            <p class="so-panel-text so-panel-text--sm">
-                Bağlantılar kalıcı olarak silinmez; kullanımdan kaldırmak için arşivleyin.
-                Arşivlenen kayıtlar operatör listelerinde ve kişisel setlerde görünmez.
-            </p>
-        </section>
+                }
+            </section>
+        }
+        <p class="so-panel-text so-panel-text--sm so-resource-footer">Arşivlenen kayıtlar normal listelerden gizlenir; kişisel gruplardaki kayıtlı seçimler korunur.</p>
     }
 </div>
 
@@ -270,6 +141,9 @@
     private UiProblem? _problem;
     private bool _busy;
     private bool _includeArchived;
+    private bool _showCategories;
+    private ResourcePreferencesResponse? _guidePreferences;
+    private void GuidePreferencesChanged(ResourcePreferencesResponse preferences) => _guidePreferences = preferences;
     private string _search = string.Empty;
     private int _pageNumber = 1;
     private int _requestId;
@@ -304,6 +178,8 @@
         _problem = null;
         await LoadCategoriesAsync();
         await LoadLinksAsync();
+        try { _guidePreferences = await ResourceApi.GetPreferencesAsync(CancellationToken.None); }
+        catch (SecureOpsApiException exception) { _problem = exception.Problem; }
     }
 
     private async Task LoadCategoriesAsync()

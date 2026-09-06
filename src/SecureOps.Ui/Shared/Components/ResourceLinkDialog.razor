@@ -40,11 +40,11 @@
                           HelperText="Operatörün listede göreceği ad. En fazla 120 karakter." />
 
             <MudTextField @bind-Value="_url" Label="Adres (URL)" aria-label="Adres (URL)" Required="true" MaxLength="2048"
-                          Immediate="true" Variant="Variant.Outlined"
+                          Immediate="true" Variant="Variant.Outlined" Class="so-field--full"
                           HelperText="Yalnızca https:// ile başlayan tam adres kabul edilir." />
 
             <MudTextField @bind-Value="_purpose" Label="Amaç" aria-label="Amaç" Required="true" MaxLength="300"
-                          Immediate="true" Lines="2" Variant="Variant.Outlined"
+                          Immediate="true" Lines="2" Variant="Variant.Outlined" Class="so-field--full"
                           HelperText="Bu bağlantının ne işe yaradığı. En fazla 300 karakter." />
 
             <MudTextField @bind-Value="_environment" Label="Ortam" aria-label="Ortam" MaxLength="40"
@@ -61,7 +61,7 @@
                              Variant="Variant.Outlined" HelperText="Küçük değer önce listelenir." />
 
             <MudTextField @bind-Value="_notes" Label="Erişim notu" aria-label="Erişim notu" MaxLength="1000" Lines="3"
-                          Variant="Variant.Outlined"
+                          Variant="Variant.Outlined" Class="so-field--full"
                           HelperText="İsteğe bağlı. Parola veya kimlik bilgisi yazmayın." />
         </div>
 
@@ -73,7 +73,7 @@
         @if (_archived)
         {
             <p class="so-consequence so-consequence--caution">
-                Arşivlenen bağlantı normal listelerde ve kişisel setlerde görünmez. Kayıtlı
+                Arşivlenen bağlantı normal listelerde ve kişisel gruplarda görünmez. Kayıtlı
                 seçimler silinmez; bağlantı yeniden etkinleştirilirse tekrar görünür olur.
             </p>
         }
