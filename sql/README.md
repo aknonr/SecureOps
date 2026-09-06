@@ -1,6 +1,6 @@
 # sql/
 
-SQL Server schema and migration scripts. Files under `schema/` are reviewed offline contracts; they are not executed by the application, tests, or deployment process.
+SQL Server schema and migration scripts. Files under `schema/` are reviewed contracts, never applied by application startup. Explicit isolated SQL tests may execute them; corporate execution requires the approved DBA process.
 
 ## Structure
 
@@ -21,7 +21,9 @@ sql/
 | 005 | Management reporting views and supporting indexes |
 | 006 | Preserve unknown Operational Record source creation timestamps as NULL |
 | 007 | Authoritative application sessions, lifecycle indexes, and limited reporting view |
+| 008 | Persisted application-user profile fields |
 | 009 | Bounded nullable SDM evaluation evidence on OperationalRecords and append-only workflow history; requires 001-008 |
+| 010 | Shared resource categories/links, owner-scoped versioned personal preferences, and unassigned ResourceCurator role seed; requires 001-009 |
 
 The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded; 004-007 guard or replace their objects. No down scripts or migration-history table exists. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
 
@@ -40,7 +42,7 @@ Current reviewed offline assets additionally include `002-operational-record-jir
 
 ## Migration Tool
 
-No application startup migration or EF migration is currently enabled. The reviewed SQLCMD assets are executed only by the approved DBA process.
+No application startup migration or EF migration is currently enabled. Corporate SQLCMD execution belongs to the approved DBA process; the isolated local test harness below is separate.
 
 Audit triggers and append-only enforcement live in `sql/schema/` and are applied as part of the same migration that creates the table.
 
@@ -49,6 +51,26 @@ The Operational Record/Jira workflow uses `schema/002-operational-record-jira-wo
 Application-session governance uses `schema/007-application-session-governance.sql`. Runtime requires `SELECT`, `INSERT`, and `UPDATE` on `security.ApplicationSessions` and `SELECT` on `reporting.ManagementSessionStatus`. It requires no `DELETE`, DDL, schema ownership, or migration permission.
 
 ## Test Harness
+
+Resource v1 adds `scripts/powershell/Test-ResourceCatalogueSql.ps1`, an explicitly
+invoked isolated LocalDB-only harness. It refuses an existing database name,
+applies 001-008, inserts synthetic predecessor rows, applies 009 then 010, checks
+preservation and empty catalogue defaults, and optionally runs ResourceSqlTests.
+It neither installs SQL nor touches existing user databases. It uses SQLCMD -I
+(QUOTED_IDENTIFIER ON), required by filtered indexes in the existing chain.
+Migration 009 remains unchanged. Local execution is not corporate readiness.
+
+010 stores bounded text and tags, ordered/visibility indexes and category/user
+foreign keys. Versions must be positive. Personal JSON is capped at 240000 bytes
+and must contain arrays plus the matching version; the service enforces nested
+counts, IDs, ownership and default-set invariants. No link snapshots or credentials
+are copied into personal JSON. Runtime needs SELECT/INSERT/UPDATE on the three
+resource tables and existing INSERT on audit.AuditLog; no DELETE or DDL.
+Existing records are untouched and no catalogue entries/user grants are seeded.
+010 guards object/role creation but does not repair a mismatched existing schema.
+The table/role batch is transactional; schema creation precedes it. Rollback
+restores binaries/configuration and retains additive tables/audit, not a destructive
+down migration. Archive changes only current state; audit remains append-only.
 
 Migration 009 adds `SdmEvaluationJson nvarchar(4000) NULL` to the record and
 history. SQL JSON/shape checks enforce safe evaluation defaults; existing rows

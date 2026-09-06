@@ -2,6 +2,9 @@
 
 DTOs, JSON contracts, authorization policy constants, utilities.
 
+`Contracts/Resources/` defines bounded catalogue and personal-set requests and
+response envelopes. Resources.View and Resources.Manage are distinct capabilities.
+
 ## What goes here
 
 - **Contracts** (`Contracts/` namespace): Request/response DTOs as `record` types. These mirror the JSON schemas in `contracts/schemas/`.

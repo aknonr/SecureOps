@@ -24,12 +24,12 @@ Target coverage:
 
 ## SecureOps.Tests.Integration
 
-Slower, broader. Current coverage uses the in-process Web API host via `WebApplicationFactory` and deterministic backend fakes. No SQL container or UI test dependency is active.
+Slower, broader. Default coverage uses the in-process Web API host via `WebApplicationFactory` and deterministic backend fakes. Resource SQL tests additionally support an explicitly selected isolated LocalDB database. No SQL container or UI test dependency is active.
 
 Subfolders:
 - `Api/` — webhook flow, controller routing, authorization.
 - `Worker/` — Hangfire job orchestration.
-- `Sql/` — future authorized SQL integration coverage; current SQL checks are offline contract tests.
+- `Sql/` — opt-in isolated LocalDB execution; offline SQL asset assertions remain separate unit tests.
 - `Security/` — JEA whitelist enforcement, forbidden-cmdlet rejection.
 - `Performance/` — concurrent webhook load, diagnostic timing.
 - `Mocks/` — mock SolarWinds, PAM, Teams.
@@ -60,8 +60,18 @@ See `docs/agent-guides/090-testing-quality.md`:
 - Each test isolated (no shared mutable state).
 ## Current Test Boundary
 
-All identity, Swagger, authorization, forwarded-header, and SQL schema tests are deterministic and local. They use mocks/fakes or offline file assertions and must not contact corporate AD, PAM, LDAP, SQL Server, IIS, or load balancers. Real provider validation is a separately authorized test-server activity.
+Resource catalogue coverage adds capability/ownership, URL/content policy,
+visibility/archive, search/order/page, stale writes, private defaults and API
+serialization. ResourceSqlTests are explicitly opt-in via
+SECUREOPS_SQL_TEST_CONNECTION, accept only the isolated Resource V1 LocalDB
+instance and test-prefixed database, and report skipped/NOT RUN when absent.
+The local harness in scripts/powershell/Test-ResourceCatalogueSql.ps1 validates
+the actual migration upgrade and then runs SQL round-trip, concurrency,
+transactional audit rollback, append-only, and SDM persistence tests. Corporate
+SQL/AD/HTTP endpoints remain forbidden. Offline SQL asset assertions are separate.
+
+All identity, Swagger, authorization, forwarded-header, and SQL schema tests are local. They use mocks/fakes, offline assertions, or the explicitly guarded disposable LocalDB facility. They must not contact corporate AD, PAM, LDAP, SQL Server, IIS, or load balancers. Real provider validation is a separately authorized test-server activity.
 
 Release validation additionally checks the published Active Directory dependency closure, manifest hashes, and ZIP paths without contacting a domain controller.
 
-Operational Record/Jira tests use deterministic fakes. They cover manual-review fallback, exact requester resolution, preview, audit, repeated/concurrent create requests, unknown Jira outcomes, persisted Jira plus source-close failure, retry, cancellation, ProblemDetails, authorization, and offline SQL uniqueness. They never contact live Jira, the Operational Record source, SQL Server, AD, IIS, or PowerShell.
+Operational Record/Jira workflow tests use deterministic fakes. They cover manual-review fallback, exact requester resolution, preview, audit, repeated/concurrent create requests, unknown Jira outcomes, persisted Jira plus source-close failure, retry, cancellation, ProblemDetails, authorization, and offline SQL uniqueness. The opt-in Resource SQL suite also validates SDM persistence in isolated LocalDB. No tests contact live Jira, the Operational Record source, corporate SQL Server, AD, IIS, or PowerShell remoting.

@@ -1,0 +1,30 @@
+# Resource Catalogue
+
+Backend-owned local application data, not a destination-system integration.
+ResourceCatalogueService revalidates persisted approved access and capabilities
+on every operation. Resources.Manage is separate from general Lead authority.
+Only internal UserId owns preferences; there is no arbitrary-owner API.
+
+SqlResourceRepository follows Access:RepositoryProvider and uses SecureOpsDb.
+Migration 010 after unchanged 001-009 creates categories, links and bounded JSON
+personal aggregates. Every write compares a version under serializable locking
+and inserts safe audit metadata in the same SQL transaction. InMemory is a
+serialized test substitute, with audit failure preventing assignment.
+
+Categories cap at 200, including archived rows. Personal preferences cap at
+200 favourites, 20 sets and 100 distinct ordered links per set. A single personal
+version guards changes to membership, ordering and the optional default. The
+service rejects a mutation built from a snapshot whose version differs from the
+client's expectation; SQL then rejects intervening writes. Reads never copy or
+return unavailable/hidden link details from saved preferences.
+
+ResourceValidation defines HTTPS/query/content policy without network I/O.
+No HttpClient, browser, PowerShell, favicon or health-check integration exists.
+Full replacement writes audit entry ID, version, archive/active state and actor
+ID, not titles, URLs, set names, link selections or query values. No browsing
+telemetry is added. Repeated accepted intents can create another version; stale
+requests create no resource audit. Audit failure rolls back SQL state.
+
+See ADR-0019, docs/contracts/secureops-api-v1-ui-integration.md and
+docs/24-api-test-deployment-readiness.md for the contract, migration gates and
+isolated SQL verification commands. No corporate validation is implied.

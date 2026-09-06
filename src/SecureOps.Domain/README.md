@@ -2,6 +2,9 @@
 
 Pure C# domain model. **No external dependencies.**
 
+`Resources/` contains catalogue category/link snapshots and the bounded private
+favourite/shift-set aggregate. It stores references, not browser execution state.
+
 ## What goes here
 
 - Entities: `Alert`, `AlertEvent`, `DiagnosticJob`, `DiagnosticResult`, `Server`, `User`, `AuditEvent`, `ApplicationSession`, and the Operational Record/Jira workflow aggregate.

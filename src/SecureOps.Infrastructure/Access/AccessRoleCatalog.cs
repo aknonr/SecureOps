@@ -10,6 +10,8 @@ public static class AccessRoleCatalog
         {
             ["Admin"] =
             [
+                Capabilities.ResourcesView,
+                Capabilities.ResourcesManage,
                 Capabilities.IdentityLookup,
                 Capabilities.DirectoryGroupsView,
                 Capabilities.DirectoryGroupMembersView,
@@ -32,6 +34,7 @@ public static class AccessRoleCatalog
             ],
             ["Lead"] =
             [
+                Capabilities.ResourcesView,
                 Capabilities.IdentityLookup,
                 Capabilities.DirectoryGroupsView,
                 Capabilities.TeamView,
@@ -44,12 +47,14 @@ public static class AccessRoleCatalog
             ],
             ["Operator"] =
             [
+                Capabilities.ResourcesView,
                 Capabilities.TeamView,
                 Capabilities.OperationalRecordsView,
                 Capabilities.OperationalRecordsCreateJiraPreview
             ],
             ["JiraPublisher"] =
             [
+                Capabilities.ResourcesView,
                 Capabilities.OperationalRecordsView,
                 Capabilities.OperationalRecordsCreateJiraPreview,
                 Capabilities.OperationalRecordsCreateJira,
@@ -57,13 +62,15 @@ public static class AccessRoleCatalog
             ],
             ["Auditor"] =
             [
+                Capabilities.ResourcesView,
                 Capabilities.AuditView,
                 Capabilities.OperationalRecordsView,
                 Capabilities.OperationalRecordsViewDiagnostics,
                 Capabilities.AccessViewAudit,
                 Capabilities.ManagementReportingView
             ],
-            ["ReadOnly"] = [Capabilities.OperationalRecordsView]
+            ["ReadOnly"] = [Capabilities.OperationalRecordsView, Capabilities.ResourcesView],
+            ["ResourceCurator"] = [Capabilities.ResourcesView, Capabilities.ResourcesManage]
         };
 
     /// <summary>All reviewed role codes.</summary>

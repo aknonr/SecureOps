@@ -3,6 +3,10 @@ namespace SecureOps.Shared.Auth;
 /// <summary>Stable application capability identifiers.</summary>
 public static class Capabilities
 {
+    /// <summary>Read permitted catalogue entries and manage personal resource preferences.</summary>
+    public const string ResourcesView = "Resources.View";
+    /// <summary>Manage shared categories and links; does not grant destination-system access.</summary>
+    public const string ResourcesManage = "Resources.Manage";
     /// <summary>Read one exact identity.</summary>
     public const string IdentityLookup = "Identity.Lookup";
     /// <summary>Read a bounded set of exact identities.</summary>

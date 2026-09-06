@@ -4,6 +4,13 @@ The audit subsystem is the project's most important non-functional feature. This
 
 ## Principles
 
+Resource catalogue mutations add `ResourceCategorySaved`, `ResourceLinkSaved`,
+and `ResourcePreferencesSaved`. Evidence contains internal actor/entry IDs,
+version, Created/Replaced disposition, and nullable archive/active flags. Shared
+state and audit commit in one SQL transaction; audit failure rolls back the write.
+Personal audit omits set names and selected links. No target URL, query value,
+content, credential, profile or browsing/opening telemetry is recorded.
+
 1. **Append-only.** UPDATE and DELETE on audit tables are blocked at the SQL layer.
 2. **Complete.** Every state-changing operation and every privileged read writes an audit entry.
 3. **Structured.** Audit entries follow a JSON schema; arbitrary text in `DetailsJson` is parseable.

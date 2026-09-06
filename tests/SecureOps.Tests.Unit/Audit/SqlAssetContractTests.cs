@@ -63,8 +63,9 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(9)
-            .And.ContainSingle(name => name!.StartsWith("009-", StringComparison.Ordinal));
+            .And.HaveCount(10)
+            .And.ContainSingle(name => name!.StartsWith("009-", StringComparison.Ordinal))
+            .And.ContainSingle(name => name!.StartsWith("010-", StringComparison.Ordinal));
 
         IReadOnlyList<int> declaredLengths = Directory
             .EnumerateFiles(Path.Combine(root, "sql", "schema"), "*.sql")

@@ -2,6 +2,10 @@
 
 External integrations and data access.
 
+`Resources/` provides the shared link catalogue and personal preferences with
+capability-checked services, SQL transactions and a local in-memory substitute.
+It requires migration 010 when Access persistence is SqlServer; see its README.
+
 ## Namespaces
 
 Current implemented Phase 1A namespaces:

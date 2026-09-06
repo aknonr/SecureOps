@@ -5,6 +5,10 @@ namespace SecureOps.Shared.Auth;
 /// </summary>
 public static class Policies
 {
+    /// <summary>Approved catalogue reader and personal preference owner.</summary>
+    public const string CanViewResources = "CanViewResources";
+    /// <summary>Explicit shared catalogue management.</summary>
+    public const string CanManageResources = "CanManageResources";
     /// <summary>Capability policy for one exact identity lookup.</summary>
     public const string CanIdentityLookup = "CanIdentityLookup";
     /// <summary>Capability policy for bounded bulk identity lookup.</summary>

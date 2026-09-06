@@ -2,6 +2,10 @@
 
 ASP.NET Core Web API. Hosted on IIS in-process.
 
+`ResourcesController` exposes `/api/v1/resources` for shared catalogue management
+and caller-owned favourites/shift sets. Destination URLs are never fetched.
+The canonical UI contract documents version conflicts and filtered set resolution.
+
 ## Responsibilities
 
 - Receive monitoring webhooks at `/api/v1/alerts/webhook` (HMAC-signed).

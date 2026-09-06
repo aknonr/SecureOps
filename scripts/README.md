@@ -22,6 +22,13 @@ scripts/
 
 ## API Release Scripts
 
+- `powershell/Test-ResourceCatalogueSql.ps1` is an explicitly authorized local-only
+  disposable database harness, not a production diagnostic. It requires the
+  separately provisioned SecureOpsResourcesV1 LocalDB instance, creates a fresh
+  prefixed database, refuses overwrite, runs migrations 001-010 with synthetic
+  upgrade rows, and optionally runs guarded SQL integration tests. It retains the
+  test database for inspection and never changes a shared SQL service.
+
 - `release/New-ApiDeploymentPackage.ps1` creates and validates a path-preserving deployment ZIP and payload manifest.
 - `release/Test-ApiReleasePayload.ps1` rejects forbidden files and scans for credential-like and caller-supplied personal markers.
 - `release/Validate-ApiAdRuntimeDependencies.ps1` validates hashes, runtime manifests, project consistency, and the AD dependency closure.

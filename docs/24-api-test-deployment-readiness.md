@@ -17,12 +17,20 @@ Run the SQLCMD-mode entrypoints in exact order through the approved DBA process:
 | 7 | `sql/migrations/007-application-session-governance.sql` | authoritative application-session table, indexes, and limited reporting view | Yes for object presence/replacement; prerequisite access and reporting schemas must exist. |
 | 8 | `sql/migrations/008-oidc-user-profile.sql` | nullable bounded OIDC login name, display name, mail, uid, and profile-update timestamp on `security.Users` | Yes for column presence; prerequisite `security.Users` must exist. |
 | 9 | `sql/migrations/009-sdm-evaluation-foundation.sql` | nullable bounded SDM evidence on operational records/history and validation constraints | Guarded column/constraint creation; requires 001-008. DBA execution before SDM binary upgrade. |
+| 10 | `sql/migrations/010-resource-catalogue.sql` | resources.Categories, Links, PersonalPreferences and unassigned ResourceCurator role | Guarded object/role creation; requires 001-009; collision fails closed. |
 
 The `:r` directives require SQLCMD mode and resolve files under `sql/schema`. Migrations 003-008 require successful prerequisites. None assumes empty tables, but 001 and 002 require the target object names to be absent. Existing rows are supported by defaults in 003 and 004; migration 008 adds nullable columns and does not invent profile values for existing users. Migrations 005 and 007 can add indexes and must be scheduled and reviewed by the DBA.
 
 There are no down migrations, migration-history table, encompassing transaction, or automatic rollback. A failure after a `GO` can leave a partially applied database. Before execution, the DBA must inventory schemas, tables, indexes, triggers, constraints, and seeded `RoleId`/`RoleCode` values, take an approved backup or recovery point, and stop on any collision. Do not re-run a failed batch without a DBA-authored corrective plan.
 
 ## Database Contract
+
+Resource v1 extends the runtime grant set with SELECT, INSERT, UPDATE on
+`resources.Categories`, `resources.Links`, and `resources.PersonalPreferences`.
+Shared and personal changes INSERT audit evidence in the same transaction.
+No direct audit SELECT, history modification, DELETE, schema ownership or DDL is
+required. ResourceCurator is a role definition only; assignment remains an
+existing Admin's versioned access operation. The provider follows Access storage.
 
 - `audit.AuditLog`; indexes `IX_AuditLog_OccurredAt`, `IX_AuditLog_CorrelationId`; append-only trigger.
 - `security.Users`, `Roles`, `RoleAssignments`, `AccessRequests`, `AccessRequestHistory`; bounded nullable OIDC profile metadata; active-role and pending-request unique indexes; status checks; no-self-approval and append-only triggers.
@@ -173,3 +181,95 @@ not been applied by this task. Next: Action Center integration with the additive
 contract, followed by approved structured source/category policy and a separate
 human-approval milestone. External writes remain disabled; no new deployment or
 release package is implied.
+
+## Resource Catalogue Backend V1: Local Task Evidence
+
+Recorded 2026-09-06, starting source
+`c18d196ba14905df92e57fe231c2e31b95d113de`, branch
+`feature/sql-runtime-hardening-20260902`. The starting tracked tree was clean;
+only the pre-existing untracked `.vscode/` was present and is preserved.
+
+The owner explicitly authorized this milestone's total diff to exceed the
+1,000-line limit in `docs/agent-guides/090-testing-quality.md`. The permanent
+rule is unchanged. This covers handwritten implementation, tests, documentation
+and generated OpenAPI together, not separate artificial per-commit limits.
+ADR-0019 records the decision; final total additions/deletions are reported from
+the starting source through the maintenance-document commit.
+
+Implemented: shared categories/links, manager-only categories, bounded search and
+pagination, explicit Admin/ResourceCurator management, owner-only favourites and
+ordered named/default sets, current visibility resolution, version conflicts,
+and SQL-transactional safe audit. No real user received a role. Claude's canonical
+handoff is `docs/contracts/secureops-api-v1-ui-integration.md`, section
+"Resource Catalogue and Shift Start Sets: Claude Handoff".
+
+### Executed Verification
+
+| Gate | Actual local result |
+|---|---|
+| Release solution build | PASS, 0 warnings, 0 errors |
+| Full unit suite | PASS, 962 passed, 0 failed, 0 skipped |
+| Full integration suite with isolated SQL enabled | PASS, 234 passed, 0 failed, 0 skipped; includes four actual SQL tests |
+| OpenAPI | Regenerated through the existing in-process Swagger snapshot test process; snapshot equality passes in the full integration suite |
+| Vulnerability scan including transitives, public nuget.org feed | PASS, no vulnerable packages reported across eight projects; no version changes |
+| Repository-wide format verification | FAIL on existing unrelated whitespace/encoding/import/naming debt, including unchanged Identity and UI files; not bulk-fixed |
+| New resource C# files | PASS, scoped `dotnet format --verify-no-changes --no-restore --include` over the explicit new C# file list |
+| Diff whitespace | PASS, `git diff --check`; staged diff checked again before commit |
+| Corporate SQL/AD/Turuncu Hat/Jira, IIS, browser targets | NOT RUN; not authorized or needed for this local milestone |
+
+The full unit run initially exposed two expected baseline assertions (six-role
+list and nine-migration count). Both were updated for ResourceCurator/010; the
+totals above are the passing rerun. No UI implementation changed.
+
+### Actual Isolated SQL Execution
+
+An existing LocalDB installation was available. A new per-user test instance
+`SecureOpsResourcesV1` and new test-prefixed databases were used, without changing
+the existing default instance or any existing user database. The final fresh
+database was `SecureOps_ResourcesV1_Complete`.
+
+`scripts/powershell/Test-ResourceCatalogueSql.ps1 -DatabaseSuffix Complete -RunTests`
+successfully applied 001-008, inserted synthetic predecessor user/Operational
+Record rows, applied **unchanged 009 then new 010**, verified preserved manual
+review/ineligibility and empty catalogue defaults, re-ran 010's guards, and ran
+four SQL tests. They exercised catalogue/personal round trips, concurrent stale
+write rejection, owner separation, archive/visibility filtering, transactional
+audit failure rollback, append-only enforcement, constraints, and SDM evaluation
+persistence/staleness/unchanged-input history idempotency. Offline SQL contract
+assertions remain separate evidence, not substitutes for these executed tests.
+
+Initial disposable attempts exposed SQLCMD's required `-I` option and a Windows
+PowerShell connection-builder property issue; the harness was corrected and the
+entire fresh upgrade succeeded. Earlier test databases are retained for inspection,
+not deployed evidence. Only a new test-owned failure-injection trigger was
+created/dropped; no existing append-only trigger was disabled or altered.
+
+### Deployment Gates and Repeatable Checklist
+
+The deployment order for this source supersedes the older 001-008 checklist:
+verify actual installed schema and backup/recovery point, apply only missing
+migrations **001 through 010 in order**, validate 009 SDM evidence and 010 objects,
+assign reviewed runtime grants, then deploy separately authorized binaries.
+No corporate migration, push, deployment or release packaging occurred here.
+
+- To repeat locally, use the existing isolated instance and a **new** database
+  suffix: `powershell -NoProfile -File scripts/powershell/Test-ResourceCatalogueSql.ps1 -DatabaseSuffix Review2 -RunTests`.
+  Build Release first. The harness refuses existing database names and nonlocal
+  destinations, installs no SQL service, and preserves databases for inspection.
+- Corporate SQL execution and least-privileged integrated runtime grants remain
+  **NOT RUN**. LocalDB owner-level success does not prove corporate permissions,
+  deployment identity, collation/compatibility configuration or production load.
+  Revalidate migration upgrade, constraints, concurrency and transactional audit
+  under the authorized deployment identity before enabling SQL-backed use.
+- Runtime needs SELECT/INSERT/UPDATE on the three resource tables and existing
+  append-only audit INSERT permission. No resource DELETE, DDL, trigger override
+  or real-user grant is required. Review role seed 7 for collisions.
+- 010 is additive and seeds no catalogue data. Older binaries ignore its tables;
+  rollback retains them and all audit evidence. No destructive down migration.
+- The SDM source baseline remains undeployed/unrevalidated in TEST. Current real
+  records remain manual review/ineligible; positive structured category policy
+  and approval are pending. Preserve ReadOnlyIntegrationMode=true and
+  ControlledTestWritesEnabled=false. No Jira create, source update or BPM close.
+- Next UI milestone: implement the resource catalogue, manager forms, private
+  favourites/set editor and explicit browser opening/fallback against the committed
+  additive contract. No cookie/token forwarding or inferred target authentication.

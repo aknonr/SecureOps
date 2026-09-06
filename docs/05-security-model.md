@@ -45,6 +45,15 @@ If the approved Turuncuhat integration is webhook-based, the approved caller inv
 
 ### Application Roles
 
+Resources.View is available to approved users through all reviewed roles.
+Resources.Manage is granted only to Admin and the limited ResourceCurator role,
+not Lead. Existing Access.AssignRoles administrators can assign ResourceCurator
+with the versioned role-replacement endpoint; it grants no other capability and
+no destination-system permission. No real user is granted this role by migration.
+Private favourites and shift sets are owned by internal UserId and cannot be
+read or changed by another user, including Admin. Current category visibility and
+link active/archive state are rechecked on every saved-reference response.
+
 | Role | Permissions |
 |---|---|
 | Operator | View Operational Records and generate read-only Jira previews |

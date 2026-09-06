@@ -9,6 +9,7 @@ using SecureOps.Infrastructure.Identity;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Infrastructure.Persistence;
 using SecureOps.Infrastructure.Reporting;
+using SecureOps.Infrastructure.Resources;
 using SecureOps.Infrastructure.Sessions;
 using SecureOps.Shared.Configuration;
 
@@ -138,15 +139,18 @@ public static class DependencyInjection
         if (string.Equals(configuration[$"{AccessOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IAccessRepository, SqlAccessRepository>();
+            services.AddScoped<IResourceRepository, SqlResourceRepository>();
             services.AddScoped<IFirstAdminBootstrapStore, SqlFirstAdminBootstrapStore>();
         }
         else
         {
             services.AddSingleton<IAccessRepository, InMemoryAccessRepository>();
+            services.AddSingleton<IResourceRepository, InMemoryResourceRepository>();
             services.AddSingleton<IFirstAdminBootstrapStore, UnavailableFirstAdminBootstrapStore>();
         }
 
         services.AddScoped<IApplicationAccessService, ApplicationAccessService>();
+        services.AddScoped<ResourceCatalogueService>();
         if (string.Equals(configuration[$"{SessionSecurityOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IApplicationSessionRepository, SqlApplicationSessionRepository>();

@@ -20,7 +20,7 @@ public sealed class AccessRoleCatalogTests
             ["ReadOnly"] = "Sadece Görüntüleme"
         };
 
-        AccessRoleCatalog.RoleCodes.Should().BeEquivalentTo(expected.Keys);
+        AccessRoleCatalog.RoleCodes.Should().BeEquivalentTo(expected.Keys.Append("ResourceCurator"));
         foreach ((string role, string label) in expected)
         {
             AccessLabels.RoleLabel(role).Should().Be(label);

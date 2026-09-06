@@ -4,6 +4,15 @@ This document captures the operational environment that shapes every design deci
 
 ## SDM Foundation: Source Implementation
 
+The Resource Links and Shift Start Sets backend v1 is implemented in source under
+ADR-0019: shared catalogue/categories, explicit curator management, private
+favourites and ordered/default sets. SQL-backed deployment requires migrations
+001-010 and resource object grants. Catalogue changes then require no deployment.
+Claude's next resource UI task consumes the committed API/OpenAPI handoff in
+`docs/contracts/secureops-api-v1-ui-integration.md`. This is not a deployment or
+corporate TEST result; SDM positive rules and approval remain pending. Local
+isolated SQL execution evidence is recorded in the deployment-readiness document.
+
 The deterministic evaluation foundation `WASAS-SDM-2026.09-v1` is implemented
 in source (ADR-0018), with additive response evidence and offline migration 009.
 The verified TEST baseline remains four real records, zero malformed/ambiguous

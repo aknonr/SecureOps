@@ -125,7 +125,7 @@ public sealed class AccessDecisionRulesTests
     [Fact]
     public void AssignableRoles_IncludeTheDocumentedRoleCodes()
     {
-        string[] expected = ["Admin", "Auditor", "JiraPublisher", "Lead", "Operator", "ReadOnly"];
+        string[] expected = ["Admin", "Auditor", "JiraPublisher", "Lead", "Operator", "ReadOnly", "ResourceCurator"];
 
         Assert.Equal(expected, AccessDecisionRules.AssignableRoles);
     }
