@@ -8,6 +8,13 @@ branding strategy, IIS awareness) remain in force and are extended here.
 This milestone converts the presentation shell into an internal operations UI built directly on the
 API contracts in `docs/contracts/secureops-api-v1-ui-integration.md`.
 
+The management custom-window control uses labelled native date inputs so both
+keyboard entry and the browser calendar have an accessible field name. Calendar
+days remain UTC; the displayed inclusive end day is converted to the backend's
+exclusive boundary. Inputs and submission are disabled during a report load.
+Jira confirmation exposes the visible title as the dialog's accessible name and
+moves keyboard focus inside the dialog before confirmation.
+
 ## 1. What changed in direction
 
 Doc 20 §3 required a three-profile demo picker on `/login`, and §5 required a permanent

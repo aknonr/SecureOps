@@ -2512,6 +2512,32 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
 
 .so-window-date {
     flex: 0 1 190px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--so-space-1);
+    font-size: 0.78rem;
+    color: var(--so-text-muted);
+}
+
+.so-window-date input {
+    width: 100%;
+    min-height: 40px;
+    padding: var(--so-space-2);
+    border: 1px solid var(--mud-palette-lines-inputs);
+    border-radius: var(--mud-default-borderradius);
+    background: var(--mud-palette-surface);
+    color: var(--so-text);
+    font: inherit;
+    color-scheme: light;
+}
+
+:root.so-dark .so-window-date input {
+    color-scheme: dark;
+}
+
+.so-window-date input:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
 }
 
 .so-window-hint,

@@ -36,21 +36,15 @@
     @if (Preset == ReportingWindowPreset.Custom)
     {
         <div class="so-window-custom">
-            <MudDatePicker @bind-Date="_from"
-                           Label="Başlangıç (UTC)"
-                           DateFormat="dd.MM.yyyy"
-                           MaxDate="DateTime.UtcNow.Date"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Class="so-window-date" />
+            <label class="so-window-date">
+                <span>Başlangıç (UTC)</span>
+                <input type="date" @bind="_from" max="@DateTime.UtcNow.ToString("yyyy-MM-dd")" disabled="@Busy" />
+            </label>
 
-            <MudDatePicker @bind-Date="_to"
-                           Label="Bitiş (UTC, dahil)"
-                           DateFormat="dd.MM.yyyy"
-                           MaxDate="DateTime.UtcNow.Date"
-                           Variant="Variant.Outlined"
-                           Margin="Margin.Dense"
-                           Class="so-window-date" />
+            <label class="so-window-date">
+                <span>Bitiş (UTC, dahil)</span>
+                <input type="date" @bind="_to" max="@DateTime.UtcNow.ToString("yyyy-MM-dd")" disabled="@Busy" />
+            </label>
 
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Search"

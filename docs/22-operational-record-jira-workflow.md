@@ -67,6 +67,12 @@ The Jira key is committed before the source close/update starts. A close failure
 
 A source refresh may update bounded source fields, but classification is reapplied only while the workflow remains in `Imported`, `Classified`, `NeedsManualReview`, or `Eligible`. Refresh cannot regress `Previewed`, create/close transition states, failures, completion, or reconciliation-required state.
 
+Interactive UI verification also requires the list and detail state labels to
+honour reconciliation-required evidence above a persisted create-failed state.
+An unknown outcome is shown as unknown, with caution styling and blocked creation.
+Duplicate reconciliation notices are collapsed only when their support references
+match; a distinct action reference remains visible.
+
 ## Security Boundaries
 
 - Browser users never provide integration credentials.

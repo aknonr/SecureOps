@@ -10,13 +10,13 @@
     actions before the first await, which is what makes a double submission unexpressible.
 *@
 
-<MudDialog Class="so-dialog">
+<MudDialog Class="so-dialog" DefaultFocus="DefaultFocus.FirstChild">
     <TitleContent>
         <div class="so-dialog-title">
             <span class="so-dialog-icon so-dialog--grant" aria-hidden="true">
                 <MudIcon Icon="@Icons.Material.Filled.AddTask" />
             </span>
-            <span>Jira Kaydı Oluştur</span>
+            <span id="@_titleId" data-sdm-dialog-title>Jira Kaydı Oluştur</span>
         </div>
     </TitleContent>
 
@@ -97,7 +97,7 @@
     </DialogContent>
 
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" data-sdm-cancel>Vazgeç</MudButton>
         <MudButton OnClick="Confirm"
                    Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -108,6 +108,8 @@
 </MudDialog>
 
 @code {
+    private readonly string _titleId = "jira-confirm-" + Guid.NewGuid().ToString("N");
+
     [CascadingParameter]
     private MudDialogInstance Dialog { get; set; } = null!;
 

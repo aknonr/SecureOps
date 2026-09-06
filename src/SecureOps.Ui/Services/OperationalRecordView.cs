@@ -29,6 +29,23 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public static class OperationalRecordView
 {
+    /// <summary>Describes authoritative uncertainty before the persisted workflow stage.</summary>
+    public static string StateLabel(OperationalRecordResponse record) =>
+        OutcomeUnknown(record) ? "Jira sonucu belirsiz" : StateLabel(record.WorkflowState);
+
+    /// <summary>Uncertain outcomes need reconciliation, not a definitive failure indicator.</summary>
+    public static SoStatusBadge.BadgeTone StateTone(OperationalRecordResponse record) =>
+        OutcomeUnknown(record) ? SoStatusBadge.BadgeTone.Caution : StateTone(record.WorkflowState);
+
+    /// <summary>Provides a matching non-colour signal for uncertain outcomes.</summary>
+    public static string StateIcon(OperationalRecordResponse record) =>
+        OutcomeUnknown(record) ? Icons.Material.Filled.HelpOutline : StateIcon(record.WorkflowState);
+
+    /// <summary>Does not describe an unconfirmed publication as a known failure.</summary>
+    public static string? StateDetail(OperationalRecordResponse record) =>
+        OutcomeUnknown(record) ? "Jira sonucu doğrulanamadı. Yeni kayıt oluşturmadan önce mutabakat gerekir."
+            : StateDetail(record.WorkflowState);
+
     /// <summary>
     /// What the operator may do with a record, according to authoritative state alone.
     /// </summary>

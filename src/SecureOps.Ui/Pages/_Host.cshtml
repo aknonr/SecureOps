@@ -157,6 +157,19 @@
         // MudBlazor 6 puts select attributes on a hidden input, not its keyboard target.
         // Transfer resource field names to that target without replacing its keyboard behavior.
         function labelResourceSelects() {
+            // MudBlazor 6 does not forward dialog attributes to its outer dialog container.
+            document.querySelectorAll('[data-sdm-dialog-title]').forEach(function (title) {
+                var dialog = title.closest('[role="dialog"]');
+                if (dialog) {
+                    dialog.setAttribute('aria-labelledby', title.id);
+                    dialog.setAttribute('aria-modal', 'true');
+                    var cancel = dialog.querySelector('[data-sdm-cancel]');
+                    if (cancel && !dialog.dataset.sdmFocusSet) {
+                        dialog.dataset.sdmFocusSet = 'true';
+                        cancel.focus();
+                    }
+                }
+            });
             document.querySelectorAll('.so-resource-filters .mud-select, .so-resource-dialog .mud-select')
                 .forEach(function (select) {
                     var input = select.querySelector('input[aria-label]');

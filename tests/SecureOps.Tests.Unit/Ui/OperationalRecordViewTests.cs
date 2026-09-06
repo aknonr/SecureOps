@@ -19,6 +19,19 @@ public sealed class OperationalRecordViewTests
     private const string Me = "demo:platform-admin";
     private const string Other = "demo:team-lead";
 
+    [Theory]
+    [InlineData(OperationalRecordWorkflowState.JiraCreateFailed)]
+    [InlineData(OperationalRecordWorkflowState.CreatingJira)]
+    [InlineData(OperationalRecordWorkflowState.Eligible)]
+    public void ReconciliationEvidence_OverridesDefinitiveStagePresentation(OperationalRecordWorkflowState state)
+    {
+        OperationalRecordResponse record = Record(state, reconciliationRequired: true);
+        Assert.Equal("Jira sonucu belirsiz", OperationalRecordView.StateLabel(record));
+        Assert.Equal(SoStatusBadge.BadgeTone.Caution, OperationalRecordView.StateTone(record));
+        Assert.Contains("mutabakat", OperationalRecordView.StateDetail(record));
+        Assert.False(OperationalRecordView.ActionsFor(record).Create);
+    }
+
     private static OperationalRecordResponse Record(
         OperationalRecordWorkflowState state,
         string? jiraKey = null,

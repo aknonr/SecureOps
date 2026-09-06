@@ -147,7 +147,7 @@
                                                    Icon="@OperationalRecordView.PresentationIcon(record.PresentationState)" />
 
                                     <span class="so-chip so-chip--quiet" title="İş akışı aşaması">
-                                        @OperationalRecordView.StateLabel(record.WorkflowState)
+                                        @OperationalRecordView.StateLabel(record)
                                     </span>
 
                                     @if (OperationalRecordView.HasJira(record))

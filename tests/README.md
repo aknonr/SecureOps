@@ -60,6 +60,34 @@ See `docs/agent-guides/090-testing-quality.md`:
 - Each test isolated (no shared mutable state).
 ## Current Test Boundary
 
+Dashboard/SDM browser journeys reuse the foreground Demo hosts, paired Simulation
+providers and the existing isolated LocalDB migration harness. They do not install
+providers or alter production eligibility. `tests/browser/management-journey.cjs`
+accepts a task-local Playwright path, UI/API loopback URLs, a fresh
+`SecureOps_ResourcesV1_` database and an evidence directory. Its SQL fixtures are
+synthetic, append-only and refused on repeat insertion. A test-owned transaction
+locks workflow history to exercise report loading, timeout and recovery; it is
+rolled back in `finally`. No proxy or runtime failure-injection route is used.
+
+Replay order: create a fresh database with `Test-ResourceCatalogueSql.ps1`, run
+the opt-in SQL tests (which also persist the evaluated blocked fixture), then
+start foreground API/UI hosts on unused loopback ports. The API uses Demo auth,
+Demo access compatibility, Mock identity, paired Simulation source/Jira, and SQL
+for Access, Audit, OperationalRecords and SessionSecurity. Supply the guarded
+integrated-auth LocalDB connection through local process configuration. The two
+UI hosts use the same API and the existing `platform-admin` / `team-lead` Demo
+actors. No runtime configuration is written to the repository.
+
+Run `management-journey.cjs`, `sdm-journey.cjs`, then `reporting-access.cjs` with
+the arguments in their headers. The latter two temporarily assign synthetic
+application roles through the supported local API and restore the original roles.
+They verify the API user belongs to the explicitly guarded SQL database first.
+Use a fresh database and fresh Simulation API process for a complete replay:
+completed/uncertain transfers are never reset. `WASAS_REUSE_FIXTURES=1` reuses
+management window fixtures; `WASAS_CAPTURE_RESULTS=1` captures persisted SDM
+results without another publication. Browser captures await responsive drawer
+closure and inspect desktop/mobile layouts at 1440x900 and 390x844.
+
 Resource catalogue coverage adds capability/ownership, URL/content policy,
 visibility/archive, search/order/page, stale writes, private defaults and API
 serialization. ResourceSqlTests are explicitly opt-in via
