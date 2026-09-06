@@ -82,6 +82,40 @@
         // Hands the operator a file the server produced. The bytes, the name, and the content type
         // all come from the API response; nothing is generated or reformatted here, which is what
         // keeps an export traceable to the audited server-side operation.
+        // Batch opening of shift-start links.
+        //
+        // Single links are ordinary anchors with target/rel set in markup — no JavaScript is
+        // involved and the browser handles them natively. This exists only because opening several
+        // tabs requires several window.open calls inside one user gesture, which markup cannot do.
+        //
+        // It must be called synchronously from a click handler. Anything awaited first spends the
+        // user activation and every browser then blocks the whole batch.
+        //
+        // noopener,noreferrer on every call: the opened page gets no window.opener handle back into
+        // WASAS and no Referer header. No cookie, token, or header is passed — window.open cannot
+        // carry any, and nothing here tries.
+        //
+        // The returned count is attempts that came back without a handle. It is a hint, not proof:
+        // a browser may block silently and still return an object, or return null for reasons
+        // unrelated to blocking. The caller must never report success from it — the only honest
+        // claim is that opening was attempted, which is why the individual links stay on screen.
+        window.secureOpsLinks = {
+            openMany: function (urls) {
+                if (!Array.isArray(urls)) { return 0; }
+                var withoutHandle = 0;
+                for (var i = 0; i < urls.length; i++) {
+                    var handle = null;
+                    try {
+                        handle = window.open(urls[i], '_blank', 'noopener,noreferrer');
+                    } catch (e) {
+                        handle = null;
+                    }
+                    if (!handle) { withoutHandle++; }
+                }
+                return withoutHandle;
+            }
+        };
+
         window.secureOpsDownload = function (fileName, contentType, base64) {
             var binary = atob(base64);
             var bytes = new Uint8Array(binary.length);

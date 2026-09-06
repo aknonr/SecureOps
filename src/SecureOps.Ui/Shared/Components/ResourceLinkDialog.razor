@@ -1,0 +1,230 @@
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+
+@*
+    Creates or replaces a catalogue link.
+
+    PUT is a complete replacement, so the form is seeded with every current field: submitting a
+    partially filled form would blank whatever it omitted. The version travels with it untouched —
+    zero when creating, the exact current value when editing — because that is the only thing
+    stopping this save from overwriting a change made in another tab.
+
+    Client-side checks mirror the documented bounds so the common mistakes are reported next to the
+    field. They are a courtesy, not the control: the server re-validates everything, including the
+    URL policy, which is far stricter than a length check can express.
+*@
+
+<MudDialog Class="so-dialog">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.Link" />
+            </span>
+            <span>@(Link is null ? "Yeni bağlantı" : "Bağlantıyı düzenle")</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="so-form-grid">
+            <MudSelect T="Guid" @bind-Value="_categoryId" Label="Kategori" Required="true"
+                       Variant="Variant.Outlined" Dense="true"
+                       HelperText="Arşivlenmemiş bir kategori seçin.">
+                @foreach (ResourceCategory category in Categories.Where(c => !c.Archived))
+                {
+                    <MudSelectItem T="Guid" Value="@category.Id">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField @bind-Value="_name" Label="Ad" Required="true" MaxLength="120"
+                          Immediate="true" Variant="Variant.Outlined"
+                          HelperText="Operatörün listede göreceği ad. En fazla 120 karakter." />
+
+            <MudTextField @bind-Value="_url" Label="Adres (URL)" Required="true" MaxLength="2048"
+                          Immediate="true" Variant="Variant.Outlined"
+                          HelperText="Yalnızca https:// ile başlayan tam adres kabul edilir." />
+
+            <MudTextField @bind-Value="_purpose" Label="Amaç" Required="true" MaxLength="300"
+                          Immediate="true" Lines="2" Variant="Variant.Outlined"
+                          HelperText="Bu bağlantının ne işe yaradığı. En fazla 300 karakter." />
+
+            <MudTextField @bind-Value="_environment" Label="Ortam" MaxLength="40"
+                          Variant="Variant.Outlined" HelperText="İsteğe bağlı. Örnek: Test, Pilot." />
+
+            <MudTextField @bind-Value="_location" Label="Konum" MaxLength="40"
+                          Variant="Variant.Outlined" HelperText="İsteğe bağlı." />
+
+            <MudTextField @bind-Value="_tags" Label="Etiketler" MaxLength="330"
+                          Variant="Variant.Outlined"
+                          HelperText="Virgülle ayırın. En fazla 10 etiket, her biri 30 karakter." />
+
+            <MudNumericField @bind-Value="_displayOrder" Label="Sıra" Min="0" Max="100000"
+                             Variant="Variant.Outlined" HelperText="Küçük değer önce listelenir." />
+
+            <MudTextField @bind-Value="_notes" Label="Erişim notu" MaxLength="1000" Lines="3"
+                          Variant="Variant.Outlined"
+                          HelperText="İsteğe bağlı. Parola veya kimlik bilgisi yazmayın." />
+        </div>
+
+        <div class="so-form-toggles">
+            <MudCheckBox T="bool" @bind-Value="_active" Label="Listede etkin" Dense="true" />
+            <MudCheckBox T="bool" @bind-Value="_archived" Label="Arşivlenmiş" Dense="true" />
+        </div>
+
+        @if (_archived)
+        {
+            <p class="so-consequence so-consequence--caution">
+                Arşivlenen bağlantı normal listelerde ve kişisel setlerde görünmez. Kayıtlı
+                seçimler silinmez; bağlantı yeniden etkinleştirilirse tekrar görünür olur.
+            </p>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="so-auth-alert so-auth-alert--error" role="alert">@_error</div>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="@_submitting">
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Link being edited, or <see langword="null"/> when creating.</summary>
+    [Parameter]
+    public ResourceLink? Link { get; set; }
+
+    /// <summary>Categories the link may belong to.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ResourceCategory> Categories { get; set; } = [];
+
+    private Guid _categoryId;
+    private string _name = string.Empty;
+    private string _url = string.Empty;
+    private string _purpose = string.Empty;
+    private string _environment = string.Empty;
+    private string _location = string.Empty;
+    private string _tags = string.Empty;
+    private string _notes = string.Empty;
+    private int _displayOrder;
+    private bool _active = true;
+    private bool _archived;
+    private string? _error;
+    private bool _submitting;
+
+    protected override void OnInitialized()
+    {
+        if (Link is null)
+        {
+            _categoryId = Categories.FirstOrDefault(c => !c.Archived)?.Id ?? Guid.Empty;
+            return;
+        }
+
+        _categoryId = Link.CategoryId;
+        _name = Link.Name;
+        _url = Link.Url;
+        _purpose = Link.Purpose;
+        _environment = Link.Environment ?? string.Empty;
+        _location = Link.Location ?? string.Empty;
+        _tags = string.Join(", ", Link.Tags);
+        _notes = Link.Notes ?? string.Empty;
+        _displayOrder = Link.DisplayOrder;
+        _active = Link.Active;
+        _archived = Link.Archived;
+    }
+
+    private void Confirm()
+    {
+        _error = Validate();
+
+        if (_error is not null)
+        {
+            return;
+        }
+
+        _submitting = true;
+
+        // Version zero creates; the exact current version replaces. Anything else is rejected
+        // server-side, which is what makes a concurrent edit visible instead of silently lost.
+        SaveResourceLinkRequest request = new(
+            _categoryId,
+            _name.Trim(),
+            _url.Trim(),
+            _purpose.Trim(),
+            Empty(_notes),
+            Empty(_environment),
+            Empty(_location),
+            ParseTags(),
+            _displayOrder,
+            _active,
+            _archived,
+            Link?.Version ?? 0);
+
+        Dialog.Close(DialogResult.Ok(request));
+    }
+
+    private string? Validate()
+    {
+        if (_categoryId == Guid.Empty)
+        {
+            return "Kategori seçilmelidir.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            return "Ad zorunludur.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_purpose))
+        {
+            return "Amaç zorunludur.";
+        }
+
+        // A shape check only. The server applies the full URL policy — allowed query keys, rejected
+        // credentials and encodings — and this cannot and should not try to reproduce it.
+        if (!Uri.TryCreate(_url.Trim(), UriKind.Absolute, out Uri? uri)
+            || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return "Adres https:// ile başlayan tam bir URL olmalıdır.";
+        }
+
+        string[] tags = ParseTags();
+
+        if (tags.Length > 10)
+        {
+            return "En fazla 10 etiket eklenebilir.";
+        }
+
+        if (tags.Any(tag => tag.Length > 30))
+        {
+            return "Her etiket en fazla 30 karakter olabilir.";
+        }
+
+        if (tags.Length != tags.Distinct(StringComparer.Ordinal).Count())
+        {
+            return "Etiketler benzersiz olmalıdır.";
+        }
+
+        return null;
+    }
+
+    // Trimmed, lower-cased and sorted to match how the server stores them, so an edit that changes
+    // nothing does not look like a change.
+    private string[] ParseTags() =>
+        _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(tag => tag.ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(tag => tag, StringComparer.Ordinal)
+            .ToArray();
+
+    private static string? Empty(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void Cancel() => Dialog.Cancel();
+}

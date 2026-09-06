@@ -1,0 +1,526 @@
+@page "/resources"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+@inject IResourceApiClient ResourceApi
+@inject ICurrentAccessProvider AccessProvider
+@inject IDialogService Dialogs
+@inject ILogger<Resources> Logger
+
+<PageTitle>Bağlantılarım · @WasasBrand.Name</PageTitle>
+
+@*
+    The shared link catalogue, as an ordinary operator reads it.
+
+    Everything here is a reference the catalogue holds. WASAS never fetches, scans, or checks any
+    target: opening one is the browser's job, and a link on this page says nothing about whether the
+    destination is reachable or whether the operator can sign in to it.
+
+    Search is server-side and debounced, and responses are matched to the request that asked for
+    them. Without that, a fast typist gets the results of an earlier prefix rendered over a later
+    one — the list looks stable and is quietly wrong.
+*@
+
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Bağlantılarım"
+                  Lead="Vardiya başında kullandığınız kurumsal bağlantıları arayın, favorilerinize ekleyin ve mesai setlerinize yerleştirin.">
+        <Actions>
+            <MudButton Href="resources/sets" Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.PlaylistPlay">
+                Mesai Setlerim
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_loading"
+                       OnClick="ReloadAsync">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.ResourcesView))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Bağlantı kataloğunu görüntülemek için
+                <code class="so-code">@Capabilities.ResourcesView</code> yetkisi gerekir.
+                Hesabınızda tanımlı yetkileri
+                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+        </section>
+    }
+    else
+    {
+        <section class="so-panel so-search-panel">
+            <div class="so-resource-filters">
+                <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync"
+                              Label="Ara" Placeholder="Bağlantı adı, amaç veya etiket"
+                              HelperText="Ad, amaç ve etiketlerde birebir metin araması yapılır."
+                              Immediate="true" DebounceInterval="350" MaxLength="100"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined" Clearable="true" Class="so-resource-search" />
+
+                <MudSelect T="Guid?" Value="_categoryId" ValueChanged="CategoryChangedAsync"
+                           Label="Kategori" Dense="true" Margin="Margin.Dense"
+                           Variant="Variant.Outlined" Clearable="true" Class="so-resource-filter">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">Tümü</MudSelectItem>
+                    @foreach (ResourceCategory category in _categories)
+                    {
+                        <MudSelectItem T="Guid?" Value="@category.Id">@category.Name</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="string" Value="_environment" ValueChanged="EnvironmentChangedAsync"
+                           Label="Ortam" Dense="true" Margin="Margin.Dense"
+                           Variant="Variant.Outlined" Clearable="true" Class="so-resource-filter">
+                    <MudSelectItem T="string" Value="@(string.Empty)">Tümü</MudSelectItem>
+                    @foreach (string environment in _environments)
+                    {
+                        <MudSelectItem T="string" Value="@environment">@environment</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect T="int" Value="_pageSize" ValueChanged="PageSizeChangedAsync"
+                           Label="Sayfa boyutu" Dense="true" Margin="Margin.Dense"
+                           Variant="Variant.Outlined" Class="so-page-size">
+                    @foreach (int size in ResourceView.PageSizes)
+                    {
+                        <MudSelectItem T="int" Value="@size">@size</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+        </section>
+
+        @if (_actionProblem is not null)
+        {
+            @* Kept apart from the list problem: a failed favourite or set edit must survive the
+               refresh that follows it, or the list reloads and the operator assumes it worked. *@
+            <SoProblemPanel Problem="_actionProblem" />
+        }
+
+        <section class="so-panel">
+            @if (_listProblem is not null)
+            {
+                <SoProblemPanel Problem="_listProblem" OnRetry="ReloadAsync" RetryLabel="Yeniden yükle" />
+            }
+            else if (_page is null)
+            {
+                <SoFlightLoading Message="Bağlantı kataloğu getiriliyor…" Bare="true" />
+            }
+            else if (_page.Items.Count == 0)
+            {
+                <SoEmptyState Title="@(HasFilters ? "Eşleşen bağlantı yok" : "Katalogda bağlantı yok")"
+                              Description="@(HasFilters
+                                  ? "Arama veya filtreleri değiştirerek tekrar deneyin."
+                                  : "Bu ortamda henüz yayımlanmış bir bağlantı bulunmuyor.")"
+                              Icon="@Icons.Material.Outlined.LinkOff" />
+            }
+            else
+            {
+                <div class="so-panel-head">
+                    <h2 class="so-panel-title">
+                        Bağlantılar
+                        <span class="so-count-chip">@_page.Total</span>
+                    </h2>
+                    @if (_loading)
+                    {
+                        @* The previous list stays on screen while the next page loads, so the page
+                           never blanks out under an operator mid-scan. *@
+                        <span class="so-pager-state" role="status">Güncelleniyor…</span>
+                    }
+                </div>
+
+                <ul class="so-resource-list">
+                    @foreach (ResourceLink link in _page.Items)
+                    {
+                        ResourceLink captured = link;
+                        bool favourite = ResourceView.IsFavourite(_preferences, link.Id);
+
+                        <li class="so-resource-item">
+                            <div class="so-resource-main">
+                                <div class="so-resource-head">
+                                    @* A real anchor: standard browser navigation, keyboard and
+                                       middle-click work, and rel keeps the opened page from
+                                       reaching back into WASAS or leaking a referrer. *@
+                                    <a class="so-resource-name" href="@link.Url"
+                                       target="_blank" rel="noopener noreferrer">
+                                        @link.Name
+                                        <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" />
+                                    </a>
+                                    @if (ResourceView.Host(link) is { } host)
+                                    {
+                                        <span class="so-resource-host">@host</span>
+                                    }
+                                </div>
+
+                                <p class="so-resource-purpose">@link.Purpose</p>
+
+                                <div class="so-resource-meta">
+                                    @if (ResourceView.Placement(link) is { } placement)
+                                    {
+                                        <span class="so-chip so-chip--quiet">@placement</span>
+                                    }
+                                    @foreach (string tag in link.Tags)
+                                    {
+                                        <span class="so-chip so-chip--quiet">@tag</span>
+                                    }
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(link.Notes))
+                                {
+                                    <details class="so-technical">
+                                        <summary>Erişim notu</summary>
+                                        <p class="so-panel-text so-panel-text--sm">@link.Notes</p>
+                                    </details>
+                                }
+                            </div>
+
+                            <div class="so-resource-actions">
+                                <MudTooltip Text="@(favourite ? "Favorilerden çıkar" : "Favorilere ekle")">
+                                    <MudIconButton Icon="@(favourite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)"
+                                                   Color="@(favourite ? Color.Primary : Color.Default)"
+                                                   Size="Size.Small"
+                                                   Disabled="@_busy"
+                                                   aria-label="@(favourite ? $"{link.Name} favorilerden çıkar" : $"{link.Name} favorilere ekle")"
+                                                   OnClick="@(() => ToggleFavouriteAsync(captured, !favourite))" />
+                                </MudTooltip>
+
+                                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.PlaylistAdd"
+                                           Disabled="@(_busy || _preferences is null || _preferences.Sets.Count == 0)"
+                                           OnClick="@(() => AddToSetAsync(captured))">
+                                    Sete Ekle
+                                </MudButton>
+                            </div>
+                        </li>
+                    }
+                </ul>
+
+                <div class="so-pager">
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.ChevronLeft"
+                               Disabled="@(_loading || _page.Page <= 1)"
+                               OnClick="@(() => GoToPageAsync(_page.Page - 1))">
+                        Önceki
+                    </MudButton>
+
+                    <span class="so-pager-state">Sayfa @_page.Page / @TotalPages</span>
+
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                               EndIcon="@Icons.Material.Filled.ChevronRight"
+                               Disabled="@(_loading || _page.Page >= TotalPages)"
+                               OnClick="@(() => GoToPageAsync(_page.Page + 1))">
+                        Sonraki
+                    </MudButton>
+                </div>
+            }
+
+            @if (_preferences is not null && _preferences.Sets.Count == 0)
+            {
+                <p class="so-panel-text so-panel-text--sm">
+                    Bir bağlantıyı sete eklemek için önce
+                    <MudLink Href="resources/sets">Mesai Setlerim</MudLink> sayfasından bir set oluşturun.
+                </p>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+    private ResourcePage? _page;
+    private ResourcePreferencesResponse? _preferences;
+    private IReadOnlyList<ResourceCategory> _categories = [];
+    private IReadOnlyList<string> _environments = [];
+
+    private UiProblem? _listProblem;
+    private UiProblem? _actionProblem;
+    private bool _loading;
+    private bool _busy;
+
+    private string _search = string.Empty;
+    private Guid? _categoryId;
+    private string _environment = string.Empty;
+    private int _pageSize = 25;
+    private int _pageNumber = 1;
+
+    // Monotonic request identifier. Search is debounced but still overlapping, and the API makes no
+    // ordering promise, so a slower earlier request can land after a faster later one. Rendering
+    // whichever arrived last would silently show results for a prefix the operator has already
+    // moved past. Only the newest request is allowed to publish.
+    private int _requestId;
+
+    private bool HasFilters =>
+        !string.IsNullOrWhiteSpace(_search) || _categoryId is not null || !string.IsNullOrWhiteSpace(_environment);
+
+    private int TotalPages =>
+        _page is null || _page.PageSize <= 0 ? 1 : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_page.PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ResourcesView))
+        {
+            await LoadCategoriesAsync();
+            await LoadPreferencesAsync();
+            await SearchAsync();
+        }
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ResourcesView))
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadCategoriesAsync();
+        await LoadPreferencesAsync();
+        await SearchAsync();
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            _categories = await ResourceApi.GetCategoriesAsync(false, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            // Non-fatal: the list still works, the category filter is simply unavailable.
+            _categories = [];
+            Logger.LogDebug("Resource categories unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+    }
+
+    private async Task LoadPreferencesAsync()
+    {
+        try
+        {
+            _preferences = await ResourceApi.GetPreferencesAsync(CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _preferences = null;
+            Logger.LogDebug("Resource preferences unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+    }
+
+    private Task SearchChangedAsync(string value)
+    {
+        _search = value ?? string.Empty;
+        _pageNumber = 1;
+        return SearchAsync();
+    }
+
+    private Task CategoryChangedAsync(Guid? value)
+    {
+        _categoryId = value;
+        _pageNumber = 1;
+        return SearchAsync();
+    }
+
+    private Task EnvironmentChangedAsync(string value)
+    {
+        _environment = value ?? string.Empty;
+        _pageNumber = 1;
+        return SearchAsync();
+    }
+
+    private Task PageSizeChangedAsync(int value)
+    {
+        _pageSize = value;
+        _pageNumber = 1;
+        return SearchAsync();
+    }
+
+    private Task GoToPageAsync(int page)
+    {
+        _pageNumber = Math.Max(1, page);
+        return SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        int id = ++_requestId;
+
+        _loading = true;
+        _listProblem = null;
+        StateHasChanged();
+
+        ResourceQuery query = new(
+            Search: string.IsNullOrWhiteSpace(_search) ? null : _search,
+            CategoryId: _categoryId,
+            Environment: string.IsNullOrWhiteSpace(_environment) ? null : _environment,
+            Location: null,
+            Tag: null,
+            IncludeArchived: false,
+            Page: _pageNumber,
+            PageSize: _pageSize);
+
+        try
+        {
+            ResourcePage page = await ResourceApi.QueryLinksAsync(query, CancellationToken.None);
+
+            if (id != _requestId)
+            {
+                // A newer search is already in flight. Discarding this result is the whole point of
+                // the sequence guard.
+                return;
+            }
+
+            _page = page;
+            _pageNumber = page.Page;
+            RefreshEnvironments(page);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            if (id != _requestId)
+            {
+                return;
+            }
+
+            _listProblem = ex.Problem;
+            Logger.LogDebug("Resource query failed. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            if (id == _requestId)
+            {
+                _loading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    // Environments are not a catalogue endpoint, so the filter offers the values present in what the
+    // server actually returned. Existing selections are preserved so a filtered page cannot remove
+    // the option that produced it.
+    private void RefreshEnvironments(ResourcePage page)
+    {
+        IEnumerable<string> found = page.Items
+            .Select(link => link.Environment)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim());
+
+        if (!string.IsNullOrWhiteSpace(_environment))
+        {
+            found = found.Append(_environment);
+        }
+
+        _environments = found
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+    }
+
+    private async Task ToggleFavouriteAsync(ResourceLink link, bool favourite)
+    {
+        if (_preferences is null || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _actionProblem = null;
+        StateHasChanged();
+
+        try
+        {
+            // The response is the refreshed aggregate, so it replaces local state rather than being
+            // patched into it. That is what keeps the next version guard correct.
+            _preferences = await ResourceApi.SetFavouriteAsync(
+                link.Id, favourite, _preferences.Version, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+            Logger.LogDebug("Favourite update failed. Code: {Code}.", ex.Problem.Code);
+
+            // A stale version means somebody else's tab moved first. Re-read before the operator
+            // tries again; never resubmit over their edit.
+            if (ex.Problem.RequiresRefresh)
+            {
+                await LoadPreferencesAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task AddToSetAsync(ResourceLink link)
+    {
+        if (_preferences is null || _busy)
+        {
+            return;
+        }
+
+        DialogParameters parameters = new()
+        {
+            { nameof(ResourceSetPickerDialog.Link), link },
+            { nameof(ResourceSetPickerDialog.Preferences), _preferences }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<ResourceSetPickerDialog>(
+            "Sete ekle", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        DialogResult? result = await dialog.Result;
+
+        if (result is null || result.Canceled || result.Data is not ShiftSetResponse target)
+        {
+            return;
+        }
+
+        _busy = true;
+        _actionProblem = null;
+        StateHasChanged();
+
+        try
+        {
+            List<Guid> linkIds = [.. ResourceView.LinkIds(target), link.Id];
+
+            _preferences = await ResourceApi.SaveSetAsync(
+                target.Id,
+                new SaveShiftSetRequest(target.Name, linkIds, target.IsDefault, _preferences.Version),
+                CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+            Logger.LogDebug("Adding link to set failed. Code: {Code}.", ex.Problem.Code);
+
+            if (ex.Problem.RequiresRefresh)
+            {
+                await LoadPreferencesAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

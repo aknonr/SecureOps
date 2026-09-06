@@ -1,0 +1,496 @@
+@page "/admin/resources"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+@inject IResourceApiClient ResourceApi
+@inject ICurrentAccessProvider AccessProvider
+@inject IDialogService Dialogs
+@inject ILogger<ResourceCatalogue> Logger
+
+<PageTitle>Katalog Yönetimi · @WasasBrand.Name</PageTitle>
+
+@*
+    Catalogue administration.
+
+    Visibility here follows the capability the API reports, never a role name and never "looks like a
+    lead": the contract gives Resources.Manage to Admin and to the separately assigned
+    ResourceCurator only. Hiding these controls is a courtesy — every call is re-checked server-side.
+
+    Archiving is the only retirement path; there is no hard delete in the contract, and the forms say
+    so rather than offering a Sil button that would fail.
+
+    Every save carries the exact version it was loaded with. A stale one is refused, and the refusal
+    is surfaced with the current state reloaded rather than retried over somebody else's edit.
+*@
+
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Katalog Yönetimi"
+                  Lead="Operatörlerin gördüğü bağlantı kataloğunu ve kategorilerini yönetin.">
+        <Actions>
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_busy"
+                       OnClick="ReloadAsync">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.ResourcesManage))
+    {
+        @* Explained rather than redirected, so an operator learns what is missing and where to ask.
+           Job title and Lead membership grant nothing here. *@
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Katalog yönetimi için <code class="so-code">@Capabilities.ResourcesManage</code>
+                yetkisi gerekir. Bu yetki yalnızca yöneticilere ve ayrıca atanmış katalog
+                sorumlularına verilir. Hesabınızda tanımlı yetkileri
+                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+            <div class="so-panel-actions">
+                <MudButton Href="resources" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
+                    Bağlantılarım
+                </MudButton>
+            </div>
+        </section>
+    }
+    else
+    {
+        @if (_problem is not null)
+        {
+            <SoProblemPanel Problem="_problem" OnRetry="ReloadAsync" RetryLabel="Yeniden yükle" />
+        }
+
+        <section class="so-panel">
+            <div class="so-panel-head">
+                <h2 class="so-panel-title">
+                    Kategoriler
+                    <span class="so-count-chip">@_categories.Count</span>
+                </h2>
+                <div class="so-panel-head-actions">
+                    <MudCheckBox T="bool" Value="_includeArchived" ValueChanged="ToggleArchivedAsync"
+                                 Label="Arşivlenenleri göster" Dense="true" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Disabled="@_busy"
+                               OnClick="CreateCategoryAsync">
+                        Yeni Kategori
+                    </MudButton>
+                </div>
+            </div>
+
+            @if (_categories.Count == 0)
+            {
+                <SoEmptyState Title="Kategori yok"
+                              Description="Bağlantı eklemeden önce en az bir kategori oluşturun."
+                              Icon="@Icons.Material.Outlined.FolderOff" />
+            }
+            else
+            {
+                <div class="so-table-scroll">
+                    <table class="so-plain-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Kategori</th>
+                                <th scope="col" class="so-num">Sıra</th>
+                                <th scope="col">Görünürlük</th>
+                                <th scope="col">Durum</th>
+                                <th scope="col"><span class="sr-only">İşlem</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (ResourceCategory category in _categories)
+                            {
+                                ResourceCategory captured = category;
+                                <tr>
+                                    <th scope="row">@category.Name</th>
+                                    <td class="so-num">@category.DisplayOrder</td>
+                                    <td>
+                                        @if (category.ManagersOnly)
+                                        {
+                                            <SoStatusBadge Label="Yalnızca yöneticiler"
+                                                           Tone="SoStatusBadge.BadgeTone.Caution" />
+                                        }
+                                        else
+                                        {
+                                            <span class="so-unknown">Tüm operatörler</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <SoStatusBadge Label="@(category.Archived ? "Arşivlenmiş" : "Etkin")"
+                                                       Tone="@(category.Archived
+                                                           ? SoStatusBadge.BadgeTone.Neutral
+                                                           : SoStatusBadge.BadgeTone.Positive)" />
+                                    </td>
+                                    <td>
+                                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                                   Disabled="@_busy"
+                                                   OnClick="@(() => EditCategoryAsync(captured))">
+                                            Düzenle
+                                        </MudButton>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="so-panel">
+            <div class="so-panel-head">
+                <h2 class="so-panel-title">
+                    Bağlantılar
+                    @if (_page is not null)
+                    {
+                        <span class="so-count-chip">@_page.Total</span>
+                    }
+                </h2>
+                <div class="so-panel-head-actions">
+                    <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync"
+                                  Label="Ara" Immediate="true" DebounceInterval="350" MaxLength="100"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                                  Class="so-resource-search" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Disabled="@(_busy || !_categories.Any(c => !c.Archived))"
+                               OnClick="CreateLinkAsync">
+                        Yeni Bağlantı
+                    </MudButton>
+                </div>
+            </div>
+
+            @if (_page is null)
+            {
+                <SoFlightLoading Message="Katalog getiriliyor…" Bare="true" />
+            }
+            else if (_page.Items.Count == 0)
+            {
+                <SoEmptyState Title="Bağlantı yok"
+                              Description="Arama ölçütünü değiştirin veya yeni bir bağlantı ekleyin."
+                              Icon="@Icons.Material.Outlined.LinkOff" />
+            }
+            else
+            {
+                <div class="so-table-scroll">
+                    <table class="so-plain-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Bağlantı</th>
+                                <th scope="col">Kategori</th>
+                                <th scope="col">Ortam / Konum</th>
+                                <th scope="col">Durum</th>
+                                <th scope="col"><span class="sr-only">İşlem</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (ResourceLink link in _page.Items)
+                            {
+                                ResourceLink captured = link;
+                                <tr>
+                                    <th scope="row">
+                                        <span class="so-session-user">
+                                            <span class="so-session-name">@link.Name</span>
+                                            @if (ResourceView.Host(link) is { } host)
+                                            {
+                                                <span class="so-session-account">@host</span>
+                                            }
+                                        </span>
+                                    </th>
+                                    <td>@CategoryName(link.CategoryId)</td>
+                                    <td>@(ResourceView.Placement(link) ?? "—")</td>
+                                    <td>
+                                        @if (link.Archived)
+                                        {
+                                            <SoStatusBadge Label="Arşivlenmiş" Tone="SoStatusBadge.BadgeTone.Neutral" />
+                                        }
+                                        else if (!link.Active)
+                                        {
+                                            <SoStatusBadge Label="Pasif" Tone="SoStatusBadge.BadgeTone.Caution" />
+                                        }
+                                        else
+                                        {
+                                            <SoStatusBadge Label="Etkin" Tone="SoStatusBadge.BadgeTone.Positive" />
+                                        }
+                                    </td>
+                                    <td>
+                                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                                   Disabled="@_busy"
+                                                   OnClick="@(() => EditLinkAsync(captured))">
+                                            Düzenle
+                                        </MudButton>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="so-pager">
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.ChevronLeft"
+                               Disabled="@(_busy || _page.Page <= 1)"
+                               OnClick="@(() => GoToPageAsync(_page.Page - 1))">
+                        Önceki
+                    </MudButton>
+                    <span class="so-pager-state">Sayfa @_page.Page / @TotalPages</span>
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                               EndIcon="@Icons.Material.Filled.ChevronRight"
+                               Disabled="@(_busy || _page.Page >= TotalPages)"
+                               OnClick="@(() => GoToPageAsync(_page.Page + 1))">
+                        Sonraki
+                    </MudButton>
+                </div>
+            }
+
+            <p class="so-panel-text so-panel-text--sm">
+                Bağlantılar kalıcı olarak silinmez; kullanımdan kaldırmak için arşivleyin.
+                Arşivlenen kayıtlar operatör listelerinde ve kişisel setlerde görünmez.
+            </p>
+        </section>
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+    private IReadOnlyList<ResourceCategory> _categories = [];
+    private ResourcePage? _page;
+    private UiProblem? _problem;
+    private bool _busy;
+    private bool _includeArchived;
+    private string _search = string.Empty;
+    private int _pageNumber = 1;
+    private int _requestId;
+
+    private int TotalPages =>
+        _page is null || _page.PageSize <= 0 ? 1 : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_page.PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ResourcesManage))
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ResourcesManage))
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadCategoriesAsync();
+        await LoadLinksAsync();
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        try
+        {
+            _categories = await ResourceApi.GetCategoriesAsync(_includeArchived, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            Logger.LogDebug("Category load failed. Code: {Code}.", ex.Problem.Code);
+        }
+    }
+
+    private async Task LoadLinksAsync()
+    {
+        int id = ++_requestId;
+        _busy = true;
+        StateHasChanged();
+
+        try
+        {
+            ResourcePage page = await ResourceApi.QueryLinksAsync(
+                new ResourceQuery(
+                    Search: string.IsNullOrWhiteSpace(_search) ? null : _search,
+                    IncludeArchived: _includeArchived,
+                    Page: _pageNumber,
+                    PageSize: 50),
+                CancellationToken.None);
+
+            if (id != _requestId)
+            {
+                return;
+            }
+
+            _page = page;
+            _pageNumber = page.Page;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            if (id != _requestId)
+            {
+                return;
+            }
+
+            _problem = ex.Problem;
+            Logger.LogDebug("Catalogue query failed. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            if (id == _requestId)
+            {
+                _busy = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private Task ToggleArchivedAsync(bool value)
+    {
+        _includeArchived = value;
+        _pageNumber = 1;
+        return ReloadAsync();
+    }
+
+    private Task SearchChangedAsync(string value)
+    {
+        _search = value ?? string.Empty;
+        _pageNumber = 1;
+        return LoadLinksAsync();
+    }
+
+    private Task GoToPageAsync(int page)
+    {
+        _pageNumber = Math.Max(1, page);
+        return LoadLinksAsync();
+    }
+
+    private string CategoryName(Guid id) =>
+        _categories.FirstOrDefault(category => category.Id == id)?.Name ?? "—";
+
+    private async Task CreateCategoryAsync()
+    {
+        SaveResourceCategoryRequest? request = await ShowCategoryDialogAsync(null);
+
+        if (request is not null)
+        {
+            await SaveAsync(() => ResourceApi.CreateCategoryAsync(request, CancellationToken.None));
+        }
+    }
+
+    private async Task EditCategoryAsync(ResourceCategory category)
+    {
+        SaveResourceCategoryRequest? request = await ShowCategoryDialogAsync(category);
+
+        if (request is not null)
+        {
+            await SaveAsync(() => ResourceApi.SaveCategoryAsync(category.Id, request, CancellationToken.None));
+        }
+    }
+
+    private async Task<SaveResourceCategoryRequest?> ShowCategoryDialogAsync(ResourceCategory? category)
+    {
+        DialogParameters parameters = new() { { nameof(ResourceCategoryDialog.Category), category } };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<ResourceCategoryDialog>(
+            "Kategori", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        DialogResult? result = await dialog.Result;
+
+        return result is null || result.Canceled ? null : result.Data as SaveResourceCategoryRequest;
+    }
+
+    private async Task CreateLinkAsync()
+    {
+        SaveResourceLinkRequest? request = await ShowLinkDialogAsync(null);
+
+        if (request is not null)
+        {
+            await SaveAsync(() => ResourceApi.CreateLinkAsync(request, CancellationToken.None));
+        }
+    }
+
+    private async Task EditLinkAsync(ResourceLink link)
+    {
+        SaveResourceLinkRequest? request = await ShowLinkDialogAsync(link);
+
+        if (request is not null)
+        {
+            await SaveAsync(() => ResourceApi.SaveLinkAsync(link.Id, request, CancellationToken.None));
+        }
+    }
+
+    private async Task<SaveResourceLinkRequest?> ShowLinkDialogAsync(ResourceLink? link)
+    {
+        DialogParameters parameters = new()
+        {
+            { nameof(ResourceLinkDialog.Link), link },
+            { nameof(ResourceLinkDialog.Categories), _categories }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<ResourceLinkDialog>(
+            "Bağlantı", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        DialogResult? result = await dialog.Result;
+
+        return result is null || result.Canceled ? null : result.Data as SaveResourceLinkRequest;
+    }
+
+    // One place for every catalogue write. On a version conflict the current state is reloaded and
+    // the problem stays on screen: the operator sees what somebody else saved before deciding
+    // whether to reapply their change, and nothing is resubmitted automatically.
+    private async Task SaveAsync(Func<Task> save)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            await save();
+            await ReloadAsync();
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            Logger.LogDebug(
+                "Catalogue save failed. Code: {Code}. CorrelationId: {CorrelationId}.",
+                ex.Problem.Code,
+                ex.Problem.CorrelationId);
+
+            if (ex.Problem.RequiresRefresh)
+            {
+                await ReloadAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

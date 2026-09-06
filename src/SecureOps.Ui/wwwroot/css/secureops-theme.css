@@ -5169,3 +5169,202 @@ html[data-so-appearance="light"] .so-auth-card {
         left: 62%;
     }
 }
+
+/* -- resource catalogue and shift sets ------------------------------------ */
+
+.so-resource-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+}
+
+.so-resource-search {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.so-resource-filter {
+    flex: 0 1 190px;
+}
+
+.so-resource-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Dense rows rather than one card per link: this is an operational list an
+   operator scans, and card padding would put three entries on a screen. */
+.so-resource-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--so-space-3);
+    padding: var(--so-space-3) 0;
+    border-top: 1px solid var(--so-border-soft);
+}
+
+.so-resource-item:first-child {
+    border-top: 0;
+}
+
+.so-resource-list--compact .so-resource-item {
+    padding: var(--so-space-2) 0;
+}
+
+.so-resource-main {
+    min-width: 0;
+}
+
+.so-resource-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--so-space-2);
+}
+
+.so-resource-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    color: var(--so-text);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.so-resource-name:hover,
+.so-resource-name:focus-visible {
+    color: var(--so-brand);
+    text-decoration: underline;
+}
+
+/* The destination host, shown before the click rather than after it. */
+.so-resource-host {
+    font-size: 0.78rem;
+    color: var(--so-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.so-resource-purpose {
+    margin: 2px 0 0;
+    font-size: 0.88rem;
+    color: var(--so-text-muted);
+}
+
+.so-resource-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-2);
+}
+
+.so-resource-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    flex: 0 0 auto;
+}
+
+/* -- shift sets ---------------------------------------------------------- */
+
+.so-set-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: none;
+}
+
+.so-set-item {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-3);
+    padding: var(--so-space-2) 0;
+    border-top: 1px solid var(--so-border-soft);
+}
+
+.so-set-item:first-child {
+    border-top: 0;
+}
+
+/* The opening order is the point of a shift set, so the position is shown
+   rather than implied by row order alone. */
+.so-set-order {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--so-bg-sunken);
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--so-text-muted);
+}
+
+.so-set-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.so-set-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+.so-set-resolved {
+    margin-top: var(--so-space-4);
+    padding-top: var(--so-space-3);
+    border-top: 1px solid var(--so-border-soft);
+}
+
+.so-set-option {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.so-set-option-name {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    font-weight: 600;
+}
+
+.so-set-option-meta {
+    font-size: 0.78rem;
+    color: var(--so-text-muted);
+}
+
+/* -- catalogue forms ----------------------------------------------------- */
+
+.so-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    gap: var(--so-space-3);
+}
+
+.so-form-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-4);
+    margin-top: var(--so-space-3);
+}
+
+@media (max-width: 720px) {
+    .so-resource-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .so-resource-actions {
+        justify-content: flex-end;
+    }
+}

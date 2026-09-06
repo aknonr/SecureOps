@@ -1,0 +1,534 @@
+@page "/resources/sets"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+@inject IResourceApiClient ResourceApi
+@inject ICurrentAccessProvider AccessProvider
+@inject IDialogService Dialogs
+@inject IJSRuntime Js
+@inject ILogger<ShiftSets> Logger
+
+<PageTitle>Mesai Setlerim · @WasasBrand.Name</PageTitle>
+
+@*
+    Personal shift-start sets.
+
+    These belong to the signed-in operator and to nobody else. The server scopes every read and write
+    to the session's own user; there is no route that reaches another person's sets, and an
+    administrator has none either.
+
+    Opening is deliberately a two-step action. A saved set is a list of references, not a snapshot:
+    the catalogue can change after it was saved, so the set is resolved against the server first and
+    only what comes back is offered. That resolution is asynchronous, which spends the browser's user
+    activation — so the resolved links are presented with their own explicit "Aç" button rather than
+    being opened straight from the first click.
+
+    Nothing here opens a tab on load, on render, or on refresh.
+*@
+
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Mesai Setlerim"
+                  Lead="Vardiya başında birlikte açtığınız bağlantıları adlandırılmış setler hâlinde saklayın ve sıralayın.">
+        <Actions>
+            <MudButton Href="resources" Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Link">
+                Bağlantılarım
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_busy"
+                       OnClick="LoadPreferencesAsync">
+                Yenile
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Disabled="@(_busy || !ResourceView.CanCreateSet(_preferences))"
+                       OnClick="CreateSetAsync">
+                Yeni Set
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.ResourcesView))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Mesai setlerinizi kullanmak için
+                <code class="so-code">@Capabilities.ResourcesView</code> yetkisi gerekir.
+            </p>
+        </section>
+    }
+    else
+    {
+        @if (_problem is not null)
+        {
+            <SoProblemPanel Problem="_problem" OnRetry="LoadPreferencesAsync" RetryLabel="Yeniden yükle" />
+        }
+
+        @if (_preferences is null)
+        {
+            <SoFlightLoading Message="Setleriniz getiriliyor…" Bare="true" />
+        }
+        else if (_preferences.Sets.Count == 0)
+        {
+            <SoEmptyState Title="Henüz bir setiniz yok"
+                          Description="Vardiya başında birlikte açtığınız bağlantıları bir sette toplayabilirsiniz."
+                          Icon="@Icons.Material.Outlined.PlaylistAdd">
+                <Actions>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Disabled="@_busy"
+                               OnClick="CreateSetAsync">
+                        İlk setinizi oluşturun
+                    </MudButton>
+                </Actions>
+            </SoEmptyState>
+        }
+        else
+        {
+            @foreach (ShiftSetResponse set in _preferences.Sets)
+            {
+                ShiftSetResponse captured = set;
+
+                <section class="so-panel">
+                    <div class="so-panel-head">
+                        <h2 class="so-panel-title">
+                            @set.Name
+                            @if (set.IsDefault)
+                            {
+                                <SoStatusBadge Label="Varsayılan"
+                                               Tone="SoStatusBadge.BadgeTone.Info"
+                                               Icon="@Icons.Material.Filled.Star" />
+                            }
+                            <span class="so-count-chip">@set.Links.Count</span>
+                        </h2>
+                        <div class="so-panel-head-actions">
+                            @if (!set.IsDefault)
+                            {
+                                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Outlined.StarBorder"
+                                           Disabled="@_busy"
+                                           OnClick="@(() => MakeDefaultAsync(captured))">
+                                    Varsayılan Yap
+                                </MudButton>
+                            }
+                            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.DriveFileRenameOutline"
+                                       Disabled="@_busy"
+                                       OnClick="@(() => RenameSetAsync(captured))">
+                                Yeniden Adlandır
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.DeleteOutline"
+                                       Disabled="@_busy"
+                                       OnClick="@(() => DeleteSetAsync(captured))">
+                                Sil
+                            </MudButton>
+                        </div>
+                    </div>
+
+                    @if (set.Links.Count == 0)
+                    {
+                        <p class="so-panel-text so-panel-text--sm so-unknown">
+                            Bu sette bağlantı yok. Bağlantılarım sayfasından ekleyebilirsiniz.
+                        </p>
+                    }
+                    else
+                    {
+                        <ol class="so-set-list">
+                            @for (int i = 0; i < set.Links.Count; i++)
+                            {
+                                ResourceLink link = set.Links[i];
+                                int index = i;
+
+                                <li class="so-set-item">
+                                    <span class="so-set-order" aria-hidden="true">@(index + 1)</span>
+                                    <span class="so-set-body">
+                                        <a class="so-resource-name" href="@link.Url"
+                                           target="_blank" rel="noopener noreferrer">
+                                            @link.Name
+                                            <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" />
+                                        </a>
+                                        @if (ResourceView.Host(link) is { } host)
+                                        {
+                                            <span class="so-resource-host">@host</span>
+                                        }
+                                    </span>
+                                    <span class="so-set-controls">
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                                       aria-label="@($"{link.Name} yukarı taşı")"
+                                                       Disabled="@(_busy || index == 0)"
+                                                       OnClick="@(() => MoveAsync(captured, index, -1))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                       aria-label="@($"{link.Name} aşağı taşı")"
+                                                       Disabled="@(_busy || index == captured.Links.Count - 1)"
+                                                       OnClick="@(() => MoveAsync(captured, index, 1))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                       aria-label="@($"{link.Name} setten çıkar")"
+                                                       Disabled="@_busy"
+                                                       OnClick="@(() => RemoveAsync(captured, link))" />
+                                    </span>
+                                </li>
+                            }
+                        </ol>
+                    }
+
+                    <div class="so-panel-actions">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.FlightTakeoff"
+                                   Disabled="@(_busy || set.Links.Count == 0)"
+                                   OnClick="@(() => PrepareOpenAsync(captured))">
+                            Vardiyayı Başlat
+                        </MudButton>
+                        <span class="so-pager-state">
+                            @set.Links.Count bağlantı açılmak üzere seçili
+                        </span>
+                    </div>
+
+                    @if (_resolved is not null && _resolvedSetId == set.Id)
+                    {
+                        <div class="so-set-resolved">
+                            @if (_resolved.Links.Count == 0)
+                            {
+                                <p class="so-panel-text so-panel-text--sm">@ResourceView.EmptySetNotice</p>
+                            }
+                            else
+                            {
+                                @if (_resolved.Links.Count < set.Links.Count)
+                                {
+                                    @* The contract returns only what is openable now and no count of
+                                       what was excluded, so this says what is true without inventing
+                                       a reason or revealing a restricted entry. *@
+                                    <div class="so-partial-notice" role="status">
+                                        <span class="so-partial-icon" aria-hidden="true">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" />
+                                        </span>
+                                        <p class="so-panel-text so-panel-text--sm">@ResourceView.PartialSetNotice</p>
+                                    </div>
+                                }
+
+                                <p class="so-panel-text so-panel-text--sm">
+                                    <strong>@_resolved.Links.Count bağlantı açılmaya hazır.</strong>
+                                    Tarayıcınız çoklu sekme açmayı engelleyebilir; bu durumda
+                                    aşağıdaki bağlantıları tek tek açabilirsiniz.
+                                </p>
+
+                                <div class="so-panel-actions">
+                                    @* A separate click on purpose: resolution already spent the
+                                       activation from the first one, and browsers block a batch
+                                       opened after an await. *@
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.OpenInNew"
+                                               OnClick="OpenResolvedAsync">
+                                        @_resolved.Links.Count Bağlantıyı Aç
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                               OnClick="ClearResolved">
+                                        Kapat
+                                    </MudButton>
+                                </div>
+
+                                @if (_openAttempted)
+                                {
+                                    @* Deliberately not "opened successfully". A window-opening
+                                       attempt is not proof the destination loaded, and blocked-tab
+                                       detection is not reliable enough to assert either way. *@
+                                    <p class="so-panel-text so-panel-text--sm" role="status">
+                                        Açma isteği gönderildi. Sekmeler açılmadıysa tarayıcınızın açılır
+                                        pencere engelini kontrol edip bağlantıları tek tek açın.
+                                    </p>
+                                }
+
+                                <ul class="so-resource-list so-resource-list--compact">
+                                    @foreach (ResourceLink link in _resolved.Links)
+                                    {
+                                        <li class="so-resource-item">
+                                            <a class="so-resource-name" href="@link.Url"
+                                               target="_blank" rel="noopener noreferrer">
+                                                @link.Name
+                                                <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" />
+                                            </a>
+                                            @if (ResourceView.Host(link) is { } resolvedHost)
+                                            {
+                                                <span class="so-resource-host">@resolvedHost</span>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    }
+                </section>
+            }
+
+            <p class="so-panel-text so-panel-text--sm">
+                Setleriniz yalnızca size aittir. WASAS bağlantı hedeflerine erişmez, oturum açmaz ve
+                kimlik bilgisi iletmez; açılan sekmede ilgili sistemin kendi kimlik doğrulaması geçerlidir.
+            </p>
+        }
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+    private ResourcePreferencesResponse? _preferences;
+    private UiProblem? _problem;
+    private bool _busy;
+
+    private ShiftSetResponse? _resolved;
+    private Guid? _resolvedSetId;
+    private bool _openAttempted;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ResourcesView))
+        {
+            await LoadPreferencesAsync();
+        }
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ResourcesView))
+        {
+            await LoadPreferencesAsync();
+        }
+    }
+
+    private async Task LoadPreferencesAsync()
+    {
+        _busy = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _preferences = await ResourceApi.GetPreferencesAsync(CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            Logger.LogDebug("Resource preferences unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateSetAsync()
+    {
+        string? name = await PromptNameAsync("Yeni set", null);
+
+        if (name is null || _preferences is null)
+        {
+            return;
+        }
+
+        string? invalid = ResourceView.ValidateSet(name, [], _preferences.Sets, null);
+        if (invalid is not null)
+        {
+            _problem = UiProblemFactory.FromResponse(400, null) with { Explanation = invalid };
+            return;
+        }
+
+        await MutateAsync(preferences => ResourceApi.CreateSetAsync(
+            new SaveShiftSetRequest(name, [], false, preferences.Version), CancellationToken.None));
+    }
+
+    private async Task RenameSetAsync(ShiftSetResponse set)
+    {
+        string? name = await PromptNameAsync("Seti yeniden adlandır", set.Name);
+
+        if (name is null || _preferences is null)
+        {
+            return;
+        }
+
+        string? invalid = ResourceView.ValidateSet(name, ResourceView.LinkIds(set), _preferences.Sets, set.Id);
+        if (invalid is not null)
+        {
+            _problem = UiProblemFactory.FromResponse(400, null) with { Explanation = invalid };
+            return;
+        }
+
+        await MutateAsync(preferences => ResourceApi.SaveSetAsync(
+            set.Id,
+            new SaveShiftSetRequest(name, ResourceView.LinkIds(set), set.IsDefault, preferences.Version),
+            CancellationToken.None));
+    }
+
+    private async Task DeleteSetAsync(ShiftSetResponse set)
+    {
+        bool? confirmed = await Dialogs.ShowMessageBox(
+            "Seti sil",
+            $"\"{set.Name}\" seti silinecek. Bu işlem yalnızca sizin kaydınızı kaldırır; katalogdaki bağlantılar etkilenmez.",
+            yesText: "Sil",
+            cancelText: "Vazgeç");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        ClearResolved();
+        await MutateAsync(preferences => ResourceApi.DeleteSetAsync(
+            set.Id, preferences.Version, CancellationToken.None));
+    }
+
+    private Task MakeDefaultAsync(ShiftSetResponse set) =>
+        MutateAsync(preferences => ResourceApi.SaveSetAsync(
+            set.Id,
+            new SaveShiftSetRequest(set.Name, ResourceView.LinkIds(set), true, preferences.Version),
+            CancellationToken.None));
+
+    private Task MoveAsync(ShiftSetResponse set, int index, int offset)
+    {
+        IReadOnlyList<Guid> reordered = ResourceView.Move(ResourceView.LinkIds(set), index, offset);
+
+        return MutateAsync(preferences => ResourceApi.SaveSetAsync(
+            set.Id,
+            new SaveShiftSetRequest(set.Name, reordered, set.IsDefault, preferences.Version),
+            CancellationToken.None));
+    }
+
+    private Task RemoveAsync(ShiftSetResponse set, ResourceLink link)
+    {
+        Guid[] remaining = ResourceView.LinkIds(set).Where(id => id != link.Id).ToArray();
+
+        ClearResolved();
+        return MutateAsync(preferences => ResourceApi.SaveSetAsync(
+            set.Id,
+            new SaveShiftSetRequest(set.Name, remaining, set.IsDefault, preferences.Version),
+            CancellationToken.None));
+    }
+
+    // Every personal mutation goes through here so the version guard, the refreshed state and the
+    // conflict recovery are written once. A rejected stale request changes nothing server-side, so
+    // the only correct response is to re-read before the operator tries again.
+    private async Task MutateAsync(Func<ResourcePreferencesResponse, Task<ResourcePreferencesResponse>> mutate)
+    {
+        if (_preferences is null || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _preferences = await mutate(_preferences);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            Logger.LogDebug("Personal set update failed. Code: {Code}.", ex.Problem.Code);
+
+            if (ex.Problem.RequiresRefresh)
+            {
+                await LoadPreferencesAsync();
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task<string?> PromptNameAsync(string title, string? current)
+    {
+        DialogParameters parameters = new()
+        {
+            { nameof(ShiftSetNameDialog.Title), title },
+            { nameof(ShiftSetNameDialog.Name), current ?? string.Empty }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<ShiftSetNameDialog>(
+            title, parameters, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+
+        DialogResult? result = await dialog.Result;
+
+        return result is null || result.Canceled || result.Data is not string name ? null : name;
+    }
+
+    // Resolution happens on its own click. The result is what the server says is openable right now,
+    // which can be shorter than what was saved; the opening button then works from that list only.
+    private async Task PrepareOpenAsync(ShiftSetResponse set)
+    {
+        _busy = true;
+        _problem = null;
+        _openAttempted = false;
+        _resolved = null;
+        _resolvedSetId = set.Id;
+        StateHasChanged();
+
+        try
+        {
+            _resolved = await ResourceApi.ResolveSetAsync(set.Id, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _resolvedSetId = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Set resolution failed. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // Called straight from the click with no await before the interop call, so the browser still
+    // sees the user activation that lets a batch through.
+    private async Task OpenResolvedAsync()
+    {
+        if (_resolved is null || _resolved.Links.Count == 0)
+        {
+            return;
+        }
+
+        string[] urls = _resolved.Links.Select(link => link.Url).ToArray();
+
+        try
+        {
+            await Js.InvokeAsync<int>("secureOpsLinks.openMany", urls);
+        }
+        catch (JSException ex)
+        {
+            Logger.LogWarning(ex, "Batch link opening could not be dispatched.");
+        }
+
+        // Records only that opening was attempted. The count of handles the browser withheld is
+        // not reliable enough to report as blocked, and no attempt proves a destination loaded.
+        _openAttempted = true;
+    }
+
+    private void ClearResolved()
+    {
+        _resolved = null;
+        _resolvedSetId = null;
+        _openAttempted = false;
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

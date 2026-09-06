@@ -1,0 +1,93 @@
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+
+@*
+    Chooses which personal set a link is added to.
+
+    Sets already containing the link are listed but not selectable: the contract rejects duplicate
+    IDs rather than collapsing them, so offering the choice would produce a validation error the
+    operator did not cause. Saying why here is more useful than failing after the click.
+*@
+
+<MudDialog Class="so-dialog">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.PlaylistAdd" />
+            </span>
+            <span>Sete ekle</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="so-dialog-subject">
+            <span class="so-dialog-subject-label">Eklenecek bağlantı</span>
+            <span class="so-dialog-subject-value">@Link.Name</span>
+        </div>
+
+        @if (Preferences.Sets.Count == 0)
+        {
+            <p class="so-panel-text">Henüz bir mesai setiniz yok.</p>
+        }
+        else
+        {
+            <MudList T="ShiftSetResponse" Clickable="true" Dense="true">
+                @foreach (ShiftSetResponse set in Preferences.Sets)
+                {
+                    ShiftSetResponse captured = set;
+                    bool already = ResourceView.Contains(set, Link.Id);
+                    bool full = set.Links.Count >= ResourceView.MaxLinksPerSet;
+
+                    <MudListItem T="ShiftSetResponse"
+                                 Disabled="@(already || full)"
+                                 OnClick="@(() => Choose(captured))">
+                        <div class="so-set-option">
+                            <span class="so-set-option-name">
+                                @set.Name
+                                @if (set.IsDefault)
+                                {
+                                    <span class="so-chip so-chip--quiet">Varsayılan</span>
+                                }
+                            </span>
+                            <span class="so-set-option-meta">
+                                @if (already)
+                                {
+                                    @:Bu bağlantı sette zaten var
+                                }
+                                else if (full)
+                                {
+                                    @:Set dolu (@ResourceView.MaxLinksPerSet bağlantı)
+                                }
+                                else
+                                {
+                                    @(set.Links.Count) @:bağlantı
+                                }
+                            </span>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Link the operator is placing into a set.</summary>
+    [Parameter, EditorRequired]
+    public ResourceLink Link { get; set; } = default!;
+
+    /// <summary>Current personal state, supplying the caller's own sets only.</summary>
+    [Parameter, EditorRequired]
+    public ResourcePreferencesResponse Preferences { get; set; } = default!;
+
+    private void Choose(ShiftSetResponse set) => Dialog.Close(DialogResult.Ok(set));
+
+    private void Cancel() => Dialog.Cancel();
+}

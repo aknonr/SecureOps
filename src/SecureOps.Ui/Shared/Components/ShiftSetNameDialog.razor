@@ -1,0 +1,70 @@
+@*
+    Names a personal set.
+
+    Bounds mirror the contract (1-80 characters) so the common mistake is reported next to the field
+    rather than arriving as a 400 after a round trip. The server stays authoritative: uniqueness is
+    per owner and case-insensitive there, and this dialog does not attempt to prove it.
+*@
+
+<MudDialog Class="so-dialog">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.PlaylistPlay" />
+            </span>
+            <span>@Title</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <MudTextField @bind-Value="_name"
+                      Label="Set adı"
+                      HelperText="En fazla 80 karakter. Yalnızca siz görürsünüz."
+                      Required="true"
+                      Immediate="true"
+                      MaxLength="80"
+                      Error="@(_error is not null)"
+                      ErrorText="@_error"
+                      Variant="Variant.Outlined"
+                      autofocus="true" />
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary">Kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Dialog heading.</summary>
+    [Parameter]
+    public string Title { get; set; } = "Set";
+
+    /// <summary>Current name when renaming; empty when creating.</summary>
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    private string _name = string.Empty;
+    private string? _error;
+
+    protected override void OnInitialized() => _name = Name;
+
+    private void Confirm()
+    {
+        string trimmed = _name.Trim();
+
+        if (trimmed.Length == 0)
+        {
+            _error = "Set adı zorunludur.";
+            return;
+        }
+
+        _error = null;
+        Dialog.Close(DialogResult.Ok(trimmed));
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

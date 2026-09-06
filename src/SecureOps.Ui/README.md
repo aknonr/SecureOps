@@ -90,6 +90,9 @@ have to be invented.
 | `/access/users/{id}` | User detail, role editor, disable | `Access.ManageUsers` |
 | `/operational-records` | OR → Jira workspace, grouped by attention | `OperationalRecords.View` |
 | `/operational-records/{id}` | Source, workflow, and Jira transfer | `OperationalRecords.View` |
+| `/resources` | Bağlantılarım — catalogue search, favourites, add-to-set | `Resources.View` |
+| `/resources/sets` | Mesai Setlerim — personal ordered sets, default, opening | `Resources.View` |
+| `/admin/resources` | Katalog Yönetimi — categories and links | `Resources.Manage` |
 | `/audit-compliance`, `/diagnostics-readonly` | Future-phase placeholders | authenticated |
 
 Interim auth endpoints: `POST /auth/sign-in`, `GET /auth/sign-out`. They establish identity only.
@@ -180,6 +183,56 @@ non-retryable presentation, never to the generic conflict message.
 
 **No polling.** `GET /operational-records` is a rate-limited source refresh, not a passive read.
 Refresh is a deliberate operator action, plus an automatic re-read after every write.
+
+## Resource catalogue and shift-start sets
+
+Three routes over `/api/v1/resources`, implemented against the "Resource Catalogue and Shift Start
+Sets: Claude Handoff" section of `docs/contracts/secureops-api-v1-ui-integration.md`.
+
+**Journeys.** An operator with `Resources.View` searches the catalogue, toggles favourites, and adds
+a permitted link to one of their own sets; manages those sets — create, rename, delete, reorder,
+choose a default; and starts a shift from a set. An operator with `Resources.Manage` additionally
+creates and edits categories and links, and archives them. Everyone else sees an explanation on
+`/admin/resources` rather than a redirect.
+
+**Ownership.** Personal routes are scoped server-side to the caller's own user. There is no route to
+another operator's favourites or sets, including for Admin, and the UI submits no owner ID.
+
+**Concurrency.** Every personal mutation sends the personal aggregate version and replaces local
+state with the refreshed response. Every catalogue write sends the exact loaded entity version —
+zero to create. On `ResourceConcurrencyConflict` the UI reloads authoritative state and leaves the
+problem on screen; it never resubmits over the edit that won.
+
+**Opening links.** Single links are ordinary anchors with `target="_blank" rel="noopener noreferrer"`.
+A set is resolved through `GET /resources/me/sets/{id}/resolve` on its own click, and only the
+returned links are offered — resolution is asynchronous and spends the browser user activation, so
+opening them is a second explicit click that calls `window.secureOpsLinks.openMany` synchronously.
+The UI reports that opening was *attempted* and always keeps the individual links visible; it never
+claims a destination loaded or authenticated, and blocked-tab detection is not treated as reliable.
+No tab is opened during load, render, or refresh. No WASAS cookie, token, or header reaches a target.
+
+**Search.** Server-side and debounced, with a monotonic request guard so a slower earlier response
+cannot overwrite a later one.
+
+### Verified
+
+Against a local Demo API with `Access:RepositoryProvider=InMemory` and synthetic fixtures created
+through the documented endpoints: the capability split (Admin has `Resources.Manage`, Lead does
+not), server-side 403 on both management write and `includeArchived` read for Lead, 409
+`ResourceConcurrencyConflict` on a stale version, and authenticated render of all three routes with
+real catalogue data. Automated coverage is in `ResourceViewTests` and `ResourceApiClientTests`, plus
+the route rows in `UiErrorRoutingTests`.
+
+**Not verified:** interactive browser behaviour — dialogs, reordering, batch opening, and
+popup-block fallback — because the local Puppeteer harness is no longer installed and this task does
+not permit adding packages. Those paths need a manual pass before TEST sign-off.
+
+### Backend baseline required
+
+Migrations 001-010 and the reviewed object grants must be applied, and an API build containing
+`ResourcesController` deployed, before these routes work against corporate TEST. Neither has
+happened yet. `ResourceCurator` is assigned by an existing Admin through
+`PUT /api/v1/access/users/{id}/roles`; no migration or task assigns it.
 
 ## HTTPS offload behind the corporate load balancer
 

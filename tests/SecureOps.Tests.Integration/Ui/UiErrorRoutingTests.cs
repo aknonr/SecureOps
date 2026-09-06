@@ -92,6 +92,9 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
     [InlineData("/admin/sessions")]
     [InlineData("/admin/system-status")]
     [InlineData("/identity-lookup")]
+    [InlineData("/resources")]
+    [InlineData("/resources/sets")]
+    [InlineData("/admin/resources")]
     public async Task ReportingRoutes_ResolveToTheSignInFlow_AndNotToNotFound(string path)
     {
         // Both are [Authorize]. Anonymously they must route into sign-in — never be reported as

@@ -1,0 +1,107 @@
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+
+@*
+    Creates or replaces a catalogue category.
+
+    Like the link form, PUT is a full replacement and the version travels untouched. There is no
+    hard delete: archiving is the documented way to retire a category, and it hides every link
+    inside it, which is why the consequence is stated before the checkbox rather than after.
+*@
+
+<MudDialog Class="so-dialog">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.Folder" />
+            </span>
+            <span>@(Category is null ? "Yeni kategori" : "Kategoriyi düzenle")</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="so-form-grid">
+            <MudTextField @bind-Value="_name" Label="Ad" Required="true" MaxLength="80"
+                          Immediate="true" Variant="Variant.Outlined"
+                          HelperText="En fazla 80 karakter." />
+
+            <MudNumericField @bind-Value="_displayOrder" Label="Sıra" Min="0" Max="100000"
+                             Variant="Variant.Outlined" HelperText="Küçük değer önce listelenir." />
+        </div>
+
+        <div class="so-form-toggles">
+            <MudCheckBox T="bool" @bind-Value="_managersOnly" Label="Yalnızca yöneticiler görebilir" Dense="true" />
+            <MudCheckBox T="bool" @bind-Value="_archived" Label="Arşivlenmiş" Dense="true" />
+        </div>
+
+        @if (_managersOnly)
+        {
+            <p class="so-consequence so-consequence--caution">
+                Bu kısıtlama kategori altındaki tüm bağlantılara uygulanır. Yetkisi olmayan
+                operatörler bu bağlantıları arama, favori veya set çözümlemesi yoluyla göremez.
+            </p>
+        }
+
+        @if (_archived)
+        {
+            <p class="so-consequence so-consequence--caution">
+                Arşivlenen kategori ve içindeki tüm bağlantılar normal listelerde görünmez.
+                Bu kategorideki bağlantıları düzenlemek için önce arşivden çıkarmanız gerekir.
+            </p>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="so-auth-alert so-auth-alert--error" role="alert">@_error</div>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary">Kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Category being edited, or <see langword="null"/> when creating.</summary>
+    [Parameter]
+    public ResourceCategory? Category { get; set; }
+
+    private string _name = string.Empty;
+    private int _displayOrder;
+    private bool _managersOnly;
+    private bool _archived;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (Category is null)
+        {
+            return;
+        }
+
+        _name = Category.Name;
+        _displayOrder = Category.DisplayOrder;
+        _managersOnly = Category.ManagersOnly;
+        _archived = Category.Archived;
+    }
+
+    private void Confirm()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _error = "Ad zorunludur.";
+            return;
+        }
+
+        _error = null;
+
+        Dialog.Close(DialogResult.Ok(new SaveResourceCategoryRequest(
+            _name.Trim(), _displayOrder, _managersOnly, _archived, Category?.Version ?? 0)));
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

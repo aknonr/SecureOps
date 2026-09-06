@@ -1,3 +1,4 @@
+using SecureOps.Infrastructure.Resources;
 using SecureOps.Shared.Contracts.Api;
 
 namespace SecureOps.Ui.Services;
@@ -519,6 +520,40 @@ public static class UiProblemFactory
             "Aynı işlem hâlihazırda çalışıyor",
             "Aynı kapsamda bir komut zaten yürütülüyor. Mükerrer çalıştırma engellendi.",
             ["İşlem tamamlanana kadar bekleyin.", RefreshStep],
+            retryable: true, requiresRefresh: true),
+
+        // ---- Resource catalogue and personal shift sets -------------------------------------------
+        // NotFound and "not visible to you" are deliberately indistinguishable in the contract, so
+        // the wording must not speculate about which one happened — saying "you lack permission"
+        // would leak the existence of a restricted entry.
+        ResourceErrors.NotFound => Build(
+            UiProblemKind.NotFound, code,
+            "Bağlantı bulunamadı",
+            "Bu kayıt bulunamadı veya görüntüleme kapsamınızda değil. Arşivlenmiş ya da kaldırılmış olabilir.",
+            ["Listeye dönüp güncel kayıtları görüntüleyin."],
+            retryable: false, requiresRefresh: true),
+
+        ResourceErrors.Invalid => Build(
+            UiProblemKind.Validation, code,
+            "Girilen bilgiler kabul edilmedi",
+            "Gönderilen alanlar kurallara uymuyor. Adres yalnızca HTTPS olabilir ve alan sınırları aşılamaz.",
+            ["Alanları kontrol edip tekrar kaydedin."],
+            retryable: false, requiresRefresh: false),
+
+        ResourceErrors.Limit => Build(
+            UiProblemKind.Validation, code,
+            "Kapasite sınırına ulaşıldı",
+            "Bu liste için izin verilen en fazla kayıt sayısına ulaşıldı.",
+            ["Yeni kayıt eklemeden önce kullanılmayan kayıtları çıkarın."],
+            retryable: false, requiresRefresh: true),
+
+        // Retryable, but only after re-reading: the whole point of the version guard is that the
+        // second attempt must be based on somebody else's saved state, not on the stale form.
+        ResourceErrors.Conflict => Build(
+            UiProblemKind.Conflict, code,
+            "Kayıt siz düzenlerken değişti",
+            "Bu kayıt başka bir yerden güncellendi. Değişikliğin üzerine yazılmaması için işlem durduruldu.",
+            [RefreshStep, "Güncel hâli inceleyip değişikliğinizi tekrar uygulayın."],
             retryable: true, requiresRefresh: true),
 
         // ---- Real-data read-only integration ----------------------------------------------------

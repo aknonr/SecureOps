@@ -36,6 +36,28 @@
                 </MudNavLink>
             }
 
+            @* Every operator with Resources.View gets the catalogue; management is a separate
+               capability the API grants only to Admin and the assigned curator role. *@
+            @if (Can(Capabilities.ResourcesView))
+            {
+                <div class="so-nav-group">KAYNAKLAR</div>
+
+                <MudNavLink Href="resources" Icon="@Icons.Material.Filled.Link">
+                    Bağlantılarım
+                </MudNavLink>
+
+                <MudNavLink Href="resources/sets" Icon="@Icons.Material.Filled.PlaylistPlay">
+                    Mesai Setlerim
+                </MudNavLink>
+
+                @if (Can(Capabilities.ResourcesManage))
+                {
+                    <MudNavLink Href="admin/resources" Icon="@Icons.Material.Filled.FolderSpecial">
+                        Katalog Yönetimi
+                    </MudNavLink>
+                }
+            }
+
             @if (CanAnyDirectory)
             {
                 <div class="so-nav-group" lang="en">ACTIVE DIRECTORY</div>

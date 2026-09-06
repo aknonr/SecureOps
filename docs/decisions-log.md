@@ -49,3 +49,30 @@
 **Error taxonomy:** Directory provider timeout is separated from generic provider failure. Timeout returns `DirectoryProviderTimeout` and audits `IdentityLookupProviderTimeout`; generic provider exceptions remain `ProviderUnavailable` / `IdentityLookupFailed`.
 
 **What remains open:** Real AD smoke testing with an approved read-only account is still pending in Test/UAT. Phase 1 diagnostic MVP has not started.
+
+## 2026-09-06 - Resource catalogue and shift-start sets UI, with a scoped diff exception
+
+**What changed:** The UI for the committed resource backend was implemented: `/resources`
+(Bağlantılarım), `/resources/sets` (Mesai Setlerim) and `/admin/resources` (Katalog Yönetimi), plus
+a typed `IResourceApiClient`, presentation rules in `ResourceView`, four dialogs, capability-gated
+navigation, and `ResourceValidationFailed` / `ResourceNotFound` / `ResourceLimitExceeded` /
+`ResourceConcurrencyConflict` mappings in `UiProblemFactory`. No backend, API, Shared contract,
+SQL, migration, capability or authentication change was made.
+
+**Scoped diff exception:** The owner authorized exceeding the usual reviewable-diff guidance for
+this milestone only, so that implementation, tests and documentation could land together rather
+than being split into partially working slices. The change is 3,269 added lines across 19 files,
+all under `src/SecureOps.Ui/` and `tests/`. The permanent "implement small, keep diffs reviewable"
+rule in `AGENTS.md` is unchanged and this exception does not extend to any later task.
+
+**Link opening is UI-owned and deliberately conservative:** single links are plain anchors with
+`noopener noreferrer`; a set is resolved server-side on its own click and opened by a second
+explicit click so the browser user activation is not already spent. The UI reports that opening was
+attempted and keeps the individual links visible. It never claims a destination loaded or
+authenticated, and does not treat a missing window handle as reliable blocked-tab detection.
+
+**What remains open:** Migrations 009-010 and the reviewed grants are not applied to corporate SQL,
+and no API build containing `ResourcesController` is deployed to TEST, so these routes cannot work
+there yet. Interactive browser verification — dialogs, reordering, batch opening and popup-block
+fallback — was not performed because the local Puppeteer harness is no longer installed and this
+task did not permit adding packages; it needs a manual pass before TEST sign-off.
