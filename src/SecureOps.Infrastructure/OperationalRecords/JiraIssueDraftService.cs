@@ -47,7 +47,7 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
                 return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.RequesterResolutionAmbiguous, "requester-resolution", false);
             }
 
-            if (resolution.Status == RequesterResolutionStatus.Found)
+            if (resolution.Status == RequesterResolutionStatus.Found && !string.IsNullOrWhiteSpace(resolution.JiraAccountId))
             {
                 requesterAccountId = resolution.JiraAccountId;
             }
@@ -59,6 +59,16 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             {
                 warnings.Add("Requester was not assigned because no unique exact Jira account was resolved.");
             }
+        }
+
+        if (string.IsNullOrWhiteSpace(record.Requester))
+        {
+            if (string.Equals(_options.UnresolvedRequesterPolicy, "Block", StringComparison.OrdinalIgnoreCase))
+            {
+                return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.RequesterResolutionFailed, "requester-resolution", false);
+            }
+
+            warnings.Add("Requester was not assigned because no unique exact Jira account was resolved.");
         }
 
         string? reporterUsername = null;
@@ -108,6 +118,10 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             Array.AsReadOnly((string[])_options.Labels.Clone()));
         string idempotencyMapping = JsonSerializer.Serialize(new
         {
+            FingerprintVersion = "reviewed-draft-v2",
+            record.SourceConcurrencyToken,
+            Summary = summary,
+            Description = description.ToString(),
             _options.MappingVersion,
             _options.ProjectKey,
             _options.IssueType,

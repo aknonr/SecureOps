@@ -26,6 +26,15 @@ SecureOps will replace the workflow with typed backend boundaries, a preview-bef
 
 ## Consequences
 
+September 2026 hardening binds the reviewed draft fingerprint to the source token
+and exact emitted summary/description. A source refresh or older persisted
+fingerprint cannot silently authorize different content. Key persistence after
+remote success uses a bounded cancellation scope independent of browser lifetime.
+If commit acknowledgement fails, the durable state is preserved and the result
+requires reconciliation; neither a retryable create failure nor exactly-once
+delivery is inferred. SQL transaction rollback and fresh-service retry exclusion
+are exercised using a test-owned failure trigger in isolated LocalDB.
+
 The backend contracts and workflow can be tested without credentials or live systems. SQL is required for restart-safe production behavior; InMemory remains development-only. Until real remote reconciliation semantics are proven, some uncertain failures require operator/administrator intervention rather than an automatic retry.
 
 ## Rejected Alternatives

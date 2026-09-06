@@ -41,6 +41,24 @@ Failures persist as `JiraCreateFailed` or `OperationalRecordCloseFailed`. Disabl
 
 ## Claims, Idempotency, Freshness, and Retry
 
+### September 2026 local hardening milestone
+
+The task explicitly authorizes cross-layer implementation, normal branch push and a
+task-scoped exception to the 1,000-line change cap. Permanent ownership and size
+rules remain unchanged. Corporate calls, deployment and external-write activation
+are excluded. The original script has no documented accessible location; the
+sanitized parity table remains the limit of script evidence.
+
+Preview fingerprints now bind the source concurrency token and exact summary and
+description as well as configured mapping and resolved identities. A refreshed
+source cannot silently replace reviewed content. Existing persisted previews from
+older binaries fail closed on fingerprint mismatch; no transfer rows are reset.
+The Block requester policy also applies when the requester is absent or a resolver
+returns an empty identity. Uncertain creates, including interrupted persistence
+after Jira success, require reconciliation and must never be described as a safe
+automatic retry. No remote lookup/reconciliation command is invented without its
+approved contract. Jira creation and source completion remain separate stages.
+
 The transfer key is SHA256 over source-record identity plus the complete normalized create mapping: mapping version, project, issue type, summary policy, team, labels, requester/watcher field and resolved account, assignee, and reporter. Create/retry also uses the caller `Idempotency-Key` or a deterministic actor/command/target fallback in `ops.CommandExecutions`. SQL permits exactly one transfer row per Operational Record and enforces unique source IDs, transfer keys, command scopes, and Jira issue keys. Once preview fixes a mapping fingerprint for a record, a different mapping or resolved identity fails with `WorkflowConflict`.
 
 Before create/retry, the API atomically acquires a bounded actor claim (`ClaimedBy`, `ClaimedAt`, `ClaimExpiresAt`). Another actor receives `OperationalRecordAlreadyClaimed`; active transition states receive `WorkflowAlreadyInProgress`. Expiry permits recovery after an abandoned client. Immediately before Jira create and again before source close, the source record is re-fetched with an exact validated numeric source-ID filter and checked for existence, open state, and matching explicit version token or deterministic source-state hash. Changed/closed source data aborts before the external write.

@@ -12,6 +12,46 @@ namespace SecureOps.Tests.Unit.OperationalRecords;
 
 public sealed class JiraIssueDraftServiceTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task BuildAsync_MissingRequester_BlockPolicyFailsClosed(string? requester)
+    {
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
+        var resolver = new StubResolver(RequesterResolutionResult.Found("jira-requester"));
+        OperationalRecordResult<JiraIssueDraft> result = await CreateService(resolver, "Block").BuildAsync(record with { Requester = requester }, "test:operator", CancellationToken.None);
+        result.Failure!.Code.Should().Be(OperationalErrorCodes.RequesterResolutionFailed);
+        resolver.Identities.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task BuildAsync_EmptyResolvedIdentity_BlockPolicyFailsClosed()
+    {
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
+        OperationalRecordResult<JiraIssueDraft> result = await CreateService(new StubResolver(RequesterResolutionResult.Found("")), "Block")
+            .BuildAsync(record, "test:operator", CancellationToken.None);
+        result.Failure!.Code.Should().Be(OperationalErrorCodes.RequesterResolutionFailed);
+    }
+
+    [Fact]
+    public async Task BuildAsync_SourceRefreshAfterPreview_CannotAcquireCreateWithChangedContent()
+    {
+        var repository = new InMemoryOperationalRecordRepository();
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.Found("jira-requester")), "Block");
+        JiraIssueDraft first = (await service.BuildAsync(record, "test:operator", CancellationToken.None)).Value!;
+        await repository.MarkPreviewedAsync(record.Id, first.MappingVersion, first.IdempotencyKey, "test:operator", "synthetic", CancellationToken.None);
+        foreach (OperationalRecord changed in new[] { record with { Title = "Changed title" }, record with { Description = "Changed description" }, record with { SourceConcurrencyToken = "source:changed" } })
+        {
+            JiraIssueDraft draft = (await service.BuildAsync(changed, "test:operator", CancellationToken.None)).Value!;
+            draft.IdempotencyKey.Should().NotBe(first.IdempotencyKey);
+            await repository.TryClaimAsync(record.Id, "test:operator", TimeSpan.FromMinutes(2), "synthetic", CancellationToken.None);
+            WorkflowAcquireResult acquired = await repository.TryAcquireCreateAsync(record.Id, draft.MappingVersion, draft.IdempotencyKey, "test:operator", "synthetic", CancellationToken.None);
+            acquired.Disposition.Should().Be(WorkflowAcquireDisposition.Conflict);
+        }
+    }
+
     [Fact]
     public async Task BuildAsync_WithExactRequesterMatch_ReturnsConfiguredPreview()
     {

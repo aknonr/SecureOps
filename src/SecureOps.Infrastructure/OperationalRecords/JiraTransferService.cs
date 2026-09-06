@@ -357,7 +357,20 @@ public sealed class JiraTransferService : IJiraTransferService
             return await RecordJiraFailureAsync(creating, OperationalErrorCodes.JiraValidationFailed, false, true, context, cancellationToken);
         }
 
-        OperationalRecord jiraCreated = await _repository.RecordJiraCreatedAsync(creating.Id, created.IssueKey, context.Actor, context.CorrelationId, cancellationToken);
+        OperationalRecord jiraCreated;
+        try
+        {
+            // Once Jira succeeds, a disconnected browser must not cancel key persistence.
+            using CancellationTokenSource persistence = new(TimeSpan.FromSeconds(15));
+            jiraCreated = await _repository.RecordJiraCreatedAsync(creating.Id, created.IssueKey, context.Actor, context.CorrelationId, persistence.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Jira result persistence requires reconciliation. OperationalRecordId: {OperationalRecordId}. CorrelationId: {CorrelationId}", creating.Id, context.CorrelationId);
+            // The transaction may have committed before its acknowledgement failed. Preserve
+            // either durable CreatingJira or JiraCreated; never overwrite it with retryable failure.
+            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.WorkflowConflict, "jira-reconciliation", false);
+        }
         if (!await TryAuditAsync(AuditActions.JiraCreated, jiraCreated, context, "Created", null, cancellationToken))
         {
             return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.AuditStoreUnavailable, "audit", true);
