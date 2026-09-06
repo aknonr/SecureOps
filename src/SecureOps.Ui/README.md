@@ -374,6 +374,83 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
+**Resume update, 02:38 TRT:** resume from this update; the rc6.10 milestone below
+is historical evidence. The checkout matched branch
+`feature/sql-runtime-hardening-20260902` and HEAD
+`1156ccf20f56bf0686c9e4a025edb484229a0b46`, with four unpushed commits and only
+untracked `.vscode/`. No clone, reset, unrelated edit or configuration overwrite.
+The initial remote query failed DNS resolution; a later live query returned
+`0276bf173705fa5919b1d2f665a2f0d182534b99`. Normal push then succeeded, including
+all four prior commits and new implementation
+`efc6c59412980ab84a736896ee0fe69f3963e685`; `git ls-remote --heads` independently
+confirmed that exact remote SHA. This update is a subsequent documentation-only
+commit; use final branch HEAD for its identity, not as a different runtime build.
+Existing approved Git authentication worked; no new sign-in or secret was needed.
+
+**Implemented:** accessible, keyboard-editable custom UTC date fields; a named
+Jira confirmation dialog with initial focus on Cancel; uncertainty-aware list
+and detail labels with caution styling; and one reconciliation notice when the
+action and persisted state share the same support reference. Different support
+references remain visible. The existing MudBlazor 6 accessibility bridge handles
+the dialog container because component attributes are not forwarded by that
+version. No framework, eligibility, approval, backend adapter, SQL migration or
+external-write fence changed. Runtime/test diff: 596 additions, 24 removals,
+16 files, below the permanent 1,000-line cap without an exception.
+
+**Current local evidence:**
+
+| Evidence | Executed result |
+|---|---|
+| Release solution build | Zero warnings/errors |
+| Unit tests | 1,034 passed, zero failures/skips; three new uncertainty presentation cases. The earlier 1,020 total was a previous checkpoint, not the current baseline |
+| Integration tests | 242 passed, zero failures/skips; eight are actual guarded LocalDB tests. Six OpenAPI cases are included. Other hosted, InMemory/fake-backed and offline checks are not relabelled as SQL evidence |
+| Isolated SQL | Existing migration harness passed 001-010 on `SecureOpsResourcesV1` / `SecureOps_ResourcesV1_JourneysFinal20260907`; the earlier `Journeys20260907` database is retained separately |
+| Dashboard browser | Four checks: populated custom window/API agreement, empty/preset recovery, real SQL-lock loading/failure/retry, and 100ns inclusive/exclusive boundary evidence. Synthetic historical transitions differ from current eligibility/backlog |
+| SDM browser | Six checks: view/publish separation, evaluated actionable blockers and cancelled draft, double confirmation/success/key replay, changed-source conflict, known failure versus unknown outcome, and close-only retry preserving the Jira key |
+| Reporting matrix | Admin/Auditor receive summary and operator data; Lead/JiraPublisher/Operator/ReadOnly receive 403. All six rows verify actual menu and direct `/dashboard` / `/reporting/operators` behavior. No new ranking UI or metric was introduced |
+| Package scan | No known vulnerable direct/transitive packages reported across eight projects |
+| Diff / format | `git diff --check` passed. Repository-wide `dotnet format --verify-no-changes --no-restore` failed on existing whitespace/naming violations, including untouched Infrastructure/Identity files. No broad formatting cleanup was performed |
+
+**Browser artifacts:** ignored `artifacts/sdm-journeys-final-20260907/` contains
+34 PNGs, the authoritative custom-window JSON, four management checks, six SDM
+checks, the six-role matrix and full-suite TRX files. Screenshots use 1440x900 and
+390x844; responsive drawer closure is awaited before capture. Confirmation shots
+come from interactive dialogs. Result shots additionally verify persisted state
+after reread, not static component HTML. See `dashboard-populated-*.png`,
+`sdm-success-confirmation-*.png`, `sdm-success-result-*.png`,
+`sdm-unknown-result-*.png` and `sdm-source-close-recovered-*.png`.
+Replay instructions and synthetic role restoration are in `tests/README.md` and
+the three browser scripts. The existing source/Jira Simulation pair performs no
+network I/O; Access, Audit, sessions, workflow, idempotency and reporting use SQL.
+Only task-owned foreground API/UI processes on 5100/64947/64949 were stopped;
+pre-existing local hosts and `.vscode/` were preserved.
+
+**Evidence limits:** the known pre-dispatch browser rejection is a changed-source
+conflict. A source-validation outage before dispatch and actual transport/response
+loss remain client/hosted-test evidence, not injected browser-network evidence.
+The ambiguous browser outcome comes from deterministic Simulation, not a real
+Jira timeout. Corporate browser policy, timed session expiry and screen-reader
+verification remain unrun. No corporate service, SQL, IIS, external write or
+deployment was exercised. The original Jira script/access location, positive SDM
+policy, requester/reporter mappings, human approval workflow and authoritative
+remote reconciliation contract remain external activation inputs.
+
+**Source versus packages:** current verified runtime source is `efc6c59`.
+Existing rc6.10 API/UI packages still belong to
+`de6e5381bd3d7e053f2e9c1c6b07e93283f55ca7`; these fixes are not inside them.
+All three ZIP SHA-256 values in the historical table below were rechecked and
+are unchanged. No package was rebuilt or overwritten.
+
+**Exact next action:** synchronize this branch normally, then obtain the approved
+original script location and sanitized positive policy/identity/approval/
+reconciliation inputs before any SDM activation work. For the unrun browser fault
+cases, extend test-only hosting around the existing scripted adapters; do not add
+production failure controls or retry rejected proxy/background startup methods.
+Any new package must have a new release root and its own source association;
+corporate TEST deployment remains a separately authorized operation.
+
+#### Historical rc6.10 Milestone
+
 Starting branch/HEAD were verified as `feature/sql-runtime-hardening-20260902` /
 `0276bf173705fa5919b1d2f665a2f0d182534b99`, matching the requested baseline.
 Only the existing untracked `.vscode/` was present and is excluded. This task
