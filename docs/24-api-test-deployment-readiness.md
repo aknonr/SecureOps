@@ -196,6 +196,11 @@ and generated OpenAPI together, not separate artificial per-commit limits.
 ADR-0019 records the decision; final total additions/deletions are reported from
 the starting source through the maintenance-document commit.
 
+Final milestone diff: +4,854/-13 lines; generated OpenAPI: +2,542/-1;
+handwritten implementation/tests/SQL/docs: +2,312/-12. This includes the separate
+historical-inventory preservation commit; no packages, UI or applied migrations
+were changed. The original `.vscode/` remains outside both commits.
+
 Implemented: shared categories/links, manager-only categories, bounded search and
 pagination, explicit Admin/ResourceCurator management, owner-only favourites and
 ordered named/default sets, current visibility resolution, version conflicts,
