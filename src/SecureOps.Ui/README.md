@@ -415,10 +415,33 @@ Activation still requires current field metadata/permissions and durable identit
 decisions, positive SDM policy/attestations, a decision on operator confirmation
 versus separate approval, remote write success/failure evidence and authoritative
 reconciliation/conditional-write semantics. No approval subsystem is inferred.
-Exact next action: complete verified source delivery and the authorized new paired
-API/UI package in a fresh release root, then obtain only these remaining owner
-inputs. Deployment and corporate writes remain separately gated. rc6.10 retains
-source `de6e538` and its original hashes; these runtime fixes are not in rc6.10.
+Exact next action: obtain only these remaining owner inputs before SDM activation;
+any later TEST deployment first needs approved target/schema/backup/rollback
+inventory under `docs/24-api-test-deployment-readiness.md`. Deployment and corporate
+writes remain separately gated.
+
+**Source/package delivery:** implementation `74cd8274250302a977cbc4c5cd6e4f1789c01459`
+was committed and normally pushed using existing authentication. After one
+transient DNS failure, `git ls-remote --heads` confirmed that exact live remote SHA.
+A following
+documentation-only commit records this package result; it is not another build
+source. Paired release root:
+`C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.11`.
+Both API/UI ProductVersion values include the exact `74cd827` full SHA and the
+shared Infrastructure DLL hashes match. Release/publish, API dependency closure,
+offline Swagger, payload scans and every archive-entry hash passed validation.
+`release-readiness.md`, `release-metadata.json`, `release-artifacts.sha256` and
+per-file manifests are in that new root. No deployment was performed.
+
+| rc6.11 artifact | SHA-256 |
+|---|---|
+| `API/secureops-api-TEST-74cd827.zip` | `CB34CDA66EE6EBEA9B7818F6A0F8D50A455098B945F81B5D97B8EFC8AEAFF597` |
+| `UI/secureops-ui-TEST-74cd827.zip` | `2FAEC67EC6757D08C6CFBC6B1203E8F00378CD571589B70788BE9C7C9ED341D5` |
+
+Schema remains 001-010; no new DBA archive was necessary. rc6.10 retains source
+`de6e538` and all three original ZIP hashes, rechecked unchanged. Those old API/UI
+packages do not contain the later runtime changes. The supplied original script
+hash was also rechecked unchanged, and `.vscode/` remains excluded.
 
 #### Prior SQL and Browser Milestone
 

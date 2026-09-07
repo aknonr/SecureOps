@@ -1,5 +1,11 @@
 # API TEST Deployment Readiness
 
+Latest local paired package: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.11`,
+exact API/UI source `74cd8274250302a977cbc4c5cd6e4f1789c01459`, schema 001-010.
+Its readiness/source/hash manifests were validated locally; no deployment or
+write activation occurred. rc6.10 and the original runbook below are preserved.
+Current source/evidence handoff is in `src/SecureOps.Ui/README.md`.
+
 ## SDM/Resources TEST Operator Runbook, 2026-09-07
 
 Bu teslimat yerel doğrulama ve paket hazırlığıdır; TEST kurulumu veya SDM yazma
