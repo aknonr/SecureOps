@@ -33,13 +33,13 @@ async function capture(page, out, name) {
     for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
         const modal = await page.getByRole('dialog').count() > 0;
-        if (!modal) {
-            if (width === 390) {
+        if (width === 390) {
                 await page.waitForFunction(() => {
                     const drawer = document.querySelector('.so-drawer');
                     return !drawer || drawer.getBoundingClientRect().right <= 1;
                 });
-            }
+        }
+        if (!modal) {
             await page.evaluate(() => window.scrollTo(0, 0));
         }
         await page.screenshot({ path: path.join(out, `${name}-${width}.png`), fullPage: !modal, animations: 'disabled' });

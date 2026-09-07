@@ -375,6 +375,18 @@ not the historical blocker list above; the hidden-membership and environment con
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
 **Workspace usability follow-up, locally verified and not packaged:** resumed actual `aac1be56cf9921555e2d1c67f0f7a22c9a4a1e3e`.
+Latest functional runtime commit: `2b895f6e6c66553be52f44471a231892865a9937`.
+Increments: `e5d7065` preferences/resolution, `4d95656` resource workspace,
+`957a70f` persisted browsing, `2b895f6` guided review/tours. Subsequent browser
+harness/handoff commits do not change runtime. The local published verification
+outputs are under `artifacts/workspace-usability-20260907/final-api` and `final-ui`;
+they were compiled during reviewed working-tree verification, not produced by
+release packaging and must not be treated as a new TEST deployment package.
+Normal push and live `ls-remote` on 2026-09-07 failed because approved GitHub
+authentication could not prompt. Remote publication is unverified; cached
+upstream remains `7c118f31d7c1aaa687b723b793b3bc792c4cbee4`, not a live remote claim.
+User action: complete the existing Git Credential Manager browser sign-in, then
+normal-push `feature/sql-runtime-hardening-20260902` and verify `ls-remote`.
 The rc6.12 archives were extracted into ignored local artifacts and hosted in
 foreground Demo with Simulation providers, no corporate configuration/calls.
 Published theme CSS equals source SHA-256 `63184EAAD85A94E56E23AC94AE0D035D4309CAFDBF362928CB84F35CDB20A0D5`.
@@ -438,6 +450,12 @@ browser, record viewport/zoom, loaded application CSS URL/status/content hash an
 computed filter grid. Compare the served file against the installed package and
 its source; stop on mismatch before considering any server change. rc6.12 still
 excludes every follow-up runtime change; no new release archive or deployment was made.
+Long contiguous names, long purposes/notes, short and paged lists and explicit
+layout reset were exercised in the published workspace. Native keyboard browser
+zoom was attempted but the headless browser did not change its zoom factor;
+only 200%-equivalent reflow is evidence. Whole-repository historical formatting
+debt was not rewritten; the new C# files passed scoped `dotnet format` verification.
+rc6.12 API/UI/DBA archive hashes were rechecked and match the table below.
 
 **Current packaged delivery, rc6.12:** build source
 `682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`, latest runtime

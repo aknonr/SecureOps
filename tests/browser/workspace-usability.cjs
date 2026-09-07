@@ -11,6 +11,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
     const admin = await apiContext(request, api), owner = await apiContext(request, api, 'team-lead');
     const browser = await chromium.launch({ executablePath: process.env.WASAS_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
     const checks = [], errors = [], assets = [];
+    let zoomBoundary = '720 CSS pixel reflow; native browser zoom not verified';
     let page;
     try {
         const categories = await json(admin, '/api/v1/resources/categories');
@@ -24,6 +25,13 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
                 location: 'Yerel', tags: ['sentetik', 'operasyon'], displayOrder: i
             } });
         }
+        const fixture = await json(admin, '/api/v1/resources/links?search=' + encodeURIComponent('Çalışma alanı örneği 01'));
+        const long = fixture.items[0];
+        assert.ok(long && long.categoryId === category.id, 'Only the labelled synthetic fixture may be edited');
+        await json(admin, `/api/v1/resources/links/${long.id}`, { method: 'PUT', data: {
+            ...long, name: 'Çalışma alanı örneği 01 ' + 'UzunMetin'.repeat(10), purpose: 'Sentetik uzun amaç. '.repeat(15),
+            notes: 'Sentetik not. '.repeat(60), expectedVersion: long.version, url: new URL('harmless/workspace/0', ui).href
+        } });
         const initial = await json(owner, '/api/v1/resources/me');
         await json(owner, '/api/v1/resources/me/layout', { method: 'PUT', data: {
             expectedVersion: initial.version, layout: { view: 'cards', density: 'comfortable', pageSize: 25, shortcuts: ['links', 'groups'] }
@@ -31,6 +39,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
         // Only harmless destination pages are fulfilled, never API traffic or corporate hosts.
         await context.route(new URL('harmless/**', ui).href, route => route.fulfill({ contentType: 'text/html', body: '<title>Synthetic destination</title><h1>Sentetik yerel hedef</h1>' }));
+        await context.route('https://localhost:5221/harmless/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Synthetic destination</title><h1>Sentetik yerel hedef</h1>' }));
         page = await context.newPage();
         page.on('pageerror', e => errors.push(e.message));
         page.on('response', r => { if (/\.css(?:\?|$)|\.js(?:\?|$)/.test(r.url())) assets.push({ url: r.url(), status: r.status() }); });
@@ -98,6 +107,17 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         await page.locator('.so-user-menu-popover.mud-popover-open .mud-list-item').filter({ hasText: /^Koyu/ }).click();
         await page.waitForFunction(() => document.documentElement.classList.contains('so-dark'));
         await capture(page, out, 'after-links-dark');
+        const beforeZoom = await page.evaluate(() => devicePixelRatio);
+        await page.getByRole('heading', { name: 'Uygulama Bağlantıları', exact: true }).click();
+        for (let i = 0; i < 4; i++) await page.keyboard.press('Control+Equal');
+        await page.waitForTimeout(300);
+        const afterZoom = await page.evaluate(() => devicePixelRatio);
+        if (Math.abs(afterZoom / beforeZoom - 2) < 0.05) {
+            assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+            await page.screenshot({ path: path.join(out, 'after-links-native-200-percent.png'), fullPage: true });
+            zoomBoundary = 'Native 200% browser zoom verified by devicePixelRatio; managed TEST browser remains unverified';
+        }
+        await page.keyboard.press('Control+Digit0');
         await page.setViewportSize({ width: 720, height: 450 });
         await page.screenshot({ path: path.join(out, 'after-links-200-percent-reflow.png'), fullPage: true });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
@@ -112,10 +132,21 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         await page.locator('[data-so-open-links]').waitFor();
         await capture(page, out, 'after-groups');
         checks.push('Group primary opening action prepares authoritative links next to the toolbar; only a second native activation opens destinations');
+        await navigate(page, ui, 'resources');
+        await page.waitForFunction(() => [...(document.querySelector('[aria-label="Bağlantı ara"]')?.attributes || [])].some(a => a.name.startsWith('_bl_')));
+        const beforeReset = await json(owner, '/api/v1/resources/me');
+        await page.getByRole('button', { name: 'Çalışma alanını düzenle', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Düzeni sıfırla', exact: true }).click();
+        await dialog.waitFor({ state: 'hidden' });
+        const reset = await json(owner, '/api/v1/resources/me');
+        assert.deepEqual(reset.workspaceLayout, { view: 'cards', density: 'comfortable', pageSize: 25, shortcuts: ['links', 'groups'] });
+        assert.deepEqual(reset.sets, beforeReset.sets);
+        assert.deepEqual(reset.favourites, beforeReset.favourites);
+        checks.push('Explicit Reset layout saves defaults without changing groups or favourites');
         assert.deepEqual(errors, []);
         assert.deepEqual(assets.filter(a => a.status >= 400), []);
-        fs.writeFileSync(path.join(out, 'workspace-results.json'), JSON.stringify({ checks, grid, errors, assets, zoomBoundary: '720 CSS pixel reflow; managed-browser native zoom not claimed' }, null, 2));
-        console.log(JSON.stringify({ checks, errors, assetFailures: assets.filter(a => a.status >= 400) }, null, 2));
+        fs.writeFileSync(path.join(out, 'workspace-results.json'), JSON.stringify({ checks, grid, errors, assets, zoomBoundary }, null, 2));
+        console.log(JSON.stringify({ checks, errors, assetFailures: assets.filter(a => a.status >= 400), zoomBoundary }, null, 2));
     } finally {
         if (page && !page.isClosed()) await page.screenshot({ path: path.join(out, 'workspace-last-state.png'), fullPage: true }).catch(() => {});
         await browser.close(); await owner.dispose(); await admin.dispose();
