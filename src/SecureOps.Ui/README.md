@@ -374,6 +374,36 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
+**Activation evidence preparation:** current starting HEAD is
+`ac00c9cacab52471b778c6d358f9144442d5f4a5`, on the existing feature branch with
+only untracked `.vscode/`. This task changes documentation only. rc6.11 retains
+runtime source `74cd8274250302a977cbc4c5cd6e4f1789c01459`; all release directories,
+packages and recorded hashes are untouched. No packaging, deployment or corporate
+request was performed.
+
+The Turkish five-step operator checklist is now in the existing
+`docs/integrations/turuncu-hat-jira-contract-gaps.md`: product/version identification,
+SDM/3 metadata and service permissions, custom fields/requester/watcher evidence,
+bounded authoritative issue correlation, and separate BPM semantics. Official
+Atlassian references are version-gated: this repository does not establish the
+actual Jira product/version. Returned data is explicitly allowlisted and sanitized;
+no credentials, broad searches or raw dumps are requested.
+
+Jira-only TEST can be planned but cannot be activated through current rc6.11
+configuration: successful creation proceeds directly to source close, retry with
+a key also closes source, and the write fence is shared. A separately approved
+implementation must independently fence BPM dispatch and persist/present Jira-only
+success without pretending source completion. Publisher review is a business
+proposal, not an approved eligibility change or a separate-approver requirement.
+
+The eight skipped SQL cases do not expose a new persistence gap in the latest
+HTTP/parser-only changes; repository/command/schema/workflow code is unchanged.
+Prior SQL and browser evidence is reused, with no new build/test/SQL run. A future
+Jira-only mode requires targeted persistence/restart/duplicate and browser coverage.
+Exact next action: the owner/Jira administrator returns step 1 product/version
+and SDM/3-context evidence using the checklist; business policy and remote
+correlation remain decisions/evidence, not inferred activation permission.
+
 **Original-script review update:** start here for contract discovery; the browser
 and rc6.10 evidence below is retained, not rerun or overwritten. Starting local
 and independently queried remote HEAD both matched
