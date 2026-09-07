@@ -1,5 +1,52 @@
 # Turuncu Hat to Jira Legacy Parity
 
+## In Use Source Recovery, 2026-09-08
+
+This is a separate workflow from the OR-to-Jira script reviewed below. The task
+states active `SMSS_oRFF`, `p_dcc IN (4241)`, `p_rel_group IN (68)` for In Use;
+the original Jira script excludes 4241. This task statement is not a response
+contract or corporate business-policy approval.
+
+Located source-only artifact:
+`C:\Users\dmtak\Desktop\in_use_v2_sifresiz hali.txt`, 3,205 bytes, SHA-256
+`7E95E749AC4F03D038A542686FBB750AFB08D4E0261BC5DC33A7F4F7ED2A437C`.
+The file was read with sensitive/endpoint lines suppressed, not executed,
+modified or copied into Git. UTF-8 PowerShell AST parsing returned
+`MissingExpressionAfterToken` (217), `MissingEndParenthesisInSubexpression` (218)
+and `MissingEndCurlyBrace` (171). The file ends inside the NMS header array.
+
+| Available source | Established behavior |
+|---|---|
+| Lines 3-12, comment only | Intended per-OR workbook and per-server Sunucular/NMS processing; not executed implementation |
+| Lines 92-108, `Write-ExcelBlock` | Hashtable row-to-key mapping writes present data into the supplied server column |
+| Lines 110-120, `Write-Header` | Supplied header map writes row labels into column 1 |
+| Lines 121-131, `Write-ServerColumnHeaders` | Sequential server headings starting at the caller's column |
+| Lines 133-169, `Ask-YesNo` | Windows Forms Yes/No returns Evet/Hayir; no unknown choice in this helper |
+| Lines 171-217, incomplete `Write-NMSHeader` | Partial header list only; no completed writer or data mappings |
+
+Visible header order is KONTROL, IP Address, ENV_ID, ITMC_Service_ID,
+ITMC_Turuncu_Sunucu_Listesi_Karsilik, ITMC_Servis_Unsuru_ID,
+ITMC_Servis_Unsuru, Hardware_Type, Device_Type, Server_Type, Country, City,
+Building, Department, Sub_Department, Contact_email, UY_Owner Mail Address,
+ITMC_Event_Owner_Group, ITMC_MEMORY_Alarm, ITMC_CPU_Alarm, ITMC_UP_DOWN_Alarm.
+The trailing comma proves this is not the complete template. Header names do
+not establish source properties, ownership joins or completed technical checks.
+
+The available file contains no actual discovery/server relation queries, call
+sites for operator questions/bulk answers, Sunucular field map, dynamic-case
+updates, workbook save/upload, or BPM lookup/update/verification. Consequently
+the reported premature `$si`, last-server environment, positional relation,
+hardcoded ownership/check, write-before-upload, first-BPM-result and missing
+post-update-verification defects are **unverified against this artifact**.
+Do not present them as observed defects or reuse Jira-script findings as proof.
+
+Required missing evidence is the complete original In Use script, inspected
+locally without execution, plus sanitized exact-key relationship/projection
+examples where that source still cannot establish the response contract.
+Passwords, tokens, runtime headers and full server configuration are unnecessary.
+Local workbook implementation must not claim legacy compatibility from this
+partial header list; unresolved requirements must remain visible in previews.
+
 ## Original Source Review, 2026-09-07
 
 Original-script discovery is resolved. The actual task attachment resolves to

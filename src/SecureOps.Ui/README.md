@@ -372,6 +372,65 @@ MudBlazor stays at 6.16.0; the boundedness assessment and exact application-wide
 are above. Local success is not TEST sign-off. Resume from this entry and `docs/decisions-log.md`,
 not the historical blocker list above; the hidden-membership and environment contract blockers are resolved.
 
+### In Use Milestone Recovery, 2026-09-08
+
+Implementation is not delivered yet. Start HEAD was
+`f18d48329d163acf12f4c7ea501f598ad9f0b1f5` on
+`feature/sql-runtime-hardening-20260902`, tracking the same origin branch.
+The tracked worktree was clean; untracked `.vscode/` is excluded and preserved.
+Two documentation commits were ahead of the cached upstream. Live `ls-remote`
+and normal push both failed: `could not read Username for 'https://github.com':
+terminal prompts disabled`, with Git Credential Manager interaction disabled.
+An unauthenticated GitHub repository read returned HTTP 404. These attempts do
+not establish a current remote SHA, default branch, or merge state. The prior
+verified remote/build source remains historical evidence below.
+
+The operator reports manually deploying rc6.13 to TEST. This is an operator
+report, not newly verified binary pairing, schema/grants, browser behavior or
+corporate acceptance. Existing rc6.13 and older archives/hashes are preserved;
+no release candidate, deployment or corporate call was performed in this task.
+
+The only located In Use script is an incomplete Desktop file. Exact provenance,
+available helper behavior and missing source sections are recorded in
+`docs/integrations/turuncu-hat-jira-legacy-parity.md`, under In Use source recovery.
+The complete original is required to verify the requested legacy defects and
+sheet/field compatibility. Do not use the OR-to-Jira script as its substitute.
+
+The requested scope explicitly includes local assignment/review/export and UI/API
+implementation. Repository quality guidance still caps the total diff at 1,000
+lines (`docs/agent-guides/090-testing-quality.md`, Definition of Done). A task-only
+exception has been requested for the combined API/SQL/UI/workbook/test/OpenAPI
+milestone; no exception has been received. Do not divide commits to conceal the
+total, or change the permanent rule. No In Use source, schema, role or UI entry
+point has been added during recovery.
+
+Verified reuse points: Turuncu Hat session renewal, bounded JSON transport and
+exact-key source parsing; persisted application capabilities and stable user IDs;
+SQL transaction/audit and expected-version patterns; durable command execution;
+existing API clients, error presentation and positioned workspace guide.
+Keep requester, service owner, provisioning team and local reviewer separate.
+Unresolved source relationships stay unresolved; manual assignment must use the
+persisted access identity, with audit and a version check.
+
+SQL currently ends at 011. New independent persistence would require a reviewed
+012 migration; none has been created or applied, and runtime grants are unchanged.
+`src/SecureOps.Worker/Program.cs` only builds/runs an empty generic host. Its README
+describes planned Hangfire responsibilities, not implemented jobs or verified
+deployment. The first workspace must use explicit operator refresh. A later
+read-only Hangfire job can call the same bounded synchronization service after
+worker hosting, storage, identity, scheduling and retry contracts are approved.
+
+Continuation: complete original source, then resolve the combined-diff constraint
+and implement/verify the requested workspace. In Use scope is active `SMSS_oRFF`,
+`p_dcc IN (4241)`, `p_rel_group IN (68)` as stated in the task; the existing Jira
+workflow excludes 4241. No In Use-to-Jira eligibility is implied. Preserve all
+three write fences. Future In Use attachment/property/BPM commands require their
+own authorization gates and authoritative outcome verification.
+
+Jira-only TEST prerequisites remain independent of In Use. See the current
+deployment-readiness note and the numbered evidence requirements in
+`docs/integrations/turuncu-hat-jira-contract-gaps.md`; no external writes are enabled.
+
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
 **Current packaged delivery, rc6.13 (not deployed):** clean tracked build source

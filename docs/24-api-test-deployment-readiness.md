@@ -1,5 +1,36 @@
 # API TEST Deployment Readiness
 
+## Current Evidence Boundary, 2026-09-08
+
+The operator reports manual rc6.13 deployment to TEST. This task has not verified
+deployed API/UI hashes, schema/grants or corporate acceptance checks; the runbook
+below remains the acceptance reference. No deployment, release repackaging,
+corporate SQL/API call or write-fence change was performed. In Use recovery and
+its source/implementation blockers are in the canonical `src/SecureOps.Ui/README.md`.
+
+Remaining prerequisites for a **single-record Jira-only TEST pilot**, independent
+of In Use development:
+
+- Verify deployed API/UI pairing and 001-011 persistence/grants against the existing
+  runbook; the operator deployment report alone does not establish these checks.
+- Approve the selected record's positive eligibility policy and required evidence,
+  then implement/verify that bounded policy. The current operator-declared request
+  type alone remains blocked. Software installation additionally needs its approved
+  label/field mapping; this is not required for a server-request-only pilot.
+- Confirm current Jira product/version, SDM/type-3 required fields and effective
+  integration-user permissions; verify the two custom-field/requester contracts and
+  the chosen assignee/reporter policy. Preserve unresolved-requester Block behavior.
+- Establish accepted create success/failure shapes and an authoritative method and
+  accountable operator for reconciling an uncertain result without a second create.
+- Obtain separate single-record TEST write approval and a reviewed activation delta;
+  current values remain ReadOnlyIntegrationMode=true, ControlledTestWritesEnabled=false,
+  SourceCloseEnabled=false. Jira-only approval must keep source close disabled.
+
+Exact bounded evidence requests remain in
+`docs/integrations/turuncu-hat-jira-contract-gaps.md`, numbered steps 1-4 and owner
+decisions. BPM step 5 is not a Jira-only prerequisite. No In Use completion,
+background worker or In Use ownership/template contract is a dependency of this pilot.
+
 ## Güncel TEST Operatör Runbook, rc6.13
 
 Paket kökü: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.13`.
