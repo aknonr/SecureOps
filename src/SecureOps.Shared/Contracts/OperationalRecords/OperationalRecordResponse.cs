@@ -38,6 +38,10 @@ public sealed record OperationalRecordResponse(
     bool ReadOnlyIntegrationMode = false,
     string? ReadOnlyNotice = null)
 {
+    /// <summary>Durable intent recorded before Jira dispatch; retry cannot enable it.</summary>
+    public bool SourceCloseRequested { get; init; }
+    /// <summary>Whether the current deployment permits source-close dispatch below global fences.</summary>
+    public bool SourceCloseEnabled { get; init; }
     /// <summary>Nullable recommendation; null means no durable SDM evaluation.</summary>
     public OperationalRecordClassification? RecommendedClassification { get; init; }
     /// <summary>Always false until a positive category policy is approved.</summary>

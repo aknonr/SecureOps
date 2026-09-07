@@ -41,8 +41,7 @@
         else
         {
             <p class="so-dialog-consequence so-dialog--grant">
-                Seçilen kayıt için Jira'da <strong>gerçek bir kayıt oluşturulacak</strong> ve
-                ardından kaynak kaydın kapatılması denenecek.
+                Seçilen kayıt için Jira'da <strong>gerçek bir kayıt oluşturulacak</strong>.
                 <strong>Bu işlem WASAS üzerinden geri alınamaz.</strong>
                 Sonuç doğrulanana kadar işlemi tekrarlamayın.
             </p>
@@ -50,6 +49,8 @@
 
         <fieldset class="so-role-picker">
             <legend>Aktarılacak içerik</legend>
+
+            <p>@(Preview.SourceCloseRequested ? "Jira oluşturulduktan sonra Turuncu Hat kaydının kapatılması denenecek." : "Turuncu Hat kaydı açık bırakılacak.")</p>
 
             <SoFieldGrid MinColumnWidth="180px">
                 <SoField Label="Proje">@Preview.ProjectKey</SoField>

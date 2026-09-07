@@ -22,4 +22,5 @@ public sealed record JiraPreviewResponse(
     string? TeamCustomField = null,
     string? TeamValue = null,
     string? RequesterWatcherCustomField = null,
-    IReadOnlyList<string>? Labels = null);
+    IReadOnlyList<string>? Labels = null,
+    bool SourceCloseRequested = false);

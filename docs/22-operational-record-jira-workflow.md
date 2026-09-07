@@ -2,6 +2,27 @@
 
 ## Status and Ownership
 
+### Independent Source Close (Source Only, 2026-09-07)
+
+`OperationalRecords:SourceCloseEnabled` defaults to false. Global read-only and
+controlled corporate-write validation remain authoritative. Jira-only still uses
+the real source read provider for freshness; only BPM write configuration is
+optional while its independent gate is off. Migration 011 adds default-false
+`SourceCloseRequested` on the transfer and its append-only history.
+The preview fingerprints close intent; create acquisition persists it atomically
+with workflow history before Jira dispatch. Confirmed Jira success stays
+`JiraCreated` with its key when intent or the current gate is false. No close
+failure or `Completed` is fabricated. Create replay cannot duplicate Jira; retry
+and restart cannot turn false intent into true. Existing transfers default false.
+An already requested close can resume only on an explicit authorized retry with
+the gate enabled. There is no worker/automatic continuation or intent-upgrade API.
+rc6.11 and earlier packages do not contain this implementation or migration.
+
+Local verification for the gate increment: Release build 0 warnings/errors;
+281 affected unit/UI cases and 37 hosted/controller/SQL cases passed, including
+four real isolated LocalDB cases. OpenAPI generation/compatibility passed.
+Interactive UI and request-type review verification follow in the same task.
+
 The backend foundation is implemented for TEST validation. Codex owns API, services, integration boundaries, persistence, SQL, authorization, audit, release packaging, and backend tests. Claude owns all Blazor/Razor/CSS/UI work and does not need to change this module.
 
 Typed Turuncu Hat and corporate Jira adapters are implemented behind the existing boundaries and remain disabled by default. Paired `Simulation` selects the explicit deterministic no-network Development/Demo/Test workflow harness; legacy `Fake` remains for compatibility. The real Turuncu Hat read-only path is deployed and verified in TEST at source `0ec0376`; Jira creation and Turuncu Hat completion remain blocked until their separate write contracts and activation gate are approved. The canonical deployed evidence is recorded in `docs/24-api-test-deployment-readiness.md`.

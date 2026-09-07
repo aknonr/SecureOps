@@ -42,6 +42,7 @@ VALUES('20000000-0000-0000-0000-000000000001','123','OR-123','Synthetic upgrade 
 '@
     Invoke-ResourceTestSql -File '009-sdm-evaluation-foundation.sql'
     Invoke-ResourceTestSql -File '010-resource-catalogue.sql'
+    Invoke-ResourceTestSql -File '011-independent-source-close.sql'
     Invoke-ResourceTestSql -Query @'
 IF NOT EXISTS(SELECT 1 FROM ops.OperationalRecords WHERE OperationalRecordId='20000000-0000-0000-0000-000000000001'
     AND SdmEvaluationJson IS NULL AND Classification='NeedsManualReview' AND JiraEligible=0)
@@ -74,4 +75,4 @@ if ($RunTests) {
         } finally { Pop-Location }
     } finally { $env:SECUREOPS_SQL_TEST_CONNECTION = $previous }
 }
-[PSCustomObject]@{ Database = $database; Migrations = '001-010'; UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }
+[PSCustomObject]@{ Database = $database; Migrations = '001-011'; UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }

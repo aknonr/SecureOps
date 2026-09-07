@@ -14,7 +14,8 @@ public sealed record JiraIssueDraft(
     IReadOnlyList<string> Warnings,
     JiraIssueFieldMapping FieldMapping,
     string? AssigneeUsername = null,
-    string? ReporterUsername = null);
+    string? ReporterUsername = null,
+    bool SourceCloseRequested = false);
 
 /// <summary>Validated create fields shared by the preview and Jira adapter.</summary>
 public sealed record JiraIssueFieldMapping(

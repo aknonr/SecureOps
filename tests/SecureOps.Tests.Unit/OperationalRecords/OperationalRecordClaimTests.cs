@@ -45,7 +45,7 @@ public sealed class OperationalRecordClaimTests
         string transferKey = OperationalRecordIdempotency.Create(record.SourceRecordId, "mapping-v1");
         _ = await repository.MarkPreviewedAsync(record.Id, "mapping-v1", transferKey, "actor-a", "correlation-a", CancellationToken.None);
         _ = await repository.TryClaimAsync(record.Id, "actor-a", TimeSpan.FromMinutes(2), "correlation-a", CancellationToken.None);
-        _ = await repository.TryAcquireCreateAsync(record.Id, "mapping-v1", transferKey, "actor-a", "correlation-a", CancellationToken.None);
+        _ = await repository.TryAcquireCreateAsync(record.Id, "mapping-v1", transferKey, "actor-a", "correlation-a", CancellationToken.None, sourceCloseRequested: true);
         _ = await repository.RecordJiraCreatedAsync(record.Id, "TEST-100", "actor-a", "correlation-a", CancellationToken.None);
         _ = await repository.TryAcquireCloseAsync(record.Id, "actor-a", "correlation-a", CancellationToken.None);
         time.Advance(TimeSpan.FromMinutes(3));

@@ -7852,6 +7852,9 @@
               "type": "string"
             },
             "nullable": true
+          },
+          "sourceCloseRequested": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -7896,6 +7899,9 @@
           "simulationNotice": {
             "type": "string",
             "nullable": true
+          },
+          "sourceCloseRequested": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -8111,6 +8117,12 @@
           "readOnlyNotice": {
             "type": "string",
             "nullable": true
+          },
+          "sourceCloseRequested": {
+            "type": "boolean"
+          },
+          "sourceCloseEnabled": {
+            "type": "boolean"
           },
           "recommendedClassification": {
             "enum": [

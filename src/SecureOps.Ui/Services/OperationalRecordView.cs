@@ -409,7 +409,8 @@ public static class OperationalRecordView
             OperationalRecordWorkflowState.OperationalRecordCloseFailed =>
                 new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : RetryBlocked),
             OperationalRecordWorkflowState.JiraCreated =>
-                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : RetryBlocked),
+                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null :
+                    !record.SourceCloseRequested ? "Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı." : RetryBlocked),
             OperationalRecordWorkflowState.ClosingOperationalRecord =>
                 new Actions(false, false, false, "Kaynak kapatma aşaması sürüyor."),
 

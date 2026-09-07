@@ -75,7 +75,7 @@ public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
         string jiraIssueKey,
         CancellationToken cancellationToken)
     {
-        if (_operationalOptions.ReadOnlyIntegrationMode)
+        if (_operationalOptions.ReadOnlyIntegrationMode || !_operationalOptions.SourceCloseEnabled)
         {
             throw new ExternalIntegrationException(OperationalErrorCodes.ExternalWritesDisabled, retryable: false);
         }

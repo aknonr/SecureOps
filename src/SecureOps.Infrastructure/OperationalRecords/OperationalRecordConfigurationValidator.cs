@@ -66,7 +66,7 @@ public static class OperationalRecordConfigurationValidator
         if (string.Equals(operational.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
         {
             ValidateTuruncuHatReadConfiguration(turuncuHat);
-            if (!readOnlyEnterpriseMode)
+            if (!readOnlyEnterpriseMode && operational.SourceCloseEnabled)
             {
                 ValidateTuruncuHatWriteConfiguration(turuncuHat);
             }

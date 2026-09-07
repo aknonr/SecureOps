@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using SecureOps.Infrastructure.OperationalRecords;
+using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Tests.Unit.OperationalRecords;
 
@@ -398,6 +399,22 @@ public sealed class OperationalRecordConfigurationValidatorTests
         act.Should().Throw<InvalidOperationException>();
     }
 
+    [Fact]
+    public void Validate_JiraOnly_DoesNotRequireBpmButRetainsCorporateFences()
+    {
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
+        values["OperationalRecords:ReadOnlyIntegrationMode"] = "false";
+        values["OperationalRecords:ControlledTestWritesEnabled"] = "true";
+        new OperationalRecordsOptions().SourceCloseEnabled.Should().BeFalse();
+        Action validate = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+        validate.Should().NotThrow();
+        values["OperationalRecords:SourceCloseEnabled"] = "true";
+        validate.Should().Throw<InvalidOperationException>();
+        values["OperationalRecords:SourceCloseEnabled"] = "false";
+        values["OperationalRecords:ControlledTestWritesEnabled"] = "false";
+        validate.Should().Throw<InvalidOperationException>();
+    }
+
     private static Dictionary<string, string?> ReadOnlyEnterpriseValues() => new()
     {
         ["OperationalRecords:SourceProvider"] = "TuruncuHat",
@@ -426,6 +443,7 @@ public sealed class OperationalRecordConfigurationValidatorTests
         Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
         values["OperationalRecords:ReadOnlyIntegrationMode"] = "false";
         values["TuruncuHat:ActivityBaseObject"] = "BPM_Actvty";
+        values["OperationalRecords:SourceCloseEnabled"] = "true";
         values["TuruncuHat:ActivityTaskModelId"] = "10";
         values["TuruncuHat:ActivityGroupId"] = "20";
         values["TuruncuHat:ActivityMainObjectTypeId"] = "30";

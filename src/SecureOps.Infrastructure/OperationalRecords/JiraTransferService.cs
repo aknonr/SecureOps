@@ -323,7 +323,8 @@ public sealed class JiraTransferService : IJiraTransferService
             draft.IdempotencyKey,
             context.Actor,
             context.CorrelationId,
-            cancellationToken);
+            cancellationToken,
+            draft.SourceCloseRequested);
         OperationalRecordFailure? acquireFailure = MapAcquireFailure(acquired.Disposition);
         if (acquireFailure is not null)
         {
@@ -384,6 +385,16 @@ public sealed class JiraTransferService : IJiraTransferService
         OperationalRecordCommandContext context,
         CancellationToken cancellationToken)
     {
+        if (!record.SourceCloseRequested || !_operationalOptions.SourceCloseEnabled)
+        {
+            return OperationalRecordResult<OperationalRecord>.Success(record);
+        }
+
+        if (_operationalOptions.ReadOnlyIntegrationMode)
+        {
+            return ExternalWritesDisabled();
+        }
+
         OperationalRecordResult<OperationalRecord> freshness = await ValidateFreshnessAsync(record, WorkflowFailureStage.OperationalRecordClose, context, cancellationToken);
         if (!freshness.IsSuccess)
         {
@@ -513,6 +524,7 @@ public sealed class JiraTransferService : IJiraTransferService
                     sourceRecordId = record.SourceRecordId,
                     orCode = record.OrCode,
                     jiraIssueKey = record.JiraIssueKey,
+                    sourceCloseRequested = record.SourceCloseRequested,
                     workflowState = record.WorkflowState.ToString(),
                     result,
                     errorCode

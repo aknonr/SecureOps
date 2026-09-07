@@ -17,6 +17,50 @@ namespace SecureOps.Tests.Integration.Sql;
 public sealed partial class ResourceSqlTests
 {
     [LocalResourceSqlFact]
+    public async Task JiraOnly_RestartAndEnableGate_PreserveIntentAndBlockSourceClose()
+    {
+        IConfiguration configuration = Configuration();
+        var repository = new SqlOperationalRecordRepository(configuration);
+        string unique = Guid.NewGuid().ToString("N");
+        var source = new OperationalRecordSourceItem(unique, "OR-" + unique[..12], "Synthetic Jira only",
+            "Synthetic only", "synthetic.requester", null, null, null, null);
+        OperationalRecord record = await repository.UpsertImportedAsync(source, "synthetic", _token);
+        await repository.SetClassificationAsync(record.Id, new(OperationalRecordClassification.ServerRequest, true, "Synthetic only"), "synthetic", _token);
+        var draft = new JiraIssueDraft(record.Id, record.OrCode, "TEST", "Task", source.Title, source.Description,
+            "synthetic.requester", "synthetic-v1", unique + unique, [], new("3", "customfield_team", "WASAS", "customfield_requester", []));
+        IJiraIssueDraftService drafts = Substitute.For<IJiraIssueDraftService>();
+        drafts.BuildAsync(Arg.Any<OperationalRecord>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(OperationalRecordResult<JiraIssueDraft>.Success(draft));
+        IJiraClient jira = Substitute.For<IJiraClient>();
+        string issueKey = "TEST" + unique.ToUpperInvariant() + "-1";
+        jira.CreateIssueAsync(Arg.Any<JiraIssueDraft>(), Arg.Any<CancellationToken>()).Returns(new JiraIssueCreationResult(issueKey));
+        IOperationalRecordClient client = Substitute.For<IOperationalRecordClient>();
+        client.GetByIdAsync(source.SourceRecordId, Arg.Any<CancellationToken>()).Returns(source);
+        var context = new OperationalRecordCommandContext("synthetic-publisher", unique, null);
+        JiraTransferService Service(bool enabled) => new(new SqlOperationalRecordRepository(configuration), drafts, jira, client,
+            new SqlCommandIdempotencyStore(configuration), new InMemoryAuditWriter(),
+            Options.Create(new OperationalRecordsOptions { SourceCloseEnabled = enabled }), Options.Create(new CommandIdempotencyOptions()), NullLogger<JiraTransferService>.Instance);
+        JiraTransferService service = Service(false);
+        (await service.PreviewAsync(record.Id, context, _token)).IsSuccess.Should().BeTrue();
+        (await service.CreateAsync(record.Id, context, _token)).IsSuccess.Should().BeTrue();
+        JiraTransferService restarted = Service(true);
+        (await restarted.CreateAsync(record.Id, context, _token)).IsSuccess.Should().BeTrue();
+        (await restarted.RetryAsync(record.Id, context, _token)).IsSuccess.Should().BeTrue();
+        (await restarted.CreateAsync(record.Id, context with { IdempotencyKey = "new-" + unique }, _token)).IsSuccess.Should().BeFalse();
+        OperationalRecord persisted = (await new SqlOperationalRecordRepository(configuration).GetAsync(record.Id, _token))!;
+        persisted.JiraIssueKey.Should().Be(issueKey);
+        persisted.WorkflowState.Should().Be(OperationalRecordWorkflowState.JiraCreated);
+        persisted.SourceCloseRequested.Should().BeFalse();
+        persisted.LastErrorCode.Should().BeNull();
+        await jira.Received(1).CreateIssueAsync(Arg.Any<JiraIssueDraft>(), Arg.Any<CancellationToken>());
+        await client.DidNotReceive().CloseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await using SqlConnection connection = new(configuration.GetConnectionString("SecureOpsDb"));
+        (await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM ops.OperationalRecordWorkflowHistory WHERE OperationalRecordId=@Id AND WorkflowState IN ('ClosingOperationalRecord','Completed','OperationalRecordCloseFailed')", new { record.Id })).Should().Be(0);
+        await repository.TryClaimAsync(record.Id, context.Actor, TimeSpan.FromMinutes(2), unique, _token);
+        (await repository.TryAcquireCloseAsync(record.Id, context.Actor, unique, _token)).Disposition.Should().Be(WorkflowAcquireDisposition.InvalidState);
+    }
+
+    [LocalResourceSqlFact]
     public async Task SdmCreate_KeyPersistenceFailure_RollsBackAndBlocksRecreationAfterRestart()
     {
         IConfiguration configuration = Configuration();
@@ -83,5 +127,36 @@ public sealed partial class ResourceSqlTests
         await store.CompleteAsync("SyntheticSdm", unique, unique, command.ExecutionToken!.Value, _token);
         CommandBeginResult replay = await new SqlCommandIdempotencyStore(configuration).TryBeginAsync("SyntheticSdm", unique, unique, "synthetic", TimeSpan.FromMinutes(2), _token);
         replay.Disposition.Should().Be(CommandBeginDisposition.Completed);
+    }
+
+    [LocalResourceSqlFact]
+    public async Task SourceClose_InterruptedWithIntent_ResumesOnlyAfterExplicitRetryAndEnabledGate()
+    {
+        IConfiguration configuration = Configuration();
+        var repository = new SqlOperationalRecordRepository(configuration);
+        string unique = Guid.NewGuid().ToString("N");
+        var source = new OperationalRecordSourceItem(unique, "OR-" + unique[..12], "Synthetic close recovery", "Synthetic", null, null, null, null, null);
+        OperationalRecord record = await repository.UpsertImportedAsync(source, unique, _token);
+        await repository.SetClassificationAsync(record.Id, new(OperationalRecordClassification.ServerRequest, true, "Synthetic only"), unique, _token);
+        var context = new OperationalRecordCommandContext("synthetic-publisher", unique, null);
+        await repository.MarkPreviewedAsync(record.Id, "synthetic", unique + unique, context.Actor, unique, _token);
+        await repository.TryClaimAsync(record.Id, context.Actor, TimeSpan.FromMinutes(2), unique, _token);
+        await repository.TryAcquireCreateAsync(record.Id, "synthetic", unique + unique, context.Actor, unique, _token, true);
+        await repository.RecordJiraCreatedAsync(record.Id, "TEST" + unique.ToUpperInvariant() + "-1", context.Actor, unique, _token);
+        await repository.TryAcquireCloseAsync(record.Id, context.Actor, unique, _token);
+        await repository.ReleaseClaimAsync(record.Id, context.Actor, unique, _token);
+        IJiraClient jira = Substitute.For<IJiraClient>();
+        IOperationalRecordClient client = Substitute.For<IOperationalRecordClient>();
+        client.GetByIdAsync(source.SourceRecordId, Arg.Any<CancellationToken>()).Returns(source);
+        JiraTransferService Service(bool enabled) => new(new SqlOperationalRecordRepository(configuration), Substitute.For<IJiraIssueDraftService>(), jira, client,
+            new SqlCommandIdempotencyStore(configuration), new InMemoryAuditWriter(),
+            Options.Create(new OperationalRecordsOptions { SourceCloseEnabled = enabled }), Options.Create(new CommandIdempotencyOptions()), NullLogger<JiraTransferService>.Instance);
+        (await Service(false).RetryAsync(record.Id, context, _token)).IsSuccess.Should().BeTrue();
+        await client.DidNotReceive().CloseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        JiraTransferService restarted = Service(true);
+        (await repository.GetAsync(record.Id, _token))!.WorkflowState.Should().Be(OperationalRecordWorkflowState.ClosingOperationalRecord);
+        (await restarted.RetryAsync(record.Id, context, _token)).Value!.WorkflowState.Should().Be(OperationalRecordWorkflowState.Completed);
+        await client.Received(1).CloseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await jira.DidNotReceive().CreateIssueAsync(Arg.Any<JiraIssueDraft>(), Arg.Any<CancellationToken>());
     }
 }

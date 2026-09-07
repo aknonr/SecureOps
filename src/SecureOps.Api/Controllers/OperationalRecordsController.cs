@@ -28,6 +28,7 @@ public sealed class OperationalRecordsController : ControllerBase
     private readonly TimeProvider _timeProvider;
     private readonly bool _simulationMode;
     private readonly bool _readOnlyIntegrationMode;
+    private readonly bool _sourceCloseEnabled;
 
     /// <summary>Initializes the controller.</summary>
     public OperationalRecordsController(
@@ -43,6 +44,7 @@ public sealed class OperationalRecordsController : ControllerBase
         _commandOptions = commandOptions.Value;
         _timeProvider = timeProvider;
         _readOnlyIntegrationMode = operationalOptions.Value.ReadOnlyIntegrationMode;
+        _sourceCloseEnabled = operationalOptions.Value.SourceCloseEnabled && !_readOnlyIntegrationMode;
         _simulationMode = string.Equals(
                 operationalOptions.Value.SourceProvider,
                 "Simulation",
@@ -115,7 +117,8 @@ public sealed class OperationalRecordsController : ControllerBase
             mapping.TeamCustomField,
             mapping.TeamValue,
             mapping.RequesterWatcherCustomField,
-            mapping.Labels));
+            mapping.Labels,
+            draft.SourceCloseRequested));
     }
 
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>
@@ -267,6 +270,8 @@ public sealed class OperationalRecordsController : ControllerBase
         ReadOnlyNotice())
     {
         RecommendedClassification = record.SdmEvaluation?.Result.RecommendedClassification,
+        SourceCloseRequested = record.SourceCloseRequested,
+        SourceCloseEnabled = _sourceCloseEnabled,
         SdmCandidateRecommended = false,
         RuleSetVersion = record.SdmEvaluation?.Result.RuleSetVersion,
         ReasonCodes = record.SdmEvaluation?.Result.ReasonCodes ?? [],
@@ -277,10 +282,10 @@ public sealed class OperationalRecordsController : ControllerBase
         ExternalWriteEligible = false
     };
 
-    private static bool IsRetryEligible(OperationalRecord record) =>
+    private bool IsRetryEligible(OperationalRecord record) =>
         !record.ReconciliationRequired
         && (record.WorkflowState == OperationalRecordWorkflowState.JiraCreateFailed
-            || (!string.IsNullOrWhiteSpace(record.JiraIssueKey)
+            || (record.SourceCloseRequested && _sourceCloseEnabled && !string.IsNullOrWhiteSpace(record.JiraIssueKey)
                 && record.WorkflowState is OperationalRecordWorkflowState.JiraCreated
                     or OperationalRecordWorkflowState.ClosingOperationalRecord
                     or OperationalRecordWorkflowState.OperationalRecordCloseFailed));
@@ -299,7 +304,8 @@ public sealed class OperationalRecordsController : ControllerBase
         record.RetryCount,
         correlationId,
         _simulationMode,
-        SimulationNotice());
+        SimulationNotice(),
+        record.SourceCloseRequested);
 
     private string? SimulationNotice() =>
         _simulationMode ? SimulationOperationalRecordClient.OperatorNotice : null;

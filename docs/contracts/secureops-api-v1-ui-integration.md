@@ -6,6 +6,13 @@ ProblemDetails includes safe `code`, `stage`, `retryable`, `correlationId`, and 
 
 ## Access
 
+SDM additive close contract: preview, transfer and record expose
+`sourceCloseRequested`; records also expose effective `sourceCloseEnabled`.
+For `JiraCreated` with false intent show "Jira oluşturuldu. Turuncu Hat kaydı açık
+bırakıldı." Never present Completed or a failed close. `retryEligible` includes
+the persisted intent and current close gate. These fields grant no capability.
+Old preview fingerprints require review after the close-intent fingerprint update.
+
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
 | `GET /api/v1/access/me` | Authenticated | none | status, roles, capabilities, nullable exact profile, latest request, pending request ID, user version, auth source, session policy | 401, `AuditStoreUnavailable` |

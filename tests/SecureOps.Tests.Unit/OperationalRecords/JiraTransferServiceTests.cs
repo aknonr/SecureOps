@@ -96,7 +96,7 @@ public sealed class JiraTransferServiceTests
         OperationalRecord record = (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!;
         string idempotencyKey = record.IdempotencyKey!;
         _ = await fixture.Repository.TryClaimAsync(record.Id, _context.Actor, TimeSpan.FromMinutes(2), _context.CorrelationId, CancellationToken.None);
-        _ = await fixture.Repository.TryAcquireCreateAsync(record.Id, "mapping-v1", idempotencyKey, _context.Actor, _context.CorrelationId, CancellationToken.None);
+        _ = await fixture.Repository.TryAcquireCreateAsync(record.Id, "mapping-v1", idempotencyKey, _context.Actor, _context.CorrelationId, CancellationToken.None, sourceCloseRequested: true);
         _ = await fixture.Repository.RecordJiraCreatedAsync(record.Id, "TEST-200", _context.Actor, _context.CorrelationId, CancellationToken.None);
 
         OperationalRecordResult<OperationalRecord> result = await fixture.Service.RetryAsync(fixture.RecordId, _context, CancellationToken.None);
@@ -241,6 +241,21 @@ public sealed class JiraTransferServiceTests
         fixture.Audit.Events.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task JiraOnly_CreateAndReplay_PreserveKeyWithoutSourceMutation()
+    {
+        TestFixture fixture = await TestFixture.CreateAsync(sourceCloseEnabled: false);
+        OperationalRecordResult<OperationalRecord> result = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.WorkflowState.Should().Be(OperationalRecordWorkflowState.JiraCreated);
+        result.Value.SourceCloseRequested.Should().BeFalse();
+        (await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None)).IsSuccess.Should().BeTrue();
+        (await fixture.Service.RetryAsync(fixture.RecordId, _context, CancellationToken.None)).IsSuccess.Should().BeTrue();
+        fixture.Jira.Calls.Should().Be(1);
+        fixture.Source.CloseCalls.Should().Be(0);
+        (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!.JiraIssueKey.Should().Be("TEST-100");
+    }
+
     private sealed class TestFixture
     {
         private TestFixture(
@@ -272,7 +287,8 @@ public sealed class JiraTransferServiceTests
             bool readOnlyIntegrationMode = false,
             OperationalRecordSourceItem? sourceItem = null,
             string sourceProvider = "Disabled",
-            bool initializePreview = true)
+            bool initializePreview = true,
+            bool sourceCloseEnabled = true)
         {
             InMemoryOperationalRecordRepository repository = new();
             OperationalRecord record;
@@ -302,7 +318,7 @@ public sealed class JiraTransferServiceTests
                     IssueType = "Task",
                     MappingVersion = "mapping-v1",
                     UnresolvedRequesterPolicy = "Block"
-                }));
+                }), Options.Create(new OperationalRecordsOptions { SourceCloseEnabled = sourceCloseEnabled, ReadOnlyIntegrationMode = readOnlyIntegrationMode }));
             JiraTransferService service = new(
                 repository,
                 draftService,
@@ -313,6 +329,7 @@ public sealed class JiraTransferServiceTests
                 Options.Create(new OperationalRecordsOptions
                 {
                     ReadOnlyIntegrationMode = readOnlyIntegrationMode,
+                    SourceCloseEnabled = sourceCloseEnabled,
                     SourceProvider = sourceProvider
                 }),
                 Options.Create(new CommandIdempotencyOptions()),

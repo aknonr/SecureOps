@@ -13,4 +13,5 @@ public sealed record JiraTransferResponse(
     int RetryCount,
     string CorrelationId,
     bool SimulationMode = false,
-    string? SimulationNotice = null);
+    string? SimulationNotice = null,
+    bool SourceCloseRequested = false);

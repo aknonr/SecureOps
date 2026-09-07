@@ -1156,7 +1156,7 @@ public sealed class EnterpriseAdapterContractTests
             Client(handler, "https://source.invalid/"),
             new FixedSessionManager(session),
             Options.Create(options),
-            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
+            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode, SourceCloseEnabled = true }),
             new EnterpriseIntegrationHealthState(),
             new EnterpriseIntegrationTelemetry(),
             logger ?? NullLogger<TuruncuHatOperationalRecordClient>.Instance);

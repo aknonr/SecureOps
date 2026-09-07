@@ -23,4 +23,7 @@ public sealed class OperationalRecordsOptions
 
     /// <summary>Explicit deployment-owned approval gate for corporate external writes in Test.</summary>
     public bool ControlledTestWritesEnabled { get; set; }
+
+    /// <summary>Independent default-off source-close dispatch gate; never grants write permission.</summary>
+    public bool SourceCloseEnabled { get; set; }
 }

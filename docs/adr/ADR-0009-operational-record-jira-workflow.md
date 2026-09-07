@@ -26,6 +26,23 @@ SecureOps will replace the workflow with typed backend boundaries, a preview-bef
 
 ## Consequences
 
+### Independent Source Close, 2026-09-07
+
+Source close is separately controlled by default-off `SourceCloseEnabled`, below
+the existing global write fences. The reviewed draft binds that intent into its
+fingerprint; create acquisition persists it before external dispatch. Jira-only
+success remains `JiraCreated`, with a durable key and `SourceCloseRequested=false`.
+It is neither a close failure nor `Completed`. Retry/replay/restart cannot upgrade
+that intent when configuration changes. No automatic continuation or future
+close-intent transition is introduced. Legacy transfers default to no close intent.
+Migration 011 is additive and must precede the new SQL-backed binaries.
+
+The owner confirms Sunucu Talebi and Uygulama Kurulumu as request types, represented
+by existing ServerRequest and SoftwareInstallation values. Operator declaration
+is not source attestation, infrastructure scope, identity validation, permission,
+or positive eligibility. No keyword classifier or separate approver is authorized.
+Application-installation Jira labels remain unresolved and cannot reuse SunucuTalep.
+
 September 2026 hardening binds the reviewed draft fingerprint to the source token
 and exact emitted summary/description. A source refresh or older persisted
 fingerprint cannot silently authorize different content. Key persistence after

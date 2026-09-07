@@ -14,16 +14,19 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
     private readonly IJiraUserResolver _jiraUserResolver;
     private readonly IIdentityAccountNormalizer _identityNormalizer;
     private readonly JiraIntegrationOptions _options;
+    private readonly OperationalRecordsOptions _operationalOptions;
 
     /// <summary>Initializes the draft service.</summary>
     public JiraIssueDraftService(
         IJiraUserResolver jiraUserResolver,
         IIdentityAccountNormalizer identityNormalizer,
-        IOptions<JiraIntegrationOptions> options)
+        IOptions<JiraIntegrationOptions> options,
+        IOptions<OperationalRecordsOptions>? operationalOptions = null)
     {
         _jiraUserResolver = jiraUserResolver;
         _identityNormalizer = identityNormalizer;
         _options = options.Value;
+        _operationalOptions = operationalOptions?.Value ?? new();
     }
 
     /// <inheritdoc />
@@ -118,7 +121,8 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             Array.AsReadOnly((string[])_options.Labels.Clone()));
         string idempotencyMapping = JsonSerializer.Serialize(new
         {
-            FingerprintVersion = "reviewed-draft-v2",
+            FingerprintVersion = "reviewed-draft-v3",
+            SourceCloseRequested = _operationalOptions.SourceCloseEnabled && !_operationalOptions.ReadOnlyIntegrationMode,
             record.SourceConcurrencyToken,
             Summary = summary,
             Description = description.ToString(),
@@ -146,7 +150,8 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             warnings,
             fieldMapping,
             assigneeUsername,
-            reporterUsername));
+            reporterUsername,
+            _operationalOptions.SourceCloseEnabled && !_operationalOptions.ReadOnlyIntegrationMode));
     }
 
     private string? ResolveAssignee(string actor, ICollection<string> warnings)

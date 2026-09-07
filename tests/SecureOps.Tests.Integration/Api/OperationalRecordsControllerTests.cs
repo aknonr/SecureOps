@@ -284,6 +284,7 @@ public sealed class OperationalRecordsControllerTests
         {
             WorkflowState = state,
             JiraIssueKey = jiraIssueKey,
+            SourceCloseRequested = true,
             ReconciliationRequired = reconciliationRequired
         };
         OperationalRecordsController controller = CreateController(record);
@@ -321,7 +322,7 @@ public sealed class OperationalRecordsControllerTests
             new StubRecordService(record),
             new StubTransferService(OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.WorkflowConflict, "test", false)),
             Options.Create(new CommandIdempotencyOptions()),
-            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
+            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode, SourceCloseEnabled = true }),
             Options.Create(new JiraIntegrationOptions()),
             new FixedTimeProvider(Now))
         {

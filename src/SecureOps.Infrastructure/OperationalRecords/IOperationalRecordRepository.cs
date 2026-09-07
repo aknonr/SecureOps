@@ -25,7 +25,7 @@ public interface IOperationalRecordRepository
     /// <summary>Transitions an eligible record to Previewed.</summary>
     public Task<WorkflowAcquireResult> MarkPreviewedAsync(Guid id, string mappingVersion, string idempotencyKey, string actor, string correlationId, CancellationToken cancellationToken);
     /// <summary>Atomically acquires Jira-create ownership.</summary>
-    public Task<WorkflowAcquireResult> TryAcquireCreateAsync(Guid id, string mappingVersion, string idempotencyKey, string actor, string correlationId, CancellationToken cancellationToken);
+    public Task<WorkflowAcquireResult> TryAcquireCreateAsync(Guid id, string mappingVersion, string idempotencyKey, string actor, string correlationId, CancellationToken cancellationToken, bool sourceCloseRequested = false);
     /// <summary>Persists a confirmed Jira issue key before any source update.</summary>
     public Task<OperationalRecord> RecordJiraCreatedAsync(Guid id, string issueKey, string actor, string correlationId, CancellationToken cancellationToken);
     /// <summary>Atomically acquires source-close ownership.</summary>

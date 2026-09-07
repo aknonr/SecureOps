@@ -290,7 +290,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
         });
 
     /// <inheritdoc />
-    public Task<WorkflowAcquireResult> TryAcquireCreateAsync(Guid id, string mappingVersion, string idempotencyKey, string actor, string correlationId, CancellationToken cancellationToken) =>
+    public Task<WorkflowAcquireResult> TryAcquireCreateAsync(Guid id, string mappingVersion, string idempotencyKey, string actor, string correlationId, CancellationToken cancellationToken, bool sourceCloseRequested = false) =>
         TransitionAsync(id, cancellationToken, current =>
         {
             if (current.WorkflowState == OperationalRecordWorkflowState.Completed)
@@ -331,6 +331,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
             OperationalRecord updated = current with
             {
                 WorkflowState = OperationalRecordWorkflowState.CreatingJira,
+                SourceCloseRequested = sourceCloseRequested,
                 MappingVersion = mappingVersion,
                 IdempotencyKey = idempotencyKey,
                 LastErrorCode = null,
@@ -387,7 +388,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 return new WorkflowAcquireResult(WorkflowAcquireDisposition.AlreadyCompleted, current);
             }
 
-            if (string.IsNullOrWhiteSpace(current.JiraIssueKey))
+            if (string.IsNullOrWhiteSpace(current.JiraIssueKey) || !current.SourceCloseRequested)
             {
                 return new WorkflowAcquireResult(WorkflowAcquireDisposition.InvalidState, current);
             }

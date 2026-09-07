@@ -410,6 +410,7 @@ public sealed class OperationalRecordWorkflowHostedTests
             builder.UseSetting("Audit:Provider", "InMemory");
             builder.UseSetting("IdentityLookup:Provider", "Mock");
             builder.UseSetting("OperationalRecords:SourceProvider", sourceProvider);
+            builder.UseSetting("OperationalRecords:SourceCloseEnabled", "true");
             builder.UseSetting("OperationalRecords:RepositoryProvider", "InMemory");
             builder.UseSetting("Jira:Provider", "Fake");
             builder.UseSetting("RateLimiting:OperationalRecordRefresh:PermitLimit", "100");
@@ -448,6 +449,7 @@ public sealed class OperationalRecordWorkflowHostedTests
             builder.UseSetting("Audit:Provider", "InMemory");
             builder.UseSetting("IdentityLookup:Provider", "Mock");
             builder.UseSetting("OperationalRecords:SourceProvider", "Simulation");
+            builder.UseSetting("OperationalRecords:SourceCloseEnabled", "true");
             builder.UseSetting("OperationalRecords:RepositoryProvider", "InMemory");
             builder.UseSetting("Jira:Provider", "Simulation");
             builder.UseSetting("RateLimiting:OperationalRecordRefresh:PermitLimit", "100");
