@@ -21,6 +21,32 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class OperationalRecordWorkflowHostedTests
 {
     [Fact]
+    public async Task StoredBrowse_IsAuthorizedBoundedAndNeverImportsOnRead()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        const string route = "/api/v1/operational-records/stored";
+        (await admin.GetFromJsonAsync<OperationalRecordPageResponse>(route))!.Total.Should().Be(0);
+        OperationalRecordResponse imported = await GetRecordAsync(admin, "SYN-OR-100");
+        OperationalRecordPageResponse page = (await admin.GetFromJsonAsync<OperationalRecordPageResponse>(route + "?pageSize=1&sort=code"))!;
+        page.Items.Should().ContainSingle();
+        page.Total.Should().BeGreaterThan(0);
+        foreach (string query in new[] { "page=0", "pageSize=101", "sort=unknown", "state=unknown", "search=" + new string('x', 101) })
+        {
+            (await admin.GetAsync(route + "?" + query)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+        (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{imported.Id}"))!.Version.Should().Be(imported.Version);
+        using HttpClient denied = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        JsonElement access = await denied.GetFromJsonAsync<JsonElement>("/api/v1/access/me");
+        string userId = access.GetProperty("userId").GetString()!;
+        JsonElement user = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/users/" + userId);
+        (await admin.PutAsJsonAsync("/api/v1/access/users/" + userId + "/roles", new
+        { roles = new[] { "ResourceCurator" }, expectedVersion = user.GetProperty("version").GetInt64(), reason = "Synthetic browse denial" })).EnsureSuccessStatusCode();
+        using HttpClient refreshed = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        (await refreshed.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Review_UsesPreviewCapabilityAndVersion_WithoutAuthorizingPublication()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();

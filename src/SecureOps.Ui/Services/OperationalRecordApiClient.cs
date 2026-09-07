@@ -11,6 +11,18 @@ public sealed class OperationalRecordApiClient : IOperationalRecordApiClient
 
     private readonly HttpClient _httpClient;
 
+    /// <inheritdoc />
+    public Task<OperationalRecordPageResponse> BrowseAsync(OperationalRecordQuery query, CancellationToken cancellationToken)
+    {
+        string uri = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString($"{Root}/stored", new Dictionary<string, string?>
+        {
+            ["search"] = query.Search, ["state"] = query.State?.ToString(), ["sort"] = query.Sort,
+            ["page"] = query.Page.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["pageSize"] = query.PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        });
+        return SendAsync<OperationalRecordPageResponse>(() => _httpClient.GetAsync(uri, cancellationToken), cancellationToken);
+    }
+
     /// <summary>
     /// Initializes a new operational-record API client.
     /// </summary>

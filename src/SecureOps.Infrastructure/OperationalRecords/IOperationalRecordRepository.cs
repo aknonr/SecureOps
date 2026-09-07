@@ -5,6 +5,8 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Durable, concurrency-safe operational workflow persistence boundary.</summary>
 public interface IOperationalRecordRepository
 {
+    /// <summary>Reads a bounded persisted page without external calls or writes.</summary>
+    public Task<OperationalRecordPage> BrowseAsync(SecureOps.Shared.Contracts.OperationalRecords.OperationalRecordQuery query, bool excludeSynthetic, CancellationToken cancellationToken);
     /// <summary>Serializes evaluation with workflow state and records safe evidence only when input changes.</summary>
     public Task<OperationalRecord> EvaluateAsync(Guid id, SdmEvaluationInput input, OperationalRecordCommandContext context,
         SecureOps.Infrastructure.Audit.IAuditWriter auditWriter, CancellationToken cancellationToken);

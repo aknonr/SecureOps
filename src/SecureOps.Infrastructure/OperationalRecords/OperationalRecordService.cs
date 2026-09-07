@@ -18,6 +18,14 @@ public sealed class OperationalRecordService : IOperationalRecordService
     private readonly OperationalRecordsOptions _options;
     private readonly ILogger<OperationalRecordService> _logger;
 
+    /// <inheritdoc />
+    public async Task<OperationalRecordPage> BrowseAsync(SecureOps.Shared.Contracts.OperationalRecords.OperationalRecordQuery query, CancellationToken cancellationToken)
+    {
+        OperationalRecordPage page = await _repository.BrowseAsync(query,
+            string.Equals(_options.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase), cancellationToken);
+        return page with { Items = page.Items.Select(SdmEvaluationEvidence.Project).ToArray() };
+    }
+
     /// <summary>Initializes the operational-record service.</summary>
     public OperationalRecordService(
         IOperationalRecordClient client,

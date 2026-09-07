@@ -369,6 +369,7 @@ public sealed class OperationalRecordsControllerTests
 
     private sealed class EmptyRecordService : IOperationalRecordService
     {
+        public Task<OperationalRecordPage> BrowseAsync(OperationalRecordQuery query, CancellationToken cancellationToken) => Task.FromResult(new OperationalRecordPage([], 0));
         public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> ListAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
             Task.FromResult(OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success(Array.Empty<OperationalRecord>()));
 
@@ -378,6 +379,7 @@ public sealed class OperationalRecordsControllerTests
 
     private sealed class StubRecordService(OperationalRecord record) : IOperationalRecordService
     {
+        public Task<OperationalRecordPage> BrowseAsync(OperationalRecordQuery query, CancellationToken cancellationToken) => Task.FromResult(new OperationalRecordPage([record], 1));
         public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> ListAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
             Task.FromResult(OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success([record]));
 

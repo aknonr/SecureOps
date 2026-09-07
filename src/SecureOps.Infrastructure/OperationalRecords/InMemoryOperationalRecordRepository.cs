@@ -6,6 +6,14 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepository
 {
     /// <inheritdoc />
+    public async Task<OperationalRecordPage> BrowseAsync(SecureOps.Shared.Contracts.OperationalRecords.OperationalRecordQuery query, bool excludeSynthetic, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try { return OperationalRecordBrowsing.Query(_records.Values, query, excludeSynthetic); }
+        finally { _gate.Release(); }
+    }
+
+    /// <inheritdoc />
     public async Task<OperationalRecord> EvaluateAsync(Guid id, SdmEvaluationInput input, OperationalRecordCommandContext context,
         SecureOps.Infrastructure.Audit.IAuditWriter auditWriter, CancellationToken cancellationToken)
     {

@@ -66,6 +66,17 @@ public sealed class OperationalRecordsController : ControllerBase
             : Failure<IReadOnlyList<OperationalRecordResponse>>(result.Failure!);
     }
 
+    /// <summary>Browses persisted records without source refresh.</summary>
+    [HttpGet("stored")]
+    [Authorize(Policy = Policies.CanViewOperationalRecords)]
+    [ProducesResponseType(typeof(OperationalRecordPageResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<OperationalRecordPageResponse>> BrowseAsync([FromQuery] OperationalRecordQuery query, CancellationToken cancellationToken)
+    {
+        OperationalRecordPage page = await _recordService.BrowseAsync(query, cancellationToken);
+        return Ok(new OperationalRecordPageResponse(page.Items.Select(ToResponse).ToArray(), page.Total, query.Page, query.PageSize));
+    }
+
     /// <summary>Returns one persisted operational record.</summary>
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Policies.CanViewOperationalRecords)]

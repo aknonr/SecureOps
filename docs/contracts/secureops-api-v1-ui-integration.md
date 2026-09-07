@@ -4,6 +4,20 @@ Claude-owned UI work must consume `docs/contracts/secureops-api-v1.openapi.json`
 
 ProblemDetails includes safe `code`, `stage`, `retryable`, `correlationId`, and `traceId` extensions. Access mutations distinguish `AccessValidationFailed` (400/validation), `AccessRequestAlreadyDecided` and `AccessUserInvalidState` (409/lifecycle), `AccessConcurrencyConflict` (409/concurrency/retryable), and `AccessSelfApprovalDenied` (403/authorization). Policy denials remain 403.
 
+## Persisted Operational Browsing
+
+`GET /api/v1/operational-records/stored` requires `OperationalRecords.View`.
+It reads persisted data only, with `search` (literal code/title substring, max
+100 characters), optional workflow `state`, `sort=updated|oldest|code`, one-based
+`page` (max 100000), and `pageSize` (1-100, default 25). Invalid queries return
+400 ProblemDetails; denied access returns 403. Response: `items`, `total`,
+`page`, `pageSize`; total is matching persisted rows, never a source total.
+Sort ties use source identifier. Corporate mode excludes synthetic records
+before counting/paging. SQL count and rows share a bounded serializable read.
+Existing GET root remains the explicit bounded source refresh; no polling,
+typing, sorting, page navigation or passive reload may call it.
+No migration or runtime grant is added; baseline remains 001-011.
+
 ## Access
 
 | Method and route | Capability | Request | Success | Important errors |
