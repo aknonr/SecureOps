@@ -374,6 +374,76 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
+**Current packaged delivery, rc6.12:** build source
+`682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`, latest runtime
+`f528da27611f52ab3c5676c485d6f6e7756af54c`. The three local commits
+`14f2f46`, `f528da2`, `682fa8e` form the direct chain above cached upstream
+`7c118f31d7c1aaa687b723b793b3bc792c4cbee4`. Tracked source was clean during
+build/publish; untracked `.vscode/` remains untouched. This release-documentation
+commit is not a new build source; its full SHA is recorded separately in the
+release root's `release-metadata.json` after commit.
+
+Release root: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.12`.
+Required schema **001-011**, no new runtime grants versus rc6.11.
+Both API/UI ProductVersion values are
+`0.1.0+682fa8eafcac611b0d18f93d0eb541f6a5acd2fc` (FileVersion 0.1.0.0,
+framework-dependent net8.0). Shared Infrastructure SHA-256 is identical:
+`D1C566ED75564881F74144A4DC5CC68B3F2548F8FEC33BDC106D3C6062D40232`.
+
+| rc6.12 artifact | SHA-256 |
+|---|---|
+| `API/secureops-api-TEST-682fa8e.zip` | `D8CB49B082D092FB663C72E4B7659EF64AFD3F8532BCCF46FE0821B102E4C17E` |
+| `UI/secureops-ui-TEST-682fa8e.zip` | `34F722506B80C091A9FFA796CA6198A212E585B9008339EE715F97098F17119F` |
+| `DBA/secureops-database-001-011-TEST-rc6.12.zip` | `CE38FF8ECDA060B3111E7C9FE9A23A2F5AD6088E36499478FAFBF9A2D317F2D1` |
+
+The existing release scripts validated API 238/UI 252 entries, path/hash
+manifests, AD runtime dependency closure, UI assets and offline TEST Swagger.
+Both publishes passed with compiler PathMap to `/_/src` and no debug symbols;
+the initial unmapped API scan correctly rejected a developer path before ZIP
+creation. No scanner bypass. Server-owned config, logs, source/test files and
+prohibited content are excluded. DBA has 22 unchanged-source SQL files, SQL
+README and the current runbook export; all 24 ZIP entry hashes were verified.
+Per-file manifests and archive hashes are under `manifests/` and
+`release-artifacts.sha256`. Local `staging/`/`evidence/` are not deployable.
+
+Fresh Release build: zero warnings/errors. **1068 unit and 236 non-SQL integration
+tests passed**, zero failed/skipped, including current API/OpenAPI contracts.
+Ten SQL cases were explicitly excluded from the fresh run and reused from the
+existing actual LocalDB evidence below. SQL/browser/harness inputs are unchanged
+from runtime f528da2 to build HEAD; original evidence hashes and applicability
+are recorded in `evidence/reused-verification.json`. No SQL/browser rerun or new
+corporate evidence is claimed. Full unit closes the previously corrected
+migration-count checkpoint. NuGet direct/transitive vulnerability scan reported
+none across eight projects. Repository-wide format was not rerun; prior
+whitespace/naming debt remains, not a clean format gate. No dependency changes.
+
+rc6.10 and rc6.11 retain their original sources and all five archive hashes were
+checked unchanged. rc6.11's 001-010 packages lack the new independent close gate,
+two-type review and migration 011; rc6.12 now includes them. Runtime support is
+not corporate activation: preserve ReadOnlyIntegrationMode=true,
+ControlledTestWritesEnabled=false, SourceCloseEnabled=false. JiraCreated is not
+source completion. Installation mapping, positive policy and external-contract
+evidence remain blocked as described below.
+
+Normal push during this packaging task failed because approved GitHub credentials
+were unavailable non-interactively. Local source/package provenance is verified;
+live remote publication is not. The final normal push and independent ls-remote
+outcome, plus the exact documentation HEAD, are recorded in release metadata.
+If authentication remains blocked, the user must complete existing-account
+`git credential-manager github login --browser`, normal push to the same branch,
+then compare HEAD/ls-remote. No secrets are requested or controls bypassed.
+
+Canonical runbook `docs/24-api-test-deployment-readiness.md` now starts with one
+current rc6.12 sequence; prior deployment instructions are explicitly historical.
+Current-only export is `operator-runbook-tr.md` in the release and DBA archive.
+First manual TEST action: inventory actual targets, current binary/config/schema
+and rollback baseline in the change record. Then verified backups, missing
+migrations/grants, API, UI and role-based TEST. 011 keeps legacy close intent
+false; old-binary compatibility is unverified and must not be assumed for
+rollback. No deployment, corporate calls/SQL, IIS changes or write activation.
+
+**Historical source-only checkpoint (superseded by the package above):**
+
 **Current multi-type/Jira-only implementation:** resumed actual HEAD
 `7c118f31d7c1aaa687b723b793b3bc792c4cbee4` on
 `feature/sql-runtime-hardening-20260902`; only untracked `.vscode/` was present

@@ -1,18 +1,93 @@
 # API TEST Deployment Readiness
 
-Latest local paired package: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.11`,
-exact API/UI source `74cd8274250302a977cbc4c5cd6e4f1789c01459`, schema 001-010.
-Its readiness/source/hash manifests were validated locally; no deployment or
-write activation occurred. rc6.10 and the original runbook below are preserved.
-Current source/evidence handoff is in `src/SecureOps.Ui/README.md`.
+## Güncel TEST Operatör Runbook, rc6.12
 
-Source-only follow-up `f528da27611f52ab3c5676c485d6f6e7756af54c` adds two-type
-review and independent default-off BPM control. It requires additive migration
-011 (transfer/history close intent); rc6.11 and earlier packages remain schema
-001-010 and do not contain these changes. No package was rebuilt or overwritten.
-Any later approved paired release must record its new source/schema association.
+Paket kökü: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.12`.
+API/UI build kaynağı: `682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`;
+son runtime commit'i: `f528da27611f52ab3c5676c485d6f6e7756af54c`.
+Gerekli şema **001-011**. Sonraki teslimat-dokümantasyon commit'i build SHA'sını
+değiştirmez. Kanonik kaynak/kanıt handoff'u: `src/SecureOps.Ui/README.md`.
+Bu hazırlık kurulum veya yazma aktivasyonu değildir; canlı uzak Git yayını da
+yerel build kanıtından ayrıdır. Kesin paket hash'leri `release-artifacts.sha256`,
+dosya hash'leri `manifests/`, kaynak ilişkisi `release-metadata.json` içindedir.
+Yalnız API/UI/DBA arşivleri ve teslimat belgeleri dağıtılır; `staging/` ve
+`evidence/` build istasyonunda kalır, uygulama dizinine kopyalanmaz.
 
-## SDM/Resources TEST Operator Runbook, 2026-09-07
+### Tek Güncel Kurulum Sırası
+
+| Adım / makine | İşlem türü | Önkoşul, beklenen çıktı ve durma koşulu |
+|---|---|---|
+| 1. Yetkili TEST operatörü, yönetim istasyonu | Salt okunur envanter | Değişiklik kaydına gerçek API/UI hedeflerini, mevcut binary/config sürümlerini, DBA tarafından doğrulanmış şema seviyesini ve rollback paketini yazın. Hedef, şema, geri dönüş tabanı veya ayrı kurulum onayı eksikse durun. İlk manuel TEST adımı budur; sunucu adı veya mevcut seviye bu belgede varsayılmaz. |
+| 2. Paket teslim alan istasyon | Salt okunur doğrulama | API/UI/DBA arşivlerinin `Get-FileHash -Algorithm SHA256 -LiteralPath <arşiv>` sonuçlarını `release-artifacts.sha256` ile karşılaştırın; per-file manifestlerini doğrulayın. API/UI ProductVersion `0.1.0+682fa8eafcac611b0d18f93d0eb541f6a5acd2fc` ve metadata kaynak SHA'sı eşleşmeli. Eksik/farklı hash, sürüm veya manifesto halinde durun; rc6.11 binary'lerini karıştırmayın. Uzak yayın zorunluysa doğrulanmış remote SHA olmadan o kapıyı geçmeyin. |
+| 3. TEST operatörü ve DBA, doğrulanmış hedefler | Ayrı onaylı yedek hazırlığı | Mevcut API/UI binary ve server-owned config yedeklerinin yolunu, hash'ini, tarihini, geri dönüş sürümünü; geri yüklenebilir SQL yedeğinin referansını ve sorumlusunu değişiklik kaydına ekleyin. Sırları belgeye/pakete koymayın. 011 sonrası eski binary uyumluluğu kanıtlanmış değildir; geri dönüş planı ve uyumluluk değerlendirmesi yoksa kurulumdan önce durun. |
+| 4. DBA, doğrulanmış TEST SQL hedefi | Ayrı onaylı şema değişikliği | Envanterde eksik olduğu doğrulanan migration'ları sırasıyla 011'e kadar uygulayın; mevcut 010 ise yalnız 011 gerekir. Arşivde `sql/migrations` çalışma dizininden SQLCMD mode ve QUOTED_IDENTIFIER ON (`-I`) kullanın; `:r ../schema/...` yollarını koruyun. 001/002 yeniden uygulanmaz; tüm zincir körlemesine çalıştırılmaz. Hata veya uyuşmayan mevcut tanımda durun; otomatik yeniden deneme yapmayın. |
+| 5. DBA, aynı SQL hedefi | Salt okunur kontrol; yalnız eksik grant için ayrı onaylı değişiklik | 011 kolonlarını iki tabloda `bit NOT NULL DEFAULT (0)` olarak, mevcut satırların false niyetini ve append-only trigger'ların etkinliğini doğrulayın. Aşağıdaki mevcut nesne grant'lerini gerçek runtime principal ile kontrol edin. 011 yeni runtime grant istemez. DDL kimliği runtime'dan ayrı olmalı; ownership-chain doğrulanmadan API'ye geçmeyin. |
+| 6. TEST API operatörü, doğrulanmış API makinesi | Ayrı kurulum onayıyla binary değişikliği | Şema/grants tamamlanınca yalnız eşleşen API arşivini mevcut onaylı dağıtım yöntemiyle kurun. `web.config`, `appsettings*.json`, Data Protection dizini, loglar ve sırlar korunur. Aşağıdaki üç fence değerini server-owned yapılandırmada doğrulayın. Sağlık/sürüm/kimlik doğrulama başarısızsa durun; UI'ye geçmeyin. |
+| 7. TEST UI operatörü, doğrulanmış UI makinesi | Ayrı kurulum onayıyla binary değişikliği | Aynı build SHA'lı UI arşivini kurun; mevcut API adresi, auth/offload ayarları ve kalıcı UI key ring korunur. LB/IIS/binding yeniden yapılandırması kapsam dışıdır. API uyumsuzluğu veya key-ring sorunu varsa durun. |
+| 8. Yetkili kullanıcılar, TEST tarayıcısı | Salt okunur rol kontrolü; yerel uygulama değişiklikleri için ayrıca onaylı UAT | Admin sağlık/sürüm; ordinary kullanıcı bağlantı arama ve grupları; curator yönetim yetkisi; manager tarih/boş/hata durumları; denied kullanıcının menü/doğrudan API reddi doğrulanır. Publisher iki talep türünü, gerçek engelleri ve yazma kapalı açıklamasını inceler; create/retry yapmaz. Katalog/grup kaydı gibi uygulama içi değişiklikler ayrı UAT onayına bağlıdır. Kaynak yenileme/AD/Jira çağrıları ayrıca kurumsal smoke onayı gerektirir. Beklenmeyen yazma, yanlış yetki veya sentetik corporate kayıt görünümünde durun. |
+
+### Korunacak Sınırlar ve Grants
+
+Server-owned `OperationalRecords` bölümünde:
+
+```text
+ReadOnlyIntegrationMode=true
+ControlledTestWritesEnabled=false
+SourceCloseEnabled=false
+```
+
+Jira-only runtime desteği Jira yazısını açmaz. Sunucu Talebi ve Uygulama Kurulumu
+seçimi operatör beyanıdır, pozitif uygunluk/onay değildir. Uygulama kurulumu
+eşlemesi ve kurumsal politika/kimlik/yetki/mutabakat kanıtları beklenmektedir.
+`JiraCreated`, kaynak tamamlandı demek değildir; kaynak açık gösterilir. Kapatma
+simüle edilmez, belirsiz Jira sonucunda otomatik create/retry yapılmaz.
+
+Mevcut runtime grant sözleşmesi (rc6.11'e göre yeni izin yok):
+
+| Nesne | Runtime izni |
+|---|---|
+| `audit.AuditLog`, `security.AccessRequestHistory`, `ops.OperationalRecordWorkflowHistory` | INSERT |
+| `security.Users`, `security.RoleAssignments`, `security.AccessRequests`, `security.ApplicationSessions` | SELECT, INSERT, UPDATE |
+| `security.Roles` | SELECT |
+| `ops.OperationalRecords`, `ops.JiraTransfers`, `ops.CommandExecutions` | SELECT, INSERT, UPDATE |
+| `resources.Categories`, `resources.Links`, `resources.PersonalPreferences` | SELECT, INSERT, UPDATE |
+| `reporting.ManagementAuditEvents`, `reporting.ManagementWorkflowEvents`, `reporting.ManagementOperationalStatus` | SELECT |
+
+Veritabanı CONNECT ve mevcut ownership-chain DBA tarafından doğrulanır. Runtime'a
+DELETE, DDL, schema ownership, `db_owner`, `db_ddladmin`, doğrudan audit/history
+SELECT veya kullanılmayan `ManagementSessionStatus` SELECT verilmez. Tarihsel
+grant-only dosyası resources izinlerini içermez; tek başına tam güncel grant seti
+değildir. Gerçek principal varsayılmaz, geniş rol atanmaz.
+
+### 011 Etkisi ve Geri Dönüş
+
+`sql/migrations/011-independent-source-close.sql`, tek transaction içinde
+`ops.JiraTransfers` ve `ops.OperationalRecordWorkflowHistory` tablolarına
+`SourceCloseRequested bit NOT NULL DEFAULT (0) WITH VALUES` ekler. Kolon-varlık
+guard'ı uyuşmayan mevcut tanımı onarmaz. Eski satırlar kapatma niyeti kazanmaz;
+daha sonra gate açılması false niyeti yükseltmez. Mevcut migration'lar değişmedi.
+
+Yerel 001-011 kurulum, legacy transfer/history upgrade ve tekrarlı 011 kanıtı
+önceki handoff'tan kullanılır; gerçek SQL restart/concurrency/audit testleri
+deterministik dış servislerle çalışmıştır. Bu, kurumsal şema/grant doğrulaması
+veya eski binary rollback uyumluluğu değildir.
+
+Binary rollback yalnız doğrulanmış önceki API/UI ve config yedeklerine dönüştür;
+011 kolonları veya append-only kanıtlar silinmez. Eski binary'nin 011 ile
+uyumluluğu ayrıca kanıtlanmadan rollback güvenli ilan edilmez. Uyumluluk belirsizse
+DBA ve operatör onaylı kurtarma planında durun. SQL restore ayrı DBA kararıdır;
+yedekten sonra oluşan işlem/audit verisini kaybettirebilir. Binary rollback dış
+sistemde oluşmuş Jira'yı geri almaz; transfer silerek yeniden create yapılmaz.
+
+## Historical Reference Only
+
+The sections below preserve earlier deployment records and contracts. In
+particular rc6.10/rc6.11 and 001-010 (or older) sequences are NOT installation
+instructions for rc6.12. Use only the current sequence above. rc6.11 retains
+source `74cd8274250302a977cbc4c5cd6e4f1789c01459`; previous packages/hashes are
+unchanged and do not contain the independent close gate or migration 011.
+
+## Historical SDM/Resources TEST Operator Runbook, rc6.10
 
 Bu teslimat yerel doğrulama ve paket hazırlığıdır; TEST kurulumu veya SDM yazma
 aktivasyonu değildir. Paket kökü mevcut standarda göre
