@@ -344,3 +344,17 @@ are included. Next Claude task: catalogue/list/detail and manager forms, persona
 favourites and set editor/default selection, version-conflict handling, and
 user-initiated opening with fallback. SDM Action Center integration and positive
 business policy/approval remain separate pending milestones.
+# Workspace Additions, 2026-09-07
+
+`PUT /api/v1/resources/me/layout` accepts `{ layout, expectedVersion }` and returns
+the current owner's ResourcePreferencesResponse. `workspaceLayout` is additive:
+view `cards|list`, density `comfortable|compact`, pageSize `10|25|50|100`, shortcuts
+an ordered unique subset of `links|groups|requests|catalogue` permitted by current
+capabilities. Reset sends defaults with the current version. Existing preferences
+survive; 409 never implies retry permission. No arbitrary owner ID is accepted.
+Legacy clients can omit/ignore the field; reads default without persisting.
+
+`POST /api/v1/resources/links/resolve` accepts `{ linkIds }`, 1-100 distinct nonempty
+GUIDs, and returns only currently permitted ResourceLink entries in supplied order.
+No missing details or destination requests. UI opening remains a separate explicit
+native browser action. Personal-group additions reuse the versioned merge route.

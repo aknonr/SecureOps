@@ -51,3 +51,11 @@ public sealed record ResourceEnvironmentQuery(
 
 /// <summary>Dismisses the first-use invitation; replay remains available. No training activity is recorded.</summary>
 public sealed record DismissResourceGuideRequest([Range(0, long.MaxValue)] long ExpectedVersion);
+
+/// <summary>Replaces only the caller's bounded presentation settings at an expected aggregate version.</summary>
+public sealed record SaveResourceLayoutRequest(
+    [Required] SecureOps.Domain.Resources.ResourceWorkspaceLayout Layout,
+    [Range(0, long.MaxValue)] long ExpectedVersion);
+
+/// <summary>Revalidates at most one visible page of selected references without visiting destinations.</summary>
+public sealed record ResolveResourceLinksRequest([Required, MinLength(1), MaxLength(100)] IReadOnlyList<Guid> LinkIds);

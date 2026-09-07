@@ -14,6 +14,14 @@ public sealed class ResourceApiClient : IResourceApiClient
 
     private readonly HttpClient _httpClient;
 
+    /// <inheritdoc />
+    public Task<ResourcePreferencesResponse> SaveLayoutAsync(SaveResourceLayoutRequest request, CancellationToken cancellationToken) =>
+        SendAsync<ResourcePreferencesResponse>(() => _httpClient.PutAsJsonAsync($"{_root}/me/layout", request, JsonOptions, cancellationToken), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<ResourceLink>> ResolveLinksAsync(ResolveResourceLinksRequest request, CancellationToken cancellationToken) =>
+        SendAsync<IReadOnlyList<ResourceLink>>(() => _httpClient.PostAsJsonAsync($"{_root}/links/resolve", request, JsonOptions, cancellationToken), cancellationToken);
+
     /// <summary>
     /// Initializes a new resource API client.
     /// </summary>

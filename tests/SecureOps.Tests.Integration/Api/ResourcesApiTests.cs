@@ -79,7 +79,7 @@ public sealed class ResourcesApiTests
                 count++;
             }
         }
-        count.Should().Be(15);
+        count.Should().Be(17);
         JsonElement schemas = root.GetProperty("components").GetProperty("schemas");
         schemas.GetProperty("ResourcePreferencesResponse").GetProperty("properties").GetProperty("defaultSetId")
             .GetProperty("nullable").GetBoolean().Should().BeTrue();
@@ -117,6 +117,29 @@ public sealed class ResourcesApiTests
         personal.Sets.Single().Links.Should().BeEmpty();
         (await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}", new SaveShiftSetRequest("Stale", [], ExpectedVersion: 1)))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Workspace_ValidatesBodyVersionCapabilitiesAndCurrentOwner()
+    {
+        using WebApplicationFactory<Program> factory = Factory();
+        using HttpClient owner = Client(factory, "team-lead");
+        using HttpClient admin = Client(factory, "platform-admin");
+        var layout = new ResourceWorkspaceLayout("list", "compact", 10, ["groups", "links"]);
+        ResourcePreferencesResponse saved = await ReadAsync<ResourcePreferencesResponse>(
+            await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout, 0)));
+        saved.WorkspaceLayout.Should().BeEquivalentTo(layout);
+        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout, 0)))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me"))).Version.Should().Be(0);
+        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout with { Shortcuts = ["catalogue"] }, 1)))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new { layout = (object?)null, expectedVersion = 1 }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await owner.PostAsJsonAsync("/api/v1/resources/links/resolve", new { linkIds = Array.Empty<Guid>() }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadAsync<ResourceLink[]>(await owner.PostAsJsonAsync("/api/v1/resources/links/resolve", new ResolveResourceLinksRequest([Guid.NewGuid()]))))
+            .Should().BeEmpty();
     }
 
     private static WebApplicationFactory<Program> Factory() => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

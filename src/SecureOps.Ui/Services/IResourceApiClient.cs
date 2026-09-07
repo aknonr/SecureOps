@@ -18,6 +18,12 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public interface IResourceApiClient
 {
+    /// <summary>Saves only caller-owned layout with optimistic concurrency; no automatic retry.</summary>
+    public Task<ResourcePreferencesResponse> SaveLayoutAsync(SaveResourceLayoutRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Freshly resolves selected references before a separate native browser activation.</summary>
+    public Task<IReadOnlyList<ResourceLink>> ResolveLinksAsync(ResolveResourceLinksRequest request, CancellationToken cancellationToken);
+
     /// <summary>Lists categories under inherited visibility rules.</summary>
     /// <param name="includeArchived">Manager-only administrative read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

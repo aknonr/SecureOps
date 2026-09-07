@@ -113,6 +113,36 @@ public sealed class ResourceCatalogueService(IResourceRepository repository, IAp
             return await SavePersonalAsync(current with { GuideDismissed = true }, request.ExpectedVersion, user, context, cancellationToken);
         }, cancellationToken);
 
+    /// <summary>Saves only caller-owned layout, preserving groups, hidden membership and favourites.</summary>
+    public Task<ResourceResult<ResourcePreferencesResponse>> SaveLayoutAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        SaveResourceLayoutRequest request, CancellationToken cancellationToken) => ExecuteAsync(principal, context, false, async user =>
+        {
+            if (!ResourceWorkspacePolicy.Valid(request.Layout) || request.ExpectedVersion is < 0 or long.MaxValue)
+            {
+                return ResourceResult<ResourcePreferencesResponse>.Fail(ResourceErrors.Invalid);
+            }
+            if (request.Layout.Shortcuts.Any(key => !ResourceWorkspacePolicy.Permitted(key, user.Capabilities)))
+            {
+                return ResourceResult<ResourcePreferencesResponse>.Fail("AccessDenied");
+            }
+            ResourcePreferences current = await repository.PreferencesAsync(user.Id, cancellationToken);
+            return await SavePersonalAsync(current with { WorkspaceLayout = request.Layout }, request.ExpectedVersion, user, context, cancellationToken);
+        }, cancellationToken);
+
+    /// <summary>Freshly resolves bounded selections; unavailable IDs reveal neither details nor reasons.</summary>
+    public Task<ResourceResult<IReadOnlyList<ResourceLink>>> ResolveLinksAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        ResolveResourceLinksRequest request, CancellationToken cancellationToken) => ExecuteAsync<IReadOnlyList<ResourceLink>>(principal, context, false, async user =>
+        {
+            if (request.LinkIds is not { Count: >= 1 and <= 100 } || request.LinkIds.Contains(Guid.Empty)
+                || request.LinkIds.Distinct().Count() != request.LinkIds.Count)
+            {
+                return ResourceResult<IReadOnlyList<ResourceLink>>.Fail(ResourceErrors.Invalid);
+            }
+            IReadOnlyList<ResourceLink> resolved = await repository.ResolveAsync(request.LinkIds, Manager(user), cancellationToken);
+            var byId = resolved.ToDictionary(link => link.Id);
+            return new(request.LinkIds.Where(byId.ContainsKey).Select(id => byId[id]).ToArray());
+        }, cancellationToken);
+
     /// <summary>Atomically merges ordered membership and explicit removals; omissions never delete saved references.</summary>
     public Task<ResourceResult<ResourcePreferencesResponse>> SaveSetAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id,
         SaveShiftSetRequest request, bool create, CancellationToken cancellationToken) => ExecuteAsync(principal, context, false, async user =>
@@ -204,7 +234,8 @@ public sealed class ResourceCatalogueService(IResourceRepository repository, IAp
         var byId = links.ToDictionary(l => l.Id);
         ResourceLink[] Resolve(IEnumerable<Guid> references) => [.. references.Where(byId.ContainsKey).Select(id => byId[id])];
         return new(value.Version, Resolve(value.FavouriteIds), [.. value.Sets.Select(s => new ShiftSetResponse(s.Id, s.Name,
-            Resolve(s.LinkIds), s.Id == value.DefaultSetId))], value.DefaultSetId, value.GuideDismissed);
+            Resolve(s.LinkIds), s.Id == value.DefaultSetId))], value.DefaultSetId, value.GuideDismissed,
+            ResourceWorkspacePolicy.Project(value.WorkspaceLayout, user.Capabilities));
     }
 
     private async Task<ResourceResult<T>> ExecuteAsync<T>(ClaimsPrincipal principal, AccessOperationContext context, bool manage,

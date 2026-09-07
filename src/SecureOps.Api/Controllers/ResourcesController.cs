@@ -22,6 +22,18 @@ namespace SecureOps.Api.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class ResourcesController(ResourceCatalogueService service) : ControllerBase
 {
+    /// <summary>Replaces only the authenticated caller's layout, with no arbitrary owner parameter.</summary>
+    [HttpPut("me/layout")]
+    [ProducesResponseType(typeof(ResourcePreferencesResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ResourcePreferencesResponse>> SaveLayoutAsync(SaveResourceLayoutRequest request, CancellationToken cancellationToken) =>
+        Reply(await service.SaveLayoutAsync(User, Context(), request, cancellationToken));
+
+    /// <summary>Resolves a bounded selection against current visibility; never opens destinations.</summary>
+    [HttpPost("links/resolve")]
+    [ProducesResponseType(typeof(IReadOnlyList<ResourceLink>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ResourceLink>>> ResolveLinksAsync(ResolveResourceLinksRequest request, CancellationToken cancellationToken) =>
+        Reply(await service.ResolveLinksAsync(User, Context(), request, cancellationToken));
+
     /// <summary>Looks up at most 100 permitted environment values independently of link pagination.</summary>
     [HttpGet("environments")]
     [ProducesResponseType(typeof(ResourceEnvironmentOptions), StatusCodes.Status200OK)]

@@ -5,6 +5,26 @@
 
 ## Decision
 
+### Bounded Workspace Follow-up, 2026-09-07
+
+The authorized usability follow-up adds optional WorkspaceLayout to existing
+personal JSON: cards/list, comfortable/compact, page size 10/25/50/100, and at
+most four unique shortcut keys (links/groups/requests/catalogue). Legacy reads
+use defaults without a write. Every read filters shortcuts by current capability;
+every save rejects unauthorized keys and arbitrary routes. Only the current
+owner's versioned aggregate is mutable, including for Admin. Layout reset changes
+layout only; favourites, default group, guide preference and hidden membership
+survive. No migration, new SQL grant or browser storage is introduced.
+
+POST resources/links/resolve revalidates 1-100 distinct IDs under current
+visibility and preserves requested order. Missing/hidden details are never
+returned. Resolution is read-only and cannot open a browser destination. Opening
+requires a subsequent explicit native browser activation; no retrying personal
+writes, bulk publication or browsing telemetry is added. Existing set merge
+semantics support atomic selected-item additions. Bulk favourites remain outside
+this increment. Previous size exceptions do not carry forward; commits remain
+bounded by the permanent rule. rc6.12 excludes these later runtime changes.
+
 This explicitly authorized Phase 2 support milestone adds local application data,
 not target-system integration or remediation. No target URL is fetched or executed.
 Shared categories and links use SQL tables, optimistic bigint versions, archive

@@ -1,5 +1,11 @@
 # Resource Catalogue
 
+WorkspaceLayout is an optional bounded field in the same versioned personal JSON.
+Legacy rows use defaults; owner-only layout saves/reset retain all membership and
+use the existing transactional audit. Current capabilities filter shortcut reads
+and gate saves. No schema/grant change. POST links/resolve revalidates at most 100
+selected IDs without fetching destinations; see ADR-0019 for exact semantics.
+
 Backend-owned local application data, not a destination-system integration.
 ResourceCatalogueService revalidates persisted approved access and capabilities
 on every operation. Resources.Manage is separate from general Lead authority.

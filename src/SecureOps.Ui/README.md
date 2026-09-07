@@ -374,6 +374,25 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
+**Workspace usability follow-up in progress:** resumed actual `aac1be56cf9921555e2d1c67f0f7a22c9a4a1e3e`.
+The rc6.12 archives were extracted into ignored local artifacts and hosted in
+foreground Demo with Simulation providers, no corporate configuration/calls.
+Published theme CSS equals source SHA-256 `63184EAAD85A94E56E23AC94AE0D035D4309CAFDBF362928CB84F35CDB20A0D5`.
+Chrome computes the desktop filter as grid (680/220/220 pixels at 1440 width),
+resource rows as grid and metadata as flex; no JS errors or failed assets (304
+is normal cache revalidation). Sparse rows are confirmed design limitations;
+stacked desktop filters are not reproduced. No TEST screenshot attachment is
+available in this turn, so live deployed CSS/cache/version remains unverified.
+Application CSS now has content-versioned references. Baseline screenshots and
+computed evidence: `artifacts/workspace-usability-20260907/before-*.png`,
+`baseline-results.json`. Server-backed layout and selected-link resolution are
+additive contracts, not yet a finished workspace UI. Verified 56 resource unit,
+6 API/OpenAPI tests and 11 actual isolated SQL cases, including legacy layout
+JSON, restart round-trip and transactional audit rollback, on
+`SecureOps_ResourcesV1_Workspace20260907`; fresh 001-011 harness upgrade passed.
+No schema/grant changes. rc6.12 remains immutable and excludes all follow-up
+runtime changes. No prior size exception is used; increments stay below 1000 lines.
+
 **Current packaged delivery, rc6.12:** build source
 `682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`, latest runtime
 `f528da27611f52ab3c5676c485d6f6e7756af54c`. The three local commits
