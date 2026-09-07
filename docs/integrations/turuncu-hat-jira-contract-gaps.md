@@ -24,6 +24,13 @@ rc6.11 kaynak SHA'sı `74cd8274250302a977cbc4c5cd6e4f1789c01459` değişmez.
 Yetkili yayıncının açık incelemesi **iş önerisidir**, onaylanmış uygunluk politikası
 değildir. Ayrı onaycı gereksinimi varsayılmaz; mevcut engeller kaldırılmaz.
 
+2026-09-07 kullanıcı kararı: **Sunucu Talebi** ve **Uygulama Kurulumu** kapsamda.
+Bu karar her OR'yi uygun yapmaz. Güncel kaynakta iki seçenek mevcut domain enum'u
+ve taslak servisiyle operatör beyanı olarak incelenir; kaynak sınıflandırması veya
+yayımlama onayı olarak kaydedilmez. Seçim değişikliği önizlemeyi geçersiz kılar.
+SunucuTalep tarihsel sunucu eşlemesidir; Uygulama Kurulumu için kullanılamaz.
+Kurulum taslağı boş etiket ve açık eşleme engeli gösterir; yayın yolu da engellidir.
+
 ### Önceden Kanıtlananlar
 
 | Kanıt | Sınırı / tekrar istenmeyen bilgi |
@@ -161,34 +168,34 @@ alan isimleri ve onaylı WASAS seçeneği dışındaki kurumsal iş değerleri m
 
 ### Owner İş Kararları
 
-- Yetkili yayıncının açık inceleme/teyidi önerisi kabul ediliyor mu? Hangi kayıt
-  kapsamı, zorunlu kanıtlar ve ret nedenleriyle? Mevcut fail-closed değerlendirme
+- İki kapsam türü zaten onaylıdır. Bu türlerde kayıt bazında hangi zorunlu altyapı,
+  süreç ve kimlik kanıtları ile yetkili yayıncı teyidi yeterlidir? Mevcut fail-closed değerlendirme
   değişecekse ayrı onaylı politika/sürüm gerekir; otomatik uygunluk veya ayrı onaycı
   sistemi bu rehberle doğmaz.
 - Requester bulunamaz/çokluysa mevcut Block korunur. Hangi kalıcı kimlik kaynağı
   onaylıdır; assignee/reporter ProjectDefault mı, açık ve doğrulanmış mapping mi?
   Custom-field yeterli mi, native watcher gerçekten iş gereksinimi mi?
-- Jira-only başarı kabulü "Jira var, kaynak açık" mıdır? Mutabakat kararını kim,
+- Uygulama Kurulumu için onaylı Jira etiket/alan eşlemesi nedir? Yeni değer uydurulmaz.
+- Jira-only sonucu "Jira var, kaynak açık" olarak uygulanmıştır. Mutabakat kararını kim,
   hangi otoritatif kanıtla verir? BPM kapanışı için ayrı owner/onay ve yarış/timeout
   riski kararı kimdedir? Yokluğa dair kanıt olmadan create tekrarı kabul edilmez.
 
 ### Jira-Only TEST ve Ayrı BPM Önkoşulları
 
-**Hazırlık yapılabilir; rc6.11 ile yalnız ayar değiştirerek çalıştırılamaz.**
-`OperationalRecordsOptions` bağımsız source-close kapısı sunmuyor;
-`JiraTransferService.cs:379` key kalıcılığından sonra doğrudan close'a gider,
-`:295` key bulunan retry'da close'u sürdürür. ConfigurationValidator'ın mevcut
-TEST kapısı corporate provider çiftini ve ortak write iznini gerektirir.
-`ReadOnlyIntegrationMode=true` Jira create'i de engeller. SourceProvider=Disabled,
-fake başarı, eksik BPM config, ağ/izin hatası üretmek desteklenen Jira-only mod değildir.
-
-Jira-only için ayrı, onaylı uygulama işi: varsayılan kapalı bağımsız BPM dispatch
-fence (create ve retry'da), kalıcı Jira key/claim/command/audit koruması, kaynak
-okuma ve stale-preview kontrolü, açık "Jira oluşturuldu, kaynak kapatılmadı"
-sunumu; sahte Completed veya otomatik close kuyruğu yok. Yetki/duplicate/ambiguous
-blokları ve business eligibility değişmeden korunmalı; mode-change/restart/retry
-semantiği ve targeted SQL/browser regresyonları ayrıca doğrulanmalı. Bu çalışma
-kod/mod/izin eklemez; mevcut paketler değişmez.
+**Bağımsız BPM kapısı uygulama açığı kapandı; rc6.11 değişmedi.** Yeni runtime
+commit'leri `14f2f466368a05d21d324dae03c3a1005190e1d0` ve
+`f528da27611f52ab3c5676c485d6f6e7756af54c`; henüz paketlenmedi/kurulmadı.
+`OperationalRecords:SourceCloseEnabled` varsayılan false; corporate provider çifti,
+ortak kontrollü TEST izni ve global read-only engeli aynen korunur. BPM write
+ayarları yalnız bağımsız kapı açıkken zorunludur; kaynak okuma/tazelik atlanmaz.
+Migration 011, transfer ve append-only geçmişte default-false kapanış niyetini
+kalıcılaştırır. Jira anahtarı saklanır, durum `JiraCreated`, sunum `SourceOpen` olur:
+"Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı." BPM dispatch sıfırdır.
+Create/retry/command replay/restart yeni Jira oluşturmaz; no-op retry geçmişe
+ikinci JiraCreated olayı veya deneme artışı eklemez. Sonradan kapıyı açmak false
+niyeti yükseltmez. Böyle kayıtlar için yetkili açık gelecek geçiş henüz yoktur;
+DB'den niyet değiştirmek desteklenen işlem değildir. Önceden true niyetli yarım
+kapanış ancak kapı açıkken açık yetkili retry ile sürer. Otomatik kuyruk/worker yok.
 
 Jira-only dispatch öncesi adım 1-4, owner politikası, SQL kalıcılığı, gerçek Jira
 success/failure sözleşmesi ve ayrı kontrollü TEST yazma onayı gerekir. Remote
@@ -199,16 +206,18 @@ BPM close için bunlara ek adım 5, exact-key/tek aktivite, atomik koşul veya a
 owner risk kararı, update başarı/timeout sonrası reconciliation ve ayrı write
 onayı gerekir. Jira başarısı BPM izni/başarısı sayılmaz.
 
-### SQL Kanıtı ve Bu Görevin Doğrulaması
+### Güncel SQL ve Tarayıcı Kanıtı
 
-Atlanan sekiz SQL testi son parser/HTTP değişiklikleri için somut yeni bir SQL
-açığı bırakmıyor: `74cd827` SQL repository/command store/schema/workflow kodunu
-değiştirmedi. Gerçek adapter JSON hataları son 90 contract ve 38 hosted/API/OpenAPI
-testiyle kontrol edildi. Eski LocalDB kanıtı claim, restart replay, key/history
-rollback, SDM evaluation ve resources işlemlerini kapsar; corporate adapter yerine
-substitute kullanır. Bunları tekrar koşmak yeni remote-response veya Jira-only
-semantiğini kanıtlamaz. Önceki sekiz LocalDB testi ve browser kanıtı **yeniden
-kullanıldı**, bu görevde test/build/SQL/browser/paket üretimi **çalıştırılmadı**.
-Yeni Jira-only kalıcı geçişleri uygulanırsa o zaman hedefli SQL testleri gerekir.
-Bu doküman değişikliği için içerik/link/kaynak referansı ve `git diff --check`
-kontrolü yapılır; eski format ihlalleri veya test toplamları yeniden başarı sayılmaz.
+Önceki belge görevinde sekiz SQL testi yeniden kullanılabilirdi; bu görev kalıcılığı
+değiştirdiği için gerçek izole LocalDB testleri yeniden çalıştırıldı. 245 entegrasyon
+testinin tamamı, içindeki **10 SQL testi dahil**, sıfır atlamayla geçti. Yeni SQL
+vakaları Jira-only restart/kapı değişimi/sıfır BPM ve true niyetli kesilmiş kapanışı
+kapsar; mevcut claim/replay/key-history rollback/mutabakat korumaları da geçti.
+001-011 temiz kurulum, eski transfer/geçmişin false niyetle yükseltilmesi ve 011'in
+tekrar uygulanması yerel harness ile doğrulandı. Gerçek kurumsal SQL kullanılmadı.
+Simulation API + SQL + gerçek Blazor/Chrome yolculuğu iki tür, yetkisiz 403,
+sürüm çakışması/korunan seçim, onay odağı/iptal/çift tıklama, kalıcı Jira-only sonuç,
+retry ve belirsiz sonuç engelini 1440x900 ve 390x844'te kanıtladı. Son sunum düzeltmesi
+host restart sonrası kayıt ve liste etkileşimiyle tekrar kontrol edildi.
+Kanıtlar `artifacts/sdm-multitype-20260907/`; komutlar/sonuç ayrımı canonical UI
+handoff'tadır. Fake-adapter/SQL/browser kanıtı uzaktaki kabul veya mutabakatı kanıtlamaz.

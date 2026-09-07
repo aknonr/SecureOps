@@ -6,6 +6,12 @@ Its readiness/source/hash manifests were validated locally; no deployment or
 write activation occurred. rc6.10 and the original runbook below are preserved.
 Current source/evidence handoff is in `src/SecureOps.Ui/README.md`.
 
+Source-only follow-up `f528da27611f52ab3c5676c485d6f6e7756af54c` adds two-type
+review and independent default-off BPM control. It requires additive migration
+011 (transfer/history close intent); rc6.11 and earlier packages remain schema
+001-010 and do not contain these changes. No package was rebuilt or overwritten.
+Any later approved paired release must record its new source/schema association.
+
 ## SDM/Resources TEST Operator Runbook, 2026-09-07
 
 Bu teslimat yerel doğrulama ve paket hazırlığıdır; TEST kurulumu veya SDM yazma

@@ -374,7 +374,98 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
-**Activation evidence preparation:** current starting HEAD is
+**Current multi-type/Jira-only implementation:** resumed actual HEAD
+`7c118f31d7c1aaa687b723b793b3bc792c4cbee4` on
+`feature/sql-runtime-hardening-20260902`; only untracked `.vscode/` was present
+and remains untouched. Runtime increments:
+`14f2f466368a05d21d324dae03c3a1005190e1d0` (durable close gate, 299 changed lines)
+and `f528da27611f52ab3c5676c485d6f6e7756af54c` (review/UI/browser, 887 changed
+lines). Each is below the permanent 1000-line cap; this handoff is a separate
+documentation increment. No reset, force push, main merge, deployment or corporate
+request. Normal push was attempted but Git Credential Manager required interactive
+sign-in. Non-interactive push and independent `ls-remote` both failed with missing
+GitHub username/interactive credentials. The cached upstream remains `7c118f3`;
+that is not a live remote-SHA verification. Runtime commits are local-only.
+
+The owner confirmed **Sunucu Talebi** and **Uygulama Kurulumu**, not positive
+eligibility for either. The existing enum/draft architecture exposes both through
+`jira-review` with the existing preview capability and expected version. The
+choice is explicitly an operator declaration, held in the UI draft and audited,
+not persisted as source classification/approval or a create-authorizing preview.
+Changing it clears preview/confirmation; version-conflict recovery retains it.
+Server review displays configured established mapping. Installation review has
+no SunucuTalep fallback, shows its mapping blocker and cannot publish; no invented
+label/field or keyword rule. Corporate positive eligibility remains fail closed.
+Viewing, reviewing and publishing use distinct existing API capabilities; a Lead
+title does not grant publication. No separate approver subsystem was added.
+
+`OperationalRecords:SourceCloseEnabled` defaults false under the existing global
+read-only/controlled-write fences. New migration 011 persists default-false close
+intent on transfers and append-only history, including existing rows. The preview
+fingerprints intent and acquisition persists it before Jira dispatch. Jira-only
+success keeps the key and `JiraCreated`, with `SourceOpen` presentation and
+"Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı." No pending close step,
+failed close or Completed is fabricated. Retry/replay/restart dispatch no second
+create or BPM write; no-op retry also preserves RetryCount and JiraCreated history.
+Enabling the gate later never upgrades deliberately false intent. No intent-upgrade
+API or automatic worker/queue exists. Already true close intent can resume only
+on explicit authorized retry with all gates open. Source freshness is retained;
+only BPM write configuration becomes optional while its independent gate is off.
+
+New verification, separate from historical/reused evidence:
+- Release solution build: 0 warnings, 0 errors. Full integration run: **245 passed,
+  zero skipped**, including **10 actual SQL tests**. Full unit run: 1065 passed,
+  one outdated migration-count assertion failed; corrected 10-to-11 assertion
+  passed in the 10-case SQL-asset subset. After the final presentation changes,
+  **66 affected unit tests and 18 controller/OpenAPI tests passed**. These subsets
+  overlap earlier runs and are not additional unique suite totals.
+- SQL: guarded `(localdb)\SecureOpsResourcesV1`, final database
+  `SecureOps_ResourcesV1_MultiTypeFinal20260907`. Clean 001-011, legacy transfer/
+  history upgrade with false intent, and repeated 011 application passed. New
+  restart/config-change and interrupted-close tests use real SQL repositories and
+  command store with deterministic external substitutes. All ten SQL cases ran;
+  there is no skipped persistence gap for these runtime changes.
+- Browser: `tests/browser/sdm-jira-only.cjs` reuses existing loopback SQL/Simulation
+  support and supported foreground hosts. Five interactive checks passed: denied
+  controls/API 403; both declarations and invalidation; SQL version conflict and
+  retained-selection recovery; confirmation focus/cancel/double click with one
+  persisted Jira key and zero close stages; ambiguous result with reconciliation
+  and retry 409. A real browser after host restart also checked SourceOpen detail
+  and list interaction. Desktop 1440x900 and mobile 390x844 screenshots were checked
+  for overflow and visually inspected; labelled native select and dialog focus work.
+- Evidence directory (local ignored artifacts): `artifacts/sdm-multitype-20260907/`.
+  `jira-only-results.json`, `final-suite/*.trx`, and paired screenshots:
+  `review-denied`, `review-server`, `review-installation`, `review-version-conflict`,
+  `jira-only-confirmation`, `jira-only-result`, `jira-only-list`,
+  `jira-unknown-confirmation`, `jira-unknown-result` (`-1440.png` / `-390.png`).
+  Test-owned hosts were stopped and synthetic role edits restored; unrelated
+  existing hosts were untouched. Local databases are retained for inspection.
+- OpenAPI snapshot/compatibility and diff checks passed. NuGet vulnerability
+  scan found none in all eight projects. Added-line sensitive-pattern review
+  passed. Whole-repository format still fails on existing whitespace/naming debt;
+  touched transfer/review test whitespace checks passed after scoped formatting.
+  This is not a clean repository-wide format gate. No unrelated cleanup.
+
+rc6.11 remains source `74cd8274250302a977cbc4c5cd6e4f1789c01459`, schema 001-010;
+all old packages/hashes remain unchanged. None contains the new runtime or 011.
+No new package was produced. Existing dashboard/resource and legacy-parser browser
+evidence is reused, not rerun or claimed as new corporate evidence.
+The independent BPM implementation gap is closed locally. Real TEST still needs
+the bounded Jira metadata/permission/identity and authoritative correlation
+evidence in `docs/integrations/turuncu-hat-jira-contract-gaps.md`, approved positive
+per-record policy, installation mapping and separate controlled TEST authorization.
+BPM close additionally needs its response/conditional-write/reconciliation evidence
+and separate approval. Do not activate either write path from this handoff.
+
+Exact delivery next action: in an interactive terminal use the existing approved
+GitHub account with `git credential-manager github login --browser`, then normal
+`git push origin feature/sql-runtime-hardening-20260902` and compare `git rev-parse
+HEAD` with `git ls-remote --heads origin feature/sql-runtime-hardening-20260902`.
+Do not send credentials to an agent. In parallel, the owner supplies per-record
+positive criteria and the installation Jira mapping; the Jira administrator returns
+the existing bounded evidence checklist. No repeated request for the two scope types.
+
+**Historical activation evidence preparation (superseded implementation gap):** starting HEAD was
 `ac00c9cacab52471b778c6d358f9144442d5f4a5`, on the existing feature branch with
 only untracked `.vscode/`. This task changes documentation only. rc6.11 retains
 runtime source `74cd8274250302a977cbc4c5cd6e4f1789c01459`; all release directories,
