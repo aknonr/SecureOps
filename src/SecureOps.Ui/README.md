@@ -381,6 +381,12 @@ and normal-pushed using existing approved Git authentication. Live `ls-remote`
 matched the full build source SHA. This supersedes the historical authentication
 failure below. The final documentation commit is separate from build source and
 recorded after commit in the new release root's `release-metadata.json`.
+The subsequent documentation push stalled in Git Credential Manager and was
+cancelled; a non-interactive retry failed with `unable to get password from user`.
+An independent read-only GitHub ref GET still verified remote at the build SHA.
+Release preparation is complete locally; later documentation is not yet remote.
+Complete the existing approved GCM sign-in before retrying normal push; do not
+extract credentials or bypass authentication. Final SHA/status are in metadata.
 
 Release root: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.13`.
 API/UI ProductVersion `0.1.0+1935dc522e70b0fcfe602812bffb06f2858d61b1`,
