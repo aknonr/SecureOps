@@ -5,6 +5,10 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Coordinates preview, create, and retry operations.</summary>
 public interface IJiraTransferService
 {
+    /// <summary>Reviews an explicit type declaration without granting publication eligibility.</summary>
+    public Task<OperationalRecordResult<JiraIssueDraft>> ReviewAsync(Guid id,
+        SecureOps.Shared.Contracts.OperationalRecords.JiraReviewRequest request,
+        OperationalRecordCommandContext context, CancellationToken cancellationToken);
     /// <summary>Generates and persists a read-only preview state.</summary>
     public Task<OperationalRecordResult<JiraIssueDraft>> PreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken);
 

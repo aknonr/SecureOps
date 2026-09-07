@@ -35,6 +35,11 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
         string actor,
         CancellationToken cancellationToken)
     {
+        if (record.Classification == OperationalRecordClassification.SoftwareInstallation)
+        {
+            return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.JiraValidationFailed, "application-mapping", false);
+        }
+
         if (!record.JiraEligible || record.WorkflowState is OperationalRecordWorkflowState.NeedsManualReview or OperationalRecordWorkflowState.Imported or OperationalRecordWorkflowState.Classified)
         {
             return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordInvalidState, "classification", false);
@@ -101,16 +106,7 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             reporterUsername = resolution.JiraAccountId;
         }
 
-        string summary = $"{record.OrCode}{_options.SummarySeparator}{record.Title}";
-        if (summary.Length > _options.SummaryMaxLength)
-        {
-            summary = summary[.._options.SummaryMaxLength];
-        }
-
-        StringBuilder description = new(record.Description);
-        AppendReference(description, "Environment", record.Environment);
-        AppendReference(description, "Server", record.ServerReference);
-        AppendReference(description, "Application", record.ApplicationReference);
+        (string summary, string description) = Content(record);
 
         string? assigneeUsername = ResolveAssignee(actor, warnings);
         JiraIssueFieldMapping fieldMapping = new(
@@ -151,7 +147,54 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             fieldMapping,
             assigneeUsername,
             reporterUsername,
-            _operationalOptions.SourceCloseEnabled && !_operationalOptions.ReadOnlyIntegrationMode));
+            _operationalOptions.SourceCloseEnabled && !_operationalOptions.ReadOnlyIntegrationMode)
+        { RequestType = record.Classification, RecordVersion = record.Version });
+    }
+
+    /// <inheritdoc />
+    public JiraIssueDraft BuildReview(OperationalRecord record, OperationalRecordClassification requestType)
+    {
+        if (requestType is not (OperationalRecordClassification.ServerRequest or OperationalRecordClassification.SoftwareInstallation))
+        {
+            throw new ArgumentOutOfRangeException(nameof(requestType));
+        }
+
+        SortedSet<string> blockers = new(record.SdmEvaluation?.Result.BlockingConditions ?? [], StringComparer.Ordinal)
+        { "CategoryPolicyPending", "OperatorDeclarationOnly", "RequesterUnresolved", "ReporterUnresolved" };
+        bool installation = requestType == OperationalRecordClassification.SoftwareInstallation;
+        if (string.IsNullOrWhiteSpace(_options.IssueTypeId) || string.IsNullOrWhiteSpace(_options.TeamCustomField)
+            || string.IsNullOrWhiteSpace(_options.TeamValue) || string.IsNullOrWhiteSpace(_options.RequesterWatcherCustomField)
+            || (!installation && _options.Labels.Length == 0))
+        {
+            blockers.Add("JiraMappingPending");
+        }
+        if (installation)
+        {
+            blockers.Add("ApplicationMappingPending");
+        }
+        (string summary, string description) = Content(record);
+        bool close = _operationalOptions.SourceCloseEnabled && !_operationalOptions.ReadOnlyIntegrationMode;
+        JiraIssueFieldMapping mapping = new(_options.IssueTypeId, _options.TeamCustomField, _options.TeamValue,
+            _options.RequesterWatcherCustomField, installation ? [] : Array.AsReadOnly((string[])_options.Labels.Clone()));
+        string fingerprint = OperationalRecordIdempotency.Create(record.SourceRecordId,
+            JsonSerializer.Serialize(new { Kind = "review-only-v1", record.SourceConcurrencyToken, record.Version, requestType, summary, description, mapping, close }));
+        return new(record.Id, record.OrCode, _options.ProjectKey, _options.IssueType, summary, description,
+            null, _options.MappingVersion, fingerprint, [], mapping, SourceCloseRequested: close)
+        { RequestType = requestType, ReviewOnly = true, BlockingConditions = blockers.ToArray(), RecordVersion = record.Version };
+    }
+
+    private (string Summary, string Description) Content(OperationalRecord record)
+    {
+        string summary = $"{record.OrCode}{_options.SummarySeparator}{record.Title}";
+        if (summary.Length > _options.SummaryMaxLength)
+        {
+            summary = summary[.._options.SummaryMaxLength];
+        }
+        StringBuilder description = new(record.Description);
+        AppendReference(description, "Environment", record.Environment);
+        AppendReference(description, "Server", record.ServerReference);
+        AppendReference(description, "Application", record.ApplicationReference);
+        return (summary, description.ToString());
     }
 
     private string? ResolveAssignee(string actor, ICollection<string> warnings)

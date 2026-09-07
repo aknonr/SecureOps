@@ -79,6 +79,49 @@ public sealed class JiraTransferService : IJiraTransferService
     }
 
     /// <inheritdoc />
+    public async Task<OperationalRecordResult<JiraIssueDraft>> ReviewAsync(Guid id,
+        SecureOps.Shared.Contracts.OperationalRecords.JiraReviewRequest request,
+        OperationalRecordCommandContext context, CancellationToken cancellationToken)
+    {
+        OperationalRecord? record = await _repository.GetAsync(id, cancellationToken);
+        if (record is null || IsSyntheticCorporateRecord(record))
+        {
+            return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
+        }
+        if (request.RequestType is not (OperationalRecordClassification.ServerRequest or OperationalRecordClassification.SoftwareInstallation))
+        {
+            return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.JiraValidationFailed, "request-type", false);
+        }
+        if (request.ExpectedVersion != record.Version)
+        {
+            return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordChanged, "review-version", false);
+        }
+        if (record.JiraIssueKey is not null || record.ReconciliationRequired || record.MappingVersion is not null
+            || record.ClaimExpiresAt > DateTimeOffset.UtcNow)
+        {
+            return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordInvalidState, "review", false);
+        }
+
+        JiraIssueDraft draft = _draftService.BuildReview(record, request.RequestType);
+        await _auditWriter.WriteAsync(new AuditEvent
+        {
+            Actor = context.Actor,
+            Action = AuditActions.JiraPreviewGenerated,
+            CorrelationId = context.CorrelationId,
+            SourceIp = context.SourceIp,
+            Details = new
+            {
+                operationalRecordId = id,
+                requestType = request.RequestType.ToString(),
+                record.Version,
+                draft.IdempotencyKey,
+                result = "ReviewOnly"
+            }
+        }, cancellationToken);
+        return OperationalRecordResult<JiraIssueDraft>.Success(draft);
+    }
+
+    /// <inheritdoc />
     public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
         _operationalOptions.ReadOnlyIntegrationMode
             ? Task.FromResult(ExternalWritesDisabled())
@@ -269,6 +312,15 @@ public sealed class JiraTransferService : IJiraTransferService
 
     private async Task<OperationalRecordResult<OperationalRecord>> ExecuteRetryClaimedAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken)
     {
+        OperationalRecord? existing = await _repository.GetAsync(id, cancellationToken);
+        if (existing is { SourceCloseRequested: false, ReconciliationRequired: false, WorkflowState: OperationalRecordWorkflowState.JiraCreated }
+            && !string.IsNullOrWhiteSpace(existing.JiraIssueKey))
+        {
+            // A deliberately source-open result has no failed stage to retry. Do not
+            // emit another JiraCreated history entry for a no-op replay.
+            return OperationalRecordResult<OperationalRecord>.Success(existing);
+        }
+
         OperationalRecord? record = await _repository.RecordRetryRequestedAsync(id, context.Actor, context.CorrelationId, cancellationToken);
         if (record is null)
         {
@@ -317,6 +369,11 @@ public sealed class JiraTransferService : IJiraTransferService
         OperationalRecordCommandContext context,
         CancellationToken cancellationToken)
     {
+        if (draft.ReviewOnly || draft.BlockingConditions.Count > 0)
+        {
+            return OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordInvalidState, "classification", false);
+        }
+
         WorkflowAcquireResult acquired = await _repository.TryAcquireCreateAsync(
             draft.OperationalRecordId,
             draft.MappingVersion,

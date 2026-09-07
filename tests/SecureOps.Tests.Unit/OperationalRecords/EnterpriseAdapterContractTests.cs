@@ -902,6 +902,21 @@ public sealed class EnterpriseAdapterContractTests
         handler.Requests[0].Headers.Should().NotContainKey("Idempotency-Key");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task JiraCreate_ReviewOrInstallation_RejectsBeforeHttpEvenWithServerLabels(bool reviewOnly)
+    {
+        ScriptedHandler handler = new();
+        CorporateJiraClient client = JiraClient(handler);
+        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SDM", "Task", "Synthetic", "Synthetic",
+            "synthetic", "v1", new string('a', 64), [], JiraMapping())
+        { ReviewOnly = reviewOnly, RequestType = reviewOnly ? null : SecureOps.Domain.OperationalRecords.OperationalRecordClassification.SoftwareInstallation };
+        Func<Task> create = () => client.CreateIssueAsync(draft, CancellationToken.None);
+        await create.Should().ThrowAsync<ExternalIntegrationException>();
+        handler.Requests.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task JiraCreate_UsesTheReviewedDraftMappingInsteadOfReadingASecondRuntimeSnapshot()
     {

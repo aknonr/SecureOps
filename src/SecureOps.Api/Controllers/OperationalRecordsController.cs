@@ -94,9 +94,26 @@ public sealed class OperationalRecordsController : ControllerBase
             return Failure<JiraPreviewResponse>(result.Failure!);
         }
 
-        JiraIssueDraft draft = result.Value!;
+        return Ok(ToPreviewResponse(result.Value!));
+    }
+
+    /// <summary>Builds a version-bound operator declaration; never authorizes publication.</summary>
+    [HttpPost("{id:guid}/jira-review")]
+    [Authorize(Policy = Policies.CanPreviewJira)]
+    [EnableRateLimiting(ApiRateLimits.JiraPreview)]
+    [ProducesResponseType(typeof(JiraPreviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<JiraPreviewResponse>> ReviewAsync(Guid id, JiraReviewRequest request, CancellationToken cancellationToken)
+    {
+        OperationalRecordResult<JiraIssueDraft> result = await _transferService.ReviewAsync(id, request, Context(), cancellationToken);
+        return result.IsSuccess ? Ok(ToPreviewResponse(result.Value!)) : Failure<JiraPreviewResponse>(result.Failure!);
+    }
+
+    private JiraPreviewResponse ToPreviewResponse(JiraIssueDraft draft)
+    {
         JiraIssueFieldMapping mapping = draft.FieldMapping;
-        return Ok(new JiraPreviewResponse(
+        return new JiraPreviewResponse(
             draft.OperationalRecordId,
             draft.OrCode,
             draft.ProjectKey,
@@ -118,7 +135,9 @@ public sealed class OperationalRecordsController : ControllerBase
             mapping.TeamValue,
             mapping.RequesterWatcherCustomField,
             mapping.Labels,
-            draft.SourceCloseRequested));
+            draft.SourceCloseRequested)
+        { RequestType = draft.RequestType, ReviewOnly = draft.ReviewOnly,
+            BlockingConditions = draft.BlockingConditions, RecordVersion = draft.RecordVersion };
     }
 
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>
@@ -319,6 +338,8 @@ public sealed class OperationalRecordsController : ControllerBase
     private static string PresentationState(OperationalRecord record) => record.WorkflowState switch
     {
         OperationalRecordWorkflowState.Completed => OperationalRecordPresentationStates.Completed,
+        OperationalRecordWorkflowState.JiraCreated when !record.SourceCloseRequested
+            && record.JiraIssueKey is not null && !record.ReconciliationRequired => OperationalRecordPresentationStates.SourceOpen,
         OperationalRecordWorkflowState.Eligible or OperationalRecordWorkflowState.Previewed =>
             OperationalRecordPresentationStates.Actionable,
         OperationalRecordWorkflowState.CreateRequested or

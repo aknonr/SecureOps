@@ -256,6 +256,22 @@ public sealed class JiraTransferServiceTests
         (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!.JiraIssueKey.Should().Be("TEST-100");
     }
 
+    [Fact]
+    public async Task Review_VersionAndTypeValidated_NoCreateTokenOrEligibilityGranted()
+    {
+        TestFixture fixture = await TestFixture.CreateAsync(initializePreview: false);
+        OperationalRecord before = (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!;
+        var selection = new SecureOps.Shared.Contracts.OperationalRecords.JiraReviewRequest(OperationalRecordClassification.SoftwareInstallation, before.Version);
+        (await fixture.Service.ReviewAsync(before.Id, selection with { ExpectedVersion = 0 }, _context, CancellationToken.None)).IsSuccess.Should().BeFalse();
+        (await fixture.Service.ReviewAsync(before.Id, selection with { RequestType = OperationalRecordClassification.ConfigurationRequest }, _context, CancellationToken.None)).IsSuccess.Should().BeFalse();
+        (await fixture.Service.ReviewAsync(before.Id, selection, _context, CancellationToken.None)).Value!.ReviewOnly.Should().BeTrue();
+        (await fixture.Repository.GetAsync(before.Id, CancellationToken.None)).Should().BeEquivalentTo(before);
+        (await fixture.Service.CreateAsync(before.Id, _context, CancellationToken.None)).IsSuccess.Should().BeFalse();
+        fixture.Jira.Calls.Should().Be(0);
+        fixture.Source.CloseCalls.Should().Be(0);
+        fixture.Audit.Events.Should().Contain(e => e.Action == AuditActions.JiraPreviewGenerated);
+    }
+
     private sealed class TestFixture
     {
         private TestFixture(

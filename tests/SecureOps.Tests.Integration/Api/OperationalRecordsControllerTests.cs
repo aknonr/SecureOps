@@ -267,6 +267,20 @@ public sealed class OperationalRecordsControllerTests
         response.ClaimExpiresAt.Should().Be(Now.AddSeconds(-1));
     }
 
+    [Fact]
+    public async Task GetAsync_JiraOnly_IsSourceOpenNotCompletedOrInFlight()
+    {
+        OperationalRecord record = Record() with
+        {
+            WorkflowState = OperationalRecordWorkflowState.JiraCreated,
+            JiraIssueKey = "FAKE-1",
+            SourceCloseRequested = false
+        };
+        OperationalRecordResponse response = await GetResponseAsync(CreateController(record), record.Id);
+        response.PresentationState.Should().Be(OperationalRecordPresentationStates.SourceOpen);
+        response.RetryEligible.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(OperationalRecordWorkflowState.JiraCreateFailed, null, false, true, false)]
     [InlineData(OperationalRecordWorkflowState.JiraCreateFailed, null, true, false, false)]
@@ -375,6 +389,7 @@ public sealed class OperationalRecordsControllerTests
 
     private sealed class StubTransferService(OperationalRecordResult<JiraIssueDraft> previewResult) : IJiraTransferService
     {
+        public Task<OperationalRecordResult<JiraIssueDraft>> ReviewAsync(Guid id, JiraReviewRequest request, OperationalRecordCommandContext context, CancellationToken cancellationToken) => Task.FromResult(previewResult);
         public Task<OperationalRecordResult<JiraIssueDraft>> PreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => Task.FromResult(previewResult);
         public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
@@ -382,6 +397,7 @@ public sealed class OperationalRecordsControllerTests
 
     private sealed class CapturingTransferService(OperationalRecordResult<JiraIssueDraft> previewResult) : IJiraTransferService
     {
+        public Task<OperationalRecordResult<JiraIssueDraft>> ReviewAsync(Guid id, JiraReviewRequest request, OperationalRecordCommandContext context, CancellationToken cancellationToken) => Task.FromResult(previewResult);
         public OperationalRecordCommandContext? Context { get; private set; }
 
         public Task<OperationalRecordResult<JiraIssueDraft>> PreviewAsync(

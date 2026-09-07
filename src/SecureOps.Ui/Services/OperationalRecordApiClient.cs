@@ -41,6 +41,10 @@ public sealed class OperationalRecordApiClient : IOperationalRecordApiClient
             cancellationToken);
 
     /// <inheritdoc />
+    public Task<JiraPreviewResponse> ReviewAsync(Guid id, JiraReviewRequest request, CancellationToken cancellationToken) =>
+        SendAsync<JiraPreviewResponse>(() => _httpClient.PostAsJsonAsync($"{Root}/{id}/jira-review", request, cancellationToken), cancellationToken);
+
+    /// <inheritdoc />
     public Task<JiraTransferResponse> CreateJiraAsync(Guid id, CancellationToken cancellationToken) =>
         // No Idempotency-Key header on purpose — see IOperationalRecordApiClient.
         SendPublicationAsync(

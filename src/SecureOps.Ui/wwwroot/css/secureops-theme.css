@@ -899,6 +899,25 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
     overflow-wrap: anywhere;
 }
 
+.so-request-type {
+    display: block;
+    width: 100%;
+    max-width: 28rem;
+    min-height: 44px;
+    margin-bottom: var(--so-space-3);
+    padding: 8px 12px;
+    border: 1px solid var(--so-border-input);
+    border-radius: 4px;
+    background: var(--so-surface);
+    color: var(--so-text);
+    font: inherit;
+}
+
+.so-request-type:focus-visible {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 2px;
+}
+
 .so-field-empty {
     color: var(--so-text-faint);
 }

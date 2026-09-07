@@ -18,13 +18,23 @@ SecureOps will replace the workflow with typed backend boundaries, a preview-bef
 - Jira creation requires an explicit authorized POST after preview.
 - A deterministic source-record/mapping idempotency key is protected by SQL uniqueness.
 - The Jira issue key is persisted before source close/update.
-- Retry resumes source close when a Jira key exists.
+- Retry resumes source close only when a Jira key exists, persisted close intent is true, and the independent gate and existing write fences permit it.
 - Unknown Jira outcomes and interrupted create ownership require reconciliation; automatic recreation is blocked.
 - Real external write adapters require a later approval and contract review.
 - Reporter policy is explicit: `ProjectDefault` preserves legacy behavior; `AuthenticatedOperator` resolves the server-authenticated actor through the bounded exact Jira user-search boundary, exposes the verified Jira username in preview, and fails closed before create when resolution is absent or ambiguous.
 - The Jira integration credential authenticates REST calls only. It is never used as an operator-reporter fallback, and Jira rejection of the explicit reporter is returned as a stable actionable failure.
 
 ## Consequences
+
+### Confirmed Review Types, 2026-09-07
+
+The owner confirmed Sunucu Talebi and Uygulama Kurulumu as in scope, not as
+automatically eligible. Existing classification enums and the draft service carry
+an explicitly operator-declared, version-bound review without changing source
+evidence or eligibility. No separate approver subsystem is introduced. The
+installation mapping remains blocked rather than inheriting SunucuTalep.
+Only an ordinary authorized, eligible, fresh publication preview can authorize
+create; review-only drafts cannot do so.
 
 ### Independent Source Close, 2026-09-07
 

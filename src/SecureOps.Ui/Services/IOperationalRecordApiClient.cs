@@ -22,6 +22,8 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public interface IOperationalRecordApiClient
 {
+    /// <summary>Builds a non-publishable, version-bound operator declaration.</summary>
+    public Task<JiraPreviewResponse> ReviewAsync(Guid id, JiraReviewRequest request, CancellationToken cancellationToken);
     /// <summary>
     /// Lists operational records.
     /// </summary>

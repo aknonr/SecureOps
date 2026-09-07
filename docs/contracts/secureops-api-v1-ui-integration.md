@@ -6,13 +6,6 @@ ProblemDetails includes safe `code`, `stage`, `retryable`, `correlationId`, and 
 
 ## Access
 
-SDM additive close contract: preview, transfer and record expose
-`sourceCloseRequested`; records also expose effective `sourceCloseEnabled`.
-For `JiraCreated` with false intent show "Jira oluşturuldu. Turuncu Hat kaydı açık
-bırakıldı." Never present Completed or a failed close. `retryEligible` includes
-the persisted intent and current close gate. These fields grant no capability.
-Old preview fingerprints require review after the close-intent fingerprint update.
-
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
 | `GET /api/v1/access/me` | Authenticated | none | status, roles, capabilities, nullable exact profile, latest request, pending request ID, user version, auth source, session policy | 401, `AuditStoreUnavailable` |
@@ -91,6 +84,23 @@ Render recommendation separately from durable workflow state, preserve reason
 order, and localize stable codes without parsing source text. Action Center may
 display this evidence but cannot infer approval or enable corporate publication.
 
+SDM additive close contract: preview, transfer and record expose
+`sourceCloseRequested`; records also expose effective `sourceCloseEnabled`.
+Confirmed `JiraCreated` with false intent has presentation category `SourceOpen`:
+"Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı." Never present Completed,
+failed close, or pending close. `retryEligible` includes persisted intent and the
+current close gate. These fields grant no capability. Old preview fingerprints
+require review after the close-intent fingerprint update.
+
+The review-only request accepts existing enum values `ServerRequest` (0) and
+`SoftwareInstallation` (2), with `expectedVersion`. The additive preview fields
+are `requestType`, `reviewOnly`, `blockingConditions` and `recordVersion`.
+Operator declaration is not source classification: review does not persist a
+classification, set eligibility, or issue a create-authorizing preview token.
+Selection changes discard the draft/confirmation; recoverable errors retain the
+selection. Application-installation label mapping is unresolved and never falls
+back to SunucuTalep. Existing blockers and unresolved identity remain explicit.
+
 `GET /api/v1/operational-records` is a source refresh, not a passive database-only read. It imports/classifies the bounded configured source response and is rate-limited. `Simulation` and legacy `Fake` are Development/Demo/Test-only, `Disabled` fails closed, and `TuruncuHat` is a typed real adapter whose external TEST activation remains contract-gated. `createdAt` is nullable because the reviewed legacy projection does not supply a source timestamp.
 
 `GET /api/v1/health/enterprise-integrations` is Admin-only and exposes only provider selection and safe status; it never exposes URLs, credentials, sessions, identities, or remote payloads.
@@ -100,6 +110,7 @@ display this evidence but cannot infer approval or enable corporate publication.
 | `GET /api/v1/operational-records` | `OperationalRecords.View` | none | `OperationalRecordResponse[]` | `OperationalSourceUnavailable`, `OperationalRecordQueryFailed`, `AuditStoreUnavailable`, 429 |
 | `GET /api/v1/operational-records/{id}` | `OperationalRecords.View` | route GUID | `OperationalRecordResponse` including claim, freshness, retry, and version state | `OperationalRecordNotFound` |
 | `POST /api/v1/operational-records/{id}/jira-preview` | `OperationalRecords.CreateJiraPreview` | no body | `JiraPreviewResponse`; optional `assigneeUsername` is the effective exact mapped assignee; optional `reporterUsername` is the exact Jira user resolved from the server-authenticated operator; never creates Jira or closes source | record state/requester/operator-reporter/Jira validation codes, 429 |
+| `POST /api/v1/operational-records/{id}/jira-review` | `OperationalRecords.CreateJiraPreview` | `{ "requestType": 0, "expectedVersion": 1 }` | review-only `JiraPreviewResponse`, audited; no external dispatch or identity lookup | 409 stale/already-previewed/claimed/known-key/reconciliation state, 422 unsupported type, 403 capability, 429 |
 | `POST /api/v1/operational-records/{id}/jira` | `OperationalRecords.CreateJira` | optional `Idempotency-Key` header, maximum configured length; no reporter input | `JiraTransferResponse` | `ExternalWritesDisabled`, `InvalidIdempotencyKey`, `OperatorReporterResolutionFailed`, `JiraReporterRejected`, `OperationalRecordAlreadyClaimed`, `OperationalRecordChanged`, `OperationalRecordNoLongerOpen`, `WorkflowAlreadyInProgress`, `JiraCreateFailed` |
 | `POST /api/v1/operational-records/{id}/retry` | `OperationalRecords.Retry` | optional `Idempotency-Key` header | resumed `JiraTransferResponse` | `ExternalWritesDisabled`, `WorkflowAlreadyCompleted`, conflict/freshness/Jira/source-close codes |
 

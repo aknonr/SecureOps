@@ -21,6 +21,48 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class OperationalRecordWorkflowHostedTests
 {
     [Fact]
+    public async Task Review_UsesPreviewCapabilityAndVersion_WithoutAuthorizingPublication()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        using HttpClient initial = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        JsonElement access = await initial.GetFromJsonAsync<JsonElement>("/api/v1/access/me");
+        string userId = access.GetProperty("userId").GetString()!;
+        OperationalRecordResponse record = await GetRecordAsync(admin, "SYN-OR-100");
+        string route = $"/api/v1/operational-records/{record.Id}/jira-review";
+        foreach (string role in new[] { "Operator", "ReadOnly" })
+        {
+            JsonElement user = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/users/" + userId);
+            (await admin.PutAsJsonAsync("/api/v1/access/users/" + userId + "/roles",
+                new { roles = new[] { role }, expectedVersion = user.GetProperty("version").GetInt64(), reason = "Synthetic review authorization" })).EnsureSuccessStatusCode();
+            using HttpClient actor = Client(factory, DemoApiAuthentication.TeamLeadActor);
+            foreach (OperationalRecordClassification type in new[] { OperationalRecordClassification.ServerRequest, OperationalRecordClassification.SoftwareInstallation })
+            {
+                HttpResponseMessage response = await actor.PostAsJsonAsync(route, new JiraReviewRequest(type, record.Version));
+                response.StatusCode.Should().Be(role == "ReadOnly" ? HttpStatusCode.Forbidden : HttpStatusCode.OK);
+                if (role == "Operator")
+                {
+                    JiraPreviewResponse review = (await response.Content.ReadFromJsonAsync<JiraPreviewResponse>())!;
+                    review.ReviewOnly.Should().BeTrue();
+                    review.RequestType.Should().Be(type);
+                    review.BlockingConditions.Should().Contain("CategoryPolicyPending");
+                    if (type == OperationalRecordClassification.SoftwareInstallation)
+                    {
+                        review.Labels.Should().BeEmpty();
+                    }
+                }
+            }
+            (await actor.PostAsync($"/api/v1/operational-records/{record.Id}/jira", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+        (await admin.PostAsJsonAsync(route, new JiraReviewRequest(OperationalRecordClassification.ServerRequest, 0))).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await admin.PostAsJsonAsync(route, new JiraReviewRequest(OperationalRecordClassification.ConfigurationRequest, record.Version))).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira", null)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        OperationalRecordResponse unchanged = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
+        unchanged.Classification.Should().Be(record.Classification);
+        unchanged.JiraIssueKey.Should().BeNull();
+    }
+
+    [Fact]
     public void SourceProviderConfiguration_SelectsExplicitImplementation()
     {
         using ServiceProvider fakeServices = Services("Fake");

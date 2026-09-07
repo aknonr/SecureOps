@@ -14,7 +14,7 @@
 *@
 
 <ol class="so-steps" aria-label="Operasyon kaydı ilerlemesi">
-    @for (int index = 0; index < OperationalRecordView.OperatorSteps.Count; index++)
+    @for (int index = 0; index < OperationalRecordView.OperatorSteps.Count - (IncludeSourceClose ? 0 : 1); index++)
     {
         bool done = index < Current;
         bool active = index == Current;
@@ -44,4 +44,8 @@
     /// </summary>
     [Parameter]
     public int Current { get; set; }
+
+    /// <summary>False when source closing is not part of the intended workflow.</summary>
+    [Parameter]
+    public bool IncludeSourceClose { get; set; } = true;
 }

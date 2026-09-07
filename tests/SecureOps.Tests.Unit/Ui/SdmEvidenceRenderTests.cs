@@ -14,6 +14,23 @@ namespace SecureOps.Tests.Unit.Ui;
 public sealed class SdmEvidenceRenderTests
 {
     [Fact]
+    public async Task JiraOnlySteps_DoNotAnnounceAnOutstandingSourceClose()
+    {
+        await using ServiceProvider services = new ServiceCollection().AddLogging().BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        string html = await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            Microsoft.AspNetCore.Components.Web.HtmlRendering.HtmlRootComponent rendered = await renderer.RenderComponentAsync<SoOperatorSteps>(ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(SoOperatorSteps.Current)] = 4,
+                [nameof(SoOperatorSteps.IncludeSourceClose)] = false
+            }));
+            return rendered.ToHtmlString();
+        });
+        System.Net.WebUtility.HtmlDecode(html).Should().NotContain("Kaynak Kaydı Tamamla").And.NotContain("sıradaki adım");
+    }
+
+    [Fact]
     public async Task ReportingWindow_ExposesSelectedTabAsAnAriaBooleanString()
     {
         await using ServiceProvider services = new ServiceCollection().AddLogging().BuildServiceProvider();
@@ -51,7 +68,7 @@ public sealed class SdmEvidenceRenderTests
             return rendered.ToHtmlString();
         });
         string decoded = System.Net.WebUtility.HtmlDecode(html);
-        decoded.Should().Contain("SDM kategori politikası onaylanmadı").And.Contain("bu ekrandan onay verilemez");
+        decoded.Should().Contain("Sunucu Talebi ve Uygulama Kurulumu kapsamda").And.Contain("Talep türü seçimi yayımlama onayı yerine geçmez");
         decoded.Should().Contain("Sunucu veya IP kanıtı yok").And.NotContain("<button");
         SdmEvidenceView.SameSource(record, record with { Version = 9 }).Should().BeTrue();
         SdmEvidenceView.SameSource(record, record with { Description = "Changed" }).Should().BeFalse();

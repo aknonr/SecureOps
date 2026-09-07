@@ -47,6 +47,15 @@ public static class UiProblemFactory
         {
             mapped = ReconciliationRequired(code ?? OperationalErrorCodes.WorkflowConflict);
         }
+        else if (string.Equals(stage, "application-mapping", StringComparison.Ordinal))
+        {
+            mapped = mapped with
+            {
+                Title = "Uygulama Kurulumu eşlemesi eksik",
+                Explanation = "Bu talep türünün Jira etiket eşlemesi doğrulanmadı. SunucuTalep ile yayımlanamaz.",
+                NextSteps = ["Süreç sahibinden Uygulama Kurulumu için onaylı alan ve etiket eşlemesini isteyin."]
+            };
+        }
 
         // The API's own retryable flag wins when present: it reflects server-side knowledge of whether
         // the durable workflow can safely accept the same command again.

@@ -42,6 +42,13 @@ VALUES('20000000-0000-0000-0000-000000000001','123','OR-123','Synthetic upgrade 
 '@
     Invoke-ResourceTestSql -File '009-sdm-evaluation-foundation.sql'
     Invoke-ResourceTestSql -File '010-resource-catalogue.sql'
+    Invoke-ResourceTestSql -Query @'
+INSERT INTO ops.JiraTransfers(JiraTransferId,OperationalRecordId,MappingVersion,IdempotencyKey,CreatedByActor,CreatedAt,UpdatedAt)
+VALUES(NEWID(),'20000000-0000-0000-0000-000000000001','synthetic-legacy',REPLICATE('a',64),'synthetic:upgrade',SYSUTCDATETIME(),SYSUTCDATETIME());
+INSERT INTO ops.OperationalRecordWorkflowHistory(OperationalRecordId,WorkflowState,Actor,CorrelationId,OccurredAt)
+VALUES('20000000-0000-0000-0000-000000000001','NeedsManualReview','synthetic:upgrade','synthetic',SYSUTCDATETIME());
+'@
+    Invoke-ResourceTestSql -File '011-independent-source-close.sql'
     Invoke-ResourceTestSql -File '011-independent-source-close.sql'
     Invoke-ResourceTestSql -Query @'
 IF NOT EXISTS(SELECT 1 FROM ops.OperationalRecords WHERE OperationalRecordId='20000000-0000-0000-0000-000000000001'
@@ -49,6 +56,9 @@ IF NOT EXISTS(SELECT 1 FROM ops.OperationalRecords WHERE OperationalRecordId='20
     THROW 51091, 'Pre-upgrade SDM row was not preserved.', 1;
 IF EXISTS(SELECT 1 FROM resources.Links) OR EXISTS(SELECT 1 FROM resources.Categories) OR EXISTS(SELECT 1 FROM resources.PersonalPreferences)
     THROW 51092, 'Migration must not seed catalogue or personal data.', 1;
+IF EXISTS(SELECT 1 FROM ops.JiraTransfers WHERE SourceCloseRequested<>0)
+    OR EXISTS(SELECT 1 FROM ops.OperationalRecordWorkflowHistory WHERE SourceCloseRequested<>0)
+    THROW 51094, 'Legacy transfers must not gain close intent.', 1;
 IF EXISTS(SELECT 1 FROM sys.triggers WHERE name IN ('TR_AuditLog_AppendOnly','TR_OperationalRecordWorkflowHistory_AppendOnly') AND is_disabled=1)
     THROW 51093, 'Append-only protection is disabled.', 1;
 '@

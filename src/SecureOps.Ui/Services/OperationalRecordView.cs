@@ -175,6 +175,7 @@ public static class OperationalRecordView
         OperationalRecordPresentationStates.NeedsAttention => "İnceleme Gerekiyor",
         OperationalRecordPresentationStates.Actionable => "Jira'ya Aktarılabilir",
         OperationalRecordPresentationStates.InProgress => "İşlemde",
+        OperationalRecordPresentationStates.SourceOpen => "Jira var, kaynak açık",
         OperationalRecordPresentationStates.Completed => "Tamamlandı",
         _ => "Durum bilinmiyor"
     };
@@ -187,6 +188,7 @@ public static class OperationalRecordView
         OperationalRecordPresentationStates.NeedsAttention => SoStatusBadge.BadgeTone.Caution,
         OperationalRecordPresentationStates.Actionable => SoStatusBadge.BadgeTone.Info,
         OperationalRecordPresentationStates.InProgress => SoStatusBadge.BadgeTone.Info,
+        OperationalRecordPresentationStates.SourceOpen => SoStatusBadge.BadgeTone.Neutral,
         OperationalRecordPresentationStates.Completed => SoStatusBadge.BadgeTone.Positive,
         _ => SoStatusBadge.BadgeTone.Neutral
     };
@@ -199,6 +201,7 @@ public static class OperationalRecordView
         OperationalRecordPresentationStates.NeedsAttention => Icons.Material.Filled.ReportProblem,
         OperationalRecordPresentationStates.Actionable => Icons.Material.Filled.PlayCircleOutline,
         OperationalRecordPresentationStates.InProgress => Icons.Material.Filled.Sync,
+        OperationalRecordPresentationStates.SourceOpen => Icons.Material.Filled.PauseCircleOutline,
         OperationalRecordPresentationStates.Completed => Icons.Material.Filled.TaskAlt,
         _ => Icons.Material.Filled.HelpOutline
     };

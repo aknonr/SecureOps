@@ -52,9 +52,11 @@ public sealed partial class ResourceSqlTests
         persisted.WorkflowState.Should().Be(OperationalRecordWorkflowState.JiraCreated);
         persisted.SourceCloseRequested.Should().BeFalse();
         persisted.LastErrorCode.Should().BeNull();
+        persisted.RetryCount.Should().Be(0);
         await jira.Received(1).CreateIssueAsync(Arg.Any<JiraIssueDraft>(), Arg.Any<CancellationToken>());
         await client.DidNotReceive().CloseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await using SqlConnection connection = new(configuration.GetConnectionString("SecureOpsDb"));
+        (await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM ops.OperationalRecordWorkflowHistory WHERE OperationalRecordId=@Id AND WorkflowState='JiraCreated'", new { record.Id })).Should().Be(1);
         (await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM ops.OperationalRecordWorkflowHistory WHERE OperationalRecordId=@Id AND WorkflowState IN ('ClosingOperationalRecord','Completed','OperationalRecordCloseFailed')", new { record.Id })).Should().Be(0);
         await repository.TryClaimAsync(record.Id, context.Actor, TimeSpan.FromMinutes(2), unique, _token);
         (await repository.TryAcquireCloseAsync(record.Id, context.Actor, unique, _token)).Disposition.Should().Be(WorkflowAcquireDisposition.InvalidState);

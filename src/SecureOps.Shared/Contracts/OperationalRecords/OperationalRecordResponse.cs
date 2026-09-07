@@ -71,6 +71,8 @@ public static class OperationalRecordPresentationStates
     public const string Actionable = "Actionable";
     /// <summary>A claimed create or source-completion stage is underway.</summary>
     public const string InProgress = "InProgress";
+    /// <summary>Jira creation is confirmed; source closing was deliberately not requested.</summary>
+    public const string SourceOpen = "SourceOpen";
     /// <summary>Jira creation and source completion are confirmed.</summary>
     public const string Completed = "Completed";
 }

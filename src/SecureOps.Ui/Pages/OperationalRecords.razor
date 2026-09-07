@@ -205,6 +205,9 @@
         /// <summary>In flight or not yet ready.</summary>
         InProgress,
 
+        /// <summary>Jira exists; source closing was deliberately not requested.</summary>
+        SourceOpen,
+
         /// <summary>Transfer finished.</summary>
         Completed
     }
@@ -214,6 +217,7 @@
         RecordGroup.NeedsAttention,
         RecordGroup.Actionable,
         RecordGroup.InProgress,
+        RecordGroup.SourceOpen,
         RecordGroup.Completed
     ];
 
@@ -249,6 +253,7 @@
     {
         OperationalRecordPresentationStates.Actionable => RecordGroup.Actionable,
         OperationalRecordPresentationStates.InProgress => RecordGroup.InProgress,
+        OperationalRecordPresentationStates.SourceOpen => RecordGroup.SourceOpen,
         OperationalRecordPresentationStates.Completed => RecordGroup.Completed,
         _ => RecordGroup.NeedsAttention
     };
@@ -281,6 +286,7 @@
     {
         RecordGroup.Actionable => OperationalRecordPresentationStates.Actionable,
         RecordGroup.InProgress => OperationalRecordPresentationStates.InProgress,
+        RecordGroup.SourceOpen => OperationalRecordPresentationStates.SourceOpen,
         RecordGroup.Completed => OperationalRecordPresentationStates.Completed,
         _ => OperationalRecordPresentationStates.NeedsAttention
     };

@@ -13,6 +13,53 @@ namespace SecureOps.Tests.Unit.OperationalRecords;
 public sealed class JiraIssueDraftServiceTests
 {
     [Theory]
+    [InlineData(OperationalRecordClassification.ServerRequest)]
+    [InlineData(OperationalRecordClassification.SoftwareInstallation)]
+    public async Task BuildReview_ConfirmedTypes_RemainDeclarationsWithoutEligibilityOrIdentityLookup(OperationalRecordClassification type)
+    {
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
+        record = record with
+        {
+            JiraEligible = false,
+            Classification = OperationalRecordClassification.NeedsManualReview,
+            WorkflowState = OperationalRecordWorkflowState.NeedsManualReview
+        };
+        var resolver = new StubResolver(RequesterResolutionResult.Found("jira-requester"));
+        JiraIssueDraftService service = CreateService(resolver, "Block");
+        JiraIssueDraft review = service.BuildReview(record, type);
+        review.ReviewOnly.Should().BeTrue();
+        review.RequestType.Should().Be(type);
+        review.RecordVersion.Should().Be(record.Version);
+        review.BlockingConditions.Should().Contain(["CategoryPolicyPending", "OperatorDeclarationOnly", "RequesterUnresolved"]);
+        if (type == OperationalRecordClassification.SoftwareInstallation)
+        {
+            review.FieldMapping.Labels.Should().BeEmpty();
+            review.BlockingConditions.Should().Contain("ApplicationMappingPending");
+        }
+        else
+        {
+            review.FieldMapping.Labels.Should().NotBeEmpty();
+        }
+        resolver.Identities.Should().BeEmpty();
+        (await service.BuildAsync(record, "synthetic", CancellationToken.None)).IsSuccess.Should().BeFalse();
+        service.BuildReview(record with { SourceConcurrencyToken = "source:changed" }, type).IdempotencyKey.Should().NotBe(review.IdempotencyKey);
+        service.BuildReview(record, type == OperationalRecordClassification.ServerRequest
+            ? OperationalRecordClassification.SoftwareInstallation : OperationalRecordClassification.ServerRequest).IdempotencyKey.Should().NotBe(review.IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task BuildAsync_InstallationEvenWhenEligible_DoesNotFallBackToServerLabels()
+    {
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
+        JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.Found("synthetic")), "Block");
+        OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record with
+        { Classification = OperationalRecordClassification.SoftwareInstallation }, "synthetic", CancellationToken.None);
+        result.Failure!.Stage.Should().Be("application-mapping");
+        Action unsupported = () => service.BuildReview(record, OperationalRecordClassification.EnvironmentRequest);
+        unsupported.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData(" ")]

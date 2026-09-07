@@ -89,7 +89,9 @@ OperationalRecordView.Ownership owner =
         @* Where this transfer has got to, in the operator's own sequence rather than in workflow
            state names. Derived from durable state, so it survives a refresh and agrees between
            two operators looking at the same record. *@
-        <SoOperatorSteps Current="@OperationalRecordView.CurrentStep(_record)" />
+        <SoOperatorSteps Current="@OperationalRecordView.CurrentStep(_record)"
+                         IncludeSourceClose="@(_record.SourceCloseRequested || _record.WorkflowState == OperationalRecordWorkflowState.Completed
+                             || (!OperationalRecordView.HasJira(_record) && _record.SourceCloseEnabled))" />
 
         @if (_result is not null)
         {
@@ -173,6 +175,23 @@ OperationalRecordView.Ownership owner =
         }
 
         <SoSdmEvidence Record="_record" />
+
+        @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview)
+            && _record.WorkflowState is OperationalRecordWorkflowState.Imported or OperationalRecordWorkflowState.Classified
+                or OperationalRecordWorkflowState.NeedsManualReview or OperationalRecordWorkflowState.Eligible)
+        {
+            <section class="so-panel">
+                <h2 class="so-panel-title">Talep incelemesi</h2>
+                <label for="sdm-request-type" class="so-field-label">Talep türü (operatör beyanı)</label>
+                <select id="sdm-request-type" class="so-request-type" @bind="_declaredType" @bind:after="ClearReviewDraft" disabled="@_busy" data-sdm-review-type>
+                    <option value="">Tür seçilmedi</option>
+                    <option value="ServerRequest">Sunucu Talebi</option>
+                    <option value="SoftwareInstallation">Uygulama Kurulumu</option>
+                </select>
+                <MudButton StartIcon="@Icons.Material.Filled.Preview" Variant="Variant.Outlined" Color="Color.Primary"
+                           Disabled="@(_busy || _declaredType is null)" OnClick="ReviewAsync">İnceleme taslağı hazırla</MudButton>
+            </section>
+        }
 
         @if (_record.WorkflowState == OperationalRecordWorkflowState.JiraCreated && !_record.SourceCloseRequested)
         {
@@ -421,6 +440,9 @@ OperationalRecordView.Ownership owner =
                     @* The backend's mapping, rendered verbatim. No mapping rule is reproduced here. *@
                     <SoFieldGrid MinColumnWidth="200px">
                         <SoField Label="Proje">@_preview.ProjectKey</SoField>
+                        <SoField Label="Talep türü">@SdmEvidenceView.RequestTypeLabel(_preview.RequestType)</SoField>
+                        <SoField Label="Türün dayanağı">@(_preview.ReviewOnly ? "Operatör beyanı; kaynak doğrulaması değil" : _record.SimulationMode ? "Yalıtılmış sentetik test" : "Kayıt değerlendirmesi")</SoField>
+                        <SoField Label="Kaynak kapatma">@(_preview.SourceCloseRequested ? "Jira sonrasında kapatma denenecek" : "Turuncu Hat kaydı açık bırakılacak")</SoField>
                         <SoField Label="Kayıt tipi">@_preview.IssueType</SoField>
                         @if (!string.IsNullOrWhiteSpace(_preview.IssueTypeId))
                         {
@@ -475,12 +497,23 @@ OperationalRecordView.Ownership owner =
                     }
                 }
 
+                @if (_preview?.ReviewOnly == true)
+                {
+                    <MudAlert Severity="Severity.Warning">Bu inceleme taslağı yayımlanamaz.</MudAlert>
+                    <ul>
+                        @foreach (string blocker in _preview.BlockingConditions.Except(_record.BlockingConditions, StringComparer.Ordinal))
+                        {
+                            <li>@SdmEvidenceView.Guidance(blocker)</li>
+                        }
+                    </ul>
+                }
+
                 <div class="so-panel-actions so-panel-actions--wrap">
                     @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
                     {
                         <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                                    StartIcon="@Icons.Material.Filled.Preview"
-                                   Disabled="@(_busy || !actions.Preview)"
+                                   Disabled="@(_busy || !actions.Preview || _declaredType is not null)"
                                    OnClick="PreviewAsync">
                             Jira Taslağını Önizle
                         </MudButton>
@@ -493,7 +526,7 @@ OperationalRecordView.Ownership owner =
 <MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                                        StartIcon="@Icons.Material.Filled.AddTask"
-                                       Disabled="@(_busy || !actions.Create || _preview is null)"
+                                       Disabled="@(_busy || !actions.Create || _preview is null || _preview.ReviewOnly || _declaredType is not null)"
                                        OnClick="CreateAsync">
                                 Jira Kaydı Oluştur
                             </MudButton>
@@ -555,6 +588,7 @@ OperationalRecordView.Ownership owner =
     private AccessSnapshot? _access;
     private OperationalRecordResponse? _record;
     private JiraPreviewResponse? _preview;
+    private OperationalRecordClassification? _declaredType;
     private UiProblem? _loadProblem;
     private UiProblem? _actionProblem;
     private string? _result;
@@ -685,9 +719,33 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         await LoadAsync(clearAction: false);
     }
 
+    private void ClearReviewDraft()
+    {
+        _preview = null;
+        _result = null;
+        _actionProblem = null;
+    }
+
+    private async Task ReviewAsync()
+    {
+        if (_busy || _record is null || _declaredType is null) return;
+        _busy = true;
+        _busyMessage = "İnceleme taslağı hazırlanıyor…";
+        _preview = null;
+        _result = null;
+        _actionProblem = null;
+        try
+        {
+            _preview = await Records.ReviewAsync(RecordId, new(_declaredType.Value, _record.Version), CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex) { _actionProblem = ex.Problem; }
+        finally { _busy = false; }
+        await LoadAsync(clearAction: false);
+    }
+
     private async Task CreateAsync()
     {
-        if (_busy || _record is null || _preview is null)
+        if (_busy || _record is null || _preview is null || _preview.ReviewOnly || _declaredType is not null)
         {
             return;
         }

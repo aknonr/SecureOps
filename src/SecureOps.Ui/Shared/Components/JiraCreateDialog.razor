@@ -54,6 +54,7 @@
 
             <SoFieldGrid MinColumnWidth="180px">
                 <SoField Label="Proje">@Preview.ProjectKey</SoField>
+                <SoField Label="Talep türü">@SdmEvidenceView.RequestTypeLabel(Preview.RequestType)</SoField>
                 <SoField Label="Kayıt tipi">@Preview.IssueType</SoField>
                 <SoField Label="Raporlayıcı">@(Preview.ReporterUsername ?? "Proje varsayılanı")</SoField>
                 <SoField Label="Atanacak kişi">@(Preview.AssigneeUsername ?? "Proje varsayılanı")</SoField>

@@ -15,7 +15,17 @@ public sealed record JiraIssueDraft(
     JiraIssueFieldMapping FieldMapping,
     string? AssigneeUsername = null,
     string? ReporterUsername = null,
-    bool SourceCloseRequested = false);
+    bool SourceCloseRequested = false)
+{
+    /// <summary>Existing source classification or explicitly declared review type.</summary>
+    public SecureOps.Domain.OperationalRecords.OperationalRecordClassification? RequestType { get; init; }
+    /// <summary>True only for an operator-declared, non-publishable review draft.</summary>
+    public bool ReviewOnly { get; init; }
+    /// <summary>Safe existing evaluation and mapping blockers.</summary>
+    public IReadOnlyList<string> BlockingConditions { get; init; } = [];
+    /// <summary>Loaded source/workflow version used for review.</summary>
+    public long RecordVersion { get; init; }
+}
 
 /// <summary>Validated create fields shared by the preview and Jira adapter.</summary>
 public sealed record JiraIssueFieldMapping(

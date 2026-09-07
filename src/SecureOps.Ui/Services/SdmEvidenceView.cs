@@ -5,16 +5,26 @@ namespace SecureOps.Ui.Services;
 /// <summary>Operator guidance for stable SDM evidence codes, without deriving eligibility.</summary>
 public static class SdmEvidenceView
 {
+    /// <summary>Labels existing classification values; not a classifier.</summary>
+    public static string RequestTypeLabel(SecureOps.Domain.OperationalRecords.OperationalRecordClassification? type) => type switch
+    {
+        SecureOps.Domain.OperationalRecords.OperationalRecordClassification.ServerRequest => "Sunucu Talebi",
+        SecureOps.Domain.OperationalRecords.OperationalRecordClassification.SoftwareInstallation => "Uygulama Kurulumu",
+        _ => "Doğrulanmış talep türü yok"
+    };
     /// <summary>Explains the evidence or decision needed to resolve a condition.</summary>
     public static string Guidance(string code) => code switch
     {
-        "CategoryPolicyPending" => "SDM kategori politikası onaylanmadı. Süreç sahibinin hangi kategorilerin yayımlanabileceğini belirlemesi gerekiyor.",
+        "OperatorDeclarationOnly" => "Talep türü operatör beyanıdır; kaynak kanıtı, altyapı kapsamı veya yayımlama onayı değildir.",
+        "ApplicationMappingPending" => "Uygulama Kurulumu için Jira etiket eşlemesi doğrulanmadı. SunucuTalep kullanılmaz; süreç sahibi eşlemeyi belirlemeli.",
+        "JiraMappingPending" => "Jira alan eşlemesi eksik. Proje, kayıt tipi, ilgili grup ve etiketlerin onaylı eşlemesi gerekiyor.",
+        "CategoryPolicyPending" => "Sunucu Talebi ve Uygulama Kurulumu kapsamda. Kayıt bazında yayımlama koşulları henüz onaylanmadı.",
         "CategoryUnknown" or "CategoryUnsupported" => "Kategori doğrulanamadı veya kapsam dışında. Kaynak kategorisi ve onaylı politika birlikte incelenmeli.",
         "GroupUnproven" or "GroupOutOfScope" => "İlgili grup kapsamı doğrulanmadı. Kayıt bazında yetkili grup kanıtı gerekiyor.",
         "DccUnproven" or "ExcludedDcc" => "DCC kapsamı doğrulanmadı veya hariç tutulmuş. Süreç sahibi kayıt kapsamını doğrulamalı.",
         "RequesterMissing" or "RequesterUnresolved" or "RequesterAmbiguous" => "Talep eden kişi tek bir hesapla eşleştirilemedi. Kaynak bilgisi ve onaylı tam hesap eşlemesi doğrulanmalı.",
         "ReporterUnresolved" => "Raporlayıcı eşlemesi doğrulanmadı. Yetkili kullanıcının onaylı hesap eşlemesi gerekiyor.",
-        "ApprovalRequired" => "Yayımlama onayı yok. Onay yetkisi ve süreci henüz tanımlanmadığından bu ekrandan onay verilemez.",
+        "ApprovalRequired" => "Yayımlama için gerekli iş kararı doğrulanmadı. Talep türü seçimi yayımlama onayı yerine geçmez.",
         "ExternalWritesDisabled" => "Bu ortamda dış sistemlere yazma kapalı. Ayrı ortam aktivasyon onayı gerekiyor.",
         "SourceChanged" or "EvaluationStale" => "Kaynak değişti veya değerlendirme güncel değil. Güncel kaydı inceleyin; yenileme yayımlama onayı vermez.",
         "ReconciliationRequired" => "Önceki yayımlamanın sonucu belirsiz. Destek referansıyla mutabakat isteyin; yeni kayıt oluşturmayın.",

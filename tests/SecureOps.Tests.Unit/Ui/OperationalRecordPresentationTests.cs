@@ -20,6 +20,7 @@ public sealed class OperationalRecordPresentationTests
     [InlineData(OperationalRecordPresentationStates.NeedsAttention, "İnceleme Gerekiyor")]
     [InlineData(OperationalRecordPresentationStates.Actionable, "Jira'ya Aktarılabilir")]
     [InlineData(OperationalRecordPresentationStates.InProgress, "İşlemde")]
+    [InlineData(OperationalRecordPresentationStates.SourceOpen, "Jira var, kaynak açık")]
     [InlineData(OperationalRecordPresentationStates.Completed, "Tamamlandı")]
     public void PresentationLabels_FollowTheDocumentedMapping(string state, string expected)
     {

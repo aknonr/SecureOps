@@ -21,13 +21,35 @@ rc6.11 and earlier packages do not contain this implementation or migration.
 Local verification for the gate increment: Release build 0 warnings/errors;
 281 affected unit/UI cases and 37 hosted/controller/SQL cases passed, including
 four real isolated LocalDB cases. OpenAPI generation/compatibility passed.
-Interactive UI and request-type review verification follow in the same task.
+The subsequent request-type increment passed interactive SQL/Simulation browser
+journeys at 1440x900 and 390x844. Full integration: 245 passed, including all ten
+real LocalDB cases with no skips. Final presentation regressions: 66 targeted unit
+and 18 controller/OpenAPI cases passed. Canonical handoff contains exact evidence.
 
 The backend foundation is implemented for TEST validation. Codex owns API, services, integration boundaries, persistence, SQL, authorization, audit, release packaging, and backend tests. Claude owns all Blazor/Razor/CSS/UI work and does not need to change this module.
 
 Typed Turuncu Hat and corporate Jira adapters are implemented behind the existing boundaries and remain disabled by default. Paired `Simulation` selects the explicit deterministic no-network Development/Demo/Test workflow harness; legacy `Fake` remains for compatibility. The real Turuncu Hat read-only path is deployed and verified in TEST at source `0ec0376`; Jira creation and Turuncu Hat completion remain blocked until their separate write contracts and activation gate are approved. The canonical deployed evidence is recorded in `docs/24-api-test-deployment-readiness.md`.
 
 ## Legacy Workflow Replacement
+
+### Operator-Declared Request-Type Review
+
+The additive `SourceOpen` presentation category identifies confirmed Jira-only
+success without labelling source completion or an in-flight close. List and detail
+use this category; the progress display omits a close step that was not requested.
+
+The confirmed choices are ServerRequest (Sunucu Talebi) and SoftwareInstallation
+(Uygulama Kurulumu). `POST /{id}/jira-review` uses the existing preview capability,
+the loaded record version and the same draft mapping service. It is a review-only
+draft, not a saved source classification, approval, or publication preview. The
+declaration is audited with its bounded source fingerprint/version, never inferred
+from keywords. It does not change evaluation evidence or acquire a create token.
+Changing choices discards the local preview/confirmation. Existing blockers plus
+CategoryPolicyPending remain; no remote identity result is fabricated. The known
+server label mapping can be displayed, but software-installation labels remain
+empty with ApplicationMappingPending. Normal create/preview also rejects an
+application-installation classification until its mapping is established.
+There is no new approval subsystem or path from review choice to eligibility.
 
 The original Operational Record/Jira PowerShell script was supplied outside the
 repository and reviewed as source on 2026-09-07. Discovery is resolved; provenance,
