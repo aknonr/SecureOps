@@ -16,7 +16,7 @@
             <MudIconButton Icon="@Icons.Material.Outlined.DashboardCustomize" aria-label="Çalışma alanını düzenle" title="Çalışma alanını düzenle"
                            data-guide="personalize" Disabled="@(_busy || _preferences is null)" OnClick="OpenLayoutAsync" />
             <MudTooltip Text="Yenile"><MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="Yenile"
-                Disabled="@(_query.Loading || _busy)" OnClick="ReloadAsync" /></MudTooltip>
+                Disabled="@(_query.Loading || _busy || _reloading)" OnClick="ReloadAsync" /></MudTooltip>
         </Actions>
     </SoPageHeader>
 
@@ -64,6 +64,7 @@
         </section>
 
         @if (_actionProblem is not null) { <SoProblemPanel Problem="_actionProblem" /> }
+        @if (_reloading) { <SoLoading Message="Bağlantılar ve kişisel tercihler yenileniyor…" /> }
         @if (_actionNotice is not null) { <p class="so-workspace-notice" role="status">@_actionNotice</p> }
         @if (_preferencesProblem is not null) { <SoProblemPanel Problem="_preferencesProblem" OnRetry="LoadPreferencesAsync" /> }
         @if (_categoriesProblem is not null) { <SoProblemPanel Problem="_categoriesProblem" OnRetry="LoadCategoriesAsync" /> }
@@ -129,7 +130,7 @@
     private IReadOnlyList<ResourceCategory> _categories = [];
     private readonly ResourceQueryState _query = new();
     private UiProblem? _actionProblem, _preferencesProblem, _categoriesProblem;
-    private bool _busy, _favouritesOnly;
+    private bool _busy, _favouritesOnly, _reloading;
     private readonly ResourceSelectionState _selection = new();
     private IReadOnlyList<ResourceLink>? _resolvedLinks;
     private string? _actionNotice;
@@ -156,9 +157,17 @@
 
     private async Task ReloadAsync()
     {
-        await LoadCategoriesAsync();
-        await LoadPreferencesAsync();
-        await SearchAsync();
+        if (_reloading) return;
+        _reloading = true;
+        try
+        {
+            await LoadCategoriesAsync();
+            StateHasChanged();
+            await LoadPreferencesAsync();
+            StateHasChanged();
+            await SearchAsync();
+        }
+        finally { _reloading = false; }
     }
 
     private async Task LoadCategoriesAsync()

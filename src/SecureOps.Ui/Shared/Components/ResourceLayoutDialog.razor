@@ -4,6 +4,7 @@
 <MudDialog Class="so-dialog so-resource-dialog" DefaultFocus="DefaultFocus.FirstChild">
     <TitleContent><div class="so-dialog-title"><MudIcon Icon="@Icons.Material.Outlined.DashboardCustomize" /><span>Çalışma alanını düzenle</span></div></TitleContent>
     <DialogContent>
+        <ResourceHelp Surface="personalize" Disabled="@_state.Saving" />
         <div class="so-workspace-fields" data-guide="layout-fields">
             <label class="so-field"><span>Görünüm</span><select aria-label="Görünüm" @bind="_view"><option value="cards">Kart</option><option value="list">Liste</option></select></label>
             <label class="so-field"><span>Yoğunluk</span><select aria-label="Yoğunluk" @bind="_density"><option value="comfortable">Rahat</option><option value="compact">Kompakt</option></select></label>
@@ -26,7 +27,7 @@
     <DialogActions>
         <MudButton StartIcon="@Icons.Material.Filled.RestartAlt" Disabled="@(!_state.CanSubmit)" OnClick="ResetAsync">Düzeni sıfırla</MudButton>
         <MudButton Disabled="_state.Saving" OnClick="() => Dialog.Cancel()">Vazgeç</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_state.CanSubmit)" OnClick="SaveAsync">Kaydet</MudButton>
+        <MudButton data-guide="layout-save" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_state.CanSubmit)" OnClick="SaveAsync">Kaydet</MudButton>
     </DialogActions>
 </MudDialog>
 

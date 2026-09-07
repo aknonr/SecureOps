@@ -21,7 +21,7 @@
     re-read rather than patched locally.
 *@
 
-<div class="so-page">
+<div class="so-page so-request-review">
     <SoPageHeader Title="@HeaderTitle" Lead="@HeaderLead">
         <Actions>
             <MudButton Variant="Variant.Text" Size="Size.Small"
@@ -174,30 +174,44 @@ OperationalRecordView.Ownership owner =
             </section>
         }
 
-        <SoSdmEvidence Record="_record" />
+        <section class="so-review-summary" data-guide="review-summary">
+            <h2 class="so-panel-title">Talep incelemesi</h2>
+            <p><strong>@_record.OrCode</strong> · @_record.Title</p>
+            <p class="so-review-description">@_record.Description</p>
+            <SoStatusBadge Label="@OperationalRecordView.StateLabel(_record)" Tone="@OperationalRecordView.StateTone(_record)" />
+        </section>
+        <ResourceHelp Surface="review" Disabled="@_busy" />
 
         @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview)
             && _record.WorkflowState is OperationalRecordWorkflowState.Imported or OperationalRecordWorkflowState.Classified
                 or OperationalRecordWorkflowState.NeedsManualReview or OperationalRecordWorkflowState.Eligible)
         {
-            <section class="so-panel">
-                <h2 class="so-panel-title">Talep incelemesi</h2>
+            <section class="so-review-type" data-guide="review-type">
+                <h2 class="so-panel-title">Talep türü</h2>
                 <label for="sdm-request-type" class="so-field-label">Talep türü (operatör beyanı)</label>
                 <select id="sdm-request-type" class="so-request-type" @bind="_declaredType" @bind:after="ClearReviewDraft" disabled="@_busy" data-sdm-review-type>
-                    <option value="">Tür seçilmedi</option>
+                    <option value="">Doğrulanmadı / kapsam dışı</option>
                     <option value="ServerRequest">Sunucu Talebi</option>
                     <option value="SoftwareInstallation">Uygulama Kurulumu</option>
                 </select>
+                <p>Yalnızca Sunucu Talebi ve Uygulama Kurulumu türleri doğrulanmıştır. Sunucu emekliliği gibi diğer talepler kapsam dışı incelemede kalır. Tür seçimi onay veya yayımlama uygunluğu değildir.</p>
+                @if (_declaredType is null) { <p role="status">Tür doğrulanmadan taslak hazırlanmaz. Talep bu iki türden değilse zorlamayın; kapsam kararını yetkili süreç sahibinden isteyin.</p> }
                 <MudButton StartIcon="@Icons.Material.Filled.Preview" Variant="Variant.Outlined" Color="Color.Primary"
                            Disabled="@(_busy || _declaredType is null)" OnClick="ReviewAsync">İnceleme taslağı hazırla</MudButton>
             </section>
         }
+        else if (!_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
+        { <p>İnceleme taslağı hazırlamak için Jira önizleme yetkisi gerekir. Kayıt ve engelleri aşağıda inceleyebilirsiniz.</p> }
+
+        <SoSdmEvidence Record="_record" />
 
         @if (_record.WorkflowState == OperationalRecordWorkflowState.JiraCreated && !_record.SourceCloseRequested)
         {
             <MudAlert Severity="Severity.Success" role="status">Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı.</MudAlert>
         }
 
+        <details class="so-review-technical">
+            <summary>Kaynak ayrıntıları ve WASAS iş akışı</summary>
         <div class="so-detail-grid">
             @* ---------------------------------------------------------------- SOURCE *@
             <section class="so-panel">
@@ -377,8 +391,10 @@ OperationalRecordView.Ownership owner =
             </section>
 
             @* ------------------------------------------------------------------ JIRA *@
-            <section class="so-panel">
-                <h2 class="so-panel-title">Jira aktarımı</h2>
+        </div>
+        </details>
+            <section class="so-review-preview" data-guide="review-preview">
+                <h2 class="so-panel-title">Önizleme ve işlem</h2>
 
                 @if (OperationalRecordView.HasJira(_record))
                 {
@@ -576,7 +592,6 @@ OperationalRecordView.Ownership owner =
                     <SoLoading Message="@_busyMessage" Bare="true" />
                 }
             </section>
-        </div>
     }
 </div>
 

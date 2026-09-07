@@ -3,393 +3,143 @@
 @implements IDisposable
 @inject ICurrentAccessProvider AccessProvider
 @inject IOperationalRecordApiClient Records
-@inject IIdentityLookupApiClient Identity
 
 <PageTitle>Operasyonel Kayıtlar · @WasasBrand.Name</PageTitle>
-
-@*
-    The Operational Record → Jira workspace.
-
-    Two things about this list are easy to get wrong:
-
-    GET /operational-records is a *source refresh*, not a passive read — it imports and classifies
-    from the source and is rate-limited. So there is no polling here, and Yenile is a deliberate
-    action the operator takes, not something the page does on a timer.
-
-    Grouping is by "does this need me", not by workflow order. An operator scanning the list is
-    asking which records are stuck or unresolved, and a stage-ordered list buries those among the
-    completed ones.
-*@
-
-<div class="so-page">
-    <SoPageHeader Title="Operasyonel Kayıtlar"
-                  Lead="Turuncu Hat üzerinden gelen uygun operasyon kayıtlarını inceleyebilir, Jira kaydı taslağını kontrol edebilir ve uygun kayıtları Jira'ya aktarabilirsiniz.">
-        <Actions>
-            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Refresh"
-                       Disabled="@_loading"
-                       OnClick="LoadAsync">
-                Yenile
-            </MudButton>
-        </Actions>
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Operasyonel Kayıtlar">
+        <Actions><MudButton StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Outlined" Disabled="@(_refreshing || _loading || _access?.Can(Capabilities.OperationalRecordsView) != true)"
+            OnClick="RefreshSourceAsync">Kaynağı yenile</MudButton></Actions>
     </SoPageHeader>
-
-    @if (_access is null)
-    {
-        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
-    }
-    else if (!_access.IsResolved)
-    {
-        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" />
-    }
+    @if (_access is null) { <SoLoading Message="Yetkileriniz doğrulanıyor…" /> }
+    else if (!_access.IsResolved) { <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" /> }
     else if (!_access.Can(Capabilities.OperationalRecordsView))
     {
-        <section class="so-panel so-panel--blocked">
-            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
-            <p class="so-panel-text">
-                Operasyonel kayıtları görüntülemek için
-                <code class="so-code">@Capabilities.OperationalRecordsView</code> yetkisi gerekir.
-                Hesabınızda tanımlı yetkileri
-                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
-            </p>
-        </section>
+        <section class="so-panel--blocked"><h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2><p>Operasyonel kayıt görüntüleme yetkisi gerekir. <a href="access/me">Erişimim</a></p></section>
     }
     else
     {
-        @* Reported by the records themselves. If the configured providers are simulated, the
-           operator must know that before opening anything, not after pressing a create button. *@
-        <SoSimulationBanner Active="@_simulationMode" Notice="@_simulationNotice" />
-
-        @* A different state from simulation, and never shown as one: here the data is real. *@
-        <SoReadOnlyIntegrationBanner Active="@_readOnlyMode" Notice="@_readOnlyNotice" />
-
-        <section class="so-panel so-panel--tabs">
-            <div class="so-tabs" role="tablist" aria-label="Kayıt grubu">
-                @foreach (RecordGroup group in _groups)
+        <div class="so-record-filters" data-guide="record-filters">
+            <div class="so-field"><span>Kayıt ara</span><MudTextField T="string" Value="@_search" ValueChanged="SearchAsync" aria-label="Kayıt ara"
+                Placeholder="OR kodu veya başlık" Immediate="true" DebounceInterval="350" MaxLength="100" Variant="Variant.Outlined" Margin="Margin.Dense" /></div>
+            <label class="so-field"><span>İş akışı</span><select aria-label="İş akışı" @bind="_state" @bind:after="FilterAsync">
+                <option value="">Tüm durumlar</option>
+                @foreach (OperationalRecordWorkflowState state in Enum.GetValues<OperationalRecordWorkflowState>())
+                { <option value="@state">@OperationalRecordView.StateLabel(state)</option> }
+            </select></label>
+            <label class="so-field"><span>Sıralama</span><select aria-label="Sıralama" @bind="_sort" @bind:after="FilterAsync">
+                <option value="updated">Son güncellenen</option><option value="oldest">En eski kaynak tarihi</option><option value="code">OR kodu</option>
+            </select></label>
+        </div>
+        <p class="so-panel-text so-panel-text--sm">Kayıtlı veriler gösterilir. Kaynağı yenile, sınırlı bir içe aktarım yapar; aşağıdaki sayı Turuncu Hat toplamı değildir.</p>
+        @if (_refreshNotice is not null) { <p role="status">@_refreshNotice</p> }
+        @if (_refreshProblem is not null) { <SoProblemPanel Problem="_refreshProblem" /> }
+        @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="LoadAsync" RetryLabel="Kayıtlı listeyi yükle" /> }
+        <section aria-label="Kayıtlı operasyonel kayıtlar" aria-busy="@_loading">
+            @if (_loading) { <SoLoading Message="Kayıtlı liste yükleniyor…" /> }
+            else if (_page is { } page)
+            {
+                <SoSimulationBanner Active="@(page.Items.Any(r => r.SimulationMode))" Notice="@(page.Items.FirstOrDefault(r => r.SimulationMode)?.SimulationNotice)" />
+                <SoReadOnlyIntegrationBanner Active="@(page.Items.Any(r => r.ReadOnlyIntegrationMode))" Notice="@(page.Items.FirstOrDefault(r => r.ReadOnlyIntegrationMode)?.ReadOnlyNotice)" />
+                <p role="status">@(page.Total) kayıtlı eşleşme</p>
+                @if (page.Items.Count == 0)
+                { <SoEmptyState Title="Kayıtlı eşleşme yok" Description="Filtreleri değiştirebilir veya yetkinizle kaynağı yenileyebilirsiniz." Icon="@Icons.Material.Outlined.Inbox" /> }
+                else
                 {
-                    RecordGroup captured = group;
-                    <button type="button"
-                            role="tab"
-                            class="so-tab @(group == _group ? "so-tab--active" : null)"
-                            aria-selected="@(group == _group)"
-                            @onclick="() => _group = captured">
-                        @GroupLabel(group)
-                        <span class="so-tab-count">@Count(group)</span>
-                    </button>
+                    <div class="so-record-table">
+                        <div class="so-record-columns" aria-hidden="true"><span>Kayıt</span><span>Ortam</span><span>Durum</span><span>Güncelleme (yerel)</span><span></span></div>
+                        <ul class="so-record-browse-list">
+                            @foreach (OperationalRecordResponse record in page.Items)
+                            {
+                                <li @key="record.Id">
+                                    <div><code>@record.OrCode</code><h2>@record.Title</h2></div>
+                                    <span>@(record.Environment ?? "Bilinmiyor")</span>
+                                    <div><SoStatusBadge Label="@OperationalRecordView.PresentationLabel(record.PresentationState)" Tone="@OperationalRecordView.PresentationTone(record.PresentationState)" />
+                                        <p>@OperationalRecordView.StateLabel(record)</p>
+                                        @if (record.Claimed) { <span class="so-chip">Operatör kilidi var</span> }
+                                        @if (record.ReconciliationRequired) { <strong>Sonuç doğrulanmalı</strong> }
+                                    </div>
+                                    <time datetime="@record.UpdatedAt.ToString("O")">@record.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</time>
+                                    <a class="mud-button-root mud-button mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small" href="@($"operational-records/{record.Id}")" aria-label="@($"{record.OrCode}: İncele")">İncele</a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
                 }
-            </div>
-        </section>
-
-        @if (_problem is not null)
-        {
-            <SoProblemPanel Problem="_problem" OnRetry="LoadAsync" RetryLabel="Yeniden yükle" />
-        }
-
-        <section class="so-panel">
-            @if (_loading)
-            {
-                <SoLoading Message="Kaynak kayıtlar yenileniyor…" Bare="true" />
-            }
-            else if (_records is null)
-            {
-                <SoEmptyState Title="Liste yüklenemedi"
-                              Description="Yenile ile yeniden deneyebilirsiniz."
-                              Icon="@Icons.Material.Outlined.CloudOff" />
-            }
-            else if (_records.Count == 0)
-            {
-                @* Distinguish "the source returned nothing" from "your filter matched nothing";
-                   they look identical otherwise and send the operator looking in the wrong place. *@
-                <SoEmptyState Title="Kaynak kayıt yok"
-                              Description="Yapılandırılmış kaynak şu anda aktarılacak kayıt döndürmüyor."
-                              Icon="@Icons.Material.Outlined.Inbox" />
-            }
-            else if (Filtered.Count == 0)
-            {
-                <SoEmptyState Title="@($"{GroupLabel(_group)} kayıt yok")"
-                              Description="Diğer grupları görmek için yukarıdaki sekmeleri kullanın."
-                              Icon="@Icons.Material.Outlined.FilterAltOff" />
-            }
-            else
-            {
-                <ul class="so-record-list">
-                    @foreach (OperationalRecordResponse record in Filtered)
-                    {
-                        <li>
-                            <a class="so-record-row" href="@($"operational-records/{record.Id}")">
-                                <span class="so-record-main">
-                                    <span class="so-record-head">
-                                        <code class="so-record-code">@record.OrCode</code>
-                                        @if (OperationalRecordView.NeedsAttention(record))
-                                        {
-                                            <span class="so-record-flag" title="Operatör ilgisi gerekiyor">
-                                                <MudIcon Icon="@Icons.Material.Filled.PriorityHigh" Size="Size.Small" />
-                                            </span>
-                                        }
-                                    </span>
-                                    <span class="so-record-title">@record.Title</span>
-                                    <span class="so-record-meta">
-                                        <span>Kaynak: @record.SourceRecordId</span>
-                                        @if (!string.IsNullOrWhiteSpace(record.Environment))
-                                        {
-                                            <span>· @record.Environment</span>
-                                        }
-                                        <span>· @record.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
-                                    </span>
-                                </span>
-
-                                <span class="so-record-states">
-                                    @* The backend's stable category leads. The workflow stage stays
-                                       underneath it as detail, because "Jira oluşturuldu" and
-                                       "Tamamlandı" answer different questions. *@
-                                    <SoStatusBadge Label="@OperationalRecordView.PresentationLabel(record.PresentationState)"
-                                                   Tone="@OperationalRecordView.PresentationTone(record.PresentationState)"
-                                                   Icon="@OperationalRecordView.PresentationIcon(record.PresentationState)" />
-
-                                    <span class="so-chip so-chip--quiet" title="İş akışı aşaması">
-                                        @OperationalRecordView.StateLabel(record)
-                                    </span>
-
-                                    @if (OperationalRecordView.HasJira(record))
-                                    {
-                                        <span class="so-chip so-chip--quiet" title="Jira kaydı">
-                                            @record.JiraIssueKey
-                                        </span>
-                                    }
-
-@{
-                                        OperationalRecordView.Ownership owner =
-                                            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow, _actor);
-                                    }
-                                    @* A lapsed claim is history, not ownership, so it earns no badge
-                                       in a list an operator scans for what is blocked. *@
-                                    @if (owner is OperationalRecordView.Ownership.Mine
-                                            or OperationalRecordView.Ownership.Other)
-                                    {
-                                        <SoStatusBadge Label="@OwnerLabel(owner)"
-                                                       Tone="@OwnerTone(owner)"
-                                                       Icon="@Icons.Material.Filled.Lock" />
-                                    }
-
-                                    @if (record.ReconciliationRequired)
-                                    {
-                                        <SoStatusBadge Label="Doğrulama gerekiyor"
-                                                       Tone="SoStatusBadge.BadgeTone.Caution"
-                                                       Icon="@Icons.Material.Filled.HelpOutline" />
-                                    }
-                                </span>
-                            </a>
-                        </li>
-                    }
-                </ul>
+                <div class="so-pager so-resource-pagination">
+                    <label class="so-field"><span>Sayfa boyutu</span><select aria-label="Sayfa boyutu" @bind="_size" @bind:after="FilterAsync">
+                        @foreach (int size in ResourceView.PageSizes) { <option value="@size">@size</option> }
+                    </select></label>
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki" title="Önceki" Disabled="@(_number <= 1)" OnClick="() => PageAsync(_number - 1)" />
+                    <span>Sayfa @_number / @Math.Max(1, (int)Math.Ceiling(page.Total / (double)_size))</span>
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki" title="Sonraki" Disabled="@(_number * _size >= page.Total)" OnClick="() => PageAsync(_number + 1)" />
+                </div>
             }
         </section>
-
-        <p class="so-panel-text so-panel-text--sm">
-            Bu liste her yenilemede kaynak sistemden içe aktarım yapar ve hız sınırına tabidir;
-            otomatik yenileme yapılmaz.
-        </p>
     }
 </div>
 
 @code {
-    /// <summary>Grouping that answers "does this need me", rather than workflow order.</summary>
-    private enum RecordGroup
-    {
-        /// <summary>Stuck, failed, or unresolved.</summary>
-        NeedsAttention,
-
-        /// <summary>An action is currently possible.</summary>
-        Actionable,
-
-        /// <summary>In flight or not yet ready.</summary>
-        InProgress,
-
-        /// <summary>Jira exists; source closing was deliberately not requested.</summary>
-        SourceOpen,
-
-        /// <summary>Transfer finished.</summary>
-        Completed
-    }
-
-    private static readonly RecordGroup[] _groups =
-    [
-        RecordGroup.NeedsAttention,
-        RecordGroup.Actionable,
-        RecordGroup.InProgress,
-        RecordGroup.SourceOpen,
-        RecordGroup.Completed
-    ];
-
     private AccessSnapshot? _access;
-    private IReadOnlyList<OperationalRecordResponse>? _records;
-    private UiProblem? _problem;
-    private RecordGroup _group = RecordGroup.NeedsAttention;
-    private bool _loading;
-    private string? _actor;
-
-    // Reported per record by the API. Any simulated record means the configured providers are
-    // simulated, so the banner is shown for the page rather than per row.
-    private bool _simulationMode;
-    private string? _simulationNotice;
-
-    // The same reasoning for the real-data write fence, which is an environment-wide setting.
-    private bool _readOnlyMode;
-    private string? _readOnlyNotice;
-
-    private IReadOnlyList<OperationalRecordResponse> Filtered =>
-        _records is null ? [] : _records.Where(r => GroupOf(r) == _group).ToArray();
-
-    private int Count(RecordGroup group) =>
-        _records is null ? 0 : _records.Count(r => GroupOf(r) == group);
-
-    // The backend owns this categorisation now. Re-deriving it from workflow state and action
-    // availability meant the list could disagree with the record screen about what a record needs,
-    // and every new workflow state had to be classified in two places.
-    //
-    // An unrecognised category is grouped as needing attention because a record has to appear
-    // somewhere and that is the conservative bucket. The label stays honest about not knowing.
-    private static RecordGroup GroupOf(OperationalRecordResponse record) => record.PresentationState switch
-    {
-        OperationalRecordPresentationStates.Actionable => RecordGroup.Actionable,
-        OperationalRecordPresentationStates.InProgress => RecordGroup.InProgress,
-        OperationalRecordPresentationStates.SourceOpen => RecordGroup.SourceOpen,
-        OperationalRecordPresentationStates.Completed => RecordGroup.Completed,
-        _ => RecordGroup.NeedsAttention
-    };
-
-    // Landing on an empty tab while five records wait one tab over is how an operator concludes
-    // there is nothing to do. The priority order is the order of the tabs, so this only ever moves
-    // forward to the first group that actually has work, and it runs on load rather than on every
-    // render so it never overrides a tab the operator chose themselves.
-    private void SelectGroupWithWork()
-    {
-        if (Count(_group) > 0)
-        {
-            return;
-        }
-
-        foreach (RecordGroup group in _groups)
-        {
-            if (Count(group) > 0)
-            {
-                _group = group;
-                return;
-            }
-        }
-    }
-
-    private static string GroupLabel(RecordGroup group) =>
-        OperationalRecordView.PresentationLabel(PresentationCode(group));
-
-    private static string PresentationCode(RecordGroup group) => group switch
-    {
-        RecordGroup.Actionable => OperationalRecordPresentationStates.Actionable,
-        RecordGroup.InProgress => OperationalRecordPresentationStates.InProgress,
-        RecordGroup.SourceOpen => OperationalRecordPresentationStates.SourceOpen,
-        RecordGroup.Completed => OperationalRecordPresentationStates.Completed,
-        _ => OperationalRecordPresentationStates.NeedsAttention
-    };
-
-private static string OwnerLabel(OperationalRecordView.Ownership owner) => owner switch
-    {
-        OperationalRecordView.Ownership.Mine => "Sizde",
-        OperationalRecordView.Ownership.Other => "Başka operatörde",
-        OperationalRecordView.Ownership.Lapsed => "Önceki kilit sona erdi",
-        _ => "Serbest"
-    };
-
-    // "Mine" is informational; only somebody else's claim is a caution, because that is the one
-    // that will stop an action.
-    private static SoStatusBadge.BadgeTone OwnerTone(OperationalRecordView.Ownership owner) => owner switch
-    {
-        OperationalRecordView.Ownership.Other => SoStatusBadge.BadgeTone.Caution,
-        OperationalRecordView.Ownership.Mine => SoStatusBadge.BadgeTone.Info,
-        _ => SoStatusBadge.BadgeTone.Neutral
-    };
+    private OperationalRecordPageResponse? _page;
+    private UiProblem? _problem, _refreshProblem;
+    private string _search = string.Empty, _sort = "updated";
+    private string? _refreshNotice;
+    private OperationalRecordWorkflowState? _state;
+    private int _number = 1, _size = 25, _generation;
+    private bool _loading, _refreshing;
+    private readonly CancellationTokenSource _lifetime = new();
 
     protected override async Task OnInitializedAsync()
     {
         AccessProvider.Changed += OnAccessChanged;
-        _access = await AccessProvider.GetAsync(CancellationToken.None);
-
-        if (_access.Can(Capabilities.OperationalRecordsView))
-        {
-            await ResolveActorAsync();
-            await LoadAsync();
-        }
+        _access = await AccessProvider.GetAsync(_lifetime.Token);
+        if (_access.Can(Capabilities.OperationalRecordsView)) await LoadAsync();
     }
-
-    /// <summary>
-    /// Reads the operator's identity <i>as the API names it</i>, for comparison against
-    /// <c>claimedBy</c>.
-    /// </summary>
-    /// <remarks>
-    /// The cookie principal is not usable here: the API records the actor as
-    /// <c>demo:platform-admin</c> where the browser session says <c>platform-admin</c>, so
-    /// comparing the cookie name would report every record as another operator's. A failure is
-    /// swallowed — without an actor the UI simply cannot claim any record is the current
-    /// operator's, which is the safe fallback rather than a reason to fail the page.
-    /// </remarks>
-    private async Task ResolveActorAsync()
-    {
-        try
-        {
-            _actor = (await Identity.GetCurrentIdentityAsync(CancellationToken.None)).Name;
-        }
-        catch (SecureOpsApiException)
-        {
-            _actor = null;
-        }
-    }
-
+    private Task SearchAsync(string value) { _search = value; return FilterAsync(); }
+    private Task FilterAsync() { _number = 1; return LoadAsync(); }
+    private Task PageAsync(int page) { _number = page; return LoadAsync(); }
     private async Task LoadAsync()
     {
+        int generation = ++_generation;
         _loading = true;
         _problem = null;
-        StateHasChanged();
-
         try
         {
-            _records = await Records.ListAsync(CancellationToken.None);
-            SelectGroupWithWork();
-
-            _simulationMode = _records.Any(record => record.SimulationMode);
-            _simulationNotice = _records
-                .FirstOrDefault(record => !string.IsNullOrWhiteSpace(record.SimulationNotice))
-                ?.SimulationNotice;
-
-            _readOnlyMode = _records.Any(record => record.ReadOnlyIntegrationMode);
-            _readOnlyNotice = _records
-                .FirstOrDefault(record => !string.IsNullOrWhiteSpace(record.ReadOnlyNotice))
-                ?.ReadOnlyNotice;
+            OperationalRecordPageResponse page = await Records.BrowseAsync(new() { Search = _search, State = _state, Sort = _sort, Page = _number, PageSize = _size }, _lifetime.Token);
+            if (generation == _generation) _page = page;
         }
-        catch (SecureOpsApiException ex)
-        {
-            _problem = ex.Problem;
-            _records = null;
-
-            // Cleared on failure: a stale "no real write" promise next to an unknown list state
-            // would be a claim the page can no longer support.
-            _simulationMode = false;
-            _simulationNotice = null;
-            _readOnlyMode = false;
-            _readOnlyNotice = null;
-        }
-        finally
-        {
-            _loading = false;
-            StateHasChanged();
-        }
+        catch (SecureOpsApiException ex) { if (generation == _generation) { _problem = ex.Problem; _page = null; } }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { if (generation == _generation) _loading = false; }
     }
-
+    private async Task RefreshSourceAsync()
+    {
+        if (_refreshing || _loading) return;
+        _refreshing = true;
+        _refreshProblem = null;
+        _refreshNotice = null;
+        try
+        {
+            await Records.ListAsync(_lifetime.Token);
+            _refreshNotice = "Sınırlı kaynak yenilemesi tamamlandı. Kayıtlı liste güncellendi; kaynak toplamı bilinmiyor.";
+            await LoadAsync();
+        }
+        catch (SecureOpsApiException ex) { _refreshProblem = ex.Problem; }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { _refreshing = false; }
+    }
     private async Task RefreshAccessAsync()
     {
-        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
-        StateHasChanged();
+        _access = await AccessProvider.RefreshAsync(_lifetime.Token);
+        if (_access.Can(Capabilities.OperationalRecordsView)) await LoadAsync();
     }
-
-    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
-
-    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        ++_generation;
+        _page = null;
+        _access = await AccessProvider.GetAsync(_lifetime.Token);
+        if (_access.Can(Capabilities.OperationalRecordsView)) await LoadAsync();
+        StateHasChanged();
+    });
+    public void Dispose() { AccessProvider.Changed -= OnAccessChanged; ++_generation; _lifetime.Cancel(); _lifetime.Dispose(); }
 }

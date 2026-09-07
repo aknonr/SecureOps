@@ -10,13 +10,13 @@
             <MudIcon Icon="@Icons.Material.Outlined.Explore" />
             <span><strong>Bağlantılarınızı düzenlemeye başlayın</strong><br />Kısa Kullanım Rehberi ile arama, favori ve grupları keşfedin.</span>
             <div class="so-inline-actions">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="StartAsync" Disabled="@(_saving || Disabled)">Başla</MudButton>
+                <MudButton id="@($"resource-guide-start-{Surface}")" Variant="Variant.Outlined" Color="Color.Primary" OnClick="StartAsync" Disabled="@(_saving || Disabled)">Başla</MudButton>
                 <MudButton Variant="Variant.Text" OnClick="DismissAsync" Disabled="@(_saving || Disabled)">Daha sonra</MudButton>
             </div>
         </div>
     }
     <div class="so-guide-replay">
-        <MudButton id="resource-guide-replay" Variant="Variant.Text" Size="Size.Small"
+        <MudButton id="@($"resource-guide-replay-{Surface}")" Variant="Variant.Text" Size="Size.Small"
                    StartIcon="@Icons.Material.Outlined.HelpOutline" OnClick="StartAsync"
                    Disabled="@(_saving || Disabled)">Nasıl kullanılır?</MudButton>
     </div>
@@ -24,15 +24,14 @@
     @if (_open)
     {
         ResourceGuideStep step = Steps[_index];
-        <aside class="so-resource-guide" aria-label="Kullanım Rehberi" @onkeydown="KeyDownAsync">
+        <aside @ref="_panel" popover="manual" class="so-resource-guide" role="dialog" aria-modal="false" aria-label="Kullanım Rehberi" @onkeydown="KeyDownAsync">
             <div class="so-guide-heading">
                 <span class="so-eyebrow">Kullanım Rehberi · @(_index + 1) / @Steps.Count</span>
                 <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Rehberi kapat" Size="Size.Small" OnClick="CloseAsync" />
             </div>
             <h2 @ref="_heading" tabindex="-1">@step.Title</h2>
             <p>@step.Description</p>
-            @if (_missing) { <p class="so-panel-text so-panel-text--sm">Bu adımın kontrolü şu anda görünmüyor; ilgili sayfaya geçebilir veya adımı atlayabilirsiniz.</p> }
-            <MudLink Href="@step.Href">@step.LinkLabel</MudLink>
+            @if (_missing) { <p class="so-panel-text so-panel-text--sm">Bu kontrol şu anda kullanılamıyor. Adımı atlayabilir veya rehberi kapatıp uygun kaydı seçebilirsiniz.</p> }
             <div class="so-guide-controls">
                 <MudButton StartIcon="@Icons.Material.Filled.ChevronLeft" Disabled="@(_index == 0)" OnClick="Back">Geri</MudButton>
                 <MudButton OnClick="CloseAsync">Atla</MudButton>
@@ -50,8 +49,8 @@
     [Parameter] public ResourcePreferencesResponse? Preferences { get; set; }
     [Parameter] public EventCallback<ResourcePreferencesResponse> PreferencesChanged { get; set; }
     private IReadOnlyList<ResourceGuideStep> Steps => ResourceGuideSteps.For(Surface, CanManage);
-    private ElementReference _heading;
-    private bool _open, _saving, _pendingTarget, _missing, _interactive;
+    private ElementReference _heading, _panel;
+    private bool _open, _saving, _pendingTarget, _missing, _interactive, _restoreFocus;
     private int _index;
     private UiProblem? _problem;
 
@@ -78,7 +77,7 @@
 
     private async Task StartAsync()
     {
-        await DismissAsync();
+        await Js.InvokeVoidAsync("secureOpsResourceGuide.begin");
         _index = 0;
         _open = true;
         _pendingTarget = true;
@@ -94,18 +93,29 @@
     private async Task CloseAsync()
     {
         _open = false;
-        await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", true);
+        _restoreFocus = true;
+        await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", false);
     }
 
-    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? CloseAsync() : Task.CompletedTask;
+    private async Task KeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") await CloseAsync();
+        else if (args.Key == "ArrowRight") await NextAsync();
+        else if (args.Key == "ArrowLeft") Back();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         _interactive = true;
+        if (_restoreFocus)
+        {
+            _restoreFocus = false;
+            await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", true);
+        }
         if (_open && _pendingTarget)
         {
             _pendingTarget = false;
-            _missing = !await Js.InvokeAsync<bool>("secureOpsResourceGuide.show", Steps[_index].Target);
+            _missing = !await Js.InvokeAsync<bool>("secureOpsResourceGuide.show", Steps[_index].Target, _panel);
             await _heading.FocusAsync(preventScroll: true);
             StateHasChanged();
         }

@@ -374,7 +374,7 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
-**Workspace usability follow-up in progress:** resumed actual `aac1be56cf9921555e2d1c67f0f7a22c9a4a1e3e`.
+**Workspace usability follow-up, locally verified and not packaged:** resumed actual `aac1be56cf9921555e2d1c67f0f7a22c9a4a1e3e`.
 The rc6.12 archives were extracted into ignored local artifacts and hosted in
 foreground Demo with Simulation providers, no corporate configuration/calls.
 Published theme CSS equals source SHA-256 `63184EAAD85A94E56E23AC94AE0D035D4309CAFDBF362928CB84F35CDB20A0D5`.
@@ -386,21 +386,58 @@ available in this turn, so live deployed CSS/cache/version remains unverified.
 Application CSS now has content-versioned references. Baseline screenshots and
 computed evidence: `artifacts/workspace-usability-20260907/before-*.png`,
 `baseline-results.json`. Server-backed layout and selected-link resolution are
-additive contracts, not yet a finished workspace UI. Verified 56 resource unit,
-6 API/OpenAPI tests and 11 actual isolated SQL cases, including legacy layout
+additive contracts, now consumed by the workspace UI. Initial verification covered
+56 resource unit, 6 API/OpenAPI tests and 11 actual isolated SQL cases, including legacy layout
 JSON, restart round-trip and transactional audit rollback, on
 `SecureOps_ResourcesV1_Workspace20260907`; fresh 001-011 harness upgrade passed.
 No schema/grant changes. rc6.12 remains immutable and excludes all follow-up
 runtime changes. No prior size exception is used; increments stay below 1000 lines.
 
-Workspace UI increment: published loopback SQL-backed `workspace-usability.cjs`
+Published loopback SQL-backed `workspace-usability.cjs`
 passes page-scoped selection, atomic two-link group addition, authoritative
 resolution/native keyboard activation with isolated openers, server layout
 persistence, desktop/mobile light/dark and no-result states. 44 affected unit
 tests pass. Evidence: `artifacts/workspace-usability-20260907/workspace-results.json`
 and `before-links-*`, `after-links-*`, `after-groups-*`. 720 CSS-pixel reflow
-was checked; native managed-browser 200% zoom is not yet claimed. This increment
-does not include the subsequent persisted operational browsing or tour work.
+was checked; native managed-browser 200% zoom is not claimed.
+
+Persisted browsing now uses `GET /api/v1/operational-records/stored`; only
+**Kaynağı yenile** calls the bounded source refresh. Search, stable sort, status,
+page and bottom page-size controls use actual persisted totals. Review starts
+with source summary, unselected type, authoritative blockers, then supported
+preview/actions. Retirement is explicitly outside the two confirmed types;
+an operator declaration never grants eligibility or approval. Source/Jira/BPM
+write fences and reconciliation semantics are unchanged.
+
+Task tours for links, groups, layout and review highlight actual targets, scroll
+and position a non-modal native popover, support next/back/skip/Escape/replay,
+and restore initiating focus including first-use invitation. Navigation performs
+no mutations. Missing targets remain skippable. Browsers without Popover API
+fall back to inline guidance; managed TEST browser compatibility is unverified.
+The popover top layer avoids Mud dialog transform/clipping without changing the
+framework or overriding dialog layout. Published desktop/mobile and 720 CSS-pixel
+review tour bounds and focus passed with reduced motion.
+
+Final local evidence: Release build/API+UI publish; 1092 unit tests, 250 integration
+tests (including actual isolated SQL, no skipped SQL cases), additive OpenAPI
+snapshot (55 prior operations retained), NuGet vulnerability scan (none reported),
+scoped formatting and diff checks. `guidance-results.json` covers explicit refresh,
+persisted browsing without row-version changes, declaration-only preview, tours,
+curator/denied routes, and auditor dashboard/date navigation. `workspace-error-results.json`
+uses an intentionally stopped owned loopback API, not interception: safe outage
+message and preserved search. Screenshots: `after-records-*`, `after-review-*`,
+`after-links-tour-*`, `after-dashboard-regression-*`, `after-links-api-unavailable-*`.
+All are local synthetic evidence, not corporate acceptance. No screen-reader,
+managed popup-policy/authentication, native browser zoom, or live TEST asset
+verification is claimed. Bulk favourites were not added; group addition is atomic
+and versioned, selection means only the current page, and native opening reports
+requests/fallback rather than guaranteed tab or destination authentication success.
+
+Operator boundary: request the missing TEST screenshot and, read-only in the TEST
+browser, record viewport/zoom, loaded application CSS URL/status/content hash and
+computed filter grid. Compare the served file against the installed package and
+its source; stop on mismatch before considering any server change. rc6.12 still
+excludes every follow-up runtime change; no new release archive or deployment was made.
 
 **Current packaged delivery, rc6.12:** build source
 `682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`, latest runtime

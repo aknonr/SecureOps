@@ -26,8 +26,14 @@ public sealed partial class SqlOperationalRecordRepository
                 AND r.OrCode NOT LIKE 'synthetic-%' AND r.OrCode NOT LIKE 'SYN-%'
                 AND r.OrCode NOT LIKE 'SIM-%' AND r.OrCode NOT LIKE 'simulation-%' AND r.OrCode NOT LIKE 'FAKE-%'))
             """;
-        var parameters = new { State = query.State?.ToString(), Search = query.Search?.Trim() ?? string.Empty,
-            ExcludeSynthetic = excludeSynthetic, Offset = (query.Page - 1) * query.PageSize, query.PageSize };
+        var parameters = new
+        {
+            State = query.State?.ToString(),
+            Search = query.Search?.Trim() ?? string.Empty,
+            ExcludeSynthetic = excludeSynthetic,
+            Offset = (query.Page - 1) * query.PageSize,
+            query.PageSize
+        };
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         // Keep count and rows coherent without requiring a database snapshot-isolation setting.
