@@ -374,7 +374,70 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
-**Workspace usability follow-up, locally verified and not packaged:** resumed actual `aac1be56cf9921555e2d1c67f0f7a22c9a4a1e3e`.
+**Current packaged delivery, rc6.13 (not deployed):** clean tracked build source
+`1935dc522e70b0fcfe602812bffb06f2858d61b1`, runtime
+`2b895f6e6c66553be52f44471a231892865a9937`. All nine outgoing commits were inspected
+and normal-pushed using existing approved Git authentication. Live `ls-remote`
+matched the full build source SHA. This supersedes the historical authentication
+failure below. The final documentation commit is separate from build source and
+recorded after commit in the new release root's `release-metadata.json`.
+
+Release root: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.13`.
+API/UI ProductVersion `0.1.0+1935dc522e70b0fcfe602812bffb06f2858d61b1`,
+FileVersion `0.1.0.0`, framework-dependent net8.0; no dependency/framework upgrade.
+
+| rc6.13 artifact | SHA-256 |
+|---|---|
+| `API/secureops-api-TEST-1935dc5.zip` | `BB9D198C5C1CA789280716263FA607CC56BE66DD1A811D587A322B9EDEAEA368` |
+| `UI/secureops-ui-TEST-1935dc5.zip` | `7ED33EE296997DE72B60C024BFEEC76089CD1BA9CB6D9B8482C7F6C4940CF69B` |
+| `DBA/secureops-database-001-011-TEST-rc6.12.zip` (unchanged reuse) | `CE38FF8ECDA060B3111E7C9FE9A23A2F5AD6088E36499478FAFBF9A2D317F2D1` |
+
+Changes from rc6.12: responsive selectable workspace, server-backed versioned
+layout, current-page selected-link resolution/group addition, persisted record
+browsing separate from source refresh, guided review and positioned task tours,
+content-versioned application CSS/JS. `manifests/changes-from-rc6.12.json` records
+exact payload differences; `release-artifacts.sha256` and `manifests/*-payload.sha256`
+record archive/per-file hashes. API 238/UI 253 files passed existing release
+scripts, forbidden-content scans, ZIP/hash validation, API AD closure and offline
+TEST Swagger gates. Same shared Infrastructure binary in both packages. Compiler
+PathMap and no debug symbols exclude developer paths. Server-owned config, source,
+logs, tests and secrets are excluded. `staging/` and `evidence/` are not deployable.
+
+Required schema remains **001-011**, no new runtime grants. No SQL asset diff
+against rc6.12 source `682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`; all 24 DBA ZIP
+entries match its original manifest and all 22 SQL files match current source.
+The unchanged DBA ZIP contains a historical rc6.12 runbook from `aac1be5`; use
+**only the new release root `operator-runbook-tr.md`** exported from canonical
+`docs/24-api-test-deployment-readiness.md`. Existing release archives, including
+all three rc6.12 hashes, remain unchanged.
+
+Fresh gates: Release build zero warnings/errors; API/UI publish, 9 OpenAPI/Swagger
+tests, package validation and NuGet vulnerability check (none reported). Reused:
+1092 unit/250 integration tests including isolated SQL, and published local
+workspace/guidance/outage journeys. Runtime is unchanged from `2b895f6` to build
+source; final CSS/JS hashes also match the browser-tested publish. Exact evidence
+hashes/source applicability are in `evidence/reused-verification.json`. These are
+reused working-tree-verification results, not fresh rc6.13 SQL/browser execution.
+No broad suite/format repetition, corporate calls, SQL execution, deployment or
+write activation. Live TEST rendering cause remains unverified; cache invalidation
+alone is not a verified fix. Current Turkish checklist covers pairing, asset
+hash/MIME, desktop/mobile layout, selection, preferences, stored paging, tours and
+roles; native 200% zoom, screen-reader and managed browser behavior remain manual.
+
+Branch status at packaging: upstream
+`origin/feature/sql-runtime-hardening-20260902`; live repository default is
+`master` at `869fc161ef6457a9f25922e755188ee859d56fa7`. No branch-specific PR target
+is configured and GitHub PR queries found no PR for this branch. `master` is the
+default prospective target, not a verified existing PR base. The build source is
+not an ancestor of fetched live `master`, so current work is not merged. No PR,
+merge or branch deletion performed; untracked `.vscode/` remains untouched.
+First manual TEST action: read-only inventory of actual targets, installed API/UI
+versions, DBA-confirmed schema and rollback/backup references in the change record;
+stop before installation if any prerequisite or separate approval is absent.
+Keep ReadOnlyIntegrationMode=true, ControlledTestWritesEnabled=false and
+SourceCloseEnabled=false. JiraCreated never means source completion.
+
+**Historical workspace verification before rc6.13 packaging:** resumed actual `aac1be56cf9921555e2d1c67f0f7a22c9a4a1e3e`.
 Latest functional runtime commit: `2b895f6e6c66553be52f44471a231892865a9937`.
 Increments: `e5d7065` preferences/resolution, `4d95656` resource workspace,
 `957a70f` persisted browsing, `2b895f6` guided review/tours. Subsequent browser
@@ -457,7 +520,7 @@ only 200%-equivalent reflow is evidence. Whole-repository historical formatting
 debt was not rewritten; the new C# files passed scoped `dotnet format` verification.
 rc6.12 API/UI/DBA archive hashes were rechecked and match the table below.
 
-**Current packaged delivery, rc6.12:** build source
+**Historical packaged delivery, rc6.12 (preserved):** build source
 `682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`, latest runtime
 `f528da27611f52ab3c5676c485d6f6e7756af54c`. The three local commits
 `14f2f46`, `f528da2`, `682fa8e` form the direct chain above cached upstream

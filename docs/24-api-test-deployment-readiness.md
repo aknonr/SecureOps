@@ -1,10 +1,10 @@
 # API TEST Deployment Readiness
 
-## Güncel TEST Operatör Runbook, rc6.12
+## Güncel TEST Operatör Runbook, rc6.13
 
-Paket kökü: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.12`.
-API/UI build kaynağı: `682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`;
-son runtime commit'i: `f528da27611f52ab3c5676c485d6f6e7756af54c`.
+Paket kökü: `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.13`.
+API/UI build kaynağı: `1935dc522e70b0fcfe602812bffb06f2858d61b1`;
+son runtime commit'i: `2b895f6e6c66553be52f44471a231892865a9937`.
 Gerekli şema **001-011**. Sonraki teslimat-dokümantasyon commit'i build SHA'sını
 değiştirmez. Kanonik kaynak/kanıt handoff'u: `src/SecureOps.Ui/README.md`.
 Bu hazırlık kurulum veya yazma aktivasyonu değildir; canlı uzak Git yayını da
@@ -13,18 +13,73 @@ dosya hash'leri `manifests/`, kaynak ilişkisi `release-metadata.json` içindedi
 Yalnız API/UI/DBA arşivleri ve teslimat belgeleri dağıtılır; `staging/` ve
 `evidence/` build istasyonunda kalır, uygulama dizinine kopyalanmaz.
 
+rc6.12 API/UI paketleri çalışma alanı değişikliklerini içermez ve korunmuştur.
+DBA arşivi rc6.12'den byte-for-byte yeniden kullanılır: SQL kaynağı
+`682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`, arşiv SHA-256
+`CE38FF8ECDA060B3111E7C9FE9A23A2F5AD6088E36499478FAFBF9A2D317F2D1`.
+24 arşiv girdisi ve güncel kaynakla aynı 22 SQL dosyası doğrulandı; yeni şema/grant
+yoktur. DBA ZIP içindeki rc6.12 runbook'u tarihsel belgedir; **yalnız yeni paket
+kökündeki `operator-runbook-tr.md` güncel kurulum sırasıdır**. Arşivi yeniden
+paketlemeyin veya içindeki tarihsel belgeyi güncel talimat olarak kullanmayın.
+
 ### Tek Güncel Kurulum Sırası
 
 | Adım / makine | İşlem türü | Önkoşul, beklenen çıktı ve durma koşulu |
 |---|---|---|
 | 1. Yetkili TEST operatörü, yönetim istasyonu | Salt okunur envanter | Değişiklik kaydına gerçek API/UI hedeflerini, mevcut binary/config sürümlerini, DBA tarafından doğrulanmış şema seviyesini ve rollback paketini yazın. Hedef, şema, geri dönüş tabanı veya ayrı kurulum onayı eksikse durun. İlk manuel TEST adımı budur; sunucu adı veya mevcut seviye bu belgede varsayılmaz. |
-| 2. Paket teslim alan istasyon | Salt okunur doğrulama | API/UI/DBA arşivlerinin `Get-FileHash -Algorithm SHA256 -LiteralPath <arşiv>` sonuçlarını `release-artifacts.sha256` ile karşılaştırın; per-file manifestlerini doğrulayın. API/UI ProductVersion `0.1.0+682fa8eafcac611b0d18f93d0eb541f6a5acd2fc` ve metadata kaynak SHA'sı eşleşmeli. Eksik/farklı hash, sürüm veya manifesto halinde durun; rc6.11 binary'lerini karıştırmayın. Uzak yayın zorunluysa doğrulanmış remote SHA olmadan o kapıyı geçmeyin. |
+| 2. Paket teslim alan istasyon | Salt okunur doğrulama | API/UI/DBA arşivlerinin `Get-FileHash -Algorithm SHA256 -LiteralPath <arşiv>` sonuçlarını `release-artifacts.sha256` ile karşılaştırın; per-file manifestlerini doğrulayın. API/UI ProductVersion `0.1.0+1935dc522e70b0fcfe602812bffb06f2858d61b1` ve metadata kaynak SHA'sı eşleşmeli. Eksik/farklı hash, sürüm veya manifesto halinde durun; rc6.12 veya önceki API/UI binary'lerini karıştırmayın. Build kaynağı normal push sonrası canlı uzak SHA ile doğrulandı; sonraki belge commit'i build kaynağı değildir. |
 | 3. TEST operatörü ve DBA, doğrulanmış hedefler | Ayrı onaylı yedek hazırlığı | Mevcut API/UI binary ve server-owned config yedeklerinin yolunu, hash'ini, tarihini, geri dönüş sürümünü; geri yüklenebilir SQL yedeğinin referansını ve sorumlusunu değişiklik kaydına ekleyin. Sırları belgeye/pakete koymayın. 011 sonrası eski binary uyumluluğu kanıtlanmış değildir; geri dönüş planı ve uyumluluk değerlendirmesi yoksa kurulumdan önce durun. |
 | 4. DBA, doğrulanmış TEST SQL hedefi | Ayrı onaylı şema değişikliği | Envanterde eksik olduğu doğrulanan migration'ları sırasıyla 011'e kadar uygulayın; mevcut 010 ise yalnız 011 gerekir. Arşivde `sql/migrations` çalışma dizininden SQLCMD mode ve QUOTED_IDENTIFIER ON (`-I`) kullanın; `:r ../schema/...` yollarını koruyun. 001/002 yeniden uygulanmaz; tüm zincir körlemesine çalıştırılmaz. Hata veya uyuşmayan mevcut tanımda durun; otomatik yeniden deneme yapmayın. |
 | 5. DBA, aynı SQL hedefi | Salt okunur kontrol; yalnız eksik grant için ayrı onaylı değişiklik | 011 kolonlarını iki tabloda `bit NOT NULL DEFAULT (0)` olarak, mevcut satırların false niyetini ve append-only trigger'ların etkinliğini doğrulayın. Aşağıdaki mevcut nesne grant'lerini gerçek runtime principal ile kontrol edin. 011 yeni runtime grant istemez. DDL kimliği runtime'dan ayrı olmalı; ownership-chain doğrulanmadan API'ye geçmeyin. |
 | 6. TEST API operatörü, doğrulanmış API makinesi | Ayrı kurulum onayıyla binary değişikliği | Şema/grants tamamlanınca yalnız eşleşen API arşivini mevcut onaylı dağıtım yöntemiyle kurun. `web.config`, `appsettings*.json`, Data Protection dizini, loglar ve sırlar korunur. Aşağıdaki üç fence değerini server-owned yapılandırmada doğrulayın. Sağlık/sürüm/kimlik doğrulama başarısızsa durun; UI'ye geçmeyin. |
 | 7. TEST UI operatörü, doğrulanmış UI makinesi | Ayrı kurulum onayıyla binary değişikliği | Aynı build SHA'lı UI arşivini kurun; mevcut API adresi, auth/offload ayarları ve kalıcı UI key ring korunur. LB/IIS/binding yeniden yapılandırması kapsam dışıdır. API uyumsuzluğu veya key-ring sorunu varsa durun. |
 | 8. Yetkili kullanıcılar, TEST tarayıcısı | Salt okunur rol kontrolü; yerel uygulama değişiklikleri için ayrıca onaylı UAT | Admin sağlık/sürüm; ordinary kullanıcı bağlantı arama ve grupları; curator yönetim yetkisi; manager tarih/boş/hata durumları; denied kullanıcının menü/doğrudan API reddi doğrulanır. Publisher iki talep türünü, gerçek engelleri ve yazma kapalı açıklamasını inceler; create/retry yapmaz. Katalog/grup kaydı gibi uygulama içi değişiklikler ayrı UAT onayına bağlıdır. Kaynak yenileme/AD/Jira çağrıları ayrıca kurumsal smoke onayı gerektirir. Beklenmeyen yazma, yanlış yetki veya sentetik corporate kayıt görünümünde durun. |
+
+### Kısa TEST Kontrol Listesi
+
+Bu liste ayrı kurulum/UAT onayından sonra gerçek TEST tarayıcısında yürütülür;
+bu teslimatta uygulanmış değildir. Yerel sentetik kanıt kurumsal kabul değildir.
+
+1. **API/UI eşleşmesi:** her iki assembly ProductVersion değerini yukarıdaki tam
+   SHA ile, arşiv/dosya hash'lerini manifestlerle karşılaştırın. Sağlık, kimlik
+   doğrulama ve API adresini doğrulayın; eski API ile yeni UI'yi karıştırmayın.
+2. **CSS/JS:** Network'te `secureops-theme.css?v=...` ve
+   `workspace-guide.js?v=...` isteğini kaydedin. Beklenen sürüm/hash değerleri
+   `release-metadata.json/versionedAssets` içindedir. CSS `text/css`, JS geçerli
+   JavaScript MIME türü (`text/javascript` veya `application/javascript`) dönmeli;
+   HTML giriş/hata sayfası olmamalı. 200 veya geçerli 304 normaldir; hash/MIME
+   farkı, 404 veya konsol hatasında durun. Sır/oturum başlığı içeren HAR paylaşmayın.
+3. **Gerçek yerleşim:** masaüstü genişliğini ve zoom'u kaydedin; filtre toolbar'ının
+   computed `display:grid` değerini, kart/liste yapısını ve etiketleri ekran
+   görüntüsüyle doğrulayın. Mobil, açık/koyu tema ve gerçek %200 zoom'u kontrol
+   edin. Canlı TEST sorununun nedeni hâlâ doğrulanmadı; cache temizliğini tek başına
+   çözüm saymayın. Paket/served dosya/computed-style kanıtını önce karşılaştırın.
+4. **Görünür sayfa seçimi:** tümünü seç yalnız mevcut sayfayı seçmeli; filtre/sayfa
+   değişiminde temizlenmeli. Onaylı kişisel UAT'ta `Gruba ekle` doğru sayıda öğeyi
+   tek versioned işlemle eklemeli, gizli üyelik korunmalı. `Bağlantıları aç` önce
+   güncel yetkili bağlantıları çözmeli; ikinci native kullanıcı eylemi açmalı.
+   Tekil bağlantı/popup yardımı görünür kalmalı; tüm sekmeler veya hedef oturumu
+   başarılı varsayılmamalı. Hedef ziyaretleri ayrı erişim onayına bağlıdır.
+5. **Kişisel düzen:** görünüm, yoğunluk, sayfa boyutu ve izinli kısayol sırasını
+   kaydedip yeniden girişte doğrulayın. `Reset layout` karşılığı düzen sıfırlama
+   varsayılanları geri getirmeli; grup/favorileri silmemeli. Yetki değişimi gizli
+   kısayolları açmamalı; çatışmada otomatik yazma tekrarı olmamalı.
+6. **Operasyonel liste:** ilk açılış/arama/sıralama/sayfalama
+   `GET /api/v1/operational-records/stored` kullanmalı; toplam yalnız kayıtlı
+   eşleşmelerdir. Turuncu Hat toplamı değildir. Yalnız `Kaynağı yenile` kaynak
+   sorgusudur; ayrıca kurumsal smoke onayı yoksa bu eylemi çalıştırmayın.
+7. **Rehber/yetki:** bağlantı, grup, düzen ve talep rehberlerinde hedef konumu,
+   ileri/geri/atla/Escape, resize ve kapanış odağını doğrulayın. Rehber gezinmesi
+   kayıt oluşturmamalı veya tercihi değiştirmemeli. Ordinary/curator/manager ve
+   denied menü/doğrudan erişimini kontrol edin. Talep tipi onay değildir;
+   kapsam dışı sunucu emekliliği zorla sınıflanmamalı. Publisher yazma kapalı
+   açıklamasını görmeli; Jira create/retry veya kaynak/BPM close yapılmamalı.
+
+Yerel Release/publish/paket kapıları ve 9 OpenAPI/Swagger testi yeniden geçti.
+1092 unit, 250 integration (gerçek izole SQL dahil) ve yayımlanmış UI tarayıcı
+kanıtları değişmeyen runtime için yeniden kullanıldı; SQL/tarayıcı yeniden
+çalıştırılmadı. Gerçek TEST asset/MIME, native %200 zoom, ekran okuyucu ve kurumsal
+popup/kimlik davranışı için yeni doğrulama iddiası yoktur.
 
 ### Korunacak Sınırlar ve Grants
 
@@ -83,7 +138,8 @@ sistemde oluşmuş Jira'yı geri almaz; transfer silerek yeniden create yapılma
 
 The sections below preserve earlier deployment records and contracts. In
 particular rc6.10/rc6.11 and 001-010 (or older) sequences are NOT installation
-instructions for rc6.12. Use only the current sequence above. rc6.11 retains
+instructions for rc6.13. The unchanged rc6.12 DBA ZIP also embeds a historical
+runbook; use only the current root export and sequence above. rc6.11 retains
 source `74cd8274250302a977cbc4c5cd6e4f1789c01459`; previous packages/hashes are
 unchanged and do not contain the independent close gate or migration 011.
 
