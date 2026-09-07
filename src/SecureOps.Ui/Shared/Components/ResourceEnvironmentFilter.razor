@@ -2,9 +2,10 @@
 @implements IDisposable
 @inject IResourceApiClient ResourceApi
 
-<div class="so-resource-filter so-resource-environment-filter">
+<div class="so-resource-filter so-resource-environment-filter so-field">
+    <span class="so-field-label">Ortam</span>
     <MudAutocomplete T="string" Value="Value" ValueChanged="ValueChanged" SearchFuncWithCancel="SearchAsync"
-                     Label="Ortam" aria-label="Ortam" Placeholder="Tüm ortamlar" Variant="Variant.Outlined"
+                     aria-label="Ortam" Placeholder="Tüm ortamlar" Variant="Variant.Outlined"
                      Margin="Margin.Dense" Dense="true" Clearable="true" ResetValueOnEmptyText="true"
                      CoerceText="true" MinCharacters="0" MaxItems="100" DebounceInterval="250"
                      ListClass="so-resource-environment-options"

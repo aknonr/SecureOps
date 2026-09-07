@@ -9,11 +9,12 @@
 
 <PageTitle>Uygulama Bağlantıları · @WasasBrand.Name</PageTitle>
 
-<div class="so-page so-page--wide so-resource-page">
-    <SoPageHeader Title="Uygulama Bağlantıları" Lead="İhtiyacınız olan uygulamayı bulun; sık kullandıklarınızı favorilere veya kişisel gruplara ekleyin.">
+<div class="so-page so-page--wide so-resource-page so-workspace so-workspace--@Layout.View so-workspace--@Layout.Density">
+    <SoPageHeader Title="Uygulama Bağlantıları">
         <Actions>
-            <MudButton Href="resources/sets" StartIcon="@Icons.Material.Outlined.Folder" Variant="Variant.Outlined"
-                       data-guide="groups-link">Bağlantı Gruplarım</MudButton>
+            <MudButton Href="resources/sets" StartIcon="@Icons.Material.Outlined.Folder" Variant="Variant.Outlined" data-guide="groups-link">Bağlantı Gruplarım</MudButton>
+            <MudIconButton Icon="@Icons.Material.Outlined.DashboardCustomize" aria-label="Çalışma alanını düzenle" title="Çalışma alanını düzenle"
+                           data-guide="personalize" Disabled="@(_busy || _preferences is null)" OnClick="OpenLayoutAsync" />
             <MudTooltip Text="Yenile"><MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="Yenile"
                 Disabled="@(_query.Loading || _busy)" OnClick="ReloadAsync" /></MudTooltip>
         </Actions>
@@ -30,18 +31,23 @@
     }
     else
     {
+        <nav class="so-workspace-shortcuts" aria-label="Çalışma alanı kısayolları">
+            @foreach (string key in Layout.Shortcuts.Where(k => ResourceWorkspaceView.Permitted(_access, k)))
+            { <a href="@ResourceWorkspaceView.Href(key)">@ResourceWorkspaceView.Label(key)</a> }
+        </nav>
         <ResourceHelp Preferences="_preferences" PreferencesChanged="PreferencesChanged" CanManage="@_access.Can(Capabilities.ResourcesManage)" Disabled="_busy" />
         <section class="so-resource-discovery" aria-label="Bağlantı arama ve filtreler">
             <div class="so-resource-filters" data-guide="resource-search">
-                <MudTextField T="string" Value="_search" ValueChanged="SearchChangedAsync" Label="Bağlantı ara" aria-label="Bağlantı ara"
+                <div class="so-field so-resource-search"><span class="so-field-label">Bağlantı ara</span>
+                <MudTextField T="string" Value="@_search" ValueChanged="SearchChangedAsync" aria-label="Bağlantı ara"
                               Placeholder="Ad, amaç veya etiket" Immediate="true" DebounceInterval="350" MaxLength="100"
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Class="so-resource-search" />
-                <MudSelect T="Guid?" Value="_categoryId" ValueChanged="CategoryChangedAsync" Label="Kategori" aria-label="Kategori"
-                           Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Clearable="true" Class="so-resource-filter">
-                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">Tüm kategoriler</MudSelectItem>
-                    @foreach (ResourceCategory category in _categories) { <MudSelectItem T="Guid?" Value="@category.Id">@category.Name</MudSelectItem> }
-                </MudSelect>
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
+                </div>
+                <label class="so-field"><span>Kategori</span><select value="@_categoryId" @onchange="e => CategoryChangedAsync(Guid.TryParse(e.Value?.ToString(), out Guid id) ? id : null)">
+                    <option value="">Tüm kategoriler</option>
+                    @foreach (ResourceCategory category in _categories) { <option value="@category.Id">@category.Name</option> }
+                </select></label>
                 <ResourceEnvironmentFilter @key="_categoryId" Value="@_environment" ValueChanged="EnvironmentChangedAsync" CategoryId="_categoryId" />
             </div>
             <div class="so-resource-viewbar">
@@ -58,6 +64,7 @@
         </section>
 
         @if (_actionProblem is not null) { <SoProblemPanel Problem="_actionProblem" /> }
+        @if (_actionNotice is not null) { <p class="so-workspace-notice" role="status">@_actionNotice</p> }
         @if (_preferencesProblem is not null) { <SoProblemPanel Problem="_preferencesProblem" OnRetry="LoadPreferencesAsync" /> }
         @if (_categoriesProblem is not null) { <SoProblemPanel Problem="_categoriesProblem" OnRetry="LoadCategoriesAsync" /> }
 
@@ -68,13 +75,19 @@
             {
                 <div class="so-resource-results-head">
                     <span role="status">@result.Total bağlantı @(_query.Loading ? "· Güncelleniyor…" : null)</span>
-                    <div class="so-resource-filters">
-                        <MudSelect T="int" Value="_pageSize" ValueChanged="PageSizeChangedAsync" Label="Sayfa boyutu" aria-label="Sayfa boyutu"
-                                   Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Class="so-page-size">
-                            @foreach (int size in ResourceView.PageSizes) { <MudSelectItem T="int" Value="@size">@size</MudSelectItem> }
-                        </MudSelect>
-                    </div>
+                    <label class="so-selection-choice"><input type="checkbox" checked="@_selection.All" disabled="@(_query.Loading || result.Items.Count == 0 || _busy)"
+                        @onchange="e => SelectPage(e.Value is true)" />Bu sayfadakileri seç</label>
                 </div>
+                @if (_selection.Ids.Count > 0)
+                {
+                    <div class="so-selection-bar" data-guide="selection-actions" aria-label="Seçili bağlantı işlemleri">
+                        <strong role="status">@_selection.Ids.Count bağlantı seçili</strong>
+                        <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" OnClick="PrepareSelectedAsync" Disabled="_busy">Açmak için hazırla</MudButton>
+                        <MudButton StartIcon="@Icons.Material.Filled.PlaylistAdd" OnClick="AddSelectedAsync" Disabled="@(_busy || _preferences is null)">Gruba ekle</MudButton>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Seçimi temizle" title="Seçimi temizle" OnClick="() => SelectPage(false)" Disabled="_busy" />
+                    </div>
+                }
+                @if (_resolvedLinks is not null) { <ResolvedResourceLinks @key="_resolvedLinks" Links="_resolvedLinks" /> }
                 @if (result.Items.Count == 0)
                 {
                     <SoEmptyState Title="@(_favouritesOnly && !HasFilters ? "Henüz favoriniz yok" : HasFilters ? "Eşleşen bağlantı yok" : "Henüz yayımlanmış bağlantı yok")"
@@ -89,20 +102,22 @@
                         {
                             <ResourceLinkRow @key="link.Id" Link="link" CategoryName="@_categories.FirstOrDefault(c => c.Id == link.CategoryId)?.Name"
                                 Favourite="@ResourceView.IsFavourite(_preferences, link.Id)" Disabled="@(_busy || _preferences is null)"
+                                Selected="@_selection.Contains(link.Id)" SelectionDisabled="@(_query.Loading || _busy)"
+                                SelectedChanged="value => SelectLink(link.Id, value)"
                                 OnFavourite="@(() => ToggleFavouriteAsync(link))" OnAdd="@(() => AddToSetAsync(link))" />
                         }
                     </ul>
                 }
-                @if (result.Total > _pageSize || result.Page > 1)
-                {
-                    <div class="so-pager">
-                        <MudButton StartIcon="@Icons.Material.Filled.ChevronLeft" Disabled="@(_query.Loading || result.Page <= 1)"
-                                   OnClick="@(() => GoToPageAsync(result.Page - 1))">Önceki</MudButton>
+                    <div class="so-pager so-resource-pagination" data-guide="pagination">
+                        <label class="so-field"><span>Sayfa boyutu</span><select value="@_pageSize" disabled="@(_busy || _query.Loading)" @onchange="e => PageSizeChangedAsync(int.Parse(e.Value!.ToString()!))">
+                            @foreach (int size in ResourceView.PageSizes) { <option value="@size">@size</option> }
+                        </select></label>
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki" title="Önceki" Disabled="@(_query.Loading || result.Page <= 1)"
+                                   OnClick="@(() => GoToPageAsync(result.Page - 1))" />
                         <span class="so-pager-state">Sayfa @result.Page / @Math.Max(1, (int)Math.Ceiling(result.Total / (double)_pageSize))</span>
-                        <MudButton EndIcon="@Icons.Material.Filled.ChevronRight" Disabled="@(_query.Loading || result.Page * _pageSize >= result.Total)"
-                                   OnClick="@(() => GoToPageAsync(result.Page + 1))">Sonraki</MudButton>
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki" title="Sonraki" Disabled="@(_query.Loading || result.Page * _pageSize >= result.Total)"
+                                   OnClick="@(() => GoToPageAsync(result.Page + 1))" />
                     </div>
-                }
             }
         </section>
     }
@@ -115,6 +130,10 @@
     private readonly ResourceQueryState _query = new();
     private UiProblem? _actionProblem, _preferencesProblem, _categoriesProblem;
     private bool _busy, _favouritesOnly;
+    private readonly ResourceSelectionState _selection = new();
+    private IReadOnlyList<ResourceLink>? _resolvedLinks;
+    private string? _actionNotice;
+    private ResourceWorkspaceLayout Layout => _preferences?.WorkspaceLayout ?? ResourceWorkspaceLayout.Default;
     private string _search = string.Empty, _environment = string.Empty;
     private Guid? _categoryId;
     private int _pageSize = 25, _pageNumber = 1;
@@ -150,7 +169,7 @@
 
     private async Task LoadPreferencesAsync()
     {
-        try { _preferences = await ResourceApi.GetPreferencesAsync(CancellationToken.None); _preferencesProblem = null; }
+        try { _preferences = await ResourceApi.GetPreferencesAsync(CancellationToken.None); _pageSize = Layout.PageSize; _preferencesProblem = null; }
         catch (SecureOpsApiException exception) { _preferences = null; _preferencesProblem = exception.Problem; }
     }
 
@@ -158,7 +177,13 @@
     private Task SearchChangedAsync(string value) { _search = value ?? string.Empty; _pageNumber = 1; return SearchAsync(); }
     private Task CategoryChangedAsync(Guid? value) { _categoryId = value; _environment = string.Empty; _pageNumber = 1; return SearchAsync(); }
     private Task EnvironmentChangedAsync(string value) { _environment = value ?? string.Empty; _pageNumber = 1; return SearchAsync(); }
-    private Task PageSizeChangedAsync(int value) { _pageSize = value; _pageNumber = 1; return SearchAsync(); }
+    private async Task PageSizeChangedAsync(int value)
+    {
+        _pageSize = value;
+        _pageNumber = 1;
+        if (_preferences is not null) await SaveLayoutAsync(new(Layout with { PageSize = value }, _preferences.Version));
+        await SearchAsync();
+    }
     private Task GoToPageAsync(int value) { _pageNumber = Math.Max(1, value); return SearchAsync(); }
     private Task SetFavouritesAsync(bool value) { _favouritesOnly = value; _pageNumber = 1; return SearchAsync(); }
     private Task ClearFiltersAsync() { _search = _environment = string.Empty; _categoryId = null; _pageNumber = 1; return SearchAsync(); }
@@ -166,10 +191,62 @@
 
     private async Task SearchAsync()
     {
-        if (_favouritesOnly) return;
+        _selection.Clear();
+        _resolvedLinks = null;
+        if (_favouritesOnly) { _selection.SetPage(CurrentPage?.Items.Select(link => link.Id) ?? []); return; }
         Task pending = _query.LoadAsync(Query, ResourceApi.QueryLinksAsync);
         StateHasChanged();
         await pending;
+        if (!_query.Loading && _query.Problem is null) _selection.SetPage(CurrentPage?.Items.Select(link => link.Id) ?? []);
+    }
+
+    private void SelectLink(Guid id, bool value) { _selection.Toggle(id, value); _resolvedLinks = null; }
+    private void SelectPage(bool value) { _selection.SelectPage(value); _resolvedLinks = null; }
+
+    private async Task PrepareSelectedAsync()
+    {
+        if (_busy || _selection.Ids.Count == 0) return;
+        _busy = true;
+        _actionProblem = null;
+        _resolvedLinks = null;
+        try
+        {
+            _resolvedLinks = await ResourceApi.ResolveLinksAsync(new(_selection.Ids), CancellationToken.None);
+            _actionNotice = _resolvedLinks.Count < _selection.Ids.Count ? "Seçimin bir bölümü şu anda kullanılamıyor; yalnızca güncel uygun bağlantılar hazırlandı." : null;
+        }
+        catch (SecureOpsApiException exception) { _actionProblem = exception.Problem; }
+        finally { _busy = false; }
+    }
+
+    private Task AddSelectedAsync() => AddLinksAsync(CurrentPage?.Items.Where(link => _selection.Contains(link.Id)).ToArray() ?? []);
+
+    private async Task OpenLayoutAsync()
+    {
+        if (_preferences is null || _access is null || _busy) return;
+        DialogParameters parameters = new()
+        {
+            { nameof(ResourceLayoutDialog.Preferences), _preferences }, { nameof(ResourceLayoutDialog.Access), _access },
+            { nameof(ResourceLayoutDialog.Save), (Func<SaveResourceLayoutRequest, Task<UiProblem?>>)SaveLayoutAsync }
+        };
+        IDialogReference dialog = await Dialogs.ShowAsync<ResourceLayoutDialog>("Çalışma alanını düzenle", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+        if (!(await dialog.Result).Canceled) { _pageNumber = 1; await SearchAsync(); }
+    }
+
+    private async Task<UiProblem?> SaveLayoutAsync(SaveResourceLayoutRequest request)
+    {
+        if (_busy) return UiProblemFactory.FromResponse(409, null);
+        _busy = true;
+        _actionProblem = null;
+        try
+        {
+            _preferences = await ResourceApi.SaveLayoutAsync(request, CancellationToken.None);
+            _pageSize = Layout.PageSize;
+            _actionNotice = "Çalışma alanı tercihleriniz kaydedildi.";
+            return null;
+        }
+        catch (SecureOpsApiException exception) { _actionProblem = exception.Problem; return exception.Problem; }
+        finally { _busy = false; }
     }
 
     private async Task ToggleFavouriteAsync(ResourceLink link)
@@ -181,17 +258,20 @@
         {
             _preferences = await ResourceApi.SetFavouriteAsync(link.Id, !ResourceView.IsFavourite(_preferences, link.Id), _preferences.Version, CancellationToken.None);
             if (_favouritesOnly && CurrentPage is { Items.Count: 0, Page: > 1 }) _pageNumber--;
+            if (_favouritesOnly) await SearchAsync();
         }
         catch (SecureOpsApiException exception) { _actionProblem = exception.Problem; await LoadPreferencesAsync(); }
         finally { _busy = false; }
     }
 
-    private async Task AddToSetAsync(ResourceLink link)
+    private Task AddToSetAsync(ResourceLink link) => AddLinksAsync([link]);
+
+    private async Task AddLinksAsync(IReadOnlyList<ResourceLink> links)
     {
-        if (_preferences is null || _busy) return;
+        if (_preferences is null || _busy || links.Count == 0) return;
         DialogParameters parameters = new()
         {
-            { nameof(ResourceSetPickerDialog.Link), link },
+            { nameof(ResourceSetPickerDialog.Links), links },
             { nameof(ResourceSetPickerDialog.Preferences), _preferences },
             { nameof(ResourceSetPickerDialog.Save), (Func<Guid?, SaveShiftSetRequest, Task<UiProblem?>>)SaveGroupAsync }
         };
@@ -209,12 +289,21 @@
         {
             _preferences = id is { } groupId ? await ResourceApi.SaveSetAsync(groupId, request, CancellationToken.None)
                 : await ResourceApi.CreateSetAsync(request, CancellationToken.None);
+            _actionNotice = "Seçili bağlantılar kişisel grubunuzda kaydedildi.";
             return null;
         }
         catch (SecureOpsApiException exception) { _actionProblem = exception.Problem; await LoadPreferencesAsync(); return exception.Problem; }
         finally { _busy = false; }
     }
 
-    private void OnAccessChanged() => InvokeAsync(async () => { _access = await AccessProvider.GetAsync(); StateHasChanged(); });
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        _access = await AccessProvider.GetAsync();
+        _selection.Clear();
+        _resolvedLinks = null;
+        if (_access.Can(Capabilities.ResourcesView)) await ReloadAsync();
+        else _preferences = null;
+        StateHasChanged();
+    });
     public void Dispose() { AccessProvider.Changed -= OnAccessChanged; _query.Dispose(); }
 }

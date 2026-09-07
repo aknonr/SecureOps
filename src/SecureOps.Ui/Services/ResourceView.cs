@@ -27,7 +27,7 @@ public static class ResourceView
     public const int MaxFavourites = 200;
 
     /// <summary>Page sizes offered for the catalogue list.</summary>
-    public static readonly int[] PageSizes = [25, 50, 100];
+    public static readonly int[] PageSizes = [10, 25, 50, 100];
 
     /// <summary>
     /// Explains a saved set whose resolved list is shorter than what the operator saved.

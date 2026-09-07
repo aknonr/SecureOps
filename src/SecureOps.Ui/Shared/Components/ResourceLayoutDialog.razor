@@ -1,0 +1,70 @@
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+
+<MudDialog Class="so-dialog so-resource-dialog" DefaultFocus="DefaultFocus.FirstChild">
+    <TitleContent><div class="so-dialog-title"><MudIcon Icon="@Icons.Material.Outlined.DashboardCustomize" /><span>Çalışma alanını düzenle</span></div></TitleContent>
+    <DialogContent>
+        <div class="so-workspace-fields" data-guide="layout-fields">
+            <label class="so-field"><span>Görünüm</span><select aria-label="Görünüm" @bind="_view"><option value="cards">Kart</option><option value="list">Liste</option></select></label>
+            <label class="so-field"><span>Yoğunluk</span><select aria-label="Yoğunluk" @bind="_density"><option value="comfortable">Rahat</option><option value="compact">Kompakt</option></select></label>
+            <label class="so-field"><span>Sayfa boyutu</span><select aria-label="Sayfa boyutu" @bind="_pageSize">@foreach (int size in ResourceView.PageSizes) { <option value="@size">@size</option> }</select></label>
+        </div>
+        <h3 class="so-panel-title">Kısayollarım</h3>
+        <ul class="so-layout-shortcuts" data-guide="layout-shortcuts">
+            @foreach (string key in _shortcuts.Concat(ResourceWorkspaceView.Keys.Except(_shortcuts)).Where(k => ResourceWorkspaceView.Permitted(Access, k)).ToArray())
+            {
+                int index = _shortcuts.IndexOf(key);
+                <li @key="key">
+                    <label><input type="checkbox" checked="@(index >= 0)" @onchange="e => Pin(key, e.Value is true)" />@ResourceWorkspaceView.Label(key)</label>
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" aria-label="@($"{ResourceWorkspaceView.Label(key)}: Yukarı taşı")" title="Yukarı taşı" Size="Size.Small" Disabled="@(index <= 0)" OnClick="() => Move(index, -1)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" aria-label="@($"{ResourceWorkspaceView.Label(key)}: Aşağı taşı")" title="Aşağı taşı" Size="Size.Small" Disabled="@(index < 0 || index == _shortcuts.Count - 1)" OnClick="() => Move(index, 1)" />
+                </li>
+            }
+        </ul>
+        @if (_state.Problem is { } problem) { <SoProblemPanel Problem="problem" /> <p role="status">Taslağınız korunuyor. İşlem otomatik tekrarlanmaz; güncel tercihleri incelemek için bu pencereyi kapatın.</p> }
+    </DialogContent>
+    <DialogActions>
+        <MudButton StartIcon="@Icons.Material.Filled.RestartAlt" Disabled="@(!_state.CanSubmit)" OnClick="ResetAsync">Düzeni sıfırla</MudButton>
+        <MudButton Disabled="_state.Saving" OnClick="() => Dialog.Cancel()">Vazgeç</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_state.CanSubmit)" OnClick="SaveAsync">Kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public ResourcePreferencesResponse Preferences { get; set; } = default!;
+    [Parameter, EditorRequired] public AccessSnapshot Access { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<SaveResourceLayoutRequest, Task<UiProblem?>> Save { get; set; } = default!;
+    private string _view = "cards", _density = "comfortable";
+    private int _pageSize = 25;
+    private List<string> _shortcuts = [];
+    private readonly ResourceSaveState _state = new();
+    protected override void OnInitialized() => Apply(Preferences.WorkspaceLayout ?? ResourceWorkspaceLayout.Default);
+    private void Apply(ResourceWorkspaceLayout layout)
+    {
+        _view = layout.View;
+        _density = layout.Density;
+        _pageSize = layout.PageSize;
+        _shortcuts = layout.Shortcuts.Where(k => ResourceWorkspaceView.Permitted(Access, k)).ToList();
+    }
+    private void Pin(string key, bool value)
+    {
+        _shortcuts.Remove(key);
+        if (value) _shortcuts.Add(key);
+    }
+    private void Move(int index, int delta)
+    {
+        if (index < 0 || index + delta < 0 || index + delta >= _shortcuts.Count) return;
+        (_shortcuts[index], _shortcuts[index + delta]) = (_shortcuts[index + delta], _shortcuts[index]);
+    }
+    private async Task ResetAsync()
+    {
+        if (!_state.CanSubmit) return;
+        Apply(ResourceWorkspaceLayout.Default);
+        await SaveAsync();
+    }
+    private async Task SaveAsync()
+    {
+        if (await _state.TrySaveAsync(() => Save(new(new(_view, _density, _pageSize, _shortcuts.ToArray()), Preferences.Version)))) Dialog.Close(DialogResult.Ok(true));
+    }
+}

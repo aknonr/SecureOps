@@ -393,6 +393,15 @@ JSON, restart round-trip and transactional audit rollback, on
 No schema/grant changes. rc6.12 remains immutable and excludes all follow-up
 runtime changes. No prior size exception is used; increments stay below 1000 lines.
 
+Workspace UI increment: published loopback SQL-backed `workspace-usability.cjs`
+passes page-scoped selection, atomic two-link group addition, authoritative
+resolution/native keyboard activation with isolated openers, server layout
+persistence, desktop/mobile light/dark and no-result states. 44 affected unit
+tests pass. Evidence: `artifacts/workspace-usability-20260907/workspace-results.json`
+and `before-links-*`, `after-links-*`, `after-groups-*`. 720 CSS-pixel reflow
+was checked; native managed-browser 200% zoom is not yet claimed. This increment
+does not include the subsequent persisted operational browsing or tour work.
+
 **Current packaged delivery, rc6.12:** build source
 `682fa8eafcac611b0d18f93d0eb541f6a5acd2fc`, latest runtime
 `f528da27611f52ab3c5676c485d6f6e7756af54c`. The three local commits

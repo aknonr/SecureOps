@@ -5215,6 +5215,53 @@ html[data-so-appearance="light"] .so-auth-card {
     }
 }
 
+/* Bounded workspace fields keep labels outside control borders in both themes. */
+.so-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 0.85rem; color: var(--so-text); }
+.so-field > span { line-height: 1.4; font-weight: 600; }
+.so-field select, .so-field > input {
+    box-sizing: border-box; width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px;
+    color: var(--so-text); background: var(--so-surface); border: 1px solid var(--so-border); border-radius: 4px;
+    font: inherit;
+}
+.so-field .mud-input-control { margin-top: 0; }
+.so-field .mud-input { min-height: 40px; background: var(--so-surface); }
+.so-field .mud-input-control-input-container { padding-top: 0; }
+.so-field :focus-visible { outline: 2px solid var(--so-accent); outline-offset: 2px; }
+.so-workspace-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
+.so-layout-shortcuts { list-style: none; padding: 0; margin: 12px 0; }
+.so-layout-shortcuts li { display: flex; gap: 4px; align-items: center; border-bottom: 1px solid var(--so-border-soft); padding-block: 8px; }
+.so-layout-shortcuts label { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
+.so-workspace-shortcuts { display: flex; gap: 8px 20px; flex-wrap: wrap; padding-block: 8px 16px; }
+.so-workspace-shortcuts a { color: var(--so-accent); font-size: 0.85rem; text-underline-offset: 4px; }
+.so-workspace .so-resource-page-header { align-items: start; }
+.so-selection-choice, .so-resource-select { display: flex; align-items: center; gap: 8px; min-height: 36px; cursor: pointer; }
+.so-resource-select { justify-content: center; }
+.so-selection-choice input, .so-resource-select input, .so-layout-shortcuts input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--so-accent); }
+.so-selection-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; background: var(--so-bg-sunken); border-block: 1px solid var(--so-border); margin-bottom: 16px; }
+.so-selection-bar strong { margin-right: auto; font-size: 0.9rem; }
+.so-workspace-notice { padding-block: 10px; font-size: 0.9rem; color: var(--so-text); }
+.so-workspace--cards .so-resource-results > .so-resource-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 16px; }
+.so-workspace--cards .so-resource-results > .so-resource-list > .so-resource-item {
+    grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: 1fr auto;
+    padding: 18px; gap: 8px 12px; min-height: 220px; background: var(--so-surface);
+    border: 1px solid var(--so-border); border-radius: 6px;
+}
+.so-workspace--cards .so-resource-results > .so-resource-list .so-resource-actions { grid-column: 1 / -1; justify-content: flex-end; border-top: 1px solid var(--so-border-soft); padding-top: 10px; }
+.so-workspace .so-resource-meta { margin-top: 10px; gap: 6px 12px; }
+.so-workspace .so-resource-meta > span + span { border-left: 1px solid var(--so-border); padding-left: 12px; }
+.so-workspace--list .so-resource-results > .so-resource-list > .so-resource-item { grid-template-columns: 28px minmax(0, 1fr) auto; padding: 16px 4px; }
+.so-workspace--compact .so-resource-results > .so-resource-list > .so-resource-item { padding: 10px; min-height: 0; }
+.so-workspace--compact .so-resource-purpose { -webkit-line-clamp: 1; }
+.so-workspace .so-resource-pagination { border-top: 1px solid var(--so-border); margin-top: 20px; align-items: end; flex-wrap: wrap; }
+.so-resource-pagination .so-field { width: 120px; margin-right: auto; text-align: left; }
+.so-resource-pagination .so-pager-state { align-self: center; }
+@media (max-width: 720px) {
+    .so-workspace--list .so-resource-results > .so-resource-list > .so-resource-item { grid-template-columns: 28px minmax(0, 1fr); }
+    .so-workspace--list .so-resource-actions { grid-column: 1 / -1; }
+    .so-workspace-fields { grid-template-columns: minmax(0, 1fr); }
+    .so-resource-pagination .so-field { width: 100px; }
+}
+
 /* Resource experience: existing semantic tokens, unframed work areas. */
 /* Mud 6 retains a closed account popover's desktop offset after a narrow resize. */
 .so-user-menu-popover:not(.mud-popover-open) { display: none; }

@@ -1,0 +1,26 @@
+@using SecureOps.Domain.Resources
+
+<section class="so-set-resolved" aria-label="Açılmaya hazır bağlantılar" data-guide="open-resolved">
+    <h3 class="so-panel-title">Açılmaya hazır bağlantılar</h3>
+    @if (Links.Count == 0) { <p role="status">Seçiminizde şu anda açılabilecek bağlantı yok. Seçimi veya güncel erişiminizi kontrol edin.</p> }
+    else
+    {
+        <p role="status">@Links.Count bağlantı güncel erişiminizle doğrulandı.</p>
+        <ul class="so-resource-list so-resource-list--compact">
+            @foreach (ResourceLink link in Links)
+            {
+                <li class="so-resource-item" @key="link.Id">
+                    <label class="so-open-choice"><input type="checkbox" data-so-open-choice checked aria-label="@($"{link.Name}: Açmak için seç")" /><span>@link.Name</span></label>
+                    <a data-so-open-url href="@link.Url" target="_blank" rel="noopener noreferrer" aria-label="@($"{link.Name}: Tek başına aç")">Aç <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /></a>
+                </li>
+            }
+        </ul>
+        <button type="button" data-so-open-links class="mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-medium">
+            <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /> Bağlantıları aç
+        </button>
+        <p role="status" data-so-open-status hidden>Açma isteği gönderildi. Sekmeler açılmadıysa bu site için açılır pencere ayarını kontrol edin veya tekil Aç bağlantılarını kullanın.</p>
+        <p class="so-panel-text so-panel-text--sm">Sekme açılması, hedefin yüklendiği veya oturum açıldığı anlamına gelmez.</p>
+    }
+</section>
+
+@code { [Parameter, EditorRequired] public IReadOnlyList<ResourceLink> Links { get; set; } = []; }
