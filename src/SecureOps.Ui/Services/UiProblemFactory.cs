@@ -139,6 +139,15 @@ public static class UiProblemFactory
 
     private static UiProblem FromCode(string code, int statusCode) => code switch
     {
+        "InUseConflict" => Build(UiProblemKind.Conflict, code, "In Use veri sürümü değişti",
+            "Bu taslak veya önizleme artık güncel değil. İşlem tekrarlanmadı.",
+            ["Kayıtlı veriyi yeniden okuyun, cevapları kontrol edip tekrar kaydedin."], retryable: true, requiresRefresh: true),
+        "InUseInvalid" => Build(UiProblemKind.Validation, code, "In Use bilgilerini kontrol edin",
+            "Doğrulanmış veya uygulanamaz cevaplar için kanıt notu gereklidir.",
+            ["Sunucu cevaplarını, kanıt notlarını ve atama gerekçesini kontrol edin."], retryable: false, requiresRefresh: false),
+        "InUseAssigneeUnavailable" or "InUseAssignmentRequired" => Build(UiProblemKind.Forbidden, code, "In Use ataması gerekli",
+            "İnceleme yalnızca onaylı ve bu kayda atanmış uygulama kullanıcısı tarafından kaydedilebilir.",
+            ["Yetkili koordinatörden güncel inceleyici atamasını kontrol etmesini isteyin."], retryable: false, requiresRefresh: true),
         // ---- Application access -------------------------------------------------------------
         OperationalErrorCodes.AccessPending => Build(
             UiProblemKind.AccessPending, code,

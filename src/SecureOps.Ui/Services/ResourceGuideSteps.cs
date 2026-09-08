@@ -11,6 +11,18 @@ public static class ResourceGuideSteps
     {
         List<ResourceGuideStep> steps = surface switch
         {
+            "inuse-list" =>
+            [
+                new("inuse-filter", "Kayıtları bulun", "Tümü, bana atanan ve atanmamış görünümleri kayıtlı veriyi kullanır.", "", ""),
+                new("inuse-refresh", "Kaynak durumunu kontrol edin", "Son başarılı okumayı ve eksik kapsam uyarısını kontrol edin. Yenileme yalnızca açık komutla başlar.", "", ""),
+                new("inuse-list", "İncelemeye geçin", "Kaydı açarak sorumlu atamasını, kaynak kanıtını ve sunucu cevaplarını inceleyin.", "", "")
+            ],
+            "inuse-review" =>
+            [
+                new("inuse-owner", "Sorumluları ayırın", "Talep sahibi, servis sahibi ve kurulum ekibi kaynak kanıtıdır. Yerel inceleyici yetkili uygulama kimliğidir.", "", ""),
+                new("inuse-servers", "Her sunucuyu doğrulayın", "Bilinmeyen cevapları doğrulanmış saymayın. Toplu cevapta seçili sunucuları ve farklı ortamları ayrıca kontrol edin.", "", ""),
+                new("inuse-report", "Taslağı kaydedin", "Önizleme kayıtlı veri sürümüne bağlıdır. Kaynak değişmişse kaydı yeniden okuyup inceleyin. Bu adımlar kaynak kaydı kapatmaz.", "", "")
+            ],
             "personalize" =>
             [
                 new("layout-fields", "Görünümü seçin", "Kart veya liste, yoğunluk ve sayfa boyutu kişisel tercihinizdir. Rehber seçimlerinizi değiştirmez.", "resources", ""),

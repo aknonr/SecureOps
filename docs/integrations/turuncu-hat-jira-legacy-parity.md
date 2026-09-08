@@ -1,6 +1,66 @@
 # Turuncu Hat to Jira Legacy Parity
 
-## In Use Source Recovery, 2026-09-08
+## Complete In Use Source Review, 2026-09-08
+
+The complete local candidate is `C:\Users\dmtak\Downloads\İNUSE_V2.ps1`:
+18,661 bytes, 742 lines, SHA-256
+`5A1ED6EF3FE5FA4CDAA6FA6CD57E520F6102A824F94A9C6A8F9AD8DD4DEB7942`.
+PowerShell AST parsing returned zero errors. It was read only, not executed,
+modified or copied into Git. Authentication material and runtime addresses were
+excluded from inspection output. This is the located full source copy; no
+separately addressable attachment object was available in the tool interface.
+The old Desktop fragment below remains historical evidence of truncation, not
+syntax defects in this complete file. No repair of the original was performed.
+
+### Verified Behavior And Defects
+
+| Original lines | Evidence | V1 treatment |
+|---|---|---|
+| 323-334 | Active SMSS_oRFF, DCC IN (4241), group IN (68); selects id, p_code, p_emb_dynamic_case_orff | Separate read-only discovery; existing Jira NOT IN exclusion is unchanged |
+| 341-343 | Dynamic-case identity from positional OR cell 3; per-OR Yes/No confirmation | No dynamic-case mutation; explicit operator refresh/review |
+| 382-436 | `rel`, m_tid=100049, m_lid=OR id, 15 service-instance select expressions | Request is evidence, not an expanded response contract; real server relationships remain unresolved |
+| 439, 487-490 | `$servisID` reads `$si[25][0]` before the relevant server foreach; the in-loop replacement is commented out | Per-server evidence only; no service identity obtained from another server |
+| 442-468 | Functional aspect query: name [Genel], p_rel_service_id; takes first result | Zero/multiple owner/aspect relationships never assign a local identity; no real aspect query until response keys are evidenced |
+| 492-522 | Three security questions; accepted common answers apply to remaining servers without individual re-review | Explicit selected-server bulk draft with environment/service labels and confirmation; no silent save |
+| 524-608 | Prod implies NMS/CPU/memory/disk Yes; up/down and KONTROL Yes; country, department, contact/owner/event addresses, OS release and aspect text are constants | Unknown/not verified unless an operator supplies an explicit answer and evidence; no embedded addresses reused |
+| 637-658 | OR dynamic properties: p_dcctp=4463 gets Application Server; 4464 gets `$si[5][0]` after the loop | Confirms last-server dependency. Neither property is updated; no OR-wide environment is inferred |
+| 663-698 | Workbook saved only after property writes; then file bytes/base64 sent to UploadAttachmentString using fBase=SMSS_oRFF, fId, fName, datastring | Managed local report only; no upload dependency or endpoint. Original upload error output also references the wrong response variable |
+| 703-732 | BPM_Actvty models 103626 OR 103627, status=1, group=68, main-object id; Items[0][0] used for update m_status=4 | No BPM call. Original does not prove uniqueness, require Success=true, or reread authoritative OR state after success |
+
+The original expanded positional reads do not establish response keys or joins:
+SI cells 0 inventory, 1 hostname, 2 server type, 4 environment display,
+6 consumer, 8 service display, 10 network segment, 12 IP, 13 OS,
+15 OS version, 17 owner directorate, 19 building, 21 city, 23 device category,
+25 service id. Cell 5 is used separately for the OR environment property.
+These are exact script positions, not approved field semantics. In particular,
+owner directorate, service owner, provisioning team and application reviewer
+must remain distinct; no corporate identity is inferred from an address/name.
+
+### Workbook Compatibility
+
+`Sunucular` has column A labels, columns B onward one server each; row 1 is
+ALAN ADI / Sunucu N Bilgileri. Rows 2-29 are inventory, hostname, server type,
+environment, consumer, owner directorate, service name, service aspect, network,
+IP, OS, OS version, OS release, InternetOut, InternetIn, Microsegmented,
+NMS requested, country, city, building, department, subdepartment, contact,
+UY owner mail, memory, CPU, up/down and disk alarms (469-482, 616-630).
+`NMS` has the exact 22 headers from 175-219, with one server per row;
+its ENV_ID column maps ENVANTER_ID, and its Server_Type column historically
+maps the per-server environment, not a newly inferred server-type meaning.
+The V1 workbook retains these positions and exact labels, including Turkish
+text. All unproven values are explicit unknowns. `CheckList_TEKNIK` and
+`CheckList_THY` are created at 358-364 but never populated by this full script;
+V1 preserves their empty state rather than fabricate technical approval.
+
+V1 additionally includes `Provenance` and `ReviewEvidence`, text-only cells,
+source/aggregate versions, source hash, last observation, authenticated reviewer
+and preparer, timestamps, synthetic marker and local-draft warning. Formula-like
+text is prefixed and every cell is an inline string with no formula element.
+Compatibility with a corporate template validator, additional-sheet acceptance,
+formatting requirements and technical-sheet content still need a sanitized
+approved workbook/template. The script alone cannot approve those requirements.
+
+## In Use Source Recovery, 2026-09-08 (Historical Truncated Copy)
 
 This is a separate workflow from the OR-to-Jira script reviewed below. The task
 states active `SMSS_oRFF`, `p_dcc IN (4241)`, `p_rel_group IN (68)` for In Use;

@@ -110,6 +110,7 @@ AddSecureOpsApiClient<IManagementReportingApiClient, ManagementReportingApiClien
 AddSecureOpsApiClient<IDirectoryApiClient, DirectoryApiClient>(builder.Services);
 AddSecureOpsApiClient<ISessionApiClient, SessionApiClient>(builder.Services);
 AddSecureOpsApiClient<IResourceApiClient, ResourceApiClient>(builder.Services);
+AddSecureOpsApiClient<InUseApiClient, InUseApiClient>(builder.Services);
 
 WebApplication app = builder.Build();
 

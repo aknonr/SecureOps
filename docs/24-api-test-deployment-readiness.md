@@ -5,8 +5,13 @@
 The operator reports manual rc6.13 deployment to TEST. This task has not verified
 deployed API/UI hashes, schema/grants or corporate acceptance checks; the runbook
 below remains the acceptance reference. No deployment, release repackaging,
-corporate SQL/API call or write-fence change was performed. In Use recovery and
-its source/implementation blockers are in the canonical `src/SecureOps.Ui/README.md`.
+corporate SQL/API call or write-fence change was performed. In Use V1 is implemented
+and verified locally, with additive migration 012 applied only to isolated LocalDB.
+Its canonical implementation/evidence/remaining-contract handoff is
+`src/SecureOps.Ui/README.md`; exact future runtime grant deltas are in `sql/README.md`.
+It is not included in rc6.13. Do not apply 012 or deploy this source as part of the
+existing rc6.13 runbook without separate rollout approval. The rc6.13 pilot below
+still uses its own 001-011 baseline and does not wait for In Use rollout.
 
 Remaining prerequisites for a **single-record Jira-only TEST pilot**, independent
 of In Use development:

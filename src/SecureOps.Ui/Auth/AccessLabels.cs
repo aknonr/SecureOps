@@ -74,7 +74,9 @@ public static class AccessLabels
         [Roles.Operator] = "Operasyon Uzmanı",
         [Roles.JiraPublisher] = "Jira İşlem Yetkilisi",
         [Roles.Auditor] = "Denetim Görüntüleyicisi",
-        [Roles.ReadOnly] = "Sadece Görüntüleme"
+        [Roles.ReadOnly] = "Sadece Görüntüleme",
+        ["InUseReviewer"] = "In Use İnceleyicisi",
+        ["InUseCoordinator"] = "In Use Koordinatörü"
     };
 
     private static readonly Dictionary<string, string> _roleDescriptions = new(StringComparer.Ordinal)
@@ -84,11 +86,17 @@ public static class AccessLabels
         [Roles.Operator] = "Ekip ve operasyonel kayıtları görüntüler; Jira önizlemesi hazırlar ancak Jira kaydı oluşturamaz.",
         [Roles.JiraPublisher] = "Operasyonel kayıtları görüntüler, Jira önizlemesi hazırlar, Jira kaydı oluşturur ve başarısız aktarımı yeniden dener.",
         [Roles.Auditor] = "Denetim, yönetim raporları ve operasyonel tanılama bilgilerini salt okunur olarak görüntüler.",
-        [Roles.ReadOnly] = "Yalnızca operasyonel kayıtları görüntüler."
+        [Roles.ReadOnly] = "Yalnızca operasyonel kayıtları görüntüler.",
+        ["InUseReviewer"] = "Atandığı In Use kayıtlarını yerel olarak inceler ve Excel taslağı hazırlar; kaynak sistemde yazma yetkisi vermez.",
+        ["InUseCoordinator"] = "In Use salt okunur keşfi, yerel atama, inceleme ve Excel hazırlığı; kaynak sistemde yazma yetkisi vermez."
     };
 
     private static readonly Dictionary<string, CapabilityDescriptor> _capabilities = new(StringComparer.Ordinal)
     {
+        [Capabilities.InUseView] = new(Capabilities.InUseView, "In Use", "Kayıtları görüntüleme", "Kayıtlı In Use verisini okur."),
+        [Capabilities.InUseReview] = new(Capabilities.InUseReview, "In Use", "Yerel inceleme", "Yerel inceleme taslağı ve Excel hazırlığı."),
+        [Capabilities.InUseAssign] = new(Capabilities.InUseAssign, "In Use", "İnceleyici atama", "Onaylı uygulama kimliğine yerel atama."),
+        [Capabilities.InUseRefresh] = new(Capabilities.InUseRefresh, "In Use", "Salt okunur keşif", "Kategori 4241 / grup 68 kaynak okuması."),
         [Capabilities.IdentityLookup] = new(
             Capabilities.IdentityLookup, Groups.Identity,
             "Kimlik sorgulama",

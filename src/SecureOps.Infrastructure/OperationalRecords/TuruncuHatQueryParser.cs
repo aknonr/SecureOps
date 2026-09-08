@@ -20,14 +20,15 @@ internal static class TuruncuHatQueryParser
     public static ParsedSourceRecords ParseSource(
         JsonElement root,
         int maximumDescriptionLength,
-        IReadOnlyList<string> expectedKeys)
+        IReadOnlyList<string> expectedKeys,
+        bool requireSemanticKeys = false)
     {
         JsonElement items = GetItems(root);
         List<OperationalRecordSourceItem> parsed = [];
         int malformed = 0;
         foreach (JsonElement item in items.EnumerateArray())
         {
-            if (!TrySourceProjection(item, expectedKeys, out IReadOnlyList<string?> values)
+            if (!TrySourceProjection(item, expectedKeys, requireSemanticKeys, out IReadOnlyList<string?> values)
                 || string.IsNullOrWhiteSpace(values[0])
                 || string.IsNullOrWhiteSpace(values[1])
                 || string.IsNullOrWhiteSpace(values[2])
@@ -238,6 +239,7 @@ internal static class TuruncuHatQueryParser
     private static bool TrySourceProjection(
         JsonElement item,
         IReadOnlyList<string> expectedKeys,
+        bool requireSemanticKeys,
         out IReadOnlyList<string?> values)
     {
         values = [];
@@ -249,7 +251,7 @@ internal static class TuruncuHatQueryParser
         bool hasKeyedCells = cells.Any(cell => cell.Key is not null);
         if (!hasKeyedCells)
         {
-            if (cells.Count != expectedKeys.Count)
+            if (requireSemanticKeys || cells.Count != expectedKeys.Count)
             {
                 return false;
             }

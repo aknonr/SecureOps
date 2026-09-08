@@ -6,6 +6,7 @@ using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
+using SecureOps.Infrastructure.InUse;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Infrastructure.Persistence;
 using SecureOps.Infrastructure.Reporting;
@@ -140,17 +141,20 @@ public static class DependencyInjection
         {
             services.AddScoped<IAccessRepository, SqlAccessRepository>();
             services.AddScoped<IResourceRepository, SqlResourceRepository>();
+            services.AddScoped<IInUseRepository, SqlInUseRepository>();
             services.AddScoped<IFirstAdminBootstrapStore, SqlFirstAdminBootstrapStore>();
         }
         else
         {
             services.AddSingleton<IAccessRepository, InMemoryAccessRepository>();
             services.AddSingleton<IResourceRepository, InMemoryResourceRepository>();
+            services.AddSingleton<IInUseRepository, InMemoryInUseRepository>();
             services.AddSingleton<IFirstAdminBootstrapStore, UnavailableFirstAdminBootstrapStore>();
         }
 
         services.AddScoped<IApplicationAccessService, ApplicationAccessService>();
         services.AddScoped<ResourceCatalogueService>();
+        services.AddScoped<InUseService>();
         if (string.Equals(configuration[$"{SessionSecurityOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IApplicationSessionRepository, SqlApplicationSessionRepository>();
@@ -164,6 +168,11 @@ public static class DependencyInjection
         services.AddScoped<ApplicationSessionContext>();
 
         string? sourceProvider = configuration[$"{OperationalRecordsOptions.SectionName}:SourceProvider"];
+        services.AddSingleton<IInUseSourceClient>(provider =>
+            string.Equals(sourceProvider, "Fake", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(sourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase) ? new LocalInUseSourceClient()
+            : provider.GetRequiredService<IOperationalRecordClient>() is IInUseSourceClient client ? client
+            : new DisabledInUseSourceClient());
         if (string.Equals(sourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IOperationalRecordClient, SimulationOperationalRecordClient>();

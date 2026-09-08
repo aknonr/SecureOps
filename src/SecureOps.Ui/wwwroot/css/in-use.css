@@ -1,0 +1,30 @@
+/* In Use workspace layout; all colors follow the established semantic theme. */
+.so-inuse { overflow-wrap: anywhere; }
+.so-inuse h2 { font-size: 1.1rem; margin: .35rem 0; }
+.so-inuse h3 { font-size: 1rem; margin-bottom: .75rem; }
+.so-inuse-band { padding: 1.25rem 0; border-bottom: 1px solid var(--so-border); }
+.so-inuse-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: end; }
+.so-inuse label { display: grid; gap: .35rem; font-size: .875rem; min-width: 0; }
+.so-inuse input:not([type=checkbox]), .so-inuse select, .so-inuse textarea {
+    width: 100%; min-width: 0; padding: .6rem; border: 1px solid var(--so-border-input);
+    border-radius: 4px; color: var(--so-text); background: var(--so-surface); font: inherit;
+}
+.so-inuse-records { list-style: none; padding: 0; }
+.so-inuse-records li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--so-border); }
+.so-inuse-pager { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; padding: 1rem 0; }
+.so-inuse-pager label { display: flex; align-items: center; gap: .5rem; }
+.so-inuse-pager select { width: 5rem; }
+.so-inuse-evidence { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr); gap: .5rem 1rem; margin: 1rem 0; }
+.so-inuse-evidence dt { font-weight: 600; }
+.so-inuse-evidence dd { margin: 0; }
+.so-inuse-server, .so-inuse-bulk { border-bottom: 1px solid var(--so-border); padding: 1rem 0; }
+.so-inuse summary { cursor: pointer; font-weight: 600; padding: .5rem 0; }
+.so-inuse-answer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 1rem; margin: .75rem 0; }
+.so-inuse .so-inuse-check { display: flex; align-items: center; gap: .6rem; margin: .75rem 0; }
+.so-inuse-workbook { overflow: auto; max-height: 28rem; border: 1px solid var(--so-border); margin-top: 1rem; }
+.so-inuse-workbook table { border-collapse: collapse; }
+.so-inuse-workbook td { border: 1px solid var(--so-border); padding: .5rem; min-width: 10rem; max-width: 24rem; }
+@media (max-width: 700px) {
+    .so-inuse-filters, .so-inuse-answer, .so-inuse-records li, .so-inuse-evidence { grid-template-columns: minmax(0, 1fr); }
+    .so-inuse-evidence dd { margin-bottom: .6rem; }
+}

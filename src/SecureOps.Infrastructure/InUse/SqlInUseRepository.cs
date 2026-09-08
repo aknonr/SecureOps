@@ -1,0 +1,152 @@
+using System.Data;
+using System.Text.Json;
+using Dapper;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using SecureOps.Infrastructure.Audit;
+using SecureOps.Shared.Contracts.InUse;
+
+namespace SecureOps.Infrastructure.InUse;
+
+/// <summary>Local SQL state with exact-version writes and same-transaction audit.</summary>
+public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRepository
+{
+    private readonly string _connectionString = configuration.GetConnectionString("SecureOpsDb")
+        ?? throw new InvalidOperationException("In Use persistence requires SecureOpsDb.");
+
+    /// <inheritdoc />
+    public async Task<InUsePage> QueryAsync(InUseQuery query, Guid actorId, CancellationToken cancellationToken)
+    {
+        const string where = """
+             FROM ops.InUseRecords WHERE
+             (@Search IS NULL OR CHARINDEX(@Search, Code) > 0 OR CHARINDEX(@Search, Title) > 0)
+             AND (@Status IS NULL OR ReviewStatus = @Status)
+             AND (@View = 'all' OR (@View = 'mine' AND AssigneeId = @ActorId) OR (@View = 'unassigned' AND AssigneeId IS NULL))
+            """;
+        await using SqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        // State is always locked first, matching mutation lock order.
+        InUseRefreshState state = await ReadStateAsync(connection, transaction, cancellationToken);
+        using SqlMapper.GridReader rows = await connection.QueryMultipleAsync(Command("SELECT COUNT(*)" + where + "; SELECT RecordJson" + where
+            + " ORDER BY Code, Id OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;", new
+            {
+                Search = string.IsNullOrWhiteSpace(query.Search) ? null : query.Search.Trim(),
+                query.Status,
+                query.View,
+                ActorId = actorId,
+                Offset = (query.Page - 1) * query.PageSize,
+                query.PageSize
+            }, cancellationToken, transaction));
+        int count = await rows.ReadSingleAsync<int>();
+        InUseRecord[] records = [.. (await rows.ReadAsync<string>()).Select(Read<InUseRecord>)];
+        await transaction.CommitAsync(cancellationToken);
+        return new(records, count, query.Page, query.PageSize, state);
+    }
+
+    /// <inheritdoc />
+    public async Task<InUseRecord?> GetAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = new(_connectionString);
+        string? json = await connection.QuerySingleOrDefaultAsync<string>(Command(
+            "SELECT RecordJson FROM ops.InUseRecords WHERE Id = @Id;", new { Id = id }, cancellationToken));
+        return json is null ? null : Read<InUseRecord>(json);
+    }
+
+    /// <inheritdoc />
+    public async Task<InUseRefreshState> StateAsync(CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = new(_connectionString);
+        return await ReadStateAsync(connection, null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RefreshAsync(long expectedVersion, InUseBatch? batch, string? error, AuditEvent audit, CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        InUseRefreshState state = await ReadStateAsync(connection, transaction, cancellationToken);
+        if (state.Version != expectedVersion)
+        { return false; }
+        foreach (InUseSource source in batch?.Records ?? [])
+        {
+            string? json = await connection.QuerySingleOrDefaultAsync<string>(Command(
+                "SELECT RecordJson FROM ops.InUseRecords WITH (UPDLOCK, HOLDLOCK) WHERE SourceId = @Id;",
+                new { source.Id }, cancellationToken, transaction));
+            InUseRecord next = InUseState.Merge(json is null ? null : Read<InUseRecord>(json), source, audit.OccurredAt);
+            await PersistAsync(connection, transaction, next, json is null, cancellationToken);
+        }
+        InUseRefreshState nextState = InUseState.Refresh(state, batch, error, audit.OccurredAt);
+        await connection.ExecuteAsync(Command("UPDATE ops.InUseRefresh SET Version = @Version, StateJson = @Json WHERE Id = 1;",
+            new { nextState.Version, Json = JsonSerializer.Serialize(nextState) }, cancellationToken, transaction));
+        await AuditAsync(connection, transaction, audit, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public Task<bool> SaveAsync(InUseRecord next, long expectedVersion, AuditEvent audit, CancellationToken cancellationToken) =>
+        WriteAsync(next.Id, expectedVersion, next, audit, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> ExportAsync(Guid id, long expectedVersion, AuditEvent audit, CancellationToken cancellationToken) =>
+        WriteAsync(id, expectedVersion, null, audit, cancellationToken);
+
+    private async Task<bool> WriteAsync(Guid id, long expectedVersion, InUseRecord? next, AuditEvent audit, CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await ReadStateAsync(connection, transaction, cancellationToken);
+        long? version = await connection.QuerySingleOrDefaultAsync<long?>(Command(
+            "SELECT Version FROM ops.InUseRecords WITH (UPDLOCK, HOLDLOCK) WHERE Id = @Id;", new { Id = id }, cancellationToken, transaction));
+        if (version != expectedVersion)
+        { return false; }
+        if (next is not null)
+        { await PersistAsync(connection, transaction, next, false, cancellationToken); }
+        await AuditAsync(connection, transaction, audit, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    private static async Task<InUseRefreshState> ReadStateAsync(SqlConnection connection, SqlTransaction? transaction, CancellationToken token) =>
+        Read<InUseRefreshState>(await connection.QuerySingleAsync<string>(Command(
+            "SELECT StateJson FROM ops.InUseRefresh WITH (UPDLOCK, HOLDLOCK) WHERE Id = 1;", null, token, transaction)));
+
+    private static Task PersistAsync(SqlConnection connection, SqlTransaction transaction, InUseRecord record, bool insert, CancellationToken token) =>
+        connection.ExecuteAsync(Command(insert ? """
+            INSERT INTO ops.InUseRecords(Id, SourceId, Code, Title, AssigneeId, ReviewStatus, Version, RecordJson)
+            VALUES(@Id, @SourceId, @Code, @Title, @AssigneeId, @ReviewStatus, @Version, @Json);
+            """ : """
+            UPDATE ops.InUseRecords SET Code = @Code, Title = @Title, AssigneeId = @AssigneeId,
+                ReviewStatus = @ReviewStatus, Version = @Version, RecordJson = @Json WHERE Id = @Id;
+            """, new
+        {
+            record.Id,
+            SourceId = record.Source.Id,
+            record.Source.Code,
+            record.Source.Title,
+            record.AssigneeId,
+            ReviewStatus = record.Status,
+            record.Version,
+            Json = JsonSerializer.Serialize(record)
+        }, token, transaction));
+
+    private static Task AuditAsync(SqlConnection connection, SqlTransaction transaction, AuditEvent audit, CancellationToken token) =>
+        connection.ExecuteAsync(Command("""
+            INSERT INTO audit.AuditLog(OccurredAt, Actor, Action, CorrelationId, DetailsJson)
+            VALUES(@OccurredAt, @Actor, @Action, @CorrelationId, @DetailsJson);
+            """, new
+        {
+            audit.OccurredAt,
+            audit.Actor,
+            audit.Action,
+            audit.CorrelationId,
+            DetailsJson = JsonSerializer.Serialize(audit.Details)
+        }, token, transaction));
+
+    private static T Read<T>(string json) => JsonSerializer.Deserialize<T>(json) ?? throw new InvalidDataException("In Use stored state is invalid.");
+    private static CommandDefinition Command(string sql, object? values, CancellationToken token, SqlTransaction? transaction = null) =>
+        new(sql, values, transaction, commandTimeout: 15, cancellationToken: token);
+}

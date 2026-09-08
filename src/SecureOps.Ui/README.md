@@ -372,64 +372,113 @@ MudBlazor stays at 6.16.0; the boundedness assessment and exact application-wide
 are above. Local success is not TEST sign-off. Resume from this entry and `docs/decisions-log.md`,
 not the historical blocker list above; the hidden-membership and environment contract blockers are resolved.
 
-### In Use Milestone Recovery, 2026-09-08
+### In Use V1 Canonical Handoff, 2026-09-08
 
-Implementation is not delivered yet. Start HEAD was
-`f18d48329d163acf12f4c7ea501f598ad9f0b1f5` on
-`feature/sql-runtime-hardening-20260902`, tracking the same origin branch.
-The tracked worktree was clean; untracked `.vscode/` is excluded and preserved.
-Two documentation commits were ahead of the cached upstream. Live `ls-remote`
-and normal push both failed: `could not read Username for 'https://github.com':
-terminal prompts disabled`, with Git Credential Manager interaction disabled.
-An unauthenticated GitHub repository read returned HTTP 404. These attempts do
-not establish a current remote SHA, default branch, or merge state. The prior
-verified remote/build source remains historical evidence below.
+**Implemented locally, not deployed or packaged.** Start source and synchronized
+remote were `49ca6e81457ed9f86b1e46833e30f17bc754d208` on
+`feature/sql-runtime-hardening-20260902`. GCM authentication and the three prior
+documentation pushes were already complete. This entry supersedes the earlier
+authentication, truncated-source and scope-approval blockers, not rc6.13 evidence.
+The scoped total-diff authorization is recorded once in
+`docs/22-operational-record-jira-workflow.md`, In Use V1 Authorization.
+Untracked `.vscode/` and all existing release archives remain excluded/preserved.
+The fresh live read/fetch required a process-only Git credential username hint
+for the existing `aknonr` GCM account; no sign-in, credential deletion or global
+setting change was needed. The final response records the independently queried post-push source/remote SHA;
+the implementation commit is not an rc6.13 build or a corporate acceptance claim.
 
-The operator reports manually deploying rc6.13 to TEST. This is an operator
-report, not newly verified binary pairing, schema/grants, browser behavior or
-corporate acceptance. Existing rc6.13 and older archives/hashes are preserved;
-no release candidate, deployment or corporate call was performed in this task.
+**Operator workflow:** an approved `InUseCoordinator` (or existing Admin) opens
+`/in-use`, explicitly refreshes, searches/filters the persisted list and assigns an
+approved reviewer by stable application identity with a reason. `InUseReviewer`
+can browse and review records assigned to them. All/mine/unassigned, review-status
+filters and footer page size are supported. Open a record, inspect the separately
+sourced requester/service owner/provisioner/assignee, review each server, and save
+a local draft. Unknown is valid; other check answers require evidence. Bulk changes
+require selected servers, a visible answer/evidence and explicit confirmation, then
+individual review/save. Preview the saved workbook and download it. Neither action
+uploads or changes Turuncu Hat. Concurrent assignment/refresh/save rejects stale
+drafts and downloads; reload the persisted record and review again. The contextual
+guide is replayable, has real targets, keyboard navigation and focus return, and
+does not refresh or save workflow state. Rapid guide closure no longer races a
+second focus interop call against a removed element.
 
-The only located In Use script is an incomplete Desktop file. Exact provenance,
-available helper behavior and missing source sections are recorded in
-`docs/integrations/turuncu-hat-jira-legacy-parity.md`, under In Use source recovery.
-The complete original is required to verify the requested legacy defects and
-sheet/field compatibility. Do not use the OR-to-Jira script as its substitute.
+**Reuse and boundaries:** existing Turuncu Hat session/transport/response bounds,
+persisted capabilities/users, command tracking, same-transaction SQL audit,
+versioned writes, typed UI HTTP/session handling, theme/components and guide.
+New `InUse` contracts/service/repositories/controller/workbook/UI are independent
+of Jira rules. Real discovery uses active `SMSS_oRFF`, category 4241/group 68,
+strict semantic root keys, maximum 100 records and a 45-second service timeout.
+Unproven completeness is visibly partial/stale; failures and missing rows never
+delete stored records. Real server/owner joins remain unresolved, not guessed.
+The existing OR-to-Jira category-4241 exclusion and corporate write settings
+`ReadOnlyIntegrationMode=true`, `ControlledTestWritesEnabled=false`,
+`SourceCloseEnabled=false` are unchanged. New capabilities authorize local work
+only. Resources personal ownership and SDM permissions are unchanged.
 
-The requested scope explicitly includes local assignment/review/export and UI/API
-implementation. Repository quality guidance still caps the total diff at 1,000
-lines (`docs/agent-guides/090-testing-quality.md`, Definition of Done). A task-only
-exception has been requested for the combined API/SQL/UI/workbook/test/OpenAPI
-milestone; no exception has been received. Do not divide commits to conceal the
-total, or change the permanent rule. No In Use source, schema, role or UI entry
-point has been added during recovery.
+**Source and workbook:** the complete 18,661-byte/742-line Downloads script has
+zero AST parse errors and includes save/upload/BPM sections. Its exact SHA-256,
+line-based behavior/defects, 29-row Sunucular and 22-column NMS mappings are in
+`docs/integrations/turuncu-hat-jira-legacy-parity.md`. It was not executed, edited
+or committed. The Desktop fragment is historical incomplete evidence. Managed
+`.NET ZipArchive/XmlWriter` emits the four legacy sheets plus provenance and review
+evidence, with text-only, formula-safe cells. The script leaves both technical
+check sheets blank; no unprovided corporate template is claimed. Hardcoded owners,
+environment-dependent successful checks and monitoring enrollment are not copied
+as facts. Preview/download are bound to source hash/version and reviewed aggregate
+version; report hash and actor are audited before delivery.
 
-Verified reuse points: Turuncu Hat session renewal, bounded JSON transport and
-exact-key source parsing; persisted application capabilities and stable user IDs;
-SQL transaction/audit and expected-version patterns; durable command execution;
-existing API clients, error presentation and positioned workspace guide.
-Keep requester, service owner, provisioning team and local reviewer separate.
-Unresolved source relationships stay unresolved; manual assignment must use the
-persisted access identity, with audit and a version check.
+**Schema/grants:** source baseline was 001-011; additive 012 creates
+`ops.InUseRecords`, singleton `ops.InUseRefresh` and two unassigned role definitions.
+No applied migration was edited. Runtime delta: SELECT/INSERT/UPDATE on records,
+SELECT/UPDATE on refresh; existing audit INSERT, command-store permissions and
+access reads are reused. No DELETE/DDL/db_owner/audit mutation is granted. Exact
+reviewed grant statements are in `sql/README.md`. Only the approved isolated
+`(localdb)\SecureOpsResourcesV1`, `SecureOps_ResourcesV1_*` test databases were used.
 
-SQL currently ends at 011. New independent persistence would require a reviewed
-012 migration; none has been created or applied, and runtime grants are unchanged.
-`src/SecureOps.Worker/Program.cs` only builds/runs an empty generic host. Its README
-describes planned Hangfire responsibilities, not implemented jobs or verified
-deployment. The first workspace must use explicit operator refresh. A later
-read-only Hangfire job can call the same bounded synchronization service after
-worker hosting, storage, identity, scheduling and retry contracts are approved.
+**Verification and replay:** `tests/browser/in-use-workspace.cjs` exercises the
+published local HTTPS UI with synthetic SQL-backed records, assignment, explicit
+bulk and differing server answers, draft save, workbook download, stale rejection,
+guide non-mutation/focus, shared Resources modal-guide regression, next/previous
+pagination and desktop/mobile light/dark states. Separate published runs prove
+direct-route/menu denial and API-unavailable presentation with retained rows. Local evidence root:
+`C:\SecureOpsBuild\validation\inuse-v1-20260908\evidence`. Before images are from
+preserved rc6.13 archive copies (`before-rc6.13-no-inuse-*`); after images are
+`after-list-*`, `after-review-dark-*`, `after-workbook-dark-*` and
+`after-concurrency-*`, at 1440x900 and 390x844. `*-browser-result.json` records
+completed runs. Published UI/API loopback ports are 5314 HTTPS / 5313 HTTP; harness
+arguments specify the installed playwright-core path, these URLs and evidence root.
+New unit/hosted API/isolated SQL tests cover malformed and reordered cells, zero
+and multiple servers, ambiguous ownership, refresh retention, stale/concurrent
+save/assignment, direct authorization, audit-failure rollback, workbook safety and
+provenance. The fresh SQL harness passed 001-012, the existing upgrade path and all
+14 SQL tests in `SecureOps_ResourcesV1_v1verified20260908`. Full suites passed
+1,108 unit and 253 integration tests, zero skips. Release build and local publish
+passed without warnings/errors; OpenAPI snapshot passed and structural comparison
+proved every prior path/schema unchanged. NuGet transitive vulnerability scan found
+none; no package/project dependency was added or upgraded. New C# files pass strict
+format verification; all changed C# files pass with only existing IDE1006 naming
+findings excluded in the two old Turuncu Hat files and UiProblemFactory. Those
+pre-existing private constants were not renamed. rc6.13 API/UI archive SHA-256
+values still match the historical manifest. No new release archive was created.
 
-Continuation: complete original source, then resolve the combined-diff constraint
-and implement/verify the requested workspace. In Use scope is active `SMSS_oRFF`,
-`p_dcc IN (4241)`, `p_rel_group IN (68)` as stated in the task; the existing Jira
-workflow excludes 4241. No In Use-to-Jira eligibility is implied. Preserve all
-three write fences. Future In Use attachment/property/BPM commands require their
-own authorization gates and authoritative outcome verification.
+Synthetic published hosts use existing Demo/Simulation profile validation
+(`ReadOnlyIntegrationMode=false` is required for that non-corporate provider pair);
+this is a process-only synthetic setting, not a change to corporate fences or
+appsettings. Browser network is loopback-only. No corporate data or API call,
+release packaging, deployment, attachment upload, Jira creation or BPM close was
+performed. Corporate expanded response keys/cardinality/completeness, owner joins,
+approved workbook consumption/template acceptance, real screen-reader/browser
+policy and deployed AD/IIS/F5/SQL behavior remain unverified. No external model is used.
 
-Jira-only TEST prerequisites remain independent of In Use. See the current
-deployment-readiness note and the numbered evidence requirements in
-`docs/integrations/turuncu-hat-jira-contract-gaps.md`; no external writes are enabled.
+**Bounded continuation:** Worker remains an empty generic host, not a deployed
+scheduler. After separate hosting/storage/service-identity/schedule/retry approval,
+add one read-only job invoking the same bounded synchronization path; it is not
+required for V1. Attachment/property/BPM closure needs a separately authorized
+In Use capability and activation fence, approved transition contracts, unique BPM
+matching, reconciliation/idempotency and authoritative OR-state verification.
+Enabling SDM must never enable those commands implicitly. Jira-only TEST pilot
+prerequisites remain the separate current list in
+`docs/24-api-test-deployment-readiness.md`; In Use is not an SDM activation dependency.
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 

@@ -6,6 +6,43 @@ ProblemDetails includes safe `code`, `stage`, `retryable`, `correlationId`, and 
 
 ## Persisted Operational Browsing
 
+### Independent In Use Workspace
+
+All `/api/v1/in-use` routes require authentication and InUse.View. They do not
+reuse OR-to-Jira eligibility, claims or source-close commands. Additional gates:
+
+| Method/path suffix | Additional capability | Contract |
+|---|---|---|
+| GET root | none | persisted search (max 100), view=all/mine/unassigned, status=Unreviewed/Draft/Stale, page=1..100000, pageSize=1..100 default 25; matching total plus refresh state |
+| GET /{id} | none | distinct source ownership evidence, per-server evidence, local assignee, source and aggregate versions, nullable draft |
+| GET /assignees | InUse.Assign | at most 200 approved InUse.View+Review application IDs/principals; no directory search or source-name matching |
+| POST /refresh | InUse.Refresh | nonempty commandId GUID; existing command tracking and refresh rate limit; at most 100 accepted records, 45s orchestration deadline and existing response-byte bounds |
+| PUT /{id}/assignment | InUse.Assign | expectedVersion, nullable assigneeId, nonblank reason max 500; approved exact identity or explicit unassignment |
+| PUT /{id}/draft | InUse.Review plus current assignment | expectedVersion, sourceVersion, answers (serverId/check/value/evidence), notes max 2000; max 900 answers, unique server/check, non-Unknown requires evidence max 500 |
+| POST /{id}/report | InUse.Review | expectedVersion of a saved current draft; returns exact preview sheets, XLSX bytes, SHA256 and version provenance after audit commit |
+
+Values are Unknown/Yes/No/NotApplicable. Check codes are InternetOut, InternetIn,
+Microsegmented, NmsRequested, MemoryAlarm, CpuAlarm, UpDownAlarm, DiskAlarm,
+Verified. Omitted answers remain unknown. Stale source versions reject save/export;
+assignment and refresh also advance aggregate versions. A conflict returns 409
+InUseConflict and is never automatically retried. Invalid input/assignee returns
+400; missing record 404; unauthorized or nonassigned review 403; persistence/audit
+failure 503. Download must revalidate the preview's version. Report preparation
+does not mark technical checks successful, approve business policy or upload.
+
+Failed refresh records actionable safe state while preserving all stored records
+and the last successful timestamp. Partial/absent records are retained, never
+interpreted as source closure. Real root-query success remains explicitly
+SourceCompletenessUnverified; legacy relationship response contracts are missing.
+Local Fake/Simulation fixtures are labelled synthetic and only selected through
+the existing validated synthetic profile. Corporate profile/fences are unchanged.
+
+Admin receives the four local capabilities; new InUseReviewer and InUseCoordinator
+roles enable narrow explicit approval. No existing SDM/Resources role is broadened.
+SQL deployment requires 012 and the exact grants in `sql/README.md`; no Worker.
+
+### Existing Operational Records
+
 `GET /api/v1/operational-records/stored` requires `OperationalRecords.View`.
 It reads persisted data only, with `search` (literal code/title substring, max
 100 characters), optional workflow `state`, `sort=updated|oldest|code`, one-based

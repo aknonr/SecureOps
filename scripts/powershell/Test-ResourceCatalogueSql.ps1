@@ -68,6 +68,10 @@ IF EXISTS(SELECT 1 FROM sys.triggers WHERE name IN ('TR_AuditLog_AppendOnly','TR
     Pop-Location
 }
 
+Push-Location (Join-Path $root 'sql\migrations')
+try { Invoke-ResourceTestSql -File '012-in-use-workspace.sql' }
+finally { Pop-Location }
+
 if ($RunTests) {
     $previous = $env:SECUREOPS_SQL_TEST_CONNECTION
     try {
@@ -85,4 +89,4 @@ if ($RunTests) {
         } finally { Pop-Location }
     } finally { $env:SECUREOPS_SQL_TEST_CONNECTION = $previous }
 }
-[PSCustomObject]@{ Database = $database; Migrations = '001-011'; UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }
+[PSCustomObject]@{ Database = $database; Migrations = '001-012'; UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }

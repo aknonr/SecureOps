@@ -54,6 +54,7 @@
         begin() { clear(false); opener = document.activeElement; openerId = opener?.id; },
         clear,
         show(targetName, guide) {
+            if (!guide?.isConnected) return false;
             clear(false);
             name = targetName;
             panel = guide;
@@ -74,6 +75,8 @@
             observer.observe(document.body, { childList: true, subtree: true });
             resizeObserver = new ResizeObserver(schedule);
             resizeObserver.observe(panel);
+            // Focus in the same browser turn: Escape may remove the panel before another interop call.
+            panel.querySelector('h2[tabindex]')?.focus({ preventScroll: true });
             return !!target;
         }
     };

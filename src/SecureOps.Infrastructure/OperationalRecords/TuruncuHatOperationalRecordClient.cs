@@ -11,7 +11,7 @@ using SecureOps.Shared.Contracts.Api;
 namespace SecureOps.Infrastructure.OperationalRecords;
 
 /// <summary>Typed Turuncu Hat Operational Record and BPM activity provider.</summary>
-public sealed class TuruncuHatOperationalRecordClient : IOperationalRecordClient
+public sealed partial class TuruncuHatOperationalRecordClient : IOperationalRecordClient
 {
     private const string Provider = "TuruncuHat";
     private static readonly string[] _sourceSelects = ["id", "p_code", "p_name", "p_description", "p_rel_requester"];

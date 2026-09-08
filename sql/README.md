@@ -25,6 +25,18 @@ sql/
 | 009 | Bounded nullable SDM evaluation evidence on OperationalRecords and append-only workflow history; requires 001-008 |
 | 010 | Shared resource categories/links, owner-scoped versioned personal preferences, and unassigned ResourceCurator role seed; requires 001-009 |
 | 011 | Default-off durable source-close intent on JiraTransfers; requires 001-010; legacy transfers remain source-open |
+| 012 | Independent local In Use records/refresh state; unassigned role seeds 8 InUseReviewer and 9 InUseCoordinator; requires 001-011 |
+
+In Use V1 requires 012 only when using SQL persistence. Runtime delta:
+`GRANT SELECT, INSERT, UPDATE ON OBJECT::ops.InUseRecords TO [approved_runtime_principal];`
+and `GRANT SELECT, UPDATE ON OBJECT::ops.InUseRefresh TO [approved_runtime_principal];`.
+Replace only the principal placeholder through the approved DBA process. Existing
+`audit.AuditLog` INSERT, `ops.CommandExecutions` SELECT/INSERT/UPDATE and access
+read grants are reused. No DELETE, DDL, db_owner, audit UPDATE/DELETE or new
+scheduler grants. Role seeds assign no users; role-ID collisions fail closed.
+012 is not a blind-rerun script. The application never applies migrations.
+The existing isolated LocalDB harness now upgrades through 012 and includes
+In Use round-trip, version conflict and transactional audit rollback tests.
 
 The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded; 004-007 guard or replace their objects. No down scripts or migration-history table exists. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
 

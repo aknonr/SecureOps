@@ -6,6 +6,28 @@ Current coverage includes Phase 1A IdentityLookup, audit hardening, Operational 
 
 Access lifecycle coverage proves one Pending request per unknown principal, protected-capability denial, configured bootstrap Admin authorization and audit, Admin approval, capability assignment, immediate disable denial, non-admin denial, and idempotent canonical role replacement.
 
+## In Use V1
+
+`SecureOps.Tests.Unit/InUse`, `SecureOps.Tests.Integration/Api/InUseHostedTests.cs`
+and `SecureOps.Tests.Integration/Sql/ResourceSqlTests.InUse.cs` cover independent
+4241/68 discovery, strict semantic response parsing, retained data on failed/partial
+refresh, explicit ownership, concurrent assignment/save, draft versions, direct API
+capabilities, audit rollback, text-only XLSX mappings and provenance. Existing SDM
+category exclusions/write-fence and Resources ownership suites remain required.
+`scripts/powershell/Test-ResourceCatalogueSql.ps1 -DatabaseSuffix <isolated-suffix> -RunTests`
+now applies 001-012 to the approved isolated LocalDB instance. Never use a corporate
+connection or an existing application database for this harness.
+
+`browser/in-use-workspace.cjs` accepts installed playwright-core, published loopback
+UI/API URLs, evidence directory and before/after/denied/unavailable mode. Before
+uses preserved rc6.13 copies; after uses Demo/Simulation with synthetic isolated SQL.
+Denied uses a separate local UI process with Demo actor team-lead. In unavailable
+mode, stop only the local test API after READY, then replace the evidence directory's
+`unavailable-continue.signal` content with `continue`. This explicit barrier precedes
+searching persisted records. Browser requests are restricted
+to loopback. No source script runs,
+corporate data, external writes or release packaging belong to these tests.
+
 ## SecureOps.Tests.Unit
 
 Fast, isolated, no I/O. Mock everything external.

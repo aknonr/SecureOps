@@ -5,6 +5,14 @@ namespace SecureOps.Shared.Auth;
 /// </summary>
 public static class Policies
 {
+    /// <summary>Read local In Use records.</summary>
+    public const string CanViewInUse = "CanViewInUse";
+    /// <summary>Review and prepare local In Use reports.</summary>
+    public const string CanReviewInUse = "CanReviewInUse";
+    /// <summary>Assign In Use reviewers.</summary>
+    public const string CanAssignInUse = "CanAssignInUse";
+    /// <summary>Explicit read-only In Use discovery.</summary>
+    public const string CanRefreshInUse = "CanRefreshInUse";
     /// <summary>Approved catalogue reader and personal preference owner.</summary>
     public const string CanViewResources = "CanViewResources";
     /// <summary>Explicit shared catalogue management.</summary>

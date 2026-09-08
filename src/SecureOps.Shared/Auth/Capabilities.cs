@@ -3,6 +3,14 @@ namespace SecureOps.Shared.Auth;
 /// <summary>Stable application capability identifiers.</summary>
 public static class Capabilities
 {
+    /// <summary>Read local In Use records; no source writes.</summary>
+    public const string InUseView = "InUse.View";
+    /// <summary>Save local reviews and prepare reports.</summary>
+    public const string InUseReview = "InUse.Review";
+    /// <summary>Assign approved In Use reviewers locally.</summary>
+    public const string InUseAssign = "InUse.Assign";
+    /// <summary>Explicit read-only source discovery.</summary>
+    public const string InUseRefresh = "InUse.Refresh";
     /// <summary>Read permitted catalogue entries and manage personal resource preferences.</summary>
     public const string ResourcesView = "Resources.View";
     /// <summary>Manage shared categories and links; does not grant destination-system access.</summary>

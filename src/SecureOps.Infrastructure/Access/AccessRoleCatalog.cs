@@ -10,6 +10,10 @@ public static class AccessRoleCatalog
         {
             ["Admin"] =
             [
+                Capabilities.InUseView,
+                Capabilities.InUseReview,
+                Capabilities.InUseAssign,
+                Capabilities.InUseRefresh,
                 Capabilities.ResourcesView,
                 Capabilities.ResourcesManage,
                 Capabilities.IdentityLookup,
@@ -70,7 +74,9 @@ public static class AccessRoleCatalog
                 Capabilities.ManagementReportingView
             ],
             ["ReadOnly"] = [Capabilities.OperationalRecordsView, Capabilities.ResourcesView],
-            ["ResourceCurator"] = [Capabilities.ResourcesView, Capabilities.ResourcesManage]
+            ["ResourceCurator"] = [Capabilities.ResourcesView, Capabilities.ResourcesManage],
+            ["InUseReviewer"] = [Capabilities.InUseView, Capabilities.InUseReview],
+            ["InUseCoordinator"] = [Capabilities.InUseView, Capabilities.InUseReview, Capabilities.InUseAssign, Capabilities.InUseRefresh]
         };
 
     /// <summary>All reviewed role codes.</summary>

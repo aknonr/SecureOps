@@ -123,6 +123,19 @@ match; a distinct action reference remains visible.
 
 ## Security Boundaries
 
+### In Use V1 Authorization, 2026-09-08
+
+The user explicitly authorized this cross-layer In Use V1 implementation and a
+one-milestone exception to the 1,000-line total reviewed diff cap, including
+code, migration, tests, OpenAPI and canonical documentation. The permanent rule
+is unchanged; the combined diff must be reported, not concealed by split commits.
+In Use uses active category 4241/group 68, independent persistence and local
+review capabilities. OR-to-Jira continues to exclude 4241. No In Use source
+mutation capability exists. Refresh, assignment, draft review and report
+preparation cannot upload, update source properties, create Jira or close BPM.
+SQL migration 012 adds only local In Use state; no scheduler is required.
+
+
 - Browser users never provide integration credentials.
 - No password, token, authorization header, or raw remote response is stored or returned.
 - Requester resolution is exact only. Ambiguous matches always fail closed.

@@ -38,6 +38,11 @@
 
             @* Every operator with Resources.View gets the catalogue; management is a separate
                capability the API grants only to Admin and the assigned curator role. *@
+            @if (Can(Capabilities.InUseView))
+            {
+                <MudNavLink Href="in-use" Icon="@Icons.Material.Filled.FactCheck">In Use</MudNavLink>
+            }
+
             @if (Can(Capabilities.ResourcesView))
             {
                 <div class="so-nav-group">KAYNAKLAR</div>

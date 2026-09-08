@@ -4,6 +4,29 @@ Controlled evidence received through 2026-09-04 resolves Jira Basic authenticati
 
 ## Resolved Evidence
 
+### Independent In Use V1 Boundary
+
+The full In Use source copy and verified defects are now recorded in the existing
+legacy-parity document. V1 implements local assignment/review/report preparation,
+not source mutation. Required next sanitized evidence is narrowly scoped:
+
+- The `rel` query's zero/one/multiple-server responses, exact expanded Key/Value
+  names and nesting, service identity/environment values, and paging/completeness
+  metadata. Preserve keys/types while replacing corporate values.
+- Exact requester/owner/provisioning relationships and stable identity keys,
+  with zero/multiple candidates. Group 68 or a generic address is not an assignee.
+- Functional-aspect zero/one/multiple response shapes and owner-approved selection
+  policy. Do not treat first-result behavior as policy.
+- Approved blank workbook/template and acceptance of provenance sheets/unknown
+  values; technical sheets in the script are empty.
+- For later closure only: approved property meanings, attachment verification,
+  BPM uniqueness and transition policy, authoritative OR post-state lookup, and
+  uncertain-outcome reconciliation. A successful HTTP/BPM response alone is not
+  authoritative closure evidence.
+
+These are In Use continuation contracts, not prerequisites for the independent
+Jira-only pilot and not authorization to change any external-write fence.
+
 - Original script discovery and historical request construction are resolved by the
   2026-09-07 source-only review and hash in `turuncu-hat-jira-legacy-parity.md`.
   The supplied copy has a line-274 string defect; no repaired file was substituted.

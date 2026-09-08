@@ -25,6 +25,10 @@ public static class SecureOpsAuthorization
         services.AddAuthorization(options =>
         {
             AddCapability(options, Policies.CanViewResources, Capabilities.ResourcesView);
+            AddCapability(options, Policies.CanViewInUse, Capabilities.InUseView);
+            AddCapability(options, Policies.CanReviewInUse, Capabilities.InUseReview);
+            AddCapability(options, Policies.CanAssignInUse, Capabilities.InUseAssign);
+            AddCapability(options, Policies.CanRefreshInUse, Capabilities.InUseRefresh);
             AddCapability(options, Policies.CanManageResources, Capabilities.ResourcesManage);
             AddCapability(options, Policies.OperatorOrAbove, Capabilities.TeamView);
             AddCapability(options, Policies.TeamLeadOrAbove, Capabilities.IdentityLookup);

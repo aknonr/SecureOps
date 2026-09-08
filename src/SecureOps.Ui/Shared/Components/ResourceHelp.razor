@@ -29,7 +29,7 @@
                 <span class="so-eyebrow">Kullanım Rehberi · @(_index + 1) / @Steps.Count</span>
                 <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Rehberi kapat" Size="Size.Small" OnClick="CloseAsync" />
             </div>
-            <h2 @ref="_heading" tabindex="-1">@step.Title</h2>
+            <h2 tabindex="-1">@step.Title</h2>
             <p>@step.Description</p>
             @if (_missing) { <p class="so-panel-text so-panel-text--sm">Bu kontrol şu anda kullanılamıyor. Adımı atlayabilir veya rehberi kapatıp uygun kaydı seçebilirsiniz.</p> }
             <div class="so-guide-controls">
@@ -49,7 +49,7 @@
     [Parameter] public ResourcePreferencesResponse? Preferences { get; set; }
     [Parameter] public EventCallback<ResourcePreferencesResponse> PreferencesChanged { get; set; }
     private IReadOnlyList<ResourceGuideStep> Steps => ResourceGuideSteps.For(Surface, CanManage);
-    private ElementReference _heading, _panel;
+    private ElementReference _panel;
     private bool _open, _saving, _pendingTarget, _missing, _interactive, _restoreFocus;
     private int _index;
     private UiProblem? _problem;
@@ -93,6 +93,7 @@
     private async Task CloseAsync()
     {
         _open = false;
+        _pendingTarget = false;
         _restoreFocus = true;
         await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", false);
     }
@@ -116,7 +117,6 @@
         {
             _pendingTarget = false;
             _missing = !await Js.InvokeAsync<bool>("secureOpsResourceGuide.show", Steps[_index].Target, _panel);
-            await _heading.FocusAsync(preventScroll: true);
             StateHasChanged();
         }
     }
