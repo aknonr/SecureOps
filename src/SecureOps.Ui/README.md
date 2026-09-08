@@ -376,6 +376,25 @@ not the historical blocker list above; the hidden-membership and environment con
 
 #### TEST Delivery Addendum, 2026-09-09
 
+**Paired delivery prepared and verified:** build source/live remote at packaging
+`b217f000eafb4a18f7029629e1119c86205d9295`; ProductVersion
+`0.1.0+b217f000eafb4a18f7029629e1119c86205d9295`, FileVersion 0.1.0.0.
+Release root: `C:\SecureOpsBuild\release\2026-09-09-pilot-rc6.14`.
+
+| Archive (relative to release root) | Bytes | SHA-256 |
+|---|---:|---|
+| API/secureops-api-TEST-b217f00.zip | 24639779 | E70B8AD75EF4F9A76DBE2A3C991CEF0B379A32C106D0BEDB141247127AD9FB3D |
+| UI/secureops-ui-TEST-b217f00.zip | 26411433 | 994EC7556C294CE9E65CE122ECBCBBC565C3DE02E020D3FC4DF36F03B2C5A66E |
+| DBA/secureops-database-001-012-TEST-rc6.14.zip | 39123 | 968D668CA89B692278E6F34E5027E5A418384E6D6F53E27E624D9CCE2A1744FF |
+
+238 API / 254 UI / 26 DBA entries passed per-file ZIP hash checks. Required
+publish/payload/secret/path/AD-dependency/Swagger gates passed; rc6.13 archive
+hashes are preserved. The first locally generated DBA ZIP's backslash paths
+were rejected; only its corrected, validated successor above is deliverable.
+The rejected file stays under build-only evidence, never in the DBA delivery.
+No source rebuild is needed for this later handoff-only commit; final documentation
+HEAD/live push verification belongs to release-metadata.json, separate from build.
+
 The requester list and relationship evidence delivery starts at verified local/
 live remote `cee08c4c13a446d4482b401423612b472c41c2e8`. The explicit task addendum
 authorizes the targeted UI/backend changes. `.vscode/` remains untouched.
