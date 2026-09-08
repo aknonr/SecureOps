@@ -63,6 +63,14 @@ async function tour(page, surface) {
             assert.equal(await page.locator('a[href="in-use"]').count(), 0);
             await capture(page, out, 'before-rc6.13-no-inuse');
         } else {
+            await navigate(page, ui, 'operational-records');
+            await page.getByRole('button', { name: 'Kaynağı yenile', exact: true }).click();
+            await page.getByText('Sınırlı kaynak yenilemesi tamamlandı.', { exact: false }).waitFor();
+            const operational = await json(client, '/api/v1/operational-records/stored');
+            const requester = operational.items.find(r => r.requester)?.requester;
+            assert.ok(requester);
+            await page.getByText(`Talep eden: ${requester}`, { exact: true }).first().waitFor();
+            await capture(page, out, 'requester-list-light');
             await page.evaluate(() => localStorage.setItem('wasas.appearance', 'dark'));
             await navigate(page, ui, 'in-use');
             await page.waitForFunction(() => document.documentElement.classList.contains('so-dark'));

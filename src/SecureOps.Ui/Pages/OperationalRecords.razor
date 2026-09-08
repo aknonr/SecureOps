@@ -51,7 +51,7 @@
                             @foreach (OperationalRecordResponse record in page.Items)
                             {
                                 <li @key="record.Id">
-                                    <div><code>@record.OrCode</code><h2>@record.Title</h2></div>
+                                    <div><code>@record.OrCode</code><h2>@record.Title</h2><p>Talep eden: @(record.Requester ?? "Bilinmiyor")</p></div>
                                     <span>@(record.Environment ?? "Bilinmiyor")</span>
                                     <div><SoStatusBadge Label="@OperationalRecordView.PresentationLabel(record.PresentationState)" Tone="@OperationalRecordView.PresentationTone(record.PresentationState)" />
                                         <p>@OperationalRecordView.StateLabel(record)</p>

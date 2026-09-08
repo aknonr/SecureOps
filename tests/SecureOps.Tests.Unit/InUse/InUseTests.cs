@@ -22,6 +22,56 @@ public sealed class InUseTests
     private static readonly AccessOperationContext _context = new("synthetic", "inuse-test", null);
 
     [Fact]
+    public async Task Diagnostic_AuditFailureAndMissingCapability_PreventSourceRead()
+    {
+        foreach (string role in new[] { "Admin", "InUseCoordinator" })
+        {
+            var f = new Fixture(role);
+            InUseRecord record = await f.ImportAsync();
+            f.Audit.WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>()).Returns(_ => throw new IOException("Synthetic audit failure"));
+            (await f.Service.DiagnoseAsync(_principal, _context, record.Id, new(record.Version, record.Source.Id), _token)).Error
+                .Should().Be(role == "Admin" ? "PersistenceUnavailable" : "AccessDenied");
+            await f.Source.DidNotReceive().DiagnoseAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        }
+    }
+
+    [Fact]
+    public async Task RelationshipStates_PreserveEvidenceAndAssignment_ButInvalidateReview()
+    {
+        var f = new Fixture();
+        InUseRecord record = await f.ImportAsync();
+        InUseSource four = record.Source with
+        {
+            Servers = Enumerable.Range(1, 4).Select(i => new InUseServer($"item-{i}",
+            new Dictionary<string, InUseEvidence>
+            {
+                ["Virtual PC User"] = new(i == 1 ? null : $"user-{i}", "Synthetic label only"),
+                ["RFC Kaydı"] = new("OR-OTHER", "Synthetic related request")
+            })).ToArray(),
+            ServiceItemsState = "Complete",
+            AffectedAssetsState = "Complete",
+            AffectedAssetCount = 0
+        };
+        f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([four], true));
+        await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
+        record = (await f.Repository.GetAsync(record.Id, _token))!;
+        record = (await f.Service.AssignAsync(_principal, _context, record.Id, new(record.Version, f.User.Id, "Manual"), _token)).Value!;
+        record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion, [], "Unknown"), _token)).Value!;
+        record.Source.Requester.Should().NotBe(record.Source.Creator);
+        foreach (string state in new[] { "Failed", "Forbidden", "Ambiguous", "NotQueried" })
+        {
+            f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([four with { Servers = [], ServiceItemsState = state }], false));
+            await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
+            InUseRecord retained = (await f.Repository.GetAsync(record.Id, _token))!;
+            retained.Source.Servers.Should().HaveCount(4);
+            retained.Source.AffectedAssetCount.Should().Be(0);
+            retained.AssigneeId.Should().Be(f.User.Id);
+            retained.Status.Should().Be("Stale");
+            (await f.Service.ExportAsync(_principal, _context, record.Id, new(retained.Version), _token)).Error.Should().Be("InUseConflict");
+        }
+    }
+
+    [Fact]
     public async Task Refresh_FailureAndPartialAndEmpty_RetainDataAndSuccessfulTimestamp()
     {
         var fixture = new Fixture();

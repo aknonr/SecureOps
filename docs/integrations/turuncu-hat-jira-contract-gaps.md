@@ -6,6 +6,15 @@ Controlled evidence received through 2026-09-04 resolves Jira Basic authenticati
 
 ### Independent In Use V1 Boundary
 
+The 2026-09-09 screenshot labels establish four Service Items and separately
+zero Affected Assets, plus Virtual PC User and RFC Kaydı on an item. They do not
+establish wire keys, ownership semantics, or a link from RFC to the current OR.
+The bounded TEST helper in docs/24-api-test-deployment-readiness.md reads only
+the script-evidenced rel query for one explicitly supplied, authorized In Use OR.
+It returns key/type/cardinality and per-call consistent aliases, not raw values.
+No corporate call was executed during preparation; real enrichment remains
+unimplemented until the sanitized output and approved field dictionary exist.
+
 The full In Use source copy and verified defects are now recorded in the existing
 legacy-parity document. V1 implements local assignment/review/report preparation,
 not source mutation. Required next sanitized evidence is narrowly scoped:

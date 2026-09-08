@@ -18,6 +18,57 @@ public sealed class InUseAdapterTests
         {"Key":"SET.p_name","Value":"Synthetic title"},{"Key":"num","Value":"1"},{"Key":"SET.id","Value":"100"}]
         """;
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public async Task Diagnostic_ExactScopeAndAliases_DoNotResolveUnknownMappings(int count)
+    {
+        string relations = JsonSerializer.Serialize(new
+        {
+            QueryResult = new
+            {
+                Items = Enumerable.Range(0, count).Select(i => new[] {
+            new { Key = "SET.synthetic_id", Value = $"item-{i}" }, new { Key = "KEY.synthetic_user", Value = i == 0 ? "Synthetic requester" : "different user" },
+            new { Key = "SET.synthetic_rfc", Value = "OR-OTHER" } }).ToArray()
+            }
+        });
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", relations);
+        JsonElement report = await Client(handler).DiagnoseAsync("100", CancellationToken.None);
+        report.GetProperty("ServiceItems").GetArrayLength().Should().Be(count);
+        report.GetProperty("AffectedAssets").GetString().Should().Be("NotQueried");
+        report.ToString().Should().NotContain("Synthetic requester").And.NotContain("OR-OTHER");
+        if (count > 0)
+        {
+            report.GetProperty("Root")[0][0].GetProperty("Alias").GetString().Should()
+                .Be(report.GetProperty("ServiceItems")[0][1].GetProperty("Alias").GetString());
+        }
+        handler.Requests.Should().HaveCount(2).And.OnlyContain(r => r.Path == "/query");
+        handler.Requests[0].Filter.Should().Contain("#%id%#=100").And.Contain("IN (4241)");
+        handler.Requests[1].Filter.Should().Be("#%m_tid%#=100049 and #%m_lid%#=100");
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("100 OR 1=1")]
+    [InlineData("-1")]
+    public async Task Diagnostic_InvalidIdentity_MakesNoRequest(string id)
+    {
+        using var handler = new Handler("{}");
+        await FluentActions.Awaiting(() => Client(handler).DiagnoseAsync(id, CancellationToken.None)).Should().ThrowAsync<InvalidDataException>();
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"QueryResult\":{\"Items\":[[{\"Value\":\"no-key\"}]]}}")]
+    [InlineData("{\"QueryResult\":{\"Items\":[[{\"Key\":\"SET.session\",\"Value\":\"do-not-return\"}]]}}")]
+    public async Task Diagnostic_MalformedOrSensitiveKey_StopsWithoutRawOutput(string related)
+    {
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", related);
+        await FluentActions.Awaiting(() => Client(handler).DiagnoseAsync("100", CancellationToken.None)).Should().ThrowAsync<Exception>();
+        handler.Requests.Should().HaveCount(2);
+    }
+
     [Fact]
     public async Task Discovery_ReorderedExpandedKeys_SeparateScopeAndUnresolvedRelationships()
     {
@@ -59,22 +110,55 @@ public sealed class InUseAdapterTests
         result.Complete.Should().BeFalse();
     }
 
-    private static TuruncuHatOperationalRecordClient Client(Handler handler)
+    [Theory]
+    [InlineData(11, 1)]
+    [InlineData(1, 70000)]
+    public async Task Diagnostic_ExcessCardinalityOrSize_ReturnsNoReport(int count, int size)
+    {
+        string related = JsonSerializer.Serialize(new
+        {
+            QueryResult = new
+            {
+                Items = Enumerable.Range(0, count).Select(_ =>
+            new[] { new { Key = "SET.synthetic", Value = new string('x', size) } }).ToArray()
+            }
+        });
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", related);
+        await FluentActions.Awaiting(() => Client(handler).DiagnoseAsync("100", CancellationToken.None)).Should().ThrowAsync<Exception>();
+    }
+
+    [Fact]
+    public async Task Diagnostic_ReadOnlyFenceOff_MakesNoRequest()
+    {
+        using var handler = new Handler("{}");
+        await FluentActions.Awaiting(() => Client(handler, false).DiagnoseAsync("100", CancellationToken.None)).Should().ThrowAsync<InvalidDataException>();
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Diagnostic_DifferentRoot_PreventsTraversal()
+    {
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}");
+        await FluentActions.Awaiting(() => Client(handler).DiagnoseAsync("101", CancellationToken.None)).Should().ThrowAsync<InvalidDataException>();
+        handler.Requests.Should().ContainSingle();
+    }
+
+    private static TuruncuHatOperationalRecordClient Client(Handler handler, bool readOnly = true)
     {
         ITuruncuHatSessionManager sessions = Substitute.For<ITuruncuHatSessionManager>();
         sessions.GetSessionAsync(Arg.Any<CancellationToken>()).Returns("synthetic-session");
         return new(new HttpClient(handler) { BaseAddress = new Uri("https://source.invalid/") }, sessions,
-            Options.Create(new TuruncuHatOptions { RelatedGroupId = 68, ExcludedDccIds = [4241] }), Options.Create(new OperationalRecordsOptions()),
+            Options.Create(new TuruncuHatOptions { RelatedGroupId = 68, ExcludedDccIds = [4241] }), Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnly }),
             new EnterpriseIntegrationHealthState(), new EnterpriseIntegrationTelemetry(), NullLogger<TuruncuHatOperationalRecordClient>.Instance);
     }
-    private sealed class Handler(string body) : HttpMessageHandler
+    private sealed class Handler(string body, string? related = null) : HttpMessageHandler
     {
         public List<(string Path, string Filter)> Requests { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
             Requests.Add((request.RequestUri!.AbsolutePath, json.RootElement.GetProperty("req").GetProperty("Filters")[0].GetString()!));
-            return new(HttpStatusCode.OK) { Content = new StringContent(body) };
+            return new(HttpStatusCode.OK) { Content = new StringContent(Requests.Count == 2 && related is not null ? related : body) };
         }
     }
 }

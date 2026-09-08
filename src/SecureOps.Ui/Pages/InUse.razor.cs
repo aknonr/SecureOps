@@ -26,6 +26,14 @@ public partial class InUse
     private readonly HashSet<string> _selected = [];
     private readonly CancellationTokenSource _lifetime = new();
     private bool Can(string capability) => _access?.Can(capability) == true;
+    private static string Relationship(string state, int? count) => state switch
+    {
+        "Complete" => count == 0 ? "İlişkili kayıt yok (doğrulandı)" : $"{count} doğrulanmış kayıt",
+        "Forbidden" => "Kaynak ilişki erişimi yetersiz; önceki kanıt varsa korunur",
+        "Failed" => "İlişki okuması başarısız; önceki kanıt varsa korunur",
+        "Ambiguous" => "Eşleme belirsiz; önceki kanıt varsa korunur",
+        _ => "Henüz sorgulanmadı / sözleşme bekleniyor"
+    };
     private bool CanEdit => Can(Capabilities.InUseReview) && _record?.AssigneeId == _access?.Access?.UserId;
     private string NextAction => _record?.AssigneeId is null ? "Yetkili koordinatör bir inceleyici atasın."
         : !CanEdit ? "Atanan inceleyicinin doğrulaması bekleniyor."

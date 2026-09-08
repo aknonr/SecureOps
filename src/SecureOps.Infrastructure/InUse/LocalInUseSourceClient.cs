@@ -14,7 +14,13 @@ public sealed class LocalInUseSourceClient : IInUseSourceClient
             new("sample.requester", "Synthetic requester display; not assignee"),
             unknown, new("Provisioning team A", "Synthetic provisioning evidence; not reviewer"),
             [Server("demo-server-01", "Production", "Sample service A"), Server("demo-server-02", "Test", "Sample service B")],
-            "Synthetic fixture: two explicit server relations with different services and environments.", true);
+            "Synthetic fixture: two explicit service items with different services and environments.", true)
+        {
+            ServiceItemsState = "Complete",
+            AffectedAssetsState = "Complete",
+            AffectedAssetCount = 0,
+            Creator = new("sample.creator", "Synthetic technical creator; not requester")
+        };
         InUseSource second = new("900002", "OR-DEMO-INUSE-02", "Related server evidence awaiting verification",
             unknown, unknown, unknown, [], "Synthetic fixture: zero resolved servers; relationship completeness unknown.", true);
         return Task.FromResult(new InUseBatch([first, second], true));
@@ -27,7 +33,10 @@ public sealed class LocalInUseSourceClient : IInUseSourceClient
             ["ENVANTER_ID"] = new(id, "Synthetic inventory identity"),
             ["SI_ENVIRONMENT"] = new(environment, "Synthetic per-server environment"),
             ["SERVICE NAME (ÜRÜN/UYGULAMA)"] = new(service, "Synthetic per-server service"),
-            ["IP ADDRESS"] = new("192.0.2.10", "Synthetic documentation address")
+            ["IP ADDRESS"] = new("192.0.2.10", "Synthetic documentation address"),
+            ["Virtual PC User"] = new(id.EndsWith("01", StringComparison.Ordinal) ? "sample.pc-user" : null, "Synthetic UI-label evidence; business meaning unverified"),
+            ["RFC Kaydı"] = new("OR-DEMO-OTHER", "Synthetic related request; not the current OR"),
+            ["STATUS"] = new("IN_PROGRESS", "Synthetic service-item status")
         });
 }
 

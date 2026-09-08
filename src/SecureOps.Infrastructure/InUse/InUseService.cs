@@ -141,6 +141,31 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
     private async Task<InUseResult<InUseRecord>> SaveAsync(InUseRecord next, long expected, AuditEvent audit, CancellationToken token) =>
         await repository.SaveAsync(next, expected, audit, token) ? new(next) : InUseResult<InUseRecord>.Fail("InUseConflict");
 
+    /// <summary>Audited bounded diagnostic; no enrichment, assignment or source mutation.</summary>
+    public Task<InUseResult<JsonElement>> DiagnoseAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        Guid id, InUseDiagnosticRequest request, CancellationToken token) => RunAsync(principal, context, Capabilities.InUseRefresh, async user =>
+        {
+            if (!user.Capabilities.Contains(Capabilities.OperationalRecordsViewDiagnostics))
+            { return InUseResult<JsonElement>.Fail("AccessDenied"); }
+            InUseRecord? record = await repository.GetAsync(id, token);
+            if (record is null)
+            { return InUseResult<JsonElement>.Fail("InUseNotFound"); }
+            if (record.Source.Id != request.SourceId || record.Version != request.ExpectedVersion)
+            { return InUseResult<JsonElement>.Fail("InUseConflict"); }
+            if (!await repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "RelationshipDiagnosticRequested", new { id }), token))
+            { return InUseResult<JsonElement>.Fail("InUseConflict"); }
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                timeout.CancelAfter(TimeSpan.FromSeconds(45));
+                JsonElement report = await source.DiagnoseAsync(request.SourceId, timeout.Token);
+                return await repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "RelationshipDiagnosticPrepared", new { id }), token)
+                    ? new(report) : InUseResult<JsonElement>.Fail("InUseConflict");
+            }
+            catch (Exception ex) when (ex is ExternalIntegrationException or HttpRequestException or OperationCanceledException or TuruncuHatQueryResultException)
+            { return InUseResult<JsonElement>.Fail("SourceUnavailableOrMalformed"); }
+        }, token);
+
     private async Task<InUseResult<T>> RunAsync<T>(ClaimsPrincipal principal, AccessOperationContext context, string capability,
         Func<ApplicationUser, Task<InUseResult<T>>> operation, CancellationToken token)
     {

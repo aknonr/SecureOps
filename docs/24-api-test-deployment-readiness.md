@@ -1,5 +1,138 @@
 # API TEST Deployment Readiness
 
+## In Use TEST Teslimatı, rc6.14 (2026-09-09)
+
+Bu bölüm rc6.14 için güncel kurulum prosedürüdür; aşağıdaki rc6.13 sırası yalnız
+eski paket içindir. Son mevcut release metadata rc6.13 olduğundan yeni teslimat
+`C:\SecureOpsBuild\release\2026-09-09-pilot-rc6.14` olarak ayrılır. Önceki
+arşivler değişmez. Hazırlık kurulum, kurumsal kabul veya yazma onayı değildir.
+Kesin build SHA, ProductVersion, boyutlar ve hash'ler bu kökteki
+`release-metadata.json`, `release-artifacts.sha256` ve `manifests/` içindedir.
+API/UI aynı build SHA'dan hazırlanır; sonraki belge HEAD'i build SHA değildir.
+FileVersion 0.1.0.0 / net8.0 korunur. Yeni UI eski API ile desteklenmez.
+
+### İlk Manuel Adım ve Kurulum
+
+1. Yetkili TEST operatörü yönetim istasyonundan, salt okunur olarak gerçek API/UI
+   hedeflerini, kurulu assembly ProductVersion/hash'lerini, server-owned config
+   yedek referanslarını ve DBA'nın doğruladığı şema seviyesini değişiklik kaydına
+   yazar. Tarihsel ekran görüntüsü tüm güncel nesne/kolon/index/trigger/grant
+   tanımlarını kanıtlamaz. Hedef, ayrı kurulum onayı veya rollback planı yoksa durun.
+2. Teslim alan istasyonda `Get-FileHash -Algorithm SHA256 -LiteralPath <arşiv>`
+   ile API/UI/DBA arşivlerini ve açılan dosyaları ilgili manifestle karşılaştırın.
+   Uyuşmazlıkta durun. Yalnız API/UI runtime payload'ları uygulama dizinine gider;
+   DBA, runbook, metadata, manifest, staging ve evidence uygulama payload'ı değildir.
+3. Operatör/DBA ayrı onayla binary, config ve geri yüklenebilir SQL yedeğini
+   doğrular. rc6.13 binary'lerinin 012 ile rollback uyumluluğu test edilmemiştir.
+   Eski paket mevcut diye güvenli rollback varsaymayın. SQL restore ayrı DBA
+   kararıdır; sonradan oluşan audit/review verisini kaybettirebilir. 012 tablolarını
+   veya append-only kanıtı silerek geri dönülmez.
+4. DBA yalnız eksik migration'ları sırasıyla uygular. **011 tamamen doğrulanmışsa
+   yalnız `sql/migrations/012-in-use-workspace.sql` gerekir.** SQLCMD mode, `-I`
+   ve `sql/migrations` çalışma dizini zorunlu; entrypoint
+   `:r ../schema/012-in-use-workspace.sql` kullanır. Paket 001-012 zincirini içerir;
+   tamamını körlemesine çalıştırmayın. 012 tekrarlanabilir değildir: mevcut nesne
+   veya rol çakışmasında durur; hatada otomatik retry/repair yoktur.
+5. DBA `ops.InUseRecords` ve `ops.InUseRefresh` tanımlarını schema/012 ile,
+   FK/index/check'leri ve etkin audit korumalarını karşılaştırır. Migration aynı
+   transaction'da `ops.InUseRefresh` için Id=1, Version=0 başlangıç JSON satırını
+   ve security.Roles 8=InUseReviewer, 9=InUseCoordinator tanımlarını oluşturur.
+   Runtime başlangıç satırı INSERT etmez. Satır eksikse INSERT iznini genişletmek
+   yerine migration/tanım tutarsızlığını DBA inceler.
+6. Yalnız eksik izinler, gerçek onaylı runtime principal'a ayrı DBA onayıyla:
+
+   ```sql
+   GRANT SELECT, INSERT, UPDATE ON OBJECT::ops.InUseRecords TO [approved_runtime_principal];
+   GRANT SELECT, UPDATE ON OBJECT::ops.InUseRefresh TO [approved_runtime_principal];
+   ```
+
+   Mevcut audit.AuditLog INSERT, ops.CommandExecutions ve access okuma izinleri
+   korunur. Yeni DELETE, DDL, db_owner veya audit UPDATE/DELETE izni yoktur.
+7. API sonra eşleşen UI mevcut onaylı kurulum yöntemiyle kurulur. Her aşamada
+   sağlık/sürüm/auth doğrulanır; başarısızsa sonraki aşamaya geçilmez. `web.config`,
+   `appsettings*.json`, sırlar, Data Protection ve log dizinleri korunur.
+
+### Konfigürasyon ve Rol Kabulü
+
+Yeni InUse provider/config anahtarı yoktur. SQL seçimi
+`Access:RepositoryProvider=SqlServer` ile yapılır (varsayılan InMemory);
+`ConnectionStrings:SecureOpsDb` mevcut server-owned bağlantıdır. Kaynak seçimi
+`OperationalRecords:SourceProvider=TuruncuHat` (varsayılan Disabled); mevcut
+TuruncuHat session/query ayarları yeniden kullanılır. Fake/Simulation yalnız
+yerel sentetik profillerdir. TEST ortamı `Test`, mevcut Jira provider `Corporate`
+ve doğrulanmış mapping ayarları korunur. Yeni secret veya config kopyası istenmez.
+`ReadOnlyIntegrationMode=true`, `ControlledTestWritesEnabled=false`,
+`SourceCloseEnabled=false` değişmez. Yeni şema dışında rc6.13'e runtime config
+delta beklenmez; Access zaten SqlServer değilse kalıcılık geçişi ayrıca incelenir.
+
+- Admin ve InUseCoordinator: View/Review/Assign/Refresh. InUseReviewer: yalnız
+  View/Review; taslak save sadece mevcut atanmış inceleyicide. Excel aynı Review
+  capability ile güncel kayıt/taslak sürümünü kontrol eder. Eski Operator/Lead
+  otomatik In Use yetkisi kazanmaz; rol seed etmek kullanıcı atamak değildir.
+- Yetkisiz kullanıcıda menü görünmez; `/in-use`, doğrudan list/detail/refresh/
+  assignment/draft/report API istekleri engellenmelidir. Yetkili Reviewer için
+  refresh/assignment reddi de kontrol edilir. Resources kişisel sınırları değişmez.
+- Koordinatör açık refresh yapar; kayıtlı liste, arama, tümü/bana atanan/atanmamış,
+  sayfa boyutu ve sayfalar denenir. Eksik kaynak sonucu toplam envanter sayılmaz.
+  Hatalı refresh önceki kayıtları silmemeli, stale/hata görünmelidir.
+- Atama gerekçesiyle inceleyici seçilir; requester, teknik creator, Virtual PC
+  User, servis sahibi ve WASAS inceleyicisi ayrı kontrol edilir. Gerçek join henüz
+  yoksa 0 sunucu yerine sorgulanmadı/sözleşme bekleniyor görülmesi beklenir.
+- Sunucu cevapları ayrı incelenir; bilinmeyen kontroller Unknown kalır. Toplu
+  cevap için seçim ve açık onay gerekir. İki oturumda aynı sürümü kaydetmek/atamak
+  conflict üretmeli; kaynak değişince eski taslak ve export güncel sayılmamalıdır.
+- Excel önce preview sonra download: Sunucular 29 satır, NMS 22 kolon; iki teknik
+  sheet boş, Provenance/ReviewEvidence ekli. Kurumsal şablon sahibi ek sheet,
+  boş/Unknown hücre, layout ve mapping kabulünü ayrıca vermelidir. Bu dosya
+  tamamlanmış teknik kontrol veya yüklenmiş/onaylanmış kaynak eki değildir.
+- Rehber replay/klavye gezinmesi refresh/save yapmamalıdır. Sağlık/audit ve
+  onaylı entegrasyon kayıtlarıyla hiçbir Jira create, attachment upload, kaynak
+  update veya BPM closure olmadığını kontrol edin; bu eylemleri test için çalıştırmayın.
+
+### Tek Kayıt İlişki Kanıtı Toplama
+
+Yalnız ayrıca onaylı TEST API'de, mevcut server-owned TuruncuHat kimliğiyle;
+yetkili operatörün Windows-auth yönetim PowerShell oturumundan çağrılır. Admin
+veya hem InUse.Refresh hem OperationalRecords.ViewDiagnostics yetkisi gerekir.
+InUseCoordinator tek başına diagnostics yetkisi almaz. Kaynak OR kimliğini
+operatör açıkça sağlar; kayıtlı WASAS GUID ve sürümüyle eşleşmek zorundadır.
+`$api` onaylı mevcut WASAS API base URL; `$id`, `$version`, `$sourceId` tek seçili
+kayıttan alınır. Şifre/header/session girilmez veya paylaşılmaz:
+
+```powershell
+$body = @{ expectedVersion = $version; sourceId = $sourceId } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "$api/api/v1/in-use/$id/relationship-evidence" -UseDefaultCredentials -ContentType 'application/json' -Body $body
+```
+
+Helper önce exact aktif kategori 4241/grup 68 OR'u tekil doğrular; sonra yalnız
+`rel`, m_tid=100049 ve m_lid=bu OR için tam scriptteki 15 select'i sorgular.
+Bir ilişki seviyesi, en çok 10 sonuç/64 hücre, 3 iç içe array seviyesi, her başarılı
+response en çok 64 KiB ve toplam 45 saniye; transport en çok bir session yenileme
+tekrarı yapar. Sonuç bounded olduğu için kurumsal tamlık kanıtı sayılmaz.
+Ham değerler/log dump yerine yalnız key/type ve çağrı-içi tutarlı value-N
+alias'ları döner. Kimlik, isim, IP, description, credential/session çıkmaz;
+alias haritası saklanmaz. Sadece bu küçük sanitize çıktı onaylı kanıt alanında
+tutulur, Git'e kurumsal screenshot/kişisel değer eklenmez. Kaynak veya yerel
+review değişmez; yalnız istek/hazırlık audit'i vardır. Yetki, tekillik, süre,
+boyut, key biçimi veya audit hatasında durun; kapsamı genişletmeyin.
+
+Beklenen eksik kanıt: bu çıktının service-item key/type/çokluk yapısı ile sistem
+sahibinin onayladığı alan sözlüğü. Virtual PC User, RFC Kaydı, teknik OR creator,
+servis sahibi ve Etkilenen Varlıklar için wire property/join henüz kanıtlanmadı;
+helper bu alanları tahmin edip sorgulamaz. Sistem sahibi bir OR için 4 servis öğesi /
+0 affected asset örneğini ve sıfır/çoklu ilişki semantiğini alias'larla eşleştirmeli.
+RFC başka OR'a gidebilir; Virtual PC User otomatik atama kaynağı değildir.
+Kaynak navigasyonunun yapılandırılmış onaylı route'u yok; screenshot task query
+parametreleriyle link üretilmez. Operational Records mevcut ServerReference ve
+ApplicationReference'ı gösterir; gerçek adapter bunları henüz çözmediğinden
+ilişkili envanter tamamlandı iddiası yoktur. Per-row remote lookup yoktur.
+
+**SDM ayrı devam:** gerçek classifier daima NeedsManualReview/false döndürür;
+JiraIssueDraftService request-type review CategoryPolicyPending bırakır. Sunucu
+talebi için pozitif politika iş kararı, bunun uygulanması/testi, kurumsal alan/
+kimlik/create/reconciliation kanıtı ve ayrı aktivasyon onayı gerekir. Yalnız config
+değişikliği yeterli değildir. In Use ilişki/şablon veya scheduler SDM önkoşulu değildir.
+
 ## Current Evidence Boundary, 2026-09-08
 
 The operator reports manual rc6.13 deployment to TEST. This task has not verified

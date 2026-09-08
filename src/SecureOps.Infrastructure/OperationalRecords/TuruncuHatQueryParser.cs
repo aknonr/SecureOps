@@ -98,7 +98,7 @@ internal static class TuruncuHatQueryParser
         return ids;
     }
 
-    private static JsonElement GetItems(JsonElement root)
+    internal static JsonElement GetItems(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("QueryResult", out JsonElement queryResult)

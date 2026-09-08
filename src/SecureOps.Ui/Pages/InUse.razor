@@ -55,7 +55,8 @@
                     {
                         <li><div><a href="@($"in-use/{record.Id}")">@record.Source.Code</a><h2>@record.Source.Title</h2>
                             @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }</div>
-                            <div>@Status(record.Status)<br />@(record.AssigneeLabel ?? "Atanmamış")<br />@record.Source.Servers.Count ilişkili sunucu</div>
+                            <div>@Status(record.Status)<br />@(record.AssigneeLabel ?? "Atanmamış")<br />Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)
+                                <br />Talep eden: @Evidence(record.Source.Requester)</div>
                             <MudButton Href="@($"in-use/{record.Id}")" EndIcon="@Icons.Material.Filled.ArrowForward">İncele</MudButton></li>
                     }
                     </ul>
@@ -78,6 +79,7 @@
                 <h3>Sorumluluk ve kaynak kanıtı</h3>
                 <dl class="so-inuse-evidence">
                     <dt>İlk talep sahibi</dt><dd>@Evidence(record.Source.Requester)</dd>
+                    <dt>Teknik kayıt oluşturucusu</dt><dd>@Evidence(record.Source.Creator ?? new(null, "Kaynak sözleşmesi doğrulanmadı"))</dd>
                     <dt>Servis / uygulama sahibi</dt><dd>@Evidence(record.Source.ServiceOwner)</dd>
                     <dt>Kurulum operatörü / ekibi</dt><dd>@Evidence(record.Source.ProvisioningTeam)</dd>
                     <dt>In Use inceleyicisi</dt><dd>@(record.AssigneeLabel ?? "Atanmamış") · Yerel, yetkili uygulama ataması</dd>
@@ -94,7 +96,15 @@
                 <p role="status">Sonraki adım: @NextAction</p>
             </section>
             <section class="so-inuse-band" data-guide="inuse-servers">
-                <h3>Sunucular ve eksik bilgiler</h3><p>@record.Source.RelationshipEvidence</p>
+                <h3>Servis öğeleri / sunucular</h3><p>@record.Source.RelationshipEvidence</p>
+                <p>Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count) · Etkilenen varlıklar: @Relationship(record.Source.AffectedAssetsState, record.Source.AffectedAssetCount)</p>
+                @if (record.Source.Servers.Count > 0)
+                {
+                    <div class="so-inuse-workbook" tabindex="0" aria-label="Servis öğesi tablosu"><table><thead><tr><th>Kaynak kimliği</th><th>Adı</th><th>Ortam</th><th>Durum</th><th>Servis / uygulama</th><th>Virtual PC User</th><th>RFC Kaydı</th></tr></thead><tbody>
+                        @foreach (InUseServer server in record.Source.Servers)
+                        { <tr><td>@server.Id</td><td>@Field(server, "HOSTNAME")</td><td>@Field(server, "SI_ENVIRONMENT")</td><td>@Field(server, "STATUS")</td><td>@Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</td><td>@Field(server, "Virtual PC User")</td><td>@Field(server, "RFC Kaydı")</td></tr> }
+                    </tbody></table></div>
+                }
                 @if (record.Source.Servers.Count == 0) { <MudAlert Severity="Severity.Warning">Doğrulanmış sunucu ilişkisi yok. Kaynak ilişki kanıtı gerekli.</MudAlert> }
                 @if (CanEdit && record.Source.Servers.Count > 1)
                 {

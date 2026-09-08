@@ -44,6 +44,8 @@ public sealed class InUseHostedTests
         page.Items.Should().ContainSingle();
         InUseRecord record = page.Items[0];
         string root = $"/api/v1/in-use/{record.Id}";
+        (await denied.PostAsJsonAsync(root + "/relationship-evidence", new InUseDiagnosticRequest(record.Version, record.Source.Id))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await admin.PostAsJsonAsync(root + "/relationship-evidence", new InUseDiagnosticRequest(record.Version, "other"))).StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await denied.GetAsync("/api/v1/in-use")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.GetAsync(root)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.GetAsync("/api/v1/in-use/assignees")).StatusCode.Should().Be(HttpStatusCode.Forbidden);

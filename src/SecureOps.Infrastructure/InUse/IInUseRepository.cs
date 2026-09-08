@@ -8,6 +8,9 @@ public interface IInUseSourceClient
 {
     /// <summary>Reads one explicitly scoped bounded batch.</summary>
     public Task<InUseBatch> DiscoverAsync(CancellationToken cancellationToken);
+    /// <summary>Explicit diagnostic only; providers without an evidenced query refuse it.</summary>
+    public Task<System.Text.Json.JsonElement> DiagnoseAsync(string sourceId, CancellationToken token) =>
+        throw new InvalidOperationException("Relationship diagnostics are unavailable for this provider.");
 }
 
 /// <summary>Completeness is explicit and cannot be inferred from an empty result.</summary>

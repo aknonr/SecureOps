@@ -22,6 +22,14 @@ namespace SecureOps.Api.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class InUseController(InUseService service) : ControllerBase
 {
+    /// <summary>TEST-only exact-record read-only relationship contract diagnostic; returns aliases, never source values.</summary>
+    [HttpPost("{id:guid}/relationship-evidence")]
+    [EnableRateLimiting(ApiRateLimits.OperationalRecordRefresh)]
+    [Authorize(Policy = Policies.CanRefreshInUse)]
+    [Authorize(Policy = Policies.CanViewOperationalRecordDiagnostics)]
+    public async Task<ActionResult<System.Text.Json.JsonElement>> DiagnoseAsync(Guid id, InUseDiagnosticRequest request,
+        [FromServices] IHostEnvironment environment, CancellationToken token) => !environment.IsEnvironment("Test")
+        ? NotFound() : Reply(await service.DiagnoseAsync(User, Context(), id, request, token));
     /// <summary>Queries a bounded persisted page.</summary>
     [HttpGet]
     public async Task<ActionResult<InUsePage>> QueryAsync([FromQuery] InUseQuery query, CancellationToken token) =>

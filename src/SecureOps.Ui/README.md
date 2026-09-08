@@ -374,6 +374,40 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 
+#### TEST Delivery Addendum, 2026-09-09
+
+The requester list and relationship evidence delivery starts at verified local/
+live remote `cee08c4c13a446d4482b401423612b472c41c2e8`. The explicit task addendum
+authorizes the targeted UI/backend changes. `.vscode/` remains untouched.
+Operational Records now displays its persisted `Requester` as **Talep eden**,
+without per-row requests or changed pagination/search semantics. In Use displays
+separate service-item/affected-asset states, a server table, creator evidence and
+per-field provenance. Failed/ambiguous enrichment retains earlier server evidence
+and invalidates affected review/export versions; manual assignment is preserved.
+Real mappings, Virtual PC User/RFC semantics and configured source links remain
+unresolved. The read-only TEST diagnostic is explicit, audited and dual-capability
+protected; it does not enrich records or infer identities. Exact collection and
+operator installation/acceptance steps are in the current rc6.14 section of
+`docs/24-api-test-deployment-readiness.md`, exported with the paired delivery.
+
+Required schema remains 001-012; no applied SQL or runtime config was changed.
+New archive paths, exact committed build SHA, hashes and later documentation HEAD
+are recorded separately under `C:\SecureOpsBuild\release\2026-09-09-pilot-rc6.14`.
+The older **not packaged** statement below describes the original V1 milestone.
+This release is not deployed or corporate-accepted. Positive ServerRequest
+eligibility still needs approved policy plus code/tests, not configuration alone.
+
+Fresh verification: Release build 0 warnings/errors; 187 targeted unit tests,
+10 hosted In Use/OpenAPI/Swagger tests and 14 real isolated SQL tests passed.
+The published SQL/Simulation UI journey passed at 1440x900 and 390x844 in dark/
+light themes, including requester text, pagination, assignment, explicit bulk,
+per-server answers, preview/download, stale conflict and guide focus/no mutation.
+Evidence: `C:\SecureOpsBuild\validation\inuse-delivery-20260909\evidence`.
+Prior 1,108 unit/253 integration totals are source-V1 evidence, not new full-suite
+runs; unchanged roles/resources/write fences reuse that evidence. NuGet reports
+no vulnerable packages. Scoped formatting excludes pre-existing IDE1006 debt.
+No corporate requests, source writes, deployment or scheduler were performed.
+
 **Implemented locally, not deployed or packaged.** Start source and synchronized
 remote were `49ca6e81457ed9f86b1e46833e30f17bc754d208` on
 `feature/sql-runtime-hardening-20260902`. GCM authentication and the three prior

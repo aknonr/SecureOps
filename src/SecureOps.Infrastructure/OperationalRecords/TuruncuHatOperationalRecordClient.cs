@@ -189,7 +189,8 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
         IReadOnlyList<string> filters,
         IReadOnlyList<string> selects,
         string operation,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? maximumBytes = null)
     {
         string session = await _sessions.GetSessionAsync(cancellationToken);
         for (int attempt = 0; attempt < 2; attempt++)
@@ -230,7 +231,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
 
                 BoundedJsonReadResult readResult = await BoundedJsonHttpContent.ReadWithLengthAsync(
                     response.Content,
-                    _options.MaxResponseBytes,
+                    Math.Min(_options.MaxResponseBytes, maximumBytes ?? _options.MaxResponseBytes),
                     cancellationToken);
                 JsonDocument document = readResult.Document;
                 if (_options.DiagnosticContractLogging)

@@ -9,7 +9,17 @@ public sealed record InUseServer(string Id, IReadOnlyDictionary<string, InUseEvi
 /// <summary>Read-only source snapshot; relationships are distinct from local assignment.</summary>
 public sealed record InUseSource(string Id, string Code, string Title, InUseEvidence Requester,
     InUseEvidence ServiceOwner, InUseEvidence ProvisioningTeam, IReadOnlyList<InUseServer> Servers,
-    string RelationshipEvidence, bool Synthetic);
+    string RelationshipEvidence, bool Synthetic)
+{
+    /// <summary>Complete, NotQueried, Forbidden, Failed or Ambiguous; never infer zero from absence.</summary>
+    public string ServiceItemsState { get; init; } = "NotQueried";
+    /// <summary>A separate relationship, never populated from service items.</summary>
+    public string AffectedAssetsState { get; init; } = "NotQueried";
+    /// <summary>Null until the affected-assets relationship is independently verified.</summary>
+    public int? AffectedAssetCount { get; init; }
+    /// <summary>Technical source creator, not requester, Virtual PC User or reviewer.</summary>
+    public InUseEvidence? Creator { get; init; }
+}
 
 /// <summary>One explicitly reviewed technical answer. Unknown is a first-class value.</summary>
 public sealed record InUseAnswer(string ServerId, string Check, string Value, string Evidence);
@@ -53,6 +63,9 @@ public sealed record SaveInUseDraftRequest(long ExpectedVersion, long SourceVers
 
 /// <summary>Export only the exact reviewed aggregate shown to the operator.</summary>
 public sealed record ExportInUseRequest(long ExpectedVersion);
+
+/// <summary>One explicitly authorized source identity, cross-checked against the stored record.</summary>
+public sealed record InUseDiagnosticRequest(long ExpectedVersion, string SourceId);
 
 /// <summary>Minimal authorized assignment-picker projection, not directory search.</summary>
 public sealed record InUseAssignee(Guid Id, string Label);

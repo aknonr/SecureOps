@@ -1,5 +1,25 @@
 # SecureOps API v1 UI Integration Contract
 
+## In Use Relationship Evidence, 2026-09-09
+
+Additive source fields: serviceItemsState/affectedAssetsState (Complete,
+NotQueried, Forbidden, Failed, Ambiguous), nullable affectedAssetCount and creator
+evidence. Missing old JSON fields default to NotQueried/null. Servers are service
+items, not affected assets. Only Complete plus an empty set establishes zero;
+non-complete enrichment retains previous evidence, with explicit state and stale
+review version. Dictionary labels Virtual PC User/RFC Kaydı are presentation
+evidence only, not invented corporate property names or assignment policies.
+Operational Records list reuses Requester; no new search/sort or remote lookup.
+
+POST `/api/v1/in-use/{id}/relationship-evidence` accepts expectedVersion/sourceId.
+It requires View, Refresh and OperationalRecords.ViewDiagnostics, Test environment
+and unchanged external-write fences. Exact source ID must match the persisted
+record/version. Returns JSON Root/ServiceItems keyed cell type/alias arrays,
+Completeness=Unverified, AffectedAssets=NotQueried; never raw source values.
+Failure returns normal 400/403/404/409/503 boundaries; no partial diagnostic output.
+No discovery enrichment or local review mutation occurs, only append-only audit.
+See the canonical TEST runbook for invocation, bounds, masking and stop conditions.
+
 Claude-owned UI work must consume `docs/contracts/secureops-api-v1.openapi.json` and this companion contract. Do not invent routes, request fields, status codes, role checks, or workflow states. Every endpoint requires authentication unless explicitly noted; capability failures return 403 ProblemDetails.
 
 ProblemDetails includes safe `code`, `stage`, `retryable`, `correlationId`, and `traceId` extensions. Access mutations distinguish `AccessValidationFailed` (400/validation), `AccessRequestAlreadyDecided` and `AccessUserInvalidState` (409/lifecycle), `AccessConcurrencyConflict` (409/concurrency/retryable), and `AccessSelfApprovalDenied` (403/authorization). Policy denials remain 403.

@@ -2,6 +2,15 @@
 
 Status: Accepted for the explicitly authorized In Use V1 local milestone.
 
+The 2026-09-09 delivery addendum keeps service items distinct from affected
+assets. Additive JSON snapshot fields need no migration beyond 012. Unqueried,
+denied, failed and ambiguous relationships are not an authoritative empty set;
+failed enrichment retains previous evidence and invalidates review provenance.
+An explicitly invoked, audited, exact-record diagnostic may read the evidenced
+legacy relation query, but cannot interpret unverified response keys as inventory
+or ownership. It requires both InUse.Refresh and operational diagnostics access.
+No source navigation route is configured or inferred from task screenshot URLs.
+
 Separate In Use discovery (active SMSS_oRFF category 4241/group 68) from the
 existing SDM/Jira workflow. Reuse authenticated transport, exact-key parsing,
 application capabilities, command tracking and transactional SQL audit.
