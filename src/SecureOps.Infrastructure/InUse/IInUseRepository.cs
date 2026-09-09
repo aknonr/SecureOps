@@ -34,7 +34,7 @@ public interface IInUseRepository
 }
 
 /// <summary>Safe application result without source payloads or exception messages.</summary>
-public sealed record InUseResult<T>(T? Value, string? Error = null)
+public sealed record InUseResult<T>(T? Value, string? Error = null, string? Detail = null)
 {
     /// <summary>Creates an expected failure.</summary>
     public static InUseResult<T> Fail(string code) => new(default, code);

@@ -38,8 +38,18 @@ reuse OR-to-Jira eligibility, claims or source-close commands. Additional gates:
 | GET /assignees | InUse.Assign | at most 200 approved InUse.View+Review application IDs/principals; no directory search or source-name matching |
 | POST /refresh | InUse.Refresh | nonempty commandId GUID; existing command tracking and refresh rate limit; at most 100 accepted records, 45s orchestration deadline and existing response-byte bounds |
 | PUT /{id}/assignment | InUse.Assign | expectedVersion, nullable assigneeId, nonblank reason max 500; approved exact identity or explicit unassignment |
-| PUT /{id}/draft | InUse.Review plus current assignment | expectedVersion, sourceVersion, answers (serverId/check/value/evidence), notes max 2000; max 900 answers, unique server/check, non-Unknown requires evidence max 500 |
-| POST /{id}/report | InUse.Review | expectedVersion of a saved current draft; returns exact preview sheets, XLSX bytes, SHA256 and version provenance after audit commit |
+| PUT /{id}/draft | InUse.Review plus current assignment | expectedVersion, sourceVersion, answers (serverId/check/value/evidence), notes max 2000; max 900 answers, unique server/check; evidence optional max 500. Blank evidence/notes and omitted historical answers preserve stored history |
+| POST /{id}/report | InUse.Review | expectedVersion; default previews a current saved draft. archive=true requires Complete/nonempty service items and explicit Yes/No for all three operator questions. archivedVersion downloads immutable history, checked against expected current record version |
+
+Normal editable codes are InternetOut/InternetIn/Microsegmented. Unknown may be
+saved, but readiness returns 400 InUseIncomplete with server/field-specific text.
+Reports include PreparedBy (authenticated application user ID), PreparedAt,
+SourceId, Size and Archived. GET detail includes ArchivedVersions. Archive download
+requires View+Review even for old versions; it never represents current evidence.
+There is no public/static file route. Storage is an atomic private JSON envelope
+containing XLSX bytes and metadata, configured by InUseReports:Directory. No SQL
+migration/grant change. Failures return no successful artifact; repeated versions
+reuse the original bytes, actor and timestamp. Preview alone is not an archive.
 
 Values are Unknown/Yes/No/NotApplicable. Check codes are InternetOut, InternetIn,
 Microsegmented, NmsRequested, MemoryAlarm, CpuAlarm, UpDownAlarm, DiskAlarm,

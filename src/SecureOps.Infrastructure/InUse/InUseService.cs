@@ -15,7 +15,7 @@ namespace SecureOps.Infrastructure.InUse;
 /// <summary>Authorized local In Use workflow. There is deliberately no external-write dependency.</summary>
 public sealed class InUseService(IInUseRepository repository, IInUseSourceClient source,
     IApplicationAccessService access, IAccessRepository users, ICommandIdempotencyStore commands,
-    ILogger<InUseService> logger)
+    ILogger<InUseService> logger, InUseReportArchive? archive = null)
 {
     /// <summary>Queries only persisted records.</summary>
     public Task<InUseResult<InUsePage>> QueryAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -32,7 +32,8 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
         Guid id, CancellationToken token) => RunAsync(principal, context, Capabilities.InUseView, async _ =>
         {
             InUseRecord? record = await repository.GetAsync(id, token);
-            return record is null ? InUseResult<InUseRecord>.Fail("InUseNotFound") : new(record);
+            return record is null ? InUseResult<InUseRecord>.Fail("InUseNotFound")
+                : new(record with { ArchivedVersions = archive?.Versions(id) ?? [] });
         }, token);
 
     /// <summary>Minimal approved-reviewer picker; never resolves source display names into users.</summary>
@@ -116,8 +117,11 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
             {
                 Version = old.Version + 1,
                 Draft = new(old.SourceVersion,
-                request.Answers.OrderBy(a => a.ServerId, StringComparer.Ordinal).ThenBy(a => a.Check, StringComparer.Ordinal).ToArray(),
-                request.Notes.Trim(), user.Id, DateTimeOffset.UtcNow)
+                (old.Draft?.Answers ?? []).Where(a => !request.Answers.Any(n => n.ServerId == a.ServerId && n.Check == a.Check))
+                    .Concat(request.Answers.Select(a => string.IsNullOrWhiteSpace(a.Evidence)
+                        ? a with { Evidence = old.Draft?.Answers.FirstOrDefault(o => o.ServerId == a.ServerId && o.Check == a.Check)?.Evidence ?? "" } : a))
+                    .OrderBy(a => a.ServerId, StringComparer.Ordinal).ThenBy(a => a.Check, StringComparer.Ordinal).ToArray(),
+                string.IsNullOrWhiteSpace(request.Notes) ? old.Draft?.Notes ?? "" : request.Notes.Trim(), user.Id, DateTimeOffset.UtcNow)
             };
             return await SaveAsync(next, request.ExpectedVersion, Audit(user, context, "DraftSaved",
                 new { id, next.Version, next.SourceVersion, AnswerCount = request.Answers.Count }), token);
@@ -130,9 +134,34 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
             InUseRecord? record = await repository.GetAsync(id, token);
             if (record is null)
             { return InUseResult<InUseReport>.Fail("InUseNotFound"); }
+            if (record.Version != request.ExpectedVersion)
+            { return InUseResult<InUseReport>.Fail("InUseConflict"); }
+            if (request.ArchivedVersion is long historical)
+            {
+                if (historical < 1 || request.Archive)
+                { return InUseResult<InUseReport>.Fail("InUseInvalid"); }
+                InUseReport? stored = await (archive ?? throw new InvalidOperationException("Archive unavailable.")).AccessAsync(id, historical, null,
+                    report => repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ArchivedReportDownloadAuthorized",
+                        new { id, report.Version, report.Sha256 }), token), token);
+                return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(stored);
+            }
             if (record.Version != request.ExpectedVersion || record.Draft is null || record.Draft.SourceVersion != record.SourceVersion)
             { return InUseResult<InUseReport>.Fail("InUseConflict"); }
+            if (request.Archive && InUseChecks.Missing(record.Source, record.Draft.Answers) is { } missing)
+            {
+                string label = missing.Check switch { "InternetOut" => "Sunucudan internete erişim", "InternetIn" => "İnternetten sunucuya erişim", _ => "Mikrosegmentasyon" };
+                return new(null, "InUseIncomplete", $"{missing.ServerId}: {label} için Evet veya Hayır seçin. Taslak kaydedilebilir; rapor hazır değil.");
+            }
+            if (request.Archive && (record.Source.ServiceItemsState != "Complete" || record.Source.Servers.Count == 0))
+            { return InUseResult<InUseReport>.Fail("InUseIncomplete"); }
             InUseReport report = InUseWorkbook.Create(record, user.Id, DateTimeOffset.UtcNow);
+            if (request.Archive)
+            {
+                InUseReport? stored = await (archive ?? throw new InvalidOperationException("Archive unavailable.")).AccessAsync(id, record.Version, report,
+                    artifact => repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ReportArchiveAuthorized",
+                        new { id, record.Version, record.SourceVersion, artifact.Sha256 }), token), token);
+                return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(stored);
+            }
             bool saved = await repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ReportPrepared",
                 new { id, record.Version, record.SourceVersion, report.Sha256 }), token);
             return saved ? new(report) : InUseResult<InUseReport>.Fail("InUseConflict");
@@ -180,7 +209,7 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
             { return InUseResult<T>.Fail("AccessDenied"); }
             return await operation(user);
         }
-        catch (Exception ex) when (ex is DbException or IOException or InvalidDataException or InvalidOperationException or JsonException)
+        catch (Exception ex) when (ex is DbException or IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException or JsonException)
         {
             logger.LogError("In Use local operation failed. FailureType: {FailureType}", ex.GetType().Name);
             return InUseResult<T>.Fail("PersistenceUnavailable");
@@ -197,7 +226,7 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
         && request.Answers.Select(a => (a.ServerId, a.Check)).Distinct().Count() == request.Answers.Count
         && request.Answers.All(a => record.Source.Servers.Any(s => s.Id == a.ServerId)
             && InUseChecks.Codes.Contains(a.Check) && InUseChecks.Values.Contains(a.Value)
-            && Text(a.Evidence, 500, required: a.Value != "Unknown"));
+            && Text(a.Evidence, 500));
     private static AuditEvent Audit(ApplicationUser user, AccessOperationContext context, string action, object details) => new()
     { Actor = user.Id.ToString("D"), Action = "InUse" + action, CorrelationId = context.CorrelationId, Details = details };
 }

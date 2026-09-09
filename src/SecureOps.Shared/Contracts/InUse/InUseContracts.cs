@@ -34,6 +34,8 @@ public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash,
 {
     /// <summary>Local review state, not authoritative source or BPM state.</summary>
     public string Status => Draft is null ? "Unreviewed" : Draft.SourceVersion == SourceVersion ? "Draft" : "Stale";
+    /// <summary>Available historical archive versions; populated only by the detail service.</summary>
+    public IReadOnlyList<long> ArchivedVersions { get; init; } = [];
 }
 
 /// <summary>Bounded persisted query; mine is resolved from the authenticated user.</summary>
@@ -62,7 +64,7 @@ public sealed record AssignInUseRequest(long ExpectedVersion, Guid? AssigneeId, 
 public sealed record SaveInUseDraftRequest(long ExpectedVersion, long SourceVersion, IReadOnlyList<InUseAnswer> Answers, string Notes);
 
 /// <summary>Export only the exact reviewed aggregate shown to the operator.</summary>
-public sealed record ExportInUseRequest(long ExpectedVersion);
+public sealed record ExportInUseRequest(long ExpectedVersion, bool Archive = false, long? ArchivedVersion = null);
 
 /// <summary>One explicitly authorized source identity, cross-checked against the stored record.</summary>
 public sealed record InUseDiagnosticRequest(long ExpectedVersion, string SourceId);
@@ -75,11 +77,29 @@ public sealed record InUseSheet(string Name, IReadOnlyList<IReadOnlyList<string>
 
 /// <summary>Version-bound local preparation, never an uploaded or approved source attachment.</summary>
 public sealed record InUseReport(Guid RecordId, long Version, long SourceVersion, string Sha256,
-    string FileName, byte[] Content, IReadOnlyList<InUseSheet> Sheets);
+    string FileName, byte[] Content, IReadOnlyList<InUseSheet> Sheets)
+{
+    /// <summary>Verified application actor, never supplied by the caller.</summary>
+    public Guid PreparedBy { get; init; }
+    /// <summary>Preparation timestamp retained on repeated archive requests.</summary>
+    public DateTimeOffset PreparedAt { get; init; }
+    /// <summary>Exact source identity bound to this artifact.</summary>
+    public string SourceId { get; init; } = "";
+    /// <summary>True only after durable archive commit or verified archive read.</summary>
+    public bool Archived { get; init; }
+    /// <summary>Workbook byte count, independently checked when reading the archive.</summary>
+    public long Size { get; init; }
+}
 
 /// <summary>Stable check codes shared by validation, workbook and UI.</summary>
 public static class InUseChecks
 {
+    /// <summary>The three legacy operator questions; other checks are historical evidence only.</summary>
+    public static IReadOnlyList<string> OperatorCodes { get; } = ["InternetOut", "InternetIn", "Microsegmented"];
+    /// <summary>First missing required answer, shared by UI and server readiness validation.</summary>
+    public static InUseAnswer? Missing(InUseSource source, IReadOnlyList<InUseAnswer> answers) =>
+        source.Servers.SelectMany(s => OperatorCodes.Select(c => new InUseAnswer(s.Id, c, "Unknown", "")))
+            .FirstOrDefault(required => !answers.Any(a => a.ServerId == required.ServerId && a.Check == required.Check && a.Value is "Yes" or "No"));
     /// <summary>Allowed independently reviewed values.</summary>
     public static IReadOnlyList<string> Values { get; } = ["Unknown", "Yes", "No", "NotApplicable"];
     /// <summary>No check defaults to a successful result.</summary>

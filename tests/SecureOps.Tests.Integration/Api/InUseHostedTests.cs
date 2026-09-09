@@ -53,6 +53,8 @@ public sealed class InUseHostedTests
         (await denied.PutAsJsonAsync(root + "/assignment", new AssignInUseRequest(record.Version, null, "Denied"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.PutAsJsonAsync(root + "/draft", new SaveInUseDraftRequest(record.Version, 1, [], ""))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.PostAsJsonAsync(root + "/report", new ExportInUseRequest(record.Version))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await denied.PostAsJsonAsync(root + "/report", new ExportInUseRequest(record.Version, true))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await denied.PostAsJsonAsync(root + "/report", new ExportInUseRequest(record.Version, ArchivedVersion: 1))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         foreach (string query in new[] { "page=0", "pageSize=101", "view=other", "status=closed" })
         { (await admin.GetAsync("/api/v1/in-use?" + query)).StatusCode.Should().Be(HttpStatusCode.BadRequest); }
         JsonElement me = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/me");
@@ -62,13 +64,13 @@ public sealed class InUseHostedTests
         (await admin.GetFromJsonAsync<InUsePage>("/api/v1/in-use?view=unassigned"))!.Total.Should().Be(1);
         foreach (InUseAnswer[] answers in new[] {
             new[] { new InUseAnswer("missing", "InternetOut", "Yes", "evidence") },
-            new[] { new InUseAnswer(record.Source.Servers[0].Id, "InternetOut", "Yes", "") },
             new[] { new InUseAnswer(record.Source.Servers[0].Id, "InternetOut", "Assumed", "evidence") } })
         { (await admin.PutAsJsonAsync(root + "/draft", new SaveInUseDraftRequest(record.Version, 1, answers, ""))).StatusCode.Should().Be(HttpStatusCode.BadRequest); }
         InUseRecord saved = (await (await admin.PutAsJsonAsync(root + "/draft", new SaveInUseDraftRequest(record.Version, 1, [], "Unknown checks retained")))
             .Content.ReadFromJsonAsync<InUseRecord>())!;
         (await admin.PostAsJsonAsync(root + "/report", new ExportInUseRequest(record.Version))).StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await admin.PostAsJsonAsync(root + "/report", new ExportInUseRequest(saved.Version))).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync(root + "/report", new ExportInUseRequest(saved.Version, true))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         // Replaying the same refresh command cannot read source again or invalidate a saved draft.
         (await admin.PostAsJsonAsync("/api/v1/in-use/refresh", command)).EnsureSuccessStatusCode();
         (await admin.GetFromJsonAsync<InUseRecord>(root))!.Version.Should().Be(saved.Version);

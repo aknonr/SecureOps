@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Xml.Linq;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SecureOps.Domain.Access;
@@ -17,6 +18,66 @@ namespace SecureOps.Tests.Unit.InUse;
 
 public sealed class InUseTests
 {
+    [Fact]
+    public async Task Archive_RequiresCompleteAnswers_PreservesEvidenceAndActor_AndReplaysOriginalBytes()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "inuse-archive-" + Guid.NewGuid());
+        var archive = new InUseReportArchive(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["InUseReports:Directory"] = directory }).Build());
+        var f = new Fixture(archive: archive);
+        InUseRecord record = await f.ImportAsync();
+        record = (await f.Service.AssignAsync(_principal, _context, record.Id, new(record.Version, f.User.Id, "Manual"), _token)).Value!;
+        record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion,
+            [new(record.Source.Servers[0].Id, "InternetOut", "Yes", "Historical evidence")], "Historical note"), _token)).Value!;
+        InUseResult<InUseReport> missing = await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version, true), _token);
+        missing.Error.Should().Be("InUseIncomplete");
+        missing.Detail.Should().Contain(record.Source.Servers[0].Id).And.Contain("İnternetten sunucuya erişim");
+        archive.Versions(record.Id).Should().BeEmpty();
+        InUseAnswer[] answers = record.Source.Servers.SelectMany(s => InUseChecks.OperatorCodes.Select(c => new InUseAnswer(s.Id, c, "No", ""))).ToArray();
+        record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion, answers, ""), _token)).Value!;
+        record.Draft!.Notes.Should().Be("Historical note");
+        record.Draft.Answers.Should().Contain(a => a.Evidence == "Historical evidence" && a.Value == "No");
+        f.Audit.WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>()).Returns(_ => throw new IOException("Synthetic audit failure"));
+        (await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version, true), _token)).Error.Should().Be("PersistenceUnavailable");
+        archive.Versions(record.Id).Should().BeEmpty();
+        f.Audit.WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        InUseReport first = (await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version, true), _token)).Value!;
+        InUseReport replay = (await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version, true), _token)).Value!;
+        first.Archived.Should().BeTrue();
+        first.PreparedBy.Should().Be(f.User.Id);
+        first.SourceId.Should().Be(record.Source.Id);
+        replay.Should().BeEquivalentTo(first);
+        archive.Versions(record.Id).Should().Equal(record.Version);
+        await f.Audit.Received().WriteAsync(Arg.Is<AuditEvent>(e => e.Actor == f.User.Id.ToString("D") && e.Action == "InUseReportArchiveAuthorized"), Arg.Any<CancellationToken>());
+        long archivedVersion = record.Version;
+        record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion, answers, ""), _token)).Value!;
+        (await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version, ArchivedVersion: archivedVersion), _token)).Value!.Sha256.Should().Be(first.Sha256);
+        await f.Source.DidNotReceive().DiagnoseAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("deployment")]
+    [InlineData("file")]
+    [InlineData("pending")]
+    public async Task Archive_UnsafeOrFailedStorage_NeverReportsSuccess(string failure)
+    {
+        string directory = failure == "deployment" ? Path.Combine(AppContext.BaseDirectory, "reports")
+            : Path.Combine(Path.GetTempPath(), "inuse-failure-" + Guid.NewGuid());
+        var archive = new InUseReportArchive(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["InUseReports:Directory"] = directory }).Build());
+        var f = new Fixture(archive: archive);
+        InUseRecord record = await f.ImportAsync();
+        record = record with { Draft = new(record.SourceVersion, [], "", f.User.Id, DateTimeOffset.UtcNow) };
+        InUseReport report = InUseWorkbook.Create(record, f.User.Id, DateTimeOffset.UtcNow);
+        if (failure == "file")
+        { await File.WriteAllTextAsync(directory, "synthetic obstruction"); }
+        if (failure == "pending")
+        { Directory.CreateDirectory(Path.Combine(directory, record.Id.ToString("D"), record.Version + ".json.pending")); }
+        Func<Task> write = async () => await archive.AccessAsync(record.Id, record.Version, report, _ => Task.FromResult(true), _token);
+        await write.Should().ThrowAsync<Exception>();
+        File.Exists(Path.Combine(directory, record.Id.ToString("D"), record.Version + ".json")).Should().BeFalse();
+    }
+
     private static readonly CancellationToken _token = CancellationToken.None;
     private static readonly ClaimsPrincipal _principal = new();
     private static readonly AccessOperationContext _context = new("synthetic", "inuse-test", null);
@@ -210,7 +271,7 @@ public sealed class InUseTests
         public InMemoryInUseRepository Repository { get; }
         public InUseService Service { get; }
         public ApplicationUser User { get; }
-        public Fixture(string role = "Admin")
+        public Fixture(string role = "Admin", InUseReportArchive? archive = null)
         {
             Repository = new(Audit);
             User = new(Guid.NewGuid(), "synthetic:reviewer", "test", AccessStatus.Approved, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, 1, [role], AccessRoleCatalog.GetCapabilities([role]));
@@ -219,7 +280,7 @@ public sealed class InUseTests
                 .Returns(AccessServiceResult<EnsureAccessUserResult>.Success(new(User, null, false, false)));
             IAccessRepository users = Substitute.For<IAccessRepository>();
             users.GetUserAsync(User.Id, Arg.Any<CancellationToken>()).Returns(User);
-            Service = new(Repository, Source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance);
+            Service = new(Repository, Source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance, archive);
         }
         public async Task<InUseRecord> ImportAsync()
         {

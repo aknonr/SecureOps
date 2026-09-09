@@ -374,6 +374,68 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 
+#### Operator Effort And Report Retention, 2026-09-09
+
+Start local/live source: `38eee722dbb18619ca6d8eb9a05a58a4afb16112` on
+`feature/sql-runtime-hardening-20260902`. This follow-up is implemented and
+locally verified, not deployed or release-packaged. rc6.14 below is unchanged
+and does not contain this follow-up. The scoped V1 line-limit exception was not
+reused; the complete follow-up is reviewed as one diff under the permanent cap.
+
+The old editor exposed nine answers and nine evidence inputs per server, plus
+one optional general note. Normal review now requires only three answers:
+outbound internet, inbound internet and microsegmentation. Select one server,
+answer it, explicitly select recipients, preview changed fields, confirm, then
+edit exceptions. For four identical servers this is three answer selections
+plus three recipient checkboxes and preview/confirmation, not 36 answers and
+36 evidence inputs. No new evidence/general note is required. Historical notes
+remain read-only and stored; bulk copy never copies source facts or notes.
+Incomplete drafts save; unknown/missing answers prevent archive readiness with
+server/field-specific Turkish validation and focus. Failed saves preserve edits.
+
+Operational Records retains its authoritative requester list mapping. In Use
+shows source Virtual PC User evidence separately from the manually assigned
+WASAS reviewer. Real Virtual PC User/RFC keys and identity joins remain unresolved;
+synthetic fixtures are not corporate proof. No source-person assignment candidate
+is offered without exact identity/capability evidence. The bounded standalone
+collection command and two-field dictionary prerequisite are in the canonical
+TEST runbook; neither UI OIDC tokens nor UseDefaultCredentials are assumed.
+
+**Storage:** configure API `InUseReports:Directory` (environment override
+`InUseReports__Directory`) to a private absolute directory outside published
+content/wwwroot. Default is unconfigured: preview/draft still work, archive
+requests fail closed. Grant the API runtime identity only required directory
+read/create/write/rename access, with no public static mapping; provision ACLs,
+capacity monitoring and backup separately. Reparse-point paths are refused.
+Archive files are `<record-guid>/<version>.json` atomic envelopes containing
+the XLSX and OR/source-version, actor, timestamp, size and SHA-256 metadata.
+Same-version requests return the original bytes/provenance. Historical versions
+remain downloadable only through View+Review authorization. No automatic deletion;
+`.lock` files and at most one uncommitted `.pending` per version may remain.
+SQL audit records authorization before file commit, not a false successful write;
+filesystem and SQL are not one distributed transaction. No schema/grant delta:
+012, ops.InUseRecords SELECT/INSERT/UPDATE and ops.InUseRefresh SELECT/UPDATE remain.
+
+Assignment/review/report actors are stable application user IDs resolved from
+authenticated access (OIDC issuer/subject in that profile), never browser actor
+names or the integration service account. Future separately approved closure
+must retain this actor, durable command ID, immutable report hash/version and
+remote request/result references, followed by authoritative state verification.
+No source-history human attribution is claimed without a supported contract.
+
+Verification: 85 targeted unit tests, 10 hosted API/OpenAPI/Swagger tests and
+14 isolated SQL tests passed. Published local SQL/Simulation journeys passed at
+1440x900 and 390x844 in light/dark themes, including bulk difference preview,
+mobile exception editing, missing-answer focus, conflict preservation, archive
+download, pagination and non-mutating keyboard tours. Evidence and before/after
+screenshots: `C:\SecureOpsBuild\validation\inuse-effort-20260909\evidence`;
+retained synthetic DB: `SecureOps_ResourcesV1_effort20260909`. Storage failure,
+audit rollback, repeated versions and unauthorized download have focused tests.
+Corporate OIDC/ACLs/SMB durability, relationship mapping and Excel template
+acceptance are not validated locally. No corporate calls, deployment, scheduler,
+Jira creation, upload or source/BPM mutation. SDM remains an independent policy/
+implementation/evidence/activation continuation, not blocked on In Use acceptance.
+
 #### TEST Delivery Addendum, 2026-09-09
 
 **Paired delivery prepared and verified:** build source/live remote at packaging

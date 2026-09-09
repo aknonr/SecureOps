@@ -38,6 +38,25 @@ must remain distinct; no corporate identity is inferred from an address/name.
 
 ### Workbook Compatibility
 
+Operator-effort follow-up: the complete file hash above was rechecked unchanged.
+Lines 492-522 ask only InternetOut, InternetIn and Microsegmented, then whether
+to reuse all three answers. Neither per-field evidence nor a general note is
+requested. The UI now follows this three-answer scope with explicit recipients
+and a before/after preview; old evidence and notes remain historical, read-only.
+
+| Remaining workbook values | Legacy classification and evidence | Current preparation |
+|---|---|---|
+| Inventory/ENV_ID, hostname, type/Hardware_Type, environment/NMS Server_Type, consumer, service, network, IP, OS, OS version, directorate, building, city, Device_Type | Source-derived positional cells listed above, lines 531-606 | Automatic only from verified per-server evidence; otherwise Unknown |
+| ITMC_Service_ID and functional-aspect ID/name | Intended source-derived; pre-loop service ID/first-result defects, 439-468 | Unknown until semantic keys and unique relationship are established |
+| Country, Department, Sub_Department, contact/owner/event addresses, OS release, literal [Genel] | Template constants, 535-588; addresses deliberately not reproduced | Not approved identity/policy; Unknown unless independently sourced |
+| NMS requested, memory/CPU/disk settings | Environment-derived requests (PROD => Yes), 524-525; not enrollment/completion evidence | Unknown pending approved request policy, never a completed monitoring check |
+| Up/down and KONTROL | Hardcoded Yes, 553/592; no check execution | Unknown / not verified; historical answers remain only in ReviewEvidence |
+| ALAN ADI / server ordinal, sheet names/headers | Template constants | Preserved |
+| Blank CheckList_TEKNIK/CheckList_THY | No populated cells anywhere in complete script | Remain blank; corporate template acceptance unresolved |
+
+No monitoring/technical answer is requested by the new editor. Historical
+non-operator answers cannot produce successful checks in the current workbook.
+
 `Sunucular` has column A labels, columns B onward one server each; row 1 is
 ALAN ADI / Sunucu N Bilgileri. Rows 2-29 are inventory, hostname, server type,
 environment, consumer, owner directorate, service name, service aspect, network,

@@ -91,21 +91,50 @@ delta beklenmez; Access zaten SqlServer değilse kalıcılık geçişi ayrıca i
 
 ### Tek Kayıt İlişki Kanıtı Toplama
 
-Yalnız ayrıca onaylı TEST API'de, mevcut server-owned TuruncuHat kimliğiyle;
-yetkili operatörün Windows-auth yönetim PowerShell oturumundan çağrılır. Admin
+Yalnız ayrıca onaylı TEST API'de, mevcut server-owned TuruncuHat kimliğiyle. Admin
 veya hem InUse.Refresh hem OperationalRecords.ViewDiagnostics yetkisi gerekir.
 InUseCoordinator tek başına diagnostics yetkisi almaz. Kaynak OR kimliğini
 operatör açıkça sağlar; kayıtlı WASAS GUID ve sürümüyle eşleşmek zorundadır.
-`$api` onaylı mevcut WASAS API base URL; `$id`, `$version`, `$sourceId` tek seçili
-kayıttan alınır. Şifre/header/session girilmez veya paylaşılmaz:
+OIDC etkinse API JWT bearer bekler; UI token'ı sunucuda saklar. Windows
+UseDefaultCredentials bu modele uygun değildir. Negotiate yalnız doğrulanmış
+OIDC-kapalı Windows profilinde geçerlidir. Dağıtılmış authentication profili bu
+görevde okunmadı; endpoint için genel bir PowerShell Windows-auth çağrısı önerilmez.
+
+**UI dağıtmadan bağımsız yol:** `scripts/diagnostics/InUseEvidence` mevcut session/
+query transport'unu kullanan dar .NET 8 konsoludur. Yalnız ayrıca izin verilmiş
+TEST Windows API/yönetim host'unda, server-owned config dosyasını okumaya yetkili
+operatör kimliğiyle çalışır. WASAS OIDC oturumu yerine bu ayrı yönetim izni gerekir;
+bir UI capability atlaması veya genel kullanıcı aracı değildir. SDK/derlenmiş
+araç ve bağımlılıkları host'ta ayrıca onaylanmalıdır; tüm UI dağıtımı gerekmez.
+Config mevcut etkin TuruncuHat/OperationalRecords bölümlerini içeren korunan
+dosyadır; repoya kopyalanmaz. Write fence üçlüsü true/false/false zorunludur.
+
+Sistem sahibinden yalnız `LCSIMS_ServiceInstance` için **Virtual PC User** ve
+**RFC Kaydı** alanlarının doğrudan property anahtarı, veri tipi, null/çokluk ve
+referans hedefini içeren iki satırlık alan sözlüğü isteyin. Metadata endpoint'i
+kanıtlanmadığından bu sözlük kaynaktan otomatik çekilemez. Onaylı iki anahtar
+`dictionary.json` içinde bu iki görünür etikete eşlenir; gerçek anahtar yerine
+tahmin yazmayın. `{}` ile mevcut 15 select'in yapısı toplanabilir, fakat bu iki
+alan toplanmış sayılmaz. Nested selector, serbest query veya başka etiket reddedilir.
 
 ```powershell
-$body = @{ expectedVersion = $version; sourceId = $sourceId } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "$api/api/v1/in-use/$id/relationship-evidence" -UseDefaultCredentials -ContentType 'application/json' -Body $body
+dotnet run --no-build --project scripts/diagnostics/InUseEvidence -- $serverConfig $sourceId $approvedDictionary $newPrivateOutput --collect
 ```
+
+Ön koşul: bu checkout'ta `dotnet build scripts/diagnostics/InUseEvidence` başarılı
+olmalı. Dört değişken sadece korunan mutlak dosya yolları ve tek sayısal kaynak OR
+kimliğidir; secret/header/token argümanı yoktur. Yeni çıktı dizini sadece operatör/
+entegrasyon sahibine ACL ile açık olmalı. Mevcut çıktı üzerine yazılmaz. Yerel
+dosyada Windows actor SID/zaman/sözlük hash'i tutulur; yalnız **Evidence** bölümü
+paylaşılır. Başarı `CollectedNotMapped`; hata/yarım dosya başarı değildir, durun.
+RFC hedef OR'u, affected assets veya kullanıcı envanteri sorgulanmaz. Karışık
+Value object/array yanıtında araç durur: sahibinden sadece o alanın kişisiz,
+tip/null/çokluk yapısı gerekir. Kaynak payload dump veya credential istenmez.
 
 Helper önce exact aktif kategori 4241/grup 68 OR'u tekil doğrular; sonra yalnız
 `rel`, m_tid=100049 ve m_lid=bu OR için tam scriptteki 15 select'i sorgular.
+Bağımsız konsol yalnız onaylı sözlük verilirse bu listeye en çok iki doğrudan
+alan ekler; eski deployed API helper bu sözlük parametresini kabul etmez.
 Bir ilişki seviyesi, en çok 10 sonuç/64 hücre, 3 iç içe array seviyesi, her başarılı
 response en çok 64 KiB ve toplam 45 saniye; transport en çok bir session yenileme
 tekrarı yapar. Sonuç bounded olduğu için kurumsal tamlık kanıtı sayılmaz.

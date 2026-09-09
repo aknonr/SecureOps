@@ -19,8 +19,12 @@ public partial class InUse
     private UiProblem? _problem;
     private string? _notice;
     private string _search = "", _view = "all", _status = "", _assignee = "", _reason = "", _notes = "";
-    private string _bulkCheck = "InternetOut", _bulkValue = "Unknown", _bulkEvidence = "";
-    private bool _busy, _dirty, _bulkConfirmed, _reloadRequested;
+    private string _editingServer = "";
+    private string? _validation;
+    private (AnswerEdit Target, string Before, string After)[]? _changes;
+    private readonly ElementReference[] _answerElements = new ElementReference[3];
+    private int? _focusAnswer;
+    private bool _busy, _dirty, _reloadRequested;
     private int _number = 1, _size = 25, _sheet;
     private List<AnswerEdit> _answers = [];
     private readonly HashSet<string> _selected = [];
@@ -98,13 +102,34 @@ public partial class InUse
         _notice = "Yerel inceleme taslağı kaydedildi.";
     });
     private Task PreviewAsync() => ExecuteAsync(async () => { _report = await ReportAsync(); _sheet = 0; });
-    private Task DownloadAsync() => ExecuteAsync(async () =>
+    private Task DownloadAsync(long? archivedVersion = null) => ExecuteAsync(async () =>
     {
-        // Revalidate on download; an old preview is not authority to export current data.
-        _report = await ReportAsync();
+        if (archivedVersion is null && !Ready())
+        { return; }
+        _report = await Api.SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
+            new ExportInUseRequest(_record.Version, Archive: archivedVersion is null, ArchivedVersion: archivedVersion), _lifetime.Token);
+        _record = _record with { ArchivedVersions = _record.ArchivedVersions.Append(_report.Version).Distinct().OrderDescending().ToArray() };
         await Js.InvokeVoidAsync("secureOpsDownload", _report.FileName,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(_report.Content));
     });
+    private bool Ready()
+    {
+        InUseAnswer? missing = InUseChecks.Missing(_record!.Source, _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, "")).ToArray());
+        if (missing is not null)
+        {
+            _editingServer = missing.ServerId;
+            _validation = $"{missing.ServerId}: {Check(missing.Check)} için Evet veya Hayır seçin. Bilinmiyor cevabı yalnızca taslak olarak kaydedilebilir.";
+            _focusAnswer = InUseChecks.OperatorCodes.ToList().IndexOf(missing.Check);
+            return false;
+        }
+        if (_record.Source.ServiceItemsState != "Complete" || _record.Source.Servers.Count == 0)
+        { _validation = "Rapor hazırlığı için servis öğesi ilişkisi doğrulanmış ve en az bir sunucu bulunmuş olmalıdır."; return false; }
+        _validation = null;
+        return true;
+    }
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    { if (_focusAnswer is int index) { _focusAnswer = null; await _answerElements[index].FocusAsync(); } }
     private Task<InUseReport> ReportAsync() => Api.SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
         new ExportInUseRequest(_record.Version), _lifetime.Token);
     private void SetRecord(InUseRecord record)
@@ -115,27 +140,30 @@ public partial class InUse
         _dirty = false;
         _report = null;
         _selected.Clear();
-        _bulkConfirmed = false;
-        _answers = record.Source.Servers.SelectMany(server => InUseChecks.Codes.Select(check =>
+        _changes = null;
+        _validation = null;
+        _editingServer = record.Source.Servers.FirstOrDefault()?.Id ?? "";
+        _answers = record.Source.Servers.SelectMany(server => InUseChecks.OperatorCodes.Select(check =>
         {
             InUseAnswer? saved = record.Draft?.Answers.FirstOrDefault(a => a.ServerId == server.Id && a.Check == check);
             return new AnswerEdit(server.Id, check) { Value = saved?.Value ?? "Unknown", Evidence = saved?.Evidence ?? "" };
         })).ToList();
     }
     private void SelectServer(string id, ChangeEventArgs args)
-    { if (args.Value is true) { _selected.Add(id); } else { _selected.Remove(id); } _bulkConfirmed = false; }
+    { if (args.Value is true) { _selected.Add(id); } else { _selected.Remove(id); } _changes = null; }
+    private void PreviewBulk() => _changes = _answers.Where(a => _selected.Contains(a.ServerId))
+        .Select(a => (Target: a, Before: a.Value, After: _answers.Single(s => s.ServerId == _editingServer && s.Check == a.Check).Value))
+        .Where(c => c.Before != c.After).ToArray();
     private void ApplyBulk()
     {
-        if (!CanEdit || !_bulkConfirmed)
+        if (!CanEdit || _changes is null)
         { return; }
-        foreach (AnswerEdit answer in _answers.Where(a => _selected.Contains(a.ServerId) && a.Check == _bulkCheck))
-        { answer.Value = _bulkValue; answer.Evidence = _bulkEvidence; }
+        foreach ((AnswerEdit Target, string Before, string After) change in _changes)
+        { change.Target.Value = change.After; }
         Dirty();
-        _bulkConfirmed = false;
         _notice = "Toplu cevaplar taslakta. Kaydetmeden önce sunucu bazında inceleyin.";
     }
-    private void Dirty() { _dirty = true; _report = null; }
-    private void BulkChanged() => _bulkConfirmed = false;
+    private void Dirty() { _dirty = true; _report = null; _changes = null; _validation = null; }
     private async Task ExecuteAsync(Func<Task> operation)
     {
         if (_busy)

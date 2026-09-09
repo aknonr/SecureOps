@@ -19,6 +19,18 @@ public sealed class InUseAdapterTests
         """;
 
     [Theory]
+    [InlineData("p_password")]
+    [InlineData("p_rfc.id")]
+    [InlineData("p_user OR 1=1")]
+    public async Task Diagnostic_UnboundedOrSensitiveDictionary_RefusesBeforeTransport(string selector)
+    {
+        using var handler = new Handler("{}");
+        await FluentActions.Awaiting(() => Client(handler).DiagnoseAsync("100",
+            new Dictionary<string, string> { ["Virtual PC User"] = selector }, CancellationToken.None)).Should().ThrowAsync<InvalidDataException>();
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(4)]
     public async Task Diagnostic_ExactScopeAndAliases_DoNotResolveUnknownMappings(int count)
@@ -33,7 +45,8 @@ public sealed class InUseAdapterTests
             }
         });
         using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", relations);
-        JsonElement report = await Client(handler).DiagnoseAsync("100", CancellationToken.None);
+        JsonElement report = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string>
+        { ["Virtual PC User"] = "p_synthetic_user", ["RFC Kaydı"] = "p_synthetic_rfc" }, CancellationToken.None);
         report.GetProperty("ServiceItems").GetArrayLength().Should().Be(count);
         report.GetProperty("AffectedAssets").GetString().Should().Be("NotQueried");
         report.ToString().Should().NotContain("Synthetic requester").And.NotContain("OR-OTHER");

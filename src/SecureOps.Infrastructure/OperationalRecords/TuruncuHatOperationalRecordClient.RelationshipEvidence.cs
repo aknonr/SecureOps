@@ -7,8 +7,15 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 public sealed partial class TuruncuHatOperationalRecordClient
 {
     /// <summary>Legacy request evidence only; never interprets unknown keys as approved relationships.</summary>
-    public async Task<JsonElement> DiagnoseAsync(string sourceId, CancellationToken token)
+    public Task<JsonElement> DiagnoseAsync(string sourceId, CancellationToken token) => DiagnoseAsync(sourceId, new Dictionary<string, string>(), token);
+
+    /// <summary>Optionally reads two direct fields from an operator-approved source dictionary; never follows RFC targets.</summary>
+    public async Task<JsonElement> DiagnoseAsync(string sourceId, IReadOnlyDictionary<string, string> dictionary, CancellationToken token)
     {
+        if (dictionary.Count > 2 || dictionary.Any(p => p.Key is not ("Virtual PC User" or "RFC Kaydı")
+            || !Regex.IsMatch(p.Value, @"\A(?:p_|c_)[A-Za-z0-9_]{1,100}\z", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))
+            || new[] { "password", "token", "session", "secret", "authorization" }.Any(s => p.Value.Contains(s, StringComparison.OrdinalIgnoreCase))))
+        { throw new InvalidDataException("Only approved direct Virtual PC User/RFC field selectors are accepted."); }
         if (!_operationalOptions.ReadOnlyIntegrationMode || _operationalOptions.ControlledTestWritesEnabled
             || _operationalOptions.SourceCloseEnabled || !long.TryParse(sourceId, NumberStyles.None, CultureInfo.InvariantCulture, out long id) || id <= 0)
         { throw new InvalidDataException("Diagnostic requires an exact identity and all write fences."); }
@@ -23,7 +30,7 @@ public sealed partial class TuruncuHatOperationalRecordClient
             "p_def_os_version", "c_new_SI_major_project.p_rel_obs", "p_rel_asset_item.p_rel_lbs",
             "p_rel_asset_item.p_rel_lbs.m_parent", "p_def_category", "c_new_SI_major_project.id"];
         using JsonDocument related = await QueryAsync("rel", [$"#%m_tid%#=100049 and #%m_lid%#={id}"],
-            fields.Select(f => "(LCSIMS_ServiceInstance)m_rid." + f).ToArray(), "in-use-evidence-rel", token, 65536);
+            fields.Concat(dictionary.Values).Distinct().Select(f => "(LCSIMS_ServiceInstance)m_rid." + f).ToArray(), "in-use-evidence-rel", token, 65536);
         var aliases = new Dictionary<string, string>(StringComparer.Ordinal);
         object Shape(JsonElement document, int maximumRows)
         {
@@ -46,14 +53,15 @@ public sealed partial class TuruncuHatOperationalRecordClient
         });
     }
 
-    private static IEnumerable<object> Cells(JsonElement cell, Dictionary<string, string> aliases, int depth)
+    private static IEnumerable<object> Cells(JsonElement cell, Dictionary<string, string> aliases, int depth, string path = "$")
     {
         if (depth > 3)
         { throw new InvalidDataException("Diagnostic nesting exceeded."); }
         if (cell.ValueKind == JsonValueKind.Array && cell.GetArrayLength() <= 64)
         {
+            int index = 0;
             foreach (JsonElement child in cell.EnumerateArray())
-            { foreach (object result in Cells(child, aliases, depth + 1)) { yield return result; } }
+            { foreach (object result in Cells(child, aliases, depth + 1, path + "[" + index++ + "]")) { yield return result; } }
             yield break;
         }
         if (cell.ValueKind != JsonValueKind.Object || !cell.TryGetProperty("Key", out JsonElement key)
@@ -75,6 +83,8 @@ public sealed partial class TuruncuHatOperationalRecordClient
                 { aliases[text] = alias = $"value-{aliases.Count + 1}"; }
             }
         }
-        yield return new { Key = name, Type = value.ValueKind.ToString(), Alias = alias };
+        if (value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+        { throw new InvalidDataException("Expanded Value contract requires a bounded source-owner schema example; no flattening permitted."); }
+        yield return new { Path = path, Key = name, Type = value.ValueKind.ToString(), Alias = alias };
     }
 }

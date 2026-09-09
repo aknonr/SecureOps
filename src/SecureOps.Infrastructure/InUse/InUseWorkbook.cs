@@ -53,6 +53,7 @@ public static class InUseWorkbook
             new[] { "ReviewedAt", record.Draft.ReviewedAt.ToString("O") }, new[] { "PreparedBy", actor.ToString("D") },
             new[] { "PreparedAt", now.ToString("O") }, new[] { "Synthetic", record.Source.Synthetic.ToString() },
             new[] { "Relationships", record.Source.RelationshipEvidence }, new[] { "Notes", record.Draft.Notes },
+            new[] { "RetainedEvidence", "Historical notes/checks are preserved; they do not verify changed answers or completed monitoring." },
             new[] { "ServiceItemsState", record.Source.ServiceItemsState },
             new[] { "AffectedAssetsState", record.Source.AffectedAssetsState, record.Source.AffectedAssetCount?.ToString(CultureInfo.InvariantCulture) ?? "Unknown" },
             new[] { "TechnicalCreator", record.Source.Creator?.Value ?? "Unknown", record.Source.Creator?.Source ?? "Unverified" },
@@ -74,7 +75,8 @@ public static class InUseWorkbook
         sheets = sheets.Select(s => new InUseSheet(s.Name, s.Rows.Select(r => (IReadOnlyList<string>)r.Select(Safe).ToArray()).ToArray())).ToArray();
         byte[] bytes = Write(sheets);
         return new(record.Id, record.Version, record.SourceVersion, Convert.ToHexString(SHA256.HashData(bytes)),
-            $"InUse-{record.Id:D}-v{record.Version}.xlsx", bytes, sheets);
+            $"InUse-{record.Id:D}-v{record.Version}.xlsx", bytes, sheets)
+        { PreparedBy = actor, PreparedAt = now, SourceId = record.Source.Id, Size = bytes.LongLength };
     }
 
     private static string ServerField(int index) => index switch
@@ -94,6 +96,8 @@ public static class InUseWorkbook
     {
         if (!field.StartsWith("check:", StringComparison.Ordinal))
         { return server.Fields.TryGetValue(field, out InUseEvidence? value) ? value.Value ?? "Unknown" : "Unknown"; }
+        if (!InUseChecks.OperatorCodes.Contains(field[6..]))
+        { return "Unknown / not verified"; }
         string? answer = record.Draft!.Answers.SingleOrDefault(a => a.ServerId == server.Id && a.Check == field[6..])?.Value;
         return answer switch { "Yes" => "Evet", "No" => "Hayır", "NotApplicable" => "Not applicable", _ => "Unknown / not verified" };
     }

@@ -2,6 +2,21 @@
 
 Status: Accepted for the explicitly authorized In Use V1 local milestone.
 
+The operator-effort follow-up limits normal input to outbound/inbound internet
+and microsegmentation. Incomplete drafts remain valid; readiness requires an
+explicit Yes/No for each of these fields on every verified service item. Bulk
+copy changes answers only, after a field-level difference preview. Historical
+notes and technical-check evidence remain stored, without new mandatory notes.
+
+Reports are archived in a server-configured private directory, not a deployment
+or static directory. An atomic envelope commits workbook bytes and provenance
+together; record/version is the idempotency key. SQL audit authorizes the exact
+version before file commit, and is not a claim that a file write succeeded.
+An archive is immutable historical evidence, not a current source approval or
+Turuncu Hat attachment. There is no automatic deletion or schema/grant change.
+The application identity resolved from authenticated access supplies the actor;
+transport service-account credentials never represent that human actor.
+
 The 2026-09-09 delivery addendum keeps service items distinct from affected
 assets. Additive JSON snapshot fields need no migration beyond 012. Unqueried,
 denied, failed and ambiguous relationships are not an authoritative empty set;

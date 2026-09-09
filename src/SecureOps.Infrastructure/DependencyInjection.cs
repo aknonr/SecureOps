@@ -155,6 +155,7 @@ public static class DependencyInjection
         services.AddScoped<IApplicationAccessService, ApplicationAccessService>();
         services.AddScoped<ResourceCatalogueService>();
         services.AddScoped<InUseService>();
+        services.AddSingleton<InUseReportArchive>();
         if (string.Equals(configuration[$"{SessionSecurityOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<IApplicationSessionRepository, SqlApplicationSessionRepository>();

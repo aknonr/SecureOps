@@ -55,7 +55,8 @@
                     {
                         <li><div><a href="@($"in-use/{record.Id}")">@record.Source.Code</a><h2>@record.Source.Title</h2>
                             @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }</div>
-                            <div>@Status(record.Status)<br />@(record.AssigneeLabel ?? "Atanmamış")<br />Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)
+                            <div>@Status(record.Status)<br />WASAS inceleyicisi: @(record.AssigneeLabel ?? "Atanmamış")<br />Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)
+                                <br />Virtual PC User: @string.Join("; ", record.Source.Servers.Select(s => Evidence(s.Fields.GetValueOrDefault("Virtual PC User") ?? new(null, "Eşleme bekleniyor"))).DefaultIfEmpty("Eşleme bekleniyor").Distinct())
                                 <br />Talep eden: @Evidence(record.Source.Requester)</div>
                             <MudButton Href="@($"in-use/{record.Id}")" EndIcon="@Icons.Material.Filled.ArrowForward">İncele</MudButton></li>
                     }
@@ -79,25 +80,28 @@
                 <h3>Sorumluluk ve kaynak kanıtı</h3>
                 <dl class="so-inuse-evidence">
                     <dt>İlk talep sahibi</dt><dd>@Evidence(record.Source.Requester)</dd>
+                    <dt>WASAS inceleyicisi</dt><dd>@(record.AssigneeLabel ?? "Atanmamış") · Yerel, yetkili uygulama ataması</dd>
+                </dl>
+                <details><summary>Diğer kaynak kimlikleri</summary><dl class="so-inuse-evidence">
                     <dt>Teknik kayıt oluşturucusu</dt><dd>@Evidence(record.Source.Creator ?? new(null, "Kaynak sözleşmesi doğrulanmadı"))</dd>
                     <dt>Servis / uygulama sahibi</dt><dd>@Evidence(record.Source.ServiceOwner)</dd>
                     <dt>Kurulum operatörü / ekibi</dt><dd>@Evidence(record.Source.ProvisioningTeam)</dd>
-                    <dt>In Use inceleyicisi</dt><dd>@(record.AssigneeLabel ?? "Atanmamış") · Yerel, yetkili uygulama ataması</dd>
-                </dl>
+                </dl></details>
                 @if (Can(Capabilities.InUseAssign))
                 {
-                    <div class="so-inuse-filters">
+                    <details class="so-inuse-assignment" open="@(record.AssigneeId is null)"><summary>İnceleyici ata / değiştir</summary><div class="so-inuse-filters">
                         <label>İnceleyici<select aria-label="In Use inceleyicisi" @bind="_assignee"><option value="">Atanmamış</option>
                             @foreach (InUseAssignee person in _assignees) { <option value="@person.Id">@person.Label</option> }</select></label>
                         <label>Atama gerekçesi<input aria-label="Atama gerekçesi" maxlength="500" @bind="_reason" @bind:event="oninput" /></label>
                         <MudButton OnClick="AssignAsync" Disabled="@(_busy || string.IsNullOrWhiteSpace(_reason))" StartIcon="@Icons.Material.Filled.PersonAdd">Atamayı kaydet</MudButton>
-                    </div>
+                    </div></details>
                 }
                 <p role="status">Sonraki adım: @NextAction</p>
             </section>
             <section class="so-inuse-band" data-guide="inuse-servers">
                 <h3>Servis öğeleri / sunucular</h3><p>@record.Source.RelationshipEvidence</p>
                 <p>Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count) · Etkilenen varlıklar: @Relationship(record.Source.AffectedAssetsState, record.Source.AffectedAssetCount)</p>
+                @if (_validation is not null) { <p role="alert">@_validation</p> }
                 @if (record.Source.Servers.Count > 0)
                 {
                     <div class="so-inuse-workbook" tabindex="0" aria-label="Servis öğesi tablosu"><table><thead><tr><th>Kaynak kimliği</th><th>Adı</th><th>Ortam</th><th>Durum</th><th>Servis / uygulama</th><th>Virtual PC User</th><th>RFC Kaydı</th></tr></thead><tbody>
@@ -106,36 +110,45 @@
                     </tbody></table></div>
                 }
                 @if (record.Source.Servers.Count == 0) { <MudAlert Severity="Severity.Warning">Doğrulanmış sunucu ilişkisi yok. Kaynak ilişki kanıtı gerekli.</MudAlert> }
-                @if (CanEdit && record.Source.Servers.Count > 1)
+                @if (record.Source.Servers.Count > 0)
                 {
-                    <details class="so-inuse-bulk"><summary>Toplu cevap hazırlığı</summary>
-                        <div class="so-inuse-filters"><label>Kontrol<select aria-label="Toplu kontrol" @bind="_bulkCheck" @bind:after="BulkChanged">@foreach (string check in InUseChecks.Codes) { <option value="@check">@Check(check)</option> }</select></label>
-                            <label>Cevap<select aria-label="Toplu cevap" @bind="_bulkValue" @bind:after="BulkChanged">@foreach (string value in InUseChecks.Values) { <option value="@value">@Answer(value)</option> }</select></label>
-                            <label>Kanıt<input aria-label="Toplu kanıt" maxlength="500" @bind="_bulkEvidence" @bind:event="oninput" @bind:after="BulkChanged" /></label></div>
-                        @foreach (InUseServer server in record.Source.Servers)
-                        { <label class="so-inuse-check"><input type="checkbox" checked="@_selected.Contains(server.Id)" @onchange="e => SelectServer(server.Id, e)" />@server.Id · @Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</label> }
-                        <p>@_selected.Count sunucu: @Check(_bulkCheck) = @Answer(_bulkValue)</p>
-                        <label class="so-inuse-check"><input type="checkbox" @bind="_bulkConfirmed" />Seçili sunucuların farklı ortam ve servislerini kontrol ettim.</label>
-                        <MudButton OnClick="ApplyBulk" Disabled="@(_busy || !_bulkConfirmed || _selected.Count == 0 || (_bulkValue != "Unknown" && string.IsNullOrWhiteSpace(_bulkEvidence)))" StartIcon="@Icons.Material.Filled.DoneAll">Seçili cevapları taslağa uygula</MudButton>
-                    </details>
-                }
-                @foreach (InUseServer server in record.Source.Servers)
-                {
-                    <details class="so-inuse-server" open="@(record.Source.Servers.Count == 1)"><summary>@server.Id · @Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</summary>
-                        <dl class="so-inuse-evidence">@foreach (var field in server.Fields) { <dt>@field.Key</dt><dd>@Evidence(field.Value)</dd> }</dl>
-                        <p>Eksik / doğrulanmamış kontrol: @_answers.Count(a => a.ServerId == server.Id && a.Value == "Unknown")</p>
-                        @foreach (AnswerEdit answer in _answers.Where(a => a.ServerId == server.Id))
+                    <label>Yanıtlanacak sunucu<select aria-label="Yanıtlanacak sunucu" @bind="_editingServer" @bind:after="() => _changes = null">
+                        @foreach (InUseServer server in record.Source.Servers) { <option value="@server.Id">@Field(server, "HOSTNAME") · @server.Id · @_answers.Count(a => a.ServerId == server.Id && a.Value == "Unknown") eksik</option> }
+                    </select></label>
+                    <div class="so-inuse-filters">
+                        @for (int i = 0; i < InUseChecks.OperatorCodes.Count; i++)
                         {
-                            <div class="so-inuse-answer"><label>@Check(answer.Check)<select aria-label="@($"{server.Id} {answer.Check}")" disabled="@(!CanEdit || _busy)" @bind="answer.Value" @bind:after="Dirty">
-                                @foreach (string value in InUseChecks.Values) { <option value="@value">@Answer(value)</option> }</select></label>
-                                <label>Kanıt / doğrulama notu<input aria-label="@($"{server.Id} {answer.Check} kanıt")" disabled="@(!CanEdit || _busy)" maxlength="500" @bind="answer.Evidence" @bind:event="oninput" @bind:after="Dirty" /></label></div>
+                            int index = i;
+                            AnswerEdit answer = _answers.Single(a => a.ServerId == _editingServer && a.Check == InUseChecks.OperatorCodes[index]);
+                            <label>@Check(answer.Check)<select @ref="_answerElements[index]" aria-label="@($"{answer.ServerId} {answer.Check}")" disabled="@(!CanEdit || _busy)" @bind="answer.Value" @bind:after="Dirty">
+                                @foreach (string value in InUseChecks.Values.Where(v => v != "NotApplicable")) { <option value="@value">@Answer(value)</option> }
+                            </select></label>
                         }
+                    </div>
+                    @if (CanEdit && record.Source.Servers.Count > 1)
+                    {
+                        <details class="so-inuse-bulk"><summary>Bu üç cevabı seçili sunuculara uygula</summary>
+                            @foreach (InUseServer server in record.Source.Servers.Where(s => s.Id != _editingServer))
+                            { <label class="so-inuse-check"><input type="checkbox" disabled="@_busy" checked="@_selected.Contains(server.Id)" @onchange="e => SelectServer(server.Id, e)" />@server.Id · @Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</label> }
+                            <MudButton OnClick="PreviewBulk" Disabled="@(_busy || _selected.Count == 0)" StartIcon="@Icons.Material.Filled.CompareArrows">Değişiklikleri göster</MudButton>
+                            @if (_changes is not null)
+                            {
+                                <ul>@foreach (var change in _changes) { <li>@change.Target.ServerId · @Check(change.Target.Check): @Answer(change.Before) → @Answer(change.After)</li> }</ul>
+                                <MudButton OnClick="ApplyBulk" Disabled="@(_busy || _changes.Length == 0)" StartIcon="@Icons.Material.Filled.DoneAll">Gösterilen değişiklikleri onayla</MudButton>
+                            }
+                        </details>
+                    }
+                    <details><summary>Kaynak kanıtı ve geçmiş notlar</summary>
+                        <p>@_notes</p>
+                        @foreach (InUseServer server in record.Source.Servers)
+                        { <h4>@server.Id</h4><dl class="so-inuse-evidence">@foreach (var field in server.Fields) { <dt>@field.Key</dt><dd>@Evidence(field.Value)</dd> }</dl> }
+                        @foreach (InUseAnswer old in record.Draft?.Answers.Where(a => !string.IsNullOrEmpty(a.Evidence)) ?? [])
+                        { <p>@old.ServerId · @Check(old.Check): @old.Evidence</p> }
                     </details>
                 }
             </section>
             <section class="so-inuse-band" data-guide="inuse-report">
                 <h3>İnceleme ve Excel hazırlığı</h3>
-                <label>İnceleme notu<textarea aria-label="İnceleme notu" rows="3" maxlength="2000" disabled="@(!CanEdit || _busy)" @bind="_notes" @bind:event="oninput" @bind:after="Dirty"></textarea></label>
                 <div class="so-inline-actions">
                     @if (CanEdit) { <MudButton OnClick="SaveAsync" Disabled="_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">Taslağı kaydet</MudButton> }
                     @if (Can(Capabilities.InUseReview)) { <MudButton OnClick="PreviewAsync" Disabled="@(_busy || _dirty || record.Draft is null || record.Status == "Stale")" StartIcon="@Icons.Material.Filled.TableView">Excel önizleme</MudButton> }
@@ -144,13 +157,17 @@
                 @if (_report is { } report)
                 {
                     <p>Yerel taslak · Sürüm @report.Version · Kaynak sürümü @report.SourceVersion · Yüklenmedi / kaynak onayı değil</p>
-                    <MudButton OnClick="DownloadAsync" Disabled="@(_busy || _dirty)" StartIcon="@Icons.Material.Filled.Download">Excel indir</MudButton>
+                    @if (!report.Archived) { <MudButton OnClick="() => DownloadAsync()" Disabled="@(_busy || _dirty)" StartIcon="@Icons.Material.Filled.Archive">WASAS'a arşivle ve indir</MudButton> }
+                    else { <MudButton OnClick="() => DownloadAsync(report.Version)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Arşivi indir</MudButton> }
+                    @if (report.Archived) { <p>WASAS arşivi · @Time(report.PreparedAt) · @report.Size bayt · Turuncu Hat'a eklenmedi</p> }
                     <label>Çalışma sayfası<select aria-label="Excel sayfası" @bind="_sheet">@for (int i = 0; i < report.Sheets.Count; i++) { <option value="@i">@report.Sheets[i].Name</option> }</select></label>
                     <div class="so-inuse-workbook" tabindex="0" aria-label="Excel hücre önizlemesi"><table><tbody>
                         @foreach (var row in report.Sheets[_sheet].Rows) { <tr>@foreach (string cell in row) { <td>@cell</td> }</tr> }
                     </tbody></table></div>
                     @if (report.Sheets[_sheet].Rows.Count == 0) { <p>Orijinal script bu sayfaya veri yazmıyor. Onaylı şablon gereksinimi bekleniyor.</p> }
                 }
+                @if (Can(Capabilities.InUseReview) && record.ArchivedVersions.Count > 0)
+                { <details><summary>Önceki WASAS raporları</summary>@foreach (long version in record.ArchivedVersions) { <MudButton OnClick="() => DownloadAsync(version)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Sürüm @version (arşiv)</MudButton> }</details> }
             </section>
         }
     }

@@ -61,6 +61,7 @@ public sealed class InUseController(InUseService service) : ControllerBase
         Reply(await service.SaveDraftAsync(User, Context(), id, request, token));
     /// <summary>Audited preview and XLSX download bytes for the exact saved review version.</summary>
     [HttpPost("{id:guid}/report")]
+    [ProducesResponseType(typeof(InUseReport), StatusCodes.Status200OK)]
     [Authorize(Policy = Policies.CanReviewInUse)]
     public async Task<ActionResult<InUseReport>> ReportAsync(Guid id, ExportInUseRequest request, CancellationToken token) =>
         Reply(await service.ExportAsync(User, Context(), id, request, token));
@@ -71,13 +72,13 @@ public sealed class InUseController(InUseService service) : ControllerBase
         { return Ok(result.Value); }
         int status = result.Error switch
         {
-            "InUseInvalid" or "InUseAssigneeUnavailable" => 400,
+            "InUseInvalid" or "InUseAssigneeUnavailable" or "InUseIncomplete" => 400,
             "InUseNotFound" => 404,
             "InUseConflict" => 409,
             "AccessDenied" or "AccessPending" or "AccessDisabled" or "InUseAssignmentRequired" => 403,
             _ => 503
         };
-        return OperationalProblemDetails.Create(status, result.Error, "The In Use operation could not be completed.",
+        return OperationalProblemDetails.Create(status, result.Error, result.Detail ?? "The In Use operation could not be completed.",
             HttpContext.TraceIdentifier, status == 409 ? "concurrency" : "in-use", status is 409 or 503);
     }
 }
