@@ -1,0 +1,22 @@
+{
+  "OperationalRecords": {
+    "SourceProvider": "TuruncuHat",
+    "ReadOnlyIntegrationMode": true,
+    "ControlledTestWritesEnabled": false,
+    "SourceCloseEnabled": false
+  },
+  "TuruncuHat": {
+    "BaseUrl": "",
+    "Authorization": "",
+    "Username": "",
+    "Password": "",
+    "TenantId": 0,
+    "SessionIdSegmentIndex": 1,
+    "SessionLifetimeSeconds": 0,
+    "ConnectTimeoutSeconds": 5,
+    "RequestTimeoutSeconds": 30,
+    "MaxResponseBytes": 1048576,
+    "MaxDescriptionLength": 8000,
+    "DiagnosticContractLogging": false
+  }
+}

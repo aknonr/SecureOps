@@ -1,5 +1,14 @@
 # API Release Packaging
 
+`New-InUseEvidencePackage.ps1 -OutputDirectory <new-absolute-directory>` builds
+only the standalone diagnostic on the development machine from committed HEAD.
+It uses the shared payload/secret scanner, publishes framework-dependent win-x64,
+smoke-checks the no-network usage path, creates per-file size/SHA256 and runtime/
+source metadata, and verifies every ZIP entry. It refuses existing destinations;
+it does not replace rc6.14, publish API/UI, deploy, or collect corporate evidence.
+The target needs both .NET 8 shared runtimes, not an SDK or repository. Operator
+instructions and the `{}` dictionary are in `scripts/diagnostics/InUseEvidence`.
+
 `New-ApiDeploymentPackage.ps1` creates a path-preserving API ZIP and SHA256 payload manifest from a completed publish directory. It excludes controlled deployment configuration (`web.config` and `appsettings*.json`) and refuses to overwrite existing artifacts.
 
 Before packaging, `Test-ApiReleasePayload.ps1` rejects PDB, source, project, test, log, `bin`, and `obj` payloads. It scans text files for credential-like assignments and can scan every publish file for caller-supplied ASCII and UTF-16 personal-path markers through `-ForbiddenText`.

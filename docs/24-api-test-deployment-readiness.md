@@ -104,8 +104,11 @@ görevde okunmadı; endpoint için genel bir PowerShell Windows-auth çağrısı
 query transport'unu kullanan dar .NET 8 konsoludur. Yalnız ayrıca izin verilmiş
 TEST Windows API/yönetim host'unda, server-owned config dosyasını okumaya yetkili
 operatör kimliğiyle çalışır. WASAS OIDC oturumu yerine bu ayrı yönetim izni gerekir;
-bir UI capability atlaması veya genel kullanıcı aracı değildir. SDK/derlenmiş
-araç ve bağımlılıkları host'ta ayrıca onaylanmalıdır; tüm UI dağıtımı gerekmez.
+bir UI capability atlaması veya genel kullanıcı aracı değildir. Araç geliştirme
+makinesinde bağımsız win-x64 olarak derlenir; hedefte SDK/repo gerekmez.
+Hedefte x64 Microsoft.NETCore.App ve Microsoft.AspNetCore.App 8.0 shared runtime
+gerekir; paket içindeki runtimeconfig ve metadata ile doğrulayın. Tüm `tool/`
+bağımlılık ağacı korunur; yalnız exe kopyalanmaz. UI/API dağıtımı gerekmez.
 Config mevcut etkin TuruncuHat/OperationalRecords bölümlerini içeren korunan
 dosyadır; repoya kopyalanmaz. Write fence üçlüsü true/false/false zorunludur.
 
@@ -117,16 +120,36 @@ kanıtlanmadığından bu sözlük kaynaktan otomatik çekilemez. Onaylı iki an
 tahmin yazmayın. `{}` ile mevcut 15 select'in yapısı toplanabilir, fakat bu iki
 alan toplanmış sayılmaz. Nested selector, serbest query veya başka etiket reddedilir.
 
+Bağımsız teslimat: `scripts/release/New-InUseEvidencePackage.ps1`; operatör
+kılavuzu ve kabul edilen JSON yapısı: `scripts/diagnostics/InUseEvidence/README.md`
+ve `server-config.example.json`. İlk çalışma için teslim edilen `dictionary.json`
+yalnız `{}` içerir. Aşağıdaki yollar operatör tarafından sağlanır; `100` gerçek
+onaylı tek sayısal kaynak OR kimliğiyle değiştirilmesi gereken sentetik örnektir:
+
+2026-09-09 standalone teslimat dizini:
+`C:\SecureOpsBuild\diagnostics\inuse-evidence-20260909`. Kesin build SHA/runtime
+`delivery-metadata.json`, boyut ve dosya hash'leri `payload-manifest.json` /
+`payload.sha256`, ZIP hash'i `archive.sha256` içindedir. rc6.14 değişmez.
+Yerel collector Release build'i 0 uyarı/hata ve 116 odaklı unit testi geçti:
+gerçek DI/session bileşimi sentetik login + sıfır/dört ilişkili kayıtla, boş
+sözlükte tam 15 select ve sanitize alias davranışı doğrulandı. Kurumsal çağrı yok.
+
 ```powershell
-dotnet run --no-build --project scripts/diagnostics/InUseEvidence -- $serverConfig $sourceId $approvedDictionary $newPrivateOutput --collect
+& 'C:\OPERATOR_TOOL_DIRECTORY\tool\InUseEvidence.exe' 'C:\OPERATOR_PRIVATE_CONFIG\server-config.json' '100' 'C:\OPERATOR_TOOL_DIRECTORY\dictionary.json' 'C:\OPERATOR_PRIVATE_OUTPUT\inuse-one-or.json' --collect
 ```
 
-Ön koşul: bu checkout'ta `dotnet build scripts/diagnostics/InUseEvidence` başarılı
-olmalı. Dört değişken sadece korunan mutlak dosya yolları ve tek sayısal kaynak OR
-kimliğidir; secret/header/token argümanı yoktur. Yeni çıktı dizini sadece operatör/
+Collector yalnız tek JSON dosyası okur. IIS `web.config` XML'i, IIS environment
+ayarları veya `__` anahtarları JSON yerine geçmez; otomatik overlay yoktur.
+Etkin ayarlar yalnız IIS ortamındaysa yetkili config sahibi, ayrıca onaylı yerel
+hazırlıkla sadece TuruncuHat ve OperationalRecords bölümlerini korunan JSON'a
+aktarır. IIS değişmez; config teslimata/Git'e/evidence'a girmez. Örnek dosyanın
+boş/0 kimlik değerleri çalıştırılabilir config değildir. SDK kurulumu istenmez.
+Dört argüman sadece korunan mutlak yollar ve sayısal kimliktir; secret/header/token
+argümanı yoktur. Yeni çıktı dizini sadece operatör/
 entegrasyon sahibine ACL ile açık olmalı. Mevcut çıktı üzerine yazılmaz. Yerel
 dosyada Windows actor SID/zaman/sözlük hash'i tutulur; yalnız **Evidence** bölümü
-paylaşılır. Başarı `CollectedNotMapped`; hata/yarım dosya başarı değildir, durun.
+paylaşılır. Başarı exit 0 ve `CollectedNotMapped`; hata/yarım dosya başarı değildir,
+durun. Yerel dosya standalone attempt kaydıdır; SQL/WASAS audit kaydı değildir.
 RFC hedef OR'u, affected assets veya kullanıcı envanteri sorgulanmaz. Karışık
 Value object/array yanıtında araç durur: sahibinden sadece o alanın kişisiz,
 tip/null/çokluk yapısı gerekir. Kaynak payload dump veya credential istenmez.
