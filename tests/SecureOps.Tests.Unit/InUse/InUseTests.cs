@@ -11,6 +11,7 @@ using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.Commands;
 using SecureOps.Infrastructure.InUse;
+using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Contracts.InUse;
 
@@ -18,14 +19,19 @@ namespace SecureOps.Tests.Unit.InUse;
 
 public sealed class InUseTests
 {
-    [Fact]
-    public async Task Archive_RequiresCompleteAnswers_PreservesEvidenceAndActor_AndReplaysOriginalBytes()
+    [Theory]
+    [InlineData("Complete")]
+    [InlineData("Observed")]
+    public async Task Archive_RequiresCompleteAnswers_PreservesEvidenceAndActor_AndReplaysOriginalBytes(string relationship)
     {
         string directory = Path.Combine(Path.GetTempPath(), "inuse-archive-" + Guid.NewGuid());
         var archive = new InUseReportArchive(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         { ["InUseReports:Directory"] = directory }).Build());
         var f = new Fixture(archive: archive);
         InUseRecord record = await f.ImportAsync();
+        f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([record.Source with { ServiceItemsState = relationship }], false));
+        await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
+        record = (await f.Repository.GetAsync(record.Id, _token))!;
         record = (await f.Service.AssignAsync(_principal, _context, record.Id, new(record.Version, f.User.Id, "Manual"), _token)).Value!;
         record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion,
             [new(record.Source.Servers[0].Id, "InternetOut", "Yes", "Historical evidence")], "Historical note"), _token)).Value!;
@@ -79,6 +85,47 @@ public sealed class InUseTests
     }
 
     private static readonly CancellationToken _token = CancellationToken.None;
+
+    [Fact]
+    public async Task SemanticServers_PersistExportAndInvalidateWithoutLosingDraftOrReviewer()
+    {
+        var f = new Fixture();
+        using var document = JsonDocument.Parse(InUseServiceItemParserTests.Response(4));
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(_token)).Records[0] with
+        { Servers = InUseServiceItemParser.Parse(document.RootElement), ServiceItemsState = "Observed", RelationshipEvidence = "Observed; completeness unverified" };
+        f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([source], false, "SourceCompletenessUnverified"));
+        await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
+        InUseRecord record = (await f.Repository.QueryAsync(new(), f.User.Id, _token)).Items.Single();
+        record = (await f.Service.AssignAsync(_principal, _context, record.Id, new(record.Version, f.User.Id, "Manual"), _token)).Value!;
+        InUseAnswer[] answers = source.Servers.SelectMany(s => InUseChecks.OperatorCodes.Select(c => new InUseAnswer(s.Id, c, "No", ""))).ToArray();
+        record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion, answers, ""), _token)).Value!;
+        InUseReport report = (await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version), _token)).Value!;
+        report.Sheets[0].Rows.Single(r => r[0] == "HOSTNAME").Skip(1).Should().Equal(Enumerable.Range(0, 4).Select(i => "synthetic-server-" + i));
+        report.Sheets[0].Rows.Single(r => r[0] == "SI_ENVIRONMENT").Skip(1).Should().Equal(Enumerable.Range(0, 4).Select(i => $"display-{i}-p_SI_def_environment"));
+        report.Sheets[3].Rows.Skip(1).Select(r => r[3]).Should().Equal("2000", "2001", "2002", "2003");
+        report.Sheets[4].Rows.Should().Contain(r => r.Contains("Observed"));
+        // A shrinking bounded result is not authoritative deletion, and prevents current archival.
+        f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([source with { Servers = source.Servers.Take(3).ToArray() }], false));
+        await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
+        InUseRecord retained = (await f.Repository.GetAsync(record.Id, _token))!;
+        retained.Source.ServiceItemsState.Should().Be("Partial");
+        retained.Source.Servers.Should().HaveCount(4);
+        retained.Draft.Should().BeEquivalentTo(record.Draft);
+        retained.AssigneeId.Should().Be(f.User.Id);
+        retained.Status.Should().Be("Stale");
+        (await f.Service.ExportAsync(_principal, _context, record.Id, new(retained.Version), _token)).Error.Should().Be("InUseConflict");
+        retained = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(retained.Version, retained.SourceVersion, answers, ""), _token)).Value!;
+        (await f.Service.ExportAsync(_principal, _context, record.Id, new(retained.Version, true), _token)).Error.Should().Be("InUseIncomplete");
+        var incomplete = source.Servers[0].Fields.ToDictionary(p => p.Key, p => p.Value);
+        incomplete["SI_ENVIRONMENT"] = new(null, "Missing response cell: KEY.(LCSIMS_ServiceInstance)m_rid.p_SI_def_environment");
+        f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([source with
+        { Servers = source.Servers.Select((s, i) => i == 0 ? s with { Fields = incomplete } : s).ToArray() }], false));
+        await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
+        retained = (await f.Repository.GetAsync(record.Id, _token))!;
+        retained.Source.ServiceItemsState.Should().Be("Partial");
+        retained.Source.Servers[0].Fields["SI_ENVIRONMENT"].Value.Should().Be(source.Servers[0].Fields["SI_ENVIRONMENT"].Value);
+        retained.Source.Servers[0].Fields["SI_ENVIRONMENT"].Source.Should().StartWith("Prior value retained;");
+    }
     private static readonly ClaimsPrincipal _principal = new();
     private static readonly AccessOperationContext _context = new("synthetic", "inuse-test", null);
 

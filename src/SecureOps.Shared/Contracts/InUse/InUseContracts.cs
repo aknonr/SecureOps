@@ -11,7 +11,7 @@ public sealed record InUseSource(string Id, string Code, string Title, InUseEvid
     InUseEvidence ServiceOwner, InUseEvidence ProvisioningTeam, IReadOnlyList<InUseServer> Servers,
     string RelationshipEvidence, bool Synthetic)
 {
-    /// <summary>Complete, NotQueried, Forbidden, Failed or Ambiguous; never infer zero from absence.</summary>
+    /// <summary>Complete, Observed (completeness unverified), Partial, NotQueried, Forbidden, Failed or Ambiguous.</summary>
     public string ServiceItemsState { get; init; } = "NotQueried";
     /// <summary>A separate relationship, never populated from service items.</summary>
     public string AffectedAssetsState { get; init; } = "NotQueried";
@@ -94,6 +94,8 @@ public sealed record InUseReport(Guid RecordId, long Version, long SourceVersion
 /// <summary>Stable check codes shared by validation, workbook and UI.</summary>
 public static class InUseChecks
 {
+    /// <summary>Local report readiness never asserts global source completeness or authorizes source closure.</summary>
+    public static bool RelationshipReady(InUseSource source) => source.ServiceItemsState is "Complete" or "Observed" && source.Servers.Count > 0;
     /// <summary>The three legacy operator questions; other checks are historical evidence only.</summary>
     public static IReadOnlyList<string> OperatorCodes { get; } = ["InternetOut", "InternetIn", "Microsegmented"];
     /// <summary>First missing required answer, shared by UI and server readiness validation.</summary>

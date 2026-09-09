@@ -1,15 +1,71 @@
+using System.Text.Json;
 using Dapper;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.InUse;
+using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Contracts.InUse;
 
 namespace SecureOps.Tests.Integration.Sql;
 
 public sealed partial class ResourceSqlTests
 {
+    [LocalResourceSqlFact]
+    public async Task InUse_SemanticProjection_PersistsForPublishedReview()
+    {
+        IConfiguration configuration = Configuration();
+        await using SqlConnection connection = new(configuration.GetConnectionString("SecureOpsDb"));
+        SecureOps.Infrastructure.Resources.ResourceActor actor = await CreateActorAsync(connection);
+        var repository = new SqlInUseRepository(configuration);
+        string prefix = "(LCSIMS_ServiceInstance)m_rid.";
+        using var response = JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            QueryResult = new
+            {
+                Items = Enumerable.Range(0, 4).Select(i => new[]
+        {
+            new { Key = "SET." + prefix + "id", Value = (5000 + i).ToString() },
+            new { Key = "SET." + prefix + "p_name", Value = "mapped-synthetic-" + i },
+            new { Key = "KEY." + prefix + "p_SI_def_environment", Value = i == 0 ? "TEST" : "PROD" },
+            new { Key = "SET." + prefix + "p_SI_def_environment", Value = (10 + i).ToString() },
+            new { Key = "KEY." + prefix + "c_new_SI_major_project", Value = "Synthetic service " + i },
+            new { Key = "SET." + prefix + "c_new_SI_major_project", Value = (6000 + i).ToString() },
+            new { Key = "SET." + prefix + "c_new_SI_major_project.id", Value = (6000 + i).ToString() },
+            new { Key = "SET." + prefix + "p_SI_ip_SI_address_1", Value = "192.0.2." + (i + 1) }
+        })
+            }
+        }));
+        string code = "OR-MAPPED-" + Guid.NewGuid().ToString("N");
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(_token)).Records[0] with
+        {
+            Id = code,
+            Code = code,
+            Servers = InUseServiceItemParser.Parse(response.RootElement),
+            ServiceItemsState = "Observed",
+            RelationshipEvidence = "Synthetic semantic projection; completeness unverified",
+            Creator = null,
+            AffectedAssetsState = "NotQueried",
+            AffectedAssetCount = null,
+            ProvisioningTeam = new(null, "Not queried")
+        };
+        var audit = new AuditEvent { Actor = actor.UserId.ToString("D"), Action = "InUseRefresh", CorrelationId = "mapped-local", Details = new { Count = 4 } };
+        (await repository.RefreshAsync((await repository.StateAsync(_token)).Version, new([source], false), null, audit, _token)).Should().BeTrue();
+        InUseRecord record = (await new SqlInUseRepository(configuration).QueryAsync(new(Search: code), actor.UserId, _token)).Items.Single();
+        record.Source.Should().BeEquivalentTo(source);
+        InUseRecord draft = record with { Version = record.Version + 1, Draft = new(record.SourceVersion, [], "", actor.UserId, DateTimeOffset.UtcNow) };
+        (await repository.SaveAsync(draft, record.Version, audit, _token)).Should().BeTrue();
+        var changed = source.Servers[0].Fields.ToDictionary(p => p.Key, p => p.Value);
+        changed["SI_ENVIRONMENT"] = new("STAGING", "Synthetic changed source evidence");
+        InUseSource next = source with { Servers = source.Servers.Select((s, i) => i == 0 ? s with { Fields = changed } : s).ToArray() };
+        await repository.RefreshAsync((await repository.StateAsync(_token)).Version, new([next], false), null, audit, _token);
+        InUseRecord stale = (await repository.GetAsync(record.Id, _token))!;
+        stale.Status.Should().Be("Stale");
+        stale.Draft.Should().BeEquivalentTo(draft.Draft);
+        stale.Source.Servers[0].Fields["SI_ENVIRONMENT"].Value.Should().Be("STAGING");
+    }
+
     [LocalResourceSqlFact]
     public async Task InUse_PersistedSearchAndPagination_HaveStableNonoverlappingPages()
     {

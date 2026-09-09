@@ -7,7 +7,7 @@ const { chromium, request } = require(process.argv[2]);
 const { loopback, navigate, signIn, capture, apiContext, json } = require('./journey-support.cjs');
 const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = path.resolve(process.argv[5]);
 const mode = process.argv[6];
-assert.ok(['before', 'effort-before', 'after', 'denied', 'unavailable'].includes(mode));
+assert.ok(['before', 'effort-before', 'after', 'mapped', 'denied', 'unavailable'].includes(mode));
 async function tour(page, surface) {
     const opener = page.locator(`#resource-guide-replay-${surface}`);
     await opener.focus(); await opener.press('Enter');
@@ -34,7 +34,53 @@ async function tour(page, surface) {
         page.on('pageerror', e => errors.push(e.message));
         page.on('request', r => requests.push(new URL(r.url()).pathname));
         await signIn(page, ui);
-        if (mode === 'denied') {
+        if (mode === 'mapped') {
+            const stored = await json(client, '/api/v1/in-use?search=OR-MAPPED-');
+            assert.equal(stored.total, 1, 'Use the fresh isolated semantic SQL fixture');
+            const record = stored.items[0], me = await json(client, '/api/v1/access/me');
+            assert.equal(record.source.synthetic, true);
+            assert.equal(record.source.serviceItemsState, 'Observed');
+            const assigned = await json(client, `/api/v1/in-use/${record.id}/assignment`, { method: 'PUT', data: { expectedVersion: record.version, assigneeId: me.userId, reason: 'Synthetic mapped review' } });
+            await json(client, `/api/v1/in-use/${record.id}/draft`, { method: 'PUT', data: { expectedVersion: assigned.version, sourceVersion: assigned.sourceVersion,
+                answers: assigned.source.servers.flatMap(s => ['InternetOut', 'InternetIn', 'Microsegmented'].map(check => ({ serverId: s.id, check, value: 'Unknown', evidence: '' }))), notes: '' } });
+            await navigate(page, ui, `in-use/${record.id}`);
+            const table = page.getByLabel('Servis öğesi tablosu', { exact: true });
+            await table.waitFor();
+            assert.equal(await table.locator('tbody tr').count(), 4);
+            assert.match(await table.innerText(), /mapped-synthetic-0/);
+            assert.match(await table.innerText(), /STAGING/);
+            assert.match(await table.innerText(), /PROD/);
+            assert.match(await table.innerText(), /Synthetic service 3/);
+            assert.equal(await page.locator('select[aria-label*="Internet"],select[aria-label*="Microsegmented"]').count(), 3);
+            for (const check of ['InternetOut', 'InternetIn', 'Microsegmented']) await page.getByLabel(`5000 ${check}`, { exact: true }).selectOption('No');
+            await page.locator('.so-inuse-bulk summary').click();
+            for (const box of await page.locator('.so-inuse-bulk input[type=checkbox]').all()) await box.check();
+            await page.getByRole('button', { name: 'Değişiklikleri göster', exact: true }).click();
+            await page.waitForFunction(() => document.querySelectorAll('.so-inuse-bulk li').length === 9);
+            await page.getByRole('button', { name: 'Gösterilen değişiklikleri onayla', exact: true }).click();
+            await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+            await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
+            const saved = await json(client, `/api/v1/in-use/${record.id}`);
+            assert.deepEqual(saved.source, record.source);
+            await page.getByRole('button', { name: 'Excel önizleme', exact: true }).click();
+            await page.getByLabel('Excel sayfası').waitFor();
+            assert.match(await page.getByLabel('Excel hücre önizlemesi').innerText(), /mapped-synthetic-3/);
+            const downloadEvent = page.waitForEvent('download');
+            await page.getByRole('button', { name: "WASAS'a arşivle ve indir", exact: true }).click();
+            const download = await downloadEvent;
+            await download.saveAs(path.join(out, download.suggestedFilename()));
+            for (const theme of ['dark', 'light']) {
+                await page.evaluate(value => localStorage.setItem('wasas.appearance', value), theme);
+                await navigate(page, ui, `in-use/${record.id}`);
+                await page.getByLabel('Servis öğesi tablosu', { exact: true }).waitFor();
+                await capture(page, out, `mapped-${theme}`);
+            }
+            await navigate(page, ui, 'in-use');
+            await page.getByLabel('In Use kayıt ara').fill('OR-MAPPED-');
+            await page.waitForFunction(() => document.querySelectorAll('.so-inuse-records li').length === 1);
+            assert.match(await page.locator('.so-inuse-records').innerText(), /4 gözlenen kayıt; tamlık doğrulanmadı/);
+            assert.equal(requests.some(p => /upload|bpm|jira/.test(p)), false);
+        } else if (mode === 'denied') {
             await navigate(page, ui, 'in-use');
             await page.getByText('In Use erişimi gerekli', { exact: true }).waitFor();
             assert.equal(await page.locator('a[href="in-use"]').count(), 0);

@@ -2,6 +2,19 @@
 
 Status: Accepted for the explicitly authorized In Use V1 local milestone.
 
+The 2026-09-10 operator collection establishes the exact 27 semantic cells for
+the existing 15-select service-item query, not global completeness. Explicit
+refresh now enriches each bounded root with those fields only. KEY display and
+SET reference identities remain separate; numeric inventory identity is required.
+Reordering is immaterial; duplicate/conflicting keys or identities fail closed.
+Absent optional fields remain unknown with their expected key as provenance.
+Observed rows can support a local draft/report marked completeness unverified.
+Failed enrichment and unverified disappearance retain prior rows; a Partial or
+failed relationship cannot be archived as a current review. Source changes
+invalidate saved drafts without changing their answers or the manual reviewer.
+No Virtual PC User/RFC/creator/affected-assets lookup or inferred assignment.
+The existing JSON snapshot stores the additive evidence without a migration.
+
 The operator-effort follow-up limits normal input to outbound/inbound internet
 and microsegmentation. Incomplete drafts remain valid; readiness requires an
 explicit Yes/No for each of these fields on every verified service item. Bulk

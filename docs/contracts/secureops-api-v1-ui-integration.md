@@ -1,13 +1,20 @@
 # SecureOps API v1 UI Integration Contract
 
-## In Use Relationship Evidence, 2026-09-09
+## In Use Relationship Evidence, 2026-09-10
 
 Additive source fields: serviceItemsState/affectedAssetsState (Complete,
 NotQueried, Forbidden, Failed, Ambiguous), nullable affectedAssetCount and creator
 evidence. Missing old JSON fields default to NotQueried/null. Servers are service
 items, not affected assets. Only Complete plus an empty set establishes zero;
-non-complete enrichment retains previous evidence, with explicit state and stale
-review version. Dictionary labels Virtual PC User/RFC Kaydı are presentation
+failed enrichment retains previous evidence, with explicit state and stale
+review version. Service items also support Observed (exact semantic mapping,
+global completeness unverified) and Partial (previous rows omitted by the latest
+bounded result are retained; not current report-ready). An observed empty set
+does not establish authoritative zero. Explicit refresh reads at most 100 roots
+and 10 service items per root within 45 seconds; lists/detail never query remotely.
+The exact supported KEY display/SET reference mappings are in the legacy parity
+record. Fields include missing-key provenance; no positional fallback, name
+resolution or auto-assignment. Dictionary labels Virtual PC User/RFC Kaydı are presentation
 evidence only, not invented corporate property names or assignment policies.
 Operational Records list reuses Requester; no new search/sort or remote lookup.
 
@@ -39,7 +46,7 @@ reuse OR-to-Jira eligibility, claims or source-close commands. Additional gates:
 | POST /refresh | InUse.Refresh | nonempty commandId GUID; existing command tracking and refresh rate limit; at most 100 accepted records, 45s orchestration deadline and existing response-byte bounds |
 | PUT /{id}/assignment | InUse.Assign | expectedVersion, nullable assigneeId, nonblank reason max 500; approved exact identity or explicit unassignment |
 | PUT /{id}/draft | InUse.Review plus current assignment | expectedVersion, sourceVersion, answers (serverId/check/value/evidence), notes max 2000; max 900 answers, unique server/check; evidence optional max 500. Blank evidence/notes and omitted historical answers preserve stored history |
-| POST /{id}/report | InUse.Review | expectedVersion; default previews a current saved draft. archive=true requires Complete/nonempty service items and explicit Yes/No for all three operator questions. archivedVersion downloads immutable history, checked against expected current record version |
+| POST /{id}/report | InUse.Review | expectedVersion; default previews a current saved draft. archive=true requires Complete or Observed nonempty service items and explicit Yes/No for all three operator questions. Observed reports retain the unverified-completeness warning; Partial/failed relationships are blocked. archivedVersion downloads immutable history, checked against expected current record version |
 
 Normal editable codes are InternetOut/InternetIn/Microsegmented. Unknown may be
 saved, but readiness returns 400 InUseIncomplete with server/field-specific text.
@@ -63,7 +70,7 @@ does not mark technical checks successful, approve business policy or upload.
 Failed refresh records actionable safe state while preserving all stored records
 and the last successful timestamp. Partial/absent records are retained, never
 interpreted as source closure. Real root-query success remains explicitly
-SourceCompletenessUnverified; legacy relationship response contracts are missing.
+SourceCompletenessUnverified; unqueried Virtual PC User/RFC and ownership contracts remain missing.
 Local Fake/Simulation fixtures are labelled synthetic and only selected through
 the existing validated synthetic profile. Corporate profile/fences are unchanged.
 

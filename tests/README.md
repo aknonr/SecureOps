@@ -8,6 +8,14 @@ Access lifecycle coverage proves one Pending request per unknown principal, prot
 
 ## In Use V1
 
+`InUseServiceItemParserTests` uses synthetic 27-cell rows with reordered/missing/
+duplicated keys, conflicting references, per-server differences and strict limits.
+`ResourceSqlTests.InUse_SemanticProjection_PersistsForPublishedReview` retains a
+four-server `OR-MAPPED-` fixture in a fresh approved isolated DB. Browser `mapped`
+mode consumes that single fixture through published local Demo API/UI, preserving
+the three-answer workflow and checking XLSX archival. Run it before/alongside the
+existing `after` regression journey. No corporate evidence file is a test fixture.
+
 `SecureOps.Tests.Unit/InUse`, `SecureOps.Tests.Integration/Api/InUseHostedTests.cs`
 and `SecureOps.Tests.Integration/Sql/ResourceSqlTests.InUse.cs` cover independent
 4241/68 discovery, strict semantic response parsing, retained data on failed/partial

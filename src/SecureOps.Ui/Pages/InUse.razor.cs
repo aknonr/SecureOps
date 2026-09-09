@@ -33,6 +33,8 @@ public partial class InUse
     private static string Relationship(string state, int? count) => state switch
     {
         "Complete" => count == 0 ? "İlişkili kayıt yok (doğrulandı)" : $"{count} doğrulanmış kayıt",
+        "Observed" => $"{count} gözlenen kayıt; tamlık doğrulanmadı",
+        "Partial" => $"Eksik sonuç; {count} kayıt korunuyor, güncel üyelik doğrulanmalı",
         "Forbidden" => "Kaynak ilişki erişimi yetersiz; önceki kanıt varsa korunur",
         "Failed" => "İlişki okuması başarısız; önceki kanıt varsa korunur",
         "Ambiguous" => "Eşleme belirsiz; önceki kanıt varsa korunur",
@@ -122,7 +124,7 @@ public partial class InUse
             _focusAnswer = InUseChecks.OperatorCodes.ToList().IndexOf(missing.Check);
             return false;
         }
-        if (_record.Source.ServiceItemsState != "Complete" || _record.Source.Servers.Count == 0)
+        if (!InUseChecks.RelationshipReady(_record.Source))
         { _validation = "Rapor hazırlığı için servis öğesi ilişkisi doğrulanmış ve en az bir sunucu bulunmuş olmalıdır."; return false; }
         _validation = null;
         return true;

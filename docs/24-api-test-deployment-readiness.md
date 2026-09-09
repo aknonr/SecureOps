@@ -1,5 +1,20 @@
 # API TEST Deployment Readiness
 
+## Service-Item Mapping Source Update, 2026-09-10
+
+The operator's bounded evidence now supports the original 15-select service-item
+projection. The implemented adapter/storage/UI/XLSX mappings and verification
+are in `src/SecureOps.Ui/README.md`, with exact keys in the legacy parity record.
+Explicit refresh maps observed rows only; completeness stays unverified. Missing
+previous rows/fields retain prior evidence and prevent current archival. Virtual
+PC User/RFC, creator/status and affected-assets mappings remain unqueried.
+This source update is NOT in preserved rc6.14 or the standalone collector ZIP.
+No deployment/package, migration, grant or runtime configuration change occurred.
+The historical delivery and initial evidence-collection procedure below remain
+applicable to those older artifacts, not proof that all relationships are missing
+from the current source. The remaining two-field dictionary requires exact direct
+keys, types/null/cardinality/reference targets and sanitized KEY/SET examples.
+
 ## In Use TEST Teslimatı, rc6.14 (2026-09-09)
 
 Bu bölüm rc6.14 için güncel kurulum prosedürüdür; aşağıdaki rc6.13 sırası yalnız

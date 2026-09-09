@@ -25,12 +25,8 @@ public sealed partial class TuruncuHatOperationalRecordClient
         ParsedSourceRecords parsed = TuruncuHatQueryParser.ParseSource(root.RootElement, _options.MaxDescriptionLength, _sourceSelects, true);
         if (parsed.MalformedCount != 0 || parsed.Items.Count != 1 || parsed.Items[0].SourceRecordId != sourceId)
         { throw new InvalidDataException("Exact authorized root was not uniquely returned."); }
-        string[] fields = ["id", "p_name", "p_SI_def_server_type", "p_SI_def_environment", "p_rel_company_owner",
-            "c_new_SI_major_project", "p_SI_def_network_segment", "p_SI_ip_SI_address_1", "p_SI_def_os_name",
-            "p_def_os_version", "c_new_SI_major_project.p_rel_obs", "p_rel_asset_item.p_rel_lbs",
-            "p_rel_asset_item.p_rel_lbs.m_parent", "p_def_category", "c_new_SI_major_project.id"];
         using JsonDocument related = await QueryAsync("rel", [$"#%m_tid%#=100049 and #%m_lid%#={id}"],
-            fields.Concat(dictionary.Values).Distinct().Select(f => "(LCSIMS_ServiceInstance)m_rid." + f).ToArray(), "in-use-evidence-rel", token, 65536);
+            InUseServiceItemParser.Selects.Concat(dictionary.Values.Select(f => "(LCSIMS_ServiceInstance)m_rid." + f)).Distinct().ToArray(), "in-use-evidence-rel", token, 65536);
         var aliases = new Dictionary<string, string>(StringComparer.Ordinal);
         object Shape(JsonElement document, int maximumRows)
         {

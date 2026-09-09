@@ -9,7 +9,39 @@ internal static class InUseState
 {
     internal static InUseRecord Merge(InUseRecord? old, InUseSource source, DateTimeOffset now)
     {
-        if (old is not null && source.ServiceItemsState != "Complete")
+        if (old is not null && source.ServiceItemsState == "Observed")
+        {
+            bool missingFields = false;
+            source = source with
+            {
+                Servers = source.Servers.Select(server =>
+            {
+                InUseServer? previous = old.Source.Servers.FirstOrDefault(s => s.Id == server.Id);
+                var fields = server.Fields.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
+                foreach (KeyValuePair<string, InUseEvidence> field in server.Fields.Where(f => f.Value.Source.StartsWith("Missing response cell: ", StringComparison.Ordinal)))
+                {
+                    if (previous?.Fields.GetValueOrDefault(field.Key)?.Value is string retainedValue)
+                    {
+                        fields[field.Key] = new(retainedValue, "Prior value retained; " + field.Value.Source);
+                        missingFields = true;
+                    }
+                }
+                return server with { Fields = fields };
+            }).ToArray()
+            };
+            InUseServer[] absent = old.Source.Servers.Where(s => !source.Servers.Any(n => n.Id == s.Id)).ToArray();
+            if (absent.Length > 0 || missingFields)
+            {
+                InUseServer[] retained = source.Servers.Concat(absent).OrderBy(s => s.Id, StringComparer.Ordinal).ToArray();
+                source = source with
+                {
+                    Servers = retained.Length <= 100 ? retained : old.Source.Servers,
+                    ServiceItemsState = "Partial",
+                    RelationshipEvidence = "Observed result omitted previously stored service items or fields; prior evidence retained. Completeness and current values require verification."
+                };
+            }
+        }
+        else if (old is not null && source.ServiceItemsState != "Complete")
         { source = source with { Servers = old.Source.Servers, ServiceOwner = old.Source.ServiceOwner, ProvisioningTeam = old.Source.ProvisioningTeam }; }
         if (old is not null && source.AffectedAssetsState != "Complete")
         { source = source with { AffectedAssetCount = old.Source.AffectedAssetCount }; }
@@ -43,5 +75,5 @@ internal static class InUseState
             && r.Servers.All(s => s.Id.Length is > 0 and <= 100 && s.Fields.Count <= 50
                 && s.Fields.All(f => f.Key.Length <= 100 && f.Value.Value?.Length is not > 1000 && f.Value.Source.Length <= 300)));
 
-    private static bool ValidState(string state) => state is "Complete" or "NotQueried" or "Forbidden" or "Failed" or "Ambiguous";
+    private static bool ValidState(string state) => state is "Complete" or "Observed" or "Partial" or "NotQueried" or "Forbidden" or "Failed" or "Ambiguous";
 }

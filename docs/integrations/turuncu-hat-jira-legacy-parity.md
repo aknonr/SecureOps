@@ -1,5 +1,55 @@
 # Turuncu Hat to Jira Legacy Parity
 
+## Observed Service-Item Contract, 2026-09-10
+
+Operator-supplied evidence-only.json: 37,050 bytes, SHA256
+`E55F9BF13E54D3083B47C07DD79A41587E69F507EC5E690A9573678051A46438`.
+One root (7 cells), four service-item rows (27 cells each), all observed value
+types String. The count matches the operator's UI example, not global completeness.
+The attachment is not committed. Tests reconstruct synthetic values, not aliases
+or corporate actor/personal values. Aliases establish equality only within this
+collection, notably SET major-project reference equals its projected id.
+
+All keys below have the exact prefix `(LCSIMS_ServiceInstance)m_rid.` after
+`KEY.` or `SET.`. Mapping follows the full script's specific workbook reads
+and the existing KEY-display/SET-reference parser contract, not names alone.
+
+| Workbook field | Exact property | Semantic key |
+|---|---|---|
+| ENVANTER_ID / NMS ENV_ID | id | SET |
+| HOSTNAME | p_name | SET |
+| SERVER TYPE / NMS Hardware_Type | p_SI_def_server_type | KEY |
+| SI_ENVIRONMENT / legacy NMS Server_Type | p_SI_def_environment | KEY |
+| CONSUMER_COMPANY | p_rel_company_owner | KEY |
+| SERVICE NAME / NMS service name | c_new_SI_major_project | KEY |
+| NETWORK SEGMENT | p_SI_def_network_segment | KEY |
+| IP ADDRESS | p_SI_ip_SI_address_1 | SET |
+| OS NAME | p_SI_def_os_name | KEY |
+| OS_VERSION | p_def_os_version | KEY |
+| SERVICE OWNER DIRECTORATE (legacy label, not an individual owner) | c_new_SI_major_project.p_rel_obs | KEY |
+| BUILDING | p_rel_asset_item.p_rel_lbs | KEY |
+| CITY | p_rel_asset_item.p_rel_lbs.m_parent | KEY |
+| NMS Device_Type | p_def_category | KEY |
+| NMS ITMC_Service_ID | c_new_SI_major_project.id | SET |
+
+Each KEY field retains its separate SET value as `Reference: <workbook field>`
+in persisted source evidence/ReviewEvidence. `num` is not identity or a field.
+Service ID is taken inside each server's own row, never from the last server.
+Duplicate keys/IDs and disagreeing service-id projections reject the relationship;
+missing optional cells stay Unknown without substituting SET for missing KEY.
+Missing/nonnumeric inventory identity rejects the relationship. Reordering does
+not change the canonical snapshot. Unqueried status, Virtual PC User, RFC, technical
+creator and Affected Assets stay unknown. Location traversal in a service-item
+projection does not establish OR Affected Assets membership.
+
+Still needed from the source owner: for EACH of the two visible labels
+`Virtual PC User` and `RFC Kaydı`, the approved direct property key on
+`LCSIMS_ServiceInstance` (`p_...` or `c_...`), data type, null/cardinality rules,
+reference target and a bounded sanitized KEY/SET response example. Then the
+existing dictionary maps those two exact labels to those verified direct keys.
+No guessed dictionary values, related-request traversal, reviewer inference or
+functional-aspect query is introduced. Monitoring requests/checks stay unverified.
+
 ## Complete In Use Source Review, 2026-09-08
 
 The complete local candidate is `C:\Users\dmtak\Downloads\İNUSE_V2.ps1`:

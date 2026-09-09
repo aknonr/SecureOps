@@ -374,6 +374,54 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 
+#### Supported Service-Item Mappings, 2026-09-10
+
+Starting HEAD: `6e05b454b6e93fdb9e3383ae6dd2f073847c2376`, branch
+`feature/sql-runtime-hardening-20260902`. Operator evidence confirms one root,
+four service-item rows and 27 semantic cells per row; the exact mapping and
+attachment hash are in `docs/integrations/turuncu-hat-jira-legacy-parity.md`.
+Aliases are equality evidence only, not corporate identities or business policy.
+No attachment, Windows actor SID or corporate values were committed.
+
+Explicit authorized refresh now enriches the existing bounded In Use scope
+using the original 15-select relation query: at most 100 roots, 10 service items
+per root, 64 KiB per related response and 45 seconds overall. Stored list/detail
+reads never query the source. Semantic keys replace positional assumptions.
+Inventory ID, hostname, type, environment, company, service, network, IP, OS/
+version, directorate, building/city, category and each server's own service ID
+flow into persisted fields, existing read-only UI/evidence and legacy XLSX cells.
+KEY display and SET reference values remain separate; no display-name assignment.
+The legacy directorate column is not an individual service/application owner.
+
+Observed means mapped rows with unverified completeness, including observed zero.
+Duplicate/conflicting cells or identities reject enrichment. Missing optional
+fields remain Unknown; previously known fields/rows omitted by a later result
+are retained with Partial/stale provenance, not silently deleted. Refresh/source
+changes invalidate the draft while preserving answers, notes and the reviewer.
+Observed nonempty records support a local archived report after the same three
+answers, version and authorization checks; global completeness remains visibly
+unverified in provenance. Partial/failed/ambiguous relationships cannot archive
+as current. No approval, closure, upload or completed monitoring is implied.
+
+Virtual PC User, RFC, technical creator, service-item status and Affected Assets
+were not queried and remain unknown. Functional aspect and individual ownership
+joins remain unresolved. To add ONLY Virtual PC User/RFC, obtain each label's
+approved direct LCSIMS_ServiceInstance property key, type, null/cardinality,
+reference target and sanitized KEY/SET structure. Existing standalone dictionary
+supports those two labels only; do not guess keys or follow RFC targets.
+
+No migration, grant, configuration, dependency or release-artifact change.
+Schema 012 and all external-write fences remain unchanged. Verification: 148
+focused unit tests; 25 integration/OpenAPI/Swagger tests including 15 isolated
+SQL tests; Release solution build zero warnings/errors. Published loopback
+journeys `mapped` and `after` passed at 1440x900/390x844, light/dark, including
+four differing service/environment rows, three-answer bulk confirmation, XLSX
+archive download and existing conflict/authorization/tour regressions.
+Evidence: `C:\SecureOpsBuild\validation\inuse-mapped-20260910\evidence`.
+SQL: `SecureOps_ResourcesV1_mapped20260910` on approved isolated LocalDB.
+This is source/local verification, not deployment or corporate acceptance.
+rc6.14 and standalone collector delivery remain unchanged. SDM is independent.
+
 #### Operator Effort And Report Retention, 2026-09-09
 
 Start local/live source: `38eee722dbb18619ca6d8eb9a05a58a4afb16112` on

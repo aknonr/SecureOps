@@ -152,7 +152,7 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
                 string label = missing.Check switch { "InternetOut" => "Sunucudan internete erişim", "InternetIn" => "İnternetten sunucuya erişim", _ => "Mikrosegmentasyon" };
                 return new(null, "InUseIncomplete", $"{missing.ServerId}: {label} için Evet veya Hayır seçin. Taslak kaydedilebilir; rapor hazır değil.");
             }
-            if (request.Archive && (record.Source.ServiceItemsState != "Complete" || record.Source.Servers.Count == 0))
+            if (request.Archive && !InUseChecks.RelationshipReady(record.Source))
             { return InUseResult<InUseReport>.Fail("InUseIncomplete"); }
             InUseReport report = InUseWorkbook.Create(record, user.Id, DateTimeOffset.UtcNow);
             if (request.Archive)

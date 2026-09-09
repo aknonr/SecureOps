@@ -85,18 +85,20 @@ public sealed class InUseAdapterTests
     [Fact]
     public async Task Discovery_ReorderedExpandedKeys_SeparateScopeAndUnresolvedRelationships()
     {
-        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}");
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", InUseServiceItemParserTests.Response(4));
         TuruncuHatOperationalRecordClient client = Client(handler);
         InUseBatch result = await client.DiscoverAsync(CancellationToken.None);
         result.Complete.Should().BeFalse();
         result.Records.Single().Requester.Value.Should().Be("Synthetic requester");
         result.Records.Single().ServiceOwner.Value.Should().BeNull();
-        result.Records.Single().Servers.Should().BeEmpty();
-        handler.Requests.Should().ContainSingle();
+        result.Records.Single().Servers.Should().HaveCount(4);
+        result.Records.Single().ServiceItemsState.Should().Be("Observed");
+        result.Records.Single().AffectedAssetsState.Should().Be("NotQueried");
+        handler.Requests.Should().HaveCount(2);
         handler.Requests[0].Path.Should().Be("/query");
         handler.Requests[0].Filter.Should().Be("#%m_active%#='True' AND #%p_dcc%# IN (4241) AND #%p_rel_group%# IN (68)");
         await client.GetActiveAsync(100, CancellationToken.None);
-        handler.Requests[1].Filter.Should().Contain("NOT IN").And.Contain("4241");
+        handler.Requests[2].Filter.Should().Contain("NOT IN").And.Contain("4241");
         handler.Requests.Should().OnlyContain(r => r.Path == "/query");
     }
 
@@ -112,6 +114,21 @@ public sealed class InUseAdapterTests
         Func<Task> read = () => Client(handler).DiscoverAsync(CancellationToken.None);
         await read.Should().ThrowAsync<InvalidDataException>();
         handler.Requests.Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData(200, "Ambiguous")]
+    [InlineData(403, "Forbidden")]
+    [InlineData(500, "Failed")]
+    public async Task Discovery_RelationshipFailure_IsExplicitWithoutInventedServers(int status, string state)
+    {
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", "{}", (HttpStatusCode)status);
+        InUseBatch result = await Client(handler).DiscoverAsync(CancellationToken.None);
+        result.Records.Single().ServiceItemsState.Should().Be(state);
+        result.Records.Single().Servers.Should().BeEmpty();
+        result.Records.Single().Creator.Should().BeNull();
+        result.Records.Single().ProvisioningTeam.Value.Should().BeNull();
+        handler.Requests.Should().OnlyContain(r => r.Path == "/query");
     }
 
     [Fact]
@@ -164,14 +181,14 @@ public sealed class InUseAdapterTests
             Options.Create(new TuruncuHatOptions { RelatedGroupId = 68, ExcludedDccIds = [4241] }), Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnly }),
             new EnterpriseIntegrationHealthState(), new EnterpriseIntegrationTelemetry(), NullLogger<TuruncuHatOperationalRecordClient>.Instance);
     }
-    private sealed class Handler(string body, string? related = null) : HttpMessageHandler
+    private sealed class Handler(string body, string? related = null, HttpStatusCode relatedStatus = HttpStatusCode.OK) : HttpMessageHandler
     {
         public List<(string Path, string Filter)> Requests { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
             Requests.Add((request.RequestUri!.AbsolutePath, json.RootElement.GetProperty("req").GetProperty("Filters")[0].GetString()!));
-            return new(HttpStatusCode.OK) { Content = new StringContent(Requests.Count == 2 && related is not null ? related : body) };
+            return new(Requests.Count > 1 ? relatedStatus : HttpStatusCode.OK) { Content = new StringContent(Requests.Count == 2 && related is not null ? related : body) };
         }
     }
 }
