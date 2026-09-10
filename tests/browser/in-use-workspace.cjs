@@ -40,7 +40,7 @@ async function tour(page, surface) {
             const record = stored.items[0], me = await json(client, '/api/v1/access/me');
             assert.equal(record.source.synthetic, true);
             assert.equal(record.source.serviceItemsState, 'Observed');
-            const assigned = await json(client, `/api/v1/in-use/${record.id}/assignment`, { method: 'PUT', data: { expectedVersion: record.version, assigneeId: me.userId, reason: 'Synthetic mapped review' } });
+            const assigned = await json(client, `/api/v1/in-use/${record.id}/assignment`, { method: 'PUT', data: { expectedVersion: record.version, assigneeId: null, reason: 'Synthetic optional assignment review' } });
             await json(client, `/api/v1/in-use/${record.id}/draft`, { method: 'PUT', data: { expectedVersion: assigned.version, sourceVersion: assigned.sourceVersion,
                 answers: assigned.source.servers.flatMap(s => ['InternetOut', 'InternetIn', 'Microsegmented'].map(check => ({ serverId: s.id, check, value: 'Unknown', evidence: '' }))), notes: '' } });
             await navigate(page, ui, `in-use/${record.id}`);
@@ -61,6 +61,8 @@ async function tour(page, surface) {
             await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
             await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
             const saved = await json(client, `/api/v1/in-use/${record.id}`);
+            assert.equal(saved.assigneeId, null, 'Review does not require or silently create assignment');
+            assert.equal(saved.draft.reviewedBy, me.userId);
             assert.deepEqual(saved.source, record.source);
             await page.getByRole('button', { name: 'Excel önizleme', exact: true }).click();
             await page.getByLabel('Excel sayfası').waitFor();
@@ -183,6 +185,7 @@ async function tour(page, surface) {
             await page.getByRole('button', { name: "WASAS'a arşivle ve indir", exact: true }).click();
             await page.getByRole('alert').filter({ hasText: 'demo-server-01: İnternetten sunucuya erişim' }).waitFor();
             await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'demo-server-01 InternetIn');
+            await capture(page, out, 'after-validation');
             await page.getByLabel('demo-server-01 InternetIn', { exact: true }).selectOption('No');
             await page.getByLabel('demo-server-01 Microsegmented', { exact: true }).selectOption('Yes');
             await page.locator('.so-inuse-bulk summary').click();
@@ -231,6 +234,14 @@ async function tour(page, surface) {
             await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
             await page.getByText('In Use veri sürümü değişti', { exact: true }).waitFor();
             assert.equal(await page.getByLabel('demo-server-01 InternetIn', { exact: true }).inputValue(), 'Yes');
+            await page.getByRole('button', { name: 'Cevapları koru ve güncel kayıtla karşılaştır', exact: true }).click();
+            await page.getByLabel('Güncel kayıt karşılaştırması', { exact: true }).waitFor();
+            assert.equal(await page.getByLabel('demo-server-01 InternetIn', { exact: true }).inputValue(), 'Yes');
+            await capture(page, out, 'after-conflict-comparison');
+            await page.getByRole('button', { name: 'Farkları inceledim; yerel cevaplarla devam et', exact: true }).click();
+            await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+            await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
+            assert.equal((await json(client, `/api/v1/in-use/${record.id}`)).draft.answers.find(a => a.serverId === 'demo-server-01' && a.check === 'InternetIn').value, 'Yes');
             await page.evaluate(() => localStorage.setItem('wasas.appearance', 'light'));
             await navigate(page, ui, `in-use/${record.id}`);
             await page.getByLabel('Yanıtlanacak sunucu', { exact: true }).waitFor();

@@ -173,6 +173,102 @@ public sealed class InUseAdapterTests
         handler.Requests.Should().ContainSingle();
     }
 
+    [Theory]
+    [InlineData("SourceId", "SET", "200")]
+    [InlineData("OrCode", "KEY", "OR-200")]
+    public async Task Diagnostic_ApprovedRfcContract_DeduplicatesExactRequestsWithoutActiveScope(string kind, string cellKind, string reference)
+    {
+        string related = RfcRows(reference);
+        string target = """
+            {"QueryResult":{"Items":[[{"Key":"SET.id","Value":"200"},{"Key":"SET.p_code","Value":"OR-200"},
+            {"Key":"SET.m_active","Value":"False"},{"Key":"KEY.p_rel_requester","Value":"Synthetic request owner"},
+            {"Key":"SET.p_rel_requester","Value":"800"},{"Key":"KEY.p_synthetic_reporter","Value":"Synthetic reporter"}]]}}
+            """;
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", related, referenced: target);
+        JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string> { ["RFC Kaydı"] = "p_synthetic_rfc" },
+            CancellationToken.None, new("p_synthetic_rfc", cellKind, kind, "p_synthetic_reporter"));
+        JsonElement references = result.GetProperty("ReferencedRequests");
+        references.GetProperty("DistinctLookups").GetInt32().Should().Be(1);
+        references.GetProperty("Links").GetArrayLength().Should().Be(4);
+        references.GetProperty("Links")[0].GetProperty("Evidence").GetProperty("State").GetString().Should().Be("ExactMatchNotBusinessOwnership");
+        references.GetProperty("Links")[0].GetProperty("Reference").GetString().Should()
+            .Be(references.GetProperty("Links")[3].GetProperty("Reference").GetString());
+        result.ToString().Should().NotContain("Synthetic request owner").And.NotContain("Synthetic reporter").And.NotContain("OR-200");
+        handler.Requests.Should().HaveCount(3).And.OnlyContain(r => r.Path == "/query");
+        handler.Requests[2].Filter.Should().Be(kind == "SourceId" ? "#%id%#=200" : "#%p_code%#='OR-200'");
+    }
+
+    [Theory]
+    [InlineData("{\"QueryResult\":{\"Items\":[]}}", 200, "NotFoundOrNotVisible")]
+    [InlineData("{\"QueryResult\":{\"Items\":[[],[]]}}", 200, "AmbiguousMatch")]
+    [InlineData("{\"QueryResult\":{\"Items\":[[{\"Key\":\"SET.id\",\"Value\":\"300\"}]]}}", 200, "IdentityMismatch")]
+    [InlineData("{}", 200, "MalformedOrAmbiguous")]
+    [InlineData("{}", 403, "Forbidden")]
+    public async Task Diagnostic_RfcMissingAmbiguousOrDenied_NeverSelectsFirstOrRecurses(string target, int status, string expected)
+    {
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", RfcRows("200"),
+            referenced: target, referencedStatus: (HttpStatusCode)status);
+        JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string> { ["RFC Kaydı"] = "p_synthetic_rfc" },
+            CancellationToken.None, new("p_synthetic_rfc", "SET", "SourceId", "p_synthetic_reporter"));
+        result.GetProperty("ReferencedRequests").GetProperty("Links")[0].GetProperty("Evidence").GetProperty("State").GetString().Should().Be(expected);
+        handler.Requests.Should().HaveCount(status == 403 ? 4 : 3); // Existing session renewal permits one retry.
+    }
+
+    [Fact]
+    public async Task Diagnostic_UnapprovedRfcContract_StopsBeforeAnyTransport()
+    {
+        using var handler = new Handler("{}");
+        await FluentActions.Awaiting(() => Client(handler).DiagnoseAsync("100", new Dictionary<string, string>(), CancellationToken.None,
+            new("p_unverified", "SET", "SourceId", "p_synthetic_reporter"))).Should().ThrowAsync<InvalidDataException>();
+        handler.Requests.Should().BeEmpty();
+    }
+
+    private static string RfcRows(string reference) => JsonSerializer.Serialize(new
+    {
+        QueryResult = new
+        {
+            Items = Enumerable.Range(1, 4).Select(i => new[] {
+            new { Key = "SET.(LCSIMS_ServiceInstance)m_rid.id", Value = (1000 + i).ToString() },
+            new { Key = "SET.(LCSIMS_ServiceInstance)m_rid.p_synthetic_rfc", Value = reference },
+            new { Key = "KEY.(LCSIMS_ServiceInstance)m_rid.p_synthetic_rfc", Value = reference } })
+        }
+    });
+
+    [Theory]
+    [InlineData("missing", 0)]
+    [InlineData("duplicate", 0)]
+    [InlineData("different", 2)]
+    public async Task Diagnostic_RfcCells_PreserveMissingConflictingAndPerServerReferences(string mode, int lookups)
+    {
+        const string prefix = "SET.(LCSIMS_ServiceInstance)m_rid.";
+        object[] rows = Enumerable.Range(0, 2).Select(i =>
+        {
+            var cells = new List<object> { new { Key = prefix + "id", Value = (1000 + i).ToString() } };
+            if (mode != "missing")
+            { cells.Add(new { Key = prefix + "p_synthetic_rfc", Value = (200 + i).ToString() }); }
+            if (mode == "duplicate")
+            { cells.Add(new { Key = prefix + "p_synthetic_rfc", Value = "300" }); }
+            cells.Reverse();
+            return (object)cells;
+        }).ToArray();
+        string related = JsonSerializer.Serialize(new { QueryResult = new { Items = rows } });
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", related,
+            referenced: "{\"QueryResult\":{\"Items\":[]}}");
+        JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string> { ["RFC Kaydı"] = "p_synthetic_rfc" },
+            CancellationToken.None, new("p_synthetic_rfc", "SET", "SourceId", "p_synthetic_reporter"));
+        result.GetProperty("ReferencedRequests").GetProperty("DistinctLookups").GetInt32().Should().Be(lookups);
+        handler.Requests.Should().HaveCount(2 + lookups);
+        if (mode == "different")
+        {
+            handler.Requests.Skip(2).Select(r => r.Filter).Should().Equal("#%id%#=200", "#%id%#=201");
+        }
+        else
+        {
+            result.GetProperty("ReferencedRequests").GetProperty("Links")[0].GetProperty("State").GetString()
+                .Should().Be(mode == "missing" ? "MissingIdentityOrReference" : "AmbiguousCells");
+        }
+    }
+
     private static TuruncuHatOperationalRecordClient Client(Handler handler, bool readOnly = true)
     {
         ITuruncuHatSessionManager sessions = Substitute.For<ITuruncuHatSessionManager>();
@@ -181,14 +277,16 @@ public sealed class InUseAdapterTests
             Options.Create(new TuruncuHatOptions { RelatedGroupId = 68, ExcludedDccIds = [4241] }), Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnly }),
             new EnterpriseIntegrationHealthState(), new EnterpriseIntegrationTelemetry(), NullLogger<TuruncuHatOperationalRecordClient>.Instance);
     }
-    private sealed class Handler(string body, string? related = null, HttpStatusCode relatedStatus = HttpStatusCode.OK) : HttpMessageHandler
+    private sealed class Handler(string body, string? related = null, HttpStatusCode relatedStatus = HttpStatusCode.OK,
+        string? referenced = null, HttpStatusCode referencedStatus = HttpStatusCode.OK) : HttpMessageHandler
     {
         public List<(string Path, string Filter)> Requests { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
             Requests.Add((request.RequestUri!.AbsolutePath, json.RootElement.GetProperty("req").GetProperty("Filters")[0].GetString()!));
-            return new(Requests.Count > 1 ? relatedStatus : HttpStatusCode.OK) { Content = new StringContent(Requests.Count == 2 && related is not null ? related : body) };
+            return new(Requests.Count > 2 && referenced is not null ? referencedStatus : Requests.Count > 1 ? relatedStatus : HttpStatusCode.OK)
+            { Content = new StringContent(Requests.Count > 2 && referenced is not null ? referenced : Requests.Count == 2 && related is not null ? related : body) };
         }
     }
 }

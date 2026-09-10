@@ -15,6 +15,10 @@ public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRep
         ?? throw new InvalidOperationException("In Use persistence requires SecureOpsDb.");
 
     /// <inheritdoc />
+    public Task<IAsyncDisposable?> TryAcquireRefreshAsync(CancellationToken cancellationToken) =>
+        InUseRefreshLock.TryAcquireAsync(_connectionString, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<InUsePage> QueryAsync(InUseQuery query, Guid actorId, CancellationToken cancellationToken)
     {
         const string where = """

@@ -7,9 +7,9 @@ using Microsoft.Extensions.Logging;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.OperationalRecords;
 
-if (args.Length != 5 || args[4] != "--collect" || !OperatingSystem.IsWindows())
+if (args.Length is not (5 or 7) || args[4] != "--collect" || (args.Length == 7 && args[5] != "--rfc-contract") || !OperatingSystem.IsWindows())
 {
-    Console.WriteLine("Usage (approved TEST Windows host only): InUseEvidence <server-config.json> <source-id> <approved-dictionary.json> <new-private-output.json> --collect");
+    Console.WriteLine("Usage (approved TEST Windows host only): InUseEvidence <server-config.json> <source-id> <approved-dictionary.json> <new-private-output.json> --collect [--rfc-contract <approved-rfc-contract.json>]");
     return 2;
 }
 try
@@ -17,8 +17,18 @@ try
     if (!Path.IsPathFullyQualified(args[0]) || !Path.IsPathFullyQualified(args[2]) || !Path.IsPathFullyQualified(args[3])
         || new FileInfo(args[2]).Length > 4096 || File.Exists(args[3]))
     { return 2; }
-    Dictionary<string, string> dictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(await File.ReadAllTextAsync(args[2]))
+    byte[] dictionaryBytes = await File.ReadAllBytesAsync(args[2]);
+    Dictionary<string, string> dictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(dictionaryBytes)
         ?? throw new InvalidDataException();
+    InUseReferencedRequestContract? referenced = null;
+    byte[]? referenceBytes = null;
+    if (args.Length == 7)
+    {
+        if (!Path.IsPathFullyQualified(args[6]) || new FileInfo(args[6]).Length > 4096)
+        { return 2; }
+        referenceBytes = await File.ReadAllBytesAsync(args[6]);
+        referenced = JsonSerializer.Deserialize<InUseReferencedRequestContract>(referenceBytes) ?? throw new InvalidDataException();
+    }
     IConfiguration configuration = new ConfigurationBuilder().AddJsonFile(args[0], optional: false).Build();
     if (configuration["OperationalRecords:SourceProvider"] != "TuruncuHat"
         || !Uri.TryCreate(configuration["TuruncuHat:BaseUrl"], UriKind.Absolute, out Uri? uri)
@@ -37,13 +47,14 @@ try
     byte[] attempt = JsonSerializer.SerializeToUtf8Bytes(new { Status = "StartedNotCompleted", ActorSid = actor.User?.Value, At = DateTimeOffset.UtcNow });
     await output.WriteAsync(attempt, timeout.Token);
     output.Flush(true);
-    JsonElement evidence = await client.DiagnoseAsync(args[1], dictionary, timeout.Token);
+    JsonElement evidence = await client.DiagnoseAsync(args[1], dictionary, timeout.Token, referenced);
     byte[] result = JsonSerializer.SerializeToUtf8Bytes(new
     {
         Status = "CollectedNotMapped",
         ActorSid = actor.User?.Value,
         At = DateTimeOffset.UtcNow,
-        DictionarySha256 = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(args[2]))),
+        DictionarySha256 = Convert.ToHexString(SHA256.HashData(dictionaryBytes)),
+        RfcContractSha256 = referenceBytes is null ? null : Convert.ToHexString(SHA256.HashData(referenceBytes)),
         Evidence = evidence
     });
     output.Position = 0;

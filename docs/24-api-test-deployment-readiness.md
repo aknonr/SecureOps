@@ -1,5 +1,17 @@
 # API TEST Deployment Readiness
 
+## Optional Review And RFC Diagnostic Source Update, 2026-09-10
+
+The current canonical UI handoff records optional capability-authorized review,
+stored conflict comparison and cross-instance refresh exclusion. Schema remains
+012; no new runtime grants/configuration. The fixed transaction-owned application
+lock uses existing PUBLIC access, verified with an isolated least-privilege user.
+The standalone source has an optional approved RFC/Reporter dictionary contract;
+the preserved collector archive does not contain it. No deployment or replacement
+package was made. Persisted RFC ownership, management dashboard and durable source
+completion remain LOCAL implementation work as well as corporate contract gates.
+Existing corporate write fences and the independent SDM continuation are unchanged.
+
 ## Service-Item Mapping Source Update, 2026-09-10
 
 The operator's bounded evidence now supports the original 15-select service-item

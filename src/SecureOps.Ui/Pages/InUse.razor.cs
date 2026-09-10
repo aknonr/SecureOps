@@ -14,6 +14,7 @@ public partial class InUse
     private AccessSnapshot? _access;
     private InUsePage? _page;
     private InUseRecord? _record;
+    private InUseRecord? _comparison;
     private InUseReport? _report;
     private IReadOnlyList<InUseAssignee> _assignees = [];
     private UiProblem? _problem;
@@ -40,11 +41,14 @@ public partial class InUse
         "Ambiguous" => "Eşleme belirsiz; önceki kanıt varsa korunur",
         _ => "Henüz sorgulanmadı / sözleşme bekleniyor"
     };
-    private bool CanEdit => Can(Capabilities.InUseReview) && _record?.AssigneeId == _access?.Access?.UserId;
-    private string NextAction => _record?.AssigneeId is null ? "Yetkili koordinatör bir inceleyici atasın."
-        : !CanEdit ? "Atanan inceleyicinin doğrulaması bekleniyor."
-        : _record.Status == "Stale" ? "Değişen kaynak kanıtına göre cevapları yeniden doğrulayın."
-        : _record.Draft is null || _dirty ? "Sunucu cevaplarını inceleyip yerel taslağı kaydedin." : "Kaydedilen taslağın Excel önizlemesini kontrol edin.";
+    private bool CanEdit => Can(Capabilities.InUseReview) && _record is not null;
+    private int CompletedServers => _record?.Source.Servers.Count(s => InUseChecks.OperatorCodes.All(c =>
+        _answers.Any(a => a.ServerId == s.Id && a.Check == c && a.Value is "Yes" or "No"))) ?? 0;
+    private string NextAction => !CanEdit ? "İnceleme yetkisi olan bir kullanıcı devam edebilir; atama zorunlu değil."
+        : _record!.Status == "Stale" ? "Değişen kaynak kanıtına göre cevapları yeniden doğrulayın."
+        : _record.Draft is null || _dirty ? "Sunucu cevaplarını inceleyip yerel taslağı kaydedin."
+        : CompletedServers < _record.Source.Servers.Count ? "Eksik cevapları tamamlayın; taslağınız korunuyor."
+        : "Kaydedilen taslağın Excel önizlemesini kontrol edin. Kaynak tamamlama kapalı.";
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
@@ -103,6 +107,44 @@ public partial class InUse
                 _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence)).ToArray(), _notes), _lifetime.Token));
         _notice = "Yerel inceleme taslağı kaydedildi.";
     });
+    private Task CompareAsync() => ExecuteAsync(async () =>
+    {
+        if (_record is not null)
+        { _comparison = await Api.GetAsync<InUseRecord>($"/{_record.Id}", _lifetime.Token); }
+    });
+    private void AcceptComparison()
+    {
+        if (_comparison is null || _record is null)
+        { return; }
+        AnswerEdit[] local = _answers.ToArray();
+        SetRecord(_comparison);
+        foreach (AnswerEdit answer in _answers)
+        {
+            AnswerEdit? retained = local.SingleOrDefault(a => a.ServerId == answer.ServerId && a.Check == answer.Check);
+            if (retained is not null)
+            { answer.Value = retained.Value; }
+        }
+        _problem = null;
+        Dirty();
+        _notice = "Güncel sürüm alındı; yerel cevaplarınız korunuyor. Gösterilen farkları doğruladıktan sonra taslağı kaydedin.";
+    }
+    private static IEnumerable<(string Server, string Field, string Before, string After)> SourceChanges(InUseRecord old, InUseRecord current)
+    {
+        foreach (string id in old.Source.Servers.Select(s => s.Id).Union(current.Source.Servers.Select(s => s.Id)))
+        {
+            InUseServer? before = old.Source.Servers.SingleOrDefault(s => s.Id == id);
+            InUseServer? after = current.Source.Servers.SingleOrDefault(s => s.Id == id);
+            if (before is null || after is null)
+            { yield return (id, "Servis öğesi", before is null ? "Yok" : "Var", after is null ? "Yok" : "Var"); }
+            foreach (string field in (before?.Fields.Keys ?? []).Union(after?.Fields.Keys ?? []))
+            {
+                string left = before?.Fields.GetValueOrDefault(field) is { } b ? Evidence(b) : "Bilinmiyor";
+                string right = after?.Fields.GetValueOrDefault(field) is { } a ? Evidence(a) : "Bilinmiyor";
+                if (left != right)
+                { yield return (id, field, left, right); }
+            }
+        }
+    }
     private Task PreviewAsync() => ExecuteAsync(async () => { _report = await ReportAsync(); _sheet = 0; });
     private Task DownloadAsync(long? archivedVersion = null) => ExecuteAsync(async () =>
     {
@@ -137,6 +179,7 @@ public partial class InUse
     private void SetRecord(InUseRecord record)
     {
         _record = record;
+        _comparison = null;
         _assignee = record.AssigneeId?.ToString("D") ?? "";
         _notes = record.Draft?.Notes ?? "";
         _dirty = false;
@@ -165,7 +208,7 @@ public partial class InUse
         Dirty();
         _notice = "Toplu cevaplar taslakta. Kaydetmeden önce sunucu bazında inceleyin.";
     }
-    private void Dirty() { _dirty = true; _report = null; _changes = null; _validation = null; }
+    private void Dirty() { _dirty = true; _report = null; _changes = null; _validation = null; _comparison = null; }
     private async Task ExecuteAsync(Func<Task> operation)
     {
         if (_busy)

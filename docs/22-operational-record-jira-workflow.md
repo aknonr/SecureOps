@@ -125,6 +125,12 @@ match; a distinct action reference remains visible.
 
 ### In Use V1 Authorization, 2026-09-08
 
+2026-09-10 follow-up: InUse.View + InUse.Review no longer requires current
+assignment for draft save. Assignment remains a separate optional action with
+InUse.Assign, approved identity and exact version. Review/report audit names the
+authenticated application actor; no external completion capability is granted.
+Current local scope and remaining implementation are in the canonical UI handoff.
+
 The user explicitly authorized this cross-layer In Use V1 implementation and a
 one-milestone exception to the 1,000-line total reviewed diff cap, including
 code, migration, tests, OpenAPI and canonical documentation. The permanent rule

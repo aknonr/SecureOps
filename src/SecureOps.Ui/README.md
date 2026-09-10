@@ -374,6 +374,69 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 
+#### Optional Review And Bounded RFC Evidence, 2026-09-10
+
+Start local/live HEAD: `fb84053a26025cbd3f77ad550fc3c6c4821ef813`, same feature
+branch. This is an independent implementation increment, NOT the entire requested
+ownership/dashboard/completion milestone. The permanent 1,000-line task cap remains;
+the prior V1 exception is not reused or concealed through multiple commits.
+
+Full increment diff: 692 lines (663 additions, 29 deletions) across 23 files.
+
+Approved InUse.View + InUse.Review actors now save version-protected drafts without
+assignment, including when another reviewer is assigned. Assignment remains optional
+and separately capability-protected. Audit/ReviewedBy/PreparedBy use the authenticated
+application identity, never browser names or the transport account. No role/Resources
+ownership change. The three questions, recipient/diff confirmation, exceptions and
+private archives remain. Three labelled steps show answered-server progress; optional
+assignment stays collapsed and cannot discard dirty answers. Explicit stored-record
+comparison after a conflict/outage preserves local answers. Confirming the comparison
+rebases matching server identities; new servers start Unknown. No corporate refresh,
+silent save retry, automatic assignment or mutating tour navigation is involved.
+
+Refresh acquires a non-waiting 4241:68 scope lock before discovery. SQL uses
+sys.sp_getapplock with Transaction ownership on a dedicated connection, shared by
+all API instances. Disposal/rollback releases it; no inventory/state row locks are
+held during source requests, so stored reads continue. Command IDs/audit are retained.
+No schema/grant/configuration delta: schema 012, ops.InUseRecords SELECT/INSERT/UPDATE,
+ops.InUseRefresh SELECT/UPDATE and existing audit/command/access grants remain.
+PUBLIC application-lock access was verified with an isolated no-login user.
+
+The existing standalone collector gains optional --rfc-contract; see its README.
+The source owner must supply exact RFC property, SET/KEY reference cell, identity/code
+meaning and separate Reporter selector. Direct references are deduplicated and read
+without an active/catalogue/group filter on the referenced OR. Closed/out-of-scope
+requests work in synthetic tests only; no corporate keys/ownership are verified.
+No recursive RFC traversal, inferred owner or persisted assignment. The complete
+legacy script remains unchanged: 742 lines, same documented hash, zero parse errors,
+never executed/copied. It proves neither the RFC contract nor final OR verification.
+
+Verification: 162 focused unit tests; 26 integration/OpenAPI/Swagger tests including
+16 isolated SQL tests. Published local SQL/Simulation mapped/after journeys passed
+at 1440x900/390x844, light/dark: unassigned review, bulk exceptions, validation focus,
+archive, conflict comparison/recovery, tours, pagination and Resources ownership.
+Screenshots/results: `C:\SecureOpsBuild\validation\inuse-workflow-20260910\evidence`.
+DB: `SecureOps_ResourcesV1_workflow20260910`. Demo/Simulation uses its required
+fake read-only-mode=false profile; no corporate provider or write is selected.
+Corporate defaults/fences remain unchanged. No actual VDI/OIDC or corporate test,
+deployment, scheduler, release package or old archive modification occurred.
+
+Remaining LOCAL implementation: persisted RFC owners/exact identity candidates;
+source creation/status mapping, waiting age and In Use dashboard; durable completion
+intent, upload/task execution/reconciliation and authoritative final-state reread.
+These are not delivered activation switches. The full combined milestone requires
+a new scoped size authorization or separately agreed narrower tasks. No dashboard
+screenshot or uncertain-completion test is claimed. Corporate template acceptance,
+required-unknown policy, upload result/idempotency, unique task-to-OR relationship,
+authorized transition and final-state contracts remain pending. All completion
+steps stay closed. .NET 10 compatibility remains separate; no upgrades were made.
+
+Next evidence action: obtain the exact RFC/Reporter dictionary contract, then run
+one approved selected-OR collection and return ONLY Evidence. Virtual PC User is
+optional and unmapped; do not return credentials, raw payload or Windows actor data.
+Old rc6.14/6e05b45 collector artifacts are preserved and do not include this change.
+SDM/Jira-only policy, implementation, evidence and activation remain independent.
+
 #### Supported Service-Item Mappings, 2026-09-10
 
 Starting HEAD: `6e05b454b6e93fdb9e3383ae6dd2f073847c2376`, branch

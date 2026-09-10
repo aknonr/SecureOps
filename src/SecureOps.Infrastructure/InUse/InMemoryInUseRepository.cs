@@ -7,8 +7,24 @@ namespace SecureOps.Infrastructure.InUse;
 public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseRepository
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly Dictionary<Guid, InUseRecord> _records = [];
     private InUseRefreshState _state = InUseRefreshState.Empty;
+
+    /// <inheritdoc />
+    public async Task<IAsyncDisposable?> TryAcquireRefreshAsync(CancellationToken cancellationToken) =>
+        await _refreshGate.WaitAsync(0, cancellationToken) ? new RefreshLease(_refreshGate) : null;
+
+    private sealed class RefreshLease(SemaphoreSlim gate) : IAsyncDisposable
+    {
+        private int _disposed;
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            { gate.Release(); }
+            return ValueTask.CompletedTask;
+        }
+    }
 
     /// <inheritdoc />
     public async Task<InUsePage> QueryAsync(InUseQuery query, Guid actorId, CancellationToken cancellationToken)

@@ -13,6 +13,42 @@ namespace SecureOps.Tests.Integration.Sql;
 public sealed partial class ResourceSqlTests
 {
     [LocalResourceSqlFact]
+    public async Task InUse_RefreshLock_SerializesIndependentRepositories_WithoutBlockingStoredReads()
+    {
+        IConfiguration configuration = Configuration();
+        var first = new SqlInUseRepository(configuration);
+        var second = new SqlInUseRepository(configuration);
+        await using (IAsyncDisposable? lease = await first.TryAcquireRefreshAsync(_token))
+        {
+            lease.Should().NotBeNull();
+            (await second.TryAcquireRefreshAsync(_token)).Should().BeNull();
+            (await second.QueryAsync(new(), Guid.NewGuid(), _token)).Should().NotBeNull();
+            // PUBLIC is sufficient for this fixed database application-lock resource; no runtime DDL grant.
+            await using SqlConnection connection = new(configuration.GetConnectionString("SecureOpsDb"));
+            await connection.OpenAsync(_token);
+            string user = "InUseLockTest_" + Guid.NewGuid().ToString("N");
+            await connection.ExecuteAsync($"CREATE USER [{user}] WITHOUT LOGIN;");
+            try
+            {
+                int result = await connection.QuerySingleAsync<int>($"""
+                    EXECUTE AS USER = '{user}';
+                    BEGIN TRANSACTION;
+                    DECLARE @result int;
+                    EXEC @result = sys.sp_getapplock @Resource=N'SecureOps:InUseRefresh:4241:68',
+                        @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=0;
+                    ROLLBACK;
+                    REVERT;
+                    SELECT @result;
+                    """);
+                result.Should().Be(-1);
+            }
+            finally { await connection.ExecuteAsync($"REVERT; DROP USER [{user}];"); }
+        }
+        await using IAsyncDisposable? reacquired = await second.TryAcquireRefreshAsync(_token);
+        reacquired.Should().NotBeNull();
+    }
+
+    [LocalResourceSqlFact]
     public async Task InUse_SemanticProjection_PersistsForPublishedReview()
     {
         IConfiguration configuration = Configuration();

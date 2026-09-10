@@ -2,6 +2,14 @@
 
 ## In Use Relationship Evidence, 2026-09-10
 
+Workflow follow-up: assignment is optional for approved View+Review actors;
+versions and actual actor provenance remain mandatory. A fixed-scope SQL
+application lock prevents overlapping discoveries from distinct command IDs/API
+instances, without blocking stored reads. No API route/DTO shape changed.
+The optional RFC-hop contract exists only in the standalone diagnostic overload,
+not the HTTP diagnostic or normal refresh. See its README and current canonical
+UI handoff; no persisted RFC owner or source completion is implemented yet.
+
 Additive source fields: serviceItemsState/affectedAssetsState (Complete,
 NotQueried, Forbidden, Failed, Ambiguous), nullable affectedAssetCount and creator
 evidence. Missing old JSON fields default to NotQueried/null. Servers are service
@@ -45,7 +53,7 @@ reuse OR-to-Jira eligibility, claims or source-close commands. Additional gates:
 | GET /assignees | InUse.Assign | at most 200 approved InUse.View+Review application IDs/principals; no directory search or source-name matching |
 | POST /refresh | InUse.Refresh | nonempty commandId GUID; existing command tracking and refresh rate limit; at most 100 accepted records, 45s orchestration deadline and existing response-byte bounds |
 | PUT /{id}/assignment | InUse.Assign | expectedVersion, nullable assigneeId, nonblank reason max 500; approved exact identity or explicit unassignment |
-| PUT /{id}/draft | InUse.Review plus current assignment | expectedVersion, sourceVersion, answers (serverId/check/value/evidence), notes max 2000; max 900 answers, unique server/check; evidence optional max 500. Blank evidence/notes and omitted historical answers preserve stored history |
+| PUT /{id}/draft | InUse.Review; assignment optional | expectedVersion, sourceVersion, answers (serverId/check/value/evidence), notes max 2000; max 900 answers, unique server/check; evidence optional max 500. Blank evidence/notes and omitted historical answers preserve stored history |
 | POST /{id}/report | InUse.Review | expectedVersion; default previews a current saved draft. archive=true requires Complete or Observed nonempty service items and explicit Yes/No for all three operator questions. Observed reports retain the unverified-completeness warning; Partial/failed relationships are blocked. archivedVersion downloads immutable history, checked against expected current record version |
 
 Normal editable codes are InternetOut/InternetIn/Microsegmented. Unknown may be

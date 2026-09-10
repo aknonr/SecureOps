@@ -19,6 +19,8 @@ public sealed record InUseBatch(IReadOnlyList<InUseSource> Records, bool Complet
 /// <summary>Local workflow persistence with atomic audit and concurrency.</summary>
 public interface IInUseRepository
 {
+    /// <summary>Exclusively owns the discovery scope until disposal; null means another refresh is running.</summary>
+    public Task<IAsyncDisposable?> TryAcquireRefreshAsync(CancellationToken cancellationToken);
     /// <summary>Reads a bounded persisted page, without source calls.</summary>
     public Task<InUsePage> QueryAsync(InUseQuery query, Guid actorId, CancellationToken cancellationToken);
     /// <summary>Gets one persisted record.</summary>

@@ -1,5 +1,50 @@
 # InUseEvidence Standalone Operator Delivery
 
+## Optional Exact RFC Hop (Source Follow-up, 2026-09-10)
+
+The preserved `6e05b45` standalone archive does NOT implement this new option.
+The current collector source accepts `--collect --rfc-contract <absolute-json-path>`.
+No corporate invocation or new release archive was made during implementation.
+Without this option the existing legacy-only/two-field collection is unchanged.
+
+Before using it, the source owner must provide these case-sensitive JSON members:
+
+| Member | Required approved meaning |
+|---|---|
+| RfcProperty | Exact direct LCSIMS_ServiceInstance property; must equal dictionary.json's `RFC Kaydı` selector |
+| ReferenceCellKind | `SET` or `KEY`, only as demonstrated by the response contract, not a name-based assumption |
+| ReferenceKind | `SourceId` for canonical positive numeric SMSS_oRFF identity, or `OrCode` for exact OR-digits code |
+| ReporterProperty | Exact direct SMSS_oRFF Reporter selector; distinct from the known Requester selector p_rel_requester |
+
+No real values for these keys are currently verified. Do not use synthetic test
+selectors as a corporate dictionary. Virtual PC User is optional and independent.
+Reporter cell display/reference semantics remain evidence to inspect, not a
+guessed KEY mapping or proof of technical creator/provisioning ownership.
+
+After the dictionary/contract is approved, the same approved TEST management host,
+private server-owned JSON configuration and normal session transport are used.
+Append `--rfc-contract 'C:\OPERATOR_PRIVATE_CONFIG\approved-rfc-contract.json'`
+to the existing five-argument command using a separately verified current tool
+build and a new private output filename. Never use web.config as JSON.
+
+The parent must be one exact active 4241/68 OR. Only its directly returned service
+items can supply RFC references. Each distinct reference is queried once, serially,
+with an exact id/code filter and only id/code/Requester/approved Reporter selects.
+Referenced requests have NO active/category/group filter; closed requests are
+allowed. No recursive request traversal, inventory/user enumeration or assignment.
+Maximum 10 service rows and 10 distinct lookups, 45 seconds overall, 64 KiB per
+response, 64 cells/row, three array levels. Existing session renewal allows one
+transport retry per query. No unverified incremental source cursor is assumed.
+
+Return only `Evidence`, including `ReferencedRequests.Links`: service-item alias,
+reference alias, exact-match state and sanitized cells, or explicit missing,
+ambiguous, denied/failed states. Equal aliases preserve links within this run;
+they are not actual names or approved ownership. `CollectedNotMapped` is collection
+success, not relationship resolution; inspect every link state. Stop on a nonzero
+exit, missing/mismatched keys, ambiguous matches or denied reads; do not widen scope.
+Keep ActorSid, both dictionary hashes, configuration and full output local. This
+collector never persists WASAS owners or writes to Turuncu Hat/Jira/BPM.
+
 This is an operator-invoked read-only console, not an API/UI deployment. Build on
 the development machine with `scripts/release/New-InUseEvidencePackage.ps1`.
 The delivery contains `tool/`, this guide, a blank configuration example,

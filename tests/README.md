@@ -8,6 +8,16 @@ Access lifecycle coverage proves one Pending request per unknown principal, prot
 
 ## In Use V1
 
+The optional-review follow-up tests unassigned/other-assigned review capability,
+actual actor attribution, concurrent saves and non-overlapping scope refresh.
+SQL tests include independent repository instances and PUBLIC-only application
+lock access. The existing mapped browser mode now reviews without an assignee;
+after mode also confirms explicit conflict comparison preserves local edits.
+RFC collector tests use synthetic direct selectors only: id/code lookup without
+active scope, deduplication, differing/missing/duplicate references, zero/multiple
+matches, identity mismatch and denied/malformed results. This is not corporate
+mapping, production ownership, template acceptance or source closure evidence.
+
 `InUseServiceItemParserTests` uses synthetic 27-cell rows with reordered/missing/
 duplicated keys, conflicting references, per-server differences and strict limits.
 `ResourceSqlTests.InUse_SemanticProjection_PersistsForPublishedReview` retains a

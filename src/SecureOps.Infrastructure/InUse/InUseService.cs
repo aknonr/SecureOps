@@ -49,6 +49,9 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
         {
             if (request.CommandId == Guid.Empty)
             { return InUseResult<InUseRefreshState>.Fail("InUseInvalid"); }
+            await using IAsyncDisposable? scope = await repository.TryAcquireRefreshAsync(token);
+            if (scope is null)
+            { return new(null, "InUseConflict", "Bu kapsam için kaynak okuması sürüyor. Tamamlandıktan sonra yeniden deneyin; kayıtlı veriler korunur."); }
             string key = request.CommandId.ToString("D");
             CommandBeginResult begin = await commands.TryBeginAsync("InUseRefresh", "4241:68", key,
                 user.Id.ToString("D"), TimeSpan.FromMinutes(2), token);
@@ -100,15 +103,13 @@ public sealed class InUseService(IInUseRepository repository, IInUseSourceClient
                 new { id, PreviousAssignee = old.AssigneeId, next.AssigneeId, request.Reason, next.Version }), token);
         }, token);
 
-    /// <summary>Only the currently assigned reviewer can replace a local draft.</summary>
+    /// <summary>An approved review-capable actor can save a version-protected draft; assignment is optional.</summary>
     public Task<InUseResult<InUseRecord>> SaveDraftAsync(ClaimsPrincipal principal, AccessOperationContext context,
         Guid id, SaveInUseDraftRequest request, CancellationToken token) => RunAsync(principal, context, Capabilities.InUseReview, async user =>
         {
             InUseRecord? old = await repository.GetAsync(id, token);
             if (old is null)
             { return InUseResult<InUseRecord>.Fail("InUseNotFound"); }
-            if (old.AssigneeId != user.Id)
-            { return InUseResult<InUseRecord>.Fail("InUseAssignmentRequired"); }
             if (request.SourceVersion != old.SourceVersion || request.ExpectedVersion != old.Version)
             { return InUseResult<InUseRecord>.Fail("InUseConflict"); }
             if (!ValidDraft(request, old))

@@ -22,7 +22,27 @@
     else
     {
         @if (_problem is not null) { <SoProblemPanel Problem="_problem" />
-            <MudButton OnClick="LoadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Refresh">Kayıtlı veriyi yeniden oku</MudButton> }
+            @if (_dirty && _record is not null)
+            { <MudButton OnClick="CompareAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.CompareArrows">Cevapları koru ve güncel kayıtla karşılaştır</MudButton> }
+            else { <MudButton OnClick="LoadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Refresh">Kayıtlı veriyi yeniden oku</MudButton> } }
+        @if (_comparison is { } current && _record is { } previous)
+        {
+            <section class="so-inuse-band" aria-label="Güncel kayıt karşılaştırması">
+                <h3>Kaydedilmemiş cevaplarınız korunuyor</h3>
+                <p>Kayıt sürümü: @previous.Version → @current.Version · Kaynak sürümü: @previous.SourceVersion → @current.SourceVersion</p>
+                <p>Güncel inceleyici: @(current.AssigneeLabel ?? "Atanmamış")</p>
+                <ul>@foreach (var answer in _answers.Where(a => (current.Draft?.Answers.FirstOrDefault(s => s.ServerId == a.ServerId && s.Check == a.Check)?.Value ?? "Unknown") != a.Value))
+                { <li>@answer.ServerId · @Check(answer.Check): kayıtlı @Answer(current.Draft?.Answers.FirstOrDefault(s => s.ServerId == answer.ServerId && s.Check == answer.Check)?.Value ?? "Unknown") → yerel @Answer(answer.Value)</li> }</ul>
+                @if (current.SourceVersion != previous.SourceVersion)
+                {
+                    <p>Kaynak değişti: @current.Source.Title · @Evidence(current.Source.Requester) · @current.Source.RelationshipEvidence</p>
+                    <ul>@foreach (var change in SourceChanges(previous, current))
+                    { <li>@change.Server · @change.Field: @change.Before → @change.After</li> }</ul>
+                    <p>Yalnız aynı kaynak kimliğine sahip sunucuların cevapları korunur. Yeni sunucular Bilinmiyor ile başlar; kaydetmeden önce doğrulayın.</p>
+                }
+                <MudButton OnClick="AcceptComparison" Disabled="_busy" StartIcon="@Icons.Material.Filled.Check">Farkları inceledim; yerel cevaplarla devam et</MudButton>
+            </section>
+        }
         @if (_notice is not null) { <p role="status">@_notice</p> }
         @if (_busy) { <SoLoading Message="İşlem sürüyor" /> }
         @if (!Id.HasValue)
@@ -89,17 +109,17 @@
                 </dl></details>
                 @if (Can(Capabilities.InUseAssign))
                 {
-                    <details class="so-inuse-assignment" open="@(record.AssigneeId is null)"><summary>İnceleyici ata / değiştir</summary><div class="so-inuse-filters">
+                    <details class="so-inuse-assignment"><summary>İnceleyici ata / değiştir (isteğe bağlı)</summary><div class="so-inuse-filters">
                         <label>İnceleyici<select aria-label="In Use inceleyicisi" @bind="_assignee"><option value="">Atanmamış</option>
                             @foreach (InUseAssignee person in _assignees) { <option value="@person.Id">@person.Label</option> }</select></label>
                         <label>Atama gerekçesi<input aria-label="Atama gerekçesi" maxlength="500" @bind="_reason" @bind:event="oninput" /></label>
-                        <MudButton OnClick="AssignAsync" Disabled="@(_busy || string.IsNullOrWhiteSpace(_reason))" StartIcon="@Icons.Material.Filled.PersonAdd">Atamayı kaydet</MudButton>
+                        <MudButton OnClick="AssignAsync" Disabled="@(_busy || _dirty || string.IsNullOrWhiteSpace(_reason))" StartIcon="@Icons.Material.Filled.PersonAdd">Atamayı kaydet</MudButton>
                     </div></details>
                 }
                 <p role="status">Sonraki adım: @NextAction</p>
             </section>
             <section class="so-inuse-band" data-guide="inuse-servers">
-                <h3>Servis öğeleri / sunucular</h3><p>@record.Source.RelationshipEvidence</p>
+                <h3>1. Sunucuları kontrol et</h3><p>@record.Source.RelationshipEvidence</p>
                 <p>Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count) · Etkilenen varlıklar: @Relationship(record.Source.AffectedAssetsState, record.Source.AffectedAssetCount)</p>
                 @if (_validation is not null) { <p role="alert">@_validation</p> }
                 @if (record.Source.Servers.Count > 0)
@@ -112,6 +132,8 @@
                 @if (record.Source.Servers.Count == 0) { <MudAlert Severity="Severity.Warning">Doğrulanmış sunucu ilişkisi yok. Kaynak ilişki kanıtı gerekli.</MudAlert> }
                 @if (record.Source.Servers.Count > 0)
                 {
+                    <h3>2. Soruları yanıtla</h3>
+                    <p role="status">@CompletedServers / @record.Source.Servers.Count sunucunun üç cevabı tamamlandı.</p>
                     <label>Yanıtlanacak sunucu<select aria-label="Yanıtlanacak sunucu" @bind="_editingServer" @bind:after="() => _changes = null">
                         @foreach (InUseServer server in record.Source.Servers) { <option value="@server.Id">@Field(server, "HOSTNAME") · @server.Id · @_answers.Count(a => a.ServerId == server.Id && a.Value == "Unknown") eksik</option> }
                     </select></label>
@@ -148,7 +170,7 @@
                 }
             </section>
             <section class="so-inuse-band" data-guide="inuse-report">
-                <h3>İnceleme ve Excel hazırlığı</h3>
+                <h3>3. Önizle ve raporu arşivle</h3>
                 <div class="so-inline-actions">
                     @if (CanEdit) { <MudButton OnClick="SaveAsync" Disabled="_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">Taslağı kaydet</MudButton> }
                     @if (Can(Capabilities.InUseReview)) { <MudButton OnClick="PreviewAsync" Disabled="@(_busy || _dirty || record.Draft is null || record.Status == "Stale")" StartIcon="@Icons.Material.Filled.TableView">Excel önizleme</MudButton> }

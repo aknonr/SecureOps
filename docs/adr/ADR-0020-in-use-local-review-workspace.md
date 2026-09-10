@@ -2,6 +2,24 @@
 
 Status: Accepted for the explicitly authorized In Use V1 local milestone.
 
+The 2026-09-10 workflow follow-up makes assignment optional for approved
+InUse.View + InUse.Review users. Review provenance is the authenticated actor,
+not the assignee; version checks protect concurrent operators. Assignment keeps
+its separate capability and never grants review permission. Explicit refresh
+holds a database-scoped application lock for 4241:68 before calling the source;
+the in-memory substitute uses an equivalent non-waiting gate. Existing command
+IDs still protect retries. The lock uses a dedicated transaction and releases on
+disposal without holding record/refresh row locks during network reads. No new
+schema, scheduler or external-write permission is introduced.
+
+An optional source-owner dictionary contract extends only the existing standalone
+evidence collector: exact direct RFC selector, semantic cell kind, identity/code
+type and separate Reporter selector. One request hop, shared-reference deduplication,
+strict bounds and shared aliases; no active In Use filter on the referenced OR.
+This is fixture-tested collection, not corporate mapping or persisted ownership.
+The broader management-summary and durable completion/reconciliation implementation
+remain separate increments, not delivered or implicitly enabled by this change.
+
 The 2026-09-10 operator collection establishes the exact 27 semantic cells for
 the existing 15-select service-item query, not global completeness. Explicit
 refresh now enriches each bounded root with those fields only. KEY display and

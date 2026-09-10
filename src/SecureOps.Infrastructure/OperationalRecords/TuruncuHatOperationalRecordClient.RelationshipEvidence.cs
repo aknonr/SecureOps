@@ -9,9 +9,14 @@ public sealed partial class TuruncuHatOperationalRecordClient
     /// <summary>Legacy request evidence only; never interprets unknown keys as approved relationships.</summary>
     public Task<JsonElement> DiagnoseAsync(string sourceId, CancellationToken token) => DiagnoseAsync(sourceId, new Dictionary<string, string>(), token);
 
-    /// <summary>Optionally reads two direct fields from an operator-approved source dictionary; never follows RFC targets.</summary>
-    public async Task<JsonElement> DiagnoseAsync(string sourceId, IReadOnlyDictionary<string, string> dictionary, CancellationToken token)
+    /// <summary>Reads approved direct fields; optional explicit RFC contract permits one bounded request hop only.</summary>
+    public async Task<JsonElement> DiagnoseAsync(string sourceId, IReadOnlyDictionary<string, string> dictionary, CancellationToken token,
+        InUseReferencedRequestContract? referencedRequest = null)
     {
+        referencedRequest?.Validate(dictionary);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+        deadline.CancelAfter(TimeSpan.FromSeconds(45));
+        token = deadline.Token;
         if (dictionary.Count > 2 || dictionary.Any(p => p.Key is not ("Virtual PC User" or "RFC Kaydı")
             || !Regex.IsMatch(p.Value, @"\A(?:p_|c_)[A-Za-z0-9_]{1,100}\z", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))
             || new[] { "password", "token", "session", "secret", "authorization" }.Any(s => p.Value.Contains(s, StringComparison.OrdinalIgnoreCase))))
@@ -39,10 +44,15 @@ public sealed partial class TuruncuHatOperationalRecordClient
                 return cells.Length <= 64 ? cells : throw new InvalidDataException("Diagnostic cell bound exceeded.");
             }).ToArray();
         }
+        object rootShape = Shape(root.RootElement, 1);
+        object serviceShape = Shape(related.RootElement, 10);
+        object? referenced = referencedRequest is null ? null : await ReferencedEvidenceAsync(related.RootElement, referencedRequest,
+            document => Shape(document, 2), value => aliases.GetValueOrDefault(value), token);
         return JsonSerializer.SerializeToElement(new
         {
-            Root = Shape(root.RootElement, 1),
-            ServiceItems = Shape(related.RootElement, 10),
+            Root = rootShape,
+            ServiceItems = serviceShape,
+            ReferencedRequests = referenced,
             Completeness = "Unverified",
             AffectedAssets = "NotQueried",
             Mapping = "Unverified; no persisted enrichment"

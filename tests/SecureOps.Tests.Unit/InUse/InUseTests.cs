@@ -205,8 +205,9 @@ public sealed class InUseTests
         var f = new Fixture();
         InUseRecord record = await f.ImportAsync();
         record.Source.ServiceOwner.Value.Should().BeNull();
-        (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion, [], ""), _token))
-            .Error.Should().Be("InUseAssignmentRequired");
+        record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion, [], ""), _token)).Value!;
+        record.AssigneeId.Should().BeNull();
+        record.Draft!.ReviewedBy.Should().Be(f.User.Id);
         (await f.Service.AssignAsync(_principal, _context, record.Id, new(record.Version, Guid.NewGuid(), "Unknown exact user"), _token))
             .Error.Should().Be("InUseAssigneeUnavailable");
         InUseResult<InUseRecord>[] assignments = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ =>
@@ -308,6 +309,58 @@ public sealed class InUseTests
         InUseRecord record = await f.ImportAsync();
         f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([record.Source, record.Source], false));
         (await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token)).Value!.Issue.Should().Be("SourceUnavailableOrMalformed");
+        (await f.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReviewCapability_DoesNotRequireAssignment_AndNeverChangesReviewer(bool assignedElsewhere)
+    {
+        var f = new Fixture("InUseReviewer");
+        InUseBatch batch = await new LocalInUseSourceClient().DiscoverAsync(_token);
+        await f.Repository.RefreshAsync(0, batch, null, new AuditEvent { Actor = "synthetic", Action = "Seed" }, _token);
+        InUseRecord record = (await f.Repository.QueryAsync(new(), f.User.Id, _token)).Items[0];
+        if (assignedElsewhere)
+        {
+            await f.Repository.SaveAsync(record with { Version = record.Version + 1, AssigneeId = Guid.NewGuid(), AssigneeLabel = "synthetic:other" },
+                record.Version, new AuditEvent { Actor = "synthetic", Action = "Seed" }, _token);
+            record = (await f.Repository.GetAsync(record.Id, _token))!;
+        }
+        var request = new SaveInUseDraftRequest(record.Version, record.SourceVersion, [], "");
+        InUseResult<InUseRecord>[] results = await Task.WhenAll(Enumerable.Range(0, 3)
+            .Select(_ => f.Service.SaveDraftAsync(_principal, _context, record.Id, request, _token)));
+        results.Count(r => r.Error is null).Should().Be(1);
+        results.Count(r => r.Error == "InUseConflict").Should().Be(2);
+        InUseRecord saved = results.Single(r => r.Error is null).Value!;
+        saved.AssigneeId.Should().Be(record.AssigneeId);
+        saved.Draft!.ReviewedBy.Should().Be(f.User.Id);
+        (await f.Service.ExportAsync(_principal, _context, record.Id, new(saved.Version), _token)).Value!.PreparedBy.Should().Be(f.User.Id);
+        (await f.Service.AssignAsync(_principal, _context, record.Id, new(saved.Version, null, "Not authorized"), _token)).Error.Should().Be("AccessDenied");
+        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(default);
+    }
+
+    [Fact]
+    public async Task Refresh_DifferentCommandsShareScope_ReleaseAfterFailureAndKeepReadsAvailable()
+    {
+        var f = new Fixture();
+        InUseRecord record = await f.ImportAsync();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource<InUseBatch>(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.Source.ClearReceivedCalls();
+        f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(_ => { entered.SetResult(); return finish.Task; });
+        Task<InUseResult<InUseRefreshState>> first = f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
+        await entered.Task;
+        try
+        {
+            (await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token)).Error.Should().Be("InUseConflict");
+            (await f.Service.GetAsync(_principal, _context, record.Id, _token)).Value.Should().NotBeNull();
+            await f.Source.Received(1).DiscoverAsync(Arg.Any<CancellationToken>());
+        }
+        finally { finish.SetException(new IOException("Synthetic source outage")); }
+        (await first).Value!.Issue.Should().Be("SourceUnavailableOrMalformed");
+        f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([], false));
+        (await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token)).Error.Should().BeNull();
         (await f.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record);
     }
 
