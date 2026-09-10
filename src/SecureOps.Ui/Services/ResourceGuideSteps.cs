@@ -41,7 +41,7 @@ public static class ResourceGuideSteps
                 new("new-group", "Kendi grubunuzu oluşturun", "Grup, yalnızca size ait sıralı bir bağlantı koleksiyonudur. Yeni grup ile bir ad belirleyin; bağlantıları Uygulama Bağlantıları sayfasından ekleyin.", "resources", "Bağlantı keşfet"),
                 new("group-list", "Tercih ettiğiniz grubu seçin", "Soldan bir grup seçin. Varsayılan grup tercih ettiğiniz gruptur; sayfa açıldığında hiçbir sekme otomatik açılmaz.", "resources/sets", "Bağlantı Gruplarım"),
                 new("group-order", "Sıralayın veya gruptan çıkarın", "Yukarı ve aşağı okları açılma sırasını değiştirir. Gruptan çıkar yalnızca seçtiğiniz bağlantıyı kaldırır; katalog kaydı etkilenmez.", "resources", "Gruba bağlantı eklemek için keşfet"),
-                new("prepare-links", "Önce denetleyin, sonra açın", "Üstteki Bağlantıları aç güncel erişimi denetler. Hazırlanan paneldeki yerel açma düğmesine kendiniz basın. Açılmayan sekmeler için tekil Aç bağlantılarını kullanın.", "resources", "Uygulama Bağlantıları")
+                new("prepare-links", "Önce denetleyin, sonra açın", "Açmak için hazırla güncel erişimi denetler. Hazırlanan paneldeki açma düğmesine kendiniz basın. Açılmayan sekmeler için tekil Aç bağlantılarını kullanın.", "resources", "Uygulama Bağlantıları")
             ],
             "management" when canManage =>
             [
@@ -51,10 +51,10 @@ public static class ResourceGuideSteps
             ],
             _ =>
             [
-                new("resource-search", "Bağlantıyı bulun ve açın", "Ad, amaç veya etiketle arayın. Kategori ve ortamla daraltın. Aç düğmesi hedefi yeni sekmede açmayı dener; hedef uygulamanın kendi oturumu gerekir.", "resources", "Uygulama Bağlantıları"),
-                new("link-actions", "Görünür bağlantıları seçin", "Kutularla seçin. Bu sayfadakileri seç yalnızca yüklü sayfayı kapsar; filtre veya sayfa değişirse seçim temizlenir. Yıldız tekil favoridir; grup üyeliğinden bağımsızdır.", "resources", "Uygulama Bağlantıları"),
-                new("selection-actions", "Seçiminizle işlem yapın", "Açmak için hazırla güncel erişimi denetler; ardından açma düğmesine kendiniz basın. Gruba ekle seçiminizi kişisel gruba kaydeder. Sekme açılması oturum açıldığını garanti etmez.", "resources/sets", "Bağlantı Gruplarım"),
-                new("personalize", "Çalışma alanınızı düzenleyin", "Bu düğmeden görünüm, yoğunluk, sayfa boyutu ve kısayollarınızı düzenleyin. Açılan pencerede kişiselleştirme rehberini başlatabilirsiniz.", "resources", "Çalışma alanı")
+                new("link-actions", "Bağlantıları seçin", "Kutularla seçin. Bu sayfadakileri seç yalnızca yüklü sayfayı kapsar; filtre veya sayfa değişirse seçim temizlenir.", "resources", "Uygulama Bağlantıları"),
+                new("selection-actions", "Bağlantıları açın", "Açmak için hazırla güncel erişimi denetler. Ardından açma düğmesine basın. Tarayıcı sekmeleri engellerse tekil Aç bağlantılarını kullanın; rehber hiçbir bağlantıyı açmaz.", "resources", "Uygulama Bağlantıları"),
+                new("save-personal-group", "Kişisel grubunuza kaydedin", "Seçilenleri grubuma kaydet ile mevcut grubu seçin veya yeni bir ad verin. Yönetici olmanız gerekmez; grup erişim yetkisini değiştirmez.", "resources", "Uygulama Bağlantıları"),
+                new("groups-link", "Grubunuzu yeniden açın", "Kişisel bağlantı gruplarım sayfasında grubunuzu seçin, gerekirse sıralayın ve Açmak için hazırla ile devam edin. Hiçbir sekme otomatik açılmaz.", "resources/sets", "Kişisel bağlantı gruplarım")
             ]
         };
         if (canManage && surface != "management")

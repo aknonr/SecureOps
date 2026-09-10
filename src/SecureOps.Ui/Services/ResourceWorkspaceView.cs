@@ -19,7 +19,7 @@ public static class ResourceWorkspaceView
     public static string Label(string key) => key switch
     {
         "links" => "Uygulama Bağlantıları",
-        "groups" => "Bağlantı Gruplarım",
+        "groups" => "Kişisel bağlantı gruplarım",
         "requests" => "Operasyonel Kayıtlar",
         "catalogue" => "Bağlantı Yönetimi",
         _ => string.Empty

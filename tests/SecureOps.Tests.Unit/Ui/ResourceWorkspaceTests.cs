@@ -67,8 +67,47 @@ public sealed class ResourceWorkspaceTests
             { [nameof(ResolvedResourceLinks.Links)] = new[] { link } }));
             return System.Net.WebUtility.HtmlDecode(result.ToHtmlString());
         });
-        html.Should().Contain("data-so-open-links").And.Contain("data-so-open-choice").And.Contain("data-so-open-url");
+        html.Should().Contain("data-so-open-links").And.NotContain("data-so-open-choice").And.Contain("data-so-open-url");
         html.Should().Contain("target=\"_blank\"").And.Contain("rel=\"noopener noreferrer\"");
         html.Should().Contain("anlamına gelmez").And.NotContain("onclick=");
+    }
+
+    [Fact]
+    public void Resolution_ContextChangeRejectsLateSuccessAndErrors()
+    {
+        var state = new ResourceResolutionState<string[]>();
+        long stale = state.Clear();
+        long current = state.Clear();
+        state.Accept(stale, ["old"]).Should().BeFalse();
+        state.IsCurrent(stale).Should().BeFalse();
+        state.Value.Should().BeNull();
+        state.Accept(current, ["current"]).Should().BeTrue();
+        state.Clear();
+        state.Value.Should().BeNull();
+        state.Accept(current, ["late"]).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(409, true)]
+    [InlineData(503, false)]
+    [InlineData(401, false)]
+    public async Task GroupRecovery_ExplicitReadOnlyRefreshNeverReplaysSave(int status, bool allowed)
+    {
+        var state = new ResourceSaveState();
+        await state.TrySaveAsync(() => Task.FromResult<UiProblem?>(UiProblemFactory.FromResponse(status, null)));
+        int reads = 0;
+        await state.RefreshConflictAsync(() => { reads++; return Task.CompletedTask; });
+        reads.Should().Be(allowed ? 1 : 0);
+        state.CanSubmit.Should().Be(allowed);
+    }
+
+    [Fact]
+    public async Task GroupRecovery_FailedRereadKeepsSavingBlocked()
+    {
+        var state = new ResourceSaveState();
+        await state.TrySaveAsync(() => Task.FromResult<UiProblem?>(UiProblemFactory.FromResponse(409, null)));
+        await state.RefreshConflictAsync(() => throw new SecureOpsApiException(UiProblemFactory.FromResponse(503, null)));
+        state.CanSubmit.Should().BeFalse();
+        state.Problem!.StatusCode.Should().Be(503);
     }
 }

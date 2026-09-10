@@ -5,6 +5,19 @@
 
 ## Decision
 
+### Resource Opening And Personal Groups, 2026-09-10
+
+The requested pre-package correction retains synchronous native `_blank`
+opening with noopener/noreferrer. Default Chrome popup policy locally opens one
+of three distinct resolved URLs; a site-specific allowance opens all three.
+This does not establish the deployed browser's cause. Do not interpret null
+handles as blocking, bypass policy or retry automatically. Keep native individual
+fallback links and one selection scope. Reject pending resolution responses when
+selection/access changes. Personal-group conflict recovery explicitly rereads the
+owner projection, retains selection/name, and requires another reviewed save.
+Resources.View/Manage, hidden-member merge, versioning and audit are unchanged.
+This bounded increment does not complete In Use or authorize packaging/deployment.
+
 ### Bounded Workspace Follow-up, 2026-09-07
 
 The authorized usability follow-up adds optional WorkspaceLayout to existing

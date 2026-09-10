@@ -122,17 +122,11 @@
             if (!button || button.disabled || !event.isTrusted) { return; }
             var panel = button.closest('.so-set-resolved');
             if (!panel) { return; }
-            var urls = Array.from(panel.querySelectorAll('[data-so-open-choice]:checked'))
-                .map(function (choice) { return choice.closest('li').querySelector('[data-so-open-url]').href; });
+            var urls = Array.from(panel.querySelectorAll('[data-so-open-url]'))
+                .map(function (link) { return link.href; });
             if (!urls.length) { return; }
             window.secureOpsLinks.openMany(urls);
             panel.querySelector('[data-so-open-status]').hidden = false;
-        });
-
-        document.addEventListener('change', function (event) {
-            if (!event.target.matches('[data-so-open-choice]')) { return; }
-            var panel = event.target.closest('.so-set-resolved');
-            panel.querySelector('[data-so-open-links]').disabled = !panel.querySelector('[data-so-open-choice]:checked');
         });
 
         // MudBlazor 6 puts select attributes on a hidden input, not its keyboard target.

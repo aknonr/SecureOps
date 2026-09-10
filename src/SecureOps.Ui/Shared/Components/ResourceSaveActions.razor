@@ -2,10 +2,16 @@
 <div class="so-resource-save">
     @if (_state.Problem is { } problem)
     {
-        <SoProblemPanel Problem="problem" />
-        @if (problem.Kind != UiProblemKind.Validation)
+        @if (problem.StatusCode == 409 && RefreshConflict is not null)
         {
-            <p class="so-panel-text">Kapatıp güncel kaydı inceleyin; işlem otomatik tekrarlanmaz.</p>
+            <p class="so-panel-text" role="alert">Kişisel gruplarınız başka bir işlemde değişti. Seçiminiz ve yazdığınız ad korundu. Güncel grupları getirip seçiminizi kontrol edin; kayıt otomatik tekrarlanmaz.</p>
+            <MudButton StartIcon="@Icons.Material.Filled.Refresh" Disabled="_state.Saving" OnClick="RefreshAsync">Güncel grupları getir</MudButton>
+        }
+        else
+        {
+            <SoProblemPanel Problem="problem" />
+            @if (problem.Kind != UiProblemKind.Validation)
+            { <p class="so-panel-text">Kapatıp güncel kaydı inceleyin; işlem otomatik tekrarlanmaz.</p> }
         }
     }
     <MudButton OnClick="Cancel" Disabled="@_state.Saving" Variant="Variant.Text">Vazgeç</MudButton>
@@ -20,8 +26,11 @@
     [Parameter, EditorRequired] public Func<Task<UiProblem?>> Save { get; set; } = default!;
     /// <summary>Names the explicit command for the current form.</summary>
     [Parameter] public string SubmitLabel { get; set; } = "Kaydet";
+    /// <summary>Optional explicit reread of a rejected personal-group version; never retries a save.</summary>
+    [Parameter] public Func<Task>? RefreshConflict { get; set; }
 
     private readonly ResourceSaveState _state = new();
+    private Task RefreshAsync() => _state.RefreshConflictAsync(RefreshConflict!);
 
     private async Task ConfirmAsync()
     {

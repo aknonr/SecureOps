@@ -12,7 +12,7 @@
 <div class="so-page so-page--wide so-resource-page so-workspace so-workspace--@Layout.View so-workspace--@Layout.Density">
     <SoPageHeader Title="Uygulama Bağlantıları">
         <Actions>
-            <MudButton Href="resources/sets" StartIcon="@Icons.Material.Outlined.Folder" Variant="Variant.Outlined" data-guide="groups-link">Bağlantı Gruplarım</MudButton>
+            <MudButton Href="resources/sets" StartIcon="@Icons.Material.Outlined.Folder" Variant="Variant.Outlined" data-guide="groups-link">Kişisel bağlantı gruplarım</MudButton>
             <MudIconButton Icon="@Icons.Material.Outlined.DashboardCustomize" aria-label="Çalışma alanını düzenle" title="Çalışma alanını düzenle"
                            data-guide="personalize" Disabled="@(_busy || _preferences is null)" OnClick="OpenLayoutAsync" />
             <MudTooltip Text="Yenile"><MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="Yenile"
@@ -32,7 +32,7 @@
     else
     {
         <nav class="so-workspace-shortcuts" aria-label="Çalışma alanı kısayolları">
-            @foreach (string key in Layout.Shortcuts.Where(k => ResourceWorkspaceView.Permitted(_access, k)))
+            @foreach (string key in Layout.Shortcuts.Where(k => k is not ("links" or "groups") && ResourceWorkspaceView.Permitted(_access, k)))
             { <a href="@ResourceWorkspaceView.Href(key)">@ResourceWorkspaceView.Label(key)</a> }
         </nav>
         <ResourceHelp Preferences="_preferences" PreferencesChanged="PreferencesChanged" CanManage="@_access.Can(Capabilities.ResourcesManage)" Disabled="_busy" />
@@ -83,8 +83,11 @@
                 {
                     <div class="so-selection-bar" data-guide="selection-actions" aria-label="Seçili bağlantı işlemleri">
                         <strong role="status">@_selection.Ids.Count bağlantı seçili</strong>
-                        <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" OnClick="PrepareSelectedAsync" Disabled="_busy">Açmak için hazırla</MudButton>
-                        <MudButton StartIcon="@Icons.Material.Filled.PlaylistAdd" OnClick="AddSelectedAsync" Disabled="@(_busy || _preferences is null)">Gruba ekle</MudButton>
+                        @if (_resolvedLinks is null)
+                        { <MudButton StartIcon="@Icons.Material.Filled.OpenInNew" OnClick="PrepareSelectedAsync" Disabled="_busy">@(_busy ? "Erişim denetleniyor…" : "Açmak için hazırla")</MudButton> }
+                        else
+                        { <MudButton StartIcon="@Icons.Material.Filled.Edit" OnClick="ClearResolved" Disabled="_busy">Seçimi değiştir</MudButton> }
+                        <MudButton StartIcon="@Icons.Material.Filled.PlaylistAdd" data-guide="save-personal-group" OnClick="AddSelectedAsync" Disabled="@(_busy || _preferences is null)">Seçilenleri grubuma kaydet</MudButton>
                         <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Seçimi temizle" title="Seçimi temizle" OnClick="() => SelectPage(false)" Disabled="_busy" />
                     </div>
                 }
@@ -96,7 +99,7 @@
                                   Icon="@Icons.Material.Outlined.LinkOff" />
                     <MudButton OnClick="DiscoverAsync" StartIcon="@Icons.Material.Filled.Search">Tüm bağlantılara dön</MudButton>
                 }
-                else
+                else if (_resolvedLinks is null)
                 {
                     <ul class="so-resource-list">
                         @foreach (ResourceLink link in result.Items)
@@ -132,7 +135,8 @@
     private UiProblem? _actionProblem, _preferencesProblem, _categoriesProblem;
     private bool _busy, _favouritesOnly, _reloading;
     private readonly ResourceSelectionState _selection = new();
-    private IReadOnlyList<ResourceLink>? _resolvedLinks;
+    private readonly ResourceResolutionState<IReadOnlyList<ResourceLink>> _opening = new();
+    private IReadOnlyList<ResourceLink>? _resolvedLinks => _opening.Value;
     private string? _actionNotice;
     private ResourceWorkspaceLayout Layout => _preferences?.WorkspaceLayout ?? ResourceWorkspaceLayout.Default;
     private string _search = string.Empty, _environment = string.Empty;
@@ -151,6 +155,7 @@
 
     private async Task ReloadAccessAsync()
     {
+        ClearResolved();
         _access = await AccessProvider.RefreshAsync(CancellationToken.None);
         if (_access.Can(Capabilities.ResourcesView)) await ReloadAsync();
     }
@@ -158,6 +163,7 @@
     private async Task ReloadAsync()
     {
         if (_reloading) return;
+        ClearResolved();
         _reloading = true;
         try
         {
@@ -201,7 +207,7 @@
     private async Task SearchAsync()
     {
         _selection.Clear();
-        _resolvedLinks = null;
+        ClearResolved();
         if (_favouritesOnly) { _selection.SetPage(CurrentPage?.Items.Select(link => link.Id) ?? []); return; }
         Task pending = _query.LoadAsync(Query, ResourceApi.QueryLinksAsync);
         StateHasChanged();
@@ -209,21 +215,24 @@
         if (!_query.Loading && _query.Problem is null) _selection.SetPage(CurrentPage?.Items.Select(link => link.Id) ?? []);
     }
 
-    private void SelectLink(Guid id, bool value) { _selection.Toggle(id, value); _resolvedLinks = null; }
-    private void SelectPage(bool value) { _selection.SelectPage(value); _resolvedLinks = null; }
+    private void ClearResolved() { _opening.Clear(); _actionNotice = null; }
+    private void SelectLink(Guid id, bool value) { _selection.Toggle(id, value); ClearResolved(); }
+    private void SelectPage(bool value) { _selection.SelectPage(value); ClearResolved(); }
 
     private async Task PrepareSelectedAsync()
     {
         if (_busy || _selection.Ids.Count == 0) return;
         _busy = true;
         _actionProblem = null;
-        _resolvedLinks = null;
+        long generation = _opening.Clear();
+        Guid[] selected = [.. _selection.Ids];
         try
         {
-            _resolvedLinks = await ResourceApi.ResolveLinksAsync(new(_selection.Ids), CancellationToken.None);
-            _actionNotice = _resolvedLinks.Count < _selection.Ids.Count ? "Seçimin bir bölümü şu anda kullanılamıyor; yalnızca güncel uygun bağlantılar hazırlandı." : null;
+            var links = await ResourceApi.ResolveLinksAsync(new(selected), CancellationToken.None);
+            if (_opening.Accept(generation, links))
+                _actionNotice = links.Count < selected.Length ? "Seçimin bir bölümü şu anda kullanılamıyor; yalnızca güncel uygun bağlantılar hazırlandı." : null;
         }
-        catch (SecureOpsApiException exception) { _actionProblem = exception.Problem; }
+        catch (SecureOpsApiException exception) { if (_opening.IsCurrent(generation)) _actionProblem = exception.Problem; }
         finally { _busy = false; }
     }
 
@@ -282,11 +291,19 @@
         {
             { nameof(ResourceSetPickerDialog.Links), links },
             { nameof(ResourceSetPickerDialog.Preferences), _preferences },
+            { nameof(ResourceSetPickerDialog.RefreshPreferences), (Func<Task<ResourcePreferencesResponse>>)RefreshGroupPreferencesAsync },
             { nameof(ResourceSetPickerDialog.Save), (Func<Guid?, SaveShiftSetRequest, Task<UiProblem?>>)SaveGroupAsync }
         };
-        IDialogReference dialog = await Dialogs.ShowAsync<ResourceSetPickerDialog>("Gruba ekle", parameters,
+        IDialogReference dialog = await Dialogs.ShowAsync<ResourceSetPickerDialog>("Seçilenleri grubuma kaydet", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
         await dialog.Result;
+    }
+
+    private async Task<ResourcePreferencesResponse> RefreshGroupPreferencesAsync()
+    {
+        _preferences = await ResourceApi.GetPreferencesAsync(CancellationToken.None);
+        _actionProblem = null;
+        return _preferences;
     }
 
     private async Task<UiProblem?> SaveGroupAsync(Guid? id, SaveShiftSetRequest request)
@@ -298,7 +315,7 @@
         {
             _preferences = id is { } groupId ? await ResourceApi.SaveSetAsync(groupId, request, CancellationToken.None)
                 : await ResourceApi.CreateSetAsync(request, CancellationToken.None);
-            _actionNotice = "Seçili bağlantılar kişisel grubunuzda kaydedildi.";
+            _actionNotice = $"Seçtiğiniz bağlantılar kişisel grubunuza kaydedildi: {request.Name}.";
             return null;
         }
         catch (SecureOpsApiException exception) { _actionProblem = exception.Problem; await LoadPreferencesAsync(); return exception.Problem; }
@@ -307,12 +324,13 @@
 
     private void OnAccessChanged() => InvokeAsync(async () =>
     {
-        _access = await AccessProvider.GetAsync();
         _selection.Clear();
-        _resolvedLinks = null;
+        ClearResolved();
+        StateHasChanged();
+        _access = await AccessProvider.GetAsync();
         if (_access.Can(Capabilities.ResourcesView)) await ReloadAsync();
         else _preferences = null;
         StateHasChanged();
     });
-    public void Dispose() { AccessProvider.Changed -= OnAccessChanged; _query.Dispose(); }
+    public void Dispose() { ClearResolved(); AccessProvider.Changed -= OnAccessChanged; _query.Dispose(); }
 }

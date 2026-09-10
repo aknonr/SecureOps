@@ -10,6 +10,20 @@ public sealed class ResourceSaveState
     /// <summary>Only validation failures permit editing and resubmitting the same draft/version.</summary>
     public bool CanSubmit => !Saving && (Problem is null || Problem.Kind == UiProblemKind.Validation);
 
+    /// <summary>Only a known version rejection may be cleared by an explicit successful reread.</summary>
+    public async Task RefreshConflictAsync(Func<Task> refresh)
+    {
+        if (Saving || Problem?.StatusCode != 409)
+        {
+            return;
+        }
+        Saving = true;
+        try
+        { await refresh(); Problem = null; }
+        catch (SecureOpsApiException exception) { Problem = exception.Problem; }
+        finally { Saving = false; }
+    }
+
     /// <summary>Returns true only for a confirmed successful save, never for a rejected duplicate click.</summary>
     public async Task<bool> TrySaveAsync(Func<Task<UiProblem?>> save)
     {

@@ -5233,6 +5233,7 @@ html[data-so-appearance="light"] .so-auth-card {
 .so-layout-shortcuts li { display: flex; gap: 4px; align-items: center; border-bottom: 1px solid var(--so-border-soft); padding-block: 8px; }
 .so-layout-shortcuts label { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
 .so-workspace-shortcuts { display: flex; gap: 8px 20px; flex-wrap: wrap; padding-block: 8px 16px; }
+.so-workspace-shortcuts:empty { display: none; }
 .so-workspace-shortcuts a { color: var(--so-accent); font-size: 0.85rem; text-underline-offset: 4px; }
 .so-workspace .so-resource-page-header { align-items: start; }
 .so-selection-choice, .so-resource-select { display: flex; align-items: center; gap: 8px; min-height: 36px; cursor: pointer; }
@@ -5333,8 +5334,7 @@ html[data-so-appearance="light"] .so-auth-card {
 .so-set-resolved { margin-top: var(--so-space-5); padding-top: var(--so-space-4); border-top: 2px solid var(--so-border); }
 .so-set-resolved h3 { font-size: 1rem; margin: 0 0 8px; }
 .so-resource-list--compact .so-resource-item { display: flex; justify-content: space-between; align-items: center; padding-block: 12px; }
-.so-open-choice { display: flex; align-items: center; gap: 12px; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
-.so-open-choice input { flex: 0 0 18px; width: 18px; height: 18px; accent-color: var(--so-accent); }
+.so-open-choice { min-width: 0; overflow-wrap: anywhere; }
 [data-so-open-links] { margin-top: var(--so-space-4); gap: 8px; min-width: 180px; min-height: 40px; }
 .so-management-toolbar { border-bottom: 1px solid var(--so-border); margin-bottom: var(--so-space-4); }
 .so-management-search { display: flex; align-items: center; gap: var(--so-space-5); justify-content: space-between; }

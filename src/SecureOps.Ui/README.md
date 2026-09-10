@@ -372,6 +372,72 @@ MudBlazor stays at 6.16.0; the boundedness assessment and exact application-wide
 are above. Local success is not TEST sign-off. Resume from this entry and `docs/decisions-log.md`,
 not the historical blocker list above; the hidden-membership and environment contract blockers are resolved.
 
+### Resources Pre-Package Correction, 2026-09-10
+
+Start local/live HEAD: `b4910ad045c688eaeb148c5d5b93d255330c9142`, same feature
+branch. This is the explicitly requested bounded Resources increment. The prior
+In Use increment (692 lines) and its unfinished backlog below remain separate;
+no old scope exception is reused. No package, deployment or release archive change.
+
+Full Resources increment: 559 changed lines (477 additions, 82 deletions), 21 files.
+Including the earlier independent In Use increment: 1,251 lines, not concealed by commit splitting.
+
+**Opening diagnosis:** the previous published UI resolved three distinct synthetic
+IDs/URLs in the requested order. Chrome 152.0.7977.83 opened one actual page under
+default blocking and three under a site-specific popup allowance. `_blank` is not
+reused, the loop continues after null/exception, and the delegated trusted browser
+click contains no Blazor/async boundary. `noopener,noreferrer` remains on every
+call/link; its null return is NOT a blocked-tab detector. The rc6.14 recorded build
+source `b217f000eafb4a18f7029629e1119c86205d9295` has identical opener/component
+source to this task's baseline. Installed binaries, actual selected corporate
+catalogue entries and managed TEST browser policy were not inspected; their live
+root cause is not proven by local reproduction.
+
+**Operator flow:** select once -> Açmak için hazırla (server access resolution) ->
+the explicit native N bağlantıyı aç button. The prepared view replaces the duplicate
+catalogue/selection list; Seçimi değiştir restores the same selection. Native Aç
+links remain individually usable. Guidance explains popup permission and avoiding
+duplicate tabs, never claims destination load/login, and never retries automatically.
+Selection/filter/page/access/refresh invalidation also rejects late preparation
+responses. No background catalogue polling or target fetching was added.
+
+Kişisel bağlantı gruplarım and Seçilenleri grubuma kaydet identify personal ownership.
+Resources.View is sufficient; Resources.Manage remains required only for shared
+catalogue administration. The dialog retains selected links when choosing an
+existing group or naming a new one. A known version rejection retains the name
+and selection, offers an explicit current-group reread, then requires another save.
+Unknown write outcomes never acquire this retry path. Existing preferences,
+hidden-member merge, server-owned actor attribution, audit and version checks remain.
+The four targeted tour steps are select/open/save/reopen; navigation is read-only.
+Duplicate header/shortcut routes are suppressed without rewriting preferences.
+
+**Verification:** Release solution build: zero warnings/errors. 233 focused unit
+tests and 6 hosted API/OpenAPI/In Use tests pass. Scoped dotnet format passes.
+`resource-opening.cjs` checks real page counts/URLs and opener isolation under both
+policies, non-admin create/existing-group save/reorder/reopen, actual 409 recovery,
+cross-user direct denial, partial resolution after archive, restored membership,
+tour keyboard/focus/nonmutation and desktop/mobile light/dark. It removes
+Playwright's `--disable-popup-blocking` in BOTH modes; the allowance exists only in
+a disposable local Chrome profile. This is not a corporate GPO override/test.
+`workspace-usability.cjs` also passes paging, page size, persistent ordered layout,
+reset isolation, long text, empty states and 720 CSS-pixel reflow. Its normal
+automation popup settings are NOT evidence of policy-respecting bulk opening.
+
+Published local Demo API/UI only, synthetic InMemory Resources/Access/Audit; no new
+SQL run was needed for these UI-only contract-preserving changes. Prior isolated
+SQL ownership/merge/audit evidence is unchanged, not rerun evidence. No real VDI,
+native 200% zoom, screen reader, OIDC, corporate target authentication or deployment
+acceptance is claimed. Evidence is under
+`C:\SecureOpsBuild\validation\resources-opening-20260910\evidence`: before/after
+`*-prepared-1440.png`, `*-prepared-390.png`, group conflict/refreshed/personal-group
+captures and `after-opening-results.json` / `workspace-results.json`.
+No API/OpenAPI/schema/grant/configuration/dependency change. Corporate external-write
+defaults and SDM eligibility remain unchanged. Before a later package decision,
+the operator must inspect the actual deployed source/version and effective site
+popup policy without reopening all already-open tabs. In Use waiting age/dashboard,
+persisted RFC ownership and controlled upload/completion/reconciliation remain
+active LOCAL work; the combined milestone is NOT complete.
+
 ### In Use V1 Canonical Handoff, 2026-09-08
 
 #### Optional Review And Bounded RFC Evidence, 2026-09-10

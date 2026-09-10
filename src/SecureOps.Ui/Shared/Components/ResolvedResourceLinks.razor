@@ -10,16 +10,16 @@
             @foreach (ResourceLink link in Links)
             {
                 <li class="so-resource-item" @key="link.Id">
-                    <label class="so-open-choice"><input type="checkbox" data-so-open-choice checked aria-label="@($"{link.Name}: Açmak için seç")" /><span>@link.Name</span></label>
+                    <span class="so-open-choice">@link.Name</span>
                     <a data-so-open-url href="@link.Url" target="_blank" rel="noopener noreferrer" aria-label="@($"{link.Name}: Tek başına aç")">Aç <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /></a>
                 </li>
             }
         </ul>
         <button type="button" data-so-open-links class="mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-medium">
-            <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /> Bağlantıları aç
+            <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /> @Links.Count bağlantıyı aç
         </button>
-        <p role="status" data-so-open-status hidden>Açma isteği gönderildi. Sekmeler açılmadıysa bu site için açılır pencere ayarını kontrol edin veya tekil Aç bağlantılarını kullanın.</p>
-        <p class="so-panel-text so-panel-text--sm">Sekme açılması, hedefin yüklendiği veya oturum açıldığı anlamına gelmez.</p>
+        <p role="status" data-so-open-status hidden>@Links.Count bağlantı için açma isteği gönderildi. Açılmayanları tekil Aç bağlantılarından açın; tümünü yeniden açmak yinelenen sekmeler oluşturabilir.</p>
+        <p class="so-panel-text so-panel-text--sm">Yalnızca bir sekme açılırsa adres çubuğundaki açılır pencere engelini kontrol edin. İzin kurumunuzca kapalıysa tekil Aç bağlantılarını kullanın. Sekme açılması, hedefin yüklendiği veya oturum açıldığı anlamına gelmez.</p>
     }
 </section>
 

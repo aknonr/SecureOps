@@ -9,17 +9,17 @@
 @inject IDialogService Dialogs
 @inject ILogger<ShiftSets> Logger
 
-<PageTitle>Bağlantı Gruplarım · @WasasBrand.Name</PageTitle>
+<PageTitle>Kişisel bağlantı gruplarım · @WasasBrand.Name</PageTitle>
 
 <div class="so-page so-page--wide so-resource-page so-shift-sets">
-    <SoPageHeader Title="Bağlantı Gruplarım" Lead="Yalnızca size ait sıralı bağlantı koleksiyonları. Bir grup seçin, düzenleyin ve bağlantıları birlikte açın.">
+    <SoPageHeader Title="Kişisel bağlantı gruplarım" Lead="Birlikte kullandığınız bağlantıları kaydedin. Örnek: Gece vardiyam. Bu grup yalnız size aittir; bağlantılara erişim yetkisini değiştirmez.">
         <Actions>
             <MudButton Href="resources" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Search">Bağlantı keşfet</MudButton>
             @if (_access?.Can(Capabilities.ResourcesView) == true)
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                            data-guide="new-group" Disabled="@(_busy || _preferences is null || !ResourceView.CanCreateSet(_preferences))"
-                           OnClick="CreateSetAsync">Yeni grup</MudButton>
+                           OnClick="CreateSetAsync">Yeni kişisel grup oluştur</MudButton>
             }
             <MudTooltip Text="Yenile"><MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="Yenile"
                 Disabled="_busy" OnClick="LoadPreferencesAsync" /></MudTooltip>
@@ -42,7 +42,7 @@
         @if (_preferences is null && _problem is null) { <SoLoading Message="Gruplarınız getiriliyor…" /> }
         else if (_preferences is { Sets.Count: 0 })
         {
-            <SoEmptyState Title="İlk bağlantı grubunuzu oluşturun" Description="Bir ad belirleyin, ardından Uygulama Bağlantıları sayfasındaki Gruba ekle eylemiyle bağlantıları seçin."
+            <SoEmptyState Title="İlk kişisel bağlantı grubunuzu oluşturun" Description="Uygulama Bağlantıları sayfasından bağlantıları seçip Seçilenleri grubuma kaydet ile adlandırabilirsiniz."
                           Icon="@Icons.Material.Outlined.FolderOpen" />
             <MudButton OnClick="CreateSetAsync" StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Outlined" Disabled="_busy">Grup oluştur</MudButton>
         }
@@ -93,19 +93,20 @@
                             </MudButton>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.OpenInNew"
                                        data-guide="prepare-links" Disabled="_busy" OnClick="@(() => PrepareOpenAsync(set))">
-                                @(_resolvedSetId == set.Id ? "Bağlantıları yeniden denetle" : "Bağlantıları aç")
+                                @(_resolvedSetId == set.Id ? "Bağlantıları yeniden denetle" : "Açmak için hazırla")
                             </MudButton>
                         </div>
                         @if (_resolvedSetId == set.Id && _resolved is { } ready)
                         {
                             <ResolvedResourceLinks @key="ready" Links="ready.Links" />
+                            <MudButton StartIcon="@Icons.Material.Filled.Edit" OnClick="ClearResolved">Düzenlemeye dön</MudButton>
                         }
                         @if (set.Links.Count == 0)
                         {
                             <SoEmptyState Title="Görüntülenebilir bağlantı yok" Description="@ResourceView.EmptySetNotice" Icon="@Icons.Material.Outlined.LinkOff" />
                             <MudButton Href="resources" StartIcon="@Icons.Material.Filled.Add">Bağlantı ekle</MudButton>
                         }
-                        else
+                        else if (_resolved is null)
                         {
                             <ol class="so-set-list" data-guide="group-order">
                                 @for (int index = 0; index < set.Links.Count; index++)
@@ -143,7 +144,8 @@
     private bool _focusGroup;
     private ElementReference _groupHeading;
 
-    private ShiftSetResponse? _resolved;
+    private readonly ResourceResolutionState<ShiftSetResponse> _opening = new();
+    private ShiftSetResponse? _resolved => _opening.Value;
     private Guid? _resolvedSetId;
     private Guid? _selectedSetId;
     private ShiftSetResponse? Selected => _preferences?.Sets.FirstOrDefault(s => s.Id == _selectedSetId)
@@ -174,6 +176,7 @@
 
     private async Task ReloadAccessAsync()
     {
+        ClearResolved();
         _access = await AccessProvider.RefreshAsync(CancellationToken.None);
 
         if (_access.Can(Capabilities.ResourcesView))
@@ -334,16 +337,18 @@
         }
         _busy = true;
         _problem = null;
-        _resolved = null;
+        long generation = _opening.Clear();
         _resolvedSetId = set.Id;
         StateHasChanged();
 
         try
         {
-            _resolved = await ResourceApi.ResolveSetAsync(set.Id, CancellationToken.None);
+            var resolved = await ResourceApi.ResolveSetAsync(set.Id, CancellationToken.None);
+            _opening.Accept(generation, resolved);
         }
         catch (SecureOpsApiException ex)
         {
+            if (!_opening.IsCurrent(generation)) return;
             _resolvedSetId = null;
             _problem = ex.Problem;
             Logger.LogDebug("Set resolution failed. Code: {Code}.", ex.Problem.Code);
@@ -356,18 +361,19 @@
 
     private void ClearResolved()
     {
-        _resolved = null;
+        _opening.Clear();
         _resolvedSetId = null;
     }
 
     private void OnAccessChanged() => InvokeAsync(async () =>
     {
-        _access = await AccessProvider.GetAsync(CancellationToken.None);
         ClearResolved();
+        StateHasChanged();
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
         if (_access.Can(Capabilities.ResourcesView)) await LoadPreferencesAsync();
         else _preferences = null;
         StateHasChanged();
     });
 
-    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+    public void Dispose() { ClearResolved(); AccessProvider.Changed -= OnAccessChanged; }
 }

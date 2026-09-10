@@ -100,6 +100,15 @@ See `docs/agent-guides/090-testing-quality.md`:
 - Each test isolated (no shared mutable state).
 ## Current Test Boundary
 
+`browser/resource-opening.cjs <playwright-core> <UI> <API> <evidence> <before|after>`
+uses only published loopback Demo hosts and synthetic Resources fixtures. Both
+fresh Chrome profiles explicitly remove `--disable-popup-blocking`; only the allow
+profile grants this loopback site popups. It asserts actual target page counts,
+URLs and opener isolation, not mocked call counts. After mode covers non-admin
+personal groups, stale-version recovery, owner isolation, partial resolution,
+keyboard tour nonmutation and responsive themes. Profiles/screenshots stay outside
+Git. This is not proof of corporate GPO, VDI or destination authentication.
+
 Dashboard/SDM browser journeys reuse the foreground Demo hosts, paired Simulation
 providers and the existing isolated LocalDB migration harness. They do not install
 providers or alter production eligibility. `tests/browser/management-journey.cjs`

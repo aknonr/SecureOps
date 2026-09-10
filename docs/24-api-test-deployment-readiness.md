@@ -1,5 +1,17 @@
 # API TEST Deployment Readiness
 
+## Resources Pre-Package Source Correction, 2026-09-10
+
+The canonical UI README records actual three-target popup-policy reproduction,
+personal-group recovery and published local verification. No new release package
+or deployment was authorized or produced. rc6.14 and older artifacts stay unchanged.
+No schema, runtime grant, API contract, provider configuration or write-fence delta.
+Local Chrome default blocking opens one target; an explicit site allowance opens
+three. Actual TEST managed policy/installed binary/catalogue identity remains an
+operator verification, not a locally established root cause. The full In Use
+waiting-age/dashboard, RFC ownership and controlled completion/reconciliation
+backlog remains active; do not package the combined milestone as complete.
+
 ## Optional Review And RFC Diagnostic Source Update, 2026-09-10
 
 The current canonical UI handoff records optional capability-authorized review,

@@ -173,15 +173,15 @@ async function ordinary(page, fixture) {
     for (let i = 0; i < 3; i++) {
         const link = fixture.links[i];
         await page.getByLabel('Bağlantı ara', { exact: true }).fill(link.name);
-        await page.getByRole('button', { name: `${link.name}: Gruba ekle`, exact: true }).click();
+        await page.getByRole('button', { name: `${link.name}: Grubuma kaydet`, exact: true }).click();
         const dialog = page.locator('.mud-dialog');
         if (i === 0) {
-            if (await dialog.getByRole('button', { name: 'Yeni grup', exact: true }).count()) await dialog.getByRole('button', { name: 'Yeni grup', exact: true }).click();
+            if (await dialog.getByRole('button', { name: 'Yeni kişisel grup oluştur', exact: true }).count()) await dialog.getByRole('button', { name: 'Yeni kişisel grup oluştur', exact: true }).click();
             await dialog.getByLabel('Grup adı', { exact: true }).fill(groupName);
-            await dialog.getByRole('button', { name: 'Oluştur ve ekle', exact: true }).click();
+            await dialog.getByRole('button', { name: 'Oluştur ve kaydet', exact: true }).click();
         } else {
             await dialog.locator('.so-group-choices button').filter({ hasText: groupName }).click();
-            await dialog.getByRole('button', { name: 'Gruba ekle', exact: true }).click();
+            await dialog.getByRole('button', { name: 'Grubuma kaydet', exact: true }).click();
         }
         await dialog.waitFor({ state: 'hidden' });
     }
@@ -210,9 +210,9 @@ async function ordinary(page, fixture) {
     await navigate(page, 'resources');
     const added = fixture.links[3];
     await page.getByLabel('Bağlantı ara', { exact: true }).fill(added.name);
-    await page.getByRole('button', { name: `${added.name}: Gruba ekle`, exact: true }).click();
+    await page.getByRole('button', { name: `${added.name}: Grubuma kaydet`, exact: true }).click();
     await page.locator('.mud-dialog .so-group-choices button').filter({ hasText: groupName }).click();
-    await page.locator('.mud-dialog').getByRole('button', { name: 'Gruba ekle', exact: true }).click();
+    await page.locator('.mud-dialog').getByRole('button', { name: 'Grubuma kaydet', exact: true }).click();
     await page.locator('.mud-dialog').waitFor({ state: 'hidden' });
     await api('resources/links/' + hidden.id, 'PUT', { ...archived, archived: false, expectedVersion: archived.version });
     await navigate(page, 'resources/sets');
@@ -233,14 +233,13 @@ async function ordinary(page, fixture) {
             return handle;
         };
     });
-    await detail.getByRole('button', { name: 'Bağlantıları hazırla', exact: true }).click();
+    await detail.getByRole('button', { name: 'Açmak için hazırla', exact: true }).click();
     await page.locator('[data-so-open-links]').waitFor();
     assert.deepEqual(await page.evaluate(() => window.resourceOpenCalls), []);
-    await page.locator('[data-so-open-choice]').nth(1).uncheck();
     await page.locator('[data-so-open-links]').press('Enter');
     await page.locator('[data-so-open-status]:visible').waitFor();
     const calls = await page.evaluate(() => window.resourceOpenCalls);
-    assert.deepEqual(calls.map(call => call.url), [fixture.links[2].url, added.url]);
+    assert.deepEqual(calls.map(call => call.url), [fixture.links[2].url, hidden.url, added.url]);
     assert.ok(calls[0].active && calls.every(call => call.features === 'noopener,noreferrer'));
     assert.doesNotMatch(await page.locator('[data-so-open-status]').innerText(), /engellendi|başarıyla açıldı/i);
     const popup = page.waitForEvent('popup');
@@ -249,8 +248,8 @@ async function ordinary(page, fixture) {
     await target.waitForLoadState();
     assert.equal(await target.evaluate(() => window.opener), null);
     await target.close();
-    for (const checkbox of await page.locator('[data-so-open-choice]').all()) await checkbox.uncheck();
-    assert.equal(await page.locator('[data-so-open-links]').isDisabled(), true);
+    await page.getByRole('button', { name: 'Düzenlemeye dön', exact: true }).click();
+    assert.equal(await page.locator('[data-so-open-links]').count(), 0);
     pass('Opening: fresh prepare opens nothing; explicit keyboard activation, ordered selection, isolation, usable individual fallback and honest null-handle status');
     await layouts(page, 'after-groups');
     await detail.getByRole('button', { name: 'Grubu sil', exact: true }).click();
