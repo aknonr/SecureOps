@@ -13,7 +13,8 @@ public sealed record SdmEvaluationInput(
     bool RequesterPresent = false, bool RequesterResolved = false, bool RequesterAmbiguous = false,
     bool ReporterResolved = false, bool ApprovalGranted = false, bool WritesDisabled = true,
     bool AlreadyTransferred = false, bool ReconciliationRequired = false,
-    bool SourceChanged = false, bool EvaluationStale = false);
+    bool SourceChanged = false, bool EvaluationStale = false,
+    bool PolicyApproved = false, bool MappingComplete = false);
 
 /// <summary>Pure versioned decision, without evaluation time or source content.</summary>
 public sealed record SdmEvaluationResult(
@@ -21,12 +22,13 @@ public sealed record SdmEvaluationResult(
     IReadOnlyList<string> ReasonCodes, IReadOnlyList<string> BlockingConditions,
     bool SourceChanged, bool EvaluationStale)
 {
-    /// <summary>No positive category policy is approved in v1.</summary>
-    public bool SdmCandidateRecommended => false;
-    /// <summary>Publication requires a later policy and approval milestone.</summary>
-    public bool JiraEligible => false;
+    /// <summary>Only the independently versioned, fully attested pilot can recommend publication.</summary>
+    public bool SdmCandidateRecommended => JiraEligible;
+    /// <summary>Business eligibility is separate from deployment-owned external-write fences.</summary>
+    public bool JiraEligible => RuleSetVersion == SdmPilotEvaluator.RuleSetVersion
+        && !SourceChanged && !EvaluationStale && BlockingConditions.All(c => c == "ExternalWritesDisabled");
     /// <summary>Evaluation alone never authorizes an external write.</summary>
-    public bool ExternalWriteEligible => false;
+    public bool ExternalWriteEligible => JiraEligible && !BlockingConditions.Contains("ExternalWritesDisabled");
 }
 
 /// <summary>Durable safe evidence and metadata recorded outside the pure evaluator.</summary>

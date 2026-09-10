@@ -105,6 +105,42 @@ public sealed partial class ResourceSqlTests
         OperationalRecord stale = await repository.EvaluateAsync(record.Id, SdmEvaluationEvidence.FromSource(changed, true, true), context, new InMemoryAuditWriter(), _token);
         stale.SdmEvaluation!.Result.SourceChanged.Should().BeTrue();
         stale.SdmEvaluation.Result.EvaluationStale.Should().BeTrue();
+        // Trusted synthetic attestations exercise persistence, not corporate mapping acceptance.
+        SdmEvaluationInput approved = SdmEvaluationEvidence.FromSource(changed, true, true) with
+        {
+            ValidId = true,
+            GroupInScope = true,
+            DccAllowed = true,
+            Category = OperationalRecordClassification.ServerRequest,
+            RequesterPresent = true,
+            RequesterResolved = true,
+            ReporterResolved = true,
+            ApprovalGranted = true,
+            PolicyApproved = true,
+            MappingComplete = true
+        };
+        string actor = "synthetic-pilot-" + Guid.NewGuid().ToString("N");
+        context = context with { Actor = actor };
+        string trigger = "TR_PilotTest_" + Guid.NewGuid().ToString("N");
+        await connection.ExecuteAsync($"CREATE TRIGGER audit.[{trigger}] ON audit.AuditLog AFTER INSERT AS BEGIN IF EXISTS(SELECT 1 FROM inserted WHERE Actor = '{actor}') THROW 51090, 'Synthetic audit failure.', 1; END;");
+        try
+        {
+            Func<Task> evaluate = () => repository.EvaluateAsync(record.Id, approved, context, new InMemoryAuditWriter(), _token);
+            await evaluate.Should().ThrowAsync<SqlException>();
+            (await repository.GetAsync(record.Id, _token))!.Should().BeEquivalentTo(stale);
+        }
+        finally { await connection.ExecuteAsync($"DROP TRIGGER audit.[{trigger}];"); }
+        OperationalRecord positive = await repository.EvaluateAsync(record.Id, approved, context, new InMemoryAuditWriter(), _token);
+        OperationalRecord persisted = (await new SqlOperationalRecordRepository(configuration).GetAsync(record.Id, _token))!;
+        persisted.JiraEligible.Should().BeTrue();
+        persisted.SdmEvaluation!.Result.JiraEligible.Should().BeTrue();
+        persisted.SdmEvaluation.Result.ExternalWriteEligible.Should().BeFalse();
+        persisted.Version.Should().Be(positive.Version);
+        Func<Task> wrongPolicy = () => connection.ExecuteAsync("UPDATE ops.OperationalRecords SET SdmEvaluationJson=JSON_MODIFY(SdmEvaluationJson,'$.Result.RuleSetVersion','unapproved-version') WHERE OperationalRecordId=@Id", new { record.Id });
+        await wrongPolicy.Should().ThrowAsync<SqlException>();
+        (await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM audit.AuditLog WHERE Actor=@Actor AND Action=@Action", new { Actor = actor, Action = SdmEvaluationEvidence.AuditAction })).Should().Be(1);
+        await repository.UpsertImportedAsync(changed with { Description = "Synthetic changed after approval" }, "synthetic-sdm", _token);
+        SdmEvaluationEvidence.Project((await repository.GetAsync(record.Id, _token))!).JiraEligible.Should().BeFalse();
     }
 
     [LocalResourceSqlFact]

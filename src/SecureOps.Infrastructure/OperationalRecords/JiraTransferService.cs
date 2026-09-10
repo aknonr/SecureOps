@@ -56,6 +56,16 @@ public sealed class JiraTransferService : IJiraTransferService
             return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
         }
 
+        bool pilot = string.Equals(_operationalOptions.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase);
+        if (pilot)
+        {
+            if (_operationalOptions.Pilot.SourceRecordId != record.SourceRecordId || string.IsNullOrWhiteSpace(_operationalOptions.Pilot.ApprovalReference))
+            { return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.JiraValidationFailed, "pilot-policy", false); }
+            OperationalRecordResult<OperationalRecord> fresh = await ValidateFreshnessAsync(record, WorkflowFailureStage.JiraCreate, context, cancellationToken, persistFailure: false);
+            if (!fresh.IsSuccess)
+            { return new(null, fresh.Failure); }
+            record = fresh.Value!;
+        }
         OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, context.Actor, cancellationToken);
         if (!draftResult.IsSuccess)
         {
@@ -63,6 +73,12 @@ public sealed class JiraTransferService : IJiraTransferService
         }
 
         JiraIssueDraft draft = draftResult.Value!;
+        if (pilot)
+        {
+            record = await _repository.EvaluateAsync(id, SdmPilotPolicy.ConfirmedInput(record, draft, _operationalOptions), context, _auditWriter, cancellationToken);
+            if (!record.JiraEligible)
+            { return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordChanged, "pilot-evaluation", false); }
+        }
         WorkflowAcquireResult transition = await _repository.MarkPreviewedAsync(id, draft.MappingVersion, draft.IdempotencyKey, context.Actor, context.CorrelationId, cancellationToken);
         OperationalRecordFailure? failure = MapAcquireFailure(transition.Disposition);
         if (failure is not null)
@@ -88,7 +104,7 @@ public sealed class JiraTransferService : IJiraTransferService
         {
             return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
         }
-        if (request.RequestType is not (OperationalRecordClassification.ServerRequest or OperationalRecordClassification.SoftwareInstallation))
+        if (request.RequestType is not (OperationalRecordClassification.ServerRequest or OperationalRecordClassification.SoftwareInstallation or OperationalRecordClassification.ServerRetirement))
         {
             return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.JiraValidationFailed, "request-type", false);
         }
@@ -501,7 +517,7 @@ public sealed class JiraTransferService : IJiraTransferService
         OperationalRecord record,
         WorkflowFailureStage failureStage,
         OperationalRecordCommandContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool persistFailure = true)
     {
         OperationalRecordSourceItem? current;
         try
@@ -525,7 +541,7 @@ public sealed class JiraTransferService : IJiraTransferService
                 : null;
         if (errorCode is not null)
         {
-            OperationalRecord failed = await _repository.RecordFailureAsync(record.Id, failureStage, errorCode, false, context.Actor, context.CorrelationId, cancellationToken);
+            OperationalRecord failed = persistFailure ? await _repository.RecordFailureAsync(record.Id, failureStage, errorCode, false, context.Actor, context.CorrelationId, cancellationToken) : record;
             _ = await TryAuditAsync(AuditActions.OperationalRecordSourceChanged, failed, context, "Rejected", errorCode, cancellationToken);
             return OperationalRecordResult<OperationalRecord>.Fail(errorCode, "source-validation", false);
         }

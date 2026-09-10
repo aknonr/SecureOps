@@ -193,11 +193,18 @@ OperationalRecordView.Ownership owner =
                     <option value="">Doğrulanmadı / kapsam dışı</option>
                     <option value="ServerRequest">Sunucu Talebi</option>
                     <option value="SoftwareInstallation">Uygulama Kurulumu</option>
+                    <option value="ServerRetirement">Sunucu İadesi/Emekliliği</option>
                 </select>
-                <p>Yalnızca Sunucu Talebi ve Uygulama Kurulumu türleri doğrulanmıştır. Sunucu emekliliği gibi diğer talepler kapsam dışı incelemede kalır. Tür seçimi onay veya yayımlama uygunluğu değildir.</p>
-                @if (_declaredType is null) { <p role="status">Tür doğrulanmadan taslak hazırlanmaz. Talep bu iki türden değilse zorlamayın; kapsam kararını yetkili süreç sahibinden isteyin.</p> }
+                <p>Tür seçimi yayımlama onayı değildir. Sunucu İadesi/Emekliliği yalnız talep takibidir; altyapı silme veya kaynak kapatma yetkisi vermez.</p>
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="SDM takip gerekçesi (öneri)">@SdmEvidenceView.TrackingReason(_declaredType)</SoField>
+                    <SoField Label="İstenen iş / beklenen sonuç">@_record.Description</SoField>
+                    <SoField Label="Doğrulanmış sunucu referansı">@(_record.ServerReference ?? "Kaynakta doğrulanmış ilişki yok; açıklamadan çıkarılmaz.")</SoField>
+                </SoFieldGrid>
                 <MudButton StartIcon="@Icons.Material.Filled.Preview" Variant="Variant.Outlined" Color="Color.Primary"
                            Disabled="@(_busy || _declaredType is null)" OnClick="ReviewAsync">İnceleme taslağı hazırla</MudButton>
+                @if (!_record.SimulationMode)
+                { <MudButton StartIcon="@Icons.Material.Filled.Verified" Disabled="_busy" OnClick="ValidatePilotAsync">Onaylı tek kayıt politikasını doğrula ve önizle</MudButton> }
             </section>
         }
         else if (!_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
@@ -733,6 +740,8 @@ if (_access.Can(Capabilities.OperationalRecordsView))
 
         await LoadAsync(clearAction: false);
     }
+
+    private Task ValidatePilotAsync() { _declaredType = null; ClearReviewDraft(); return PreviewAsync(); }
 
     private void ClearReviewDraft()
     {

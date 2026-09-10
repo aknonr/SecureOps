@@ -15,6 +15,23 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class OperationalRecordsControllerTests
 {
     [Fact]
+    public async Task PositivePolicy_ProjectsCandidateButDoesNotOverrideReadOnlyFence()
+    {
+        OperationalRecord record = Record();
+        record = SdmEvaluationEvidence.Apply(record, new(SdmPilotPolicy.Fingerprint(record),
+            ProviderSupported: true, Active: true, GroupInScope: true, DccAllowed: true,
+            ValidId: true, ValidCode: true, ValidTitle: true, ValidDescription: true,
+            Category: OperationalRecordClassification.ServerRequest, RequesterPresent: true,
+            RequesterResolved: true, ReporterResolved: true, ApprovalGranted: true,
+            PolicyApproved: true, MappingComplete: true), Now);
+        OperationalRecordResponse response = await GetResponseAsync(CreateController(record, true), record.Id);
+        response.SdmCandidateRecommended.Should().BeTrue();
+        response.JiraEligible.Should().BeTrue();
+        response.ExternalWriteEligible.Should().BeFalse();
+        response.SourceFingerprint.Should().Be(SdmPilotPolicy.Fingerprint(record));
+    }
+
+    [Fact]
     public async Task GetAsync_SdmEvaluation_ExposesAdditiveNumericContractAndSafeDefaults()
     {
         OperationalRecord record = Record();

@@ -36,7 +36,9 @@ public static class SdmEvaluationEvidence
         bool changed = current.SdmEvaluation?.Result.SourceChanged == true
             || (current.SdmEvaluation is not null && current.SdmEvaluation.SourceFingerprint != input.SourceFingerprint)
             || input.SourceFingerprint != Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(current.SourceConcurrencyToken))).ToLowerInvariant();
-        SdmEvaluationResult result = SdmEvaluator.Evaluate(input with
+        if (input.PolicyApproved && input.ApprovalGranted)
+        { changed = input.SourceFingerprint != Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(current.SourceConcurrencyToken))).ToLowerInvariant(); }
+        SdmEvaluationInput checkedInput = input with
         {
             AlreadyTransferred = !string.IsNullOrWhiteSpace(current.JiraIssueKey)
                 || current.WorkflowState is OperationalRecordWorkflowState.JiraCreated
@@ -45,8 +47,9 @@ public static class SdmEvaluationEvidence
             ReconciliationRequired = current.ReconciliationRequired
                 || current.WorkflowState == OperationalRecordWorkflowState.CreatingJira,
             SourceChanged = changed,
-            EvaluationStale = changed || current.SdmEvaluation?.Result.EvaluationStale == true
-        });
+            EvaluationStale = changed || (!input.PolicyApproved && current.SdmEvaluation?.Result.EvaluationStale == true)
+        };
+        SdmEvaluationResult result = input.PolicyApproved ? SdmPilotEvaluator.Evaluate(checkedInput) : SdmEvaluator.Evaluate(checkedInput);
         if (current.SdmEvaluation?.Result.InputHash == result.InputHash)
         {
             return current;
@@ -58,10 +61,10 @@ public static class SdmEvaluationEvidence
         return current with
         {
             SdmEvaluation = new(input.SourceFingerprint, result, now),
-            JiraEligible = false,
+            JiraEligible = result.JiraEligible,
             Classification = initial ? result.RecommendedClassification : current.Classification,
-            EligibilityReason = initial ? "SDM evaluation requires review; publication is blocked." : current.EligibilityReason,
-            WorkflowState = initial ? OperationalRecordWorkflowState.NeedsManualReview : current.WorkflowState,
+            EligibilityReason = initial ? result.JiraEligible ? "Approved single-record policy; exact preview and write gates still required." : "SDM evaluation requires review; publication is blocked." : current.EligibilityReason,
+            WorkflowState = initial ? result.JiraEligible ? OperationalRecordWorkflowState.Eligible : OperationalRecordWorkflowState.NeedsManualReview : current.WorkflowState,
             UpdatedAt = now,
             Version = current.Version + 1
         };
@@ -70,7 +73,7 @@ public static class SdmEvaluationEvidence
     /// <summary>Contains only safe result evidence and internal record identity.</summary>
     public static AuditEvent Audit(OperationalRecord record, OperationalRecordCommandContext context) => new()
     {
-        Actor = "system:sdm-evaluator",
+        Actor = record.SdmEvaluation?.Result.RuleSetVersion == SdmPilotEvaluator.RuleSetVersion ? context.Actor : "system:sdm-evaluator",
         Action = AuditAction,
         CorrelationId = context.CorrelationId,
         Details = new { operationalRecordId = record.Id, record.Classification, record.JiraEligible, evaluation = record.SdmEvaluation }

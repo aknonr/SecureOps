@@ -42,9 +42,11 @@ public sealed record OperationalRecordResponse(
     public bool SourceCloseRequested { get; init; }
     /// <summary>Whether the current deployment permits source-close dispatch below global fences.</summary>
     public bool SourceCloseEnabled { get; init; }
+    /// <summary>Current stored source digest for exact-version policy review; not an authorization token.</summary>
+    public string? SourceFingerprint { get; init; }
     /// <summary>Nullable recommendation; null means no durable SDM evaluation.</summary>
     public OperationalRecordClassification? RecommendedClassification { get; init; }
-    /// <summary>Always false until a positive category policy is approved.</summary>
+    /// <summary>Stored policy recommendation, independent of actor capability and deployment activation.</summary>
     public bool SdmCandidateRecommended { get; init; }
     /// <summary>Nullable immutable evaluation policy identifier.</summary>
     public string? RuleSetVersion { get; init; }

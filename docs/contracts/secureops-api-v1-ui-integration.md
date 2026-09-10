@@ -1,5 +1,18 @@
 # SecureOps API v1 UI Integration Contract
 
+## Bounded SDM Pilot, rc6.15
+
+Classification adds ServerRetirement=7 without renumbering v1 values; review-only
+tracking, never decommissioning. Record responses add `sourceFingerprint`, the
+current stored source digest for exact-version policy review, not an approval token.
+Existing preview/create capabilities, confirmation fingerprints and command routes
+remain. Empty `OperationalRecords:Pilot` fails closed. ADR-0018 defines the proposed
+server-owned one-record policy; only ServerRequest has an evaluable positive path.
+Schema 013 is required for its persisted evidence. Existing v1 remains negative.
+Requester and authenticated Jira reporter are separately resolved; source Reporter
+is not inferred. UI reason suggestions do not authorize publication. No new source
+query keys or remote reconciliation/search contract is introduced.
+
 ## In Use Relationship Evidence, 2026-09-10
 
 Workflow follow-up: assignment is optional for approved View+Review actors;

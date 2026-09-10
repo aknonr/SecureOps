@@ -36,7 +36,7 @@ const out = path.resolve(process.argv[6]);
     async function detail(record) {
         await navigate(page, ui, 'operational-records/' + record.id);
         await page.getByRole('heading', { name: record.orCode, exact: true }).waitFor();
-        await page.getByRole('heading', { name: 'Jira aktarımı', exact: true }).waitFor();
+        await page.getByRole('heading', { name: 'Talep incelemesi', exact: true }).waitFor();
     }
     async function previewAndConfirm(record, name) {
         await detail(record);
@@ -96,7 +96,7 @@ const out = path.resolve(process.argv[6]);
 
         await role(['Operator']);
         await detail(blocked);
-        for (const [label, name] of [['Sunucu Talebi', 'server'], ['Uygulama Kurulumu', 'installation']]) {
+        for (const [label, name] of [['Sunucu Talebi', 'server'], ['Uygulama Kurulumu', 'installation'], ['Sunucu İadesi/Emekliliği', 'retirement']]) {
             const select = page.getByRole('combobox', { name: 'Talep türü (operatör beyanı)', exact: true });
             await select.focus();
             assert.equal(await select.evaluate(e => e === document.activeElement), true);
@@ -116,11 +116,11 @@ const out = path.resolve(process.argv[6]);
         query(database, `UPDATE ops.OperationalRecords SET UpdatedAt=DATEADD(second,1,UpdatedAt) WHERE OperationalRecordId='${blocked.id}'`);
         await page.getByRole('button', { name: 'İnceleme taslağı hazırla', exact: true }).click();
         await page.getByText('Kaynak kayıt değişmiş', { exact: true }).waitFor();
-        assert.equal(await page.getByRole('combobox', { name: 'Talep türü (operatör beyanı)', exact: true }).inputValue(), 'SoftwareInstallation');
+        assert.equal(await page.getByRole('combobox', { name: 'Talep türü (operatör beyanı)', exact: true }).inputValue(), 'ServerRetirement');
         await capture(page, out, 'review-version-conflict');
         await page.getByRole('button', { name: 'İnceleme taslağı hazırla', exact: true }).click();
         await page.getByText('Bu inceleme taslağı yayımlanamaz.', { exact: true }).waitFor();
-        checks.push('Both declarations render; choice changes invalidate draft; blockers remain and Operator cannot publish');
+        checks.push('Three declarations render; choice changes invalidate draft; blockers remain and Operator cannot publish');
         checks.push('Real SQL version conflict preserves declaration; fresh review recovers without publication');
 
         await role(['JiraPublisher']);

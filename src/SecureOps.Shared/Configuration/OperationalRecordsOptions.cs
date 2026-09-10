@@ -26,4 +26,6 @@ public sealed class OperationalRecordsOptions
 
     /// <summary>Independent default-off source-close dispatch gate; never grants write permission.</summary>
     public bool SourceCloseEnabled { get; set; }
+    /// <summary>Default-empty single-record policy proposal; never an external-write activation gate.</summary>
+    public SdmPilotOptions Pilot { get; set; } = new();
 }

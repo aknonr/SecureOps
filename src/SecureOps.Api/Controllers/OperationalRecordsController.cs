@@ -28,6 +28,7 @@ public sealed class OperationalRecordsController : ControllerBase
     private readonly TimeProvider _timeProvider;
     private readonly bool _simulationMode;
     private readonly bool _readOnlyIntegrationMode;
+    private readonly bool _controlledTestWritesEnabled;
     private readonly bool _sourceCloseEnabled;
 
     /// <summary>Initializes the controller.</summary>
@@ -44,6 +45,7 @@ public sealed class OperationalRecordsController : ControllerBase
         _commandOptions = commandOptions.Value;
         _timeProvider = timeProvider;
         _readOnlyIntegrationMode = operationalOptions.Value.ReadOnlyIntegrationMode;
+        _controlledTestWritesEnabled = operationalOptions.Value.ControlledTestWritesEnabled;
         _sourceCloseEnabled = operationalOptions.Value.SourceCloseEnabled && !_readOnlyIntegrationMode;
         _simulationMode = string.Equals(
                 operationalOptions.Value.SourceProvider,
@@ -147,8 +149,12 @@ public sealed class OperationalRecordsController : ControllerBase
             mapping.RequesterWatcherCustomField,
             mapping.Labels,
             draft.SourceCloseRequested)
-        { RequestType = draft.RequestType, ReviewOnly = draft.ReviewOnly,
-            BlockingConditions = draft.BlockingConditions, RecordVersion = draft.RecordVersion };
+        {
+            RequestType = draft.RequestType,
+            ReviewOnly = draft.ReviewOnly,
+            BlockingConditions = draft.BlockingConditions,
+            RecordVersion = draft.RecordVersion
+        };
     }
 
     /// <summary>Explicitly creates Jira and then closes/updates the source record.</summary>
@@ -299,17 +305,19 @@ public sealed class OperationalRecordsController : ControllerBase
         _readOnlyIntegrationMode,
         ReadOnlyNotice())
     {
+        SourceFingerprint = SdmPilotPolicy.Fingerprint(record),
         RecommendedClassification = record.SdmEvaluation?.Result.RecommendedClassification,
         SourceCloseRequested = record.SourceCloseRequested,
         SourceCloseEnabled = _sourceCloseEnabled,
-        SdmCandidateRecommended = false,
+        SdmCandidateRecommended = record.SdmEvaluation?.Result.SdmCandidateRecommended == true,
         RuleSetVersion = record.SdmEvaluation?.Result.RuleSetVersion,
         ReasonCodes = record.SdmEvaluation?.Result.ReasonCodes ?? [],
         EvaluatedAt = record.SdmEvaluation?.EvaluatedAt,
         EvaluationStale = record.SdmEvaluation?.Result.EvaluationStale ?? true,
         SourceChanged = record.SdmEvaluation?.Result.SourceChanged ?? false,
         BlockingConditions = record.SdmEvaluation?.Result.BlockingConditions ?? [],
-        ExternalWriteEligible = false
+        ExternalWriteEligible = record.SdmEvaluation?.Result.ExternalWriteEligible == true
+            && !_readOnlyIntegrationMode && _controlledTestWritesEnabled
     };
 
     private bool IsRetryEligible(OperationalRecord record) =>
@@ -351,7 +359,7 @@ public sealed class OperationalRecordsController : ControllerBase
         OperationalRecordWorkflowState.Completed => OperationalRecordPresentationStates.Completed,
         OperationalRecordWorkflowState.JiraCreated when !record.SourceCloseRequested
             && record.JiraIssueKey is not null && !record.ReconciliationRequired => OperationalRecordPresentationStates.SourceOpen,
-        OperationalRecordWorkflowState.Eligible or OperationalRecordWorkflowState.Previewed =>
+        OperationalRecordWorkflowState.Eligible or OperationalRecordWorkflowState.Previewed when record.JiraEligible =>
             OperationalRecordPresentationStates.Actionable,
         OperationalRecordWorkflowState.CreateRequested or
         OperationalRecordWorkflowState.CreatingJira or

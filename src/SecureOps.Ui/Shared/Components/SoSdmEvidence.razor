@@ -14,7 +14,9 @@
         </SoFieldGrid>
         @if (Record.BlockingConditions.Count > 0)
         {
-            <h3 class="so-subhead">İnceleme gerektiren koşullar</h3>
+            <h3 class="so-subhead">Eksik kaynak bilgisi</h3>
+            <ul>@foreach (string code in Record.ReasonCodes.Where(c => c is "RequesterMissing" or "InvalidTitle" or "InvalidDescription" or "InfrastructureReferenceMissing")) { <li>@SdmEvidenceView.Guidance(code)</li> }</ul>
+            <h3 class="so-subhead">Yayımlama koşulları ve engeller</h3>
             <ul class="so-warning-list">
                 @foreach (string guidance in Record.BlockingConditions.Select(SdmEvidenceView.Guidance).Distinct(StringComparer.Ordinal))
                 {

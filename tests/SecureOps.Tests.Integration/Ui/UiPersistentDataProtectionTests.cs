@@ -1,5 +1,8 @@
 using FluentAssertions;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Ui.Hosting;
@@ -8,6 +11,57 @@ namespace SecureOps.Tests.Integration.Ui;
 
 public sealed class UiPersistentDataProtectionTests
 {
+    [Theory]
+    [InlineData("Ephemeral", false, false)]
+    [InlineData("FileSystemDpapi", false, true)]
+    [InlineData("FileSystemDpapi", true, false)]
+    public async Task Antiforgery_RestartRequiresPersistentKeysAndStableApplication(string mode, bool differentApplication, bool valid)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"secureops-csrf-{Guid.NewGuid():N}");
+        WebApplication Host(string application)
+        {
+            WebApplicationBuilder builder = WebApplication.CreateBuilder();
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DataProtection:Mode"] = mode,
+                ["DataProtection:ApplicationName"] = application,
+                ["DataProtection:KeyRingPath"] = path
+            });
+            builder.Services.AddSecureOpsUiDataProtection(builder.Configuration);
+            builder.Services.AddAntiforgery(o => { o.HeaderName = "X-Synthetic-Csrf"; o.Cookie.Name = "__Host-SecureOpsUi.AntiForgery"; o.Cookie.SecurePolicy = CookieSecurePolicy.Always; });
+            return builder.Build();
+        }
+        try
+        {
+            await using WebApplication first = Host("Synthetic.Ui");
+            var issuedContext = new DefaultHttpContext { RequestServices = first.Services };
+            issuedContext.Request.Scheme = "https";
+            AntiforgeryTokenSet tokens = first.Services.GetRequiredService<IAntiforgery>().GetAndStoreTokens(issuedContext);
+            await using WebApplication restarted = Host(differentApplication ? "Synthetic.Other" : "Synthetic.Ui");
+            var request = new DefaultHttpContext { RequestServices = restarted.Services };
+            request.Request.Scheme = "https";
+            request.Request.Method = "POST";
+            request.Request.Headers.Cookie = $"__Host-SecureOpsUi.AntiForgery={tokens.CookieToken}";
+            request.Request.Headers["X-Synthetic-Csrf"] = tokens.RequestToken;
+            Func<Task> validate = () => restarted.Services.GetRequiredService<IAntiforgery>().ValidateRequestAsync(request);
+            if (valid)
+            {
+                await validate.Should().NotThrowAsync();
+            }
+            else
+            {
+                await validate.Should().ThrowAsync<AntiforgeryValidationException>();
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, true);
+            }
+        }
+    }
+
     [Fact]
     public void PersistentKeyRing_SurvivesUiProviderRecreation()
     {

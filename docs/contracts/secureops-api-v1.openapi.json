@@ -10347,7 +10347,8 @@
           3,
           4,
           5,
-          6
+          6,
+          7
         ],
         "type": "integer",
         "format": "int32"
@@ -10513,6 +10514,10 @@
           "sourceCloseEnabled": {
             "type": "boolean"
           },
+          "sourceFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
           "recommendedClassification": {
             "enum": [
               0,
@@ -10522,6 +10527,7 @@
               4,
               5,
               6,
+              7,
               null
             ],
             "type": "integer",

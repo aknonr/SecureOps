@@ -5,6 +5,30 @@
 
 ## Decision
 
+### Bounded Pilot Policy Proposal, 2026-09-10
+
+Implementation is authorized; corporate policy acceptance/activation is NOT.
+Proposed `WASAS-SDM-PILOT-2026.09-v1`: approve exactly one numeric source ID,
+its SHA-256 source fingerprint, exact configured source scope, mapping version,
+expiry and decision reference in server-owned configuration. A type selection or
+prose cannot grant eligibility. Only ServerRequest uses the evidenced mapping;
+SoftwareInstallation and appended ServerRetirement=7 remain mapping-blocked.
+Retirement means request tracking, never decommissioning. No second approver is
+invented. Source/current-content, exact requester and authenticated reporter,
+capabilities, archive-independent Jira linkage/claims and write fences still apply.
+Policy changes are part of the preview fingerprint and rechecked before create.
+Positive evaluation is persisted through existing transactional evaluation/audit.
+Configuration defaults empty: no corporate record becomes eligible on upgrade.
+The v1 evaluator remains the default; stored v1 results cannot acquire eligibility
+by deserialization. Migration 013 replaces the 009 negative-only CHECK in a
+transaction; existing runtime grants suffice. No applied migration is rewritten.
+
+Business decision required: accept this exact one-record tracking-only rule,
+including optional structured server references, or specify which missing
+information must block it. Type-specific mappings, searchable remote correlation
+and create-result acceptance remain separate evidence requirements. No remote
+exactly-once or unknown-create search contract is claimed.
+
 `WASAS-SDM-2026.09-v1` separates recommendation, human approval, Jira publication readiness, and external-write eligibility. This bounded Operational Record milestone does not activate the Phase 6 analysis engine.
 
 V1 has no positive category policy. Current seven-cell corporate records remain `NeedsManualReview`, `JiraEligible=false`, and `SdmCandidateRecommended=false`. Existing enums and workflow states stay frozen. `CategorySupported` means a recognized category enum, not approved SDM policy; `CategoryPolicyPending` always blocks publication.

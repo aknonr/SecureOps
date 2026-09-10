@@ -26,6 +26,13 @@ sql/
 | 010 | Shared resource categories/links, owner-scoped versioned personal preferences, and unassigned ResourceCurator role seed; requires 001-009 |
 | 011 | Default-off durable source-close intent on JiraTransfers; requires 001-010; legacy transfers remain source-open |
 | 012 | Independent local In Use records/refresh state; unassigned role seeds 8 InUseReviewer and 9 InUseCoordinator; requires 001-011 |
+| 013 | Transactional SDM evidence CHECK replacement admits the exact positive pilot policy version; requires 001-012; no new objects, columns, roles or runtime grants |
+
+013 uses `migrations/013-sdm-pilot-policy.sql` in SQLCMD mode. Existing NULL/v1
+evidence and append-only triggers remain untouched; WITH CHECK validates stored
+rows. DBA DDL identity only. No runtime DDL is needed. Older writers can invalidate
+positive evidence or drop additive In Use JSON metadata; downgrade is not a proven
+compatible write path. Keep recovery points and suspend writes before rollback.
 
 In Use V1 requires 012 only when using SQL persistence. Runtime delta:
 `GRANT SELECT, INSERT, UPDATE ON OBJECT::ops.InUseRecords TO [approved_runtime_principal];`

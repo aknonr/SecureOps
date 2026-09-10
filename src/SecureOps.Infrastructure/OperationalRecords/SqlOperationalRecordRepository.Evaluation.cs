@@ -24,13 +24,13 @@ public sealed partial class SqlOperationalRecordRepository
             // The SQL audit insert shares the transaction; a queued writer cannot make this atomic.
             const string sql = """
                 UPDATE ops.OperationalRecords SET SdmEvaluationJson = @Evidence, Classification = @Classification,
-                    JiraEligible = 0, EligibilityReason = @EligibilityReason, WorkflowState = @State,
+                    JiraEligible = @JiraEligible, EligibilityReason = @EligibilityReason, WorkflowState = @State,
                     CorrelationId = @CorrelationId, UpdatedAt = @EvaluatedAt WHERE OperationalRecordId = @Id;
                 INSERT INTO ops.OperationalRecordWorkflowHistory
                     (OperationalRecordId, WorkflowState, Actor, CorrelationId, OccurredAt, SdmEvaluationJson)
-                VALUES (@Id, @State, 'system:sdm-evaluator', @CorrelationId, @EvaluatedAt, @Evidence);
+                VALUES (@Id, @State, @Actor, @CorrelationId, @EvaluatedAt, @Evidence);
                 INSERT INTO audit.AuditLog (OccurredAt, Actor, Action, CorrelationId, DetailsJson)
-                VALUES (@EvaluatedAt, 'system:sdm-evaluator', @Action, @CorrelationId, @Details);
+                VALUES (@EvaluatedAt, @Actor, @Action, @CorrelationId, @Details);
                 """;
             await connection.ExecuteAsync(Command(sql, new
             {
@@ -38,6 +38,8 @@ public sealed partial class SqlOperationalRecordRepository
                 Evidence = SdmEvaluationEvidence.Serialize(evaluated.SdmEvaluation!),
                 Classification = evaluated.Classification.ToString(),
                 evaluated.EligibilityReason,
+                evaluated.JiraEligible,
+                Actor = SdmEvaluationEvidence.Audit(evaluated, context).Actor,
                 State = evaluated.WorkflowState.ToString(),
                 context.CorrelationId,
                 evaluated.SdmEvaluation!.EvaluatedAt,

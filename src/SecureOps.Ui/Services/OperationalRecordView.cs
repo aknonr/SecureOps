@@ -31,20 +31,24 @@ public static class OperationalRecordView
 {
     /// <summary>Describes authoritative uncertainty before the persisted workflow stage.</summary>
     public static string StateLabel(OperationalRecordResponse record) =>
-        OutcomeUnknown(record) ? "Jira sonucu belirsiz" : StateLabel(record.WorkflowState);
+        OutcomeUnknown(record) ? "Jira sonucu belirsiz" : StateLabel(CurrentStage(record));
 
     /// <summary>Uncertain outcomes need reconciliation, not a definitive failure indicator.</summary>
     public static SoStatusBadge.BadgeTone StateTone(OperationalRecordResponse record) =>
-        OutcomeUnknown(record) ? SoStatusBadge.BadgeTone.Caution : StateTone(record.WorkflowState);
+        OutcomeUnknown(record) ? SoStatusBadge.BadgeTone.Caution : StateTone(CurrentStage(record));
 
     /// <summary>Provides a matching non-colour signal for uncertain outcomes.</summary>
     public static string StateIcon(OperationalRecordResponse record) =>
-        OutcomeUnknown(record) ? Icons.Material.Filled.HelpOutline : StateIcon(record.WorkflowState);
+        OutcomeUnknown(record) ? Icons.Material.Filled.HelpOutline : StateIcon(CurrentStage(record));
 
     /// <summary>Does not describe an unconfirmed publication as a known failure.</summary>
     public static string? StateDetail(OperationalRecordResponse record) =>
         OutcomeUnknown(record) ? "Jira sonucu doğrulanamadı. Yeni kayıt oluşturmadan önce mutabakat gerekir."
-            : StateDetail(record.WorkflowState);
+            : StateDetail(CurrentStage(record));
+
+    private static OperationalRecordWorkflowState CurrentStage(OperationalRecordResponse record) =>
+        !record.JiraEligible && record.WorkflowState is OperationalRecordWorkflowState.Eligible or OperationalRecordWorkflowState.Previewed
+            ? OperationalRecordWorkflowState.NeedsManualReview : record.WorkflowState;
 
     /// <summary>
     /// What the operator may do with a record, according to authoritative state alone.

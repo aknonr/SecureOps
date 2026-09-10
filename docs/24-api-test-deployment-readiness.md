@@ -1,5 +1,110 @@
 # API TEST Deployment Readiness
 
+<!-- TEST-RELEASE-RUNBOOK:START -->
+## Birleşik TEST Teslimatı, rc6.15 (2026-09-10)
+
+Teslimat kökü `C:\SecureOpsBuild\release\2026-09-10-pilot-rc6.15`.
+Bu bölüm önceki rc6.14 ve kaynak-only notlarının güncel devamıdır. Kurulum ve
+kurumsal yazma onayı değildir. Kesin build SHA, boyut, sürüm ve SHA-256 değerleri
+`release-metadata.json`, `release-artifacts.sha256`, `manifests/*-files.json` ve
+`*-payload.sha256` içindedir. Son belge HEAD'i build SHA'dan ayrı tutulur.
+API/UI aynı net8.0 / FileVersion 0.1.0.0 build'idir; eski API ile yeni UI desteklenmez.
+
+### İlk İşlem ve Kurulum Sırası
+
+1. İlk işlem yalnız salt okunur envanterdir: gerçek API/UI hedefi, kurulu assembly
+   ProductVersion/hash, mevcut config ve özel dizinlerin yedek referansı, DBA'nın
+   doğruladığı nesne/constraint/trigger/grant listesi değişiklik kaydına yazılır.
+   Tarihsel ekran görüntüsü tam şema kanıtı değildir. Ayrı kurulum onayı yoksa durun.
+2. `Get-FileHash -Algorithm SHA256 -LiteralPath '<teslim alınan ZIP yolu>'` ile
+   üç arşivi, açılan dosyaları manifestlerle karşılaştırın. Hash farkında durun.
+   Runtime'a yalnız API/UI payload gider; DBA/runbook/metadata/evidence/staging gitmez.
+3. Binary/config, SQL recovery point, In Use özel arşivi ve Data Protection ring
+   yedeklerini doğrulayın. Geri dönüşte eski yazarlar additive JSON alanlarını
+   kaybedebilir veya pozitif değerlendirmeyi bozabilir. Eski binary+013 yazma
+   uyumluluğu kanıtlanmadı. Önce yerel/dış yazmaları durdurun; audit veya 012
+   tablolarını silmeyin. SQL restore veri kaybı riskiyle ayrı DBA kararıdır.
+4. DBA SQLCMD mode ve `-I` ile, `sql/migrations` dizininden yalnız eksikleri uygular:
+   **012 tamamen doğrulanmışsa yalnız `013-sdm-pilot-policy.sql`; 011 ise 012 ve 013.**
+   DBA ZIP 001-013 zinciridir. 001/002/012 körlemesine yeniden çalıştırılmaz.
+   013 transaction içinde `ops.OperationalRecords` üzerindeki
+   `CK_OperationalRecords_SdmEvaluation` kısıtını WITH CHECK ile değiştirir;
+   yeni tablo/kolon/rol/veri güncellemesi yoktur. Hata halinde otomatik repair yoktur.
+5. Yeni runtime grant yoktur. 012 izinleri: `ops.InUseRecords` SELECT/INSERT/UPDATE;
+   `ops.InUseRefresh` SELECT/UPDATE. Refresh Id=1/Version=0 satırını 012 oluşturur;
+   runtime INSERT etmez. Eksik satırda izin genişletmeyin. Mevcut ops kayıt/transfer/
+   command SELECT/INSERT/UPDATE, workflow history ve audit INSERT, access/reporting
+   ve resources izinleri canonical Database Contract ile doğrulanır. DELETE, DDL,
+   db_owner, audit UPDATE/DELETE verilmez. DBA DDL kimliği runtime'dan ayrıdır.
+6. `InUseReports:Directory` için mutlak, deployment/webroot dışında özel dizin
+   hazırlığı gerekir. API işlem kimliğine okuma/listeleme, dosya/dizin oluşturma,
+   yazma ve atomic move için gerekli sınırlı dizin ACL'si verilir; UI/IIS static
+   erişimi açılmaz. Reparse-point kullanılmaz. Aynı OR/sürüm tek immutable JSON
+   envelope içinde XLSX+aktör/zaman/boyut/hash tutar; eski raporlar silinmez.
+   Arşivlenmiş olmak Turuncu Hat'a eklenmiş olmak değildir.
+7. API/UI için ayrı kalıcı `DataProtection:KeyRingPath`, sabit `ApplicationName`
+   ve `Mode=FileSystemDpapi` (tek Windows host) veya mevcut onaylı sertifika modu
+   korunur. Her işlem kimliği yalnız kendi ring'ine gerekli erişimi alır.
+   DPAPI makineye bağlıdır; çok host/LB taşınabilirliği varsayılmaz. Ring, kimlik,
+   uygulama adı, HTTPS ve `__Host-` cookie kapsamı doğrulanır; sır/key içeriği alınmaz.
+   Eski ephemeral cookie/token için yeniden giriş gerekir; antiforgery kapatılmaz.
+8. Ayrı kurulum penceresinde API, sağlık/sürüm/auth kontrolü, sonra eşleşen UI.
+   `web.config`, `appsettings*.json`, server-owned secrets, ring, log ve rapor dizini
+   korunur. IIS environment değişiklikleri ayrı inceleme konusudur; web.config JSON
+   değildir. Bu görev deployment yapmaz.
+
+### Salt Okunur Kabul
+
+- Mevcut provider/session ayarları korunur. `ReadOnlyIntegrationMode=true`,
+  `ControlledTestWritesEnabled=false`, `SourceCloseEnabled=false` kalır.
+  `OperationalRecords:Pilot` varsayılan boş/kapalıdır; yeni onay kaydı teslim edilmez.
+- Resources.View olan non-admin kişisel grup oluşturur/kaydeder/sıralar/açar;
+  başka kişinin API verisine erişemez. Shared yönetim Resources.Manage ister.
+  Üç kontrollü link site popup izniyle üç hedef açar; default/managed engelde ayrı
+  native linkler kullanılır. Açma isteği hedefe giriş başarısı değildir.
+- InUseReviewer View/Review; InUseCoordinator ve Admin ayrıca Assign/Refresh.
+  Eski Operator/Lead otomatik In Use hakkı almaz. Atama opsiyoneldir; üç cevap,
+  seçilmiş sunuculara fark önizlemeli toplu uygulama, eksik taslak, çatışma ve
+  sürüme bağlı preview/arşiv denenir. Direkt route/API yetki reddi doğrulanır.
+  Yönetim panosu ayrıca Reporting.ManagementView ister; sayımlar OR bazındadır.
+- Gerçek 15 alanlı servis öğesi projeksiyonu desteklenir; gözlenen adet global
+  tamlık değildir. RFC/Virtual PC User/Reporter/teknik creator/Affected Assets ve
+  In Use kaynak açılış/durum eşlemeleri doğrulanmadıkça bilinmiyor kalır.
+  Kurumsal Excel şablon kabulü, kaynak upload/kapanış ve RFC sahipliği operasyonel
+  değildir. Yerel completion journal dış yazı göndermez.
+
+### Ayrı Tek Kayıt Jira-only Pilotu
+
+Pozitif kod vardır; iş kararı ve aktivasyon yoktur. Somut öneri ADR-0018:
+yalnız Sunucu Talebi, bir sayısal OR, exact kaynak hash/kapsam/mapping sürümü,
+süreli karar ve gerekçe; yapılandırılmış sunucu referansı destekleyici/opsiyonel.
+İş sahibi bu kuralı kabul etmeli veya zorunlu ek bilgi koşulunu somutlaştırmalıdır.
+Tür beyanı/free text onay değildir; ikinci onaycı kuralı eklenmemiştir.
+
+Server-owned `OperationalRecords:Pilot` alanları: `RuleSetVersion` =
+`WASAS-SDM-PILOT-2026.09-v1`, `ApprovalReference`, `TrackingReason`, `SourceRecordId`,
+`SourceFingerprint`, `SourceScope`, `MappingVersion`, `ExpiresAt` (UTC),
+`RequestType=ServerRequest`. Hash yetkili kayıt detail API'sinin `sourceFingerprint`
+alanıdır; token/sır değildir. Kapsam `SMSS_oRFF:<RelatedGroupId>:<sıralı ExcludedDccIds>`;
+4241 hariç tutulmalıdır. Aktiflik/kapsam mevcut exact-ID kaynak sorgu filtresinden
+gelir, yeni response alanı varsayılmaz. Kaynak değişirse karar yeniden ele alınır.
+
+Kalan kanıt: mevcut Jira proje/issueTypeId/team/requester-watcher/label mapping
+sürümü, requester ve authenticated-operator reporter exact hesap çözümü ve create
+response sözleşmesi TEST'te doğrulanmalı. Uygulama Kurulumu ve İade için ayrı
+mapping eksik; pozitif yayın kapalıdır. Kaynak Reporter alanı tahmin edilmez.
+JiraPublisher capability ve ayrı bir-record aktivasyon onayı gerekir; In Use beklenmez.
+Onay sonrasında akış: güncel kaynak -> yetkili `jira-preview` -> içerik/fingerprint
+ve kaynak açık kalacak uyarısı -> açık create onayı -> persisted intent -> Jira key.
+SourceCloseEnabled false ve In Use dış adımları kapalı kalır.
+Timeout/key-persistence belirsizliğinde create tekrarlanmaz. Bilinen en fazla iki
+Jira key için mevcut onaylı salt okunur kontrol, `turuncu-hat-jira-contract-gaps.md`
+kapsamında yapılır. Bilinmeyen key'i arayan doğrulanmış uzak correlation sözleşmesi
+yoktur; source OR kodunun summary'de olması unique arama/absence kanıtı değildir.
+Bu sözleşme için sistem sahibinin dar arama alanı/semantiği ve temizlenmiş örneği
+gerekir; otomatik reconciliation çözümü veya exactly-once iddiası yoktur.
+<!-- TEST-RELEASE-RUNBOOK:END -->
+
 ## Resources Pre-Package Source Correction, 2026-09-10
 
 The canonical UI README records actual three-target popup-policy reproduction,

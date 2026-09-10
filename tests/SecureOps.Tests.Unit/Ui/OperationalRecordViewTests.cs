@@ -20,6 +20,16 @@ public sealed class OperationalRecordViewTests
     private const string Other = "demo:team-lead";
 
     [Theory]
+    [InlineData(OperationalRecordWorkflowState.Eligible)]
+    [InlineData(OperationalRecordWorkflowState.Previewed)]
+    public void InvalidatedEligibility_DoesNotKeepAnActionableBadge(OperationalRecordWorkflowState state)
+    {
+        OperationalRecordResponse record = Record(state, eligible: false);
+        Assert.Equal(OperationalRecordView.StateLabel(OperationalRecordWorkflowState.NeedsManualReview), OperationalRecordView.StateLabel(record));
+        Assert.False(OperationalRecordView.ActionsFor(record).Create);
+    }
+
+    [Theory]
     [InlineData(OperationalRecordWorkflowState.JiraCreateFailed)]
     [InlineData(OperationalRecordWorkflowState.CreatingJira)]
     [InlineData(OperationalRecordWorkflowState.Eligible)]

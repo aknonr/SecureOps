@@ -374,6 +374,37 @@ not the historical blocker list above; the hidden-membership and environment con
 
 ### Resources Pre-Package Correction, 2026-09-10
 
+#### Consolidated TEST Continuation, rc6.15
+
+Canonical installation/pilot procedure: the first rc6.15 section of
+`docs/24-api-test-deployment-readiness.md`; export markers feed the paired-release
+script. This supersedes older "do not package" source-only notes, not their
+historical evidence. Resources improvements and stored In Use overview/local
+completion journal are included; RFC ownership and real source completion are not.
+SDM now has three review declarations and separately labelled reason suggestion,
+source work/outcome, missing facts and specific blockers. Server-owned, exact
+single-record policy can produce positive ServerRequest preview; default empty
+policy and unchanged write fences keep corporate publication disabled. Retirement
+and application installation remain mapping-blocked. Schema 013, no new grants.
+
+Verification source: current task starts at `dbd09219ebf88e326462fb8d34affea50302acd4`.
+Targeted unit 345; API/OpenAPI/DP 43 (four isolated SQL tests intentionally skipped
+in that host-only run); isolated 001-013 harness passes 17 tests for upgrade, evaluation/audit
+rollback, constraints and workflow persistence. Published loopback SQL/Simulation
+journeys cover three review types, direct API denial, conflict preservation,
+confirmation double-click, Jira-only linkage and unknown-result no-retry; In Use
+after/mapped/progress cover desktop/mobile, themes, archive and local completion.
+Evidence root: `C:\SecureOpsBuild\validation\sdm-delivery-20260910\browser`.
+No corporate call, real VDI, deployment or source-write acceptance is claimed.
+
+Antiforgery reproduction: provider restart with Ephemeral rejects the previous
+token; FileSystemDpapi with the same application/ring validates; different app
+identity rejects. Six DP tests pass, no antiforgery weakening. Published persistent
+hosts pass login and all journeys. Five fresh-circuit refreshes completed in
+188-266 ms without page errors; earlier timeout did not recur. Its historical root
+cause remains unproven, not declared a corporate outage or product regression.
+
+
 Start local/live HEAD: `b4910ad045c688eaeb148c5d5b93d255330c9142`, same feature
 branch. This is the explicitly requested bounded Resources increment. The prior
 In Use increment (692 lines) and its unfinished backlog below remain separate;

@@ -15,18 +15,21 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
     private readonly IIdentityAccountNormalizer _identityNormalizer;
     private readonly JiraIntegrationOptions _options;
     private readonly OperationalRecordsOptions _operationalOptions;
+    private readonly TuruncuHatOptions _sourceOptions;
 
     /// <summary>Initializes the draft service.</summary>
     public JiraIssueDraftService(
         IJiraUserResolver jiraUserResolver,
         IIdentityAccountNormalizer identityNormalizer,
         IOptions<JiraIntegrationOptions> options,
-        IOptions<OperationalRecordsOptions>? operationalOptions = null)
+        IOptions<OperationalRecordsOptions>? operationalOptions = null,
+        IOptions<TuruncuHatOptions>? sourceOptions = null)
     {
         _jiraUserResolver = jiraUserResolver;
         _identityNormalizer = identityNormalizer;
         _options = options.Value;
         _operationalOptions = operationalOptions?.Value ?? new();
+        _sourceOptions = sourceOptions?.Value ?? new();
     }
 
     /// <inheritdoc />
@@ -35,7 +38,18 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
         string actor,
         CancellationToken cancellationToken)
     {
-        if (record.Classification == OperationalRecordClassification.SoftwareInstallation)
+        if (string.Equals(_operationalOptions.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
+        {
+            if (SdmPilotPolicy.Blockers(record, _operationalOptions, _options, _sourceOptions, DateTimeOffset.UtcNow).Count > 0)
+            { return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.JiraValidationFailed, "pilot-policy", false); }
+            record = record with
+            {
+                Classification = _operationalOptions.Pilot.RequestType!.Value,
+                JiraEligible = true,
+                WorkflowState = record.WorkflowState == OperationalRecordWorkflowState.NeedsManualReview ? OperationalRecordWorkflowState.Eligible : record.WorkflowState
+            };
+        }
+        if (record.Classification is OperationalRecordClassification.SoftwareInstallation or OperationalRecordClassification.ServerRetirement)
         {
             return OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.JiraValidationFailed, "application-mapping", false);
         }
@@ -118,6 +132,7 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
         string idempotencyMapping = JsonSerializer.Serialize(new
         {
             FingerprintVersion = "reviewed-draft-v3",
+            Pilot = string.Equals(_operationalOptions.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase) ? _operationalOptions.Pilot : null,
             SourceCloseRequested = _operationalOptions.SourceCloseEnabled && !_operationalOptions.ReadOnlyIntegrationMode,
             record.SourceConcurrencyToken,
             Summary = summary,
@@ -154,7 +169,7 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
     /// <inheritdoc />
     public JiraIssueDraft BuildReview(OperationalRecord record, OperationalRecordClassification requestType)
     {
-        if (requestType is not (OperationalRecordClassification.ServerRequest or OperationalRecordClassification.SoftwareInstallation))
+        if (requestType is not (OperationalRecordClassification.ServerRequest or OperationalRecordClassification.SoftwareInstallation or OperationalRecordClassification.ServerRetirement))
         {
             throw new ArgumentOutOfRangeException(nameof(requestType));
         }
@@ -162,6 +177,17 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
         SortedSet<string> blockers = new(record.SdmEvaluation?.Result.BlockingConditions ?? [], StringComparer.Ordinal)
         { "CategoryPolicyPending", "OperatorDeclarationOnly", "RequesterUnresolved", "ReporterUnresolved" };
         bool installation = requestType == OperationalRecordClassification.SoftwareInstallation;
+        bool retirement = requestType == OperationalRecordClassification.ServerRetirement;
+        if (retirement)
+        {
+            blockers.Add("RetirementMappingPending");
+        }
+
+        if (string.Equals(_operationalOptions.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
+        {
+            blockers.UnionWith(SdmPilotPolicy.Blockers(record, _operationalOptions, _options, _sourceOptions, DateTimeOffset.UtcNow));
+        }
+
         if (string.IsNullOrWhiteSpace(_options.IssueTypeId) || string.IsNullOrWhiteSpace(_options.TeamCustomField)
             || string.IsNullOrWhiteSpace(_options.TeamValue) || string.IsNullOrWhiteSpace(_options.RequesterWatcherCustomField)
             || (!installation && _options.Labels.Length == 0))
@@ -175,7 +201,7 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
         (string summary, string description) = Content(record);
         bool close = _operationalOptions.SourceCloseEnabled && !_operationalOptions.ReadOnlyIntegrationMode;
         JiraIssueFieldMapping mapping = new(_options.IssueTypeId, _options.TeamCustomField, _options.TeamValue,
-            _options.RequesterWatcherCustomField, installation ? [] : Array.AsReadOnly((string[])_options.Labels.Clone()));
+            _options.RequesterWatcherCustomField, installation || retirement ? [] : Array.AsReadOnly((string[])_options.Labels.Clone()));
         string fingerprint = OperationalRecordIdempotency.Create(record.SourceRecordId,
             JsonSerializer.Serialize(new { Kind = "review-only-v1", record.SourceConcurrencyToken, record.Version, requestType, summary, description, mapping, close }));
         return new(record.Id, record.OrCode, _options.ProjectKey, _options.IssueType, summary, description,
@@ -191,6 +217,9 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
             summary = summary[.._options.SummaryMaxLength];
         }
         StringBuilder description = new(record.Description);
+        if (string.Equals(_operationalOptions.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase)
+            && SdmPilotPolicy.Blockers(record, _operationalOptions, _options, _sourceOptions, DateTimeOffset.UtcNow).Count == 0)
+        { AppendReference(description, "SDM tracking reason (approved policy)", _operationalOptions.Pilot.TrackingReason); }
         AppendReference(description, "Environment", record.Environment);
         AppendReference(description, "Server", record.ServerReference);
         AppendReference(description, "Application", record.ApplicationReference);

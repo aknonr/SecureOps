@@ -68,7 +68,7 @@ public sealed class SdmEvidenceRenderTests
             return rendered.ToHtmlString();
         });
         string decoded = System.Net.WebUtility.HtmlDecode(html);
-        decoded.Should().Contain("Sunucu Talebi ve Uygulama Kurulumu kapsamda").And.Contain("Talep türü seçimi yayımlama onayı yerine geçmez");
+        decoded.Should().Contain("Tek kayıt, kaynak sürümü, kapsam, gerekçe ve mapping sürümü").And.Contain("Talep türü seçimi yayımlama onayı yerine geçmez");
         decoded.Should().Contain("Sunucu veya IP kanıtı yok").And.NotContain("<button");
         SdmEvidenceView.SameSource(record, record with { Version = 9 }).Should().BeTrue();
         SdmEvidenceView.SameSource(record, record with { Description = "Changed" }).Should().BeFalse();

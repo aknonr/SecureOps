@@ -16,5 +16,7 @@ public enum OperationalRecordClassification
     /// <summary>A record explicitly excluded from Jira.</summary>
     NotJiraEligible = 5,
     /// <summary>No approved deterministic rule classified the record.</summary>
-    NeedsManualReview = 6
+    NeedsManualReview = 6,
+    /// <summary>Retirement request tracking only; never infrastructure decommissioning.</summary>
+    ServerRetirement = 7
 }

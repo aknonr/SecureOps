@@ -18,7 +18,8 @@ public sealed class OperationalRecordEnumContractTests
                 ("ConfigurationRequest", 3),
                 ("OperationalSupport", 4),
                 ("NotJiraEligible", 5),
-                ("NeedsManualReview", 6)
+                ("NeedsManualReview", 6),
+                ("ServerRetirement", 7)
             ]);
     }
 

@@ -1,5 +1,12 @@
 # API Release Packaging
 
+`New-PairedTestRelease.ps1 -ReleaseName <reviewed-next-name>` requires a clean
+committed feature branch (pre-existing `.vscode/` is excluded), publishes matching
+API/UI, reuses both payload scanners/validators, exports the canonical Turkish
+runbook and packages DBA 001-013 with per-file sizes/hashes and source metadata.
+It refuses an existing release directory. Determine the next name from actual
+release metadata first. It does not deploy, activate writes or certify TEST acceptance.
+
 `New-InUseEvidencePackage.ps1 -OutputDirectory <new-absolute-directory>` builds
 only the standalone diagnostic on the development machine from committed HEAD.
 It uses the shared payload/secret scanner, publishes framework-dependent win-x64,

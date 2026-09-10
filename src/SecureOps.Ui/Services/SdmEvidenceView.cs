@@ -10,15 +10,31 @@ public static class SdmEvidenceView
     {
         SecureOps.Domain.OperationalRecords.OperationalRecordClassification.ServerRequest => "Sunucu Talebi",
         SecureOps.Domain.OperationalRecords.OperationalRecordClassification.SoftwareInstallation => "Uygulama Kurulumu",
+        SecureOps.Domain.OperationalRecords.OperationalRecordClassification.ServerRetirement => "Sunucu İadesi/Emekliliği",
         _ => "Doğrulanmış talep türü yok"
+    };
+    /// <summary>Tracking intent only; never approval or infrastructure execution.</summary>
+    public static string TrackingReason(SecureOps.Domain.OperationalRecords.OperationalRecordClassification? type) => type switch
+    {
+        SecureOps.Domain.OperationalRecords.OperationalRecordClassification.ServerRequest => "Sunucu talebini SDM'de izleme önerisi; kesin gerekçe onaylı pilot politikasında yer alır.",
+        SecureOps.Domain.OperationalRecords.OperationalRecordClassification.SoftwareInstallation => "Uygulama kurulum talebini izleme önerisi; Jira eşlemesi bekleniyor.",
+        SecureOps.Domain.OperationalRecords.OperationalRecordClassification.ServerRetirement => "İade/emeklilik talebini izleme önerisi; uygulama/decommission izni değil.",
+        _ => "Talep türü ve iş kararı bekleniyor."
     };
     /// <summary>Explains the evidence or decision needed to resolve a condition.</summary>
     public static string Guidance(string code) => code switch
     {
         "OperatorDeclarationOnly" => "Talep türü operatör beyanıdır; kaynak kanıtı, altyapı kapsamı veya yayımlama onayı değildir.",
+        "PilotPolicyExpired" => "Tek kayıt politika süresi yok veya dolmuş. Süreç sahibi süreli karar kaydını doğrulamalı.",
+        "PilotRecordMismatch" => "Bu OR veya kaynak sürümü onaylı tek kayıt politikasıyla eşleşmiyor.",
+        "PilotScopeUnproven" => "Onaylı kaynak kapsamı yapılandırmayla eşleşmiyor; In Use dışlaması korunmalıdır.",
+        "PilotMustRemainSourceOpen" => "Jira-only pilot için kaynak kapatma kapalı olmalıdır.",
+        "TrackingReasonMissing" => "Onaylı SDM takip gerekçesi eksik; tür seçimi bu gerekçenin yerine geçmez.",
+        "RetirementMappingPending" or "TypeMappingPending" => "Bu talep türünün Jira eşlemesi doğrulanmadı; Sunucu Talebi etiketleri yerine kullanılamaz.",
+        "SingleRecordPolicyApproved" => "Bu kaynak sürümü için tek kayıt politika kanıtı doğrulandı; create yetkisi ve dış yazma aktivasyonu ayrıca gerekir.",
         "ApplicationMappingPending" => "Uygulama Kurulumu için Jira etiket eşlemesi doğrulanmadı. SunucuTalep kullanılmaz; süreç sahibi eşlemeyi belirlemeli.",
         "JiraMappingPending" => "Jira alan eşlemesi eksik. Proje, kayıt tipi, ilgili grup ve etiketlerin onaylı eşlemesi gerekiyor.",
-        "CategoryPolicyPending" => "Sunucu Talebi ve Uygulama Kurulumu kapsamda. Kayıt bazında yayımlama koşulları henüz onaylanmadı.",
+        "CategoryPolicyPending" => "Tek kayıt, kaynak sürümü, kapsam, gerekçe ve mapping sürümü için server-owned politika kararı bekleniyor.",
         "CategoryUnknown" or "CategoryUnsupported" => "Kategori doğrulanamadı veya kapsam dışında. Kaynak kategorisi ve onaylı politika birlikte incelenmeli.",
         "GroupUnproven" or "GroupOutOfScope" => "İlgili grup kapsamı doğrulanmadı. Kayıt bazında yetkili grup kanıtı gerekiyor.",
         "DccUnproven" or "ExcludedDcc" => "DCC kapsamı doğrulanmadı veya hariç tutulmuş. Süreç sahibi kayıt kapsamını doğrulamalı.",
