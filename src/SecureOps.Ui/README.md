@@ -447,7 +447,7 @@ explicitly resumed increment preserves Resources, `.vscode/` and every old archi
 It delivers stored waiting/management views and a blocked local completion journal;
 it is NOT corporate ownership resolution or executable source closure.
 
-Full increment: 932 changed lines (925 additions, 7 deletions), 23 files.
+Full increment: 934 changed lines (927 additions, 7 deletions), 23 files.
 The permanent 1,000-line cap is respected; no old exception is reused.
 
 List/detail use parent In Use OR creation evidence only. The real adapter has no
@@ -512,6 +512,8 @@ The wider historical `after` journey timed out on the unrelated Operational Reco
 refresh notice; it is NOT claimed passed here. Previous conflict/tour/outage
 evidence above remains scoped prior evidence. No actual VDI, corporate OIDC,
 corporate API/SQL, deployment, source write, scheduler or release package validation.
+The local UI host also logged an antiforgery token-decryption failure during reruns;
+passed journeys do not establish persistent-key or corporate-session acceptance.
 
 Remaining: exact RFC dictionary/reference kind and Reporter selector, then persisted
 server-to-request owner enrichment/candidates; verified parent creation/open-state
