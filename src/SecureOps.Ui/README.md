@@ -404,6 +404,25 @@ hosts pass login and all journeys. Five fresh-circuit refreshes completed in
 188-266 ms without page errors; earlier timeout did not recur. Its historical root
 cause remains unproven, not declared a corporate outage or product regression.
 
+Release build source: `fcde31010e82c5551ce1cb06846ba8fbd16e620c`.
+Root `C:\SecureOpsBuild\release\2026-09-10-pilot-rc6.15`; generated manifests
+contain every file's size/SHA256. All older ZIP hashes were rechecked unchanged.
+| Artifact under release root | Bytes | SHA-256 |
+|---|---:|---|
+| API/secureops-api-TEST-fcde310.zip | 24673169 | 4D06FFAC69FE3D5CBEAF6B96967B71CC384DFB9A24CF77DA5042608CA3FFA8B6 |
+| UI/secureops-ui-TEST-fcde310.zip | 26457611 | ED1DEC135762BF5361F895A275C9BE8E260975804B80C93F078ACF4BE9EBA1E0 |
+| DBA/secureops-database-001-013-TEST-rc6.15.zip | 22726 | 16778AFF16ABE2B4D68A029924F5F92A4A0E0A606EE45CB792A83C208926A433 |
+API 238/UI 254/DBA 28 entries verified, config/source/PDB/secret-marker gates
+and API AD dependency closure passed. No NuGet vulnerability was reported for
+the eight solution projects. Scoped formatting passed excluding pre-existing
+IDE1006 private-constant naming diagnostics; build has zero warnings/errors.
+Both framework-dependent hosts require .NETCore.App and AspNetCore.App 8.0
+(IIS Hosting Bundle for IIS); no SDK on TEST. .NET 10 migration is separate.
+Exact release binary journeys passed in `browser/release-sdm`, `release-mapped`
+and `release-refresh`; five refresh notices took 186-310 ms, no page errors.
+Later documentation commits do not alter these payloads. Final Git synchronization
+is recorded separately in release metadata after a live remote query.
+
 
 Start local/live HEAD: `b4910ad045c688eaeb148c5d5b93d255330c9142`, same feature
 branch. This is the explicitly requested bounded Resources increment. The prior
