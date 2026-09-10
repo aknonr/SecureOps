@@ -422,6 +422,11 @@ Exact release binary journeys passed in `browser/release-sdm`, `release-mapped`
 and `release-refresh`; five refresh notices took 186-310 ms, no page errors.
 Later documentation commits do not alter these payloads. Final Git synchronization
 is recorded separately in release metadata after a live remote query.
+One persistent team-lead host also logged one antiforgery exception; its detailed
+cause was not retained. Fresh isolated replay (`browser/release-auth`) passed
+without that exception, including shutdown. Do not equate this with a resolved
+IIS/cookie issue: persistent-key/app-identity/login smoke remains a TEST acceptance
+gate. No antiforgery bypass or corporate configuration change was made.
 
 
 Start local/live HEAD: `b4910ad045c688eaeb148c5d5b93d255330c9142`, same feature
