@@ -440,6 +440,90 @@ active LOCAL work; the combined milestone is NOT complete.
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 
+#### Stored Overview And Local Completion Journal, 2026-09-10
+
+Start: `4fc1f80d632a89d2f06e3640512afcce82c7cf56`, same feature branch. This
+explicitly resumed increment preserves Resources, `.vscode/` and every old archive.
+It delivers stored waiting/management views and a blocked local completion journal;
+it is NOT corporate ownership resolution or executable source closure.
+
+Full increment: 932 changed lines (925 additions, 7 deletions), 23 files.
+The permanent 1,000-line cap is respected; no old exception is reused.
+
+List/detail use parent In Use OR creation evidence only. The real adapter has no
+verified creation/lifecycle wire mapping and leaves both unknown; active 4241/68
+query membership is not an open-state contract. New records retain WASAS first-seen
+time separately. Existing records are not backfilled from last refresh. Absent new
+source fields are omitted from JSON so unchanged legacy hashes/drafts remain valid.
+No SLA threshold is introduced. Oldest records require both explicit Open evidence
+and a valid non-future offset-bearing parent creation date; referenced RFC dates
+are never used. Unknown/closed records cannot enter the confirmed-open count.
+
+GET `/api/v1/in-use/overview` requires InUse.View AND Reporting.ManagementView,
+also enforced by the service. It reads a consistent stored SQL snapshot and audits
+before release. Counts are per OR, not per server/owner. AwaitingAnswers/ReportReady
+partition all retained ORs by current local structural readiness, not corporate
+open status or approved-template acceptance. Only counts and up to five lightweight
+oldest-record links reach the browser. Last successful refresh, existing stale and
+partial flags are shown. The implementation aggregates stored JSON on the API host;
+large accumulated inventories have not been benchmarked. Opening/reloading the
+panel, list, detail or preview never calls the source.
+
+An approved InUse.View + InUse.Review actor can preview, privately archive, then
+confirm the exact current version/hash through POST `/{id}/completion-intent`.
+Assignment remains optional. Server-side checks require all three answers for
+each server, acceptable observed relationships and a valid immutable archive.
+Actor comes from authenticated WASAS identity; browser input contains no actor.
+The command ID, actor, source/report versions, hash and time persist with atomic
+audit and optimistic concurrency. Replay cannot duplicate the intent. Confirmation
+always saves Blocked, never grants external-write authority or uploads anything.
+
+The local result journal and transition reducer distinguish upload failure,
+ambiguous result/reconciliation, unique authorized task lookup, task failure,
+task success awaiting OR read, task completed with OR still open, and verified
+closure. Result journal writes use existing version/audit protection and the
+original authorized actor. There is deliberately no HTTP result-ingestion endpoint
+or production executor; pending states are seeded ONLY by synthetic tests. No
+production transition leaves Blocked, and failed/uncertain states cannot retry writes.
+The UI displays separate messages/remote references, and flags superseded evidence.
+The three-question/bulk-difference flow, optional notes and private historical
+downloads remain. Missing answers save as drafts; `Alana git` focuses the exact
+server/question. No new mandatory operator input or completion activation setting.
+
+Schema remains 012. Existing JSON aggregates and command/audit tables store this
+increment: ops.InUseRecords SELECT/INSERT/UPDATE, ops.InUseRefresh SELECT/UPDATE,
+existing command SELECT/INSERT/UPDATE and append-only audit INSERT. No migration,
+new grant, DDL permission, role/configuration change or package. Existing
+InUseReports:Directory private archive configuration still applies. Corporate
+ReadOnlyIntegrationMode=true, ControlledTestWritesEnabled=false and
+SourceCloseEnabled=false remain unchanged; .NET/UI dependency versions unchanged.
+Older binaries may drop additive JSON metadata when rewriting aggregates; downgrade
+write compatibility is not asserted. No rollback/deployment was performed.
+
+Verification: Release build 0 warnings/errors; 132 focused InUse/SDM/write-fence
+unit tests; 10 hosted API/OpenAPI/Swagger tests; 17 approved isolated SQL tests.
+SQL: `SecureOps_ResourcesV1_inuse_progress_20260910`, migrations 001-012.
+Published local `in-use-workspace.cjs mapped` and `in-use-progress.cjs` passed:
+four independent servers, unassigned review, explicit bulk-copy differences,
+missing-answer keyboard focus, immutable archive/preview, stored dashboard and
+blocked confirmation. 1440x900/390x844, light/dark, no overflow/page errors.
+Screenshots/results: `C:\SecureOpsBuild\validation\inuse-progress-20260910\browser`.
+The wider historical `after` journey timed out on the unrelated Operational Records
+refresh notice; it is NOT claimed passed here. Previous conflict/tour/outage
+evidence above remains scoped prior evidence. No actual VDI, corporate OIDC,
+corporate API/SQL, deployment, source write, scheduler or release package validation.
+
+Remaining: exact RFC dictionary/reference kind and Reporter selector, then persisted
+server-to-request owner enrichment/candidates; verified parent creation/open-state
+mapping; corporate XLSX acceptance/required-unknown policy; upload result/idempotency,
+unique task-to-OR authorization and authoritative final-state response contracts.
+The real executor, read-only reconciliation and separately authorized activation
+still require implementation after those contracts, not merely configuration.
+Next single evidence action: source owner completes the RFC/Reporter contract in
+`scripts/diagnostics/InUseEvidence/README.md`, then one bounded selected-OR run
+returns ONLY Evidence. Virtual PC User remains independent and optional. SDM/Jira-only
+eligibility/activation remains a separate continuation, never gated on In Use.
+
 #### Optional Review And Bounded RFC Evidence, 2026-09-10
 
 Start local/live HEAD: `fb84053a26025cbd3f77ad550fc3c6c4821ef813`, same feature

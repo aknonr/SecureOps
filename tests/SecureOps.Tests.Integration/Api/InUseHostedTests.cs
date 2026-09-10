@@ -45,6 +45,11 @@ public sealed class InUseHostedTests
         InUseRecord record = page.Items[0];
         string root = $"/api/v1/in-use/{record.Id}";
         record.AssigneeId.Should().BeNull();
+        (await denied.GetAsync("/api/v1/in-use/overview")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await admin.GetFromJsonAsync<InUseOverview>("/api/v1/in-use/overview"))!.Unknown.Should().Be(2);
+        var intent = new ConfirmInUseRequest(record.Version, Guid.NewGuid(), new string('A', 64));
+        (await denied.PostAsJsonAsync(root + "/completion-intent", intent)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await admin.PostAsJsonAsync(root + "/completion-intent", intent)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         record = (await (await admin.PutAsJsonAsync(root + "/draft", new SaveInUseDraftRequest(record.Version, record.SourceVersion, [], "")))
             .Content.ReadFromJsonAsync<InUseRecord>())!;
         record.AssigneeId.Should().BeNull();

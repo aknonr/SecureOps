@@ -49,12 +49,22 @@ reuse OR-to-Jira eligibility, claims or source-close commands. Additional gates:
 | Method/path suffix | Additional capability | Contract |
 |---|---|---|
 | GET root | none | persisted search (max 100), view=all/mine/unassigned, status=Unreviewed/Draft/Stale, page=1..100000, pageSize=1..100 default 25; matching total plus refresh state |
+| GET /overview | Reporting.ManagementView | audited stored OR counts, refresh health, up to five oldest confirmed-open parent records with verified creation evidence; no source call |
+| POST /{id}/completion-intent | InUse.Review | expectedVersion, commandId, reportSha256; current ready draft and exact private archive required. Saves actor-bound Blocked intent only; no external execution |
 | GET /{id} | none | distinct source ownership evidence, per-server evidence, local assignee, source and aggregate versions, nullable draft |
 | GET /assignees | InUse.Assign | at most 200 approved InUse.View+Review application IDs/principals; no directory search or source-name matching |
 | POST /refresh | InUse.Refresh | nonempty commandId GUID; existing command tracking and refresh rate limit; at most 100 accepted records, 45s orchestration deadline and existing response-byte bounds |
 | PUT /{id}/assignment | InUse.Assign | expectedVersion, nullable assigneeId, nonblank reason max 500; approved exact identity or explicit unassignment |
 | PUT /{id}/draft | InUse.Review; assignment optional | expectedVersion, sourceVersion, answers (serverId/check/value/evidence), notes max 2000; max 900 answers, unique server/check; evidence optional max 500. Blank evidence/notes and omitted historical answers preserve stored history |
 | POST /{id}/report | InUse.Review | expectedVersion; default previews a current saved draft. archive=true requires Complete or Observed nonempty service items and explicit Yes/No for all three operator questions. Observed reports retain the unverified-completeness warning; Partial/failed relationships are blocked. archivedVersion downloads immutable history, checked against expected current record version |
+
+Creation/lifecycle evidence and FirstSeenAt/Completion are additive nullable JSON.
+Existing source JSON omits absent creation/lifecycle fields to preserve source hashes.
+No corporate creation/lifecycle wire mapping is asserted. AwaitingAnswers and
+ReportReady partition all stored ORs by local readiness; Open counts only explicit
+Open evidence. Null status is Unknown, never confirmed open. The result journal
+has no HTTP endpoint; only a future verified executor can supply remote outcomes.
+Unknown outcomes require reconciliation; no retry path leaves Blocked/failed/unknown.
 
 Normal editable codes are InternetOut/InternetIn/Microsegmented. Unknown may be
 saved, but readiness returns 400 InUseIncomplete with server/field-specific text.

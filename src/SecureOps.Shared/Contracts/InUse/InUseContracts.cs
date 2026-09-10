@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SecureOps.Shared.Contracts.InUse;
 
 /// <summary>A value and its exact source; null is unresolved, never inferred.</summary>
@@ -19,6 +21,12 @@ public sealed record InUseSource(string Id, string Code, string Title, InUseEvid
     public int? AffectedAssetCount { get; init; }
     /// <summary>Technical source creator, not requester, Virtual PC User or reviewer.</summary>
     public InUseEvidence? Creator { get; init; }
+    /// <summary>Verified parent OR creation as ISO-8601 plus provenance; never a referenced request date.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public InUseEvidence? Creation { get; init; }
+    /// <summary>Verified parent lifecycle Open/Closed plus provenance; absent is unknown.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public InUseEvidence? Lifecycle { get; init; }
 }
 
 /// <summary>One explicitly reviewed technical answer. Unknown is a first-class value.</summary>
@@ -36,6 +44,10 @@ public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash,
     public string Status => Draft is null ? "Unreviewed" : Draft.SourceVersion == SourceVersion ? "Draft" : "Stale";
     /// <summary>Available historical archive versions; populated only by the detail service.</summary>
     public IReadOnlyList<long> ArchivedVersions { get; init; } = [];
+    /// <summary>Local first observation only; old aggregates without this evidence remain null.</summary>
+    public DateTimeOffset? FirstSeenAt { get; init; }
+    /// <summary>Last locally confirmed completion intent, never proof of an external operation.</summary>
+    public InUseCompletion? Completion { get; init; }
 }
 
 /// <summary>Bounded persisted query; mine is resolved from the authenticated user.</summary>

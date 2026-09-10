@@ -13,7 +13,7 @@ using SecureOps.Shared.Contracts.InUse;
 namespace SecureOps.Infrastructure.InUse;
 
 /// <summary>Authorized local In Use workflow. There is deliberately no external-write dependency.</summary>
-public sealed class InUseService(IInUseRepository repository, IInUseSourceClient source,
+public sealed partial class InUseService(IInUseRepository repository, IInUseSourceClient source,
     IApplicationAccessService access, IAccessRepository users, ICommandIdempotencyStore commands,
     ILogger<InUseService> logger, InUseReportArchive? archive = null)
 {

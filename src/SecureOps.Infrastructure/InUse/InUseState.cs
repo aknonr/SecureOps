@@ -48,7 +48,7 @@ internal static class InUseState
         string hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
         if (old is null)
         {
-            return new(Guid.NewGuid(), source, hash, 1, 1, null, null, null, now);
+            return new(Guid.NewGuid(), source, hash, 1, 1, null, null, null, now) { FirstSeenAt = now };
         }
         bool changed = hash != old.SourceHash;
         return old with

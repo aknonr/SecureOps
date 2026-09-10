@@ -22,6 +22,16 @@ namespace SecureOps.Api.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class InUseController(InUseService service) : ControllerBase
 {
+    /// <summary>Management-authorized OR-based summary of stored records.</summary>
+    [HttpGet("overview")]
+    [Authorize(Policy = Policies.CanViewManagementReports)]
+    public async Task<ActionResult<InUseOverview>> OverviewAsync(CancellationToken token) =>
+        Reply(await service.OverviewAsync(User, Context(), token));
+    /// <summary>Explicit local confirmation of an archived version; external execution remains blocked.</summary>
+    [HttpPost("{id:guid}/completion-intent")]
+    [Authorize(Policy = Policies.CanReviewInUse)]
+    public async Task<ActionResult<InUseRecord>> ConfirmAsync(Guid id, ConfirmInUseRequest request, CancellationToken token) =>
+        Reply(await service.ConfirmAsync(User, Context(), id, request, token));
     /// <summary>TEST-only exact-record read-only relationship contract diagnostic; returns aliases, never source values.</summary>
     [HttpPost("{id:guid}/relationship-evidence")]
     [EnableRateLimiting(ApiRateLimits.OperationalRecordRefresh)]

@@ -1,5 +1,19 @@
 # ADR-0020: In Use Local Review Workspace
 
+## Stored Overview And Blocked Completion Intent, 2026-09-10
+
+Source creation and lifecycle require explicit evidence; active query membership
+does not establish an open lifecycle. New records retain local first-seen time;
+legacy timestamps remain unknown, not reconstructed from last refresh. Management
+counts are per stored OR, authorized by InUse.View plus Reporting.ManagementView.
+Readiness means local structural review readiness, not corporate template approval.
+Completion confirmation retains actor, command and the exact archived version/hash
+under existing aggregate concurrency and atomic audit. No external adapter is wired:
+unique BPM relation, upload response/idempotency, final OR reread and template
+acceptance are unverified. Local state transitions distinguish failure/uncertainty;
+uncertainty is terminal reconciliation, never an automatic write retry. Existing
+JSON persistence/command tables suffice; no migration or runtime grant is added.
+
 Status: Accepted for the explicitly authorized In Use V1 local milestone.
 
 The 2026-09-10 workflow follow-up makes assignment optional for approved
@@ -17,8 +31,9 @@ evidence collector: exact direct RFC selector, semantic cell kind, identity/code
 type and separate Reporter selector. One request hop, shared-reference deduplication,
 strict bounds and shared aliases; no active In Use filter on the referenced OR.
 This is fixture-tested collection, not corporate mapping or persisted ownership.
-The broader management-summary and durable completion/reconciliation implementation
-remain separate increments, not delivered or implicitly enabled by this change.
+That earlier increment did not deliver management/completion. The stored overview
+and local journal above now supersede that backlog portion; a real executor and
+read-only reconciliation remain unimplemented and require verified source contracts.
 
 The 2026-09-10 operator collection establishes the exact 27 semantic cells for
 the existing 15-select service-item query, not global completeness. Explicit

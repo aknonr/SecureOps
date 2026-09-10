@@ -6,12 +6,32 @@ using Microsoft.Extensions.Configuration;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.InUse;
 using SecureOps.Infrastructure.OperationalRecords;
+using SecureOps.Infrastructure.Resources;
 using SecureOps.Shared.Contracts.InUse;
 
 namespace SecureOps.Tests.Integration.Sql;
 
 public sealed partial class ResourceSqlTests
 {
+    [LocalResourceSqlFact]
+    public async Task InUse_OverviewAndIntent_PersistWithoutInventingSourceDates()
+    {
+        await using SqlConnection connection = new(Configuration().GetConnectionString("SecureOpsDb"));
+        ResourceActor actor = await CreateActorAsync(connection);
+        var repository = new SqlInUseRepository(Configuration());
+        var audit = new AuditEvent { Actor = actor.UserId.ToString("D"), Action = "InUseLocalProgress", CorrelationId = "synthetic-progress" };
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(_token)).Records[0] with { Id = Guid.NewGuid().ToString(), Code = "OR-PROGRESS" };
+        await repository.RefreshAsync((await repository.StateAsync(_token)).Version, new([source], false), null, audit, _token);
+        InUseRecord r = (await repository.QueryAsync(new(Search: "OR-PROGRESS"), actor.UserId, _token)).Items.Single();
+        var intent = new InUseCompletion(Guid.NewGuid(), actor.UserId, r.Version, r.SourceVersion, new string('A', 64), DateTimeOffset.UtcNow);
+        (await repository.SaveAsync(r with { Version = r.Version + 1, Completion = intent }, r.Version, audit, _token)).Should().BeTrue();
+        InUseRecord stored = (await new SqlInUseRepository(Configuration()).GetAsync(r.Id, _token))!;
+        stored.FirstSeenAt.Should().Be(r.FirstSeenAt);
+        stored.Source.Creation.Should().BeNull();
+        stored.Completion.Should().BeEquivalentTo(intent);
+        (await repository.SaveAsync(stored with { Version = stored.Version + 1 }, r.Version, audit, _token)).Should().BeFalse();
+        (await repository.OverviewAsync(audit, _token)).Unknown.Should().BeGreaterThan(0);
+    }
     [LocalResourceSqlFact]
     public async Task InUse_RefreshLock_SerializesIndependentRepositories_WithoutBlockingStoredReads()
     {

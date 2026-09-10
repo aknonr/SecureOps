@@ -146,6 +146,19 @@ public partial class InUse
         }
     }
     private Task PreviewAsync() => ExecuteAsync(async () => { _report = await ReportAsync(); _sheet = 0; });
+    private Task ConfirmCompletionAsync() => ExecuteAsync(async () =>
+    {
+        if (_record is null || _report is not { Archived: true } report || !Ready())
+        {
+            return;
+        }
+
+        SetRecord(await Api.SendAsync<InUseRecord>(HttpMethod.Post, $"/{_record.Id}/completion-intent",
+            new ConfirmInUseRequest(_record.Version, Guid.NewGuid(), report.Sha256), _lifetime.Token));
+    });
+    private static string Waiting(InUseRecord record) => InUseProgress.Created(record.Source, DateTimeOffset.UtcNow) is { } created
+        ? $"Kaynak açılışından beri {(DateTimeOffset.UtcNow - created).Days} gün · {record.Source.Creation!.Source}"
+        : "Kaynak açılış tarihi bilinmiyor" + (record.FirstSeenAt is { } seen ? $" · WASAS ilk görülme: {seen.ToLocalTime():g} (kaynak yaşı değil)" : " · Yerel ilk görülme bilinmiyor");
     private Task DownloadAsync(long? archivedVersion = null) => ExecuteAsync(async () =>
     {
         if (archivedVersion is null && !Ready())
@@ -236,6 +249,20 @@ public partial class InUse
     /// <inheritdoc />
     public void Dispose() { AccessProvider.Changed -= AccessChanged; _lifetime.Cancel(); _lifetime.Dispose(); }
     private static string Evidence(InUseEvidence evidence) => (evidence.Value ?? "Bilinmiyor") + " · " + evidence.Source;
+    private static string CompletionStatus(InUseCompletion intent) => intent.Stage switch
+    {
+        "Blocked" => "Tamamlama: sözleşme nedeniyle engelli. Ek yüklenmedi; görev tamamlanmadı; OR son durumu doğrulanmadı.",
+        "UploadPending" => "Ek yükleme sonucu bekleniyor; yeniden yazma başlatmayın.",
+        "UploadFailed" => "Ek yükleme başarısız. Görev tamamlanmadı; kayıtlı hatayı inceleyin.",
+        "TaskLookupPending" => "Ek yüklendi; benzersiz yetkili görev eşleşmesi bekleniyor.",
+        "TaskLookupBlocked" => "Ek yüklendi; görev eşleşmesi yok veya belirsiz. Görev tamamlanmadı.",
+        "CompletionPending" => "Görev tamamlama sonucu bekleniyor; yeniden yazma başlatmayın.",
+        "CompletionFailed" => "Ek yüklendi; görev tamamlama başarısız. OR kapanışı doğrulanmadı.",
+        "VerificationPending" => "Görev tamamlandı; yetkili kaynaktan OR son durumu henüz doğrulanmadı.",
+        "TaskCompletedOrOpen" => $"Görev tamamlandı; OR durumu: {intent.FinalOrState}. OR kapalı olarak doğrulanmadı.",
+        "ClosedVerified" => "Görev tamamlandı; OR kapalı durumu kaynak okumasıyla doğrulandı.",
+        _ => "Sonuç belirsiz; mutabakat gerekli. Dış yazmayı otomatik tekrarlamayın."
+    };
     private static string Field(InUseServer server, string field) => server.Fields.GetValueOrDefault(field)?.Value ?? "Bilinmiyor";
     private static string Time(DateTimeOffset? value) => value?.ToLocalTime().ToString("g") ?? "Henüz yok";
     private static string Status(string value) => value switch { "Draft" => "Yerel taslak", "Stale" => "Yeniden inceleme gerekli", _ => "İncelenmedi" };

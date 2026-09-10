@@ -17,7 +17,7 @@ using SecureOps.Shared.Contracts.InUse;
 
 namespace SecureOps.Tests.Unit.InUse;
 
-public sealed class InUseTests
+public sealed partial class InUseTests
 {
     [Theory]
     [InlineData("Complete")]

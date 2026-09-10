@@ -12,6 +12,15 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
     private InUseRefreshState _state = InUseRefreshState.Empty;
 
     /// <inheritdoc />
+    public async Task<InUseOverview> OverviewAsync(AuditEvent evidence, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        { await audit.WriteAsync(evidence, cancellationToken); return InUseProgress.Summarize(_records.Values.ToArray(), _state, DateTimeOffset.UtcNow); }
+        finally { _gate.Release(); }
+    }
+
+    /// <inheritdoc />
     public async Task<IAsyncDisposable?> TryAcquireRefreshAsync(CancellationToken cancellationToken) =>
         await _refreshGate.WaitAsync(0, cancellationToken) ? new RefreshLease(_refreshGate) : null;
 

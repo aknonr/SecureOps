@@ -15,6 +15,21 @@ public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRep
         ?? throw new InvalidOperationException("In Use persistence requires SecureOpsDb.");
 
     /// <inheritdoc />
+    public async Task<InUseOverview> OverviewAsync(AuditEvent audit, CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        InUseRefreshState state = await ReadStateAsync(connection, transaction, cancellationToken);
+        InUseRecord[] records = (await connection.QueryAsync<string>(Command("SELECT RecordJson FROM ops.InUseRecords;", null, cancellationToken, transaction)))
+            .Select(Read<InUseRecord>).ToArray();
+        InUseOverview result = InUseProgress.Summarize(records, state, DateTimeOffset.UtcNow);
+        await AuditAsync(connection, transaction, audit, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    /// <inheritdoc />
     public Task<IAsyncDisposable?> TryAcquireRefreshAsync(CancellationToken cancellationToken) =>
         InUseRefreshLock.TryAcquireAsync(_connectionString, cancellationToken);
 

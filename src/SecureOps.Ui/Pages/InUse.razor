@@ -77,7 +77,7 @@
                             @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }</div>
                             <div>@Status(record.Status)<br />WASAS inceleyicisi: @(record.AssigneeLabel ?? "Atanmamış")<br />Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)
                                 <br />Virtual PC User: @string.Join("; ", record.Source.Servers.Select(s => Evidence(s.Fields.GetValueOrDefault("Virtual PC User") ?? new(null, "Eşleme bekleniyor"))).DefaultIfEmpty("Eşleme bekleniyor").Distinct())
-                                <br />Talep eden: @Evidence(record.Source.Requester)</div>
+                                <br />Talep eden: @Evidence(record.Source.Requester)<br />@Waiting(record)</div>
                             <MudButton Href="@($"in-use/{record.Id}")" EndIcon="@Icons.Material.Filled.ArrowForward">İncele</MudButton></li>
                     }
                     </ul>
@@ -94,6 +94,7 @@
         {
             <h2>@record.Source.Code · @record.Source.Title</h2>
             <p>@Status(record.Status) · Veri sürümü @record.SourceVersion · Kayıt sürümü @record.Version · Son okuma @Time(record.LastSeenAt)</p>
+            <MudAlert Severity="Severity.Info">@Waiting(record) · SLA/gecikme eşiği tanımlanmadı.</MudAlert>
             @if (record.Source.Synthetic) { <MudAlert Severity="Severity.Info">Sentetik yerel veri; kurumsal doğrulama değildir.</MudAlert> }
             @if (record.Status == "Stale") { <MudAlert Severity="Severity.Warning">Kaynak değişti. Önceki taslak güncel değildir; cevapları yeniden doğrulayın.</MudAlert> }
             <section class="so-inuse-band" data-guide="inuse-owner">
@@ -121,7 +122,7 @@
             <section class="so-inuse-band" data-guide="inuse-servers">
                 <h3>1. Sunucuları kontrol et</h3><p>@record.Source.RelationshipEvidence</p>
                 <p>Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count) · Etkilenen varlıklar: @Relationship(record.Source.AffectedAssetsState, record.Source.AffectedAssetCount)</p>
-                @if (_validation is not null) { <p role="alert">@_validation</p> }
+                @if (_validation is not null) { <p role="alert">@_validation</p><MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">Alana git</MudButton> }
                 @if (record.Source.Servers.Count > 0)
                 {
                     <div class="so-inuse-workbook" tabindex="0" aria-label="Servis öğesi tablosu"><table><thead><tr><th>Kaynak kimliği</th><th>Adı</th><th>Ortam</th><th>Durum</th><th>Servis / uygulama</th><th>Virtual PC User</th><th>RFC Kaydı</th></tr></thead><tbody>
@@ -182,6 +183,12 @@
                     @if (!report.Archived) { <MudButton OnClick="() => DownloadAsync()" Disabled="@(_busy || _dirty)" StartIcon="@Icons.Material.Filled.Archive">WASAS'a arşivle ve indir</MudButton> }
                     else { <MudButton OnClick="() => DownloadAsync(report.Version)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Arşivi indir</MudButton> }
                     @if (report.Archived) { <p>WASAS arşivi · @Time(report.PreparedAt) · @report.Size bayt · Turuncu Hat'a eklenmedi</p> }
+                    @if (report.Archived && report.Version == record.Version && CanEdit)
+                    {
+                        <p>Planlanan dış adımlar: bu OR'a @record.Source.Servers.Count sunuculuk XLSX ekleme → benzersiz yetkili görevi tamamlama → OR son durumunu yeniden okuma.</p>
+                        <p>Arşiv SHA-256: @report.Sha256. Dış sözleşmeler ve yazma yetkisi doğrulanmadı; aşağıdaki onay yalnız WASAS'ta engelli niyet kaydeder.</p>
+                        <MudButton OnClick="ConfirmCompletionAsync" Disabled="@(_busy || _dirty)" StartIcon="@Icons.Material.Filled.FactCheck">Bu sürüm için yerel tamamlama niyetini onayla</MudButton>
+                    }
                     <label>Çalışma sayfası<select aria-label="Excel sayfası" @bind="_sheet">@for (int i = 0; i < report.Sheets.Count; i++) { <option value="@i">@report.Sheets[i].Name</option> }</select></label>
                     <div class="so-inuse-workbook" tabindex="0" aria-label="Excel hücre önizlemesi"><table><tbody>
                         @foreach (var row in report.Sheets[_sheet].Rows) { <tr>@foreach (string cell in row) { <td>@cell</td> }</tr> }
@@ -190,6 +197,15 @@
                 }
                 @if (Can(Capabilities.InUseReview) && record.ArchivedVersions.Count > 0)
                 { <details><summary>Önceki WASAS raporları</summary>@foreach (long version in record.ArchivedVersions) { <MudButton OnClick="() => DownloadAsync(version)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Sürüm @version (arşiv)</MudButton> }</details> }
+                @if (record.Completion is { } intent)
+                {
+                    <p role="status">@CompletionStatus(intent)</p>
+                    <p>Komut @intent.CommandId · WASAS aktörü @intent.ActorId · Rapor sürümü @intent.ReportVersion · @Time(intent.ConfirmedAt)</p>
+                    <p>Ek kimliği: @(intent.AttachmentId ?? "Doğrulanmadı") · Görev kimliği: @(intent.TaskId ?? "Doğrulanmadı")</p>
+                    @if (Can(Capabilities.InUseReview)) { <MudButton OnClick="() => DownloadAsync(intent.ReportVersion)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Bağlı arşivi indir</MudButton> }
+                    @if (record.Draft?.ReviewedAt > intent.ConfirmedAt || record.SourceVersion != intent.SourceVersion)
+                    { <p>Bu niyet önceki incelemeye aittir; güncel veri için yeniden doğrulama gerekir.</p> }
+                }
             </section>
         }
     }
