@@ -1,5 +1,20 @@
 # API TEST Deployment Readiness
 
+## RFC Reporter Diagnostic Preparation, 2026-09-11
+
+The standalone delivery now separates DOM-backed candidate inspection (A) from
+one exact RFC hop after operator representation verification (B). See
+`scripts/diagnostics/InUseEvidence/operator-reporter-tr.md` for current Turkish
+commands. Preserve the old C:\SecureOpsBuild\diagnostics\inuse-evidence-20260909
+delivery; it cannot accept the new options. This is not an API/UI release.
+
+Observed p_rel_requester is Bildiren, not the independently verified Istem Sahibi
+field. Local code prepares per-server reporter evidence and existing JSON merge
+semantics; production refresh and UI rendering await operator A/B evidence and
+the existing UI ownership boundary. No migration is rerun. Corporate binaries
+cannot be identified from source HEAD. No SQL/API, deployment or source write is
+executed by this task. Exact new package metadata follows in the delivery record.
+
 <!-- TEST-RELEASE-RUNBOOK:START -->
 ## Birleşik TEST Teslimatı, rc6.15 (2026-09-10)
 

@@ -1,5 +1,33 @@
 # SecureOps.Ui
 
+## RFC Reporter Preparation, 2026-09-11
+
+The current correction supersedes historical requester/Reporter/ownership wording
+below: observed SMSS_oRFF p_rel_requester is Bildiren. The separate Istem Sahibi
+selector is unknown. Do not rewrite old source/audit values or rename broad DTOs.
+DOM establishes c_rfc_record/c_virtual_pc_user as candidates only; _i_ is not an
+API selector. New collector A inspects them independently; B follows one exact
+RFC only after representation verification. Current commands are in
+`scripts/diagnostics/InUseEvidence/operator-reporter-tr.md`; preserve 6e05b45.
+
+Local preparation adds a per-server reporter observation, strict exact projection,
+JSON persistence, raw display/reference separation and stale/version behavior.
+The additive contract is in `docs/contracts/secureops-api-v1-ui-integration.md`.
+Production DiscoverAsync is intentionally unchanged pending operator evidence.
+The UI owner must then replace ownership/requester labels with the observed
+semantics and show **İlgili talebi bildiren** per stored server on list/detail.
+No person is inferred as owner, provisioner or reviewer. Existing optional review,
+trusted reviewer labels and single-pass decoding are preserved. UI rendering,
+production RFC persistence and corporate/VDI acceptance are NOT complete.
+
+Local verification: Release solution and standalone builds passed with zero
+warnings/errors; 1,209 unit and 243 integration tests passed, with 18 opt-in SQL
+tests skipped (no database execution). Coverage includes field order/types,
+private comparison isolation, empty Virtual PC User, missing RFC, exact closed
+targets, ambiguous/denied results, shared-reference deduplication, per-server
+reporters, Turkish decoding, stale/failed retention and existing authorization/
+concurrency regressions. OpenAPI compatibility passed without snapshot changes.
+
 Blazor Server + MudBlazor operations UI. Hosted on IIS in-process.
 
 Built against the API contracts in `docs/contracts/secureops-api-v1-ui-integration.md` and

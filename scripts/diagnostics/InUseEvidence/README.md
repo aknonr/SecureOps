@@ -1,5 +1,29 @@
 # InUseEvidence Standalone Operator Delivery
 
+## Current Reporter Delivery, 2026-09-11
+
+Use **operator-reporter-tr.md** for current A/B commands. Packaging now includes
+candidate-dictionary.json and rfc-contract.template.json alongside the preserved
+empty legacy dictionary. --inspect-candidates accepts only the two DOM-backed
+direct candidates and cannot be combined with an RFC contract. A never traverses.
+B uses --collect --rfc-contract after A establishes representation. An empty
+template fails before transport. Candidates are not approved runtime mappings.
+
+Observed SMSS_oRFF p_rel_requester means **Bildiren**. KEY display and SET user
+reference remain separate. RequesterState is a compatibility name only;
+ReporterState now describes the observed field, not an invented selector.
+The deprecated ReporterProperty member may be omitted or equal p_rel_requester;
+other selectors are rejected. Targets request only id/p_code/p_rel_requester.
+The standalone private output also has LocalComparison: whitelisted actual
+candidate/identity/reporter cells with matching aliases for local browser checks.
+Never share that section. The returned Evidence and the HTTP diagnostic stay masked.
+The independent Istem Sahibi selector remains unknown. Protected configuration,
+transport, limits and privacy rules below still apply. Preserve old 6e05b45.
+
+The following dated notes are historical discovery records, not current commands
+or requirements for a separate Reporter selector. Runtime refresh is still
+unwired pending operator evidence; this collector does not persist data.
+
 ## Two Missing Fields: Targeted Inspection, 2026-09-11
 
 The runtime adapter requests the 15 legacy selects only. Its dictionary is NOT

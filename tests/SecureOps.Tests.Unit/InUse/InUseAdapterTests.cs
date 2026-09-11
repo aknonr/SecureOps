@@ -185,8 +185,9 @@ public sealed class InUseAdapterTests
             {"Key":"SET.p_rel_requester","Value":"800"},{"Key":"KEY.p_synthetic_reporter","Value":"Synthetic reporter"}]]}}
             """;
         using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", related, referenced: target);
+        var comparison = new List<JsonElement>();
         JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string> { ["RFC Kaydı"] = "p_synthetic_rfc" },
-            CancellationToken.None, new("p_synthetic_rfc", cellKind, kind, "p_synthetic_reporter"));
+            CancellationToken.None, new("p_synthetic_rfc", cellKind, kind), comparison.Add);
         JsonElement references = result.GetProperty("ReferencedRequests");
         references.GetProperty("DistinctLookups").GetInt32().Should().Be(1);
         references.GetProperty("Links").GetArrayLength().Should().Be(4);
@@ -194,6 +195,9 @@ public sealed class InUseAdapterTests
         references.GetProperty("Links")[0].GetProperty("Reference").GetString().Should()
             .Be(references.GetProperty("Links")[3].GetProperty("Reference").GetString());
         result.ToString().Should().NotContain("Synthetic request owner").And.NotContain("Synthetic reporter").And.NotContain("OR-200");
+        comparison.Should().HaveCount(2); // One related set and one deduplicated exact target.
+        string local = JsonSerializer.Serialize(comparison);
+        local.Should().Contain("Synthetic request owner").And.Contain("OR-200").And.NotContain("p_synthetic_reporter").And.NotContain("m_active");
         handler.Requests.Should().HaveCount(3).And.OnlyContain(r => r.Path == "/query");
         handler.Requests[2].Filter.Should().Be(kind == "SourceId" ? "#%id%#=200" : "#%p_code%#='OR-200'");
     }
@@ -209,7 +213,7 @@ public sealed class InUseAdapterTests
         using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", RfcRows("200"),
             referenced: target, referencedStatus: (HttpStatusCode)status);
         JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string> { ["RFC Kaydı"] = "p_synthetic_rfc" },
-            CancellationToken.None, new("p_synthetic_rfc", "SET", "SourceId", "p_synthetic_reporter"));
+            CancellationToken.None, new("p_synthetic_rfc", "SET", "SourceId"));
         result.GetProperty("ReferencedRequests").GetProperty("Links")[0].GetProperty("Evidence").GetProperty("State").GetString().Should().Be(expected);
         handler.Requests.Should().HaveCount(status == 403 ? 4 : 3); // Existing session renewal permits one retry.
     }
@@ -229,6 +233,7 @@ public sealed class InUseAdapterTests
         {
             Items = Enumerable.Range(1, 4).Select(i => new[] {
             new { Key = "SET.(LCSIMS_ServiceInstance)m_rid.id", Value = (1000 + i).ToString() },
+            new { Key = "SET.(LCSIMS_ServiceInstance)m_rid.c_virtual_pc_user", Value = "" },
             new { Key = "SET.(LCSIMS_ServiceInstance)m_rid.p_synthetic_rfc", Value = reference },
             new { Key = "KEY.(LCSIMS_ServiceInstance)m_rid.p_synthetic_rfc", Value = reference } })
         }
@@ -249,7 +254,9 @@ public sealed class InUseAdapterTests
             CancellationToken.None, new("p_synthetic_rfc", "SET", "SourceId"));
         JsonElement evidence = result.GetProperty("ReferencedRequests").GetProperty("Links")[0].GetProperty("Evidence");
         evidence.GetProperty("RequesterState").GetString().Should().Be(expected);
-        evidence.GetProperty("ReporterState").GetString().Should().Be("NotQueried");
+        evidence.GetProperty("ReporterState").GetString().Should().Be(expected);
+        evidence.GetProperty("ReporterLabel").GetString().Should().Be("Bildiren");
+        evidence.GetProperty("ReporterReferenceState").GetString().Should().Be("Omitted");
         handler.Selects[2].Should().Equal("id", "p_code", "p_rel_requester");
         handler.Requests.Should().HaveCount(3);
         handler.Requests[2].Filter.Should().Be("#%id%#=200");
@@ -276,7 +283,7 @@ public sealed class InUseAdapterTests
         using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", related,
             referenced: "{\"QueryResult\":{\"Items\":[]}}");
         JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string> { ["RFC Kaydı"] = "p_synthetic_rfc" },
-            CancellationToken.None, new("p_synthetic_rfc", "SET", "SourceId", "p_synthetic_reporter"));
+            CancellationToken.None, new("p_synthetic_rfc", "SET", "SourceId"));
         result.GetProperty("ReferencedRequests").GetProperty("DistinctLookups").GetInt32().Should().Be(lookups);
         handler.Requests.Should().HaveCount(2 + lookups);
         if (mode == "different")
@@ -288,6 +295,63 @@ public sealed class InUseAdapterTests
             result.GetProperty("ReferencedRequests").GetProperty("Links")[0].GetProperty("State").GetString()
                 .Should().Be(mode == "missing" ? "MissingIdentityOrReference" : "AmbiguousCells");
         }
+    }
+
+    [Fact]
+    public async Task Diagnostic_CandidatesWithoutHop_ReportsNullEmptyOmittedAndNumericShapes()
+    {
+        const string related = """
+            {"QueryResult":{"Items":[[
+            {"Key":"SET.(LCSIMS_ServiceInstance)m_rid.id","Value":1001},
+            {"Key":"SET.(LCSIMS_ServiceInstance)m_rid.c_virtual_pc_user","Value":""},
+            {"Key":"SET.(LCSIMS_ServiceInstance)m_rid.c_rfc_record","Value":null}],
+            [{"Key":"SET.(LCSIMS_ServiceInstance)m_rid.id","Value":1002}]]}}
+            """;
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", related);
+        var comparison = new List<JsonElement>();
+        JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string>
+        { ["RFC Kaydı"] = "c_rfc_record", ["Virtual PC User"] = "c_virtual_pc_user" }, CancellationToken.None, privateComparison: comparison.Add);
+        handler.Requests.Should().HaveCount(2);
+        handler.Selects[1].Should().HaveCount(17).And.NotContain(s => s.Contains("_i_", StringComparison.Ordinal));
+        result.GetProperty("ReferencedRequests").ValueKind.Should().Be(JsonValueKind.Null);
+        JsonElement fields = result.GetProperty("CandidateFields");
+        fields[0].GetProperty("Contract").GetString().Should().Be("CandidateNotApproved");
+        fields[0].GetProperty("Rows")[0].GetProperty("Cells")[0].GetProperty("ValueState").GetString().Should().Be("Null");
+        fields[0].GetProperty("Rows")[1].GetProperty("Cells").GetArrayLength().Should().Be(0);
+        fields[1].GetProperty("Rows")[0].GetProperty("Cells")[0].GetProperty("ValueState").GetString().Should().Be("Empty");
+        result.GetRawText().Should().NotContain("1001").And.NotContain("1002");
+        comparison.Should().ContainSingle();
+        JsonSerializer.Serialize(comparison).Should().Contain("1001").And.NotContain("p_rel_requester");
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("SET", "")]
+    public async Task Diagnostic_UnfilledRepresentationTemplate_MakesNoRequest(string cell, string kind)
+    {
+        using var handler = new Handler("{}");
+        await FluentActions.Awaiting(() => Client(handler).DiagnoseAsync("100",
+            new Dictionary<string, string> { ["RFC Kaydı"] = "c_rfc_record" }, CancellationToken.None,
+            new("c_rfc_record", cell, kind))).Should().ThrowAsync<InvalidDataException>();
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("[\"private-A\",\"private-B\"]", "Array")]
+    [InlineData("{\"private-A\":1,\"private-B\":2}", "Object")]
+    public async Task Diagnostic_CompoundCandidate_ReportsCardinalityWithoutFlattening(string value, string type)
+    {
+        string related = "{\"QueryResult\":{\"Items\":[[{\"Key\":\"SET.(LCSIMS_ServiceInstance)m_rid.c_rfc_record\",\"Value\":" + value + "}]]}}";
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", related);
+        var comparison = new List<JsonElement>();
+        JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string>
+        { ["RFC Kaydı"] = "c_rfc_record" }, CancellationToken.None, privateComparison: comparison.Add);
+        JsonElement cell = result.GetProperty("ServiceItems")[0][0];
+        cell.GetProperty("Type").GetString().Should().Be(type);
+        cell.GetProperty("Cardinality").GetInt32().Should().Be(2);
+        result.GetRawText().Should().NotContain("private-A");
+        JsonSerializer.Serialize(comparison).Should().NotContain("private-A");
+        handler.Requests.Should().HaveCount(2);
     }
 
     private static TuruncuHatOperationalRecordClient Client(Handler handler, bool readOnly = true)

@@ -6,7 +6,12 @@ namespace SecureOps.Shared.Contracts.InUse;
 public sealed record InUseEvidence(string? Value, string Source);
 
 /// <summary>One related server, retaining independent service/environment evidence.</summary>
-public sealed record InUseServer(string Id, IReadOnlyDictionary<string, InUseEvidence> Fields);
+public sealed record InUseServer(string Id, IReadOnlyDictionary<string, InUseEvidence> Fields)
+{
+    /// <summary>Optional verified RFC observation. Normal source refresh remains unwired pending operator evidence.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public InUseRelatedRequestReporter? RelatedRequestReporter { get; init; }
+}
 
 /// <summary>Read-only source snapshot; relationships are distinct from local assignment.</summary>
 public sealed record InUseSource(string Id, string Code, string Title, InUseEvidence Requester,

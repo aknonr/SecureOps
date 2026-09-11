@@ -7,9 +7,10 @@ using Microsoft.Extensions.Logging;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.OperationalRecords;
 
-if (args.Length is not (5 or 7) || args[4] != "--collect" || (args.Length == 7 && args[5] != "--rfc-contract") || !OperatingSystem.IsWindows())
+if (args.Length is not (5 or 7) || args[4] is not ("--collect" or "--inspect-candidates")
+    || (args.Length == 7 && (args[4] != "--collect" || args[5] != "--rfc-contract")) || !OperatingSystem.IsWindows())
 {
-    Console.WriteLine("Usage (approved TEST Windows host only): InUseEvidence <server-config.json> <source-id> <approved-dictionary.json> <new-private-output.json> --collect [--rfc-contract <approved-rfc-contract.json>]");
+    Console.WriteLine("Usage (approved TEST Windows host only): InUseEvidence <server-config.json> <source-id> <dictionary.json> <new-private-output.json> --inspect-candidates OR --collect [--rfc-contract <verified-rfc-contract.json>]");
     return 2;
 }
 try
@@ -20,6 +21,10 @@ try
     byte[] dictionaryBytes = await File.ReadAllBytesAsync(args[2]);
     Dictionary<string, string> dictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(dictionaryBytes)
         ?? throw new InvalidDataException();
+    if (args[4] == "--inspect-candidates" && (dictionary.Count != 2
+        || dictionary.GetValueOrDefault("RFC Kaydı") != "c_rfc_record"
+        || dictionary.GetValueOrDefault("Virtual PC User") != "c_virtual_pc_user"))
+    { return 2; }
     InUseReferencedRequestContract? referenced = null;
     byte[]? referenceBytes = null;
     if (args.Length == 7)
@@ -28,6 +33,7 @@ try
         { return 2; }
         referenceBytes = await File.ReadAllBytesAsync(args[6]);
         referenced = JsonSerializer.Deserialize<InUseReferencedRequestContract>(referenceBytes) ?? throw new InvalidDataException();
+        referenced.Validate(dictionary);
     }
     IConfiguration configuration = new ConfigurationBuilder().AddJsonFile(args[0], optional: false).Build();
     if (configuration["OperationalRecords:SourceProvider"] != "TuruncuHat"
@@ -47,7 +53,8 @@ try
     byte[] attempt = JsonSerializer.SerializeToUtf8Bytes(new { Status = "StartedNotCompleted", ActorSid = actor.User?.Value, At = DateTimeOffset.UtcNow });
     await output.WriteAsync(attempt, timeout.Token);
     output.Flush(true);
-    JsonElement evidence = await client.DiagnoseAsync(args[1], dictionary, timeout.Token, referenced);
+    var comparison = new List<JsonElement>();
+    JsonElement evidence = await client.DiagnoseAsync(args[1], dictionary, timeout.Token, referenced, comparison.Add);
     byte[] result = JsonSerializer.SerializeToUtf8Bytes(new
     {
         Status = "CollectedNotMapped",
@@ -55,13 +62,14 @@ try
         At = DateTimeOffset.UtcNow,
         DictionarySha256 = Convert.ToHexString(SHA256.HashData(dictionaryBytes)),
         RfcContractSha256 = referenceBytes is null ? null : Convert.ToHexString(SHA256.HashData(referenceBytes)),
-        Evidence = evidence
+        Evidence = evidence,
+        LocalComparison = comparison
     });
     output.Position = 0;
     await output.WriteAsync(result, timeout.Token);
     output.SetLength(result.Length);
     output.Flush(true);
-    Console.WriteLine("Bounded evidence written. Keep actor provenance local; share only the Evidence property.");
+    Console.WriteLine("Bounded evidence written. Keep LocalComparison and actor provenance private; share only Evidence.");
     return 0;
 }
 catch (Exception)

@@ -14,7 +14,9 @@ smoke-checks the no-network usage path, creates per-file size/SHA256 and runtime
 source metadata, and verifies every ZIP entry. It refuses existing destinations;
 it does not replace rc6.14, publish API/UI, deploy, or collect corporate evidence.
 The target needs both .NET 8 shared runtimes, not an SDK or repository. Operator
-instructions and the `{}` dictionary are in `scripts/diagnostics/InUseEvidence`.
+instructions, the legacy `{}` dictionary, DOM candidate dictionary and unfilled
+RFC representation template are in `scripts/diagnostics/InUseEvidence`. Current
+A/B commands are in `operator-reporter-tr.md`; only Evidence may be shared.
 
 `New-ApiDeploymentPackage.ps1` creates a path-preserving API ZIP and SHA256 payload manifest from a completed publish directory. It excludes controlled deployment configuration (`web.config` and `appsettings*.json`) and refuses to overwrite existing artifacts.
 

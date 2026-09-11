@@ -1,5 +1,25 @@
 # ADR-0020: In Use Local Review Workspace
 
+## Related Request Reporter, 2026-09-11
+
+The observed SMSS_oRFF form labels p_rel_requester as Bildiren. Existing
+Requester C# members are compatibility names, not verification of the separate
+Istem Sahibi field. That selector remains unknown. Do not rewrite historical
+snapshots or infer ownership, provisioning, assignment or reviewer identity.
+
+DOM controls establish c_rfc_record and c_virtual_pc_user as direct candidate
+Service Item properties only. The standalone candidate inspection queries these
+through the existing bounded relation transport without a traversal contract.
+An exact RFC hop requires operator-verified cell kind and identity/code meaning.
+It selects only id, p_code and p_rel_requester, includes closed requests, and
+keeps reporter display and stable reference separate. No invented Reporter field
+is required. No candidate dictionary constitutes production mapping approval.
+
+Prepare reusable projection/persistence behavior locally; connect production
+explicit refresh only after sanitized operator evidence validates the mapping.
+List/detail remain database reads. Preserve reviewer assignments, source version
+checks, raw display fingerprints and single-pass plain-text presentation.
+
 ## Display Correction, 2026-09-11
 
 Use persisted trusted access profiles for reviewer labels, never directory scans

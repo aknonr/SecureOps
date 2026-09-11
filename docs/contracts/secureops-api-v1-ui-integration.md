@@ -1,5 +1,36 @@
 # SecureOps API v1 UI Integration Contract
 
+## Related Request Reporter Preparation, 2026-09-11
+
+Each stored server may now carry nullable `relatedRequestReporter`, omitted for
+legacy snapshots. It binds parentId/serviceItemId/rfcReference/referenceKind,
+requestId/requestCode, raw display/userReference, state/displayState/referenceState
+and lastVerifiedAt. The existing JSON aggregate persists this additive member;
+no migration is needed. Normal production refresh does not populate it until
+operator A/B evidence validates the candidate mapping. No new HTTP lookup exists.
+
+Use the exact visible label **İlgili talebi bildiren**, per server, when the
+verified mapping is wired. p_rel_requester is observed as Bildiren, not an
+independently verified Istem Sahibi. Existing Requester names remain compatibility
+members. Do not populate the separate Istem Sahibi or local reviewer assignment.
+TuruncuHatQueryParser reads KEY.p_rel_requester into OperationalRecordSourceItem.Requester;
+DiscoverAsync copies that parent display into InUseSource.Requester. The workbook's
+legacy Requester row and UI parent labels consume it. None of those usages verifies
+the separate Istem Sahibi field or the RFC target; Jira's authenticated reporter
+policy is also independent. Historical snapshots/export archives remain unchanged.
+KEY.p_rel_requester is raw display; SET.p_rel_requester is a separate user reference.
+The shared DisplayText helper decodes once and returns state instead of a current
+person when stale/failed; render as escaped plain text. Legacy rows remain unknown.
+
+State values: ExactMatch, MissingRfc, NotFoundOrNotVisible, AmbiguousMatch,
+IdentityMismatch, Forbidden, Failed, Stale, NotQueried. Display/reference states
+are independently Returned/Empty/Null/Omitted. EffectiveState returns Stale for
+missing/future/older-than-24-hour verification. Failed same-reference refresh
+retains historical evidence with the failure state; unqueried/absent relationships
+retain it as Stale. Verification-time-only changes preserve source fingerprints;
+content/state changes invalidate drafts, without changing manual assignments.
+UI list/detail changes remain with the UI owner after operator mapping evidence.
+
 ## Bounded SDM Pilot, rc6.15
 
 Classification adds ServerRetirement=7 without renumbering v1 values; review-only

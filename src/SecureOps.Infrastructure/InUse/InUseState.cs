@@ -26,26 +26,38 @@ internal static class InUseState
                         missingFields = true;
                     }
                 }
-                return server with { Fields = fields };
+                return server with
+                {
+                    Fields = fields,
+                    RelatedRequestReporter = MergeReporter(server.RelatedRequestReporter, previous?.RelatedRequestReporter)
+                };
             }).ToArray()
             };
             InUseServer[] absent = old.Source.Servers.Where(s => !source.Servers.Any(n => n.Id == s.Id)).ToArray();
             if (absent.Length > 0 || missingFields)
             {
-                InUseServer[] retained = source.Servers.Concat(absent).OrderBy(s => s.Id, StringComparer.Ordinal).ToArray();
+                InUseServer[] retained = source.Servers.Concat(absent.Select(s => s with
+                { RelatedRequestReporter = Stale(s.RelatedRequestReporter) })).OrderBy(s => s.Id, StringComparer.Ordinal).ToArray();
                 source = source with
                 {
-                    Servers = retained.Length <= 100 ? retained : old.Source.Servers,
+                    Servers = retained.Length <= 100 ? retained : old.Source.Servers.Select(s => s with
+                    { RelatedRequestReporter = Stale(s.RelatedRequestReporter) }).ToArray(),
                     ServiceItemsState = "Partial",
                     RelationshipEvidence = "Observed result omitted previously stored service items or fields; prior evidence retained. Completeness and current values require verification."
                 };
             }
         }
         else if (old is not null && source.ServiceItemsState != "Complete")
-        { source = source with { Servers = old.Source.Servers, ServiceOwner = old.Source.ServiceOwner, ProvisioningTeam = old.Source.ProvisioningTeam }; }
+        { source = source with { Servers = old.Source.Servers.Select(s => s with { RelatedRequestReporter = Stale(s.RelatedRequestReporter) }).ToArray(), ServiceOwner = old.Source.ServiceOwner, ProvisioningTeam = old.Source.ProvisioningTeam }; }
         if (old is not null && source.AffectedAssetsState != "Complete")
         { source = source with { AffectedAssetCount = old.Source.AffectedAssetCount }; }
-        string hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(source)));
+        // Verification time is freshness metadata; unchanged source content must not invalidate a draft.
+        InUseSource fingerprint = source with
+        {
+            Servers = source.Servers.Select(s => s.RelatedRequestReporter is null ? s
+            : s with { RelatedRequestReporter = s.RelatedRequestReporter with { LastVerifiedAt = null } }).ToArray()
+        };
+        string hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(fingerprint)));
         if (old is null)
         {
             return new(Guid.NewGuid(), source, hash, 1, 1, null, null, null, now) { FirstSeenAt = now };
@@ -73,7 +85,40 @@ internal static class InUseState
             && r.AffectedAssetCount is not < 0
             && r.Servers.Select(s => s.Id).Distinct(StringComparer.Ordinal).Count() == r.Servers.Count
             && r.Servers.All(s => s.Id.Length is > 0 and <= 100 && s.Fields.Count <= 50
+                && ValidReporter(s.RelatedRequestReporter, r.Id, s.Id)
                 && s.Fields.All(f => f.Key.Length <= 100 && f.Value.Value?.Length is not > 1000 && f.Value.Source.Length <= 300)));
+
+    private static InUseRelatedRequestReporter? Stale(InUseRelatedRequestReporter? reporter) => reporter is null ? null
+        : reporter with { State = "Stale" };
+
+    private static InUseRelatedRequestReporter? MergeReporter(InUseRelatedRequestReporter? next, InUseRelatedRequestReporter? old)
+    {
+        if (next is null)
+        { return Stale(old); }
+        if (next.State == "ExactMatch" || old is null || next.RfcReference != old.RfcReference
+            || next.ReferenceKind != old.ReferenceKind)
+        { return next; }
+        return next with
+        {
+            RequestId = old.RequestId,
+            RequestCode = old.RequestCode,
+            Display = old.Display,
+            UserReference = old.UserReference,
+            LastVerifiedAt = old.LastVerifiedAt
+        };
+    }
+
+    private static bool ValidReporter(InUseRelatedRequestReporter? value, string parent, string server) => value is null
+        || value.ParentId == parent && value.ServiceItemId == server
+        && value.ReferenceKind is "SourceId" or "OrCode"
+        && value.State is "ExactMatch" or "MissingRfc" or "NotFoundOrNotVisible" or "AmbiguousMatch" or "IdentityMismatch"
+            or "Forbidden" or "Failed" or "Stale" or "NotQueried"
+        && value.DisplayState is "Returned" or "Empty" or "Null" or "Omitted"
+        && value.ReferenceState is "Returned" or "Empty" or "Null" or "Omitted"
+        && value.RfcReference?.Length is not > 254 && value.RequestId?.Length is not > 100
+        && value.RequestCode?.Length is not > 100 && value.Display?.Length is not > 1000 && value.UserReference?.Length is not > 100
+        && (value.State != "ExactMatch" || value.LastVerifiedAt is not null && !string.IsNullOrWhiteSpace(value.RequestId)
+            && !string.IsNullOrWhiteSpace(value.RequestCode) && !string.IsNullOrWhiteSpace(value.RfcReference));
 
     private static bool ValidState(string state) => state is "Complete" or "Observed" or "Partial" or "NotQueried" or "Forbidden" or "Failed" or "Ambiguous";
 }
