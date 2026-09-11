@@ -1,5 +1,61 @@
 # API TEST Deployment Readiness
 
+## Verified RFC Reporter Connected, 2026-09-11
+
+Source-only implementation on top of actual HEAD `744b7d37d168bd1da2a8586b134b4f339e4bcec3`.
+The operator supplied evidence-only JSON and attested browser agreement: four
+direct Service Items, SET.c_rfc_record String/OrCode, one exact referenced OR,
+four links, KEY.p_rel_requester display and SET.p_rel_requester user reference.
+This approves the specific RFC/Bildiren mapping, not ownership or Istem Sahibi.
+Private values, LocalComparison, credentials and actor provenance are not stored
+in source. Null Virtual PC User cells do not approve a populated-value contract.
+
+Explicit In Use refresh now resolves each item's own RFC through the existing
+exact resolver/session transport, including closed targets. It deduplicates
+across the refresh, reads at most ten distinct targets and retains every link.
+Identity/code disagreement, missing/ambiguous/denied results and budget overflow
+remain explicit. Existing JSON persistence, audit, concurrency and source hashes
+are reused. Failed/partial reads retain old evidence/time without claiming fresh
+verification; whole failed or omitted-parent refresh also stales old reporters.
+Optional WASAS reviewer assignments and historical archives remain unchanged.
+List/detail show `İlgili talebi bildiren` with RFC, separately per service item
+and grouped only by matching RFC/person/state in the list. Reads use SQL only.
+The narrow Razor integration is part of this explicitly requested delivery.
+
+Local UTF-8 BOM reproduction confirms that direct byte deserialization rejects
+a BOM-bearing JSON input. Dictionary and RFC contract parsing now accept one
+leading UTF-8 BOM, preserving original hash input and the 4096-byte bound. This
+reproduces a compatible failure mechanism, not a forensic claim about the
+operator's unavailable original failed file. Existing executables are unchanged.
+
+Verification: Release solution and standalone collector builds; scoped format
+verification, OpenAPI snapshot checks and public NuGet vulnerability check pass;
+1223 unit tests;
+243 non-SQL integration tests (19 SQL tests skipped in that invocation); all 19
+SQL tests passed separately in the fresh isolated `RfcVerified20260911` harness.
+The harness applied 001-013 only to new synthetic LocalDB databases. An initial
+fixture reviewer lacked review permission and was corrected; rerunning the full
+suite against a retained database hit an existing duplicate-fixture limitation.
+No existing data was deleted to make tests pass. The final fresh-database run
+passed, including adapter -> explicit refresh -> SQL -> new repository reads,
+partial/whole failure, assignment retention, source versions and stale writes.
+Synthetic SQL/browser evidence is not corporate deployment or VDI acceptance.
+
+Playwright journey: `tests/browser/in-use-reporter.cjs`, desktop 1440x900 and
+mobile 390x844, interactive list/detail, grouped/different RFCs, Turkish and
+encoded markup, null RFC, denied stale values, capability denial and unchanged
+DB versions. Screenshots/result are under
+`C:\SecureOpsBuild\validation\inuse-rfc-connected-20260911\browser-verified`.
+Only loopback Demo/Simulation hosts and fake HTTP were used; no corporate calls.
+
+No new migration, runtime configuration, role, authentication or write activation
+is needed. No replacement release was prepared; rc6.15 and both old diagnostic
+deliveries remain unchanged. Source implementation is not a claim about the
+corporate installed binary. Broader source completeness and populated Virtual
+PC User/independent ownership semantics remain unverified. Remote synchronization
+must be checked live; the pre-commit probe failed because credentials were not
+available noninteractively. The final delivery reports the actual push result.
+
 ## RFC Reporter Diagnostic Preparation, 2026-09-11
 
 The standalone delivery now separates DOM-backed candidate inspection (A) from

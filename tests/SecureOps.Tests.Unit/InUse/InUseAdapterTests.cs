@@ -10,7 +10,7 @@ using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Tests.Unit.InUse;
 
-public sealed class InUseAdapterTests
+public sealed partial class InUseAdapterTests
 {
     private const string _row = """
         [{"Key":"KEY.p_rel_requester","Value":"Synthetic requester"},{"Key":"SET.p_description","Value":"Synthetic description"},
@@ -363,7 +363,7 @@ public sealed class InUseAdapterTests
             new EnterpriseIntegrationHealthState(), new EnterpriseIntegrationTelemetry(), NullLogger<TuruncuHatOperationalRecordClient>.Instance);
     }
     private sealed class Handler(string body, string? related = null, HttpStatusCode relatedStatus = HttpStatusCode.OK,
-        string? referenced = null, HttpStatusCode referencedStatus = HttpStatusCode.OK) : HttpMessageHandler
+        string? referenced = null, HttpStatusCode referencedStatus = HttpStatusCode.OK, Func<string, string>? responseForFilter = null) : HttpMessageHandler
     {
         public List<(string Path, string Filter)> Requests { get; } = [];
         public List<string[]> Selects { get; } = [];
@@ -372,6 +372,27 @@ public sealed class InUseAdapterTests
             using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
             Selects.Add(json.RootElement.GetProperty("req").GetProperty("Selects").EnumerateArray().Select(s => s.GetString()!).ToArray());
             Requests.Add((request.RequestUri!.AbsolutePath, json.RootElement.GetProperty("req").GetProperty("Filters")[0].GetString()!));
+            if (responseForFilter is not null)
+            { return new(HttpStatusCode.OK) { Content = new StringContent(responseForFilter(Requests[^1].Filter)) }; }
+            if (Requests.Count > 2 && referenced == "exact-fixture")
+            {
+                string code = Requests[^1].Filter.Split('\'')[1];
+                string id = code[3..];
+                return new(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(new
+                    {
+                        QueryResult = new
+                        {
+                            Items = new[] { new[] {
+                    new { Key = "SET.p_rel_requester", Value = id == "200" ? "800" : "801" },
+                    new { Key = "KEY.p_rel_requester", Value = "Sentetik &#350;ah&#305;s " + id + " &lt;b&gt;" },
+                    new { Key = "SET.p_code", Value = code }, new { Key = "SET.id", Value = id },
+                    new { Key = "SET.m_active", Value = "False" } } }
+                        }
+                    }))
+                };
+            }
             return new(Requests.Count > 2 && referenced is not null ? referencedStatus : Requests.Count > 1 ? relatedStatus : HttpStatusCode.OK)
             { Content = new StringContent(Requests.Count > 2 && referenced is not null ? referenced : Requests.Count == 2 && related is not null ? related : body) };
         }

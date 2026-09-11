@@ -125,3 +125,29 @@ InUse.Refresh are separate. Existing Admin receives these local capabilities;
 explicit InUseReviewer and InUseCoordinator roles allow narrow approval. No
 existing role acquires any additional external-write power. Scheduled refresh
 is deferred to the planned Hangfire Worker after separate hosting approval.
+
+## 2026-09-11 Verified RFC Reporter Wiring
+
+Operator evidence establishes SET.(LCSIMS_ServiceInstance)m_rid.c_rfc_record
+as String / OrCode: four direct items, one distinct exact lookup, four preserved
+links. The operator attests browser agreement. KEY.p_rel_requester is Bildiren
+display and SET.p_rel_requester its reference, not independently verified Istem
+Sahibi, server ownership, provisioning operator or WASAS reviewer. Both Virtual
+PC User cells were null; no populated-value mapping is approved. Private values
+and comparison data are excluded from source. Historical evidence above remains
+an account of its original delivery, not the current wiring contract.
+
+Explicit refresh adds only the verified RFC select, reuses the diagnostic exact
+resolver and existing session/access transport. Each item's own reference is
+resolved once per refresh (maximum ten distinct target reads, existing 45-second
+deadline and ten items per parent). Excess references remain NotQueried. Target
+reads select identity/code/p_rel_requester only, without parent listing filters.
+List/detail remain database-only and show related-request reporter with RFC.
+Narrow UI integration is included in this explicitly requested end-to-end task.
+
+Existing JSON persistence/version/audit boundaries are reused, with no new
+migration, configuration, role or assignment. Failed/omitted evidence retains
+old values and verification time, explicitly stale or failed; timestamps alone
+do not change source fingerprints. A failed whole refresh also stales retained
+reporters without advancing LastSeenAt. Optional reviewer and archives survive.
+Local synthetic verification cannot establish broader corporate acceptance.

@@ -79,7 +79,9 @@
                         <li><div><a href="@($"in-use/{record.Id}")">@record.Source.Code</a><h2>@record.Source.Title</h2>
                             @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }</div>
                             <div><strong>@record.Source.Servers.Count sunucu · @Status(record.Status)</strong>
-                                <p>İlgili sunucu talebinin sahibi: RFC eşlemesi bekleniyor</p>
+                                <p>@InUseRelatedRequestReporter.Label</p>
+                                @foreach (var group in record.Source.Servers.GroupBy(s => new { s.RelatedRequestReporter?.RfcReference, s.RelatedRequestReporter?.Display, s.RelatedRequestReporter?.UserReference, State = s.RelatedRequestReporter?.EffectiveState(DateTimeOffset.UtcNow) }))
+                                { <div>@group.Count() sunucu <InUseReporter Value="group.First().RelatedRequestReporter" /></div> }
                                 <span>WASAS inceleyicisi: @(record.AssigneeLabel ?? "Atanmamış (isteğe bağlı)")</span><br />@Waiting(record)
                                 @if (record.Source.ServiceItemsState is "Partial" or "Failed" or "Forbidden" or "Ambiguous")
                                 { <p>@Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p> }</div>
@@ -105,7 +107,6 @@
                 <h3>Kayıt özeti</h3>
                 <dl class="so-inuse-evidence">
                     <dt>In Use kaydındaki talep eden</dt><dd>@InUseDisplayText.Decode(record.Source.Requester.Value)</dd>
-                    <dt>İlgili sunucu talebinin sahibi</dt><dd>RFC eşlemesi bekleniyor; henüz sorgulanmadı.</dd>
                     <dt>WASAS inceleyicisi</dt><dd>@(record.AssigneeLabel ?? "Atanmamış (isteğe bağlı)")</dd>
                 </dl>
                 <details><summary>Diğer kaynak kimlikleri</summary><dl class="so-inuse-evidence">
@@ -133,9 +134,9 @@
                 @if (_validation is not null) { <p role="alert">@_validation</p><MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">Alana git</MudButton> }
                 @if (record.Source.Servers.Count > 0)
                 {
-                    <div class="so-inuse-workbook" tabindex="0" aria-label="Servis öğesi tablosu"><table><thead><tr><th>Kaynak kimliği</th><th>Adı</th><th>Ortam</th><th>Durum</th><th>Servis / uygulama</th><th>Virtual PC User</th><th>RFC Kaydı</th></tr></thead><tbody>
+                    <div class="so-inuse-workbook" tabindex="0" aria-label="Servis öğesi tablosu"><table><thead><tr><th>Kaynak kimliği</th><th>Adı</th><th>Ortam</th><th>Durum</th><th>Servis / uygulama</th><th>Virtual PC User</th><th>@InUseRelatedRequestReporter.Label · RFC Kaydı</th></tr></thead><tbody>
                         @foreach (InUseServer server in record.Source.Servers)
-                        { <tr><td>@server.Id</td><td>@Field(server, "HOSTNAME")</td><td>@Field(server, "SI_ENVIRONMENT")</td><td>@FieldState(server, "STATUS")</td><td>@Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</td><td>@FieldState(server, "Virtual PC User")</td><td>@FieldState(server, "RFC Kaydı")</td></tr> }
+                        { <tr><td>@server.Id</td><td>@Field(server, "HOSTNAME")</td><td>@Field(server, "SI_ENVIRONMENT")</td><td>@FieldState(server, "STATUS")</td><td>@Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</td><td>@FieldState(server, "Virtual PC User")</td><td><InUseReporter Value="server.RelatedRequestReporter" Detailed="true" /></td></tr> }
                     </tbody></table></div>
                 }
                 @if (record.Source.Servers.Count == 0) { <MudAlert Severity="Severity.Warning">Doğrulanmış sunucu ilişkisi yok. Kaynak ilişki kanıtı gerekli.</MudAlert> }

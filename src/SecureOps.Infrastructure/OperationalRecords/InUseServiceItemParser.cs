@@ -7,7 +7,7 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Exact semantic service-item projection evidenced by the bounded operator collection.</summary>
 public static class InUseServiceItemParser
 {
-    private const string Prefix = "(LCSIMS_ServiceInstance)m_rid.";
+    private const string _prefix = "(LCSIMS_ServiceInstance)m_rid.";
     private static readonly (string Field, string Property, bool Reference)[] _fields =
     [
         ("ENVANTER_ID", "id", false), ("HOSTNAME", "p_name", false),
@@ -19,34 +19,39 @@ public static class InUseServiceItemParser
         ("BUILDING", "p_rel_asset_item.p_rel_lbs", true), ("CITY", "p_rel_asset_item.p_rel_lbs.m_parent", true),
         ("Device_Type", "p_def_category", true), ("ITMC_Service_ID", "c_new_SI_major_project.id", false)
     ];
-    internal static string[] Selects => _fields.Select(f => Prefix + f.Property).ToArray();
+    internal static string[] Selects => _fields.Select(f => _prefix + f.Property).ToArray();
+    internal static string[] ReporterSelects => [.. Selects, _prefix + "c_rfc_record"];
 
     /// <summary>Parses observed rows only; rejects ambiguous identities and never proves global completeness.</summary>
-    public static IReadOnlyList<InUseServer> Parse(JsonElement response)
+    public static IReadOnlyList<InUseServer> Parse(JsonElement response, bool includeRfc = false)
     {
         JsonElement rows = TuruncuHatQueryParser.GetItems(response);
         if (rows.GetArrayLength() > 10)
         { throw new InvalidDataException("Service-item row limit exceeded."); }
-        var allowed = _fields.SelectMany(f => f.Reference ? new[] { "KEY." + Prefix + f.Property, "SET." + Prefix + f.Property }
-            : new[] { "SET." + Prefix + f.Property }).Append("num").ToHashSet(StringComparer.Ordinal);
+        var allowed = _fields.SelectMany(f => f.Reference ? new[] { "KEY." + _prefix + f.Property, "SET." + _prefix + f.Property }
+            : new[] { "SET." + _prefix + f.Property }).Append("num").ToHashSet(StringComparer.Ordinal);
         List<InUseServer> servers = [];
+        if (includeRfc)
+        { allowed.Add("SET." + _prefix + "c_rfc_record"); }
         foreach (JsonElement row in rows.EnumerateArray())
         {
             var cells = new Dictionary<string, string?>(StringComparer.Ordinal);
             Read(row, cells, allowed, 0);
-            if (!cells.TryGetValue("SET." + Prefix + "id", out string? id)
+            if (!cells.TryGetValue("SET." + _prefix + "id", out string? id)
                 || !long.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out long numericId) || numericId <= 0
                 || id != numericId.ToString(CultureInfo.InvariantCulture) || servers.Any(s => s.Id == id))
             { throw new InvalidDataException("Service-item identity is missing or ambiguous."); }
             var fields = new Dictionary<string, InUseEvidence>(StringComparer.Ordinal);
             foreach ((string Field, string Property, bool Reference) field in _fields)
             {
-                string key = (field.Reference ? "KEY." : "SET.") + Prefix + field.Property;
+                string key = (field.Reference ? "KEY." : "SET.") + _prefix + field.Property;
                 fields[field.Field] = Evidence(cells, key);
                 if (field.Reference)
-                { fields["Reference: " + field.Field] = Evidence(cells, "SET." + Prefix + field.Property); }
+                { fields["Reference: " + field.Field] = Evidence(cells, "SET." + _prefix + field.Property); }
             }
             string? serviceId = fields["ITMC_Service_ID"].Value;
+            if (includeRfc)
+            { fields["RFC Kaydı"] = Evidence(cells, "SET." + _prefix + "c_rfc_record"); }
             string? reference = fields["Reference: SERVICE NAME (ÜRÜN/UYGULAMA)"].Value;
             if (serviceId is not null && reference is not null && serviceId != reference)
             { throw new InvalidDataException("Service identity projections disagree."); }

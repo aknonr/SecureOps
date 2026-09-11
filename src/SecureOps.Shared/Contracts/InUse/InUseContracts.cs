@@ -8,7 +8,7 @@ public sealed record InUseEvidence(string? Value, string Source);
 /// <summary>One related server, retaining independent service/environment evidence.</summary>
 public sealed record InUseServer(string Id, IReadOnlyDictionary<string, InUseEvidence> Fields)
 {
-    /// <summary>Optional verified RFC observation. Normal source refresh remains unwired pending operator evidence.</summary>
+    /// <summary>Per-service-item RFC reporter observation from explicit refresh, separate from ownership and assignment.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public InUseRelatedRequestReporter? RelatedRequestReporter { get; init; }
 }

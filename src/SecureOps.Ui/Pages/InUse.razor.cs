@@ -136,6 +136,12 @@ public partial class InUse
             InUseServer? after = current.Source.Servers.SingleOrDefault(s => s.Id == id);
             if (before is null || after is null)
             { yield return (id, "Servis öğesi", before is null ? "Yok" : "Var", after is null ? "Yok" : "Var"); }
+            if (before?.RelatedRequestReporter != after?.RelatedRequestReporter)
+            {
+                static string Reporter(InUseRelatedRequestReporter? r) => r is null ? "Sorgulanmadı"
+                    : $"{r.RfcReference} · {InUseDisplayText.Decode(r.Display)} · {r.UserReference} · {r.EffectiveState(DateTimeOffset.UtcNow)}";
+                yield return (id, InUseRelatedRequestReporter.Label, Reporter(before?.RelatedRequestReporter), Reporter(after?.RelatedRequestReporter));
+            }
             foreach (string field in (before?.Fields.Keys ?? []).Union(after?.Fields.Keys ?? []))
             {
                 string left = before?.Fields.GetValueOrDefault(field) is { } b ? Evidence(b) : "Bilinmiyor";

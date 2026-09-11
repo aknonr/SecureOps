@@ -88,6 +88,16 @@ public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRep
         InUseRefreshState state = await ReadStateAsync(connection, transaction, cancellationToken);
         if (state.Version != expectedVersion)
         { return false; }
+        // Retention is local database evidence, not a source inventory query.
+        InUseRecord[] retained = (await connection.QueryAsync<string>(Command(
+            "SELECT RecordJson FROM ops.InUseRecords WITH (UPDLOCK, HOLDLOCK);", null, cancellationToken, transaction)))
+            .Select(Read<InUseRecord>).Where(r => !(batch?.Records.Any(s => s.Id == r.Source.Id) ?? false)).ToArray();
+        foreach (InUseRecord old in retained)
+        {
+            InUseRecord next = InUseState.RetainUnobserved(old);
+            if (next.Version != old.Version)
+            { await PersistAsync(connection, transaction, next, false, cancellationToken); }
+        }
         foreach (InUseSource source in batch?.Records ?? [])
         {
             string? json = await connection.QuerySingleOrDefaultAsync<string>(Command(

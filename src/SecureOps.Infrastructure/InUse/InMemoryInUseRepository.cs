@@ -77,8 +77,10 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
         {
             if (_state.Version != expectedVersion)
             { return false; }
-            InUseRecord[] next = batch is null ? [] : batch.Records.Select(source => InUseState.Merge(
-                _records.Values.SingleOrDefault(r => r.Source.Id == source.Id), source, evidence.OccurredAt)).ToArray();
+            InUseRecord[] next = (batch?.Records ?? []).Select(source => InUseState.Merge(
+                _records.Values.SingleOrDefault(r => r.Source.Id == source.Id), source, evidence.OccurredAt))
+                .Concat(_records.Values.Where(r => !(batch?.Records.Any(s => s.Id == r.Source.Id) ?? false))
+                    .Select(InUseState.RetainUnobserved)).ToArray();
             await audit.WriteAsync(evidence, cancellationToken);
             foreach (InUseRecord record in next)
             { _records[record.Id] = record; }

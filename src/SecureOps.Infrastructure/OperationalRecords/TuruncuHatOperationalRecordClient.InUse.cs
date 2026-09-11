@@ -29,6 +29,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IInUseSourceClie
             throw new InvalidDataException("In Use batch is malformed or exceeds the local bound.");
         }
         List<InUseSource> records = [];
+        var reporters = new Dictionary<string, InUseRelatedRequestReporter>(StringComparer.Ordinal);
         foreach (OperationalRecordSourceItem item in parsed.Items)
         {
             if (!long.TryParse(item.SourceRecordId, System.Globalization.NumberStyles.None,
@@ -41,10 +42,11 @@ public sealed partial class TuruncuHatOperationalRecordClient : IInUseSourceClie
             try
             {
                 using JsonDocument related = await QueryAsync("rel", [$"#%m_tid%#=100049 and #%m_lid%#={id}"],
-                    InUseServiceItemParser.Selects, "in-use-service-items", cancellationToken, 65536);
+                    InUseServiceItemParser.ReporterSelects, "in-use-service-items", cancellationToken, 65536);
                 source = source with
                 {
-                    Servers = InUseServiceItemParser.Parse(related.RootElement),
+                    Servers = await EnrichReportersAsync(item.SourceRecordId,
+                        InUseServiceItemParser.Parse(related.RootElement, includeRfc: true), reporters, cancellationToken),
                     ServiceItemsState = "Observed",
                     RelationshipEvidence = "TuruncuHat rel m_tid=100049 / m_lid=source OR; exact KEY/SET projection. Observed rows only; completeness unverified."
                 };
@@ -58,5 +60,45 @@ public sealed partial class TuruncuHatOperationalRecordClient : IInUseSourceClie
             records.Add(source);
         }
         return new(records, false, "SourceCompletenessUnverified");
+    }
+
+    private async Task<IReadOnlyList<InUseServer>> EnrichReportersAsync(string parentId, IReadOnlyList<InUseServer> servers,
+        Dictionary<string, InUseRelatedRequestReporter> cache, CancellationToken token)
+    {
+        List<InUseServer> result = [];
+        foreach (InUseServer server in servers)
+        {
+            string? reference = server.Fields["RFC Kaydı"].Value;
+            InUseRelatedRequestReporter reporter = new(parentId, server.Id, reference, "OrCode",
+                null, null, null, null, "MissingRfc", "Omitted", "Omitted", null);
+            if (server.Fields["RFC Kaydı"].Source.StartsWith("Missing response cell:", StringComparison.Ordinal))
+            { reporter = reporter with { State = "Stale" }; }
+            if (reference is not null)
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(reference, @"\AOR-[0-9]{1,20}\z",
+                    System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)))
+                { reporter = reporter with { RfcReference = reference.Length <= 254 ? reference : null, State = "IdentityMismatch" }; }
+                else if (cache.TryGetValue(reference, out InUseRelatedRequestReporter? cached))
+                { reporter = cached; }
+                else if (cache.Count >= 10)
+                { reporter = reporter with { State = "NotQueried" }; }
+                else
+                {
+                    try
+                    {
+                        (reporter, _) = await ReadReferencedRequestAsync(reference, new("c_rfc_record", "SET", "OrCode"), token);
+                        if (reporter.State == "ExactMatch" && (reporter.DisplayState == "Omitted" || reporter.ReferenceState == "Omitted"))
+                        { reporter = reporter with { State = "Stale", LastVerifiedAt = null }; }
+                    }
+                    catch (ExternalIntegrationException ex)
+                    { reporter = reporter with { State = ex.ErrorCode == SecureOps.Shared.Contracts.Api.OperationalErrorCodes.OperationalSourceAuthenticationFailed ? "Forbidden" : "Failed" }; }
+                    catch (Exception ex) when (ex is InvalidDataException or JsonException or TuruncuHatQueryResultException)
+                    { reporter = reporter with { State = "AmbiguousMatch" }; }
+                    cache.Add(reference, reporter);
+                }
+            }
+            result.Add(server with { RelatedRequestReporter = reporter with { ParentId = parentId, ServiceItemId = server.Id } });
+        }
+        return result;
     }
 }

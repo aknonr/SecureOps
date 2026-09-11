@@ -77,6 +77,18 @@ internal static class InUseState
         new(old.Version + 1, now, batch is null ? old.LastSuccessfulAt : now,
             batch?.Complete ?? false, error ?? batch?.Issue);
 
+    internal static InUseRecord RetainUnobserved(InUseRecord old)
+    {
+        if (!old.Source.Servers.Any(s => s.RelatedRequestReporter is { State: not "Stale" }))
+        { return old; }
+        InUseSource source = old.Source with
+        {
+            Servers = old.Source.Servers.Select(s => s with
+            { RelatedRequestReporter = Stale(s.RelatedRequestReporter) }).ToArray()
+        };
+        return Merge(old, source, old.LastSeenAt) with { LastSeenAt = old.LastSeenAt };
+    }
+
     internal static bool Valid(InUseBatch batch) => batch.Records.Count <= 100
         && batch.Records.Select(r => r.Id).Distinct(StringComparer.Ordinal).Count() == batch.Records.Count
         && batch.Records.All(r => !string.IsNullOrWhiteSpace(r.Id) && r.Id.Length <= 100 && r.Code.Length <= 100
@@ -95,6 +107,10 @@ internal static class InUseState
     {
         if (next is null)
         { return Stale(old); }
+        if (next.State == "Stale" && next.RfcReference is null && old is not null)
+        { return Stale(old); }
+        if (next.State == "ExactMatch" && (next.DisplayState == "Omitted" || next.ReferenceState == "Omitted"))
+        { next = next with { State = "Stale", LastVerifiedAt = null }; }
         if (next.State == "ExactMatch" || old is null || next.RfcReference != old.RfcReference
             || next.ReferenceKind != old.ReferenceKind)
         { return next; }

@@ -59,18 +59,13 @@ public sealed partial class TuruncuHatOperationalRecordClient
     {
         try
         {
-            string filter = contract.ReferenceKind == "SourceId" ? $"#%id%#={reference}" : $"#%p_code%#='{reference}'";
-            // No active/catalogue/group filter: an exact related request can be closed or outside In Use.
-            string[] selects = ["id", "p_code", "p_rel_requester"];
-            using JsonDocument response = await QueryAsync("SMSS_oRFF", [filter], selects, "in-use-evidence-rfc", token, 65536);
-            InUseRelatedRequestReporter parsed = InUseRelatedRequestParser.Parse("", "", reference, contract,
-                response.RootElement, DateTimeOffset.UtcNow);
+            (InUseRelatedRequestReporter parsed, object? cells) = await ReadReferencedRequestAsync(reference, contract, token, shape);
             if (parsed.State != "ExactMatch")
             { return new { parsed.State }; }
             return new
             {
                 State = "ExactMatchNotBusinessOwnership",
-                Cells = shape(response.RootElement),
+                Cells = cells,
                 RequesterKey = "KEY.p_rel_requester",
                 ReporterSelector = "p_rel_requester",
                 ReporterLabel = "Bildiren",
@@ -87,7 +82,19 @@ public sealed partial class TuruncuHatOperationalRecordClient
         { return new { State = "MalformedOrAmbiguous" }; }
     }
 
-    internal static Dictionary<string, string?> EvidenceValues(JsonElement row, HashSet<string>? selectedKeys = null)
+    private async Task<(InUseRelatedRequestReporter Reporter, object? Cells)> ReadReferencedRequestAsync(
+        string reference, InUseReferencedRequestContract contract, CancellationToken token, Func<JsonElement, object>? shape = null)
+    {
+        string filter = contract.ReferenceKind == "SourceId" ? $"#%id%#={reference}" : $"#%p_code%#='{reference}'";
+        // Exact related requests may be closed or outside the parent catalogue/group.
+        using JsonDocument response = await QueryAsync("SMSS_oRFF", [filter],
+            ["id", "p_code", "p_rel_requester"], "in-use-evidence-rfc", token, 65536);
+        InUseRelatedRequestReporter parsed = InUseRelatedRequestParser.Parse("", "", reference, contract,
+            response.RootElement, DateTimeOffset.UtcNow);
+        return (parsed, parsed.State == "ExactMatch" ? shape?.Invoke(response.RootElement) : null);
+    }
+
+    internal static Dictionary<string, string?> EvidenceValues(JsonElement row, HashSet<string>? selectedKeys = null, HashSet<string>? stringKeys = null)
     {
         var result = new Dictionary<string, string?>(StringComparer.Ordinal);
         int count = 0;
@@ -103,6 +110,7 @@ public sealed partial class TuruncuHatOperationalRecordClient
             if (selectedKeys is not null && !selectedKeys.Contains(key.GetString()!))
             { return; }
             if (value.ValueKind is not (JsonValueKind.String or JsonValueKind.Null or JsonValueKind.Number)
+                || value.ValueKind == JsonValueKind.Number && (stringKeys?.Contains(key.GetString()!) ?? false)
                 || !result.TryAdd(key.GetString()!, value.ValueKind == JsonValueKind.Number ? value.GetRawText() : value.GetString()))
             { throw new InvalidDataException("Semantic evidence cells required; duplicates are ambiguous."); }
         }

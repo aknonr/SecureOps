@@ -19,8 +19,7 @@ try
         || new FileInfo(args[2]).Length > 4096 || File.Exists(args[3]))
     { return 2; }
     byte[] dictionaryBytes = await File.ReadAllBytesAsync(args[2]);
-    Dictionary<string, string> dictionary = JsonSerializer.Deserialize<Dictionary<string, string>>(dictionaryBytes)
-        ?? throw new InvalidDataException();
+    Dictionary<string, string> dictionary = InUseDiagnosticJson.Read<Dictionary<string, string>>(dictionaryBytes);
     if (args[4] == "--inspect-candidates" && (dictionary.Count != 2
         || dictionary.GetValueOrDefault("RFC Kaydı") != "c_rfc_record"
         || dictionary.GetValueOrDefault("Virtual PC User") != "c_virtual_pc_user"))
@@ -32,7 +31,7 @@ try
         if (!Path.IsPathFullyQualified(args[6]) || new FileInfo(args[6]).Length > 4096)
         { return 2; }
         referenceBytes = await File.ReadAllBytesAsync(args[6]);
-        referenced = JsonSerializer.Deserialize<InUseReferencedRequestContract>(referenceBytes) ?? throw new InvalidDataException();
+        referenced = InUseDiagnosticJson.Read<InUseReferencedRequestContract>(referenceBytes);
         referenced.Validate(dictionary);
     }
     IConfiguration configuration = new ConfigurationBuilder().AddJsonFile(args[0], optional: false).Build();
