@@ -13,7 +13,8 @@ field. Local code prepares per-server reporter evidence and existing JSON merge
 semantics; production refresh and UI rendering await operator A/B evidence and
 the existing UI ownership boundary. No migration is rerun. Corporate binaries
 cannot be identified from source HEAD. No SQL/API, deployment or source write is
-executed by this task. Exact new package metadata follows in the delivery record.
+executed by this task. Exact new package metadata is recorded in
+`docs/release-candidates/2026-09-11-inuse-reporter-diagnostic.md`.
 
 <!-- TEST-RELEASE-RUNBOOK:START -->
 ## Birleşik TEST Teslimatı, rc6.15 (2026-09-10)
