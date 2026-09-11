@@ -24,7 +24,9 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             if (query.Page is < 1 or > 100000 || query.PageSize is < 1 or > 100 || query.Search?.Length > 100
                 || query.View is not ("all" or "mine" or "unassigned") || query.Status is not (null or "Unreviewed" or "Draft" or "Stale"))
             { return InUseResult<InUsePage>.Fail("InUseInvalid"); }
-            return new(await repository.QueryAsync(query, user.Id, token));
+            InUsePage page = await repository.QueryAsync(query, user.Id, token);
+            IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
+            return new(page with { Items = page.Items.Select(r => Label(r, labels)).ToArray() });
         }, token);
 
     /// <summary>Reads local detail without querying corporate data.</summary>
@@ -33,15 +35,24 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         {
             InUseRecord? record = await repository.GetAsync(id, token);
             return record is null ? InUseResult<InUseRecord>.Fail("InUseNotFound")
-                : new(record with { ArchivedVersions = archive?.Versions(id) ?? [] });
+                : new(Label(record, InUseAssigneeLabels.Create(await users.ListUsersAsync(token)))
+                    with
+                { ArchivedVersions = archive?.Versions(id) ?? [] });
         }, token);
 
     /// <summary>Minimal approved-reviewer picker; never resolves source display names into users.</summary>
     public Task<InUseResult<IReadOnlyList<InUseAssignee>>> AssigneesAsync(ClaimsPrincipal principal,
         AccessOperationContext context, CancellationToken token) => RunAsync<IReadOnlyList<InUseAssignee>>(principal, context,
-        Capabilities.InUseAssign, async _ => new((await users.ListUsersAsync(token)).Where(Reviewer)
-            .OrderBy(u => u.CorporateIdentity, StringComparer.Ordinal).Take(200)
-            .Select(u => new InUseAssignee(u.Id, u.CorporateIdentity)).ToArray()), token);
+        Capabilities.InUseAssign, async _ =>
+        {
+            ApplicationUser[] eligible = (await users.ListUsersAsync(token)).Where(Reviewer).ToArray();
+            IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(eligible);
+            return new(eligible.OrderBy(u => labels[u.Id], StringComparer.Ordinal).ThenBy(u => u.Id).Take(200)
+                .Select(u => new InUseAssignee(u.Id, labels[u.Id])).ToArray());
+        }, token);
+
+    private static InUseRecord Label(InUseRecord record, IReadOnlyDictionary<Guid, string> labels) => record.AssigneeId is Guid id
+        ? record with { AssigneeLabel = labels.GetValueOrDefault(id) ?? $"Kayıtlı inceleyici · {id:D}" } : record;
 
     /// <summary>Refreshes a bounded independent scope, with durable command tracking and no deletion.</summary>
     public Task<InUseResult<InUseRefreshState>> RefreshAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -98,7 +109,13 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             ApplicationUser? assignee = request.AssigneeId is Guid target ? await users.GetUserAsync(target, token) : null;
             if (request.AssigneeId.HasValue && (assignee is null || !Reviewer(assignee)))
             { return InUseResult<InUseRecord>.Fail("InUseAssigneeUnavailable"); }
-            InUseRecord next = old with { Version = old.Version + 1, AssigneeId = assignee?.Id, AssigneeLabel = assignee?.CorporateIdentity };
+            IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
+            InUseRecord next = old with
+            {
+                Version = old.Version + 1,
+                AssigneeId = assignee?.Id,
+                AssigneeLabel = assignee is null ? null : labels.GetValueOrDefault(assignee.Id) ?? InUseAssigneeLabels.Create([assignee])[assignee.Id]
+            };
             return await SaveAsync(next, request.ExpectedVersion, Audit(user, context, "Assigned",
                 new { id, PreviousAssignee = old.AssigneeId, next.AssigneeId, request.Reason, next.Version }), token);
         }, token);
@@ -151,7 +168,8 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             if (request.Archive && InUseChecks.Missing(record.Source, record.Draft.Answers) is { } missing)
             {
                 string label = missing.Check switch { "InternetOut" => "Sunucudan internete erişim", "InternetIn" => "İnternetten sunucuya erişim", _ => "Mikrosegmentasyon" };
-                return new(null, "InUseIncomplete", $"{missing.ServerId}: {label} için Evet veya Hayır seçin. Taslak kaydedilebilir; rapor hazır değil.");
+                string serverName = InUseDisplayText.Decode(record.Source.Servers.Single(s => s.Id == missing.ServerId).Fields.GetValueOrDefault("HOSTNAME")?.Value);
+                return new(null, "InUseIncomplete", $"{serverName} ({missing.ServerId}): {label} için Evet veya Hayır seçin. Taslak kaydedilebilir; rapor hazır değil.");
             }
             if (request.Archive && !InUseChecks.RelationshipReady(record.Source))
             { return InUseResult<InUseReport>.Fail("InUseIncomplete"); }
@@ -168,8 +186,11 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             return saved ? new(report) : InUseResult<InUseReport>.Fail("InUseConflict");
         }, token);
 
-    private async Task<InUseResult<InUseRecord>> SaveAsync(InUseRecord next, long expected, AuditEvent audit, CancellationToken token) =>
-        await repository.SaveAsync(next, expected, audit, token) ? new(next) : InUseResult<InUseRecord>.Fail("InUseConflict");
+    private async Task<InUseResult<InUseRecord>> SaveAsync(InUseRecord next, long expected, AuditEvent audit, CancellationToken token)
+    {
+        IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
+        return await repository.SaveAsync(next, expected, audit, token) ? new(Label(next, labels)) : InUseResult<InUseRecord>.Fail("InUseConflict");
+    }
 
     /// <summary>Audited bounded diagnostic; no enrichment, assignment or source mutation.</summary>
     public Task<InUseResult<JsonElement>> DiagnoseAsync(ClaimsPrincipal principal, AccessOperationContext context,

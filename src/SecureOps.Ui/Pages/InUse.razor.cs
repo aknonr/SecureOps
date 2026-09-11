@@ -157,7 +157,7 @@ public partial class InUse
             new ConfirmInUseRequest(_record.Version, Guid.NewGuid(), report.Sha256), _lifetime.Token));
     });
     private static string Waiting(InUseRecord record) => InUseProgress.Created(record.Source, DateTimeOffset.UtcNow) is { } created
-        ? $"Kaynak açılışından beri {(DateTimeOffset.UtcNow - created).Days} gün · {record.Source.Creation!.Source}"
+        ? $"Kaynak açılışından beri {(DateTimeOffset.UtcNow - created).Days} gün"
         : "Kaynak açılış tarihi bilinmiyor" + (record.FirstSeenAt is { } seen ? $" · WASAS ilk görülme: {seen.ToLocalTime():g} (kaynak yaşı değil)" : " · Yerel ilk görülme bilinmiyor");
     private Task DownloadAsync(long? archivedVersion = null) => ExecuteAsync(async () =>
     {
@@ -175,7 +175,7 @@ public partial class InUse
         if (missing is not null)
         {
             _editingServer = missing.ServerId;
-            _validation = $"{missing.ServerId}: {Check(missing.Check)} için Evet veya Hayır seçin. Bilinmiyor cevabı yalnızca taslak olarak kaydedilebilir.";
+            _validation = $"{Field(_record.Source.Servers.Single(s => s.Id == missing.ServerId), "HOSTNAME")} ({missing.ServerId}): {Check(missing.Check)} için Evet veya Hayır seçin. Bilinmiyor cevabı yalnızca taslak olarak kaydedilebilir.";
             _focusAnswer = InUseChecks.OperatorCodes.ToList().IndexOf(missing.Check);
             return false;
         }
@@ -263,7 +263,13 @@ public partial class InUse
         "ClosedVerified" => "Görev tamamlandı; OR kapalı durumu kaynak okumasıyla doğrulandı.",
         _ => "Sonuç belirsiz; mutabakat gerekli. Dış yazmayı otomatik tekrarlamayın."
     };
-    private static string Field(InUseServer server, string field) => server.Fields.GetValueOrDefault(field)?.Value ?? "Bilinmiyor";
+    private static string Field(InUseServer server, string field) => server.Fields.GetValueOrDefault(field)?.Value is { } value
+        ? InUseDisplayText.Field(field, value) : "Bilinmiyor";
+    private static string FieldState(InUseServer server, string field) => !server.Fields.TryGetValue(field, out InUseEvidence? evidence)
+        ? "Sorgulanmadı" : evidence.Source.StartsWith("Missing response cell:", StringComparison.Ordinal)
+        ? "Yanıtta alan yok" : evidence.Source.StartsWith("Prior value retained;", StringComparison.Ordinal)
+        ? Field(server, field) + " (önceki veri)" : string.IsNullOrWhiteSpace(evidence.Value)
+        ? evidence.Source.StartsWith("TuruncuHat:", StringComparison.Ordinal) ? "Kaynakta boş" : "Doğrulanmadı" : Field(server, field);
     private static string Time(DateTimeOffset? value) => value?.ToLocalTime().ToString("g") ?? "Henüz yok";
     private static string Status(string value) => value switch { "Draft" => "Yerel taslak", "Stale" => "Yeniden inceleme gerekli", _ => "İncelenmedi" };
     private static string Answer(string value) => value switch { "Yes" => "Evet", "No" => "Hayır", "NotApplicable" => "Uygulanamaz", _ => "Bilinmiyor / doğrulanmadı" };

@@ -23,6 +23,10 @@
 .so-inuse .so-inuse-check { display: flex; align-items: center; gap: .6rem; margin: .75rem 0; }
 .so-inuse-workbook { overflow: auto; max-height: 28rem; border: 1px solid var(--so-border); margin-top: 1rem; }
 .so-inuse-workbook table { border-collapse: collapse; }
+.so-inuse-workbook th { text-align: left; padding: .65rem .5rem; background: var(--so-surface); }
+.so-inuse-records p { margin: .35rem 0; }
+.so-inuse [data-guide=inuse-owner] { padding-top: .25rem; }
+.so-inuse select:focus-visible, .so-inuse summary:focus-visible { outline: 2px solid var(--so-text); outline-offset: 2px; }
 .so-inuse-workbook td { border: 1px solid var(--so-border); padding: .5rem; min-width: 10rem; max-width: 24rem; }
 @media (max-width: 700px) {
     .so-inuse-filters, .so-inuse-answer, .so-inuse-records li, .so-inuse-evidence { grid-template-columns: minmax(0, 1fr); }

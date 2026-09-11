@@ -495,6 +495,73 @@ active LOCAL work; the combined milestone is NOT complete.
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 
+#### Display Acceptance Correction, 2026-09-11 (Source Only)
+
+Scope: 19 files, 584 changed lines (+536/-48); no scope exception.
+
+Start: `428160968c5309c89cd1267616b5444b017b2220`, expected feature branch,
+only pre-existing `.vscode/` untracked. rc6.15 remains unchanged and does not
+contain this fix. No release/deployment, corporate call, SQL repair or auth change.
+
+Causes and corrected boundaries:
+- Assignees previously projected CorporateIdentity directly. The existing
+  security.Users DisplayName/LoginName profile now supplies picker and assigned
+  record labels. Duplicate/missing names get a collision-checked application-ID
+  suffix; IDs, eligibility, assignment concurrency and actor audit are unchanged.
+  Reads batch existing local access records, never AD/OIDC per row. Old stored
+  assignment labels are refreshed in the read projection, not repaired in SQL.
+  Missing profiles use the existing successful OIDC login/profile-upsert path;
+  the current-user header is not evidence of another user's saved profile.
+- Root title/description were already HtmlDecoded; requester and service fields
+  were not. InUseDisplayText decodes those display values ONCE at UI/XLSX output,
+  including old persisted rows. Raw source snapshots, IDs, hashes and historical
+  notes remain unchanged. Razor escapes plain text; XLSX uses inline strings and
+  formula protection AFTER decoding. No raw HTML rendering. Existing archived
+  XLSX stays byte-identical; save a new draft version for a corrected new report.
+- Parent requester is now `In Use kaydındaki talep eden`, never RFC owner.
+  `Sunucu Kullanıma Alma Kontrolleri` retains three questions, explicit bulk
+  differences, exceptions, optional secondary assignment and source-version
+  checks. Technical evidence is collapsed under the same authorized source view.
+  Specific Turkish missing-answer messages name server/question and restore focus.
+
+RFC and Virtual PC User are **not requested / runtime mapping not implemented**:
+the real selects are still the verified 15 legacy fields. Neither field appears
+in the 27-cell evidence, parser projection or persisted runtime field dictionary;
+DTO forwarding does not lose them. The UI now says Sorgulanmadı instead of implying
+an empty source value. Null returned evidence, omitted cells and retained prior
+values remain distinct. No RFC owner, Reporter, creator or affected-asset mapping
+was invented. Optional collector ReporterProperty no longer blocks the exact
+requester-only hop; tests prove deduplication and closed/out-of-scope exact lookup.
+That diagnostic is not yet a persisted runtime ownership implementation.
+
+Next single evidence action: inspect only the RFC and Virtual PC User controls
+on one explicitly related Service Item, per `scripts/diagnostics/InUseEvidence/README.md`.
+No supported metadata/detail endpoint is established; do not guess one. Return
+two bounded sanitized candidate-attribute fragments, not page HTML/HAR/values.
+Then verify exact selectors and SET/KEY identity-or-code meaning with the existing
+protected-config collector. Old `6e05b45` cannot accept the newer RFC-hop option.
+
+Verification: Release solution and standalone collector builds passed, zero
+warnings/errors; 99 focused unit, 28 hosted API/OpenAPI/access tests and 6 actual
+isolated In Use SQL tests passed (fresh 001-013). Scoped formatter passes excluding
+pre-existing IDE1006 naming diagnostics. No API schema/dependency change.
+Published local Demo/Simulation browser: same synthetic stored system requester,
+encoded Turkish/markup text, missing/duplicate OIDC profiles, long titles and 2/4
+servers; list/review/preview, bulk exceptions, incomplete draft/focus, authenticated
+archive, direct API denial and tour non-mutation passed at 1440/390, light/dark.
+Existing full In Use journey also passed conflict/edit preservation and pagination.
+One old assertion required the new server-name error text; one new browser search
+ran before interactive readiness and passed after the existing busy-state barrier.
+Neither is claimed as corporate/VDI acceptance. No real VDI test was performed.
+
+Evidence: `C:\SecureOpsBuild\validation\inuse-display-20260911\browser\before`,
+`after-final`, `regression-final` (screenshots, results and synthetic XLSX).
+The initial `after` run additionally shows the named assigned reviewer before
+the optional unassignment journey. Local isolated database:
+`SecureOps_ResourcesV1_inuse_display_20260911`, retained. No new migrations,
+grants, settings, scheduler, external-write capability or retention policy.
+Runtime schema remains 001-013; private report/DP prerequisites remain as rc6.15.
+
 #### Stored Overview And Local Completion Journal, 2026-09-10
 
 Start: `4fc1f80d632a89d2f06e3640512afcce82c7cf56`, same feature branch. This

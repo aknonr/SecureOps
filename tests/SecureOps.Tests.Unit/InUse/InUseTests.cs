@@ -364,6 +364,32 @@ public sealed partial class InUseTests
         (await f.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record);
     }
 
+    [Fact]
+    public async Task Assignees_UseSavedProfiles_RefreshOldLabels_WithoutChangingStoredIdentityOrVersions()
+    {
+        var f = new Fixture();
+        ApplicationUser known = f.User with { CorporateIdentity = "oidc:synthetic-known", AuthenticationSource = "oidc", DisplayName = "Deniz Örnek" };
+        ApplicationUser missing = known with { Id = Guid.NewGuid(), DisplayName = null };
+        ApplicationUser disabled = known with { Id = Guid.NewGuid(), Status = AccessStatus.Disabled };
+        f.Users.ListUsersAsync(_token).Returns(new[] { known, missing, disabled });
+        f.Users.GetUserAsync(known.Id, _token).Returns(known);
+        InUseRecord r = await f.ImportAsync();
+        await f.Repository.SaveAsync(r with { Version = r.Version + 1, AssigneeId = known.Id, AssigneeLabel = known.CorporateIdentity },
+            r.Version, new AuditEvent { Actor = "synthetic", Action = "SyntheticOldAssignment" }, _token);
+        r = (await f.Repository.GetAsync(r.Id, _token))!;
+        IReadOnlyList<InUseAssignee> picker = (await f.Service.AssigneesAsync(_principal, _context, _token)).Value!;
+        picker.Select(p => p.Id).Should().BeEquivalentTo(new[] { known.Id, missing.Id });
+        picker.Should().Contain(p => p.Id == known.Id && p.Label == "Deniz Örnek");
+        (await f.Service.GetAsync(_principal, _context, r.Id, _token)).Value!.AssigneeLabel.Should().StartWith("Deniz Örnek");
+        (await f.Service.QueryAsync(_principal, _context, new(), _token)).Value!.Items.Single(i => i.Id == r.Id).AssigneeLabel.Should().StartWith("Deniz Örnek");
+        (await f.Repository.GetAsync(r.Id, _token)).Should().BeEquivalentTo(r);
+        InUseRecord saved = (await f.Service.SaveDraftAsync(_principal, _context, r.Id, new(r.Version, r.SourceVersion, [], ""), _token)).Value!;
+        saved.AssigneeId.Should().Be(known.Id);
+        saved.AssigneeLabel.Should().StartWith("Deniz Örnek");
+        (await f.Service.AssignAsync(_principal, _context, saved.Id, new(saved.Version, disabled.Id, "Denied"), _token)).Error.Should().Be("InUseAssigneeUnavailable");
+        await f.Source.Received(1).DiscoverAsync(Arg.Any<CancellationToken>());
+    }
+
     private sealed class Fixture
     {
         public IAuditWriter Audit { get; } = Substitute.For<IAuditWriter>();
@@ -371,6 +397,7 @@ public sealed partial class InUseTests
         public InMemoryInUseRepository Repository { get; }
         public InUseService Service { get; }
         public ApplicationUser User { get; }
+        public IAccessRepository Users { get; } = Substitute.For<IAccessRepository>();
         public Fixture(string role = "Admin", InUseReportArchive? archive = null)
         {
             Repository = new(Audit);
@@ -378,8 +405,9 @@ public sealed partial class InUseTests
             IApplicationAccessService access = Substitute.For<IApplicationAccessService>();
             access.GetCurrentAsync(Arg.Any<ClaimsPrincipal>(), Arg.Any<AccessOperationContext>(), Arg.Any<CancellationToken>())
                 .Returns(AccessServiceResult<EnsureAccessUserResult>.Success(new(User, null, false, false)));
-            IAccessRepository users = Substitute.For<IAccessRepository>();
+            IAccessRepository users = Users;
             users.GetUserAsync(User.Id, Arg.Any<CancellationToken>()).Returns(User);
+            users.ListUsersAsync(Arg.Any<CancellationToken>()).Returns(new[] { User });
             Service = new(Repository, Source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance, archive);
         }
         public async Task<InUseRecord> ImportAsync()

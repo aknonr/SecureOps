@@ -45,8 +45,9 @@ public sealed partial class TuruncuHatOperationalRecordClient
             string lookup = contract.ReferenceKind == "SourceId" ? "id" : "p_code";
             string filter = contract.ReferenceKind == "SourceId" ? $"#%id%#={reference}" : $"#%p_code%#='{reference}'";
             // No active/catalogue/group filter: an exact related request can be closed or outside In Use.
-            using JsonDocument response = await QueryAsync("SMSS_oRFF", [filter],
-                ["id", "p_code", "p_rel_requester", contract.ReporterProperty], "in-use-evidence-rfc", token, 65536);
+            string[] selects = contract.ReporterProperty is { } reporter
+                ? ["id", "p_code", "p_rel_requester", reporter] : ["id", "p_code", "p_rel_requester"];
+            using JsonDocument response = await QueryAsync("SMSS_oRFF", [filter], selects, "in-use-evidence-rfc", token, 65536);
             JsonElement rows = TuruncuHatQueryParser.GetItems(response.RootElement);
             if (rows.GetArrayLength() != 1)
             { return new { State = rows.GetArrayLength() == 0 ? "NotFoundOrNotVisible" : "AmbiguousMatch" }; }
@@ -59,7 +60,10 @@ public sealed partial class TuruncuHatOperationalRecordClient
                 State = "ExactMatchNotBusinessOwnership",
                 Cells = shape(response.RootElement),
                 RequesterKey = "KEY.p_rel_requester",
-                ReporterSelector = contract.ReporterProperty
+                ReporterSelector = contract.ReporterProperty,
+                ReporterState = contract.ReporterProperty is null ? "NotQueried" : "Requested",
+                RequesterState = !cells.ContainsKey("KEY.p_rel_requester") ? "Omitted"
+                    : string.IsNullOrWhiteSpace(cells["KEY.p_rel_requester"]) ? "Empty" : "Returned"
             };
         }
         catch (ExternalIntegrationException ex)

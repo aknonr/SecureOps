@@ -3,14 +3,14 @@ using System.Text.RegularExpressions;
 namespace SecureOps.Infrastructure.OperationalRecords;
 
 /// <summary>Operator-supplied source-owner contract for one diagnostic RFC hop, never runtime mapping approval.</summary>
-public sealed record InUseReferencedRequestContract(string RfcProperty, string ReferenceCellKind, string ReferenceKind, string ReporterProperty)
+public sealed record InUseReferencedRequestContract(string RfcProperty, string ReferenceCellKind, string ReferenceKind, string? ReporterProperty = null)
 {
     internal void Validate(IReadOnlyDictionary<string, string> dictionary)
     {
-        if (!Direct(RfcProperty) || !Direct(ReporterProperty) || ReporterProperty == "p_rel_requester"
+        if (!Direct(RfcProperty) || (ReporterProperty is not null && (!Direct(ReporterProperty) || ReporterProperty == "p_rel_requester"))
             || ReferenceCellKind is not ("SET" or "KEY") || ReferenceKind is not ("SourceId" or "OrCode")
             || !dictionary.TryGetValue("RFC Kaydı", out string? rfc) || rfc != RfcProperty)
-        { throw new InvalidDataException("Approved RFC identity and separate Reporter contract required."); }
+        { throw new InvalidDataException("Approved RFC identity contract required; optional Reporter must have a separate verified selector."); }
     }
 
     private static bool Direct(string? value) => value is not null

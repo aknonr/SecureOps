@@ -57,7 +57,7 @@ public static class InUseWorkbook
             new[] { "ServiceItemsState", record.Source.ServiceItemsState },
             new[] { "AffectedAssetsState", record.Source.AffectedAssetsState, record.Source.AffectedAssetCount?.ToString(CultureInfo.InvariantCulture) ?? "Unknown" },
             new[] { "TechnicalCreator", record.Source.Creator?.Value ?? "Unknown", record.Source.Creator?.Source ?? "Unverified" },
-            new[] { "Requester", record.Source.Requester.Value ?? "Unknown", record.Source.Requester.Source },
+            new[] { "Requester", InUseDisplayText.Decode(record.Source.Requester.Value), record.Source.Requester.Source },
             new[] { "ServiceOwner", record.Source.ServiceOwner.Value ?? "Unknown", record.Source.ServiceOwner.Source },
             new[] { "ProvisioningTeam", record.Source.ProvisioningTeam.Value ?? "Unknown", record.Source.ProvisioningTeam.Source },
             new[] { "LocalAssignee", record.AssigneeId?.ToString("D") ?? "Unassigned", "Authorized manual application assignment" }
@@ -66,7 +66,7 @@ public static class InUseWorkbook
         foreach (InUseServer server in record.Source.Servers)
         {
             evidenceRows.AddRange(server.Fields.OrderBy(f => f.Key, StringComparer.Ordinal)
-                .Select(f => new[] { server.Id, f.Key, f.Value.Value ?? "Unknown", f.Value.Source }));
+                .Select(f => new[] { server.Id, f.Key, InUseDisplayText.Field(f.Key, f.Value.Value), f.Value.Source }));
             evidenceRows.AddRange(record.Draft.Answers.Where(a => a.ServerId == server.Id)
                 .Select(a => new[] { a.ServerId, a.Check, a.Value, a.Evidence }));
         }
@@ -95,7 +95,7 @@ public static class InUseWorkbook
     private static string Value(InUseRecord record, InUseServer server, string field)
     {
         if (!field.StartsWith("check:", StringComparison.Ordinal))
-        { return server.Fields.TryGetValue(field, out InUseEvidence? value) ? value.Value ?? "Unknown" : "Unknown"; }
+        { return server.Fields.TryGetValue(field, out InUseEvidence? value) ? InUseDisplayText.Field(field, value.Value) : "Unknown"; }
         if (!InUseChecks.OperatorCodes.Contains(field[6..]))
         { return "Unknown / not verified"; }
         string? answer = record.Draft!.Answers.SingleOrDefault(a => a.ServerId == server.Id && a.Check == field[6..])?.Value;

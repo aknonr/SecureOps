@@ -7,9 +7,9 @@
 @inject ICurrentAccessProvider AccessProvider
 @inject IJSRuntime Js
 
-<PageTitle>In Use · @WasasBrand.Name</PageTitle>
+<PageTitle>Sunucu Kullanıma Alma Kontrolleri · @WasasBrand.Name</PageTitle>
 <div class="so-page so-page--wide so-inuse">
-    <SoPageHeader Title="In Use">
+    <SoPageHeader Title="Sunucu Kullanıma Alma Kontrolleri" Lead="Sunucuları kontrol edin, üç soruyu yanıtlayın ve Excel raporunu hazırlayın.">
         <Actions>
             @if (Id.HasValue) { <MudButton Href="in-use" StartIcon="@Icons.Material.Filled.ArrowBack">Listeye dön</MudButton> }
             @if (Can(Capabilities.InUseView)) { <ResourceHelp Surface="@(Id.HasValue ? "inuse-review" : "inuse-list")" Disabled="_busy" /> }
@@ -35,9 +35,10 @@
                 { <li>@answer.ServerId · @Check(answer.Check): kayıtlı @Answer(current.Draft?.Answers.FirstOrDefault(s => s.ServerId == answer.ServerId && s.Check == answer.Check)?.Value ?? "Unknown") → yerel @Answer(answer.Value)</li> }</ul>
                 @if (current.SourceVersion != previous.SourceVersion)
                 {
-                    <p>Kaynak değişti: @current.Source.Title · @Evidence(current.Source.Requester) · @current.Source.RelationshipEvidence</p>
+                    <p>Kaynak değişti: @current.Source.Title · @InUseDisplayText.Decode(current.Source.Requester.Value)</p>
+                    <details><summary>Değişen kaynak kanıtı</summary>
                     <ul>@foreach (var change in SourceChanges(previous, current))
-                    { <li>@change.Server · @change.Field: @change.Before → @change.After</li> }</ul>
+                    { <li>@change.Server · @change.Field: @change.Before → @change.After</li> }</ul></details>
                     <p>Yalnız aynı kaynak kimliğine sahip sunucuların cevapları korunur. Yeni sunucular Bilinmiyor ile başlar; kaydetmeden önce doğrulayın.</p>
                 }
                 <MudButton OnClick="AcceptComparison" Disabled="_busy" StartIcon="@Icons.Material.Filled.Check">Farkları inceledim; yerel cevaplarla devam et</MudButton>
@@ -63,7 +64,9 @@
                 {
                     <p>Son başarılı okuma: @Time(_page.Refresh.LastSuccessfulAt)</p>
                     @if (_page.Refresh.Stale) { <MudAlert Severity="Severity.Warning">@RefreshIssue(_page.Refresh.Issue) Kayıtlı veriler korunur.</MudAlert> }
-                    <p>@_page.Total kayıtlı eşleşme · Kaynak kapsamı: @(_page.Refresh.Complete ? "Tam yerel sorgu sonucu" : "Tamlığı doğrulanmadı")</p>
+                    else if (_page.Items.Any(r => r.Source.ServiceItemsState == "Observed"))
+                    { <p>Gözlenen servis öğeleri gösteriliyor; ilişkilerin tamlığı doğrulanmadı.</p> }
+                    <p>@_page.Total kayıtlı eşleşme</p>
                 }
             </section>
             <section data-guide="inuse-list" aria-label="In Use kayıtları">
@@ -75,9 +78,11 @@
                     {
                         <li><div><a href="@($"in-use/{record.Id}")">@record.Source.Code</a><h2>@record.Source.Title</h2>
                             @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }</div>
-                            <div>@Status(record.Status)<br />WASAS inceleyicisi: @(record.AssigneeLabel ?? "Atanmamış")<br />Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)
-                                <br />Virtual PC User: @string.Join("; ", record.Source.Servers.Select(s => Evidence(s.Fields.GetValueOrDefault("Virtual PC User") ?? new(null, "Eşleme bekleniyor"))).DefaultIfEmpty("Eşleme bekleniyor").Distinct())
-                                <br />Talep eden: @Evidence(record.Source.Requester)<br />@Waiting(record)</div>
+                            <div><strong>@record.Source.Servers.Count sunucu · @Status(record.Status)</strong>
+                                <p>İlgili sunucu talebinin sahibi: RFC eşlemesi bekleniyor</p>
+                                <span>WASAS inceleyicisi: @(record.AssigneeLabel ?? "Atanmamış (isteğe bağlı)")</span><br />@Waiting(record)
+                                @if (record.Source.ServiceItemsState is "Partial" or "Failed" or "Forbidden" or "Ambiguous")
+                                { <p>@Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p> }</div>
                             <MudButton Href="@($"in-use/{record.Id}")" EndIcon="@Icons.Material.Filled.ArrowForward">İncele</MudButton></li>
                     }
                     </ul>
@@ -93,15 +98,15 @@
         else if (_record is { } record)
         {
             <h2>@record.Source.Code · @record.Source.Title</h2>
-            <p>@Status(record.Status) · Veri sürümü @record.SourceVersion · Kayıt sürümü @record.Version · Son okuma @Time(record.LastSeenAt)</p>
-            <MudAlert Severity="Severity.Info">@Waiting(record) · SLA/gecikme eşiği tanımlanmadı.</MudAlert>
+            <p>@Status(record.Status) · Son okuma @Time(record.LastSeenAt) · @Waiting(record)</p>
             @if (record.Source.Synthetic) { <MudAlert Severity="Severity.Info">Sentetik yerel veri; kurumsal doğrulama değildir.</MudAlert> }
             @if (record.Status == "Stale") { <MudAlert Severity="Severity.Warning">Kaynak değişti. Önceki taslak güncel değildir; cevapları yeniden doğrulayın.</MudAlert> }
             <section class="so-inuse-band" data-guide="inuse-owner">
-                <h3>Sorumluluk ve kaynak kanıtı</h3>
+                <h3>Kayıt özeti</h3>
                 <dl class="so-inuse-evidence">
-                    <dt>İlk talep sahibi</dt><dd>@Evidence(record.Source.Requester)</dd>
-                    <dt>WASAS inceleyicisi</dt><dd>@(record.AssigneeLabel ?? "Atanmamış") · Yerel, yetkili uygulama ataması</dd>
+                    <dt>In Use kaydındaki talep eden</dt><dd>@InUseDisplayText.Decode(record.Source.Requester.Value)</dd>
+                    <dt>İlgili sunucu talebinin sahibi</dt><dd>RFC eşlemesi bekleniyor; henüz sorgulanmadı.</dd>
+                    <dt>WASAS inceleyicisi</dt><dd>@(record.AssigneeLabel ?? "Atanmamış (isteğe bağlı)")</dd>
                 </dl>
                 <details><summary>Diğer kaynak kimlikleri</summary><dl class="so-inuse-evidence">
                     <dt>Teknik kayıt oluşturucusu</dt><dd>@Evidence(record.Source.Creator ?? new(null, "Kaynak sözleşmesi doğrulanmadı"))</dd>
@@ -115,19 +120,22 @@
                             @foreach (InUseAssignee person in _assignees) { <option value="@person.Id">@person.Label</option> }</select></label>
                         <label>Atama gerekçesi<input aria-label="Atama gerekçesi" maxlength="500" @bind="_reason" @bind:event="oninput" /></label>
                         <MudButton OnClick="AssignAsync" Disabled="@(_busy || _dirty || string.IsNullOrWhiteSpace(_reason))" StartIcon="@Icons.Material.Filled.PersonAdd">Atamayı kaydet</MudButton>
-                    </div></details>
+                    </div>
+                    @if (_assignees.Any(p => p.Label.StartsWith("Profil adı bekleniyor", StringComparison.Ordinal)))
+                    { <p>Profil adı eksik kullanıcılar sonraki başarılı OIDC girişinde güncellenir. Kimliğinden emin olmadığınız kullanıcıya atama yapmayın.</p> }
+                    </details>
                 }
                 <p role="status">Sonraki adım: @NextAction</p>
             </section>
             <section class="so-inuse-band" data-guide="inuse-servers">
-                <h3>1. Sunucuları kontrol et</h3><p>@record.Source.RelationshipEvidence</p>
-                <p>Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count) · Etkilenen varlıklar: @Relationship(record.Source.AffectedAssetsState, record.Source.AffectedAssetCount)</p>
+                <h3>1. Sunucuları kontrol et</h3>
+                <p>Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p>
                 @if (_validation is not null) { <p role="alert">@_validation</p><MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">Alana git</MudButton> }
                 @if (record.Source.Servers.Count > 0)
                 {
                     <div class="so-inuse-workbook" tabindex="0" aria-label="Servis öğesi tablosu"><table><thead><tr><th>Kaynak kimliği</th><th>Adı</th><th>Ortam</th><th>Durum</th><th>Servis / uygulama</th><th>Virtual PC User</th><th>RFC Kaydı</th></tr></thead><tbody>
                         @foreach (InUseServer server in record.Source.Servers)
-                        { <tr><td>@server.Id</td><td>@Field(server, "HOSTNAME")</td><td>@Field(server, "SI_ENVIRONMENT")</td><td>@Field(server, "STATUS")</td><td>@Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</td><td>@Field(server, "Virtual PC User")</td><td>@Field(server, "RFC Kaydı")</td></tr> }
+                        { <tr><td>@server.Id</td><td>@Field(server, "HOSTNAME")</td><td>@Field(server, "SI_ENVIRONMENT")</td><td>@FieldState(server, "STATUS")</td><td>@Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</td><td>@FieldState(server, "Virtual PC User")</td><td>@FieldState(server, "RFC Kaydı")</td></tr> }
                     </tbody></table></div>
                 }
                 @if (record.Source.Servers.Count == 0) { <MudAlert Severity="Severity.Warning">Doğrulanmış sunucu ilişkisi yok. Kaynak ilişki kanıtı gerekli.</MudAlert> }
@@ -152,7 +160,7 @@
                     {
                         <details class="so-inuse-bulk"><summary>Bu üç cevabı seçili sunuculara uygula</summary>
                             @foreach (InUseServer server in record.Source.Servers.Where(s => s.Id != _editingServer))
-                            { <label class="so-inuse-check"><input type="checkbox" disabled="@_busy" checked="@_selected.Contains(server.Id)" @onchange="e => SelectServer(server.Id, e)" />@server.Id · @Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</label> }
+                            { <label class="so-inuse-check"><input type="checkbox" disabled="@_busy" checked="@_selected.Contains(server.Id)" @onchange="e => SelectServer(server.Id, e)" />@Field(server, "HOSTNAME") · @server.Id · @Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</label> }
                             <MudButton OnClick="PreviewBulk" Disabled="@(_busy || _selected.Count == 0)" StartIcon="@Icons.Material.Filled.CompareArrows">Değişiklikleri göster</MudButton>
                             @if (_changes is not null)
                             {
@@ -162,6 +170,10 @@
                         </details>
                     }
                     <details><summary>Kaynak kanıtı ve geçmiş notlar</summary>
+                        <p>Veri sürümü @record.SourceVersion · Kayıt sürümü @record.Version</p>
+                        <p>@record.Source.RelationshipEvidence</p>
+                        <p>Etkilenen varlıklar: @Relationship(record.Source.AffectedAssetsState, record.Source.AffectedAssetCount)</p>
+                        <p>Talep eden: @Evidence(record.Source.Requester)</p>
                         <p>@_notes</p>
                         @foreach (InUseServer server in record.Source.Servers)
                         { <h4>@server.Id</h4><dl class="so-inuse-evidence">@foreach (var field in server.Fields) { <dt>@field.Key</dt><dd>@Evidence(field.Value)</dd> }</dl> }
@@ -186,7 +198,8 @@
                     @if (report.Archived && report.Version == record.Version && CanEdit)
                     {
                         <p>Planlanan dış adımlar: bu OR'a @record.Source.Servers.Count sunuculuk XLSX ekleme → benzersiz yetkili görevi tamamlama → OR son durumunu yeniden okuma.</p>
-                        <p>Arşiv SHA-256: @report.Sha256. Dış sözleşmeler ve yazma yetkisi doğrulanmadı; aşağıdaki onay yalnız WASAS'ta engelli niyet kaydeder.</p>
+                        <p>Kaynak tamamlama kapalıdır. Aşağıdaki onay yalnız WASAS'ta engelli niyet kaydeder; ek yüklemez veya görev tamamlamaz.</p>
+                        <details><summary>Rapor doğrulama bilgisi</summary><p>Arşiv SHA-256: @report.Sha256</p></details>
                         <MudButton OnClick="ConfirmCompletionAsync" Disabled="@(_busy || _dirty)" StartIcon="@Icons.Material.Filled.FactCheck">Bu sürüm için yerel tamamlama niyetini onayla</MudButton>
                     }
                     <label>Çalışma sayfası<select aria-label="Excel sayfası" @bind="_sheet">@for (int i = 0; i < report.Sheets.Count; i++) { <option value="@i">@report.Sheets[i].Name</option> }</select></label>
@@ -200,8 +213,8 @@
                 @if (record.Completion is { } intent)
                 {
                     <p role="status">@CompletionStatus(intent)</p>
-                    <p>Komut @intent.CommandId · WASAS aktörü @intent.ActorId · Rapor sürümü @intent.ReportVersion · @Time(intent.ConfirmedAt)</p>
-                    <p>Ek kimliği: @(intent.AttachmentId ?? "Doğrulanmadı") · Görev kimliği: @(intent.TaskId ?? "Doğrulanmadı")</p>
+                    <details><summary>Tamamlama kanıtı</summary><p>Komut @intent.CommandId · WASAS aktörü @intent.ActorId · Rapor sürümü @intent.ReportVersion · @Time(intent.ConfirmedAt)</p>
+                    <p>Ek kimliği: @(intent.AttachmentId ?? "Doğrulanmadı") · Görev kimliği: @(intent.TaskId ?? "Doğrulanmadı")</p></details>
                     @if (Can(Capabilities.InUseReview)) { <MudButton OnClick="() => DownloadAsync(intent.ReportVersion)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Bağlı arşivi indir</MudButton> }
                     @if (record.Draft?.ReviewedAt > intent.ConfirmedAt || record.SourceVersion != intent.SourceVersion)
                     { <p>Bu niyet önceki incelemeye aittir; güncel veri için yeniden doğrulama gerekir.</p> }

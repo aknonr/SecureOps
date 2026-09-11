@@ -19,7 +19,7 @@ public static class ResourceGuideSteps
             ],
             "inuse-review" =>
             [
-                new("inuse-owner", "Sorumluları ayırın", "Talep sahibi, servis sahibi ve kurulum ekibi kaynak kanıtıdır. Yerel inceleyici yetkili uygulama kimliğidir.", "", ""),
+                new("inuse-owner", "Sorumluları ayırın", "In Use kaydındaki talep eden, ilgili sunucu talebinin sahibi değildir. RFC eşlemesi bekleniyor; WASAS inceleyicisi isteğe bağlıdır.", "", ""),
                 new("inuse-servers", "Her sunucuyu doğrulayın", "Bilinmeyen cevapları doğrulanmış saymayın. Toplu cevapta seçili sunucuları ve farklı ortamları ayrıca kontrol edin.", "", ""),
                 new("inuse-report", "Taslağı kaydedin", "Önizleme kayıtlı veri sürümüne bağlıdır. Kaynak değişmişse kaydı yeniden okuyup inceleyin. Bu adımlar kaynak kaydı kapatmaz.", "", "")
             ],

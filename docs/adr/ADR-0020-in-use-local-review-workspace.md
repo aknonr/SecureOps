@@ -1,5 +1,17 @@
 # ADR-0020: In Use Local Review Workspace
 
+## Display Correction, 2026-09-11
+
+Use persisted trusted access profiles for reviewer labels, never directory scans
+or identity/name joins. Assignment and audit retain immutable application IDs.
+Decode the evidenced entity-encoded requester and service display values once at
+presentation/export, not in persisted source snapshots or fingerprints. Titles
+are already decoded by the root parser and must not be decoded again. Existing
+archives remain immutable; corrected output requires a new saved draft version.
+RFC diagnostic traversal may omit Reporter: the established requester projection
+is independently useful. Neither this nor a DOM selector approves a runtime RFC
+mapping. The explicitly requested cross-layer display fixes preserve all policies.
+
 ## Stored Overview And Blocked Completion Intent, 2026-09-10
 
 Source creation and lifecycle require explicit evidence; active query membership

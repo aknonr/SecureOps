@@ -235,6 +235,27 @@ public sealed class InUseAdapterTests
     });
 
     [Theory]
+    [InlineData("Returned", "owner")]
+    [InlineData("Empty", "")]
+    [InlineData("Omitted", null)]
+    public async Task Diagnostic_RequesterOnly_DoesNotRequireReporterOrVirtualPcUser(string expected, string? value)
+    {
+        var cells = new List<object> { new { Key = "SET.id", Value = "200" }, new { Key = "SET.p_code", Value = "OR-200" } };
+        if (value is not null)
+        { cells.Add(new { Key = "KEY.p_rel_requester", Value = value }); }
+        using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}", RfcRows("200"),
+            referenced: JsonSerializer.Serialize(new { QueryResult = new { Items = new[] { cells } } }));
+        JsonElement result = await Client(handler).DiagnoseAsync("100", new Dictionary<string, string> { ["RFC Kaydı"] = "p_synthetic_rfc" },
+            CancellationToken.None, new("p_synthetic_rfc", "SET", "SourceId"));
+        JsonElement evidence = result.GetProperty("ReferencedRequests").GetProperty("Links")[0].GetProperty("Evidence");
+        evidence.GetProperty("RequesterState").GetString().Should().Be(expected);
+        evidence.GetProperty("ReporterState").GetString().Should().Be("NotQueried");
+        handler.Selects[2].Should().Equal("id", "p_code", "p_rel_requester");
+        handler.Requests.Should().HaveCount(3);
+        handler.Requests[2].Filter.Should().Be("#%id%#=200");
+    }
+
+    [Theory]
     [InlineData("missing", 0)]
     [InlineData("duplicate", 0)]
     [InlineData("different", 2)]
@@ -281,9 +302,11 @@ public sealed class InUseAdapterTests
         string? referenced = null, HttpStatusCode referencedStatus = HttpStatusCode.OK) : HttpMessageHandler
     {
         public List<(string Path, string Filter)> Requests { get; } = [];
+        public List<string[]> Selects { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
+            Selects.Add(json.RootElement.GetProperty("req").GetProperty("Selects").EnumerateArray().Select(s => s.GetString()!).ToArray());
             Requests.Add((request.RequestUri!.AbsolutePath, json.RootElement.GetProperty("req").GetProperty("Filters")[0].GetString()!));
             return new(Requests.Count > 2 && referenced is not null ? referencedStatus : Requests.Count > 1 ? relatedStatus : HttpStatusCode.OK)
             { Content = new StringContent(Requests.Count > 2 && referenced is not null ? referenced : Requests.Count == 2 && related is not null ? related : body) };

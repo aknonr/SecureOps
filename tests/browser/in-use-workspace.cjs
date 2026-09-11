@@ -80,7 +80,7 @@ async function tour(page, surface) {
             await navigate(page, ui, 'in-use');
             await page.getByLabel('In Use kayıt ara').fill('OR-MAPPED-');
             await page.waitForFunction(() => document.querySelectorAll('.so-inuse-records li').length === 1);
-            assert.match(await page.locator('.so-inuse-records').innerText(), /4 gözlenen kayıt; tamlık doğrulanmadı/);
+            assert.match(await page.locator('.so-inuse-records').innerText(), /4 sunucu/);
             assert.equal(requests.some(p => /upload|bpm|jira/.test(p)), false);
         } else if (mode === 'denied') {
             await navigate(page, ui, 'in-use');
@@ -161,7 +161,7 @@ async function tour(page, surface) {
             assert.equal(stored.total, 2);
             const record = await json(client, `/api/v1/in-use/${stored.items.find(r => r.source.code === 'OR-DEMO-INUSE-01').id}`);
             await page.getByRole('link', { name: 'OR-DEMO-INUSE-01', exact: true }).click();
-            await page.getByText('Sorumluluk ve kaynak kanıtı', { exact: true }).waitFor();
+            await page.getByText('Kayıt özeti', { exact: true }).waitFor();
             await tour(page, 'inuse-review');
             assert.deepEqual(await json(client, `/api/v1/in-use/${record.id}`), record);
             const me = await json(client, '/api/v1/access/me');
@@ -183,7 +183,7 @@ async function tour(page, surface) {
             await page.getByRole('button', { name: 'Excel önizleme', exact: true }).click();
             await page.getByLabel('Excel sayfası').waitFor();
             await page.getByRole('button', { name: "WASAS'a arşivle ve indir", exact: true }).click();
-            await page.getByRole('alert').filter({ hasText: 'demo-server-01: İnternetten sunucuya erişim' }).waitFor();
+            await page.getByRole('alert').filter({ hasText: 'demo-server-01): İnternetten sunucuya erişim' }).waitFor();
             await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'demo-server-01 InternetIn');
             await capture(page, out, 'after-validation');
             await page.getByLabel('demo-server-01 InternetIn', { exact: true }).selectOption('No');

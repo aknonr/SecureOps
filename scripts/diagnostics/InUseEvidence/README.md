@@ -1,5 +1,51 @@
 # InUseEvidence Standalone Operator Delivery
 
+## Two Missing Fields: Targeted Inspection, 2026-09-11
+
+The runtime adapter requests the 15 legacy selects only. Its dictionary is NOT
+runtime configuration: only this collector accepts it. Neither RFC nor Virtual
+PC User was requested in the supplied 27-cell sample. Thus both are **NotQueried /
+mapping not implemented**, not empty, forbidden, parse-rejected or lost in SQL.
+The JSON aggregate and UI can retain/show named evidence, but runtime refresh
+does not produce these fields or persist referenced-request owners yet.
+
+The full legacy script and checked-in API evidence establish `query` + the
+bounded `rel` filter (m_tid=100049, m_lid=selected OR). They do NOT establish a
+single-service-item detail endpoint, field-metadata endpoint, wildcard projection,
+or either missing selector. Do not guess such requests. The old `6e05b45` binary
+has no RFC-hop option; do not pass new arguments to that package.
+
+Smallest next operator action, in the existing authorized browser session:
+1. Open ONE explicitly selected In Use OR, its Service Items relation, then ONE
+   item whose membership is visible. Do not use Affected Assets as a substitute.
+2. In browser developer tools, inspect the RFC control, then Virtual PC User.
+   For each, collect ONLY the control's tag/type, id/name, label-for reference and
+   relevant field/property data-attribute NAMES plus selector-like values. Use
+   the control and its immediate label/wrapper only; no page/outerHTML export.
+   Do not copy value attributes, hidden fields, event handlers, URLs, cookies,
+   HAR, tokens or personal text. Replace generated record IDs consistently with
+   `item-A` / `parent-A`. Record locally whether the visible value is empty.
+3. Return those TWO sanitized fragments (max 2 KiB each). They are candidate
+   property evidence, not proven API keys. If no selector-like attribute exists,
+   stop and report that fact; do not enumerate the page or inventory.
+
+After exact direct selectors are verified, the EXISTING bounded dictionary
+collection (same protected JSON, login/session transport and `--collect`) can
+query them with the selected parent OR's related items, at most ten. An empty
+Virtual PC User does not prevent RFC collection. Compare actual visible RFC and
+reference type locally; export only aliased keys/types/nesting and membership.
+This task does not claim a newly packaged collector. A reviewed standalone build
+of this source is required before using the changed requester-only RFC option.
+
+For that option, omit `ReporterProperty` entirely when unverified. Three required
+contract members remain: `RfcProperty` (same exact dictionary selector),
+`ReferenceCellKind` (`SET` or `KEY`, evidenced), `ReferenceKind` (`SourceId` or
+`OrCode`, evidenced). The target selects are then only `id`, `p_code`,
+`p_rel_requester`; ReporterState=NotQueried. RequesterState distinguishes Returned,
+Empty and Omitted. Exact id/code lookup includes closed requests, deduplicates
+shared references and never recurses. Nothing here approves corporate ownership
+semantics or changes the runtime refresh mapping.
+
 ## Optional Exact RFC Hop (Source Follow-up, 2026-09-10)
 
 The preserved `6e05b45` standalone archive does NOT implement this new option.
@@ -14,7 +60,7 @@ Before using it, the source owner must provide these case-sensitive JSON members
 | RfcProperty | Exact direct LCSIMS_ServiceInstance property; must equal dictionary.json's `RFC Kaydı` selector |
 | ReferenceCellKind | `SET` or `KEY`, only as demonstrated by the response contract, not a name-based assumption |
 | ReferenceKind | `SourceId` for canonical positive numeric SMSS_oRFF identity, or `OrCode` for exact OR-digits code |
-| ReporterProperty | Exact direct SMSS_oRFF Reporter selector; distinct from the known Requester selector p_rel_requester |
+| ReporterProperty | Optional; omit if unverified. When supplied, exact direct SMSS_oRFF Reporter selector, distinct from p_rel_requester |
 
 No real values for these keys are currently verified. Do not use synthetic test
 selectors as a corporate dictionary. Virtual PC User is optional and independent.
