@@ -17,7 +17,8 @@ try {
     }
     $assemblies = @()
     foreach ($component in @('Api','Ui')) {
-        & dotnet publish "src/SecureOps.$component/SecureOps.$component.csproj" -c Release --no-restore -o "$destination/staging/$($component.ToLowerInvariant())" -p:DebugType=None -p:DebugSymbols=false
+        & dotnet publish "src/SecureOps.$component/SecureOps.$component.csproj" -c Release --no-restore -o "$destination/staging/$($component.ToLowerInvariant())" `
+            -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true "-p:PathMap=$repo=/_/" "-p:SourceRevisionId=$sha"
         if ($LASTEXITCODE -ne 0) { throw 'Publish failed; partial delivery retained, not ready.' }
         $version = [Diagnostics.FileVersionInfo]::GetVersionInfo("$destination/staging/$($component.ToLowerInvariant())/SecureOps.$component.dll")
         if ($version.ProductVersion -ne "0.1.0+$sha") { throw 'Assembly does not identify exact build source.' }

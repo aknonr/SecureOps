@@ -15,6 +15,8 @@ public sealed class ApiReleasePackagingContractTests
             .And.Contain(".Replace('{{RELEASE_NAME}}', $ReleaseName).Replace('{{BUILD_SHA}}', $sha)")
             .And.Contain("$runtime.runtimeOptions.frameworks")
             .And.Contain("manifestSha256=")
+            .And.Contain("-p:ContinuousIntegrationBuild=true")
+            .And.Contain("-p:PathMap=$repo=/_/")
             .And.NotContain("@{ Ready=$true;");
     }
 

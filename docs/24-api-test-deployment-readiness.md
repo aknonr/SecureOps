@@ -2,7 +2,12 @@
 
 ## Matched Delivery Preparation, 2026-09-12
 
-Selected next unused identifier: `2026-09-12-pilot-rc6.16`. Starting local and
+Initial identifier `2026-09-12-pilot-rc6.16` is retained as FAILED: the payload
+scanner detected a build-profile CodeView/PDB path in SecureOps.Api.dll after
+ordinary Release build followed by publish. No ZIP was approved. The paired
+publisher now reuses the standalone collector's CI/PathMap compiler settings;
+the scanner remains unchanged. Retry uses new `2026-09-12-pilot-rc6.17`.
+Starting local and
 live GitHub branch SHA agree at `5692c77fbab0aea542d6408dfc1756ee8d965140`.
 The Git credential helper is unavailable to noninteractive commands; GitHub's
 read-only branches API independently verified the live source. No newer work
