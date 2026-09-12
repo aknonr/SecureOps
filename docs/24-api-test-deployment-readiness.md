@@ -1,5 +1,147 @@
 # API TEST Deployment Readiness
 
+## Matched Delivery Preparation, 2026-09-12
+
+Selected next unused identifier: `2026-09-12-pilot-rc6.16`. Starting local and
+live GitHub branch SHA agree at `5692c77fbab0aea542d6408dfc1756ee8d965140`.
+The Git credential helper is unavailable to noninteractive commands; GitHub's
+read-only branches API independently verified the live source. No newer work
+or existing `.vscode/` content is removed. Build SHA is the committed preparation
+source; final evidence documentation may have a later HEAD.
+
+DoD section Build and Test requires repository-wide format success. Historical
+scoped passes in earlier release evidence are not a documented waiver. The
+packager validates payload integrity only, never grants installation readiness.
+Continue allowed local preparation, but keep installation blocked if any required
+gate fails. Do not broaden this task into unrelated formatting cleanup.
+Build, complete unit/hosted tests, fresh isolated SQL harness, dependency audit,
+API AD/Swagger and UI payload gates, plus matched published-host browser acceptance
+must be reported separately from reused historical evidence. SQL fixtures remain
+test-owned and retained. No corporate collection, deployment or write activation.
+
+<!-- TEST-RELEASE-RUNBOOK:START -->
+## Eşleşen TEST Teslimatı: {{RELEASE_NAME}}
+
+**Yalnız inceleme adayıdır; kurulum izni değildir.** Build SHA: `{{BUILD_SHA}}`.
+`release-metadata.json` kaynak/payload bilgisini; `evidence/validation.json`
+çalıştırılan, başarısız, atlanan ve yeniden kullanılan kapıları ayırır.
+`readyForInstallation=false` veya açık zorunlu kapı varsa kurulumda durun.
+Depo geneli format hatası için onaylı istisna varsaymayın.
+
+### 1. Build / Operatör Makinesi: İlk İşlem
+
+Teslim alınan yeni dizinde üç arşivin boyut/hash değerini doğrulayın:
+
+```powershell
+$Release = 'C:\SecureOpsBuild\release\{{RELEASE_NAME}}' # Teslim alınan kopya
+$Metadata = Get-Content -LiteralPath "$Release\release-metadata.json" -Raw | ConvertFrom-Json
+$Metadata | Select-Object release, buildSource, productVersion, fileVersion, readyForInstallation
+foreach ($Package in $Metadata.packages) {
+    $File = Get-Item -LiteralPath (Join-Path $Release $Package.path)
+    if ($File.Length -ne $Package.bytes -or
+        (Get-FileHash -LiteralPath $File.FullName -Algorithm SHA256).Hash -ne $Package.sha256) {
+        throw 'DUR: paket boyutu/hash uyusmazligi.'
+    }
+}
+Get-Content -LiteralPath "$Release\evidence\validation.json"
+```
+
+API/UI aynı build SHA ve `0.1.0.0` FileVersion taşır. Windows x64 TEST hostunda
+.NET 8 `Microsoft.NETCore.App` ve `Microsoft.AspNetCore.App` ile IIS Hosting Bundle
+gerekir; SDK gerekmez. Gerçek framework sürümleri metadata/runtimeconfig içindedir.
+ZIP'ler server-owned `web.config`, `appsettings*.json`, sır, ring, log, rapor veya
+test verisi içermez. `staging`, `evidence`, `DBA` ve metadata runtime'a kopyalanmaz.
+
+### 2. TEST Hostu: Salt Okunur Envanter ve Yedek Referansları
+
+Aşağıdaki yer tutucuları mevcut onaylı hedeflerle doldurun; sır paylaşmayın:
+
+```powershell
+$ApiPath = '<mevcut API dizini>'
+$UiPath = '<mevcut UI dizini>'
+foreach ($Dll in @("$ApiPath\SecureOps.Api.dll", "$UiPath\SecureOps.Ui.dll")) {
+    (Get-Item -LiteralPath $Dll).VersionInfo | Select-Object FileName, ProductVersion, FileVersion
+    Get-FileHash -LiteralPath $Dll -Algorithm SHA256
+}
+dotnet --list-runtimes
+```
+
+Kurulu SHA'yı Git HEAD'den çıkarmayın. Değişiklik kaydına API/UI binary ve config
+yedeği, SQL recovery point, özel `InUseReports:Directory` arşivi, ayrı API/UI kalıcı
+Data Protection ring yedek referanslarını yazın. Sır veya key içeriğini dışarı almayın.
+Mevcut işlem kimliklerini, ring yollarını, ApplicationName ve koruma modunu koruyun.
+
+### 3. DBA: Mevcut 013 Şemasını Doğrula, Yeniden Uygulama
+
+rc6.15 kaynağına göre **yeni migration, config veya runtime grant yoktur**.
+DBA ZIP içindeki değişmeyen 001-013 SQL dosyaları inceleme/recovery referansıdır;
+dahil edilmeleri çalıştırma talimatı değildir. 012/013 veya bütün zinciri yeniden
+çalıştırmayın. Mevcut onaylı SQL bağlantısında DBA yalnız envanter sorgusu çalıştırır:
+
+```sql
+SELECT name, is_disabled, is_not_trusted, definition
+FROM sys.check_constraints
+WHERE parent_object_id = OBJECT_ID(N'ops.OperationalRecords')
+  AND name = N'CK_OperationalRecords_SdmEvaluation';
+SELECT OBJECT_ID(N'ops.InUseRecords') AS InUseRecords,
+       OBJECT_ID(N'ops.InUseRefresh') AS InUseRefresh;
+SELECT Id, Version FROM ops.InUseRefresh WHERE Id = 1;
+SELECT name, is_disabled FROM sys.triggers
+WHERE name IN (N'TR_AuditLog_AppendOnly', N'TR_OperationalRecordWorkflowHistory_AppendOnly');
+```
+
+DBA tanımı `sql/schema/013-sdm-pilot-policy.sql` ile ve mevcut nesne bazlı runtime
+izinlerini canonical Database Contract ile karşılaştırır. Eksik/disabled/untrusted
+kısıt, eksik nesne/satır veya izin uyuşmazlığında durun; repair, grant veya DDL vermeyin.
+
+### 4. Ayrı Kurulum Onayından Sonra: Eşleşen API/UI
+
+Bu adım bu hazırlık görevinin kapsamında çalıştırılmaz. Zorunlu kapılar ve yedekler
+onaylandıktan sonra mevcut kontrollü kurulum süreciyle önce API, sonra aynı SHA'nın
+UI payload'ı kurulur. Eski/yeni API/UI karışımı desteklenmez; bakım penceresi içinde
+eşleşme tamamlanmadan kullanıcı kabulü başlatılmaz. Server-owned `web.config`,
+`appsettings*.json`, pilot politikası, sırlar, ring/log/rapor dizinleri korunur.
+Yeni approval veya pilot aktivasyonu eklenmez. Açılmış payload için her bileşenin
+`manifests/{api,ui}-files.json` dosyasındaki göreli yol/boyut/hash doğrulanır:
+
+```powershell
+$Payload = '<yalniz yeni payload dosyalarinin acildigi dizin>'
+$Manifest = '<ilgili api-files.json veya ui-files.json>'
+foreach ($Entry in (Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json)) {
+    $File = Get-Item -LiteralPath (Join-Path $Payload $Entry.path)
+    if ($File.Length -ne $Entry.bytes -or
+        (Get-FileHash -LiteralPath $File.FullName -Algorithm SHA256).Hash -ne $Entry.sha256) {
+        throw 'DUR: payload uyusmazligi.'
+    }
+}
+```
+
+### 5. Operatör Kabulü ve Durma Koşulları
+
+- Mevcut onaylı oturumla health, access/capability, audit-store, SignalR ve statik
+  CSS/JS/font/marka dosyaları kontrol edilir. Yeni giriş akışı kurulmaz; antiforgery
+  kapatılmaz. Onaylı restart sonrası kalıcı ring/oturum davranışı ayrıca doğrulanır.
+- `ReadOnlyIntegrationMode=true`, `ControlledTestWritesEnabled=false`,
+  `SourceCloseEnabled=false` korunur. Mevcut provider/session ayarı yeniden istenmez.
+  Kaynak okuma ve WASAS yerel kalıcılığı, Jira/upload/BPM/source-close yazıları değildir.
+- Yetkili operatör yalnız açık In Use yenilemeyi çalıştırır: her sunucunun kendi RFC'si,
+  exact bağlı OR ve `İlgili talebi bildiren` görünümü kontrol edilir. Ardından liste/
+  detaya tekrar giriş yalnız kayıtlı DB verisini göstermelidir. Dört sunucu ve seçim
+  listesi aynı kimlikleri taşımalı; klavye, üç soru, seçili toplu fark onayı, eksik soru
+  yönlendirmesi, taslak, çatışma, isteğe bağlı inceleyici ve Excel denenmelidir.
+- Bildiren, İstem Sahibi/sunucu sahibi/kurulum operatörü/inceleyici değildir. Erişim
+  reddi, eksik/belirsiz RFC ve saklanan eski kanıt görünür kalmalıdır. Türkçe/ampersand
+  tek geçişte okunur; kodlanmış markup düz metindir. İnceleyici kayıtlı güvenilir
+  profilden gelir; eksik/aynı adlar kimlikleri birleştirmez. Otomatik atama yapılmaz.
+- Resources kişisel/grup erişimi ve SDM mevcut salt-okunur durumları korunur.
+  Jira, upload, BPM veya kaynak kapama etkinleştirilmez. Dolu Virtual PC User ve
+  ayrı İstem Sahibi eşlemesi bağımsız eksiklerdir; bunlar tekrar A/B toplama sebebi değildir.
+- Hash/sürüm, auth, şema, ring, varlık, yetki veya kanıt kaybında durun. Eski binary'nin
+  yeni JSON kanıtını koruyan güvenli bir yazar olduğu kanıtlanmadı. Geri dönüşten önce
+  yerel/dış yazmaları durdurma ve binary/config/SQL recovery kararı ayrı onay ister.
+  Audit, raporlar ve additive tablolar silinmez; SQL restore veri kaybı riski taşır.
+<!-- TEST-RELEASE-RUNBOOK:END -->
+
 ## RFC Reporter Source/UI Acceptance, 2026-09-12
 
 Starting branch `feature/sql-runtime-hardening-20260902`, full HEAD
@@ -118,7 +260,6 @@ cannot be identified from source HEAD. No SQL/API, deployment or source write is
 executed by this task. Exact new package metadata is recorded in
 `docs/release-candidates/2026-09-11-inuse-reporter-diagnostic.md`.
 
-<!-- TEST-RELEASE-RUNBOOK:START -->
 ## Birleşik TEST Teslimatı, rc6.15 (2026-09-10)
 
 Teslimat kökü `C:\SecureOpsBuild\release\2026-09-10-pilot-rc6.15`.
@@ -221,7 +362,6 @@ kapsamında yapılır. Bilinmeyen key'i arayan doğrulanmış uzak correlation s
 yoktur; source OR kodunun summary'de olması unique arama/absence kanıtı değildir.
 Bu sözleşme için sistem sahibinin dar arama alanı/semantiği ve temizlenmiş örneği
 gerekir; otomatik reconciliation çözümü veya exactly-once iddiası yoktur.
-<!-- TEST-RELEASE-RUNBOOK:END -->
 
 ## Resources Pre-Package Source Correction, 2026-09-10
 

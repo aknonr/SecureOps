@@ -6,6 +6,11 @@ API/UI, reuses both payload scanners/validators, exports the canonical Turkish
 runbook and packages DBA 001-013 with per-file sizes/hashes and source metadata.
 It refuses an existing release directory. Determine the next name from actual
 release metadata first. It does not deploy, activate writes or certify TEST acceptance.
+Payload success is not release approval: `readyForInstallation` stays false;
+the release owner records required gates in `evidence/validation.json`. DoD still
+requires repository-wide format success; historical scoped passes are not a waiver.
+Canonical runbook tokens bind the actual release name/build SHA. DBA 001-013
+inclusion is a reference artifact, never an instruction to replay unchanged SQL.
 
 `New-InUseEvidencePackage.ps1 -OutputDirectory <new-absolute-directory>` builds
 only the standalone diagnostic on the development machine from committed HEAD.

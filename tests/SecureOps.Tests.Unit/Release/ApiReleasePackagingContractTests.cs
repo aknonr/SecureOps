@@ -1,10 +1,23 @@
-using FluentAssertions;
 using System.Text.Json;
+using FluentAssertions;
 
 namespace SecureOps.Tests.Unit.Release;
 
 public sealed class ApiReleasePackagingContractTests
 {
+    [Fact]
+    public void PairedDelivery_BindsRunbookAndRuntimeMetadata_WithoutGrantingInstallationReadiness()
+    {
+        string script = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "scripts", "release", "New-PairedTestRelease.ps1"));
+        script.Should().Contain("$metadata.readyForInstallation = $false")
+            .And.Contain("$metadata.payloadValidated = $true")
+            .And.Contain("evidence/validation.json")
+            .And.Contain(".Replace('{{RELEASE_NAME}}', $ReleaseName).Replace('{{BUILD_SHA}}', $sha)")
+            .And.Contain("$runtime.runtimeOptions.frameworks")
+            .And.Contain("manifestSha256=")
+            .And.NotContain("@{ Ready=$true;");
+    }
+
     [Fact]
     public void PackagingScript_PreservesRelativePathsAndRunsIntegrityGate()
     {

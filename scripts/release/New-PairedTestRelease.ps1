@@ -15,18 +15,22 @@ try {
     foreach ($folder in @('API','UI','DBA','manifests','evidence','staging/api','staging/ui','staging/database/sql/migrations','staging/database/sql/schema')) {
         New-Item -ItemType Directory -Path (Join-Path $destination $folder) | Out-Null
     }
+    $assemblies = @()
     foreach ($component in @('Api','Ui')) {
         & dotnet publish "src/SecureOps.$component/SecureOps.$component.csproj" -c Release --no-restore -o "$destination/staging/$($component.ToLowerInvariant())" -p:DebugType=None -p:DebugSymbols=false
         if ($LASTEXITCODE -ne 0) { throw 'Publish failed; partial delivery retained, not ready.' }
         $version = [Diagnostics.FileVersionInfo]::GetVersionInfo("$destination/staging/$($component.ToLowerInvariant())/SecureOps.$component.dll")
         if ($version.ProductVersion -ne "0.1.0+$sha") { throw 'Assembly does not identify exact build source.' }
+        $runtime = Get-Content -LiteralPath "$destination/staging/$($component.ToLowerInvariant())/SecureOps.$component.runtimeconfig.json" -Raw | ConvertFrom-Json
+        $assemblies += [ordered]@{ component=$component; productVersion=$version.ProductVersion; fileVersion=$version.FileVersion; frameworks=@($runtime.runtimeOptions.frameworks) }
     }
     $doc = Get-Content -LiteralPath 'docs/24-api-test-deployment-readiness.md' -Raw -Encoding UTF8
     $start = '<!-- TEST-RELEASE-RUNBOOK:START -->'; $end = '<!-- TEST-RELEASE-RUNBOOK:END -->'
     $from = $doc.IndexOf($start, [StringComparison]::Ordinal) + $start.Length
     $to = $doc.IndexOf($end, [StringComparison]::Ordinal)
     if ($from -lt $start.Length -or $to -le $from) { throw 'Canonical runbook export markers missing.' }
-    [IO.File]::WriteAllText("$destination/operator-runbook-tr.md", $doc.Substring($from, $to-$from).Trim(), [Text.UTF8Encoding]::new($false))
+    $runbook = $doc.Substring($from, $to-$from).Trim().Replace('{{RELEASE_NAME}}', $ReleaseName).Replace('{{BUILD_SHA}}', $sha)
+    [IO.File]::WriteAllText("$destination/operator-runbook-tr.md", $runbook, [Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath "$destination/operator-runbook-tr.md" -Destination "$destination/staging/database/operator-runbook-tr.md"
     Copy-Item -LiteralPath 'sql/README.md' -Destination "$destination/staging/database/DBA-README.md"
     foreach ($folder in @('migrations','schema')) {
@@ -68,10 +72,16 @@ try {
         } finally { $zip.Dispose() }
         [IO.File]::WriteAllText("$destination/manifests/$($item[1])-files.json", (ConvertTo-Json -InputObject $files -Depth 5), [Text.UTF8Encoding]::new($false))
         [IO.File]::WriteAllLines("$destination/manifests/$($item[1])-payload.sha256", [string[]]@($files | ForEach-Object { "$($_.sha256)  $($_.path)" }), [Text.Encoding]::ASCII)
-        $packages += [ordered]@{ component=$item[0]; path=$item[2].Substring($destination.Length+1); bytes=(Get-Item -LiteralPath $item[2]).Length; sha256=(Get-FileHash -LiteralPath $item[2] -Algorithm SHA256).Hash; payloadFiles=$files.Count }
+        $packages += [ordered]@{ component=$item[0]; path=$item[2].Substring($destination.Length+1); bytes=(Get-Item -LiteralPath $item[2]).Length; sha256=(Get-FileHash -LiteralPath $item[2] -Algorithm SHA256).Hash; payloadFiles=$files.Count; manifest="manifests/$($item[1])-payload.sha256"; manifestSha256=(Get-FileHash -LiteralPath "$destination/manifests/$($item[1])-payload.sha256" -Algorithm SHA256).Hash }
     }
     $metadata = [ordered]@{ release=$ReleaseName; branch=$branch; buildSource=$sha; requiredSchema='001-013'; productVersion="0.1.0+$sha"; fileVersion='0.1.0.0'; targetFramework='net8.0'; selfContained=$false; packages=$packages; corporateCallsPerformed=$false; deploymentPerformed=$false; requiredFences=@{ ReadOnlyIntegrationMode=$true; ControlledTestWritesEnabled=$false; SourceCloseEnabled=$false } }
+    $metadata.assemblies = $assemblies
+    $metadata.requiredHost = 'Windows x64 IIS Hosting Bundle; Microsoft.NETCore.App 8.0 and Microsoft.AspNetCore.App 8.0; no SDK'
+    $metadata.payloadValidated = $true
+    $metadata.readyForInstallation = $false
+    $metadata.validationEvidence = 'evidence/validation.json'
+    $metadata.readiness = 'Pending mandatory release gates and separate installation approval'
     [IO.File]::WriteAllText("$destination/release-metadata.json", ($metadata | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllLines("$destination/release-artifacts.sha256", [string[]]@($packages | ForEach-Object { "$($_.sha256)  $($_.path)" }), [Text.Encoding]::ASCII)
-    [pscustomobject]@{ Ready=$true; BuildSource=$sha; Directory=$destination; Packages=$packages }
+    [pscustomobject]@{ PayloadValidated=$true; ReadyForInstallation=$false; BuildSource=$sha; Directory=$destination; Packages=$packages }
 } finally { Pop-Location }
