@@ -1,0 +1,143 @@
+using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.JSInterop;
+using SecureOps.Domain.Announcements;
+using SecureOps.Shared.Auth;
+using SecureOps.Shared.Contracts.Announcements;
+using SecureOps.Shared.Contracts.Resources;
+using SecureOps.Ui.Services;
+
+namespace SecureOps.Ui.Pages;
+
+/// <summary>Explicit, owner-authorized draft journey; no source calls or mail sending.</summary>
+public partial class Announcements
+{
+    /// <summary>Resets shell feedback when unsaved-edit protection cancels navigation.</summary>
+    [Microsoft.AspNetCore.Components.CascadingParameter] public Shared.MainLayout? Shell { get; set; }
+    private readonly CancellationTokenSource _lifetime = new();
+    private AnnouncementPage? _page;
+    private AnnouncementForm? _form;
+    private ResourcePreferencesResponse? _preferences;
+    private AnnouncementBanner[] _banners = [];
+    private (AnnouncementContent Content, long Version)? _comparison;
+    private Guid _id;
+    private long _version;
+    private bool _allowed, _busy, _dirty, _optional;
+    private string? _html, _notice;
+    private UiProblem? _problem;
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    { Access.Changed += AccessChanged; await InitializeAsync(); }
+    private Task InitializeAsync() => RunAsync(async () =>
+    {
+        AccessSnapshot access = await Access.GetAsync(_lifetime.Token);
+        _allowed = access.Can(Capabilities.AnnouncementDrafts);
+        if (!_allowed)
+        { _problem = access.Problem ?? UiProblemFactory.FromResponse(403, null); return; }
+        _page = await Api.ListAsync(1, _lifetime.Token);
+        _preferences = await Resources.GetPreferencesAsync(_lifetime.Token);
+    });
+    private Task PageAsync(int number) => RunAsync(async () => _page = await Api.ListAsync(number, _lifetime.Token));
+    private Task NewAsync() => RunAsync(async () =>
+    { _banners = await Api.BannersAsync(_lifetime.Token); _id = Guid.NewGuid(); _version = 0; _form = new(); _dirty = false; Add("To"); });
+    private Task OpenAsync(Guid id) => RunAsync(async () =>
+    {
+        (AnnouncementContent Content, long Version) draft = await Api.DraftAsync(id, 0, null, _lifetime.Token);
+        _banners = await Api.BannersAsync(_lifetime.Token);
+        _id = id;
+        _version = draft.Version;
+        _form = AnnouncementForm.From(draft.Content);
+        _dirty = false;
+    });
+    private Task BannersAsync() => RunAsync(async () => _banners = await Api.BannersAsync(_lifetime.Token));
+    private async Task<bool> DiscardAsync() => !_dirty || await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikler",
+        "Değişiklikleri bırakıp devam edilsin mi?", yesText: "Değişiklikleri bırak", cancelText: "Düzenlemeye dön") == true;
+    private async Task LeavingAsync(LocationChangingContext context)
+    {
+        if (_busy || !await DiscardAsync())
+        {
+            context.PreventNavigation();
+            Shell?.CancelPendingNavigation();
+        }
+    }
+    private async Task BackAsync()
+    {
+        if (!await DiscardAsync())
+        {
+            return;
+        }
+
+        _form = null;
+        _html = null;
+        _comparison = null;
+        _dirty = false;
+        _optional = false;
+        await PageAsync(1);
+    }
+    private void Change(string key, string value) { _form!.Values[key] = value; Changed(); }
+    private void Changed() { _dirty = true; _html = null; _notice = null; }
+    private void Add(string kind) { _form!.Recipients.Add(new(kind, "")); Changed(); }
+    private void Remove(AnnouncementForm.Recipient recipient) { _form!.Recipients.Remove(recipient); Changed(); }
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        if (_comparison is not null)
+        { return; }
+        (AnnouncementContent Content, long Version) saved = await Api.DraftAsync(_id, _version, _form!.Content(), _lifetime.Token);
+        _form = AnnouncementForm.From(saved.Content);
+        _version = saved.Version;
+        _dirty = false;
+        _html = null;
+        _notice = "Taslak kaydedildi.";
+    });
+    private Task PreviewAsync() => RunAsync(async () =>
+    {
+        if (_dirty || _version == 0)
+        {
+            return;
+        }
+
+        _html = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'unsafe-inline'\">"
+            + await Api.PreviewAsync(_id, _version, _lifetime.Token);
+    });
+    private Task DownloadAsync() => RunAsync(async () =>
+    {
+        if (_dirty || _version == 0)
+        {
+            return;
+        }
+
+        (byte[] Bytes, string Name) file = await Api.DownloadAsync(_id, _version, _lifetime.Token);
+        await Js.InvokeVoidAsync("secureOpsDownload", _lifetime.Token, file.Name, "message/rfc822", Convert.ToBase64String(file.Bytes));
+        _notice = "Mail dosyası indirildi; gönderim yapılmadı.";
+    });
+    private Task CompareAsync() => RunAsync(async () => _comparison = await Api.DraftAsync(_id, 0, null, _lifetime.Token));
+    private void AcceptComparison()
+    { _version = _comparison!.Value.Version; _comparison = null; _problem = null; _dirty = true; _notice = "Düzenlemeleriniz korunuyor. Kaydet ile onaylayın."; }
+    private static string FieldLabel(string key) => key switch
+    { "To" => "Alıcılar", "Cc" => "Bilgi", "BannerRevision" => "Görsel", _ => AnnouncementForm.Fields.First(f => f.Key == key).Label };
+    private async Task FocusAsync(string key)
+    {
+        _optional = AnnouncementForm.Fields.Any(f => f.Key == key && f.Optional) || _optional;
+        await InvokeAsync(StateHasChanged);
+        await Js.InvokeVoidAsync("secureOpsAnnouncements.focus", _lifetime.Token, "announcement-" + key);
+    }
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (_busy || _lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _busy = true;
+        _problem = null;
+        _notice = null;
+        try
+        { await action(); }
+        catch (SecureOpsApiException ex) { _problem = ex.Problem; _html = null; }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { _busy = false; }
+    }
+    private void AccessChanged() => _ = InvokeAsync(async () =>
+    { _allowed = (await Access.GetAsync(_lifetime.Token)).Can(Capabilities.AnnouncementDrafts); if (!_allowed) { _html = null; } StateHasChanged(); });
+    /// <inheritdoc />
+    public void Dispose() { Access.Changed -= AccessChanged; _lifetime.Cancel(); _lifetime.Dispose(); }
+}

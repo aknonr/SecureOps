@@ -3,7 +3,8 @@
 Two test projects mirroring `src/`.
 
 Announcement commands, isolated SQL setup and actual results are recorded in
-`docs/contracts/planned-announcements-v1.md`. No UI/SMTP acceptance is implied.
+`docs/contracts/planned-announcements-v1.md`, including the isolated published
+`browser/announcements.cjs` UI journey. No corporate/VDI/SMTP acceptance is implied.
 
 Current coverage includes Phase 1A IdentityLookup, audit hardening, Operational Record/Jira classification and workflow behavior, authorization, SQL contracts, and release packaging. Phase 1 diagnostic, Hangfire, and JEA tests are still planned.
 

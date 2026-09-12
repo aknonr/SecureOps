@@ -50,7 +50,7 @@ public interface IResourceApiClient
     public Task<ResourceEnvironmentOptions> GetEnvironmentsAsync(ResourceEnvironmentQuery query, CancellationToken cancellationToken);
 
     /// <summary>Dismisses the owner-only first-use guide invitation at the current aggregate version.</summary>
-    public Task<ResourcePreferencesResponse> DismissGuideAsync(long expectedVersion, CancellationToken cancellationToken);
+    public Task<ResourcePreferencesResponse> DismissGuideAsync(long expectedVersion, CancellationToken cancellationToken, string guide = "resources");
 
     /// <summary>Reads one link under the same visibility rules.</summary>
     public Task<ResourceLink> GetLinkAsync(Guid id, bool includeArchived, CancellationToken cancellationToken);

@@ -98,7 +98,8 @@ public sealed class WasasBrandingTests
                     || trimmed.Contains("SecureOpsApiException", StringComparison.Ordinal)
                     || trimmed.Contains("ILogger<", StringComparison.Ordinal);
 
-                if (!isComment && !isCode && line.Contains("SecureOps", StringComparison.Ordinal))
+                string visible = Regex.Replace(line, @"\b(?:href|src)=""[^""]*""", "");
+                if (!isComment && !isCode && visible.Contains("SecureOps", StringComparison.Ordinal))
                 {
                     offenders.Add($"{Path.GetFileName(file)}: {trimmed}");
                 }

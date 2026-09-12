@@ -210,7 +210,8 @@ public sealed class ResourceApiClientTests
         handler.LastMethod.Should().Be(HttpMethod.Put);
         using var body = JsonDocument.Parse(handler.Body!);
         body.RootElement.GetProperty("expectedVersion").GetInt64().Should().Be(23);
-        body.RootElement.EnumerateObject().Should().HaveCount(1);
+        body.RootElement.GetProperty("guide").GetString().Should().Be("resources");
+        body.RootElement.EnumerateObject().Should().HaveCount(2);
         result.GuideDismissed.Should().BeTrue();
     }
 

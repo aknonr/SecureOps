@@ -103,6 +103,21 @@ public sealed partial class ResourceCatalogueTests
     }
 
     [Fact]
+    public async Task AnnouncementGuide_IsIndependentAuthorizedAndVersioned()
+    {
+        var repository = new InMemoryResourceRepository(new InMemoryAuditWriter());
+        ResourceCatalogueService admin = Service(repository, "Admin"), denied = Service(repository, "Operator");
+        (await denied.DismissGuideAsync(_principal, _context, new(0, "announcements"), _token)).ErrorCode.Should().Be("AccessDenied");
+        (await admin.DismissGuideAsync(_principal, _context, new(0, "unknown"), _token)).ErrorCode.Should().Be(ResourceErrors.Invalid);
+        ResourcePreferencesResponse saved = (await admin.DismissGuideAsync(_principal, _context, new(0, "announcements"), _token)).Value!;
+        saved.AnnouncementGuideDismissed.Should().BeTrue();
+        saved.GuideDismissed.Should().BeFalse();
+        (await admin.DismissGuideAsync(_principal, _context, new(0, "announcements"), _token)).ErrorCode.Should().Be(ResourceErrors.Conflict);
+        (await denied.PreferencesAsync(_principal, _context, _token)).Value!.AnnouncementGuideDismissed.Should().BeFalse();
+        (await admin.DismissGuideAsync(_principal, _context, new(saved.Version), _token)).Value!.AnnouncementGuideDismissed.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Environments_AreBoundedSearchableAndDoNotLeakInaccessibleOrArchivedValues()
     {
         var repository = new InMemoryResourceRepository(new InMemoryAuditWriter());

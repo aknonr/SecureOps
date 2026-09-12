@@ -157,9 +157,9 @@ public sealed class ResourceApiClient : IResourceApiClient
     }
 
     /// <inheritdoc />
-    public Task<ResourcePreferencesResponse> DismissGuideAsync(long expectedVersion, CancellationToken cancellationToken) =>
+    public Task<ResourcePreferencesResponse> DismissGuideAsync(long expectedVersion, CancellationToken cancellationToken, string guide = "resources") =>
         SendAsync<ResourcePreferencesResponse>(() => _httpClient.PutAsJsonAsync($"{_root}/me/guide",
-            new DismissResourceGuideRequest(expectedVersion), JsonOptions, cancellationToken), cancellationToken);
+            new DismissResourceGuideRequest(expectedVersion, guide), JsonOptions, cancellationToken), cancellationToken);
 
     private static string Bool(bool value) => value ? "true" : "false";
 

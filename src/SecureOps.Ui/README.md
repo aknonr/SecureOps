@@ -1,5 +1,13 @@
 # SecureOps.Ui
 
+## Planned Announcements UI
+
+`/announcements` now connects owner-scoped paging, structured drafts, banners,
+explicit saved preview/download, conflict comparison and per-user guided help.
+Codex owns this module's UI and backend by explicit user instruction. No sending,
+history or ordinary-user role was added. See `docs/contracts/planned-announcements-v1.md`
+for API behavior, local browser replay, evidence and remaining quality gates.
+
 ## Current RFC Reporter Acceptance, 2026-09-12
 
 The preparation-only statements below are historical. Operator-approved RFC

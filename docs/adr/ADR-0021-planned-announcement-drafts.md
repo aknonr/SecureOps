@@ -13,6 +13,14 @@ This increment provides PUT and GET representations by client-generated UUID;
 paginated draft discovery, saved recipient sets, send history and UI follow later.
 Only Admin has Announcements.Drafts initially; no user or new role is assigned.
 
+UI continuation from a1818e17 is owned by Codex, including Razor and browser tests.
+Reuse authenticated API/session clients, WASAS shell, explicit saved previews and
+existing resource-guide infrastructure. A separate AnnouncementGuideDismissed flag
+in the versioned owner-only personal preferences keeps module invitations independent.
+No browser storage, auto-save, polling, sending or new authentication is introduced.
+Unsaved edits survive failures; conflicts require comparison and explicit adoption
+of the current version before a separate Save. Preview is sandboxed, never raw HTML.
+
 Follow-up from 1e6454cebfd0944d114bd413fd462b37499bc66c adds owner-scoped
 SQL pagination (page 1, size 25, cap 100), latest revision only, SavedAt descending
 and UUID text ascending as tie-breaker. One serializable read gives consistent

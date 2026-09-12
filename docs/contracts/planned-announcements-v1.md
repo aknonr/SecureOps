@@ -1,6 +1,6 @@
-# Planned announcements: implemented backend / Claude handoff
+# Planned announcements: implemented API and UI
 
-See ADR-0021 and generated `secureops-api-v1.openapi.json`. UI is not implemented.
+See ADR-0021 and generated `secureops-api-v1.openapi.json`. UI route: `/announcements`.
 All routes require authenticated, approved persisted access and `Announcements.Drafts`
 (Admin only), then owner isolation. Immutable user IDs remain authorization keys.
 No new authentication flow. Default `Announcements:Enabled=false` fails closed.
@@ -55,8 +55,8 @@ keyboard labels and field errors. Keep Blazor Server/MudBlazor; no public AI.
 ## Explicit follow-up boundaries
 
 Saved recipient sets and Send History have no endpoints yet. Do not fabricate
-empty successful history or wire send buttons. Claude now implements list/editor
-views against the discovery routes below. Immutable send-intent/Hangfire/SQL
+empty successful history or wire send buttons. Codex owns this module's API/UI
+against the discovery routes below. Immutable send-intent/Hangfire/SQL
 states and retry rules are in ADR-0021.
 Changing content invalidates future send confirmation; downloads/local captures
 must stay separate from actual sends. Real SMTP remains disabled.
@@ -71,10 +71,11 @@ Retain old revision files; changing bytes blocks previous exports. PNG/JPEG only
 MimeKit 4.17.0 and SkiaSharp 4.151.2 are centrally pinned, MIT, .NET 8 compatible:
 [MimeKit](https://www.nuget.org/packages/MimeKit/4.17.0),
 [SkiaSharp](https://www.nuget.org/packages/SkiaSharp/4.151.2).
-Native Skia runtime assets need future publish/platform validation; no package here.
+Windows x64 native Skia assets were locally published and exercised below; other
+platforms and corporate installations remain unverified. No release package here.
 No appsettings, SMTP credentials, authentication, grants or production files changed.
 
-## Discovery contract and Claude implementation task
+## Discovery contract and implemented editor
 
 GET `/api/v1/announcements?page=1&pageSize=25` returns `AnnouncementPage`:
 `items`, `page`, `pageSize`, `total`. Page 1..10000, size 1..100; invalid input is
@@ -118,7 +119,7 @@ and returns AnnouncementAssetChanged. Metadata is uncached, and never decodes im
 Both discovery routes use the unchanged Admin-only Announcements.Drafts capability,
 no-store responses and fail-closed audit. List has no per-row asset I/O or rendering.
 
-Claude task: implement "Planlı Çalışma Duyuruları" using existing Blazor Server,
+Implemented "Planlı Çalışma Duyuruları" uses existing Blazor Server,
 MudBlazor, authenticated typed API/session transport and capability visibility.
 Use a server-paged table with subject/OCO, work dates, update time and field status;
 preserve literal text via escaped rendering, never HTML decode or MarkupString.
@@ -135,8 +136,8 @@ Download uses authenticated bytes + server attachment filename, never a sending 
 400 fields navigate to editor inputs; 409 keeps edits, reads latest separately,
 shows explicit differences and asks before reapplying to the new version. Do not
 blindly retry writes or discard changes. Missing/changed banner errors remain visible.
-No Send button or fictional Sent tab. Add keyboard/mobile and conflict UI tests;
-this backend handoff is not a completed UI or corporate/VDI acceptance.
+No Send button or fictional Sent tab. Browser evidence below covers keyboard/mobile
+and conflict UI behavior; it is not corporate/VDI acceptance.
 
 Future ordinary-user mapping (proposal, not implemented): a limited
 AnnouncementAuthor application role grants ONLY Announcements.Drafts to approved
@@ -189,7 +190,7 @@ fails on 58 untouched baseline files (`format-verified-report.json`), outside th
 diff; no waiver or broad cleanup. Full DoD remains blocked on that independent work.
 No UI/browser, Outlook interoperability, SMTP, publish/package or deployment tested.
 
-## Discovery validation and fresh local replay
+## Historical discovery validation and fresh backend replay
 
 Base: `1e6454cebfd0944d114bd413fd462b37499bc66c`, same isolated announcement
 worktree/branch as ADR-0021. Evidence: `C:\SecureOpsBuild\validation\oco-discovery-20260912`.
@@ -217,7 +218,7 @@ Full format failed on 58 untouched baseline files; scoped format and diff checks
 passed. No waiver. Dependency/config provider/auth changes: none; BannerLabels is optional.
 No UI, SMTP, source integration, packaging, deployment or active-release edits.
 
-Claude can execute the backend contract journey from the isolated worktree with
+Execute the backend contract journey from the isolated worktree with
 a NEW test-owned DB each time (existing approved LocalDB harness required):
 ```powershell
 $suffix = 'OcoUi_' + [Guid]::NewGuid().ToString('N')
@@ -230,4 +231,82 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Local announcement contract failed; retain evidence.' }
 } finally { $env:SECUREOPS_SQL_TEST_CONNECTION = $previous }
 ```
-This validates backend contracts and sanitized examples, not a running Claude UI.
+This command validates backend contracts, not a running browser UI.
+
+## UI increment and local verification, 2026-09-12
+
+Base `a1818e17ef498a01c3b7444d0381a75724184122`, isolated branch/worktree unchanged.
+The UI has a 25-row owner page, one New action, structured editor, stable To/Cc
+rows, allowlisted banners, optional notes/restart details, explicit Save/Preview/
+Download, field-focus errors, dirty-navigation confirmation and reviewed conflict
+reapplication. Dates retain explicit offsets; text is escaped, never decoded.
+Preview is a sandboxed no-script frame with data-only images and a restrictive CSP.
+The typed client uses existing per-browser API sessions; API authorization remains
+authoritative. No autosave, per-keystroke preview, send/history or caching was added.
+
+The existing guided tour supports first-entry Start/Not now and manual reopening.
+`PUT /api/v1/resources/me/guide` accepts `{expectedVersion,guide}`;
+guide defaults to `resources`; `announcements` additionally requires
+Announcements.Drafts. `ResourcePreferencesResponse.announcementGuideDismissed`
+is a separate optional persisted boolean, default false; shared preferences retain
+their version/owner/audit protocol. The tour never saves draft content. Current
+Admins have both Resources.View and Announcements.Drafts. A future author role
+must also review personal-guide access without granting administrative capabilities.
+No SQL/config/grant delta in this increment; existing 014-015 and module opt-in
+prerequisites above still apply. Additive JSON is not a promise of safe downgrade.
+
+Evidence root: `C:\SecureOpsBuild\validation\oco-ui-20260912` (outside Git).
+`dotnet restore SecureOps.sln`; `dotnet build SecureOps.sln -c Release --no-restore`:
+success, zero warnings/errors. `dotnet test SecureOps.sln -c Release --no-restore`
+with TRX results: 1236 unit + 251 integration passed; 22 opt-in SQL skipped in the
+default run. OpenAPI generation used the existing opt-in test; normal comparison passed.
+Fresh harness `-DatabaseSuffix OcoUi20260912 -IncludeAnnouncementDrafts`, then the
+ResourceSqlTests/AnnouncementTests filter above: 30 passed, no skips (20 existing
+SQL + 10 announcement tests, including 2 SQL); `sql.trx`. No corporate calls.
+Full format command remains `dotnet format SecureOps.sln --verify-no-changes --no-restore`.
+Its 58 baseline files have the same diagnostic descriptions as discovery evidence,
+including existing naming findings in the touched UiProblemFactory. No waiver;
+full DoD is still blocked. New C# formatting and changed-file whitespace are checked
+separately, not substituted for the mandatory full command.
+
+`tests/browser/announcement-hosts.ps1 -EvidenceRoot <fresh-published-root> -DatabaseSuffix <fresh-Oco-suffix>`
+starts local published API/UI on 5431/5432 and denied UI on 5433, refusing occupied
+ports. First run the existing fresh SQL harness and publish API/UI into `api`/`ui`
+under that root. It uses supported Demo auth, SQL access/session/audit, Mock identity,
+disabled source/Jira and ReadOnlyIntegrationMode=false ONLY for this local composition;
+both external write flags remain false. No runtime settings or test data enter Git.
+Run `node tests/browser/announcements.cjs <playwright-core> https://localhost:5432 http://127.0.0.1:5431 https://localhost:5433 <fresh-evidence>`.
+Optional last argument `start` checks initial Start instead of Not now. Test-only
+playwright-core 1.63.0 uses installed headless Chrome; no application dependency.
+`attempt4/browser/results.json` records real SQL persistence, inert Turkish preview,
+image loading, authenticated MIME download without send/version mutation, saved tour
+dismissal/reopening, keyboard tour, conflict recovery, dirty-discard cancellation,
+25/2 paging and direct API/UI denial. Desktop 1440/mobile 390 PNGs are beside it.
+Earlier failed attempts are retained: fixed Razor string binding and missing scoped
+CSS bundle; native date seconds and asynchronous preference timing were test issues.
+`payload-versions.json` records exact attempted/tested DLL and native asset hashes;
+these are working-tree builds, not committed release payloads. The full-page preview
+PNGs have a blank off-screen iframe despite passing frame DOM/image assertions;
+the final replay adds scrolled viewport captures. Visual frame acceptance is pending.
+Subsequent shell navigation cancellation and comparison-edit guards are not included
+in attempt4 binaries. The prepared attempt5 replay additionally checks those guards,
+initial Start and mobile re-anchoring, but its invocation returned `rejected: blocked by policy`.
+Do not label that final browser replay passed. Outlook/VDI/SMTP are not tested.
+
+## Bounded dependency decision
+
+Direct/transitive API inventory used NuGet v3, with solution-wide vulnerability
+scan after restore (`vulnerabilities.log`: no known advisories at execution time).
+Dapper 2.1.28 -> 2.1.86 centrally pinned, Apache-2.0, net8.0; SQL regressions above
+exercise the update. [Official release](https://github.com/DapperLib/Dapper/releases/tag/2.1.86).
+No tracked lockfiles exist; .NET 8 and Microsoft 8.0.30 pins remain unchanged.
+MimeKit 4.17.0 / SkiaSharp and native assets 4.151.2 (MIT) remain matched. NuGet
+lists 4.152.0, but [official notes](https://mono.github.io/SkiaSharp/docs/releases/4.152.0.html)
+still call it preview; defer until stable-support status and native compatibility
+are reconciled. Only local Windows x64 codec/preview/MIME execution is evidenced.
+MudBlazor 6.16 -> 9.9.0 is NOT applied: theme/dialog/menu activation changes affect
+the shared shell; [migration guide](https://github.com/MudBlazor/MudBlazor/issues/12666).
+Microsoft 10 requires framework migration. FluentValidation 12, SqlClient 7,
+Swashbuckle 10 and major Serilog updates need separate contract/platform review;
+Hangfire 1.8.25 and other servicing updates remain inventoried, not validated here.
+This bounded UI increment does not certify all dependencies current or future-safe.

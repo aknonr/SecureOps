@@ -10058,6 +10058,10 @@
           "expectedVersion": {
             "type": "integer",
             "format": "int64"
+          },
+          "guide": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -11360,6 +11364,9 @@
           },
           "workspaceLayout": {
             "$ref": "#/components/schemas/ResourceWorkspaceLayout"
+          },
+          "announcementGuideDismissed": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

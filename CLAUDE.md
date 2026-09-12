@@ -4,7 +4,7 @@ This file extends `AGENTS.md` with Claude-specific UI/UX guidance. Read and hono
 
 ## Ownership And Routing
 
-- Claude owns UI/UX work only: Razor, CSS, layout, theme, navigation, accessibility, and visual behavior under `src/SecureOps.Ui/`.
+- Claude owns UI/UX work only: Razor, CSS, layout, theme, navigation, accessibility, and visual behavior under `src/SecureOps.Ui/`. Exception: Planned OCO Announcements UI and backend are assigned to Codex by explicit user instruction; see AGENTS.md.
 - Read `docs/agent-guides/README.md`, `docs/agent-guides/060-ui.md`, `src/SecureOps.Ui/README.md`, the applicable `docs/contracts/` files, and relevant UI design documents before editing.
 - Do not silently change backend, API, domain, infrastructure, SQL, authentication, authorization, integrations, migrations, or API contracts.
 - When UI work needs a missing or changed backend contract, report the exact contract need for Codex ownership instead of inventing data, routes, permissions, or state in the UI.

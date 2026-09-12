@@ -78,7 +78,7 @@
             </MudDrawer>
 
             <MudMainContent Class="so-main">
-                @Body
+                <CascadingValue Value="this" IsFixed="true">@Body</CascadingValue>
             </MudMainContent>
         </Authorized>
 
@@ -146,6 +146,12 @@
         _routeNavigating = true;
         StateHasChanged();
         return Task.CompletedTask;
+    }
+
+    public void CancelPendingNavigation()
+    {
+        _routeNavigating = false;
+        StateHasChanged();
     }
 
     private async Task SetModeAsync(AppearanceMode mode)

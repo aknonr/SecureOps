@@ -31,6 +31,7 @@
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <link href="~/css/secureops-theme.css" rel="stylesheet" asp-append-version="true" />
     <link href="~/css/in-use.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/SecureOps.Ui.styles.css" rel="stylesheet" asp-append-version="true" />
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
 </head>
 <body>
@@ -209,6 +210,13 @@
             // Revoked on the next tick so the click has already been handled.
             setTimeout(function () { URL.revokeObjectURL(url); }, 0);
         };
+        window.secureOpsAnnouncements = { focus: function (id) {
+            var target = document.getElementById(id);
+            if (!target) return;
+            var details = target.closest('details');
+            if (details) details.open = true;
+            target.focus();
+        } };
     </script>
     <script src="~/js/workspace-guide.js" asp-append-version="true"></script>
 </body>

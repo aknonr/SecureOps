@@ -84,6 +84,8 @@ public sealed record UiProblem(
     string? Stage,
     int? StatusCode)
 {
+    /// <summary>Field identifiers translated by the structured editor.</summary>
+    public IReadOnlyList<string> Fields { get; init; } = [];
     /// <summary>
     /// MudBlazor severity for this problem class. Conditions the operator can resolve, or that clear on
     /// their own, stay at Warning; states that need someone else to act are Error.

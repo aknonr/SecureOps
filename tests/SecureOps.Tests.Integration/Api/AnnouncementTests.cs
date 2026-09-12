@@ -102,6 +102,12 @@ public sealed partial class AnnouncementTests(ITestOutputHelper output)
         using HttpClient admin = factory.CreateClient(), denied = factory.CreateClient(), anonymous = factory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
         denied.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "team-lead");
+        Shared.Contracts.Resources.ResourcePreferencesResponse? preferences = await admin.GetFromJsonAsync<SecureOps.Shared.Contracts.Resources.ResourcePreferencesResponse>("/api/v1/resources/me");
+        (await admin.PutAsJsonAsync("/api/v1/resources/me/guide", new { expectedVersion = preferences!.Version, guide = "announcements" })).EnsureSuccessStatusCode();
+        Shared.Contracts.Resources.ResourcePreferencesResponse? persistedPreferences = await admin.GetFromJsonAsync<SecureOps.Shared.Contracts.Resources.ResourcePreferencesResponse>("/api/v1/resources/me");
+        persistedPreferences!.AnnouncementGuideDismissed.Should().BeTrue();
+        persistedPreferences.GuideDismissed.Should().Be(preferences.GuideDismissed);
+        (await denied.PutAsJsonAsync("/api/v1/resources/me/guide", new { expectedVersion = 0, guide = "announcements" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var id = Guid.NewGuid();
         string path = "/api/v1/announcements/" + id;
         (await anonymous.GetAsync(path)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
