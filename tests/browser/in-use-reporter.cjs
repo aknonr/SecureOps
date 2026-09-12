@@ -4,10 +4,13 @@ const { chromium, request } = require(process.argv[2]);
 const { loopback, navigate, signIn, capture, apiContext, json } = require('./journey-support.cjs');
 const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = path.resolve(process.argv[5]);
 const code = process.argv[6] || 'OR-91000', before = process.argv[7] === 'before';
+const statsUrl = process.argv[8] ? loopback(process.argv[8]) : null;
 (async () => {
     fs.mkdirSync(out, { recursive: true });
     const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
     const client = await apiContext(request, api), errors = [];
+    const probe = statsUrl ? await request.newContext({ ignoreHTTPSErrors: true }) : null;
+    const initialStats = probe ? await (await probe.get(statsUrl.href)).json() : null;
     try {
         const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
         await context.route('**/*', r => ['localhost', '127.0.0.1'].includes(new URL(r.request().url()).hostname) ? r.continue() : r.abort());
@@ -143,6 +146,8 @@ const code = process.argv[6] || 'OR-91000', before = process.argv[7] === 'before
             assert.equal((await denied.post('/api/v1/in-use/refresh', { data: { commandId: '11111111-1111-4111-8111-111111111111' } })).status(), 403);
         } finally { await denied.dispose(); }
         assert.deepEqual(errors, []);
-        fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify({ passed: true, metrics, sourceCallsDuringDisplay: 'Disabled adapters; stored synthetic SQL fixture', checks: ['four keyboard-selectable servers', 'shared/different RFC', 'single-pass UI/Excel', 'retained denied evidence', 'null RFC', 'trusted persisted profiles', 'optional assignment', 'selected identity differences', 'missing-answer focus', 'conflict preserves edits', 'authorization', 'unchanged source hash'] }, null, 2));
-    } finally { await client.dispose(); await browser.close(); }
+        const finalStats = probe ? await (await probe.get(statsUrl.href)).json() : null;
+        if (probe) assert.deepEqual(finalStats, initialStats, 'DB-backed journey must not call source or Jira');
+        fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify({ passed: true, metrics, sourceCallsDuringDisplay: probe ? 0 : 'Not instrumented', initialStats, finalStats, checks: ['four keyboard-selectable servers', 'shared/different RFC', 'single-pass UI/Excel', 'retained denied evidence', 'null RFC', 'trusted persisted profiles', 'optional assignment', 'selected identity differences', 'missing-answer focus', 'conflict preserves edits', 'authorization', 'unchanged source hash'] }, null, 2));
+    } finally { if (probe) await probe.dispose(); await client.dispose(); await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

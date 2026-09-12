@@ -1,5 +1,16 @@
 # API TEST Deployment Readiness
 
+## rc6.17 Gate Follow-up, 2026-09-12
+
+The unchanged paired payloads now pass the supported loopback transport and
+SQL-backed desktop/mobile journeys. Installation remains blocked by mandatory
+full format: an independent Roslyn preview requires 59 files, +523/-488 = 1011
+lines before harness/tests/docs, exceeding the 1000-line task cap. No preview
+changes were applied to product source. See
+[gate follow-up](release-candidates/2026-09-12-rc6.17-gate-followup.md) for exact
+payloads, commands, evidence scope and the Turkish operator stop instruction.
+This does not amend rc6.17's archived failed evidence or authorize installation.
+
 ## Matched Delivery Preparation, 2026-09-12
 
 Initial identifier `2026-09-12-pilot-rc6.16` is retained as FAILED: the payload
