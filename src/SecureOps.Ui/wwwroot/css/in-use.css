@@ -28,7 +28,18 @@
 .so-inuse [data-guide=inuse-owner] { padding-top: .25rem; }
 .so-inuse select:focus-visible, .so-inuse summary:focus-visible { outline: 2px solid var(--so-text); outline-offset: 2px; }
 .so-inuse-workbook td { border: 1px solid var(--so-border); padding: .5rem; min-width: 10rem; max-width: 24rem; }
+.so-inuse-server-table table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.so-inuse-server-table th, .so-inuse-server-table td { text-align: left; vertical-align: top; padding: .7rem .5rem; border-bottom: 1px solid var(--so-border); }
+.so-inuse-server-table th { background: var(--so-surface); }
+.so-inuse-server-table .mud-button-root { max-width: 100%; text-align: left; white-space: normal; scroll-margin-top: 5rem; }
+.so-inuse-server-table button:focus-visible { outline: 2px solid var(--so-text); outline-offset: 2px; }
+.so-inuse-mobile-label { display: none; }
 @media (max-width: 700px) {
+    .so-inuse-server-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .so-inuse-server-table table, .so-inuse-server-table tbody, .so-inuse-server-table tr, .so-inuse-server-table td { display: block; width: 100%; }
+    .so-inuse-server-table tr { padding: .75rem 0; border-bottom: 1px solid var(--so-border); }
+    .so-inuse-server-table td { border: 0; padding: .25rem 0; }
+    .so-inuse-mobile-label { display: block; font-weight: 600; margin-bottom: .25rem; }
     .so-inuse-filters, .so-inuse-answer, .so-inuse-records li, .so-inuse-evidence { grid-template-columns: minmax(0, 1fr); }
     .so-inuse-evidence dd { margin-bottom: .6rem; }
 }

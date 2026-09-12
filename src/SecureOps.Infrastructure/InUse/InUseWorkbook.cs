@@ -65,6 +65,15 @@ public static class InUseWorkbook
         List<IReadOnlyList<string>> evidenceRows = [new[] { "Server", "Field or check", "Value", "Evidence" }];
         foreach (InUseServer server in record.Source.Servers)
         {
+            if (server.RelatedRequestReporter is { } reporter)
+            {
+                evidenceRows.AddRange(new[] {
+                    new[] { server.Id, InUseRelatedRequestReporter.Label, InUseDisplayText.Decode(reporter.Display), reporter.StateText(now) },
+                    new[] { server.Id, "RFC reference", reporter.RfcReference ?? "Unknown", $"{reporter.RequestCode ?? "Unknown"} / {reporter.RequestId ?? "Unknown"}" },
+                    new[] { server.Id, "Related-request user reference", reporter.UserReference ?? "Unknown", "SET.p_rel_requester" },
+                    new[] { server.Id, "Reporter last verified", reporter.LastVerifiedAt?.ToString("O") ?? "Unknown", "Historical observation; not business ownership" }
+                });
+            }
             evidenceRows.AddRange(server.Fields.OrderBy(f => f.Key, StringComparer.Ordinal)
                 .Select(f => new[] { server.Id, f.Key, InUseDisplayText.Field(f.Key, f.Value.Value), f.Value.Source }));
             evidenceRows.AddRange(record.Draft.Answers.Where(a => a.ServerId == server.Id)

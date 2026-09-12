@@ -42,6 +42,12 @@ public partial class InUse
         _ => "Henüz sorgulanmadı / sözleşme bekleniyor"
     };
     private bool CanEdit => Can(Capabilities.InUseReview) && _record is not null;
+    private void ReviewServer(string id)
+    {
+        _editingServer = id;
+        _changes = null;
+        _focusAnswer = CanEdit ? 0 : null;
+    }
     private int CompletedServers => _record?.Source.Servers.Count(s => InUseChecks.OperatorCodes.All(c =>
         _answers.Any(a => a.ServerId == s.Id && a.Check == c && a.Value is "Yes" or "No"))) ?? 0;
     private string NextAction => !CanEdit ? "İnceleme yetkisi olan bir kullanıcı devam edebilir; atama zorunlu değil."

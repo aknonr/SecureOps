@@ -151,3 +151,21 @@ old values and verification time, explicitly stale or failed; timestamps alone
 do not change source fingerprints. A failed whole refresh also stales retained
 reporters without advancing LastSeenAt. Optional reviewer and archives survive.
 Local synthetic verification cannot establish broader corporate acceptance.
+
+## 2026-09-12 Source/UI Acceptance Closure
+
+Keep the verified RFC resolver/persistence unchanged. The server table must not
+inherit the Excel preview's bounded vertical scroll region. All observed servers
+remain in normal page flow, keyboard-selectable by stable identity; mobile uses
+stacked rows. Ordinary rows show operational context, RFC, Bildiren and explicit
+RFC-only matching/failure/freshness labels. Technical IDs stay in the existing
+InUse.View-gated collapsed source evidence, not in ordinary person labels.
+
+Current and retained raw display values use the same one-pass text boundary.
+Different single/double-encoded fixture inputs intentionally produce different
+inert output. Newly generated ReviewEvidence sheets include reporter text and
+state separately from references; legacy columns and immutable archives remain
+unchanged. Persisted trusted reviewer profiles, including missing/duplicate names,
+are exercised without changing identity, authorization or authentication flows.
+Acceptance uses existing isolated LocalDB schema only: no migration/repair/grant
+or corporate execution. New synthetic records do not replace previous fixtures.

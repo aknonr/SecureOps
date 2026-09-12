@@ -63,7 +63,7 @@
                 @if (_page is not null)
                 {
                     <p>Son başarılı okuma: @Time(_page.Refresh.LastSuccessfulAt)</p>
-                    @if (_page.Refresh.Stale) { <MudAlert Severity="Severity.Warning">@RefreshIssue(_page.Refresh.Issue) Kayıtlı veriler korunur.</MudAlert> }
+                    @if (_page.Refresh.Stale) { <MudAlert Severity="@(_page.Refresh.Issue == "SourceCompletenessUnverified" && _page.Refresh.LastSuccessfulAt >= DateTimeOffset.UtcNow.AddHours(-24) ? Severity.Info : Severity.Warning)">@RefreshIssue(_page.Refresh.Issue) Kayıtlı veriler korunur.</MudAlert> }
                     else if (_page.Items.Any(r => r.Source.ServiceItemsState == "Observed"))
                     { <p>Gözlenen servis öğeleri gösteriliyor; ilişkilerin tamlığı doğrulanmadı.</p> }
                     <p>@_page.Total kayıtlı eşleşme</p>
@@ -134,9 +134,11 @@
                 @if (_validation is not null) { <p role="alert">@_validation</p><MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">Alana git</MudButton> }
                 @if (record.Source.Servers.Count > 0)
                 {
-                    <div class="so-inuse-workbook" tabindex="0" aria-label="Servis öğesi tablosu"><table><thead><tr><th>Kaynak kimliği</th><th>Adı</th><th>Ortam</th><th>Durum</th><th>Servis / uygulama</th><th>Virtual PC User</th><th>@InUseRelatedRequestReporter.Label · RFC Kaydı</th></tr></thead><tbody>
+                    <div class="so-inuse-server-table" aria-label="Servis öğesi tablosu"><table><thead><tr><th scope="col">Sunucu</th><th scope="col">Ortam · Servis / uygulama</th><th scope="col">@InUseRelatedRequestReporter.Label · RFC Kaydı</th></tr></thead><tbody>
                         @foreach (InUseServer server in record.Source.Servers)
-                        { <tr><td>@server.Id</td><td>@Field(server, "HOSTNAME")</td><td>@Field(server, "SI_ENVIRONMENT")</td><td>@FieldState(server, "STATUS")</td><td>@Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</td><td>@FieldState(server, "Virtual PC User")</td><td><InUseReporter Value="server.RelatedRequestReporter" Detailed="true" /></td></tr> }
+                        { <tr data-server-id="@server.Id"><td><MudButton OnClick="() => ReviewServer(server.Id)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Edit" aria-label="@($"{Field(server, "HOSTNAME")} sunucusunu yanıtla")">@Field(server, "HOSTNAME")</MudButton></td>
+                            <td>@Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</td>
+                            <td><span class="so-inuse-mobile-label">@InUseRelatedRequestReporter.Label</span><InUseReporter Value="server.RelatedRequestReporter" /></td></tr> }
                     </tbody></table></div>
                 }
                 @if (record.Source.Servers.Count == 0) { <MudAlert Severity="Severity.Warning">Doğrulanmış sunucu ilişkisi yok. Kaynak ilişki kanıtı gerekli.</MudAlert> }
@@ -177,7 +179,9 @@
                         <p>Talep eden: @Evidence(record.Source.Requester)</p>
                         <p>@_notes</p>
                         @foreach (InUseServer server in record.Source.Servers)
-                        { <h4>@server.Id</h4><dl class="so-inuse-evidence">@foreach (var field in server.Fields) { <dt>@field.Key</dt><dd>@Evidence(field.Value)</dd> }</dl> }
+                        { <h4>@Field(server, "HOSTNAME") · @server.Id</h4><InUseReporter Value="server.RelatedRequestReporter" Detailed="true" /><dl class="so-inuse-evidence">
+                            <dt>Durum</dt><dd>@FieldState(server, "STATUS")</dd><dt>Virtual PC User</dt><dd>@FieldState(server, "Virtual PC User")</dd>
+                            @foreach (var field in server.Fields) { <dt>@field.Key</dt><dd>@Evidence(field.Value)</dd> }</dl> }
                         @foreach (InUseAnswer old in record.Draft?.Answers.Where(a => !string.IsNullOrEmpty(a.Evidence)) ?? [])
                         { <p>@old.ServerId · @Check(old.Check): @old.Evidence</p> }
                     </details>

@@ -1,5 +1,51 @@
 # API TEST Deployment Readiness
 
+## RFC Reporter Source/UI Acceptance, 2026-09-12
+
+Starting branch `feature/sql-runtime-hardening-20260902`, full HEAD
+`b61c594b29e2c154b6afe38503d484a7b11b3586`; only pre-existing `.vscode/`
+was untracked. This increment preserves the operator-approved RFC/Bildiren
+mapping and explicit refresh path; it does not repeat corporate collection.
+
+Baseline reproduction found four DOM rows and four selection options. The
+server table reused the workbook's 28rem internal scroll region: 446px visible,
+614px content, fourth row below the region. No projection row was lost.
+Server rows now use normal page scrolling, stacked mobile presentation and
+keyboard-operable answer buttons. Identity-based bulk preview remains explicit.
+Ordinary rows show hostname/context/RFC/person/resolution; technical references
+and verification time are in the existing collapsed source evidence view.
+`RFC eşleşti` describes exact matching only, not server checks or ownership.
+
+Current `<b>` versus retained `&lt;b&gt;` is intentional fixture input difference:
+one source contains `&lt;b&gt;`, the other `&amp;lt;b&amp;gt;`. Both decode once.
+New ReviewEvidence workbook rows now include reporter/RFC/reference/time with
+the same plain-text contract. Raw snapshots, hashes and old XLSX are untouched.
+Persisted OIDC fixtures cover trusted, absent and duplicate display names and
+the existing successful profile-refresh path without changing immutable IDs.
+The old long synthetic `test` identity was fallback fixture behavior, not proof
+of a production name regression. Existing BOM reproduction/tests remain intact.
+
+Commands/results (repository root, Release):
+- `dotnet build SecureOps.sln -c Release --no-restore -v minimal`: 0 warnings/errors.
+- `dotnet test SecureOps.sln -c Release --no-build -v minimal`: 1227 unit and 243 integration pass; 20 opt-in SQL tests skipped.
+- `dotnet format SecureOps.sln --no-restore --verify-no-changes`: fails on existing unrelated whitespace/charset/import/naming findings. The same command with `--include` for all five changed C# files passes; no repository-wide cleanup was performed.
+- Focused unit filter `FullyQualifiedName~InUse|FullyQualifiedName~Access`: 228 pass, no skips.
+- Integration filter `FullyQualifiedName~InUse_ReporterAcceptance_NewFixtureOnly`: 1 pass, no skips, using the existing isolated LocalDB schema and a fresh `SECUREOPS_INUSE_ACCEPTANCE_SOURCE_ID` in 930000000..939999999.
+- No migration harness was run. The narrow test refreshes fake HTTP into memory, inserts one NEW synthetic aggregate, then verifies SQL round-trip and new service reads without target calls. Existing RecordJson values compare unchanged. It does not replace the previous full adapter-to-SQL-refresh evidence.
+- Browser: `node tests/browser/in-use-reporter.cjs <existing-playwright-core> https://localhost:63947/ http://localhost:5000/ <fresh-output> <synthetic-code>`; add `before` only against the starting binary to reproduce internal scrolling. Foreground Demo hosts used persisted SQL with source/Jira adapters Disabled; hosts stopped afterward.
+- Browser checks passed: all four rows/options/keyboard paths, shared/different RFCs, retained denial/null RFC, inert UI/Excel text, trusted labels, unassignment, selected identities and six explicit differences, 1/4 then 3/4 counts, missing-answer focus, conflict preservation and authorization denial. Source/hash remain unchanged.
+
+Screenshots and machine-readable results:
+`C:\SecureOpsBuild\validation\inuse-acceptance-20260912\baseline` and `after-4`.
+The latter contains `reporter-detail-{1440,390}.png`, `reporter-retained-evidence-*`,
+`reporter-reviewer-labels-*`, `reporter-bulk-differences-*`, `reporter-conflict-*`
+and `result.json`. These are synthetic local checks, not corporate/VDI acceptance.
+No schema/config/auth change, migration, deployment or replacement package.
+rc6.15, older diagnostics, data and audit history remain intact. Populated
+Virtual PC User and separate Istem Sahibi remain independent unverified gaps.
+Final format/diff counts and live push outcome are recorded in the task handoff.
+Pre-commit live remote probe failed noninteractively: `unable to get password from user`.
+
 ## Verified RFC Reporter Connected, 2026-09-11
 
 Source-only implementation on top of actual HEAD `744b7d37d168bd1da2a8586b134b4f339e4bcec3`.

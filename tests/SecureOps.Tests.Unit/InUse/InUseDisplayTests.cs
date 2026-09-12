@@ -68,4 +68,35 @@ public sealed class InUseDisplayTests
         labels[users[2].Id].Should().StartWith("Profil adı bekleniyor");
         labels[users[4].Id].Should().Be("synthetic.login");
     }
+
+    [Theory]
+    [InlineData("G&#246;zlem &#350;ah&#305;s &amp; Kontrol", "Gözlem Şahıs & Kontrol")]
+    [InlineData("Gözlem Şahıs", "Gözlem Şahıs")]
+    [InlineData("&lt;b&gt;", "<b>")]
+    [InlineData("&amp;lt;b&amp;gt;", "&lt;b&gt;")]
+    public async Task Reporter_CurrentAndRetained_UseSamePlainTextInNewExcel_WithoutRewritingSnapshots(string raw, string expected)
+    {
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(default)).Records[0];
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        source = source with
+        {
+            Servers = new[] { "ExactMatch", "Forbidden", "Stale" }.Select((state, i) => new InUseServer($"{100 + i}", new Dictionary<string, InUseEvidence>())
+            { RelatedRequestReporter = new(source.Id, $"{100 + i}", "OR-200", "OrCode", "200", "OR-200", raw, "800", state, "Returned", "Returned", now.AddMinutes(-5)) }).ToArray()
+        };
+        var record = new InUseRecord(Guid.NewGuid(), source, "preserved-source-hash", 2, 3, null, null,
+            new(2, [], "", Guid.NewGuid(), now), now);
+        string original = JsonSerializer.Serialize(record);
+        InUseReport report = InUseWorkbook.Create(record, Guid.NewGuid(), now);
+        IReadOnlyList<string>[] rows = report.Sheets[5].Rows.Where(r => r[1] == InUseRelatedRequestReporter.Label).ToArray();
+        rows.Select(r => r[2]).Should().Equal(expected, expected, expected);
+        rows.Select(r => r[3]).Should().Equal("RFC eşleşti", "Erişim reddedildi", "Güncel değil");
+        using var zip = new ZipArchive(new MemoryStream(report.Content));
+        using Stream stream = zip.GetEntry("xl/worksheets/sheet6.xml")!.Open();
+        var xml = XDocument.Load(stream);
+        XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        xml.Descendants(ns + "t").Select(t => t.Value).Should().Equal(report.Sheets[5].Rows.SelectMany(r => r));
+        xml.Descendants(ns + "f").Should().BeEmpty();
+        xml.Descendants("b").Should().BeEmpty();
+        JsonSerializer.Serialize(record).Should().Be(original);
+    }
 }

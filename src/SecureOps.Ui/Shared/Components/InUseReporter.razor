@@ -4,7 +4,7 @@
     <strong>@(Value?.RfcReference ?? "RFC yok")</strong>
     @if (Value is { } value)
     {
-        <span> · @State(value.EffectiveState(DateTimeOffset.UtcNow))</span>
+        <span> · @value.StateText(DateTimeOffset.UtcNow)</span>
         @if (!string.IsNullOrWhiteSpace(value.Display))
         { <div>@(value.EffectiveState(DateTimeOffset.UtcNow) == "ExactMatch" ? "" : "Önceki kanıt: ")@InUseDisplayText.Decode(value.Display)</div> }
         else { <div>Bildiren bilgisi yok</div> }
@@ -12,10 +12,8 @@
         {
             <div>Servis öğesi: @value.ServiceItemId</div>
             <div>Kişi referansı: @(value.UserReference ?? "Yok")</div>
-            <details><summary>Doğrulama kanıtı</summary>
             <div>Bağlı OR: @(value.RequestCode ?? "Çözümlenmedi") · @(value.RequestId ?? "Kimlik yok")</div>
             <div>Son doğrulama: @(value.LastVerifiedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "Yok")</div>
-            </details>
         }
     }
     else { <span> · Sorgulanmadı</span> }
@@ -24,11 +22,4 @@
 @code {
     [Parameter] public InUseRelatedRequestReporter? Value { get; set; }
     [Parameter] public bool Detailed { get; set; }
-    private static string State(string state) => state switch
-    {
-        "ExactMatch" => "Doğrulandı", "MissingRfc" => "RFC boş", "Stale" => "Güncel değil",
-        "NotFoundOrNotVisible" => "Bulunamadı veya görünür değil", "AmbiguousMatch" => "Belirsiz eşleşme",
-        "IdentityMismatch" => "Kimlik uyuşmazlığı", "Forbidden" => "Erişim reddedildi",
-        "Failed" => "Okuma başarısız", _ => "Sorgulanmadı"
-    };
 }

@@ -1,5 +1,14 @@
 # SecureOps API v1 UI Integration Contract
 
+## Current Reporter Contract, 2026-09-12
+
+The preparation gate below was satisfied by operator A/B evidence and connected
+in the 2026-09-11 increment. Existing explicit refresh persists each server's
+RFC/Bildiren; page reads remain database-only. This task changes presentation
+and new workbook evidence, not API/schema/identity contracts. Exact resolution
+is labelled `RFC eşleşti`; references/provenance use collapsed source evidence.
+See the current canonical handoff in `docs/24-api-test-deployment-readiness.md`.
+
 ## Related Request Reporter Preparation, 2026-09-11
 
 Each stored server may now carry nullable `relatedRequestReporter`, omitted for

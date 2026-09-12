@@ -1,5 +1,15 @@
 # SecureOps.Ui
 
+## Current RFC Reporter Acceptance, 2026-09-12
+
+The preparation-only statements below are historical. Operator-approved RFC
+enrichment is connected through explicit refresh; list/detail read stored data.
+See `docs/24-api-test-deployment-readiness.md` for current evidence and limits.
+All four server rows use page flow, with keyboard answer selection and mobile
+stacking. Technical reporter references remain in collapsed source evidence;
+ordinary rows say `RFC eşleşti`, not ownership/completion verified. UI and new
+ReviewEvidence exports decode once; archives and raw values remain unchanged.
+
 ## RFC Reporter Preparation, 2026-09-11
 
 The current correction supersedes historical requester/Reporter/ownership wording
