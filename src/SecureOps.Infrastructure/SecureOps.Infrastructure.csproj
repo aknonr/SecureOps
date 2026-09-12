@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <!-- Data access -->
+    <PackageReference Include="MimeKit" />
+    <PackageReference Include="SkiaSharp" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />

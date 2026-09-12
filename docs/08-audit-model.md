@@ -1,5 +1,9 @@
 # 08 — Audit Model
 
+Announcement drafts add transactional `AnnouncementDraftSaved` and fail-closed
+`AnnouncementDraftRead` / `AnnouncementDownloadPrepared`: internal actor/id/version, template revision and
+banner hash only. No content/recipients or Sent claim. Revisions are append-only.
+
 The audit subsystem is the project's most important non-functional feature. This document is the canonical specification.
 
 ## Principles

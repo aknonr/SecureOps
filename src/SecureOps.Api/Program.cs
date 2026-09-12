@@ -91,6 +91,7 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SchemaFilter<LegacyIdentityEventReferenceSchemaFilter>();
     options.SchemaFilter<SdmEvaluationSchemaFilter>();
+    options.OperationFilter<AnnouncementOperationFilter>();
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "SecureOps API",

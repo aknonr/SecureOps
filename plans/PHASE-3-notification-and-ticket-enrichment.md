@@ -12,6 +12,9 @@
 
 ## Deliverables
 
+The authorized isolated draft-only OCO increment is ADR-0021. It does not satisfy
+SMTP or Phase 3 production preconditions; sending/history and Claude UI are later.
+
 1. `INotifier` interface family + mock implementations.
 2. Teams adapter (webhook + Adaptive Card).
 3. SMTP mail adapter with HTML + text templates.

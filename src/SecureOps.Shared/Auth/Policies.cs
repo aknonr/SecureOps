@@ -5,6 +5,8 @@ namespace SecureOps.Shared.Auth;
 /// </summary>
 public static class Policies
 {
+    /// <summary>Capability policy for owned announcement drafts.</summary>
+    public const string CanDraftAnnouncements = "CanDraftAnnouncements";
     /// <summary>Read local In Use records.</summary>
     public const string CanViewInUse = "CanViewInUse";
     /// <summary>Review and prepare local In Use reports.</summary>

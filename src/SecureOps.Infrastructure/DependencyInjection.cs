@@ -154,6 +154,10 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationAccessService, ApplicationAccessService>();
         services.AddScoped<ResourceCatalogueService>();
+        services.Configure<AnnouncementOptions>(configuration.GetSection("Announcements"));
+        services.AddScoped<Announcements.SqlAnnouncementStore>();
+        services.AddScoped<Announcements.AnnouncementRenderer>();
+        services.AddScoped<Announcements.AnnouncementService>();
         services.AddScoped<InUseService>();
         services.AddSingleton<InUseReportArchive>();
         if (string.Equals(configuration[$"{SessionSecurityOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))

@@ -10,6 +10,7 @@ public static class AccessRoleCatalog
         {
             ["Admin"] =
             [
+                Capabilities.AnnouncementDrafts,
                 Capabilities.InUseView,
                 Capabilities.InUseReview,
                 Capabilities.InUseAssign,

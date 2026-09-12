@@ -3,6 +3,8 @@ namespace SecureOps.Shared.Auth;
 /// <summary>Stable application capability identifiers.</summary>
 public static class Capabilities
 {
+    /// <summary>Prepare and download owned local announcement drafts; never send.</summary>
+    public const string AnnouncementDrafts = "Announcements.Drafts";
     /// <summary>Read local In Use records; no source writes.</summary>
     public const string InUseView = "InUse.View";
     /// <summary>Save local reviews and prepare reports.</summary>

@@ -72,6 +72,12 @@ Application-session governance uses `schema/007-application-session-governance.s
 
 ## Test Harness
 
+Announcement drafts use additive 014 (separate append-only revisions). Runtime
+needs SELECT/INSERT on announcements.DraftRevisions plus existing audit INSERT;
+no UPDATE/DELETE/DDL. No grants are applied automatically. Retain additive data on
+rollback; older binaries cannot operate this module. Do not replay 012/013.
+The harness opt-in `-IncludeAnnouncementDrafts` adds 014 only to its fresh local DB.
+
 Resource v1 adds `scripts/powershell/Test-ResourceCatalogueSql.ps1`, an explicitly
 invoked isolated LocalDB-only harness. It refuses an existing database name,
 applies 001-008, inserts synthetic predecessor rows, applies 009 then 010, checks
