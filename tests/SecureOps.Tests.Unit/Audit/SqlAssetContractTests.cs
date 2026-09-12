@@ -63,7 +63,8 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(14)
+            .And.HaveCount(15)
+            .And.ContainSingle(name => name == "015-announcement-owner-index.sql")
             .And.ContainSingle(name => name == "014-announcement-drafts.sql")
             .And.ContainSingle(name => name!.StartsWith("009-", StringComparison.Ordinal))
             .And.ContainSingle(name => name!.StartsWith("010-", StringComparison.Ordinal))

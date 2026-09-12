@@ -27,6 +27,8 @@ sql/
 | 011 | Default-off durable source-close intent on JiraTransfers; requires 001-010; legacy transfers remain source-open |
 | 012 | Independent local In Use records/refresh state; unassigned role seeds 8 InUseReviewer and 9 InUseCoordinator; requires 001-011 |
 | 013 | Transactional SDM evidence CHECK replacement admits the exact positive pilot policy version; requires 001-012; no new objects, columns, roles or runtime grants |
+| 014 | Independent append-only announcement draft revisions; requires 001-013 |
+| 015 | Announcement owner/latest-version index only; requires 014; no JSON rewrite or new runtime grant |
 
 013 uses `migrations/013-sdm-pilot-policy.sql` in SQLCMD mode. Existing NULL/v1
 evidence and append-only triggers remain untouched; WITH CHECK validates stored
@@ -76,7 +78,7 @@ Announcement drafts use additive 014 (separate append-only revisions). Runtime
 needs SELECT/INSERT on announcements.DraftRevisions plus existing audit INSERT;
 no UPDATE/DELETE/DDL. No grants are applied automatically. Retain additive data on
 rollback; older binaries cannot operate this module. Do not replay 012/013.
-The harness opt-in `-IncludeAnnouncementDrafts` adds 014 only to its fresh local DB.
+The harness opt-in `-IncludeAnnouncementDrafts` adds 014-015 only to its fresh local DB.
 
 Resource v1 adds `scripts/powershell/Test-ResourceCatalogueSql.ps1`, an explicitly
 invoked isolated LocalDB-only harness. It refuses an existing database name,

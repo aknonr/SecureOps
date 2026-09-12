@@ -13,6 +13,20 @@ This increment provides PUT and GET representations by client-generated UUID;
 paginated draft discovery, saved recipient sets, send history and UI follow later.
 Only Admin has Announcements.Drafts initially; no user or new role is assigned.
 
+Follow-up from 1e6454cebfd0944d114bd413fd462b37499bc66c adds owner-scoped
+SQL pagination (page 1, size 25, cap 100), latest revision only, SavedAt descending
+and UUID text ascending as tie-breaker. One serializable read gives consistent
+count/page; separate requests are not a frozen snapshot.
+Owner transaction application locks (Shared list / Exclusive save, public DB
+principal, bounded wait) prevent the observed owner-index/PK lock-order deadlock.
+Additive 015 indexes (OwnerId, Id, Version DESC); JSON bodies are never returned by list queries.
+New saves persist a derived missing-field count. Historical JSON is untouched;
+old revisions report unknown completeness until explicitly saved again.
+Banner discovery is bounded to 32 allowlisted revisions with optional labels;
+only file metadata is inspected, never image decoding/rendering per row. Presence
+is not validation: selected saves/previews/exports still validate bytes and hashes.
+No cache, source calls, sending, scheduling or role changes are introduced.
+
 All submitted content is manual/unverified, including OCO reference and scope.
 Provenance is server-stamped Manual, never source attestation. Source integration
 must later retain source snapshots separately from overrides. Dates are distinct;

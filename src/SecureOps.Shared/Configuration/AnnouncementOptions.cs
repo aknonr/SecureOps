@@ -11,4 +11,6 @@ public sealed class AnnouncementOptions
     public string AssetDirectory { get; set; } = "";
     /// <summary>Immutable revision to flat PNG/JPEG filename allowlist.</summary>
     public Dictionary<string, string> Banners { get; set; } = [];
+    /// <summary>Optional plain-text choice labels; absent/invalid labels fall back to revision.</summary>
+    public Dictionary<string, string> BannerLabels { get; set; } = [];
 }

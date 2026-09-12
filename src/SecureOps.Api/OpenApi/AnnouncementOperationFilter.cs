@@ -13,7 +13,13 @@ public sealed class AnnouncementOperationFilter : IOperationFilter
     {
         if (context.MethodInfo.DeclaringType != typeof(AnnouncementsController))
         { return; }
-        operation.Responses["200"].Headers["ETag"] = new OpenApiHeader { Description = "Quoted current draft version", Schema = new() { Type = "string" } };
+        foreach (OpenApiParameter parameter in operation.Parameters.Where(p => p.Name is "page" or "pageSize"))
+        {
+            parameter.Schema.Minimum = 1;
+            parameter.Schema.Maximum = parameter.Name == "page" ? 10000 : 100;
+        }
+        if (operation.Parameters.Any(p => p.Name == "id"))
+        { operation.Responses["200"].Headers["ETag"] = new OpenApiHeader { Description = "Quoted current draft version", Schema = new() { Type = "string" } }; }
         operation.Responses["default"] = new OpenApiResponse { Description = "ProblemDetails: code, fields and correlationId; 400 invalid/incomplete, 401/403 access, 404 not found, 409 conflict/asset changed, 503 unavailable." };
         OpenApiParameter? format = operation.Parameters.FirstOrDefault(p => p.Name == "format");
         if (format is null)

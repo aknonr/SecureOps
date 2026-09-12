@@ -74,6 +74,7 @@ try {
     Invoke-ResourceTestSql -File '012-in-use-workspace.sql'
     Invoke-ResourceTestSql -File '013-sdm-pilot-policy.sql'
     if ($IncludeAnnouncementDrafts) { Invoke-ResourceTestSql -File '014-announcement-drafts.sql' }
+    if ($IncludeAnnouncementDrafts) { Invoke-ResourceTestSql -File '015-announcement-owner-index.sql' }
 }
 finally { Pop-Location }
 
@@ -94,4 +95,4 @@ if ($RunTests) {
         } finally { Pop-Location }
     } finally { $env:SECUREOPS_SQL_TEST_CONNECTION = $previous }
 }
-[PSCustomObject]@{ Database = $database; Migrations = $(if ($IncludeAnnouncementDrafts) { '001-014' } else { '001-013' }); UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }
+[PSCustomObject]@{ Database = $database; Migrations = $(if ($IncludeAnnouncementDrafts) { '001-015' } else { '001-013' }); UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }

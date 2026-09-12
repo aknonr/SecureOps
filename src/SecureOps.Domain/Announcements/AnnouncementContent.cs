@@ -9,4 +9,4 @@ public sealed record AnnouncementContent(string OcoReference, string Scope, stri
 /// <summary>Immutable local revision; downloading never changes its state into Sent.</summary>
 public sealed record AnnouncementDraft(Guid Id, Guid OwnerId, long Version, DateTimeOffset SavedAt,
     AnnouncementContent Content, string Sender, string BannerHash,
-    string Origin = "Manual", string TemplateRevision = "oco-v1");
+    string Origin = "Manual", string TemplateRevision = "oco-v1", int? MissingFieldCount = null);

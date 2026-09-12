@@ -12,12 +12,14 @@ using MimeKit;
 using SecureOps.Domain.Announcements;
 using SecureOps.Infrastructure.Announcements;
 using SecureOps.Shared.Configuration;
+using SecureOps.Shared.Contracts.Announcements;
 using SecureOps.Tests.Integration.Sql;
 using SkiaSharp;
+using Xunit.Abstractions;
 
 namespace SecureOps.Tests.Integration.Api;
 
-public sealed class AnnouncementTests
+public sealed partial class AnnouncementTests(ITestOutputHelper output)
 {
     private static AnnouncementContent Content() => new("OCO-SYNTHETIC", "Manual scope", "Planlı & çalışma",
         "2026-09-12", "2026-09-13T01:00+03:00", "2026-09-13T02:00+03:00", "Türkçe &lt;b&gt; <script>alert(1)</script>",
@@ -146,6 +148,11 @@ public sealed class AnnouncementTests
         string[] actions = (await sql.QueryAsync<string>("SELECT Action FROM audit.AuditLog WHERE JSON_VALUE(CASE WHEN ISJSON(DetailsJson)=1 THEN DetailsJson ELSE '{}' END,'$.Id')=@id", new { id = id.ToString() })).ToArray();
         actions.Count(a => a == "AnnouncementDraftRead").Should().Be(3);
         actions.Where(a => a != "AnnouncementDraftRead").Should().BeEquivalentTo(["AnnouncementDraftSaved", "AnnouncementDownloadPrepared", "AnnouncementDraftSaved"]);
+        foreach (string route in new[] { "/api/v1/announcements", "/api/v1/announcements/banners" })
+        {
+            (await anonymous.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            (await denied.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
         await FluentActions.Awaiting(() => sql.ExecuteAsync("UPDATE announcements.DraftRevisions SET Version=99 WHERE Id=@id", new { id })).Should().ThrowAsync<SqlException>();
         string trigger = "TR_OcoTest_" + Guid.NewGuid().ToString("N");
         await sql.ExecuteAsync($"CREATE TRIGGER audit.[{trigger}] ON audit.AuditLog AFTER INSERT AS BEGIN IF EXISTS(SELECT 1 FROM inserted WHERE Action LIKE 'Announcement%') THROW 51149, 'Synthetic failure.', 1; END;");
@@ -155,6 +162,8 @@ public sealed class AnnouncementTests
             (await admin.GetAsync(path + "?version=2&format=eml")).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
             (await admin.GetAsync(path)).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
             (await admin.GetAsync(path + "?version=2&format=html")).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+            (await admin.GetAsync("/api/v1/announcements")).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+            (await admin.GetAsync("/api/v1/announcements/banners")).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
             (await store.GetAsync(id, owner, default))!.Version.Should().Be(2);
         }
         finally { await sql.ExecuteAsync($"DROP TRIGGER audit.[{trigger}];"); }
@@ -168,5 +177,22 @@ public sealed class AnnouncementTests
         JsonElement problem = (await missing.Content.ReadFromJsonAsync<JsonElement>());
         problem.GetProperty("code").GetString().Should().Be("AnnouncementIncomplete");
         problem.GetProperty("fields").EnumerateArray().Select(f => f.GetString()).Should().Contain(["Subject", "To"]);
+        using HttpResponseMessage listed = await admin.GetAsync("/api/v1/announcements?page=1&pageSize=1&ownerId=" + Guid.NewGuid());
+        listed.EnsureSuccessStatusCode();
+        listed.Headers.CacheControl!.NoStore.Should().BeTrue();
+        AnnouncementPage page = (await listed.Content.ReadFromJsonAsync<AnnouncementPage>())!;
+        page.Total.Should().Be(2);
+        page.Items.Single().MissingFieldCount.Should().Be(2);
+        (await admin.GetFromJsonAsync<AnnouncementPage>("/api/v1/announcements?page=2&pageSize=1"))!.Items.Single().Version.Should().Be(2);
+        foreach (string invalid in new[] { "page=0", "pageSize=101", "page=10001", "pageSize=0" })
+        { (await admin.GetAsync("/api/v1/announcements?" + invalid)).StatusCode.Should().Be(HttpStatusCode.BadRequest); }
+        (await admin.GetAsync(path + "?format=list")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        output.WriteLine("HTTP list page bytes={0}", (await listed.Content.ReadAsByteArrayAsync()).Length);
+        (await admin.GetFromJsonAsync<AnnouncementBanner[]>("/api/v1/announcements/banners"))!.Single().State.Should().Be("PresentNotValidated");
+        File.Move(Path.Combine(assets, "banner.bin"), Path.Combine(assets, "banner.retained"));
+        (await admin.GetFromJsonAsync<AnnouncementBanner[]>("/api/v1/announcements/banners"))!.Single().State.Should().Be("Missing");
+        using HttpResponseMessage absent = await admin.GetAsync(path + "?version=2&format=eml");
+        absent.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await absent.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("AnnouncementAssetMissing");
     }
 }

@@ -7,12 +7,14 @@ using SecureOps.Domain.Announcements;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Configuration;
+using SecureOps.Shared.Contracts.Announcements;
 
 namespace SecureOps.Infrastructure.Announcements;
 
 /// <summary>Expected outcome of a local draft operation.</summary>
 public sealed record AnnouncementOutcome(AnnouncementDraft? Draft = null, string? Html = null,
-    byte[]? Email = null, string? Error = null, string[]? Fields = null);
+    byte[]? Email = null, string? Error = null, string[]? Fields = null,
+    AnnouncementPage? Page = null, IReadOnlyList<AnnouncementBanner>? Banners = null);
 
 /// <summary>Owner-scoped local draft orchestration; no source or mail transport dependency.</summary>
 public sealed class AnnouncementService(SqlAnnouncementStore store, AnnouncementRenderer renderer,
@@ -20,7 +22,7 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
 {
     /// <summary>Revalidates persisted capabilities for every save/read/preview/download.</summary>
     public async Task<AnnouncementOutcome> ExecuteAsync(ClaimsPrincipal principal, AccessOperationContext context,
-        Guid id, long version, string format, AnnouncementContent? input, CancellationToken token)
+        Guid id, long version, string format, AnnouncementContent? input, int page, int pageSize, CancellationToken token)
     {
         try
         {
@@ -30,9 +32,23 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
             { return new(Error: "AccessDenied"); }
             if (!options.Value.Enabled)
             { return new(Error: "AnnouncementsDisabled"); }
+            Guid owner = current.Value.User.Id;
+            if (format == "list")
+            {
+                if (page is < 1 or > 10000 || pageSize is < 1 or > 100)
+                { return new(Error: "AnnouncementInvalid", Fields: ["Page", "PageSize"]); }
+                AnnouncementPage found = await store.ListAsync(owner, page, pageSize, token);
+                await store.DiscoveryAuditAsync(owner, false, found.Items.Count, context.CorrelationId, token);
+                return new(Page: found);
+            }
+            if (format == "banners")
+            {
+                IReadOnlyList<AnnouncementBanner> banners = renderer.Banners(token);
+                await store.DiscoveryAuditAsync(owner, true, banners.Count, context.CorrelationId, token);
+                return new(Banners: banners);
+            }
             if (id == Guid.Empty || version is < 0 or long.MaxValue || format is not ("save" or "draft" or "html" or "eml"))
             { return new(Error: "AnnouncementInvalid"); }
-            Guid owner = current.Value.User.Id;
             if (format == "save")
             {
                 if (input is null)
@@ -73,6 +89,11 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
             byte[] email = await AnnouncementRenderer.EmailAsync(draft, asset.Bytes, asset.Type, token);
             await store.ReadAuditAsync(draft, true, context.CorrelationId, token);
             return new(draft, Email: email);
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            logger.LogWarning("Announcement asset missing. FailureType: {FailureType}", exception.GetType().Name);
+            return new(Error: "AnnouncementAssetMissing");
         }
         catch (Exception exception) when (exception is DbException or IOException or InvalidOperationException or UnauthorizedAccessException)
         {

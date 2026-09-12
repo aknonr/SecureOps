@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using MimeKit;
 using SecureOps.Domain.Announcements;
 using SecureOps.Shared.Configuration;
+using SecureOps.Shared.Contracts.Announcements;
 using SkiaSharp;
 
 namespace SecureOps.Infrastructure.Announcements;
@@ -11,16 +12,44 @@ namespace SecureOps.Infrastructure.Announcements;
 /// <summary>Allowlisted private assets and one escaped, non-network template pipeline.</summary>
 public sealed class AnnouncementRenderer(IOptions<AnnouncementOptions> options)
 {
-    /// <summary>Reads at most 256 KiB; codec checks type, dimensions and complete decode before use.</summary>
-    public async Task<(byte[] Bytes, string Type, string Hash)> AssetAsync(string revision, CancellationToken token)
+    private string AssetPath(string revision)
     {
         AnnouncementOptions config = options.Value;
         if (!config.Banners.TryGetValue(revision, out string? name) || string.IsNullOrEmpty(name) || name != Path.GetFileName(name) || name.Contains(':')
-            || !Path.IsPathFullyQualified(config.AssetDirectory) || config.AssetDirectory.StartsWith("\\\\", StringComparison.Ordinal))
+            || !Path.IsPathFullyQualified(config.AssetDirectory) || config.AssetDirectory.StartsWith("\\\\", StringComparison.Ordinal)
+            || config.AssetDirectory.StartsWith("//", StringComparison.Ordinal))
         { throw new InvalidOperationException("Banner unavailable."); }
         string path = Path.Combine(config.AssetDirectory, name);
         if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0 || (File.GetAttributes(config.AssetDirectory) & FileAttributes.ReparsePoint) != 0)
         { throw new InvalidOperationException("Banner unavailable."); }
+        return path;
+    }
+
+    /// <summary>At most 32 allowlisted choices; metadata I/O only, no filesystem enumeration or codec/cache.</summary>
+    public IReadOnlyList<AnnouncementBanner> Banners(CancellationToken token = default)
+    {
+        if (options.Value.Banners.Count > 32 || options.Value.Banners.Keys.Any(k =>
+            !System.Text.RegularExpressions.Regex.IsMatch(k, @"\A[a-z0-9-]{1,64}\z")))
+        { throw new InvalidOperationException("Banner catalogue invalid."); }
+        return options.Value.Banners.Keys.Order(StringComparer.Ordinal).Select(revision =>
+        {
+            token.ThrowIfCancellationRequested();
+            string? label = options.Value.BannerLabels.GetValueOrDefault(revision);
+            if (string.IsNullOrWhiteSpace(label) || label.Length > 80 || label.Any(c => char.IsControl(c) || c is '<' or '>'))
+            { label = revision; }
+            string state;
+            try
+            { state = new FileInfo(AssetPath(revision)).Length is >= 24 and <= 262144 ? "PresentNotValidated" : "Invalid"; }
+            catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException) { state = "Missing"; }
+            catch (Exception e) when (e is IOException or InvalidOperationException or UnauthorizedAccessException) { state = "Unavailable"; }
+            return new AnnouncementBanner(revision, label, state);
+        }).ToArray();
+    }
+
+    /// <summary>Reads at most 256 KiB; codec checks type, dimensions and complete decode before use.</summary>
+    public async Task<(byte[] Bytes, string Type, string Hash)> AssetAsync(string revision, CancellationToken token)
+    {
+        string path = AssetPath(revision);
         await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (file.Length is < 24 or > 262144)
         { throw new InvalidOperationException("Banner size invalid."); }

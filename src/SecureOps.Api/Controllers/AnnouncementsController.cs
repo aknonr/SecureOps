@@ -4,6 +4,7 @@ using SecureOps.Domain.Announcements;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Announcements;
 using SecureOps.Shared.Auth;
+using SecureOps.Shared.Contracts.Announcements;
 
 namespace SecureOps.Api.Controllers;
 
@@ -11,29 +12,39 @@ namespace SecureOps.Api.Controllers;
 [ApiController, Route("api/v1/announcements"), Authorize(Policy = Policies.CanDraftAnnouncements), Produces("application/json")]
 public sealed class AnnouncementsController(AnnouncementService service) : ControllerBase
 {
+    /// <summary>Lists only the caller's latest draft summaries; page 1..10000 and size 1..100.</summary>
+    [HttpGet, ProducesResponseType(typeof(AnnouncementPage), 200)]
+    public Task<IActionResult> ListAsync(int page = 1, int pageSize = 25, CancellationToken token = default) =>
+        ExecuteAsync(Guid.Empty, 0, "list", null, page, pageSize, token);
+
+    /// <summary>Lists bounded allowlisted banner choices without exposing paths or decoding images.</summary>
+    [HttpGet("banners"), ProducesResponseType(typeof(IReadOnlyList<AnnouncementBanner>), 200)]
+    public Task<IActionResult> BannersAsync(CancellationToken token = default) =>
+        ExecuteAsync(Guid.Empty, 0, "banners", null, 1, 25, token);
+
     /// <summary>Reads stored content or a version-bound safe preview/email representation.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(AnnouncementContent), 200)]
     public Task<IActionResult> GetAsync(Guid id, long version = 0, string format = "draft", CancellationToken token = default) =>
-        ExecuteAsync(id, version, format, null, token);
+        ExecuteAsync(id, version, format is "draft" or "html" or "eml" ? format : "invalid", null, 1, 25, token);
 
     /// <summary>Creates at version zero or appends after a matching version; returns new ETag.</summary>
     [HttpPut("{id:guid}"), RequestSizeLimit(131072), Consumes("application/json")]
     [ProducesResponseType(typeof(AnnouncementContent), 200)]
     public Task<IActionResult> SaveAsync(Guid id, AnnouncementContent content, long version = 0, CancellationToken token = default) =>
-        ExecuteAsync(id, version, "save", content, token);
+        ExecuteAsync(id, version, "save", content, 1, 25, token);
 
-    private async Task<IActionResult> ExecuteAsync(Guid id, long version, string format, AnnouncementContent? content, CancellationToken token)
+    private async Task<IActionResult> ExecuteAsync(Guid id, long version, string format, AnnouncementContent? content, int page, int pageSize, CancellationToken token)
     {
         Response.Headers.CacheControl = "no-store";
-        AnnouncementOutcome result = await service.ExecuteAsync(User, new AccessOperationContext("announcement", HttpContext.TraceIdentifier, null), id, version, format, content, token);
+        AnnouncementOutcome result = await service.ExecuteAsync(User, new AccessOperationContext("announcement", HttpContext.TraceIdentifier, null), id, version, format, content, page, pageSize, token);
         if (result.Error is not null)
         {
             int status = result.Error switch
             {
                 "AccessDenied" => 403,
                 "AnnouncementNotFound" => 404,
-                "AnnouncementConflict" or "AnnouncementAssetChanged" => 409,
+                "AnnouncementConflict" or "AnnouncementAssetChanged" or "AnnouncementAssetMissing" => 409,
                 "AnnouncementInvalid" or "AnnouncementIncomplete" => 400,
                 _ => 503
             };
@@ -45,6 +56,10 @@ public sealed class AnnouncementsController(AnnouncementService service) : Contr
             })
             { StatusCode = status };
         }
+        if (result.Page is not null)
+        { return Ok(result.Page); }
+        if (result.Banners is not null)
+        { return Ok(result.Banners); }
         Response.Headers.ETag = $"\"{result.Draft!.Version}\"";
         Response.Headers["X-Announcement-Origin"] = result.Draft.Origin;
         if (result.Email is not null)

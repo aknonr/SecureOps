@@ -8,7 +8,7 @@ using SecureOps.Domain.Announcements;
 namespace SecureOps.Infrastructure.Announcements;
 
 /// <summary>Independent append-only revisions; owner and version are checked inside the audit transaction.</summary>
-public sealed class SqlAnnouncementStore(IConfiguration configuration)
+public sealed partial class SqlAnnouncementStore(IConfiguration configuration)
 {
     private readonly string _connection = configuration.GetConnectionString("SecureOpsDb") ?? "";
     /// <summary>Returns the caller's latest stored revision only.</summary>
@@ -24,12 +24,14 @@ public sealed class SqlAnnouncementStore(IConfiguration configuration)
     /// <summary>Appends a revision and safe audit metadata atomically; stale writes have no effect.</summary>
     public async Task<string?> SaveAsync(AnnouncementDraft draft, string correlation, CancellationToken token)
     {
+        draft = draft with { MissingFieldCount = AnnouncementValidation.Errors(draft.Content, true).Length };
         string json = JsonSerializer.Serialize(draft);
         if (System.Text.Encoding.Unicode.GetByteCount(json) > 262144)
         { return "AnnouncementInvalid"; }
         await using var connection = new SqlConnection(_connection);
         await connection.OpenAsync(token);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        await OwnerLockAsync(connection, transaction, draft.OwnerId, "Exclusive", token);
         (Guid Owner, long Version)? current = await connection.QuerySingleOrDefaultAsync<(Guid, long)?>(new CommandDefinition(
             "SELECT TOP(1) OwnerId, Version FROM announcements.DraftRevisions WITH(UPDLOCK,HOLDLOCK) WHERE Id=@Id ORDER BY Version DESC;",
             new { draft.Id }, transaction, commandTimeout: 15, cancellationToken: token));
