@@ -33,6 +33,19 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
             if (!options.Value.Enabled)
             { return new(Error: "AnnouncementsDisabled"); }
             Guid owner = current.Value.User.Id;
+            if (format == "live")
+            {
+                if (input is null)
+                { return new(Error: "AnnouncementInvalid"); }
+                string[] invalid = AnnouncementValidation.Errors(input, false);
+                if (invalid.Length > 0)
+                { return new(Error: "AnnouncementInvalid", Fields: invalid); }
+                AnnouncementPresentation presentation = await renderer.PresentationAsync(input, token);
+                var transient = new AnnouncementDraft(Guid.Empty, owner, 0, DateTimeOffset.UnixEpoch, input, "",
+                    presentation.Hash, TemplateRevision: input.TemplateRevision);
+                return new(Html: AnnouncementRenderer.RenderPresentation(transient, presentation, true).Html,
+                    Fields: AnnouncementValidation.Errors(input, true));
+            }
             if (format == "list")
             {
                 if (page is < 1 or > 10000 || pageSize is < 1 or > 100)

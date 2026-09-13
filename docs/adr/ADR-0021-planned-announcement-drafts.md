@@ -2,6 +2,20 @@
 
 Status: accepted for this explicitly authorized local draft-only increment.
 
+Editor continuation from e48f13e: new UI drafts select v2; legacy drafts require an
+explicit versioned upgrade. A debounced transient preview transforms caller-supplied
+bounded content through the same renderer, without reading draft records, writing
+revisions or sending. Capability/session checks are never cached. This transformation
+is not a privileged stored-content read; existing discovery/save/read/download audit
+remains fail-closed. Incomplete fields stay blank. Preview failure clears old HTML.
+Configured manual display offsets never reinterpret source LMT or change an existing
+instant. The 1000-line cap defers the separate source/profile slice: Worker has no
+Hangfire composition and SCCM is absent. Required durable jobs, adapters, SQL/audit,
+reviewed application UI and tests are estimated at 1300-1700 additional changed lines.
+DateTextRevision independently versions email date presentation: omitted iso-v1
+preserves existing rendering/hashes; new UI v2 drafts and explicit upgrades use
+tr-v1, fingerprinted with the presentation. Raw ISO dates/instants stay unchanged.
+
 Continuation from 142a48f: explicitly selected `oco-table-v2` adds a bounded
 structured affected-service list, separate from the system/application Scope,
 and an immutable six-role private asset bundle. `oco-v1` rendering and old JSON

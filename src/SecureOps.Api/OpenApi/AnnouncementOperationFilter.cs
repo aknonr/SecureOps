@@ -13,6 +13,12 @@ public sealed class AnnouncementOperationFilter : IOperationFilter
     {
         if (context.MethodInfo.DeclaringType != typeof(AnnouncementsController))
         { return; }
+        if (context.MethodInfo.Name == nameof(AnnouncementsController.PreviewAsync))
+        {
+            operation.Responses["200"].Headers["X-Announcement-Incomplete"] = new OpenApiHeader
+            { Description = "Comma-separated missing-field keys; no saved version or ETag.", Schema = new() { Type = "string" } };
+            operation.Responses["429"] = new OpenApiResponse { Description = "Actor preview limit exceeded; no automatic retry." };
+        }
         foreach (OpenApiParameter parameter in operation.Parameters.Where(p => p.Name is "page" or "pageSize"))
         {
             parameter.Schema.Minimum = 1;

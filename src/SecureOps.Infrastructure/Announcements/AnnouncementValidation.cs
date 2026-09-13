@@ -18,6 +18,8 @@ public static class AnnouncementValidation
     public static string[] Errors(AnnouncementContent content, bool complete)
     {
         List<string> errors = [];
+        if (content.DateTextRevision is not ("iso-v1" or "tr-v1") || content.TemplateRevision == "oco-v1" && content.DateTextRevision != "iso-v1")
+        { errors.Add("DateTextRevision"); }
         if (content.TemplateRevision is not ("oco-v1" or "oco-table-v2"))
         { errors.Add("TemplateRevision"); }
         string[] services = content.AffectedServices ?? [];

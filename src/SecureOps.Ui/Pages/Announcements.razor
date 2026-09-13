@@ -11,6 +11,7 @@
 
 <PageTitle>Planlı Çalışma Duyuruları · @WasasBrand.Name</PageTitle>
 <NavigationLock ConfirmExternalNavigation="_dirty" OnBeforeInternalNavigation="LeavingAsync" />
+<MudHidden Breakpoint="Breakpoint.LgAndUp" IsHidden="_wide" IsHiddenChanged="WidthChanged" />
 <div class="so-page so-announcements" aria-busy="@_busy.ToString().ToLowerInvariant()">
     <SoPageHeader Title="Planlı Çalışma Duyuruları">
         <Actions>
@@ -68,14 +69,21 @@
                 <MudButton OnClick="AcceptComparison" Disabled="_busy">Farkları inceledim; düzenlemelerimle devam et</MudButton>
             </section>
         }
+        @if (!_wide)
+        {
+            <div class="so-inline-actions" role="group" aria-label="Duyuru görünümü">
+                <MudButton aria-pressed="@((!_previewTab).ToString().ToLowerInvariant())" Variant="@(_previewTab ? Variant.Text : Variant.Filled)" OnClick="@(() => PreviewTab(false))">Düzenle</MudButton>
+                <MudButton aria-pressed="@_previewTab.ToString().ToLowerInvariant()" Variant="@(_previewTab ? Variant.Filled : Variant.Text)" OnClick="@(() => PreviewTab(true))">Önizleme</MudButton>
+            </div>
+        }
+        <div class="so-announcement-workspace">
+        <div hidden="@(!_wide && _previewTab)">
         <EditForm Model="_form" OnSubmit="SaveAsync">
             <fieldset disabled="@_busy" data-guide="announcement-details">
-                <label class="so-announcement-field" for="announcement-TemplateRevision">Duyuru biçimi
-                    <select id="announcement-TemplateRevision" value="@_form.Template" @onchange="TemplateAsync">
-                        <option value="oco-v1" disabled="@(_form.Services.Length > 0)">Önceki taslak biçimi</option>
-                        <option value="oco-table-v2">Nihai duyuru</option>
-                    </select>
-                </label>
+                @if (_form.Template == "oco-v1")
+                { <MudButton id="announcement-TemplateRevision" StartIcon="@Icons.Material.Filled.Upgrade" OnClick="UpgradeAsync">Yeni duyuru biçimine yükselt</MudButton> }
+                @if (!_banners.Any(b => b.State == "PresentNotValidated"))
+                { <p role="alert">Kullanılabilir görsel paketi yok. Yöneticiniz görsel kurulumunu tamamladıktan sonra görselleri yenileyin.</p> }
                 <div class="so-announcement-grid">
                     @foreach (var f in AnnouncementForm.Fields.Where(f => !f.Optional))
                     { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" ValueChanged="@(value => Change(f.Key, value))" /> }
@@ -124,7 +132,16 @@
                 <span role="status">@(_dirty ? "Kaydedilmemiş değişiklikler" : _version > 0 ? "Kaydedildi" : "Yeni taslak")</span>
             </div>
         </EditForm>
-        @if (_html is not null)
-        { <section aria-label="Kaydedilmiş duyuru önizlemesi"><h2>Önizleme</h2><iframe title="Duyuru önizlemesi" sandbox="" referrerpolicy="no-referrer" srcdoc="@_html"></iframe></section> }
+        </div>
+        @if (PreviewVisible)
+        {
+            <section class="so-announcement-preview" aria-label="Duyuru önizlemesi">
+                <h2>Önizleme</h2><p role="status">@_previewStatus</p>
+                @if (_previewProblem is not null) { <SoProblemPanel Problem="_previewProblem" /><MudButton OnClick="SchedulePreview">Yeniden dene</MudButton> }
+                @if (_html is not null)
+                { <iframe title="Duyuru önizlemesi" tabindex="0" sandbox="" referrerpolicy="no-referrer" srcdoc="@_html"></iframe> }
+            </section>
+        }
+        </div>
     }
 </div>

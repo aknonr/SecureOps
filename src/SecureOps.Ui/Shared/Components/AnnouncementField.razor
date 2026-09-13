@@ -1,32 +1,19 @@
+@if (Type == "datetime-local")
+{ <AnnouncementTimeField Key="@Key" Label="@Label" Value="@Value" ValueChanged="ValueChanged" /> }
+else
+{
 <label class="so-announcement-field" for="@($"announcement-{Key}")">@Label
     @if (Type == "textarea")
     { <textarea id="@($"announcement-{Key}")" rows="3" maxlength="4000" value="@Value" @oninput="ChangeAsync"></textarea> }
-    else if (Type == "datetime-local")
-    {
-        <input id="@($"announcement-{Key}")" type="datetime-local" step="1" value="@Local" @onchange="DateChangedAsync" />
-        <span class="so-announcement-offset"><span>Saat dilimi</span>
-            <select aria-label="@(Label + " saat dilimi")" value="@Offset" @onchange="OffsetChangedAsync">
-                <option value="">Seçin</option>
-                @foreach (string offset in Offsets) { <option value="@offset">UTC @offset</option> }
-            </select>
-        </span>
-    }
     else
     { <input id="@($"announcement-{Key}")" type="@Type" maxlength="@(Key == "Subject" ? 200 : 4000)" value="@Value" @oninput="ChangeAsync" /> }
 </label>
+}
 @code {
     [Parameter] public string Key { get; set; } = "";
     [Parameter] public string Label { get; set; } = "";
     [Parameter] public string Type { get; set; } = "text";
     [Parameter] public string Value { get; set; } = "";
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
-    private string? _chosenOffset;
-    private string Offset => Value.EndsWith('Z') ? "+00:00" : Value.Length >= 22 ? Value[^6..] : _chosenOffset ?? "";
-    private string Local => Value.EndsWith('Z') ? Value[..^1] : Value.Length >= 22 ? Value[..^6] : Value;
-    private IEnumerable<string> Offsets => Enumerable.Range(-48, 105).Select(i =>
-        (i < 0 ? "-" : "+") + $"{Math.Abs(i) / 4:00}:{Math.Abs(i) % 4 * 15:00}").Append(Offset).Where(s => s.Length > 0).Distinct();
     private Task ChangeAsync(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value?.ToString() ?? "");
-    private Task DateChangedAsync(ChangeEventArgs e) => ValueChanged.InvokeAsync(string.IsNullOrEmpty(e.Value?.ToString()) ? "" : e.Value + Offset);
-    private Task OffsetChangedAsync(ChangeEventArgs e)
-    { _chosenOffset = e.Value?.ToString() ?? ""; return ValueChanged.InvokeAsync(Local.Length == 0 ? "" : Local + _chosenOffset); }
 }

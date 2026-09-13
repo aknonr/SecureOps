@@ -29,6 +29,7 @@ if (!builder.Environment.IsDevelopment() && !builder.Environment.IsProduction())
 }
 
 builder.Services.Configure<DemoModeOptions>(builder.Configuration.GetSection(DemoModeOptions.SectionName));
+builder.Services.Configure<AnnouncementOptions>(builder.Configuration.GetSection("Announcements"));
 
 // Trusted HTTPS-offload recognition. Validated at startup so a misconfigured trust boundary stops
 // the host rather than silently degrading to cleartext behaviour behind the load balancer.

@@ -34,6 +34,13 @@ public sealed class AnnouncementsController(AnnouncementService service) : Contr
     public Task<IActionResult> SaveAsync(Guid id, AnnouncementContent content, long version = 0, CancellationToken token = default) =>
         ExecuteAsync(id, version, "save", content, 1, 25, token);
 
+    /// <summary>Transforms supplied incomplete content only; no stored draft read, save or send.</summary>
+    [HttpPost("preview"), RequestSizeLimit(131072), Consumes("application/json"), Produces("text/html")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting(Security.ApiRateLimits.AnnouncementPreview)]
+    [ProducesResponseType(typeof(string), 200)]
+    public Task<IActionResult> PreviewAsync(AnnouncementContent content, CancellationToken token = default) =>
+        ExecuteAsync(Guid.Empty, 0, "live", content, 1, 25, token);
+
     private async Task<IActionResult> ExecuteAsync(Guid id, long version, string format, AnnouncementContent? content, int page, int pageSize, CancellationToken token)
     {
         Response.Headers.CacheControl = "no-store";
@@ -60,15 +67,20 @@ public sealed class AnnouncementsController(AnnouncementService service) : Contr
         { return Ok(result.Page); }
         if (result.Banners is not null)
         { return Ok(result.Banners); }
-        Response.Headers.ETag = $"\"{result.Draft!.Version}\"";
-        Response.Headers["X-Announcement-Origin"] = result.Draft.Origin;
+        if (result.Draft is not null)
+        {
+            Response.Headers.ETag = $"\"{result.Draft.Version}\"";
+            Response.Headers["X-Announcement-Origin"] = result.Draft.Origin;
+        }
         if (result.Email is not null)
-        { return File(result.Email, "message/rfc822", $"announcement-{id:N}-v{result.Draft.Version}.eml"); }
+        { return File(result.Email, "message/rfc822", $"announcement-{id:N}-v{result.Draft!.Version}.eml"); }
         if (result.Html is not null)
         {
             Response.Headers.ContentSecurityPolicy = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox";
+            if (format == "live")
+            { Response.Headers["X-Announcement-Incomplete"] = string.Join(",", result.Fields ?? []); }
             return Content(result.Html, "text/html", System.Text.Encoding.UTF8);
         }
-        return Ok(result.Draft.Content);
+        return Ok(result.Draft!.Content);
     }
 }

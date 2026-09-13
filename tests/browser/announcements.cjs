@@ -1,8 +1,9 @@
-// Local published Demo hosts only. Args: playwright-core, UI, API, denied UI, fresh evidence directory, optional start|final-template.
+// Local published Demo hosts with -FinalPresentation. Args: playwright-core, UI, API, denied UI, fresh evidence directory, optional start|final-template|editor.
 const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { chromium, request } = require(process.argv[2]);
 const { loopback, navigate, signIn, capture, apiContext, json } = require('./journey-support.cjs');
 const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi = loopback(process.argv[5]), out = path.resolve(process.argv[6]);
+const finalMode = ['final-template', 'editor'].includes(process.argv[7]);
 (async () => {
     fs.mkdirSync(out, { recursive: true });
     const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
@@ -26,7 +27,8 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         await navigate(page, ui, 'announcements'); await ready();
         assert.equal(await page.getByText('Bu modülün nasıl kullanıldığını öğrenmek ister misiniz?').count(), 0);
         await click('Yeni duyuru');
-        await page.locator('#announcement-BannerRevision').selectOption('synthetic');
+        assert.equal(await page.locator('#announcement-TemplateRevision').count(), 0);
+        await page.locator('#announcement-BannerRevision').selectOption('bundle-v1');
         await page.getByRole('button', { name: 'Kaydet', exact: true }).focus(); await page.keyboard.press('Enter');
         await page.getByText('Taslak kaydedildi.', { exact: true }).waitFor(); await click('Önizle');
         await page.getByText('Duyuru alanlarını kontrol edin', { exact: true }).waitFor();
@@ -35,9 +37,12 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
             Description: 'Türkçe &lt;b&gt; <script>window.invalid=true</script>', Impact: 'Kısa kesinti', Checks: 'Sağlık kontrolü' };
         for (const [key, value] of Object.entries(values)) await page.locator('#announcement-' + key).fill(value);
         for (const [key, label, time] of [['WorkStart','Çalışma başlangıcı','01:00'], ['WorkEnd','Çalışma bitişi','02:00']]) {
-            await page.locator('#announcement-' + key).fill('2026-09-13T' + time);
-            await page.getByLabel(label + ' saat dilimi', { exact: true }).selectOption('+03:00');
+            await page.locator('#announcement-' + key).fill('2026-09-13');
+            await page.getByLabel(label + ' saat', { exact: true }).selectOption(time.split(':')[0]);
+            await page.getByLabel(label + ' dakika', { exact: true }).selectOption(time.split(':')[1]);
         }
+        await page.getByText('Etkilenen servisler (0)', { exact: true }).click();
+        await page.locator('#announcement-AffectedServices').fill('Yerel sentetik servis');
         await click('Alıcı ekle'); await page.getByLabel('Alıcı adresi', { exact: true }).fill('reader@example.invalid');
         await click('Bilgi ekle'); await page.getByLabel('Bilgi adresi', { exact: true }).fill('copy@example.invalid');
         assert.equal(await page.getByRole('button', { name: 'Önizle', exact: true }).isDisabled(), true);
@@ -68,7 +73,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         assert.equal(await page.locator('iframe').getAttribute('sandbox'), '');
         assert.match(await frame.locator('body').innerText(), /Türkçe &lt;b&gt; <script>/);
         assert.equal(await frame.locator('script').count(), 0);
-        assert.equal(await frame.locator('img').evaluate(e => e.complete && e.naturalWidth > 0), true);
+        assert.equal(await frame.locator('img').evaluateAll(images => images.length === 6 && images.every(e => e.complete && e.naturalWidth > 0)), true);
         await capture(page, out, 'preview');
         for (const width of [1440, 390]) {
             await page.setViewportSize({ width, height: 844 });
@@ -81,6 +86,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         const download = await downloadEvent; assert.match(download.suggestedFilename(), /^announcement-[a-f0-9]{32}-v2.eml$/);
         await download.saveAs(path.join(out, download.suggestedFilename()));
         assert.deepEqual(await json(client, '/api/v1/announcements'), beforeTour);
+        if (process.argv[7] === 'editor') await editorChecks(page, client, denied, route, stored, click, frame, checks);
         checks.push('SQL save/read, explicit sandbox preview, image, Turkish inert text, authenticated download without revision/send, guide persistence and keyboard nonmutation');
         await page.locator('#announcement-Subject').fill('Korunan yerel düzenleme');
         const version = (await client.get(route)).headers().etag.replaceAll('"', '');
@@ -98,14 +104,15 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         assert.equal(await page.locator('#announcement-Subject').inputValue(), 'Kaydedilmemiş');
         await page.locator('.so-route-progress.is-active').waitFor({ state: 'hidden' });
         await click('Taslaklar'); await page.getByRole('button', { name: 'Değişiklikleri bırak', exact: true }).click(); await ready();
-        if (process.argv[7] === 'final-template') {
+        if (finalMode) {
             const services = Array.from({ length: 155 }, (_, i) => `Sentetik servis ${String(i + 1).padStart(3, '0')} - Türkçe & inceleme <b> uygulama hizmeti`);
-            await click('Yeni duyuru'); await page.locator('#announcement-TemplateRevision').selectOption('oco-table-v2'); await ready();
+            await click('Yeni duyuru'); await ready();
             await page.locator('#announcement-BannerRevision').selectOption('bundle-v1');
             for (const [key, value] of Object.entries(values)) await page.locator('#announcement-' + key).fill(value);
             for (const [key, label, time] of [['WorkStart','Çalışma başlangıcı','01:00'], ['WorkEnd','Çalışma bitişi','02:00']]) {
-                await page.locator('#announcement-' + key).fill('2026-09-13T' + time);
-                await page.getByLabel(label + ' saat dilimi', { exact: true }).selectOption('+03:00');
+                await page.locator('#announcement-' + key).fill('2026-09-13');
+                await page.getByLabel(label + ' saat', { exact: true }).selectOption(time.split(':')[0]);
+                await page.getByLabel(label + ' dakika', { exact: true }).selectOption(time.split(':')[1]);
             }
             await page.getByText('Etkilenen servisler (0)', { exact: true }).click();
             await page.locator('#announcement-AffectedServices').fill(services.join('\n'));
@@ -132,6 +139,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
                 assert.ok(reachedFooter, 'Keyboard reaches the complete footer in the visible sandbox');
                 await page.screenshot({ path: path.join(out, `final-footer-${width}.png`) });
             }
+            await page.setViewportSize({ width: 1440, height: 900 });
             const event = page.waitForEvent('download'); await click('Maili indir');
             const eml = await event; await eml.saveAs(path.join(out, 'final-template.eml'));
             await page.setViewportSize({ width: 1440, height: 900 }); await click('Taslaklar');
@@ -141,7 +149,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         await navigate(page, ui, 'announcements'); await ready();
         assert.equal(await page.locator('tbody tr').count(), 25);
         await click('Sonraki sayfa');
-        await page.waitForFunction(n => document.querySelectorAll('tbody tr').length === n, process.argv[7] === 'final-template' ? 3 : 2);
+        await page.waitForFunction(n => document.querySelectorAll('tbody tr').length === n, finalMode ? 3 : 2);
         await capture(page, out, 'list-page2');
         await click('Önceki sayfa'); await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 25);
         for (const url of ['/api/v1/announcements', route, route + '?version=4&format=html', route + '?version=4&format=eml', '/api/v1/announcements/banners'])
@@ -154,3 +162,64 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
     } catch (e) { await page.screenshot({ path: path.join(out, 'failed.png'), fullPage: true }); throw e; }
     finally { await client.dispose(); await denied.dispose(); await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
+
+async function editorChecks(page, client, denied, route, stored, click, frame, checks) {
+    const before = await json(client, '/api/v1/announcements');
+    for (const mode of ['Aydınlık', 'Koyu']) {
+        await page.getByRole('button', { name: 'Hesap menüsü', exact: true }).click();
+        await page.locator('.so-user-menu-popover.mud-popover-open .mud-list-item').filter({ hasText: new RegExp('^' + mode) }).click();
+        await page.waitForFunction(dark => document.documentElement.classList.contains('so-dark') === dark, mode === 'Koyu');
+        const date = page.locator('#announcement-WorkStart'); await date.scrollIntoViewIfNeeded();
+        assert.equal(await date.evaluate(e => getComputedStyle(e).colorScheme), mode === 'Koyu' ? 'dark' : 'light');
+        const original = await date.inputValue(), rect = await date.boundingBox();
+        await date.click({ position: { x: rect.width - 15, y: rect.height / 2 } });
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        await page.screenshot({ path: path.join(out, 'calendar-' + (mode === 'Koyu' ? 'dark' : 'light') + '.png') });
+        await page.keyboard.press('ArrowRight'); await page.keyboard.press('Enter');
+        assert.notEqual(await date.inputValue(), original, 'Visible picker accepts keyboard date selection'); await date.fill(original);
+    }
+    assert.equal(await page.getByLabel('Çalışma başlangıcı dakika', { exact: true }).locator('option').count(), 61);
+    await page.getByLabel('Çalışma başlangıcı dakika', { exact: true }).focus(); await page.keyboard.press('End'); await page.keyboard.press('Enter');
+    assert.equal(await page.getByLabel('Çalışma başlangıcı dakika', { exact: true }).inputValue(), '59');
+    const details = page.locator('.so-announcement-field').filter({ has: page.locator('#announcement-WorkStart') });
+    await details.locator('summary').click(); await page.getByLabel('Çalışma başlangıcı saniye', { exact: true }).fill('37');
+    await page.getByLabel('Çalışma başlangıcı gösterim saat dilimi', { exact: true }).selectOption('+00:00');
+    await page.waitForFunction(() => document.querySelector('#announcement-WorkStart').value === '2026-09-12');
+    assert.equal(await page.locator('#announcement-WorkStart').inputValue(), '2026-09-12');
+    assert.equal(await page.getByLabel('Çalışma başlangıcı saat', { exact: true }).inputValue(), '22');
+    assert.equal(await page.getByLabel('Çalışma başlangıcı saniye', { exact: true }).inputValue(), '37');
+    for (let i = 0; i < 8; i++) await page.locator('#announcement-Description').fill('Hızlı düzenleme ' + i);
+    await frame.getByText('Hızlı düzenleme 7', { exact: true }).waitFor();
+    assert.deepEqual(await json(client, '/api/v1/announcements'), before);
+    await page.locator('#announcement-WorkEnd').fill('2026-09-11');
+    await page.getByText('Önizleme güncellenemedi', { exact: true }).waitFor(); assert.equal(await page.locator('iframe').count(), 0);
+    await page.locator('#announcement-WorkEnd').fill('2026-09-13');
+    await frame.locator('body').waitFor();
+    await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('button', { name: 'Düzenle', exact: true }).click();
+    await page.locator('#announcement-Description').fill('Mobil korunmuş düzenleme'); assert.equal(await page.locator('iframe').count(), 0);
+    await page.getByRole('button', { name: 'Önizleme', exact: true }).focus(); await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('[aria-label="Duyuru görünümü"] button[aria-pressed=true]')?.textContent.includes('Önizleme'));
+    await frame.getByText('Mobil korunmuş düzenleme', { exact: true }).waitFor();
+    await page.locator('iframe').scrollIntoViewIfNeeded(); await frame.locator('h1').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(out, 'live-mobile.png') });
+    await page.setViewportSize({ width: 1440, height: 900 }); await click('Kaydet');
+    await page.getByText('Taslak kaydedildi.', { exact: true }).waitFor();
+    assert.equal((await json(client, route)).workStart, '2026-09-12T22:59:37+00:00');
+    await frame.getByText('Mobil korunmuş düzenleme', { exact: true }).waitFor();
+    await page.locator('iframe').scrollIntoViewIfNeeded(); await frame.locator('h1').scrollIntoViewIfNeeded(); await page.screenshot({ path: path.join(out, 'live-desktop.png') });
+    assert.equal((await denied.post('/api/v1/announcements/preview', { data: stored })).status(), 403);
+    // Reuse the same UUID to exercise explicit legacy upgrade and concurrency, without changing list counts.
+    await click('Taslaklar');
+    const revision = (await client.get(route)).headers().etag.replaceAll('"', '');
+    await json(client, route + '?version=' + revision, { method: 'PUT', data: { ...stored, templateRevision: 'oco-v1', dateTextRevision: 'iso-v1', affectedServices: null, bannerRevision: 'synthetic' } });
+    await page.reload(); await page.getByRole('button', { name: 'Düzenle: ' + stored.subject, exact: true }).click();
+    await page.locator('#announcement-Subject').fill('Korunan yükseltme düzenlemesi');
+    await click('Yeni duyuru biçimine yükselt'); await page.getByRole('button', { name: 'Yükselt', exact: true }).click();
+    assert.equal(await page.locator('#announcement-Subject').inputValue(), 'Korunan yükseltme düzenlemesi');
+    assert.equal((await json(client, route)).templateRevision, 'oco-v1');
+    await page.locator('#announcement-BannerRevision').selectOption('bundle-v1');
+    await page.getByText('Etkilenen servisler (0)', { exact: true }).click(); await page.locator('#announcement-AffectedServices').fill('İncelenen servis');
+    await click('Kaydet'); await page.getByText('Taslak kaydedildi.', { exact: true }).waitFor();
+    assert.equal((await json(client, route)).templateRevision, 'oco-table-v2');
+    checks.push('New v2, legacy explicit upgrade preserving edits, light/dark picker, all minutes, seconds/instant preservation, rapid/hidden/error live preview without save');
+}

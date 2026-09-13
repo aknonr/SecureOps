@@ -204,6 +204,7 @@ public sealed partial class AnnouncementTests(ITestOutputHelper output)
         output.WriteLine("HTTP list page bytes={0}", (await listed.Content.ReadAsByteArrayAsync()).Length);
         (await admin.GetFromJsonAsync<AnnouncementBanner[]>("/api/v1/announcements/banners"))!.Single().State.Should().Be("PresentNotValidated");
         await FinalApiAsync(admin, denied, store, owner);
+        await TransientApiAsync(admin, denied, anonymous, sql, path);
         File.Move(Path.Combine(assets, "banner.bin"), Path.Combine(assets, "banner.retained"));
         (await admin.GetFromJsonAsync<AnnouncementBanner[]>("/api/v1/announcements/banners"))!.Single().State.Should().Be("Missing");
         using HttpResponseMessage absent = await admin.GetAsync(path + "?version=2&format=eml");

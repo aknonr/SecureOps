@@ -5,7 +5,7 @@ public sealed record AnnouncementContent(string OcoReference, string Scope, stri
     string AnnouncementDate, string WorkStart, string WorkEnd, string Description, string Impact,
     string Checks, string Notes, string[] To, string[] Cc, string BannerRevision,
     string? RestartStart = null, string? RestartEnd = null,
-    string TemplateRevision = "oco-v1", string[]? AffectedServices = null);
+    string TemplateRevision = "oco-v1", string[]? AffectedServices = null, string DateTextRevision = "iso-v1");
 
 /// <summary>Immutable local revision; downloading never changes its state into Sent.</summary>
 public sealed record AnnouncementDraft(Guid Id, Guid OwnerId, long Version, DateTimeOffset SavedAt,

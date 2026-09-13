@@ -82,6 +82,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(ApiRateLimits.JiraPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraPreview, configuredRateLimits.JiraPreview));
     options.AddPolicy(ApiRateLimits.JiraCreate, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraCreate, configuredRateLimits.JiraCreate));
     options.AddPolicy(ApiRateLimits.WorkflowRetry, context => ApiRateLimits.Partition(context, ApiRateLimits.WorkflowRetry, configuredRateLimits.WorkflowRetry));
+    options.AddPolicy(ApiRateLimits.AnnouncementPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.AnnouncementPreview, new OperationRateLimitOptions { PermitLimit = 120, WindowSeconds = 60 }));
 });
 
 builder.Services.AddControllers();

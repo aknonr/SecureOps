@@ -38,6 +38,14 @@ public sealed class AnnouncementApiClient
         using HttpResponseMessage response = await SendAsync($"/{id}?version={version}&format=html", null, token);
         return await response.Content.ReadAsStringAsync(token);
     }
+    /// <summary>Pure transient rendering, no UUID authority or persistence operation.</summary>
+    public async Task<(string Html, string[] Missing)> LiveAsync(AnnouncementContent content, CancellationToken token)
+    {
+        using HttpResponseMessage response = await SendAsync("/preview", content, token, HttpMethod.Post);
+        string[] missing = response.Headers.TryGetValues("X-Announcement-Incomplete", out IEnumerable<string>? values)
+            ? string.Join(",", values).Split(',', StringSplitOptions.RemoveEmptyEntries) : [];
+        return (await response.Content.ReadAsStringAsync(token), missing);
+    }
     /// <summary>Returns authenticated MIME bytes and the server-owned safe filename.</summary>
     public async Task<(byte[] Bytes, string Name)> DownloadAsync(Guid id, long version, CancellationToken token)
     {
@@ -47,11 +55,11 @@ public sealed class AnnouncementApiClient
         { throw new SecureOpsApiException(UiProblemFactory.FromResponse(502, null)); }
         return (await response.Content.ReadAsByteArrayAsync(token), name);
     }
-    private async Task<HttpResponseMessage> SendAsync(string path, AnnouncementContent? content, CancellationToken token)
+    private async Task<HttpResponseMessage> SendAsync(string path, AnnouncementContent? content, CancellationToken token, HttpMethod? method = null)
     {
         try
         {
-            using HttpRequestMessage request = new(content is null ? HttpMethod.Get : HttpMethod.Put, "api/v1/announcements" + path);
+            using HttpRequestMessage request = new(method ?? (content is null ? HttpMethod.Get : HttpMethod.Put), "api/v1/announcements" + path);
             if (content is not null)
             {
                 request.Content = JsonContent.Create(content, options: ApiResponseReader.JsonOptions);

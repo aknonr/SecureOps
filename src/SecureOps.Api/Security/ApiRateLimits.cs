@@ -6,6 +6,8 @@ namespace SecureOps.Api.Security;
 /// <summary>Named actor-and-operation API rate-limit policies.</summary>
 public static class ApiRateLimits
 {
+    /// <summary>Bounded transient announcement rendering.</summary>
+    public const string AnnouncementPreview = "AnnouncementPreview";
     /// <summary>Single exact identity lookup.</summary>
     public const string IdentityLookup = "IdentityLookup";
     /// <summary>Bounded bulk exact identity lookup.</summary>

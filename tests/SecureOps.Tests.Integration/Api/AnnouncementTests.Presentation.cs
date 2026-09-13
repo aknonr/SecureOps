@@ -35,6 +35,7 @@ public sealed partial class AnnouncementTests
         json.Remove("AffectedServices");
         AnnouncementContent legacy = json.Deserialize<AnnouncementContent>()!;
         legacy.TemplateRevision.Should().Be("oco-v1");
+        legacy.DateTextRevision.Should().Be("iso-v1");
         legacy.AffectedServices.Should().BeNull();
     }
     [Fact]
@@ -71,6 +72,15 @@ public sealed partial class AnnouncementTests
             html.Should().Contain(Convert.ToBase64String(bytes.ToArray()));
         }
         mail.BodyParts.OfType<MimePart>().Count(p => p.ContentId is not null).Should().Be(6);
+        AnnouncementContent readable = FinalContent() with { DateTextRevision = "tr-v1", WorkStart = "2026-09-13T23:59:37+03:00", WorkEnd = "2026-09-14T02:01:03+03:00" };
+        AnnouncementPresentation changed = await renderer.PresentationAsync(readable, default);
+        changed.Hash.Should().NotBe(presentation.Hash);
+        AnnouncementDraft readableDraft = draft with { Content = readable, BannerHash = changed.Hash };
+        using var readableMail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(readableDraft, changed, default)));
+        readableMail.TextBody.Should().Contain("13.09.2026 23:59:37 UTC +03:00").And.Contain("14.09.2026 02:01:03 UTC +03:00");
+        readableMail.HtmlBody.Should().Contain("23:59:37 UTC +03:00");
+        AnnouncementRenderer.RenderPresentation(draft, presentation, true).Html.Should().Be(html);
+        (await renderer.PresentationAsync(FinalContent(), default)).Hash.Should().Be(presentation.Hash);
         config.Bundles["bundle-v1"].Footer += " amended";
         (await renderer.PresentationAsync(FinalContent(), default)).Hash.Should().NotBe(presentation.Hash);
         config.Bundles["bundle-v1"].Assets.Remove("logo");

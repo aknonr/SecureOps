@@ -5,6 +5,120 @@ All routes require authenticated, approved persisted access and `Announcements.D
 (Admin only), then owner isolation. Immutable user IDs remain authorization keys.
 No new authentication flow. Default `Announcements:Enabled=false` fails closed.
 
+## Integrated editor continuation from e48f13e
+
+This section supersedes earlier explicit-preview-only/new-v1 UI descriptions;
+historical evidence below is retained. New drafts choose `oco-table-v2`, with no
+routine template switch. A single available bundle is selected; absent/invalid
+bundles show a setup error, never a v1 fallback. Existing v1 records open unchanged.
+The explicit upgrade preserves text/recipients, asks for a v2 bundle, and appends
+only on Save using the existing version/conflict rules. Old revisions/assets remain.
+
+POST `/api/v1/announcements/preview` accepts the existing AnnouncementContent JSON
+without a draft ID. It transforms only supplied data; extra query IDs cannot read
+another owner's draft. Authentication, persisted capability/session validation and
+module opt-in remain mandatory. Limit: 131072 request bytes; actor limit 120/minute,
+no queue (429). Text/recipient/date/asset safety limits remain identical to Save.
+Blank required fields are allowed, not fabricated; malformed nonblank fields return
+400 AnnouncementInvalid. Success is UTF-8 text/html, no-store, no ETag, sandbox CSP;
+`X-Announcement-Incomplete` contains comma-separated PascalCase missing-field keys.
+No announcement SQL reads/inserts, revisions or sending; access/session maintenance
+still uses its established SQL path. This caller-input transformation is not a
+privileged stored-data read; discovery/save/saved-preview/download audit is unchanged.
+No per-keystroke persistence or render audit was added. Private input is not logged.
+
+The editor debounces visible live preview for 600ms. Generation checks reject old
+success AND error responses, cancellation covers edit/hide/save/navigation/disposal.
+Wide screens use a right preview; smaller screens use Edit/Preview tabs. Only a
+visibility change restarts rendering; resizing an already visible saved frame does
+not. Loading/failure removes old HTML. Live output says Kaydedilmemis on the UI,
+not saved/approved. Final preview and download still require a complete saved version.
+Both use the same versioned rendering pipeline, escaped text, data images/CID bytes.
+No second template, scripts, HTML decoding, polling, send or fake history was added.
+
+New manual time entry uses UI-host `Announcements:DefaultDisplayOffset` (default
+`+00:00`; configure the intended explicit offset, e.g. `+03:00`). This is not a
+Turuncu Hat timezone mapping. Date is separate from labeled 00..23 hour and 00..59
+minute controls. Advanced seconds retain imported values. Explicit display-offset
+conversion preserves the instant and adjusts the date across midnight; direct time
+editing intentionally changes the instant. Partial entry stays incomplete/invalid,
+not the previous valid time. Existing strings/offsets survive unrelated edits.
+Native date controls inherit the actual app theme's light/dark color-scheme;
+the baseline kept normal black picker icons on a dark field. Additive content field
+`dateTextRevision` defaults to `iso-v1` for old JSON/API clients, preserving old
+rendering/hashes. New UI v2 drafts and explicit upgrades select `tr-v1`: email dates
+use dd.MM.yyyy HH:mm:ss UTC +/-HH:mm, in both alternatives. This presentation revision
+is hash-bound; raw ISO values and instants remain unchanged. Other values, and tr-v1
+with legacy oco-v1, are rejected. Existing v2 drafts retain their saved selection.
+
+Renderer reuse is limited to 32 successful SHA-256/type validation receipts, under
+a lock; no bytes, paths, private draft data or access decisions are cached. Every
+request still validates path/permissions/size, reads bytes and computes their hash.
+Only a previously fully decoded identical hash skips codec work. Missing/changed
+bytes cannot be concealed by the receipt; save/export fingerprints are unchanged.
+
+Delivery checklist: editor/live/date work implemented; source jobs, maintenance
+profile/default-recipient review and corporate acceptance are NOT implemented or
+simulated here. Worker Program.cs still has no Hangfire registration; SCCM is absent.
+Completing that boundary adds an estimated 1300-1700 lines: job/SQL state 350-450,
+adapters 300-400, protected profiles/provenance 200-300, reviewed UI/tests 450-550.
+The five names remain NonProd/Prod01/Prod02/ProdSingle/ProdRPA maintenance groups.
+Local script inspection confirms two active base To rules, five extra Cc for
+ProdSingle, two Cc plus High for ProdRPA; commented To is excluded. Those recipients
+belong to a distribution request, NOT an approved final-announcement audience.
+No real IDs, addresses or source snapshot were copied into this increment.
+
+No dependency, migration or grant delta. Existing 014-015 prerequisites and six
+original files listed below remain required. UI-only DefaultDisplayOffset is the
+only optional configuration addition; no server configuration was changed. No new
+asset revision, original branding approval, Outlook acceptance or external writes.
+
+### Editor verification, 2026-09-13
+
+Evidence root: `C:\SecureOpsBuild\validation\oco-editor-20260913` (outside Git).
+`dotnet build SecureOps.sln -c Release --no-restore`: zero warnings/errors,
+build-verified.log. `dotnet test SecureOps.sln -c Release --no-build --logger trx`:
+1240 unit + 254 integration passed; 22 opt-in SQL skipped (tests-closeout.log).
+OpenAPI was regenerated with SECUREOPS_UPDATE_OPENAPI=1 and the existing snapshot
+test; the normal comparison passes. Fresh SQL harness: DatabaseSuffix
+OcoEditorDateSql20260913, IncludeAnnouncementDrafts; ResourceSqlTests|AnnouncementTests
+filter: 33 passed, zero skips (20 existing SQL + 13 announcement tests, two SQL).
+sql-verified.log covers owner/version/audit, transient no-save, date presentation,
+155-service MIME alternatives, asset invalidation and authenticated download.
+No corporate database, source adapter or SMTP call was used.
+
+Full `dotnet format SecureOps.sln --verify-no-changes --no-restore` still fails:
+58 baseline files; diagnostic comparison with oco-template-20260913 is identical
+(zero differences). format-verified.json is retained. Changed-C# format is checked
+separately; it is not a waiver or substitute. Full DoD/release readiness stays blocked.
+Local synthetic performance: 240 drafts / 1200 revisions, five 25-item list queries
+210ms total in the recorded run, largest response 6999 bytes; owner index seek seen.
+These are local observations, not corporate capacity/VDI acceptance. Asset tests
+record cold versus 20 hash-checked reads; no latency guarantee is asserted.
+
+Matched working-tree payloads: publish-verified/api and publish-verified/ui.
+payload-manifest.json contains per-file sizes/SHA-256; payload-versions.json records
+assembly ProductVersion 0.1.0+e48f13e... (pre-commit base, NOT the final source HEAD).
+API DLL SHA-256: 017852179CEF80720A5FB3B2E1F5E22A1D21ACFAB40BC524051B95090687CA57.
+UI DLL SHA-256: BDC77216783B031DBF367546E1E533D362E7FCC03AD079CC36CA39E150E2E37D.
+No release package was prepared. Final source commit is recorded in closeout.json.
+
+Fresh browser DB OcoEditorVerified20260913; local ports 5561/5562/5563. Run existing
+announcements.cjs with the published UI/API/denied URLs, a fresh evidence directory
+and `editor` mode, using announcement-hosts.ps1 -FinalPresentation. The successful
+browser-verified/evidence/results.json records new-v2/legacy upgrade, keyboard calendar
+in both themes, every minute, seconds/offset preservation, rapid edits/hidden preview,
+failure clearing, conflict recovery, guide dismissal/reopening, owner paging, denial,
+155 services and download. Actual images: live-desktop.png, live-mobile.png,
+calendar-light.png, calendar-dark.png, final-preview-1440.png, final-footer-390.png.
+Screenshots were taken from the visible iframe and inspected; synthetic branding only.
+Earlier failed attempts remain: stale Blazor test reads, encoded srcdoc assertions,
+and the fixed unnecessary responsive iframe recreation. No rejected browser command
+was retried or bypassed. Initial Start/Outlook/corporate source acceptance remain
+unverified; source-fixture journey is not claimed because the source slice is absent.
+Older writers may drop new JSON presentation metadata; downgrade writes are not safe
+by assumption. Release/In Use/OR-to-SDM checkouts and previous archives are untouched.
+
 ## Implemented journey
 
 Client creates a UUID. PUT `/api/v1/announcements/{id}?version=0` creates a draft.

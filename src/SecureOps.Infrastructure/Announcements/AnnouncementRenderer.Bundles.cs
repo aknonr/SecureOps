@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -74,7 +75,10 @@ public sealed partial class AnnouncementRenderer
             bundle.Footer,
             Assets = images.Select(i => new { i.Role, Revision = bundle.Assets[i.Role], i.Type, i.Hash })
         });
-        return new(Convert.ToHexString(SHA256.HashData(identity)), bundle.Footer, images);
+        string presentationHash = Convert.ToHexString(SHA256.HashData(identity));
+        if (content.DateTextRevision != "iso-v1")
+        { presentationHash = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(presentationHash + "\n" + content.DateTextRevision))); }
+        return new(presentationHash, bundle.Footer, images);
     }
 
     /// <summary>Version-specific, escaped table rendering; all affected services appear in both alternatives.</summary>
@@ -86,13 +90,24 @@ public sealed partial class AnnouncementRenderer
         if (draft.TemplateRevision != "oco-table-v2" || !presentation.Images.Select(i => i.Role).SequenceEqual(_bundleRoles))
         { throw new InvalidOperationException("Unknown presentation."); }
         AnnouncementContent c = draft.Content;
-        (string Label, string Value)[] fields = [("Duyuru Tarihi", c.AnnouncementDate), ("Çalışma Kayıt Numarası", c.OcoReference),
-            ("Çalışma Yapılacak Sistem/Uygulama", c.Scope), ("Çalışmanın Başlangıç Tarihi/Saati", c.WorkStart),
-            ("Çalışma Bitiş Tarihi/Saati", c.WorkEnd), ("Çalışmanın Açıklaması", c.Description), ("Çalışmanın Etki Detayı", c.Impact),
+        string DateText(string value)
+        {
+            if (c.DateTextRevision == "iso-v1" || value.Length == 0)
+            { return value; }
+            if (c.DateTextRevision != "tr-v1")
+            { throw new InvalidOperationException("Unknown date presentation."); }
+            if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly day))
+            { return day.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture); }
+            return DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTimeOffset time)
+                ? time.ToString("dd.MM.yyyy HH:mm:ss 'UTC' zzz", CultureInfo.InvariantCulture) : value;
+        }
+        (string Label, string Value)[] fields = [("Duyuru Tarihi", DateText(c.AnnouncementDate)), ("Çalışma Kayıt Numarası", c.OcoReference),
+            ("Çalışma Yapılacak Sistem/Uygulama", c.Scope), ("Çalışmanın Başlangıç Tarihi/Saati", DateText(c.WorkStart)),
+            ("Çalışma Bitiş Tarihi/Saati", DateText(c.WorkEnd)), ("Çalışmanın Açıklaması", c.Description), ("Çalışmanın Etki Detayı", c.Impact),
             ("Çalışmadan Etkilenen Servisler", string.Join("\n", c.AffectedServices ?? [])),
             ("Notlar/Özel Durumlar", string.Join("\n\n", new[] { c.Checks, c.Notes }.Where(s => !string.IsNullOrEmpty(s))))];
         if (!string.IsNullOrEmpty(c.RestartStart))
-        { fields = [.. fields, ("Yeniden başlatma başlangıcı", c.RestartStart), ("Yeniden başlatma bitişi", c.RestartEnd ?? "")]; }
+        { fields = [.. fields, ("Yeniden başlatma başlangıcı", DateText(c.RestartStart)), ("Yeniden başlatma bitişi", DateText(c.RestartEnd ?? ""))]; }
         string Image(string role, int width) => "<img alt=\"" + role + "\" width=\"" + width + "\" style=\"max-width:100%;height:auto\" src=\""
             + WebUtility.HtmlEncode(Source(presentation.Images.Single(i => i.Role == role))) + "\">";
         string rows = string.Concat(fields.Select((f, i) => "<tr style=\"background:" + (i % 2 == 0 ? "#f2f2f2" : "#fff")

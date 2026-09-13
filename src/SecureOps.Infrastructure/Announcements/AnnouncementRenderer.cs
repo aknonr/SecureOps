@@ -12,6 +12,8 @@ namespace SecureOps.Infrastructure.Announcements;
 /// <summary>Allowlisted private assets and one escaped, non-network template pipeline.</summary>
 public sealed partial class AnnouncementRenderer(IOptions<AnnouncementOptions> options)
 {
+    // Only 32 successful content-hash/type receipts; never paths, bytes, drafts or access decisions.
+    private readonly Dictionary<string, string> _validatedImages = [];
     private string AssetPath(string revision)
     {
         AnnouncementOptions config = options.Value;
@@ -55,6 +57,12 @@ public sealed partial class AnnouncementRenderer(IOptions<AnnouncementOptions> o
         { throw new InvalidOperationException("Banner size invalid."); }
         byte[] bytes = new byte[(int)file.Length];
         await file.ReadExactlyAsync(bytes, token);
+        string hash = Convert.ToHexString(SHA256.HashData(bytes));
+        lock (_validatedImages)
+        {
+            if (_validatedImages.TryGetValue(hash, out string? knownType))
+            { return (bytes, knownType, hash); }
+        }
         using var stream = new SKMemoryStream(bytes);
         using var codec = SKCodec.Create(stream);
         if (codec is null || codec.EncodedFormat is not (SKEncodedImageFormat.Png or SKEncodedImageFormat.Jpeg)
@@ -63,7 +71,14 @@ public sealed partial class AnnouncementRenderer(IOptions<AnnouncementOptions> o
         using var bitmap = new SKBitmap(codec.Info);
         if (codec.GetPixels(bitmap.Info, bitmap.GetPixels()) != SKCodecResult.Success)
         { throw new InvalidOperationException("Banner decode failed."); }
-        return (bytes, codec.EncodedFormat == SKEncodedImageFormat.Png ? "png" : "jpeg", Convert.ToHexString(SHA256.HashData(bytes)));
+        string type = codec.EncodedFormat == SKEncodedImageFormat.Png ? "png" : "jpeg";
+        lock (_validatedImages)
+        {
+            if (_validatedImages.Count >= 32)
+            { _validatedImages.Remove(_validatedImages.Keys.First()); }
+            _validatedImages[hash] = type;
+        }
+        return (bytes, type, hash);
     }
 
     /// <summary>Returns inert HTML and text; source/user text is never HTML-decoded.</summary>

@@ -26,6 +26,7 @@ $env:OperationalRecords__ReadOnlyIntegrationMode = 'false' # Supported Demo + di
 $env:OperationalRecords__ControlledTestWritesEnabled = 'false'
 $env:OperationalRecords__SourceCloseEnabled = 'false'
 $env:Announcements__Enabled = 'true'
+$env:Announcements__DefaultDisplayOffset = '+03:00'
 $env:Announcements__Sender = 'announcements@example.invalid'
 $env:Announcements__AssetDirectory = "$root/assets"
 $env:Announcements__Banners__synthetic_v1 = $null

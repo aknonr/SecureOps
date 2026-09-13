@@ -7,9 +7,10 @@ explicit saved preview/download, conflict comparison and per-user guided help.
 Codex owns this module's UI and backend by explicit user instruction. No sending,
 history or ordinary-user role was added. See `docs/contracts/planned-announcements-v1.md`
 for API behavior, local browser replay, evidence and remaining quality gates.
-Explicit final-table selection keeps system/application and a collapsed affected-service
-list separate; saved previews and downloads share the selected six-role private bundle.
-Existing v1 drafts are not upgraded automatically. Source/profile flow is still pending.
+New drafts default to the final table; existing v1 requires explicit versioned upgrade.
+System/application and the collapsed service list stay separate. Debounced unsaved
+preview shares the saved-preview/export renderer, with responsive tabs and cancellation.
+Date/hour/minute controls retain seconds and explicit offsets. Source/profile flow is pending.
 
 ## Current RFC Reporter Acceptance, 2026-09-12
 

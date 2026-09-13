@@ -156,7 +156,7 @@ public static class DependencyInjection
         services.AddScoped<ResourceCatalogueService>();
         services.Configure<AnnouncementOptions>(configuration.GetSection("Announcements"));
         services.AddScoped<Announcements.SqlAnnouncementStore>();
-        services.AddScoped<Announcements.AnnouncementRenderer>();
+        services.AddSingleton<Announcements.AnnouncementRenderer>();
         services.AddScoped<Announcements.AnnouncementService>();
         services.AddScoped<InUseService>();
         services.AddSingleton<InUseReportArchive>();

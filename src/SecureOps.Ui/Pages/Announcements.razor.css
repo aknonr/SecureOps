@@ -10,6 +10,15 @@
 .so-announcements ::deep .so-announcement-offset select { width: auto; }
 .so-announcement-recipient { display: flex; max-width: 38rem; margin-bottom: .5rem; }
 .so-announcement-actions { margin: 1.25rem 0; flex-wrap: wrap; }
+.so-announcement-workspace { display: grid; gap: 1.5rem; align-items: start; min-width: 0; }
+.so-announcement-workspace > div { min-width: 0; }
+.so-announcements ::deep .so-announcement-clock { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.so-announcements ::deep select option:checked { font-weight: bold; }
+@media (min-width: 1280px) {
+    .so-announcement-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 600px); }
+    .so-announcement-workspace .so-announcement-grid { grid-template-columns: minmax(0, 1fr); }
+    .so-announcement-preview { position: sticky; top: 90px; }
+}
 .so-announcements iframe { width: 100%; height: 650px; border: 1px solid var(--mud-palette-lines-default); }
 .so-announcements ::deep td, .so-announcements dd { overflow-wrap: anywhere; }
 .so-announcements ::deep :focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
