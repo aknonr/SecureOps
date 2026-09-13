@@ -574,3 +574,30 @@ Microsoft 10 requires framework migration. FluentValidation 12, SqlClient 7,
 Swashbuckle 10 and major Serilog updates need separate contract/platform review;
 Hangfire 1.8.25 and other servicing updates remain inventoried, not validated here.
 This bounded UI increment does not certify all dependencies current or future-safe.
+
+## Source integration contract, 2026-09-14 (pending Codex editor connection)
+
+Routes need the same authenticated, approved, `Announcements.Drafts` owner as the draft routes, plus
+`Announcements:Enabled` and `AnnouncementSource:Enabled`. GET `source/profiles` returns
+`MaintenanceProfileChoice[]` (`name`, `label`, `state` Configured|Unconfigured|Invalid, `missing`);
+collection IDs are never returned. POST `{id}/source/jobs` with `{profile, ocoReference, submissionKey}`
+returns 202 `AnnouncementSourceJobStatus`; reusing `submissionKey` returns the same job with
+`duplicateOf` set, so never resubmit on retry. GET `{id}/source/jobs[?jobId=]` refreshes status; poll
+only while `terminal` is false. States are Queued, Running, Succeeded, Partial and Failed; Partial is
+usable but explicitly incomplete, so read `completeness`. GET `{id}/source/jobs/{jobId}/proposal` returns
+`AnnouncementSourceProposal`, whose `fields[]` carry `current`, `proposed`, `sourceText`, `origin` and
+`state` (Unchanged, Changed, SourceUnavailable, RequiresOperatorOffset). WorkStart/WorkEnd are always
+RequiresOperatorOffset with raw offset-free `sourceText`; RestartStart/RestartEnd are always
+SourceUnavailable. `to`/`cc` are `RecipientDifference` (`added`, `removed`, `preservedManual`,
+`preservedRemoval`): show it, never auto-replace. `audience` is always `DistributionRequest`, not a
+final-announcement audience, and `stale` true means a newer snapshot was already applied. POST
+`{id}/source/apply` with `{jobId, expectedVersion, fields[], applyRecipients, applyAffectedServices}`
+returns `AnnouncementSourceApplyResult` plus a new draft revision, where `skippedFields` lists what the
+source could not supply. Errors reuse `code`/`fields`/`correlationId`: 403 AccessDenied; 404
+AnnouncementNotFound|AnnouncementSourceJobNotFound; 409 AnnouncementConflict (re-read
+version)|AnnouncementSourceStale|AnnouncementSourceOverrideConflict; 400 AnnouncementSourceInvalid; 503
+AnnouncementSourceDisabled|AnnouncementSourceProfileUnavailable|AnnouncementSourceJobHostUnavailable|
+AnnouncementSourceUnavailable/Timeout/Rejected. Configuration: `AnnouncementSource:{Enabled,
+CollectionProvider,ServiceProvider,...}` with per profile `{CollectionId,Scope,Impact,Checks,Description,
+To,Cc,HighPriority}`, plus `Hangfire:{Enabled,SchemaName,Queue}`, migration 016 and the DBA-installed
+Hangfire schema. No endpoint sends mail; connection to Codex's editor remains explicitly pending.

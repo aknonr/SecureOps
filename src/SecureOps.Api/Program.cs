@@ -9,6 +9,7 @@ using SecureOps.Api.Services;
 using SecureOps.Api.Validation;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Access;
+using SecureOps.Infrastructure.Announcements.Sources;
 using SecureOps.Infrastructure.Audit;
 using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Infrastructure.Identity;
@@ -164,6 +165,8 @@ builder.Services.AddSwaggerGen(options =>
     }
 });
 builder.Services.AddSecureOpsInfrastructure(builder.Configuration);
+// The API only enqueues announcement source work; the Worker hosts the Hangfire job server.
+builder.Services.AddSecureOpsJobClient(builder.Configuration);
 builder.Services.AddSingleton<IDirectoryContinuationTokenCodec, DataProtectedDirectoryContinuationTokenCodec>();
 builder.Services.AddSingleton<ApplicationSessionCookie>();
 if (builder.Configuration.GetValue("Audit:Queue:Enabled", true)

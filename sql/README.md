@@ -29,6 +29,7 @@ sql/
 | 013 | Transactional SDM evidence CHECK replacement admits the exact positive pilot policy version; requires 001-012; no new objects, columns, roles or runtime grants |
 | 014 | Independent append-only announcement draft revisions; requires 001-013 |
 | 015 | Announcement owner/latest-version index only; requires 014; no JSON rewrite or new runtime grant |
+| 016 | Durable announcement source jobs and versioned operator overrides; requires 014-015. Adds `announcements.SourceJobs` (unique OwnerId/DraftId/SubmissionKey, no-delete trigger) and mutable `announcements.SourceOverrides`. Runtime delta: `GRANT SELECT, INSERT, UPDATE` on those two objects only; no DELETE or DDL grant. Hangfire's own schema is a separate DBA step using the published Hangfire 1.8.6 script; the application creates it only when the isolated LocalDB facility sets `Hangfire:PrepareSchema` |
 
 013 uses `migrations/013-sdm-pilot-policy.sql` in SQLCMD mode. Existing NULL/v1
 evidence and append-only triggers remain untouched; WITH CHECK validates stored

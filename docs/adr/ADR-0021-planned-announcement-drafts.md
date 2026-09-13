@@ -85,3 +85,26 @@ invalidates confirmation; sent revisions/history never change. History is bounde
 paginated, permission-controlled operational evidence, not employee ranking.
 Implement local capture first; SMTP/SCCM configuration is independent of protected
 Turuncu Hat configuration. No source adapter, worker, auth or external write changes.
+Source slice from 38f6941fbcd81b158e89dab16f814f0ae34a2696; branch
+`feature/planned-oco-source-20260913`; worktree `secure-ops-planned-oco-source-20260913`. Codex's
+checkout, hosts, databases and evidence are untouched. `MaintenanceProfiles.Allowed` is a code-owned
+allowlist (NonProd, Prod01, Prod02, ProdSingle, ProdRPA); configuration completes a profile, never adds
+one. Collection IDs, recipients and profile text are configuration only, default empty; an incomplete
+profile is Unconfigured, not partly usable. Worker composition now exists: Hangfire + SQL per
+ADR-0001/0003, API enqueues only, one `announcement-source` queue, per-job DI scope, `AutomaticRetry(0)`
+because a source read is not blindly repeated; Hangfire's schema is created only by the isolated LocalDB
+facility. Migration 016 adds `announcements.SourceJobs` (no-delete trigger, unique
+OwnerId/DraftId/SubmissionKey) and mutable versioned `announcements.SourceOverrides`. Job state lives in
+SQL, so restart never erases an outcome: one Queued->Running claim, one terminal write. Collection
+membership supplies devices, relationships supply services, the OCO supplies proposed dates; each keeps
+its own retrieval timestamp and resolution. Values are read by exact `SET.` key, never by position;
+ambiguity keeps every candidate. `m_active` is not approval and membership is not OCO scope. Source
+windows carry no offset, so `WorkStart`/`WorkEnd` stay RequiresOperatorOffset with raw source text and
+`RestartStart`/`RestartEnd` are NotDerivable: no restart time comes from an OCO finish. `MaxPages>1` and
+device ceilings report Partial rather than treating page one as all. Snapshots stay separate from
+operator overrides. Reviewed apply needs a matching draft version, refuses a snapshot older than the
+applied one, writes only listed fields and reconciles recipients from profile base plus manual additions
+minus explicit removals, which survive a profile change. Recipients are `DistributionRequest` audience,
+never an approved final-announcement audience; HighPriority is review metadata, not delivery. Automated
+tests for this slice are NOT written: the authorized 2,000-line budget was consumed by implementation.
+No SMTP, sending, corporate execution or UI change is included here.
