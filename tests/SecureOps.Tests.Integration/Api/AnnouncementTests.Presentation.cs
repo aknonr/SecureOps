@@ -14,8 +14,42 @@ namespace SecureOps.Tests.Integration.Api;
 [CollectionDefinition("Announcement SQL", DisableParallelization = true)]
 public sealed class AnnouncementSqlCollection;
 
+public sealed class BrowserAnnouncementMailFactAttribute : FactAttribute
+{
+    public BrowserAnnouncementMailFactAttribute()
+    { if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SECUREOPS_ANNOUNCEMENT_BROWSER_EVIDENCE"))) { Skip = "Opt-in local browser mail evidence not supplied."; } }
+}
+
 public sealed partial class AnnouncementTests
 {
+    [BrowserAnnouncementMailFact]
+    public void BrowserDownload_ParsesSavedTurkishContentAndSixMatchingCidImagesWithoutSending()
+    {
+        string root = Environment.GetEnvironmentVariable("SECUREOPS_ANNOUNCEMENT_BROWSER_EVIDENCE")!;
+        root.StartsWith(@"\\", StringComparison.Ordinal).Should().BeFalse();
+        string path = Path.Combine(root, "representative.eml");
+        new FileInfo(path).Length.Should().BeLessThan(3_000_000);
+        using var mail = MimeMessage.Load(path);
+        string preview = File.ReadAllText(Path.Combine(root, "saved-preview.html"));
+        AnnouncementContent saved = JsonSerializer.Deserialize<AnnouncementContent>(File.ReadAllText(Path.Combine(root, "saved-draft.json")), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        mail.To.Mailboxes.Select(m => m.Address).Should().Equal("reader@example.invalid");
+        mail.Cc.Mailboxes.Select(m => m.Address).Should().Equal("copy@example.invalid");
+        mail.Subject.Should().Be(saved.Subject);
+        mail.TextBody.Should().Contain(saved.Description);
+        mail.HtmlBody.Should().Contain(WebUtility.HtmlEncode(saved.Description)).And.NotContain("<script");
+        saved.AffectedServices.Should().HaveCount(155);
+        foreach (string service in saved.AffectedServices!)
+        { mail.TextBody.Should().Contain(service); mail.HtmlBody.Should().Contain(WebUtility.HtmlEncode(service)); }
+        MimePart[] images = mail.BodyParts.OfType<MimePart>().Where(p => p.ContentId is not null).ToArray();
+        images.Select(p => p.ContentId).Should().BeEquivalentTo(_roles);
+        foreach (MimePart image in images)
+        {
+            using var bytes = new MemoryStream();
+            image.Content!.DecodeTo(bytes);
+            preview.Should().Contain(Convert.ToBase64String(bytes.ToArray()));
+            mail.HtmlBody.Should().Contain("cid:" + image.ContentId);
+        }
+    }
     private static readonly string[] _roles = ["header", "main", "logo", "linkedin", "instagram", "youtube"];
     private static string[] Services() => Enumerable.Range(1, 155).Select(i => $"Sentetik servis {i:000} - Türkçe & inceleme <b> uygulama hizmeti").ToArray();
     private static AnnouncementContent FinalContent() => Content() with

@@ -86,7 +86,7 @@
                 { <p role="alert">Kullanılabilir görsel paketi yok. Yöneticiniz görsel kurulumunu tamamladıktan sonra görselleri yenileyin.</p> }
                 <div class="so-announcement-grid">
                     @foreach (var f in AnnouncementForm.Fields.Where(f => !f.Optional))
-                    { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" ValueChanged="@(value => Change(f.Key, value))" /> }
+                    { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" Error="@FieldError(f.Key)" ValueChanged="@(value => Change(f.Key, value))" /> }
                     <label class="so-announcement-field" for="announcement-BannerRevision">Görsel
                         <select id="announcement-BannerRevision" @bind="_form.Banner" @bind:after="Changed">
                             <option value="">Seçin</option>
@@ -122,26 +122,32 @@
                 }
                 <details open="@_optional"><summary @onclick="() => _optional = !_optional">İsteğe bağlı ayrıntılar</summary>
                     <div class="so-announcement-grid">@foreach (var f in AnnouncementForm.Fields.Where(f => f.Optional))
-                    { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" ValueChanged="@(value => Change(f.Key, value))" /> }</div>
+                    { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" Error="@FieldError(f.Key)" ValueChanged="@(value => Change(f.Key, value))" /> }</div>
                 </details>
             </fieldset>
             <div class="so-inline-actions so-announcement-actions">
                 <MudButton data-guide="announcement-save" ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" Disabled="@(_busy || _comparison is not null)">Kaydet</MudButton>
                 <MudButton data-guide="announcement-preview" OnClick="PreviewAsync" StartIcon="@Icons.Material.Filled.Visibility" Disabled="@(_busy || _dirty || _version == 0)">Önizle</MudButton>
                 <MudButton data-guide="announcement-download" OnClick="DownloadAsync" StartIcon="@Icons.Material.Filled.Download" Disabled="@(_busy || _dirty || _version == 0)">Maili indir</MudButton>
-                <span role="status">@(_dirty ? "Kaydedilmemiş değişiklikler" : _version > 0 ? "Kaydedildi" : "Yeni taslak")</span>
+                <span role="status" data-save-state>@(_dirty ? "Kaydedilmemiş değişiklikler" : _version > 0 ? "Güncel içerik kaydedildi" : "Yeni taslak")</span>
             </div>
         </EditForm>
         </div>
-        @if (PreviewVisible)
-        {
-            <section class="so-announcement-preview" aria-label="Duyuru önizlemesi">
-                <h2>Önizleme</h2><p role="status">@_previewStatus</p>
-                @if (_previewProblem is not null) { <SoProblemPanel Problem="_previewProblem" /><MudButton OnClick="SchedulePreview">Yeniden dene</MudButton> }
-                @if (_html is not null)
-                { <iframe title="Duyuru önizlemesi" tabindex="0" sandbox="" referrerpolicy="no-referrer" srcdoc="@_html"></iframe> }
+            <section class="so-announcement-preview" aria-label="Duyuru önizlemesi" hidden="@(!PreviewVisible)">
+                <h2>Önizleme</h2>
+                <div class="so-preview-status" role="status" aria-live="polite">
+                    <span>@PreviewStatus</span>
+                    <span>@(_previewStale && _html is not null ? "Önceki önizleme; güncel alanları yansıtmıyor" : "")</span>
+                </div>
+                <AnnouncementPreviewFrame @key="_id" Html="@_html" HtmlGeneration="_htmlGeneration" Generation="_previewRequests.Generation" Presented="PreviewPresented" />
+                <div class="so-preview-feedback">
+                @if (_previewProblem is not null && _previewFields.Count == 0)
+                { <p>@_previewProblem.Explanation <MudButton OnClick="SchedulePreview">Yeniden dene</MudButton></p> }
+                @if (_previewFields.Count > 0)
+                { <div class="so-inline-actions">@foreach (string key in _previewFields.Where(k => AnnouncementForm.Fields.Any(f => f.Key == k) || k is "To" or "Cc" or "BannerRevision" or "AffectedServices"))
+                    { <MudButton OnClick="@(() => FocusAsync(key))">@FieldLabel(key) alanını kontrol et</MudButton> }</div> }
+                </div>
             </section>
-        }
         </div>
     }
 </div>

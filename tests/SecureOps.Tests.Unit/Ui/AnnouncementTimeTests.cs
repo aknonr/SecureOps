@@ -6,20 +6,52 @@ namespace SecureOps.Tests.Unit.Ui;
 
 public sealed class AnnouncementTimeTests
 {
+    [Theory]
+    [InlineData("2026-09-14T01:00:37+03:00", "2026-09-13T02:00:59+03:00", "Bitiş, başlangıçtan sonra")]
+    [InlineData("2026-09-13T01:00:37+00:00", "2026-09-13T02:00:59+03:00", "Bitiş, başlangıçtan sonra")]
+    [InlineData("2026-09-13T01:00:37+03:00", "T02:00:59+03:00", "Tarih, saat ve dakikayı tamamlayın")]
+    public void ServerFieldGuidance_DistinguishesRangeAndPartialInputWithoutChangingValues(string start, string end, string message)
+    {
+        var values = new Dictionary<string, string> { ["WorkStart"] = start, ["WorkEnd"] = end };
+        AnnouncementFieldFeedback.Message("WorkEnd", values).Should().StartWith(message);
+        values["WorkStart"].Should().Be(start);
+        values["WorkEnd"].Should().Be(end);
+    }
     [Fact]
-    public async Task PreviewGeneration_RejectsLateSuccessOrFailureAndCancelsHiddenOrDisposedWork()
+    public void DirtyComparison_TracksRevertedContentWithoutDroppingSecondsOrOffsets()
+    {
+        var form = new AnnouncementForm();
+        form.Values["WorkStart"] = "2026-09-30T23:59:37+05:45";
+        SecureOps.Domain.Announcements.AnnouncementContent saved = form.Content();
+        form.Values["Subject"] = "Changed";
+        form.Differences(saved).Should().ContainSingle();
+        form.Values["Subject"] = "";
+        form.Differences(saved).Should().BeEmpty();
+        form.Content().WorkStart.Should().Be(saved.WorkStart);
+    }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreviewGeneration_RejectsLateSuccessOrFailureAndCancelsHiddenOrDisposedWork(bool failure)
     {
         using var lifetime = new CancellationTokenSource();
         using var requests = new AnnouncementPreviewRequests();
         var late = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         (long first, CancellationToken oldToken) = requests.Begin(lifetime.Token);
         async Task<string?> CompleteAsync()
-        { string result = await late.Task; return requests.IsCurrent(first) ? result : null; }
+        {
+            try
+            { string result = await late.Task; return requests.IsCurrent(first) ? result : null; }
+            catch (InvalidOperationException) { return requests.IsCurrent(first) ? "obsolete error" : null; }
+        }
         Task<string?> old = CompleteAsync();
         (long second, CancellationToken newToken) = requests.Begin(lifetime.Token);
         oldToken.IsCancellationRequested.Should().BeTrue();
         newToken.IsCancellationRequested.Should().BeFalse();
-        late.SetResult("obsolete HTML");
+        if (failure)
+        { late.SetException(new InvalidOperationException("obsolete error")); }
+        else
+        { late.SetResult("obsolete HTML"); }
         (await old).Should().BeNull();
         requests.IsCurrent(first).Should().BeFalse();
         requests.IsCurrent(second).Should().BeTrue();

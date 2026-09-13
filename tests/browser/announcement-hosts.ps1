@@ -1,9 +1,11 @@
-param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation)
+param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $EvidenceRoot).Path
 $payload = (Resolve-Path -LiteralPath $PayloadRoot).Path
 if (!(Test-Path "$payload/api/SecureOps.Api.dll") -or !(Test-Path "$payload/ui/SecureOps.Ui.dll")) { throw 'Publish both local payloads first.' }
-foreach ($candidate in @($Port,($Port+1),($Port+2))) { if (Get-NetTCPConnection -LocalPort $candidate -State Listen -ErrorAction SilentlyContinue) { throw "Port $candidate is occupied." } }
+foreach ($candidate in $(if ($ResumeApiOnly) { @($Port) } else { @($Port,($Port+1),($Port+2)) })) { if (Get-NetTCPConnection -LocalPort $candidate -State Listen -ErrorAction SilentlyContinue) { throw "Port $candidate is occupied." } }
+if ($ResumeApiOnly -and (!(Test-Path "$root/hosts.json") -or !(Test-Path "$root/assets/banner.png"))) { throw 'Resume only an existing task-owned acceptance host.' }
+if (!$ResumeApiOnly) {
 if (Test-Path "$root/assets") { throw 'Use a fresh test-owned evidence directory.' }
 New-Item -ItemType Directory "$root/assets" | Out-Null
 Add-Type -AssemblyName System.Drawing
@@ -11,6 +13,7 @@ $bitmap = New-Object System.Drawing.Bitmap(320,64)
 $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 try { $graphics.Clear([System.Drawing.Color]::White); $graphics.DrawString('YEREL TEST', [System.Drawing.SystemFonts]::DefaultFont, [System.Drawing.Brushes]::Black, 12, 20); $bitmap.Save("$root/assets/banner.png", [System.Drawing.Imaging.ImageFormat]::Png) }
 finally { $graphics.Dispose(); $bitmap.Dispose() }
+}
 $env:ASPNETCORE_ENVIRONMENT = 'Demo'
 $env:DOTNET_ENVIRONMENT = 'Demo'
 $env:DemoAuth__Enabled = 'true'
@@ -34,10 +37,12 @@ $env:Announcements__Banners__synthetic = 'banner.png'
 $env:Announcements__BannerLabels__synthetic = 'Yerel test'
 if ($FinalPresentation) {
     foreach ($role in @('header','main','logo','linkedin','instagram','youtube')) {
+        if (!$ResumeApiOnly) {
         $bitmap = New-Object System.Drawing.Bitmap(320,64)
         $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
         try { $graphics.Clear([System.Drawing.Color]::White); $graphics.DrawString("LOCAL TEST $role", [System.Drawing.SystemFonts]::DefaultFont, [System.Drawing.Brushes]::Black, 4, 20); $bitmap.Save("$root/assets/$role.png", [System.Drawing.Imaging.ImageFormat]::Png) }
         finally { $graphics.Dispose(); $bitmap.Dispose() }
+        }
         [Environment]::SetEnvironmentVariable("Announcements__Banners__$role", "$role.png", 'Process')
         [Environment]::SetEnvironmentVariable("Announcements__Bundles__bundle-v1__Assets__$role", $role, 'Process')
     }
@@ -45,9 +50,15 @@ if ($FinalPresentation) {
     [Environment]::SetEnvironmentVariable('Announcements__Bundles__bundle-v1__Footer', 'LOCAL TEST - not approved corporate branding', 'Process')
     [Environment]::SetEnvironmentVariable('Announcements__Bundles__bundle-v1__Label', 'Yerel test paketi', 'Process')
 }
-$env:DataProtection__Mode = 'Ephemeral'
+$env:DataProtection__Mode = 'FileSystemDpapi' # Test-owned persistent keys keep a transport restart distinct from session revocation.
+$env:DataProtection__ApplicationName = 'SecureOps.Api'
+$env:DataProtection__KeyRingPath = "$root/private-api-keys"
 $env:Oidc__Enabled = 'false'
-$api = Start-Process dotnet -ArgumentList @('SecureOps.Api.dll',"--urls=http://127.0.0.1:$Port") -WorkingDirectory "$payload/api" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/api-host.log" -RedirectStandardError "$root/api-host.err"
+$log = if ($ResumeApiOnly) { 'api-resumed-' + [guid]::NewGuid().ToString('N') } else { 'api-host' }
+$api = Start-Process dotnet -ArgumentList @('SecureOps.Api.dll',"--urls=http://127.0.0.1:$Port") -WorkingDirectory "$payload/api" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/$log.log" -RedirectStandardError "$root/$log.err"
+if ($ResumeApiOnly) { @{Api=$api.Id;Port=$Port} | ConvertTo-Json | Set-Content "$root/$log.json"; return }
+$env:DataProtection__ApplicationName = 'SecureOps.Ui'
+$env:DataProtection__KeyRingPath = "$root/private-ui-keys"
 $env:IdentityLookupApi__BaseAddress = "http://127.0.0.1:$Port/"
 $env:DemoMode__Enabled = 'true'
 $env:DemoMode__AllowMockAuthentication = 'true'

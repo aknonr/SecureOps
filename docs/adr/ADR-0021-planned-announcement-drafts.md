@@ -2,12 +2,19 @@
 
 Status: accepted for this explicitly authorized local draft-only increment.
 
+Acceptance repair from 38f6941: temporary invalid dates remain invalid; API save,
+preview and export validation is unchanged. Same-context preview retains its last
+successful content with explicit stale status during edits/errors. A sandboxed
+staging frame loads before presentation, without reading its internals. Access
+loss, navigation and draft replacement clear private content and cancel results.
+No source/profile scope, SQL, dependency or external-write changes belong here.
+
 Editor continuation from e48f13e: new UI drafts select v2; legacy drafts require an
 explicit versioned upgrade. A debounced transient preview transforms caller-supplied
 bounded content through the same renderer, without reading draft records, writing
 revisions or sending. Capability/session checks are never cached. This transformation
 is not a privileged stored-content read; existing discovery/save/read/download audit
-remains fail-closed. Incomplete fields stay blank. Preview failure clears old HTML.
+remains fail-closed. Incomplete fields stay blank. Preview retention is defined above.
 Configured manual display offsets never reinterpret source LMT or change an existing
 instant. The 1000-line cap defers the separate source/profile slice: Worker has no
 Hangfire composition and SCCM is absent. Required durable jobs, adapters, SQL/audit,

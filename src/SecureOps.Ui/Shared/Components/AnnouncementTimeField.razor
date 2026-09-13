@@ -1,5 +1,5 @@
 @inject Microsoft.Extensions.Options.IOptions<SecureOps.Shared.Configuration.AnnouncementOptions> Options
-<div class="so-announcement-field">
+<div class="so-announcement-field so-announcement-time" role="group" aria-label="@Label" aria-describedby="@($"announcement-error-{Key}")" aria-invalid="@(Error is not null)">
     <label for="@($"announcement-{Key}")">@Label <small>(UTC @_time.Offset)</small></label>
     <input id="@($"announcement-{Key}")" type="date" value="@_time.Day" @oninput="DayAsync" />
     <div class="so-announcement-clock">
@@ -16,11 +16,13 @@
         @if (_offsetError) { <span role="alert">Önce tarih ve saati tamamlayın.</span> }
     </details>
     @if (!AnnouncementTime.ValidOffset(_time.Offset)) { <span role="alert">Varsayılan saat dilimi yapılandırılmalı.</span> }
+    <span class="so-announcement-field-error" id="@($"announcement-error-{Key}")">@Error</span>
 </div>
 @code {
     [Parameter] public string Key { get; set; } = "";
     [Parameter] public string Label { get; set; } = "";
     [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string? Error { get; set; }
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     private readonly AnnouncementTime _time = new();
     private string? _loaded;

@@ -14,6 +14,26 @@ namespace SecureOps.Tests.Integration.Api;
 
 public sealed partial class AnnouncementTests
 {
+    [Theory]
+    [InlineData("2026-09-14T01:00:37+03:00", "2026-09-13T02:00:59+03:00", "WorkEnd")]
+    [InlineData("2026-09-14T01:00:37+03:00", "2026-09-14T02:00:59+03:00", null)]
+    [InlineData("2026-09-30T23:59:37+03:00", "2026-10-01T00:01:59+03:00", null)]
+    [InlineData("2026-09-13T01:00:37+00:00", "2026-09-13T02:00:59+03:00", "WorkEnd")]
+    [InlineData("T01:00:37+03:00", "2026-09-13T02:00:59+03:00", "WorkStart")]
+    public void EditingDates_PreservesStrictSaveAndExportRules(string start, string end, string? expected)
+    {
+        AnnouncementContent content = FinalContent() with { WorkStart = start, WorkEnd = end };
+        foreach (bool complete in new[] { false, true })
+        {
+            string[] errors = AnnouncementValidation.Errors(content, complete);
+            if (expected is null)
+            { errors.Should().BeEmpty(); }
+            else
+            { errors.Should().ContainSingle().Which.Should().Be(expected); }
+        }
+        content.WorkStart.Should().Be(start);
+        content.WorkEnd.Should().Be(end);
+    }
     private static async Task TransientApiAsync(HttpClient admin, HttpClient denied, HttpClient anonymous, SqlConnection sql, string savedPath)
     {
         const string route = "/api/v1/announcements/preview";

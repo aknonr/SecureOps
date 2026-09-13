@@ -17,6 +17,7 @@ public partial class Announcements
     private readonly CancellationTokenSource _lifetime = new();
     private AnnouncementPage? _page;
     private AnnouncementForm? _form;
+    private AnnouncementContent? _savedContent;
     private ResourcePreferencesResponse? _preferences;
     private AnnouncementBanner[] _banners = [];
     private (AnnouncementContent Content, long Version)? _comparison;
@@ -40,6 +41,8 @@ public partial class Announcements
     private Task PageAsync(int number) => RunAsync(async () => _page = await Api.ListAsync(number, _lifetime.Token));
     private Task NewAsync() => RunAsync(async () =>
     {
+        CancelPreview(true);
+        _savedContent = null;
         _banners = await Api.BannersAsync(_lifetime.Token, "oco-table-v2");
         _id = Guid.NewGuid();
         _version = 0;
@@ -51,11 +54,13 @@ public partial class Announcements
     });
     private Task OpenAsync(Guid id) => RunAsync(async () =>
     {
+        CancelPreview(true);
         (AnnouncementContent Content, long Version) draft = await Api.DraftAsync(id, 0, null, _lifetime.Token);
         _banners = await Api.BannersAsync(_lifetime.Token, draft.Content.TemplateRevision);
         _id = id;
         _version = draft.Version;
         _form = AnnouncementForm.From(draft.Content);
+        _savedContent = draft.Content;
         _dirty = false;
     });
     private Task BannersAsync() => RunAsync(async () => _banners = await Api.BannersAsync(_lifetime.Token, _form!.Template));
@@ -79,6 +84,8 @@ public partial class Announcements
             context.PreventNavigation();
             Shell?.CancelPendingNavigation();
         }
+        else
+        { CancelPreview(true); }
     }
     private async Task BackAsync()
     {
@@ -88,7 +95,7 @@ public partial class Announcements
         }
 
         _form = null;
-        CancelPreview();
+        CancelPreview(true);
         _html = null;
         _comparison = null;
         _dirty = false;
@@ -96,7 +103,14 @@ public partial class Announcements
         await PageAsync(1);
     }
     private void Change(string key, string value) { _form!.Values[key] = value; Changed(); }
-    private void Changed() { _dirty = true; _notice = null; SchedulePreview(); }
+    private void Changed()
+    {
+        _dirty = _savedContent is null || _form!.Differences(_savedContent).Any();
+        _notice = null;
+        if (_problem?.Kind == UiProblemKind.Validation)
+        { _problem = null; }
+        SchedulePreview();
+    }
     private void Add(string kind) { _form!.Recipients.Add(new(kind, "")); Changed(); }
     private void Remove(AnnouncementForm.Recipient recipient) { _form!.Recipients.Remove(recipient); Changed(); }
     private Task SaveAsync() => RunAsync(async () =>
@@ -105,9 +119,9 @@ public partial class Announcements
         { return; }
         (AnnouncementContent Content, long Version) saved = await Api.DraftAsync(_id, _version, _form!.Content(), _lifetime.Token);
         _form = AnnouncementForm.From(saved.Content);
+        _savedContent = saved.Content;
         _version = saved.Version;
         _dirty = false;
-        _html = null;
         _notice = "Taslak kaydedildi.";
     });
     private Task PreviewAsync() => RunAsync(async () =>
@@ -118,9 +132,9 @@ public partial class Announcements
         }
 
         _previewTab = true;
-        _previewStatus = "Kaydedilmiş önizleme";
         _html = _previewPolicy
             + await Api.PreviewAsync(_id, _version, _lifetime.Token);
+        _htmlGeneration = _previewRequests.Generation;
     });
     private Task DownloadAsync() => RunAsync(async () =>
     {
@@ -135,7 +149,7 @@ public partial class Announcements
     });
     private Task CompareAsync() => RunAsync(async () => _comparison = await Api.DraftAsync(_id, 0, null, _lifetime.Token));
     private void AcceptComparison()
-    { _version = _comparison!.Value.Version; _comparison = null; _problem = null; Changed(); _notice = "Düzenlemeleriniz korunuyor. Kaydet ile onaylayın."; }
+    { _version = _comparison!.Value.Version; _savedContent = _comparison.Value.Content; _comparison = null; _problem = null; Changed(); _notice = "Düzenlemeleriniz korunuyor. Kaydet ile onaylayın."; }
     private static string FieldLabel(string key) => key switch
     {
         "To" => "Alıcılar",
@@ -166,12 +180,12 @@ public partial class Announcements
         _notice = null;
         try
         { await action(); }
-        catch (SecureOpsApiException ex) { _problem = ex.Problem; _html = null; }
+        catch (SecureOpsApiException ex) { if (!LoseAccess(ex.Problem)) { _problem = ex.Problem; } }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
-        finally { _busy = false; if (_html is null && _problem is null) { SchedulePreview(); } }
+        finally { _busy = false; if (_htmlGeneration != _previewRequests.Generation && _problem is null) { SchedulePreview(); } }
     }
     private void AccessChanged() => _ = InvokeAsync(async () =>
-    { _allowed = (await Access.GetAsync(_lifetime.Token)).Can(Capabilities.AnnouncementDrafts); if (!_allowed) { CancelPreview(); } StateHasChanged(); });
+    { _allowed = (await Access.GetAsync(_lifetime.Token)).Can(Capabilities.AnnouncementDrafts); if (!_allowed) { _form = null; _savedContent = null; CancelPreview(true); } StateHasChanged(); });
     /// <inheritdoc />
-    public void Dispose() { Access.Changed -= AccessChanged; CancelPreview(); _lifetime.Cancel(); _lifetime.Dispose(); }
+    public void Dispose() { Access.Changed -= AccessChanged; CancelPreview(true); _lifetime.Cancel(); _lifetime.Dispose(); }
 }

@@ -5,6 +5,8 @@ public sealed class AnnouncementPreviewRequests : IDisposable
 {
     private CancellationTokenSource? _pending;
     private long _generation;
+    /// <summary>Also invalidates not-yet-loaded sandbox frames after an edit.</summary>
+    public long Generation => _generation;
     /// <summary>Invalidates earlier responses even when their transport ignores cancellation.</summary>
     public (long Generation, CancellationToken Token) Begin(CancellationToken lifetime)
     {

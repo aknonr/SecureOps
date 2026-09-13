@@ -5,6 +5,99 @@ All routes require authenticated, approved persisted access and `Announcements.D
 (Admin only), then owner isolation. Immutable user IDs remain authorization keys.
 No new authentication flow. Default `Announcements:Enabled=false` fails closed.
 
+## Acceptance repair from 38f6941
+
+The 2026-09-14 user evidence supersedes earlier automated UX acceptance. Validation
+is unchanged: start-after-end and inconsistent offsets return 400 AnnouncementInvalid
+with WorkEnd; partial components return WorkStart/WorkEnd; an entirely blank required
+time may render with an incomplete-field header but cannot be exported. No dates,
+seconds or offsets are silently repaired. UI explains returned keys beside fields.
+
+This explicitly REPLACES loading/failure-removes-HTML behavior below. During ordinary
+editing, incomplete input and recoverable errors, retain the last successful preview
+only for the same authorized draft. Mark it stale, show compact updating/field state,
+and recover on the next valid edit after 600ms. Hidden preview does no new work.
+Preparing a new sandboxed frame before its load event avoids replacing readable
+content with a blank document. At most two frames exist; canceled/obsolete loads
+cannot become active. Identical HTML reuses the active frame and its scroll position.
+During loading/validation failure the active frame is untouched. New changed HTML
+starts at its own top: opaque sandbox scroll cannot safely be copied. No scripts,
+same-origin permission, iframe DOM access or alternate renderer were added.
+
+Saved/dirty is compared with the last explicitly read/saved content; reverting edits
+restores saved status. Live rendering of unchanged saved content is labeled saved,
+not an unconditional unsaved preview. Loading/stale/incomplete are separate states.
+Explicit save/conflict/version and saved-download rules are unchanged. Access/session
+denial clears preview and editor state; navigation and draft switches invalidate all
+pending work. Retention is not an authorization cache or persisted render history.
+
+Source/profile/default-recipient work remains unimplemented, with the existing
+1300-1700-line cohesive estimate and unresolved 1000-line allowance. No source fixture
+journey, original branding, corporate/VDI/SMTP acceptance or release readiness claim.
+No new SQL, grants, runtime configuration or dependency changes in this repair.
+
+### Repair validation and remaining acceptance
+
+Evidence root: `C:\SecureOpsBuild\validation\oco-repair-20260914` (outside Git).
+Baseline `baseline/evidence/results.json` records sanitized requests/responses;
+`continuity.json` reproduced 225 missing-frame samples and a 655px pane collapse.
+`CancelPreview` cleared HTML on every edit, conditional Razor removed the iframe,
+and expected field validation used a disruptive problem panel. Unconditional unsaved
+preview text and an event-only dirty flag caused conflicting save labels. No API
+date validation or serialization defect was found; those contracts are unchanged.
+
+Final matched local publications: `publish-verified/api` and `publish-verified/ui`.
+`payload-manifest.json` records every file's size/SHA-256; `payload-versions.json`
+matches the final compiled application DLLs. ProductVersion embeds base `38f6941...`,
+not the later commit: these binaries include the tested working-tree repair.
+`tested-source-manifest.json` and final `closeout.json` identify that source precisely.
+They are local validation payloads, not release candidates or installed binaries.
+
+Executed commands (logs/TRX under the evidence root):
+- `dotnet build SecureOps.sln -c Release --no-restore`: zero warnings/errors (`build-closeout.log`).
+- `dotnet test SecureOps.sln -c Release --no-build --logger trx --results-directory <root>/tests-closeout`: 1245 unit and 259 integration passed; 23 skipped (22 opt-in SQL, one browser-artifact test).
+- `scripts/powershell/Test-ResourceCatalogueSql.ps1 -DatabaseSuffix OcoRepairSql20260914 -IncludeAnnouncementDrafts`, followed by the integration project with `--filter 'FullyQualifiedName~ResourceSqlTests|FullyQualifiedName~AnnouncementTests'`: 39 passed, no skips (`sql-verified.log`). This includes 22 SQL tests, not 39 SQL tests; the remaining checks cover announcement contracts/rendering, including the earlier repaired-browser download.
+- With `SECUREOPS_ANNOUNCEMENT_BROWSER_EVIDENCE=<root>/browser-continuity-final/evidence`, the integration project filter `FullyQualifiedName~BrowserDownload_ParsesSavedTurkishContentAndSixMatchingCidImagesWithoutSending|FullyQualifiedName~Test_OpenApiDocument_MatchesCheckedInUiContractSnapshot`: two passed, no skips (`mail-contract-closeout.log`). Actual final browser download, six CID/preview byte matches, recipients, Turkish inert text and all 155 services in both MIME alternatives passed; OpenAPI snapshot unchanged.
+- `dotnet format SecureOps.sln --verify-no-changes --no-restore`: still fails on 58 unchanged baseline files / 201 diagnostic findings (`format-closeout.json`, `format-comparison.json`). No exception or full-DoD pass; scoped changed-C# verification is separate.
+
+Fresh SQL-backed browser runs use the existing Chrome/Playwright installation:
+`node tests/browser/announcements.cjs <playwright-core> https://localhost:5622
+http://127.0.0.1:5621 https://localhost:5623 <root>/browser-regression/evidence editor`
+passed v1 preservation/upgrade, save, conflict comparison, canceled navigation,
+pagination, capability denial, guide persistence and six-role final export.
+`node tests/browser/announcement-continuity.cjs <playwright-core>
+https://localhost:5652 http://127.0.0.1:5651
+<root>/browser-continuity-final/evidence after network` passed initial Start/Next/Back/
+Exit without mutation, both themes' calendar and keyboard minute controls, temporary
+invalid/recovery, seconds/offset/month boundaries, continuous typing/focus, network
+recovery, draft switches and session revocation. Its 256 animation-frame samples
+contain zero missing previews, constant pane height and unchanged page scroll.
+Desktop/mobile `footer-1440.png` / `footer-390.png`, `temporary-invalid.png`,
+`recovered.png` and theme captures are new evidence. `private-browser-trace.zip`
+contains a timed screenshot/DOM sequence; keep it local because session context is
+private. Late success/error and disposal cancellation also have deterministic unit
+coverage; no delayed corporate response was exercised.
+
+The optional `network` mode requires a local controller: on `stop-api.request`,
+validate the task-owned API PID/DLL/port before stopping it and write
+`api-stopped.signal`; on `resume-api.request`, rerun `announcement-hosts.ps1` with
+the same root/database/payload/port plus `-FinalPresentation -ResumeApiOnly`, wait for
+authenticated loopback health, then write `api-resumed.signal`. The harness now uses
+supported private FileSystemDpapi keys so transport restart does not revoke sessions.
+This is test setup only, not a production authentication change. Earlier ephemeral
+key restart correctly returned access denial; another controller attempt used the
+wrong Demo health header and timed out. Both failed attempts are retained, not passes.
+
+The six originals named below remain absent from available local inputs; only those
+files were requested. Synthetic images do not validate branding or an approved new
+bundle. Outlook `16.0.20326.20144` was inventoried read-only, but no permitted desktop
+interaction tool was available: open/render/edit/save-copy checks are unexecuted.
+Operator check: open `browser-continuity-final/evidence/representative.eml` locally
+without sending, inspect all 155 services, six images, Turkish text, recipients and
+offset dates; test editing and saving a separate copy and record actual support.
+Do not rename to MSG/OFT or infer universal Outlook draft behavior. Original-branding,
+Outlook, source integration and full-format acceptance remain distinct blockers.
+
 ## Integrated editor continuation from e48f13e
 
 This section supersedes earlier explicit-preview-only/new-v1 UI descriptions;
@@ -31,8 +124,8 @@ The editor debounces visible live preview for 600ms. Generation checks reject ol
 success AND error responses, cancellation covers edit/hide/save/navigation/disposal.
 Wide screens use a right preview; smaller screens use Edit/Preview tabs. Only a
 visibility change restarts rendering; resizing an already visible saved frame does
-not. Loading/failure removes old HTML. Live output says Kaydedilmemis on the UI,
-not saved/approved. Final preview and download still require a complete saved version.
+not. Preview continuity and saved/dirty labels now follow the acceptance repair above.
+Final preview and download still require a complete saved version.
 Both use the same versioned rendering pipeline, escaped text, data images/CID bytes.
 No second template, scripts, HTML decoding, polling, send or fake history was added.
 
