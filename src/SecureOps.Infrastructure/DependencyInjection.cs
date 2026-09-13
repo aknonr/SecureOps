@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Audit;
@@ -158,6 +159,7 @@ public static class DependencyInjection
         services.AddScoped<Announcements.SqlAnnouncementStore>();
         services.AddSingleton<Announcements.AnnouncementRenderer>();
         services.AddScoped<Announcements.AnnouncementService>();
+        AddAnnouncementSource(services, configuration);
         services.AddScoped<InUseService>();
         services.AddSingleton<InUseReportArchive>();
         if (string.Equals(configuration[$"{SessionSecurityOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
@@ -283,6 +285,55 @@ public static class DependencyInjection
 
     private static Uri ProviderBaseAddress(string value) =>
         new($"{value.TrimEnd('/')}/", UriKind.Absolute);
+
+    // Source adapters are selected by validated server-owned configuration and never fall back to a
+    // working provider: an unset or unknown provider stays Disabled and fails closed on first use.
+    private static void AddAnnouncementSource(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<AnnouncementSourceOptions>(configuration.GetSection(AnnouncementSourceOptions.SectionName));
+        services.Configure<HangfireOptions>(configuration.GetSection(HangfireOptions.SectionName));
+        services.AddSingleton<Announcements.Sources.MaintenanceProfileCatalog>();
+        services.AddScoped<Announcements.Sources.SqlAnnouncementSourceStore>();
+        services.AddScoped<Announcements.Sources.AnnouncementSourceCollector>();
+        services.AddScoped<Announcements.Sources.AnnouncementSourceService>();
+        services.AddScoped<Announcements.Sources.AnnouncementSourceJobRunner>();
+        services.AddScoped<Announcements.Sources.AnnouncementSourceRecovery>();
+        services.AddScoped<Announcements.Sources.IAnnouncementSourceAuthorizationRecheck,
+            Announcements.Sources.AnnouncementSourceAuthorizationRecheck>();
+
+        string? collectionProvider = configuration[$"{AnnouncementSourceOptions.SectionName}:CollectionProvider"];
+        if (string.Equals(collectionProvider, "ConfigurationManager", StringComparison.OrdinalIgnoreCase))
+        { services.AddScoped<Announcements.Sources.ICollectionMembershipClient, Announcements.Sources.ConfigurationManagerCollectionClient>(); }
+        else if (string.Equals(collectionProvider, "Fixture", StringComparison.OrdinalIgnoreCase))
+        { services.AddScoped<Announcements.Sources.ICollectionMembershipClient, Announcements.Sources.FixtureCollectionMembershipClient>(); }
+        else
+        { services.AddScoped<Announcements.Sources.ICollectionMembershipClient, Announcements.Sources.DisabledAnnouncementSourceClient>(); }
+
+        string? serviceProviderName = configuration[$"{AnnouncementSourceOptions.SectionName}:ServiceProvider"];
+        if (string.Equals(serviceProviderName, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
+        {
+            // The Operational Record provider may be selected independently; the session manager is shared, not duplicated.
+            services.TryAddSingleton<ITuruncuHatSessionManager>(serviceProvider => new TuruncuHatSessionManager(
+                serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),
+                serviceProvider.GetRequiredService<IOptions<TuruncuHatOptions>>(),
+                serviceProvider.GetRequiredService<TimeProvider>(),
+                serviceProvider.GetRequiredService<EnterpriseIntegrationHealthState>(),
+                serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
+                serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<TuruncuHatSessionManager>>()));
+            // Reuses the existing single-flight session manager; announcement configuration adds no credential.
+            services.AddScoped<Announcements.Sources.IAnnouncementServiceSourceClient>(serviceProvider =>
+                new Announcements.Sources.TuruncuHatAnnouncementSourceClient(
+                    serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),
+                    serviceProvider.GetRequiredService<ITuruncuHatSessionManager>(),
+                    serviceProvider.GetRequiredService<IOptions<TuruncuHatOptions>>(),
+                    serviceProvider.GetRequiredService<IOptions<AnnouncementSourceOptions>>(),
+                    serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Announcements.Sources.TuruncuHatAnnouncementSourceClient>>()));
+        }
+        else if (string.Equals(serviceProviderName, "Fixture", StringComparison.OrdinalIgnoreCase))
+        { services.AddScoped<Announcements.Sources.IAnnouncementServiceSourceClient, Announcements.Sources.FixtureAnnouncementServiceSourceClient>(); }
+        else
+        { services.AddScoped<Announcements.Sources.IAnnouncementServiceSourceClient, Announcements.Sources.DisabledAnnouncementSourceClient>(); }
+    }
 
     private static void AddPersistentAuditWriter(IServiceCollection services, IConfiguration configuration)
     {

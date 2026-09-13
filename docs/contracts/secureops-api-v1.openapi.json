@@ -1290,6 +1290,187 @@
         }
       }
     },
+    "/api/v1/announcements/source/profiles": {
+      "get": {
+        "tags": [
+          "AnnouncementSource"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MaintenanceProfileChoice"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/announcements/{id}/source/jobs": {
+      "post": {
+        "tags": [
+          "AnnouncementSource"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementSourceSubmission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementSourceJobStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "AnnouncementSource"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementSourceJobStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/announcements/{id}/source/jobs/{jobId}/proposal": {
+      "get": {
+        "tags": [
+          "AnnouncementSource"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementSourceProposal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/announcements/{id}/source/apply": {
+      "post": {
+        "tags": [
+          "AnnouncementSource"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementSourceApply"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementSourceApplyResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/directory/principals/groups": {
       "post": {
         "tags": [
@@ -9255,6 +9436,216 @@
         },
         "additionalProperties": false
       },
+      "AnnouncementSourceApply": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "applyRecipients": {
+            "type": "boolean"
+          },
+          "applyAffectedServices": {
+            "type": "boolean"
+          },
+          "expectedOverrideVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnnouncementSourceApplyResult": {
+        "type": "object",
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "appliedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "recipientsApplied": {
+            "type": "boolean"
+          },
+          "affectedServicesApplied": {
+            "type": "boolean"
+          },
+          "skippedFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnnouncementSourceJobStatus": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "draftId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile": {
+            "type": "string",
+            "nullable": true
+          },
+          "ocoReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "terminal": {
+            "type": "boolean"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "duplicateOf": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnnouncementSourceProposal": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "draftId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "draftVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedField"
+            },
+            "nullable": true
+          },
+          "proposedAffectedServices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "ambiguousServices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "unresolvedDevices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "to": {
+            "$ref": "#/components/schemas/RecipientDifference"
+          },
+          "cc": {
+            "$ref": "#/components/schemas/RecipientDifference"
+          },
+          "highPriority": {
+            "type": "boolean"
+          },
+          "audience": {
+            "type": "string",
+            "nullable": true
+          },
+          "completeness": {
+            "$ref": "#/components/schemas/SourceCompletenessView"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "overrideVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnnouncementSourceSubmission": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "nullable": true
+          },
+          "ocoReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "submissionKey": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AnnouncementSummary": {
         "type": "object",
         "properties": {
@@ -10902,6 +11293,31 @@
         },
         "additionalProperties": false
       },
+      "MaintenanceProfileChoice": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ManagementReportResponse": {
         "type": "object",
         "properties": {
@@ -11484,6 +11900,84 @@
         },
         "additionalProperties": { }
       },
+      "ProposedField": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "nullable": true
+          },
+          "current": {
+            "type": "string",
+            "nullable": true
+          },
+          "proposed": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceText": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecipientDifference": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "proposed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "preservedManual": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "preservedRemoval": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RefreshInUseRequest": {
         "type": "object",
         "properties": {
@@ -12062,6 +12556,53 @@
           },
           "isDefault": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceCompletenessView": {
+        "type": "object",
+        "properties": {
+          "devicesComplete": {
+            "type": "boolean"
+          },
+          "deviceCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "devicePagesRead": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "devicesRequested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "servicesResolved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "servicesAmbiguous": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "servicesMissing": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "servicesFailed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "partial": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -2,6 +2,13 @@
 
 .NET Worker Service hosting the Hangfire job server. Registered as a Windows Service.
 
+The default-off announcement source composition uses one configured Hangfire/SQL queue,
+bounded execution leases and startup/minutely dispatch recovery. API and Worker must share
+the same dedicated source database, preinstalled Hangfire schema and queue. Runtime schema
+preparation is rejected; no email is sent. Fixture-backed process interruption/restart is
+locally exercised; corporate adapter/service-installation acceptance remains separate.
+See `docs/contracts/planned-announcement-source-acceptance.md` for configuration and evidence.
+
 ## Responsibilities
 
 - Host Hangfire job server.

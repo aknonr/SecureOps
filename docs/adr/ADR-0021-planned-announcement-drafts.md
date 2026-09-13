@@ -102,3 +102,39 @@ invalidates confirmation; sent revisions/history never change. History is bounde
 paginated, permission-controlled operational evidence, not employee ranking.
 Implement local capture first; SMTP/SCCM configuration is independent of protected
 Turuncu Hat configuration. No source adapter, worker, auth or external write changes.
+Source slice from 38f6941fbcd81b158e89dab16f814f0ae34a2696; branch
+`feature/planned-oco-source-20260913`; worktree `secure-ops-planned-oco-source-20260913`. Codex's
+checkout, hosts, databases and evidence are untouched. `MaintenanceProfiles.Allowed` is a code-owned
+allowlist (NonProd, Prod01, Prod02, ProdSingle, ProdRPA); configuration completes a profile, never adds
+one. Collection IDs, recipients and profile text are configuration only, default empty; an incomplete
+profile is Unconfigured, not partly usable. Worker composition now exists: Hangfire + SQL per
+ADR-0001/0003, API enqueues only, one configured source queue and per-job DI scope. `AutomaticRetry(0)`
+does not establish crash safety; the repair below supplies bounded dispatch and execution recovery.
+Hangfire's schema is provisioned separately, never by the runtime. Migration 016 adds `announcements.SourceJobs` (no-delete trigger, unique
+OwnerId/DraftId/SubmissionKey) and mutable versioned `announcements.SourceOverrides`. Job state lives in
+SQL; terminal writes are fenced by the current unexpired execution attempt. Collection
+membership supplies devices, relationships supply services, the OCO supplies proposed dates; each keeps
+its own retrieval timestamp and resolution. Values are read by exact `SET.` key, never by position;
+ambiguity keeps every candidate. `m_active` is not approval and membership is not OCO scope. Source
+windows retain raw text; explicit ISO offsets are resolved separately, while `WorkStart`/`WorkEnd` still require review and
+`RestartStart`/`RestartEnd` are NotDerivable: no restart time comes from an OCO finish. `MaxPages>1` and
+device ceilings report Partial rather than treating page one as all. Snapshots stay separate from
+operator overrides. Reviewed apply needs a matching draft version, refuses a snapshot older than the
+applied one, writes only listed fields and reconciles recipients from profile base plus manual additions
+minus explicit removals, which survive a profile change. Recipients are `DistributionRequest` audience,
+never an approved final-announcement audience; HighPriority is review metadata, not delivery. The initial
+implementation lacked automated/source-host acceptance; the repair evidence below supersedes that gap.
+No SMTP, sending, corporate execution or UI change is included here.
+
+Source repair acceptance (2026-09-14): the same task has a 5,000 changed-line ceiling
+from 38f6941. Migration 016 stays immutable; additive 017 supplies dispatch recovery
+and expiring execution attempts on SourceJobs, with no new runtime object grants.
+The SQL row is the durable dispatch intent. A bounded Hangfire recovery job retries
+due intents on the same configured queue; enqueue/ack crashes may redeliver a job.
+Only the current, unexpired attempt may complete it. Reads have a bounded lifetime;
+exhausted attempts fail explicitly. No automatic application or mail delivery exists.
+Reviewed apply uses the existing owner lock and one transaction for draft, overrides
+and both audits. Recipient profile state changes only when recipients are accepted.
+Raw bounded dates remain intact; unresolved formats/offsets cannot become instants.
+Acceptance results and integration requirements are recorded in
+[the source handoff](../contracts/planned-announcement-source-acceptance.md).
