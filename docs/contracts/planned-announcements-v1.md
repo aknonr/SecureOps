@@ -1,5 +1,78 @@
 # Planned announcements: implemented API and UI
 
+## Preparation/history from 72a503a
+
+This increment adds persisted **Prepared** final-announcement snapshots, not a send
+confirmation, queued work, SMTP acceptance or delivery. Save/live preview/download
+remain independent. Claude owns source/profile/recipient/Worker work in its separate
+tree; this increment does not change that boundary or introduce queue/storage hosts.
+
+Implemented routes, authenticated Admin-only Announcements.Drafts plus owner checks:
+- `PUT /api/v1/announcements/preparations/{id}?draftId={uuid}&version={N}`: explicit preparation of a complete current saved revision. UUID is the preparation idempotency key, not a send confirmation. The server reloads/revalidates owner, revision, sender and selected assets; client content/hashes/confirmation flags are not accepted. Same key/revision returns the original snapshot; reuse for a different revision returns 409 AnnouncementPreparationConflict. Stale draft returns 409 AnnouncementConflict; inaccessible data 404, denied capability 403, incomplete content 400, unavailable persistence/audit 503.
+- `GET /api/v1/announcements/preparations?page=1&pageSize=25`: PreparationPage (items, page, pageSize, total); bounds 1..10000 / 1..100. Summary: id, subject, version, preparedAt, preparedBy. Every row is Prepared. SQL owner filter, timestamp DESC/unique ID order and covering index; serializable count/page, no JSON/image/render work per row. Separate pages are not a frozen snapshot.
+- `GET /api/v1/announcements/preparations/{id}`: PreparedAnnouncement (id, draft, preparedAt, preparedBy, fingerprint, html, email as base64, assetRevisions, artifactType=FinalAnnouncement, state=Prepared). Privileged no-store detail only: exact rendered alternatives and CID bytes are in MIME; data-image HTML is captured in the same render action. Historical reads never resolve latest draft/files. Sender and trusted preparer profile are server-owned; immutable owner ID remains the authorization/audit key.
+
+Snapshot SHA-256 binds the complete serialized record with an empty fingerprint
+field, including exact MIME bytes, metadata, HTML, original draft and asset revisions.
+It is a persisted artifact identity, not deterministic MIME-boundary regeneration or
+a Message-ID deduplication guarantee. Preparation retries return stored bytes.
+JSON is bounded to 24,000,000 UTF-16 bytes, MIME to 3,000,000 bytes; existing six-image
+and 155-service limits remain. Storage/audit insert is one serializable transaction
+under the existing owner lock, with latest-revision fence and append-only trigger.
+Runtime needs only SELECT/INSERT on the new table plus existing access/audit grants.
+No startup DDL, role assignment, production configuration or SMTP switch is added.
+
+SQL numbering remains pending: Claude's committed source branch owns 016. The
+unnumbered `sql/pending/announcement-preparations.sql` is applied ONLY by the
+fresh isolated `scripts/powershell/Test-AnnouncementPreparationsSql.ps1` wrapper.
+Deployment integration must assign a coordinated number and reviewed entrypoint;
+do not replay 012/013 or apply this candidate on a corporate database.
+
+UI: saved clean editor -> **İncelemeye hazırla** -> read-only recipients/sender,
+saved artifact preview/download -> **Hazırlık geçmişi**. Unsaved edits must be saved
+explicitly first; existing date, preview and conflict controls remain unchanged.
+No operational Send/Confirm button, simulated Sent row or distribution-recipient
+defaults. Preparation/download labels explicitly say no message was sent.
+
+Worker handoff: AnnouncementDispatchBoundary.ExecuteAsync consumes a stored
+PreparedAnnouncement, IAnnouncementDispatchClaim and IAnnouncementTransport.
+Neither interface has a runtime registration. The future claim must load a durable
+confirmed intent, compare the stored fingerprint, recheck current approved owner/
+send capability and server write gates, and atomically exclude duplicate jobs.
+Preparation alone MUST NOT pass that claim. Persist the claim before transport and
+immutable outcome/recipient evidence afterward through the agreed Hangfire/SQL
+boundary; a crash after submission is UnknownOutcome, never an automatic resend.
+The current boundary has no queue/retry and returns NotDispatched on denied claims
+or invalid fingerprints. Tests only inject local in-memory capture and fake claims.
+Transport outcomes distinguish LocalCapture, KnownPreSubmissionFailure,
+PartialRecipientAcceptance and UnknownOutcome; accepted/rejected recipients survive
+unchanged. IO/cancellation during submission becomes UnknownOutcome. Future
+SmtpAccepted means relay acceptance, not mailbox delivery; partial/uncertain outcomes
+require reconciliation and a new explicit targeted decision, not retry-to-all.
+Confirmed intents, dispatch claims/outcomes/history and their idempotent confirmation
+API remain a bounded follow-up, not implemented acceptance claims in this increment.
+Confirmation must reload the current revision/assets, reject stale review, atomically
+persist intent/audit and bind its idempotency key to the exact preparation fingerprint.
+Different-content key reuse must fail; editing never modifies an earlier intent.
+Original six branding files and Outlook opening/editing/save-copy remain outstanding.
+
+Local evidence: `C:/SecureOpsBuild/validation/oco-preparation-20260914`; synthetic only.
+`dotnet build SecureOps.sln -c Release --no-restore`: zero warnings/errors.
+`dotnet test SecureOps.sln -c Release --no-build`: 1245 unit + 263 integration pass,
+24 opt-in skips. `tests-hardened` contains TRX; OpenAPI comparison is included.
+Fresh owned SQL harnesses, then integration `--filter 'FullyQualifiedName~ResourceSqlTests|FullyQualifiedName~AnnouncementTests'`:
+43 pass (23 SQL-enabled tests), one opt-in prior browser-artifact check skipped.
+Preparation SQL uses SECUREOPS_PREPARATION_SQL=1 and its separate
+SECUREOPS_PREPARATION_SQL_CONNECTION; existing SQL uses SECUREOPS_SQL_TEST_CONNECTION.
+`publish-final` is the matching API/UI payload; manifests/versions are in the evidence root.
+`browser-final/editor` and `browser-final/preparations`: desktop/mobile, retained
+editor behavior, exact stored MIME/download, 155 services/six synthetic CID images,
+history and denial. Replay uses the existing announcement-hosts/journey-support harness.
+The flaky legacy-upgrade replay now waits for an interactive Blazor connection;
+the SQL discovery test selects the actual ordered page rather than assuming a random
+UUID is in page one. Failed attempts are retained, not replaced as passing evidence.
+Full format remains a release blocker on unchanged baseline findings; no waiver.
+
 See ADR-0021 and generated `secureops-api-v1.openapi.json`. UI route: `/announcements`.
 All routes require authenticated, approved persisted access and `Announcements.Drafts`
 (Admin only), then owner isolation. Immutable user IDs remain authorization keys.

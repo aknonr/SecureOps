@@ -12,6 +12,16 @@ public sealed class AnnouncementApiClient
     /// <summary>Attaches the authenticated browser session, never a shared identity.</summary>
     public AnnouncementApiClient(HttpClient client, IApiSessionContext session)
     { _client = client; ApiSessionHeaders.Attach(client, session); }
+    /// <summary>Owned persisted preparation history, metadata only.</summary>
+    public async Task<PreparationPage> PreparationsAsync(int page, CancellationToken token)
+    { using HttpResponseMessage response = await SendAsync($"/preparations?page={page}", null, token); return await ApiResponseReader.ReadBodyAsync<PreparationPage>(response, token); }
+    /// <summary>Explicit snapshot preparation or historical read; neither confirms nor sends.</summary>
+    public async Task<PreparedAnnouncement> PreparedAsync(Guid id, Guid? draftId, long version, CancellationToken token)
+    {
+        string query = draftId is null ? "" : $"?draftId={draftId}&version={version}";
+        using HttpResponseMessage response = await SendAsync($"/preparations/{id}" + query, null, token, draftId is null ? HttpMethod.Get : HttpMethod.Put);
+        return await ApiResponseReader.ReadBodyAsync<PreparedAnnouncement>(response, token);
+    }
     /// <summary>Reads one bounded owner-only page.</summary>
     public async Task<AnnouncementPage> ListAsync(int page, CancellationToken token)
     {

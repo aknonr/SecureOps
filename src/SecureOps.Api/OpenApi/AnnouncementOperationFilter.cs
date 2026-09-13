@@ -24,7 +24,7 @@ public sealed class AnnouncementOperationFilter : IOperationFilter
             parameter.Schema.Minimum = 1;
             parameter.Schema.Maximum = parameter.Name == "page" ? 10000 : 100;
         }
-        if (operation.Parameters.Any(p => p.Name == "id"))
+        if (context.MethodInfo.Name is nameof(AnnouncementsController.GetAsync) or nameof(AnnouncementsController.SaveAsync))
         { operation.Responses["200"].Headers["ETag"] = new OpenApiHeader { Description = "Quoted current draft version", Schema = new() { Type = "string" } }; }
         operation.Responses["default"] = new OpenApiResponse { Description = "ProblemDetails: code, fields and correlationId; 400 invalid/incomplete, 401/403 access, 404 not found, 409 conflict/asset changed, 503 unavailable." };
         OpenApiParameter? format = operation.Parameters.FirstOrDefault(p => p.Name == "format");

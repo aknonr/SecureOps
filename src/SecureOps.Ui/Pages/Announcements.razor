@@ -8,6 +8,7 @@
 @inject ICurrentAccessProvider Access
 @inject IJSRuntime Js
 @inject IDialogService Dialogs
+@inject NavigationManager Navigation
 
 <PageTitle>Planlı Çalışma Duyuruları · @WasasBrand.Name</PageTitle>
 <NavigationLock ConfirmExternalNavigation="_dirty" OnBeforeInternalNavigation="LeavingAsync" />
@@ -17,6 +18,7 @@
         <Actions>
             @if (_allowed)
             {
+                <MudButton Href="/announcements/preparations" StartIcon="@Icons.Material.Filled.History">Hazırlık geçmişi</MudButton>
                 @if (_form is null)
                 { <MudButton data-guide="announcement-new" StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="NewAsync">Yeni duyuru</MudButton> }
                 else { <MudButton StartIcon="@Icons.Material.Filled.ArrowBack" Disabled="_busy" OnClick="BackAsync">Taslaklar</MudButton> }
@@ -129,6 +131,7 @@
                 <MudButton data-guide="announcement-save" ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" Disabled="@(_busy || _comparison is not null)">Kaydet</MudButton>
                 <MudButton data-guide="announcement-preview" OnClick="PreviewAsync" StartIcon="@Icons.Material.Filled.Visibility" Disabled="@(_busy || _dirty || _version == 0)">Önizle</MudButton>
                 <MudButton data-guide="announcement-download" OnClick="DownloadAsync" StartIcon="@Icons.Material.Filled.Download" Disabled="@(_busy || _dirty || _version == 0)">Maili indir</MudButton>
+                <MudButton OnClick="PrepareAsync" StartIcon="@Icons.Material.Filled.FactCheck" Disabled="@(_busy || _dirty || _version == 0)">İncelemeye hazırla</MudButton>
                 <span role="status" data-save-state>@(_dirty ? "Kaydedilmemiş değişiklikler" : _version > 0 ? "Güncel içerik kaydedildi" : "Yeni taslak")</span>
             </div>
         </EditForm>

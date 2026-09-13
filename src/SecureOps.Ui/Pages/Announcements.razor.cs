@@ -105,6 +105,7 @@ public partial class Announcements
     private void Change(string key, string value) { _form!.Values[key] = value; Changed(); }
     private void Changed()
     {
+        _preparationKey = null;
         _dirty = _savedContent is null || _form!.Differences(_savedContent).Any();
         _notice = null;
         if (_problem?.Kind == UiProblemKind.Validation)
@@ -121,6 +122,7 @@ public partial class Announcements
         _form = AnnouncementForm.From(saved.Content);
         _savedContent = saved.Content;
         _version = saved.Version;
+        _preparationKey = null;
         _dirty = false;
         _notice = "Taslak kaydedildi.";
     });
@@ -148,6 +150,16 @@ public partial class Announcements
         _notice = "Mail dosyası indirildi; gönderim yapılmadı.";
     });
     private Task CompareAsync() => RunAsync(async () => _comparison = await Api.DraftAsync(_id, 0, null, _lifetime.Token));
+    private Guid? _preparationKey;
+    private Task PrepareAsync() => RunAsync(async () =>
+    {
+        if (_dirty || _version == 0)
+        { return; }
+        _preparationKey ??= Guid.NewGuid();
+        PreparedAnnouncement prepared = await Api.PreparedAsync(_preparationKey.Value, _id, _version, _lifetime.Token);
+        _busy = false;
+        Navigation.NavigateTo($"/announcements/preparations/{prepared.Id}");
+    });
     private void AcceptComparison()
     { _version = _comparison!.Value.Version; _savedContent = _comparison.Value.Content; _comparison = null; _problem = null; Changed(); _notice = "Düzenlemeleriniz korunuyor. Kaydet ile onaylayın."; }
     private static string FieldLabel(string key) => key switch

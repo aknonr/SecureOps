@@ -125,7 +125,8 @@ public sealed partial class AnnouncementTests
         (await store.ListAsync(owner, 1, 100, default)).Items.Should().HaveCount(100);
         (await store.ListAsync(other, 1, 100, default)).Items.Should().NotContain(i => ids.Contains(i.Id));
         AnnouncementDraft latest = (await store.GetAsync(ids[0], owner, default))!;
-        (await store.ListAsync(owner, 1, 100, default)).Items.Where(i => i.Id == ids[0]).Should().OnlyContain(i => i.MissingFieldCount == 1);
+        int targetPage = Array.IndexOf(ids.OrderBy(i => i.ToString("D"), StringComparer.Ordinal).ToArray(), ids[0]) / 100 + 1;
+        (await store.ListAsync(owner, targetPage, 100, default)).Items.Should().ContainSingle(i => i.Id == ids[0]).Which.MissingFieldCount.Should().Be(1);
         Task<string?> save = store.SaveAsync(latest with { Version = 6, SavedAt = time.AddMinutes(1) }, "synthetic", default);
         AnnouncementPage during = await new SqlAnnouncementStore(config).ListAsync(owner, 1, 100, default);
         (await save).Should().BeNull();

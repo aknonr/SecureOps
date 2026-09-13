@@ -74,6 +74,11 @@ Application-session governance uses `schema/007-application-session-governance.s
 
 ## Test Harness
 
+`pending/announcement-preparations.sql` is an unnumbered local-test candidate,
+not a deployment migration. Use the fresh `Test-AnnouncementPreparationsSql.ps1`
+wrapper; numbering must be coordinated after Claude's source-job 016. Runtime needs
+SELECT/INSERT on announcements.Preparations plus existing audit/access grants only.
+
 Announcement drafts use additive 014 (separate append-only revisions). Runtime
 needs SELECT/INSERT on announcements.DraftRevisions plus existing audit INSERT;
 no UPDATE/DELETE/DDL. No grants are applied automatically. Retain additive data on

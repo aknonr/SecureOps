@@ -17,7 +17,7 @@ public sealed record AnnouncementOutcome(AnnouncementDraft? Draft = null, string
     AnnouncementPage? Page = null, IReadOnlyList<AnnouncementBanner>? Banners = null);
 
 /// <summary>Owner-scoped local draft orchestration; no source or mail transport dependency.</summary>
-public sealed class AnnouncementService(SqlAnnouncementStore store, AnnouncementRenderer renderer,
+public sealed partial class AnnouncementService(SqlAnnouncementStore store, AnnouncementRenderer renderer,
     IApplicationAccessService access, IOptions<AnnouncementOptions> options, ILogger<AnnouncementService> logger)
 {
     /// <summary>Revalidates persisted capabilities for every save/read/preview/download.</summary>
@@ -60,7 +60,7 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
                 await store.DiscoveryAuditAsync(owner, true, banners.Count, context.CorrelationId, token);
                 return new(Banners: banners);
             }
-            if (id == Guid.Empty || version is < 0 or long.MaxValue || format is not ("save" or "draft" or "html" or "eml"))
+            if (id == Guid.Empty || version is < 0 or long.MaxValue || format is not ("save" or "draft" or "html" or "eml" or "prepare"))
             { return new(Error: "AnnouncementInvalid"); }
             if (format == "save")
             {
@@ -101,8 +101,9 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
                 return new(draft, AnnouncementRenderer.RenderPresentation(draft, asset, true).Html);
             }
             byte[] email = await AnnouncementRenderer.EmailAsync(draft, asset, token);
-            await store.ReadAuditAsync(draft, true, context.CorrelationId, token);
-            return new(draft, Email: email);
+            if (format != "prepare")
+            { await store.ReadAuditAsync(draft, true, context.CorrelationId, token); }
+            return new(draft, Html: format == "prepare" ? AnnouncementRenderer.RenderPresentation(draft, asset, true).Html : null, Email: email);
         }
         catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
         {

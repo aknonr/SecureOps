@@ -4,8 +4,8 @@
 
 `/announcements` now connects owner-scoped paging, structured drafts, banners,
 explicit saved preview/download, conflict comparison and per-user guided help.
-Codex owns this module's UI and backend by explicit user instruction. No sending,
-history or ordinary-user role was added. See `docs/contracts/planned-announcements-v1.md`
+Codex owns this module's UI and backend by explicit user instruction. Owned immutable
+preparation history is implemented; sending/confirmation and ordinary-user roles are not. See `docs/contracts/planned-announcements-v1.md`
 for API behavior, local browser replay, evidence and remaining quality gates.
 New drafts default to the final table; existing v1 requires explicit versioned upgrade.
 System/application and the collapsed service list stay separate. Debounced unsaved

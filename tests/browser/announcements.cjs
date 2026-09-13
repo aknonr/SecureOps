@@ -213,7 +213,7 @@ async function editorChecks(page, client, denied, route, stored, click, frame, c
     await click('Taslaklar');
     const revision = (await client.get(route)).headers().etag.replaceAll('"', '');
     await json(client, route + '?version=' + revision, { method: 'PUT', data: { ...stored, templateRevision: 'oco-v1', dateTextRevision: 'iso-v1', affectedServices: null, bannerRevision: 'synthetic' } });
-    await page.reload(); await page.getByRole('button', { name: 'Düzenle: ' + stored.subject, exact: true }).click();
+    await navigate(page, new URL(page.url()), '/announcements'); await page.getByRole('button', { name: 'Düzenle: ' + stored.subject, exact: true }).click();
     await page.locator('#announcement-Subject').fill('Korunan yükseltme düzenlemesi');
     await click('Yeni duyuru biçimine yükselt'); await page.getByRole('button', { name: 'Yükselt', exact: true }).click();
     assert.equal(await page.locator('#announcement-Subject').inputValue(), 'Korunan yükseltme düzenlemesi');

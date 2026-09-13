@@ -2,6 +2,16 @@
 
 Status: accepted for this explicitly authorized local draft-only increment.
 
+Send preparation from 72a503a: append an owner-authorized exact saved snapshot,
+including MIME/image bytes, safe preview, sender and audit metadata. Prepared is
+not confirmed, queued or sent. Preparation UUID is an idempotency key, bound to
+one immutable draft revision. History reads stored snapshots, never current assets.
+Confirmation/dispatch persistence and Worker integration are deferred; only an
+unregistered transport boundary and isolated test capture are permitted here.
+Claude owns source/profile/recipient jobs and Worker composition in another tree.
+SQL numbering requires coordination; the unnumbered pending schema is local-test
+only until assigned. No corporate dispatcher, queue or external-write activation.
+
 Acceptance repair from 38f6941: temporary invalid dates remain invalid; API save,
 preview and export validation is unchanged. Same-context preview retains its last
 successful content with explicit stale status during edits/errors. A sandboxed

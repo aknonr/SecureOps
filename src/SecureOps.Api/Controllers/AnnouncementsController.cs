@@ -10,7 +10,7 @@ namespace SecureOps.Api.Controllers;
 
 /// <summary>Local owned drafts. GET format is draft, html or eml; no sending route exists.</summary>
 [ApiController, Route("api/v1/announcements"), Authorize(Policy = Policies.CanDraftAnnouncements), Produces("application/json")]
-public sealed class AnnouncementsController(AnnouncementService service) : ControllerBase
+public sealed partial class AnnouncementsController(AnnouncementService service) : ControllerBase
 {
     /// <summary>Lists only the caller's latest draft summaries; page 1..10000 and size 1..100.</summary>
     [HttpGet, ProducesResponseType(typeof(AnnouncementPage), 200)]
