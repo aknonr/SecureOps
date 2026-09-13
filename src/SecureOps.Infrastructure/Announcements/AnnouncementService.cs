@@ -21,8 +21,13 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
     IApplicationAccessService access, IOptions<AnnouncementOptions> options, ILogger<AnnouncementService> logger)
 {
     /// <summary>Revalidates persisted capabilities for every save/read/preview/download.</summary>
-    public async Task<AnnouncementOutcome> ExecuteAsync(ClaimsPrincipal principal, AccessOperationContext context,
-        Guid id, long version, string format, AnnouncementContent? input, int page, int pageSize, CancellationToken token)
+    public Task<AnnouncementOutcome> ExecuteAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        Guid id, long version, string format, AnnouncementContent? input, int page, int pageSize, CancellationToken token) =>
+        ExecuteAsync(principal, context, id, version, format, input, page, pageSize, null, token);
+
+    internal async Task<AnnouncementOutcome> ExecuteAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        Guid id, long version, string format, AnnouncementContent? input, int page, int pageSize,
+        Func<AnnouncementDraft, CancellationToken, Task<string?>>? reviewedSave, CancellationToken token)
     {
         try
         {
@@ -76,7 +81,8 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
                 input = input with { To = to, Cc = [.. input.Cc.Except(to, StringComparer.OrdinalIgnoreCase).Distinct(StringComparer.OrdinalIgnoreCase)] };
                 var next = new AnnouncementDraft(id, owner, version + 1, DateTimeOffset.UtcNow, input, options.Value.Sender,
                     presentation.Hash, TemplateRevision: input.TemplateRevision);
-                string? error = await store.SaveAsync(next, context.CorrelationId, token);
+                string? error = reviewedSave is null ? await store.SaveAsync(next, context.CorrelationId, token)
+                    : await reviewedSave(next, token);
                 return error is null ? new(next) : new(Error: error);
             }
             AnnouncementDraft? draft = await store.GetAsync(id, owner, token);

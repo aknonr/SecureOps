@@ -53,7 +53,7 @@ public sealed class AnnouncementSourceController(AnnouncementSourceService servi
             {
                 "AccessDenied" => 403,
                 "AnnouncementNotFound" or "AnnouncementSourceJobNotFound" => 404,
-                "AnnouncementConflict" or "AnnouncementSourceStale" or "AnnouncementSourceOverrideConflict" => 409,
+                "AnnouncementConflict" or "AnnouncementSourceStale" or "AnnouncementSourceOverrideConflict" or "AnnouncementSourceSubmissionConflict" => 409,
                 "AnnouncementSourceInvalid" or "AnnouncementInvalid" or "AnnouncementIncomplete" => 400,
                 _ => 503
             };

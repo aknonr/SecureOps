@@ -3,10 +3,12 @@ param(
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix = ([Guid]::NewGuid().ToString('N')),
     [switch]$RunTests,
-    [switch]$IncludeAnnouncementDrafts
+    [switch]$IncludeAnnouncementDrafts,
+    [switch]$IncludeAnnouncementSources
 )
 
 $ErrorActionPreference = 'Stop'
+if ($IncludeAnnouncementSources) { $IncludeAnnouncementDrafts = $true }
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $database = 'SecureOps_ResourcesV1_' + $DatabaseSuffix
 $server = '(localdb)\SecureOpsResourcesV1'
@@ -75,6 +77,8 @@ try {
     Invoke-ResourceTestSql -File '013-sdm-pilot-policy.sql'
     if ($IncludeAnnouncementDrafts) { Invoke-ResourceTestSql -File '014-announcement-drafts.sql' }
     if ($IncludeAnnouncementDrafts) { Invoke-ResourceTestSql -File '015-announcement-owner-index.sql' }
+    if ($IncludeAnnouncementSources) { Invoke-ResourceTestSql -File '016-announcement-source-jobs.sql' }
+    if ($IncludeAnnouncementSources) { Invoke-ResourceTestSql -File '017-announcement-source-recovery.sql' }
 }
 finally { Pop-Location }
 
@@ -95,4 +99,4 @@ if ($RunTests) {
         } finally { Pop-Location }
     } finally { $env:SECUREOPS_SQL_TEST_CONNECTION = $previous }
 }
-[PSCustomObject]@{ Database = $database; Migrations = $(if ($IncludeAnnouncementDrafts) { '001-015' } else { '001-013' }); UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }
+[PSCustomObject]@{ Database = $database; Migrations = $(if ($IncludeAnnouncementSources) { '001-017' } elseif ($IncludeAnnouncementDrafts) { '001-015' } else { '001-013' }); UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }

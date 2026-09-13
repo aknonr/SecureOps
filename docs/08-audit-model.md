@@ -6,6 +6,15 @@ banner hash only. No content/recipients or Sent claim. Revisions are append-only
 `AnnouncementDraftsListed` / `AnnouncementBannersRead` audit only actor and returned
 count; audit failure blocks metadata responses. No content, recipient or path data.
 
+Announcement source operations add `AnnouncementSourceJobSubmitted`, `AnnouncementSourceJobStarted`,
+`AnnouncementSourceJobCompleted` and `AnnouncementSourceApplied`. Each state write and its required
+audit share a SQL transaction; reviewed apply includes the draft-saved audit in that transaction.
+Job audits contain internal job/draft IDs, profile/state, attempt identity/count and bounded outcome
+metadata only. Apply audit includes draft/job/version, selected field count and recipient-review choice.
+`AnnouncementSourceRead` records owner, optional draft/job IDs and Profiles/Status/Proposal operation;
+audit failure blocks the response. No raw source text, device names, recipient addresses or OCO values
+are recorded. Dispatch retries are operational logs, not claims of application or mail delivery.
+
 The audit subsystem is the project's most important non-functional feature. This document is the canonical specification.
 
 ## Principles

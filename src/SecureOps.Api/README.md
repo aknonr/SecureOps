@@ -34,7 +34,9 @@ The canonical UI contract documents version conflicts and filtered set resolutio
 
 Planned announcement owned draft pagination, banner metadata, safe preview and authenticated .eml export:
 `docs/contracts/planned-announcements-v1.md`. Default-off; connected owned-draft UI,
-explicit v1/v2 templates and private asset bundles; no sending or source collection.
+explicit v1/v2 templates and private asset bundles; no sending. Source routes submit durable work,
+read status/proposals and apply reviewed fields atomically; source collection runs only in Worker.
+See `docs/contracts/planned-announcement-source-acceptance.md` for contracts and executed local evidence.
 POST announcement preview is a bounded authenticated caller-input transformation;
 it neither reads draft records nor saves/sends. Saved exports remain version-bound.
 

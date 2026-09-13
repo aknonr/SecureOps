@@ -73,7 +73,9 @@ public sealed class ConfigurationManagerCollectionClient(IOptions<AnnouncementSo
             { warnings.Add("DeviceCeilingReached"); break; }
             devices.Add(new SourceDevice(name.Trim(), collectionId, retrieved));
         }
-        bool complete = !warnings.Contains("DeviceCeilingReached");
+        bool complete = !warnings.Contains("DeviceCeilingReached") && malformed == 0;
+        if (output.Count > settings.MaxDevices)
+        { complete = false; warnings.Add("DeviceCeilingReached"); }
         if (shell.HadErrors)
         { warnings.Add("PartialCollectionErrors"); complete = false; }
         if (duplicates > 0)

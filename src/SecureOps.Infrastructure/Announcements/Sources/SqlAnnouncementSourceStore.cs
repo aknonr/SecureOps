@@ -12,12 +12,12 @@ namespace SecureOps.Infrastructure.Announcements.Sources;
 /// held by the job host, so an API or Worker restart never erases a completed result. Every read is
 /// filtered by owner; a job is never returned to a principal that did not submit it.
 /// </summary>
-public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
+public sealed partial class SqlAnnouncementSourceStore(IConfiguration configuration)
 {
-    private const string Columns = "JobId,OwnerId,DraftId,Profile,OcoReference,State,ErrorCode,SnapshotJson,SubmittedAt,UpdatedAt";
+    private const string _columns = "JobId,OwnerId,DraftId,Profile,OcoReference,State,ErrorCode,SnapshotJson,SubmittedAt,UpdatedAt,AttemptCount";
     private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
     private readonly string _connection = configuration.GetConnectionString("SecureOpsDb")
-        ?? throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required for announcement source jobs.");
+        ?? "";
 
     /// <summary>Accepted job plus whether an identical submission key already existed.</summary>
     public sealed record SubmitResult(AnnouncementSourceJob Job, bool Duplicate);
@@ -32,11 +32,13 @@ public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
         await connection.OpenAsync(token);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
         JobRow? existing = await connection.QuerySingleOrDefaultAsync<JobRow>(Command($"""
-            SELECT {Columns} FROM announcements.SourceJobs WITH (UPDLOCK, HOLDLOCK)
+            SELECT {_columns} FROM announcements.SourceJobs WITH (UPDLOCK, HOLDLOCK)
             WHERE OwnerId=@OwnerId AND DraftId=@DraftId AND SubmissionKey=@SubmissionKey;
             """, new { job.OwnerId, job.DraftId, SubmissionKey = submissionKey }, transaction, token));
         if (existing is not null)
         {
+            if (existing.Profile != job.Profile || !string.Equals(existing.OcoReference, job.OcoReference, StringComparison.Ordinal))
+            { throw new AnnouncementSourceException("AnnouncementSourceSubmissionConflict", false); }
             await transaction.CommitAsync(token);
             return new(Map(existing), true);
         }
@@ -50,23 +52,36 @@ public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
         return new(job, false);
     }
 
-    /// <summary>Moves exactly one Queued job to Running; a redelivered or terminal job returns null.</summary>
-    public async Task<AnnouncementSourceJob?> ClaimAsync(Guid jobId, DateTimeOffset now, CancellationToken token)
+    /// <summary>Claims a queued or expired job. SQL time and attempt identity fence obsolete workers.</summary>
+    public async Task<SourceJobAttempt?> ClaimAsync(Guid jobId, Guid attemptId, int leaseSeconds, CancellationToken token)
     {
         await using SqlConnection connection = new(_connection);
+        await connection.OpenAsync(token);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, token);
         JobRow? row = await connection.QuerySingleOrDefaultAsync<JobRow>(Command("""
-            UPDATE announcements.SourceJobs SET State=N'Running', UpdatedAt=@now
+            UPDATE announcements.SourceJobs SET State=N'Running', UpdatedAt=SYSUTCDATETIME(),
+                AttemptId=@attemptId, AttemptCount=AttemptCount+1,
+                LeaseUntil=DATEADD(second,@leaseSeconds,SYSUTCDATETIME())
             OUTPUT inserted.JobId,inserted.OwnerId,inserted.DraftId,inserted.Profile,inserted.OcoReference,
-                   inserted.State,inserted.ErrorCode,inserted.SnapshotJson,inserted.SubmittedAt,inserted.UpdatedAt
-            WHERE JobId=@jobId AND State=N'Queued';
-            """, new { jobId, now }, null, token));
-        return row is null ? null : Map(row);
+                   inserted.State,inserted.ErrorCode,inserted.SnapshotJson,inserted.SubmittedAt,inserted.UpdatedAt,inserted.AttemptCount
+            WHERE JobId=@jobId AND (State=N'Queued' OR
+                (State=N'Running' AND (LeaseUntil IS NULL OR LeaseUntil<=SYSUTCDATETIME())));
+            """, new { jobId, attemptId, leaseSeconds }, transaction, token));
+        if (row is not null)
+        {
+            await AuditAsync(connection, transaction, row.OwnerId, "AnnouncementSourceJobStarted", jobId.ToString("N"),
+                new { JobId = jobId, AttemptId = attemptId, row.AttemptCount }, token);
+        }
+        await transaction.CommitAsync(token);
+        return row is null ? null : new SourceJobAttempt(Map(row), attemptId, row.AttemptCount);
     }
 
     /// <summary>Writes a terminal outcome exactly once; a late duplicate completion changes nothing.</summary>
-    public async Task<bool> CompleteAsync(Guid jobId, string state, string? errorCode,
+    public async Task<bool> CompleteAsync(Guid jobId, Guid attemptId, string state, string? errorCode,
         AnnouncementSourceSnapshot? snapshot, string correlation, DateTimeOffset now, CancellationToken token)
     {
+        if (!AnnouncementSourceJobStates.IsTerminal(state))
+        { throw new ArgumentException("A terminal state is required.", nameof(state)); }
         string? snapshotJson = snapshot is null ? null : JsonSerializer.Serialize(snapshot, _json);
         if (snapshotJson is not null && System.Text.Encoding.Unicode.GetByteCount(snapshotJson) > 1_048_576)
         { (snapshotJson, state, errorCode) = (null, AnnouncementSourceJobStates.Failed, "AnnouncementSourceSnapshotTooLarge"); }
@@ -75,17 +90,26 @@ public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
         Guid? owner = await connection.QuerySingleOrDefaultAsync<Guid?>(Command("""
             UPDATE announcements.SourceJobs SET State=@state, ErrorCode=@errorCode, SnapshotJson=@snapshotJson, UpdatedAt=@now
-            OUTPUT inserted.OwnerId WHERE JobId=@jobId AND State IN (N'Queued', N'Running');
-            """, new { jobId, state, errorCode, snapshotJson, now }, transaction, token));
+            OUTPUT inserted.OwnerId WHERE JobId=@jobId AND State=N'Running' AND AttemptId=@attemptId
+                AND LeaseUntil>SYSUTCDATETIME();
+            """, new { jobId, attemptId, state, errorCode, snapshotJson, now }, transaction, token));
         if (owner is null)
         {
             await transaction.CommitAsync(token);
             return false;
         }
         await AuditAsync(connection, transaction, owner.Value, "AnnouncementSourceJobCompleted", correlation,
-            new { JobId = jobId, State = state, ErrorCode = errorCode, DeviceCount = snapshot?.Completeness.DeviceCount }, token);
+            new { JobId = jobId, AttemptId = attemptId, State = state, ErrorCode = errorCode, DeviceCount = snapshot?.Completeness.DeviceCount }, token);
         await transaction.CommitAsync(token);
         return true;
+    }
+
+    /// <summary>Required source read audit, containing identifiers and operation only, never source content.</summary>
+    public async Task ReadAuditAsync(Guid owner, Guid? draftId, Guid? jobId, string operation, string correlation, CancellationToken token)
+    {
+        await using SqlConnection connection = new(_connection);
+        await AuditAsync(connection, null, owner, "AnnouncementSourceRead", correlation,
+            new { DraftId = draftId, JobId = jobId, Operation = operation }, token);
     }
 
     /// <summary>Owner-scoped job read including any persisted snapshot.</summary>
@@ -93,7 +117,7 @@ public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
     {
         await using SqlConnection connection = new(_connection);
         JobRow? row = await connection.QuerySingleOrDefaultAsync<JobRow>(Command(
-            $"SELECT {Columns} FROM announcements.SourceJobs WHERE JobId=@jobId AND OwnerId=@owner;",
+            $"SELECT {_columns} FROM announcements.SourceJobs WHERE JobId=@jobId AND OwnerId=@owner;",
             new { jobId, owner }, null, token));
         return row is null ? null : Map(row);
     }
@@ -103,7 +127,7 @@ public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
     {
         await using SqlConnection connection = new(_connection);
         JobRow? row = await connection.QuerySingleOrDefaultAsync<JobRow>(Command($"""
-            SELECT TOP(1) {Columns} FROM announcements.SourceJobs WHERE OwnerId=@owner AND DraftId=@draftId
+            SELECT TOP(1) {_columns} FROM announcements.SourceJobs WHERE OwnerId=@owner AND DraftId=@draftId
             ORDER BY SubmittedAt DESC, JobId;
             """, new { draftId, owner }, null, token));
         return row is null ? null : Map(row);
@@ -128,14 +152,13 @@ public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
     /// Persists overrides under an optimistic version check. A stale caller receives false instead of
     /// overwriting a newer operator decision.
     /// </summary>
-    public async Task<bool> SaveOverridesAsync(AnnouncementSourceOverrides overrides, long expectedVersion,
-        DateTimeOffset now, CancellationToken token)
+    private static async Task<bool> SaveOverridesAsync(SqlConnection connection, SqlTransaction transaction,
+        AnnouncementSourceOverrides overrides, long expectedVersion, DateTimeOffset now, CancellationToken token)
     {
         string json = JsonSerializer.Serialize(new OverrideDocument(overrides.Profile, overrides.ManualTo,
             overrides.ManualCc, overrides.RemovedTo, overrides.RemovedCc), _json);
         if (System.Text.Encoding.Unicode.GetByteCount(json) > 65536)
         { return false; }
-        await using SqlConnection connection = new(_connection);
         int affected = await connection.ExecuteAsync(Command("""
             UPDATE announcements.SourceOverrides SET Version=@nextVersion, OverridesJson=@json,
                 AppliedJobId=@AppliedJobId, AppliedCapturedAt=@AppliedCapturedAt, UpdatedAt=@now
@@ -155,18 +178,38 @@ public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
             overrides.AppliedJobId,
             overrides.AppliedCapturedAt,
             now
-        }, null, token));
+        }, transaction, token));
         return affected > 0;
     }
 
-    /// <summary>Records a reviewed application against the owned draft; details carry no addresses.</summary>
-    public async Task ApplyAuditAsync(Guid owner, Guid draftId, Guid jobId, long version, string[] fields,
-        bool recipients, string correlation, CancellationToken token)
-    {
-        await using SqlConnection connection = new(_connection);
-        await AuditAsync(connection, null, owner, "AnnouncementSourceApplied", correlation,
-            new { DraftId = draftId, JobId = jobId, Version = version, FieldCount = fields.Length, Recipients = recipients }, token);
-    }
+    /// <summary>Uses the draft owner's existing transaction for all reviewed writes and audits.</summary>
+    public Task<string?> ApplyAsync(SqlAnnouncementStore drafts, AnnouncementDraft draft,
+        AnnouncementSourceOverrides next, long expectedVersion, string[] fields, bool recipients,
+        string correlation, CancellationToken token) =>
+        drafts.SaveAsync(draft, correlation, async (connection, transaction, cancellation) =>
+        {
+            OverrideRow? current = await connection.QuerySingleOrDefaultAsync<OverrideRow>(Command("""
+                SELECT Version,OverridesJson,AppliedJobId,AppliedCapturedAt,UpdatedAt
+                FROM announcements.SourceOverrides WITH(UPDLOCK,HOLDLOCK) WHERE DraftId=@Id AND OwnerId=@OwnerId;
+                """, new { draft.Id, draft.OwnerId }, transaction, cancellation));
+            if ((current?.Version ?? 0) != expectedVersion)
+            { return "AnnouncementSourceOverrideConflict"; }
+            if (next.DraftId != draft.Id || next.OwnerId != draft.OwnerId)
+            { return "AnnouncementNotFound"; }
+            JobRow? job = await connection.QuerySingleOrDefaultAsync<JobRow>(Command(
+                $"SELECT {_columns} FROM announcements.SourceJobs WHERE JobId=@AppliedJobId AND OwnerId=@OwnerId;",
+                new { next.AppliedJobId, draft.OwnerId }, transaction, cancellation));
+            AnnouncementSourceSnapshot? snapshot = job is null ? null : Map(job).Snapshot;
+            if (snapshot is null || snapshot.DraftId != draft.Id || snapshot.CapturedAt != next.AppliedCapturedAt)
+            { return "AnnouncementSourceJobNotFound"; }
+            if (current?.AppliedCapturedAt is { } applied && snapshot.CapturedAt <= applied)
+            { return "AnnouncementSourceStale"; }
+            if (!await SaveOverridesAsync(connection, transaction, next, expectedVersion, draft.SavedAt, cancellation))
+            { return "AnnouncementSourceOverrideConflict"; }
+            await AuditAsync(connection, transaction, draft.OwnerId, "AnnouncementSourceApplied", correlation,
+                new { DraftId = draft.Id, JobId = next.AppliedJobId, draft.Version, FieldCount = fields.Length, Recipients = recipients }, cancellation);
+            return null;
+        }, token);
 
     private static Task AuditAsync(SqlConnection connection, SqlTransaction? transaction, Guid owner,
         string action, string correlation, object details, CancellationToken token) =>
@@ -190,9 +233,12 @@ public sealed class SqlAnnouncementSourceStore(IConfiguration configuration)
         row.SnapshotJson is null ? null : JsonSerializer.Deserialize<AnnouncementSourceSnapshot>(row.SnapshotJson, _json));
 
     private sealed record JobRow(Guid JobId, Guid OwnerId, Guid DraftId, string Profile, string OcoReference,
-        string State, string? ErrorCode, string? SnapshotJson, DateTimeOffset SubmittedAt, DateTimeOffset UpdatedAt);
+        string State, string? ErrorCode, string? SnapshotJson, DateTimeOffset SubmittedAt, DateTimeOffset UpdatedAt, int AttemptCount);
     private sealed record OverrideRow(long Version, string OverridesJson, Guid? AppliedJobId,
         DateTimeOffset? AppliedCapturedAt, DateTimeOffset UpdatedAt);
     private sealed record OverrideDocument(string? Profile, string[] ManualTo, string[] ManualCc,
         string[] RemovedTo, string[] RemovedCc);
 }
+
+/// <summary>The attempt fence and its bounded execution number, separate from the public job status.</summary>
+public sealed record SourceJobAttempt(AnnouncementSourceJob Job, Guid AttemptId, int Number);

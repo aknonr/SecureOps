@@ -12,8 +12,10 @@ namespace SecureOps.Infrastructure.Announcements.Sources;
 /// <summary>Hands an accepted job to the established Hangfire queue. No second queue is introduced.</summary>
 public interface IAnnouncementSourceDispatcher
 {
+    /// <summary>Whether durable dispatch was explicitly configured for this host.</summary>
+    public bool IsConfigured { get; }
     /// <summary>Enqueues durable execution for an already-persisted Queued job.</summary>
-    public void Enqueue(Guid jobId);
+    public string Enqueue(Guid jobId);
 }
 
 /// <summary>Hangfire client dispatch. The API only enqueues; the Worker executes.</summary>
@@ -21,7 +23,9 @@ public sealed class HangfireAnnouncementSourceDispatcher(IBackgroundJobClient cl
     : IAnnouncementSourceDispatcher
 {
     /// <inheritdoc />
-    public void Enqueue(Guid jobId) =>
+    public bool IsConfigured => true;
+    /// <inheritdoc />
+    public string Enqueue(Guid jobId) =>
         client.Create<AnnouncementSourceJobRunner>(runner => runner.RunAsync(jobId, CancellationToken.None),
             new Hangfire.States.EnqueuedState(queue));
 }
@@ -30,76 +34,88 @@ public sealed class HangfireAnnouncementSourceDispatcher(IBackgroundJobClient cl
 public sealed class UnavailableAnnouncementSourceDispatcher : IAnnouncementSourceDispatcher
 {
     /// <inheritdoc />
-    public void Enqueue(Guid jobId) => throw new AnnouncementSourceException("AnnouncementSourceJobHostUnavailable", false);
+    public bool IsConfigured => false;
+    /// <inheritdoc />
+    public string Enqueue(Guid jobId) => throw new AnnouncementSourceException("AnnouncementSourceJobHostUnavailable", false);
 }
 
 /// <summary>
-/// The durable source job body. It claims the persisted Queued row, collects evidence and writes exactly
-/// one terminal outcome back to SQL. Because both the claim and the outcome are persisted, a process
-/// restart mid-run leaves a Running row that a redelivery cannot double-complete, and a completed
-/// outcome survives restart. Authorization was checked at submission and is rechecked here against the
-/// stored owner before any source call, so a revoked owner cannot have work executed on their behalf.
+/// Claims a timed, fenced execution attempt. Abandoned attempts are recoverable; obsolete attempts
+/// cannot complete. Authorization is rechecked before source access and collection never applies data.
 /// </summary>
 public sealed class AnnouncementSourceJobRunner(
     SqlAnnouncementSourceStore store,
     MaintenanceProfileCatalog profiles,
     AnnouncementSourceCollector collector,
     IAnnouncementSourceAuthorizationRecheck recheck,
+    IOptions<AnnouncementSourceOptions> options,
     TimeProvider time,
     ILogger<AnnouncementSourceJobRunner> logger)
 {
     /// <summary>Executes one job. Hangfire retries are disabled: a source read is not blindly repeated.</summary>
     [AutomaticRetry(Attempts = 0)]
-    [DisableConcurrentExecution(timeoutInSeconds: 60)]
     public async Task RunAsync(Guid jobId, CancellationToken cancellationToken)
     {
-        DateTimeOffset started = time.GetUtcNow();
-        AnnouncementSourceJob? job = await store.ClaimAsync(jobId, started, cancellationToken);
-        if (job is null)
+        var attemptId = Guid.NewGuid();
+        int leaseSeconds = Math.Clamp(options.Value.JobTimeoutSeconds, 30, 3600) + 60;
+        SourceJobAttempt? attempt = await store.ClaimAsync(jobId, attemptId, leaseSeconds, cancellationToken);
+        if (attempt is null)
         {
             // Already claimed or already terminal: never re-run and never overwrite a recorded outcome.
             logger.LogInformation("Announcement source job was not claimable. JobId: {JobId}.", jobId);
             return;
         }
+        AnnouncementSourceJob job = attempt.Job;
         string correlation = "announcement-source:" + jobId.ToString("N");
         try
         {
+            if (attempt.Number > Math.Clamp(options.Value.MaxExecutionAttempts, 1, 5))
+            {
+                await store.CompleteAsync(jobId, attemptId, AnnouncementSourceJobStates.Failed,
+                    "AnnouncementSourceAttemptsExhausted", null, correlation, time.GetUtcNow(), cancellationToken);
+                return;
+            }
             if (!await recheck.IsStillAuthorizedAsync(job.OwnerId, cancellationToken))
             {
-                await store.CompleteAsync(jobId, AnnouncementSourceJobStates.Failed, "AccessDenied", null,
+                await store.CompleteAsync(jobId, attemptId, AnnouncementSourceJobStates.Failed, "AccessDenied", null,
                     correlation, time.GetUtcNow(), cancellationToken);
                 return;
             }
             Shared.Configuration.MaintenanceProfileOptions? profile = profiles.Configured(job.Profile);
             if (profile is null)
             {
-                await store.CompleteAsync(jobId, AnnouncementSourceJobStates.Failed,
+                await store.CompleteAsync(jobId, attemptId, AnnouncementSourceJobStates.Failed,
                     "AnnouncementSourceProfileUnavailable", null, correlation, time.GetUtcNow(), cancellationToken);
                 return;
             }
             AnnouncementSourceSnapshot snapshot = await collector.CollectAsync(jobId, job.DraftId, job.OwnerId,
                 job.Profile, profile.CollectionId, job.OcoReference, cancellationToken);
-            await store.CompleteAsync(jobId,
+            await store.CompleteAsync(jobId, attemptId,
                 snapshot.Completeness.Partial ? AnnouncementSourceJobStates.Partial : AnnouncementSourceJobStates.Succeeded,
                 null, snapshot, correlation, time.GetUtcNow(), cancellationToken);
         }
         catch (AnnouncementSourceException exception)
         {
             logger.LogWarning("Announcement source job failed safely. JobId: {JobId}. ErrorCode: {ErrorCode}.", jobId, exception.ErrorCode);
-            await store.CompleteAsync(jobId, AnnouncementSourceJobStates.Failed, exception.ErrorCode, null,
+            await store.CompleteAsync(jobId, attemptId, AnnouncementSourceJobStates.Failed, exception.ErrorCode, null,
                 correlation, time.GetUtcNow(), CancellationToken.None);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Host shutdown leaves the fenced attempt recoverable after its bounded lease expires.
+            throw;
         }
         catch (OperationCanceledException)
         {
             // A cancelled or timed-out read produced no trustworthy evidence; the outcome is recorded, not lost.
-            await store.CompleteAsync(jobId, AnnouncementSourceJobStates.Failed, "AnnouncementSourceTimeout", null,
+            await store.CompleteAsync(jobId, attemptId, AnnouncementSourceJobStates.Failed, "AnnouncementSourceTimeout", null,
                 correlation, time.GetUtcNow(), CancellationToken.None);
             throw;
         }
         catch (Exception exception)
         {
             logger.LogError("Announcement source job faulted. JobId: {JobId}. FailureType: {FailureType}.", jobId, exception.GetType().Name);
-            await store.CompleteAsync(jobId, AnnouncementSourceJobStates.Failed, "AnnouncementSourceUnavailable", null,
+            await store.CompleteAsync(jobId, attemptId, AnnouncementSourceJobStates.Failed, "AnnouncementSourceUnavailable", null,
                 correlation, time.GetUtcNow(), CancellationToken.None);
             throw;
         }

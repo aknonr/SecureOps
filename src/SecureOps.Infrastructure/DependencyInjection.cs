@@ -297,6 +297,7 @@ public static class DependencyInjection
         services.AddScoped<Announcements.Sources.AnnouncementSourceCollector>();
         services.AddScoped<Announcements.Sources.AnnouncementSourceService>();
         services.AddScoped<Announcements.Sources.AnnouncementSourceJobRunner>();
+        services.AddScoped<Announcements.Sources.AnnouncementSourceRecovery>();
         services.AddScoped<Announcements.Sources.IAnnouncementSourceAuthorizationRecheck,
             Announcements.Sources.AnnouncementSourceAuthorizationRecheck>();
 

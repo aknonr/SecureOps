@@ -21,8 +21,8 @@ public sealed class TuruncuHatAnnouncementSourceClient(
     IOptions<AnnouncementSourceOptions> source,
     ILogger<TuruncuHatAnnouncementSourceClient> logger) : IAnnouncementServiceSourceClient
 {
-    private const string StartKey = "SET.p_proposed_start_date_time";
-    private const string FinishKey = "SET.p_proposed_finish_date_time";
+    private const string _startKey = "SET.p_proposed_start_date_time";
+    private const string _finishKey = "SET.p_proposed_finish_date_time";
 
     /// <inheritdoc />
     public async Task<ServiceLookupResult> GetDeviceServicesAsync(string device, CancellationToken cancellationToken)
@@ -66,13 +66,13 @@ public sealed class TuruncuHatAnnouncementSourceClient(
         { return new(null, null, "Failed"); }
         if (outcome.Rows.Count == 0)
         { return new(null, null, "Missing"); }
-        string?[] starts = [.. outcome.Rows.Select(row => Cell(row, StartKey)).Distinct(StringComparer.Ordinal)];
-        string?[] finishes = [.. outcome.Rows.Select(row => Cell(row, FinishKey)).Distinct(StringComparer.Ordinal)];
+        if (outcome.Rows.Count > 1)
+        { return new(null, null, "Ambiguous"); }
+        string?[] starts = [.. outcome.Rows.Select(row => Cell(row, _startKey)).Distinct(StringComparer.Ordinal)];
+        string?[] finishes = [.. outcome.Rows.Select(row => Cell(row, _finishKey)).Distinct(StringComparer.Ordinal)];
         if (starts.Length > 1 || finishes.Length > 1)
         { return new(null, null, "Ambiguous"); }
-        string? start = SourceNames.CleanWindow(starts[0]);
-        string? finish = SourceNames.CleanWindow(finishes[0]);
-        return new(start, finish, start is null && finish is null ? "Missing" : "Resolved");
+        return SourceWindowEvidence.Read(starts[0], finishes[0]);
     }
 
     // The backend owns the query grammar; values are validated, never escaped into an expression.
@@ -117,7 +117,7 @@ public sealed class TuruncuHatAnnouncementSourceClient(
                         ? "AnnouncementSourceUnavailable" : "AnnouncementSourceRejected", (int)response.StatusCode >= 500);
                 }
                 using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(response.Content,
-                    wire.MaxResponseBytes, cancellationToken);
+                    wire.MaxResponseBytes, timeout.Token);
                 return AnnouncementSourceQueryParser.Parse(document.RootElement, selects);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

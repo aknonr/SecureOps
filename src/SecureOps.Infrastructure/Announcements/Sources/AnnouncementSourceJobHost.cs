@@ -11,8 +11,7 @@ namespace SecureOps.Infrastructure.Announcements.Sources;
 /// Hangfire with SQL Server storage per ADR-0001 and ADR-0003, composed for the first time here.
 /// The API registers only the enqueue client; the Worker additionally runs the job server. No second
 /// queue, in-process background loop or polling service is introduced. Hangfire never creates its own
-/// schema unless the isolated local test facility explicitly opts in, because the application does not
-/// apply migrations in a corporate environment.
+/// schema. Provision it separately with the version-matched installation script before starting hosts.
 /// </summary>
 public static class AnnouncementSourceJobHost
 {
@@ -53,6 +52,11 @@ public static class AnnouncementSourceJobHost
     {
         HangfireOptions options = new();
         configuration.GetSection(HangfireOptions.SectionName).Bind(options);
+        if (options.Enabled && !IsQueueName(options.Queue))
+        { throw new InvalidOperationException("Hangfire queue must be an explicit valid isolated queue name."); }
+        if (options.Enabled && options.PrepareSchema)
+        { throw new InvalidOperationException("Provision the Hangfire schema separately; runtime schema preparation is prohibited."); }
+        options.Queue = Queue(options.Queue);
         return options;
     }
 
@@ -60,7 +64,7 @@ public static class AnnouncementSourceJobHost
         new(connection, new SqlServerStorageOptions
         {
             SchemaName = options.SchemaName,
-            PrepareSchemaIfNecessary = options.PrepareSchema,
+            PrepareSchemaIfNecessary = false,
             QueuePollInterval = TimeSpan.FromSeconds(Math.Clamp(options.QueuePollIntervalSeconds, 1, 60)),
             SlidingInvisibilityTimeout = TimeSpan.FromMinutes(Math.Clamp(options.InvisibilityTimeoutMinutes, 5, 180)),
             CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
@@ -90,13 +94,23 @@ public sealed class HangfireJobServer(JobStorage storage, JobActivator activator
     private BackgroundJobServer? _server;
 
     /// <inheritdoc />
-    public void Start() => _server ??= new BackgroundJobServer(new BackgroundJobServerOptions
+    public void Start()
     {
-        Queues = [options.Queue.ToLowerInvariant()],
-        WorkerCount = options.WorkerCount > 0 ? Math.Clamp(options.WorkerCount, 1, 64) : Environment.ProcessorCount * 2,
-        Activator = activator,
-        ServerName = Environment.MachineName + ":secureops-worker"
-    }, storage);
+        if (_server is not null)
+        { return; }
+        var manager = new RecurringJobManager(storage);
+        manager.AddOrUpdate<AnnouncementSourceRecovery>("announcement-source-recovery:" + options.Queue,
+            options.Queue, job => job.RunAsync(CancellationToken.None), Cron.Minutely(), new RecurringJobOptions());
+        new BackgroundJobClient(storage).Create<AnnouncementSourceRecovery>(job => job.RunAsync(CancellationToken.None),
+            new Hangfire.States.EnqueuedState(options.Queue));
+        _server = new BackgroundJobServer(new BackgroundJobServerOptions
+        {
+            Queues = [options.Queue.ToLowerInvariant()],
+            WorkerCount = options.WorkerCount > 0 ? Math.Clamp(options.WorkerCount, 1, 16) : 4,
+            Activator = activator,
+            ServerName = Environment.MachineName + ":secureops-worker"
+        }, storage);
+    }
 
     /// <inheritdoc />
     public void Dispose() => _server?.Dispose();

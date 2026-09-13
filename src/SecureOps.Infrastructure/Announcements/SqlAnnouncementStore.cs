@@ -22,7 +22,11 @@ public sealed partial class SqlAnnouncementStore(IConfiguration configuration)
     }
 
     /// <summary>Appends a revision and safe audit metadata atomically; stale writes have no effect.</summary>
-    public async Task<string?> SaveAsync(AnnouncementDraft draft, string correlation, CancellationToken token)
+    public Task<string?> SaveAsync(AnnouncementDraft draft, string correlation, CancellationToken token) =>
+        SaveAsync(draft, correlation, null, token);
+
+    internal async Task<string?> SaveAsync(AnnouncementDraft draft, string correlation,
+        Func<SqlConnection, SqlTransaction, CancellationToken, Task<string?>>? reviewedWrite, CancellationToken token)
     {
         draft = draft with { MissingFieldCount = AnnouncementValidation.Errors(draft.Content, true).Length };
         string json = JsonSerializer.Serialize(draft);
@@ -43,6 +47,12 @@ public sealed partial class SqlAnnouncementStore(IConfiguration configuration)
             "INSERT INTO announcements.DraftRevisions(Id,Version,OwnerId,DocumentJson) VALUES(@Id,@Version,@OwnerId,@json);",
             new { draft.Id, draft.Version, draft.OwnerId, json }, transaction, commandTimeout: 15, cancellationToken: token));
         await AuditAsync(connection, transaction, draft, "AnnouncementDraftSaved", correlation, token);
+        if (reviewedWrite is not null)
+        {
+            string? error = await reviewedWrite(connection, transaction, token);
+            if (error is not null)
+            { return error; }
+        }
         await transaction.CommitAsync(token);
         return null;
     }

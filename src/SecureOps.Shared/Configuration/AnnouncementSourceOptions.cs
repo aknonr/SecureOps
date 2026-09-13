@@ -26,6 +26,8 @@ public sealed class AnnouncementSourceOptions
     public int ServiceLookupConcurrency { get; set; } = 4;
     /// <summary>Whole-job wall clock budget; expiry produces Partial or Failed, never silent success.</summary>
     public int JobTimeoutSeconds { get; set; } = 600;
+    /// <summary>Maximum source execution attempts before an abandoned job fails explicitly (1-5).</summary>
+    public int MaxExecutionAttempts { get; set; } = 3;
     /// <summary>Per-device service lookup budget.</summary>
     public int DeviceLookupTimeoutSeconds { get; set; } = 30;
     /// <summary>Turuncu Hat base object holding service instances.</summary>
@@ -71,11 +73,11 @@ public sealed class HangfireOptions
     public bool Enabled { get; set; }
     /// <summary>Existing reviewed Hangfire schema name; the application never chooses a shared default silently.</summary>
     public string SchemaName { get; set; } = "HangFire";
-    /// <summary>Permits Hangfire's own schema creation. Only the isolated local test facility sets this.</summary>
+    /// <summary>Must remain false. Schema provisioning is a separate DBA or isolated test-harness step.</summary>
     public bool PrepareSchema { get; set; }
     /// <summary>Queue this deployment's Worker consumes.</summary>
     public string Queue { get; set; } = "announcement-source";
-    /// <summary>Worker thread count; zero uses the Hangfire default.</summary>
+    /// <summary>Worker thread count, bounded to 1-16; zero uses the source default of four.</summary>
     public int WorkerCount { get; set; }
     /// <summary>Storage queue poll interval.</summary>
     public int QueuePollIntervalSeconds { get; set; } = 5;

@@ -55,7 +55,7 @@ public sealed class FixtureCollectionMembershipClient(IOptions<AnnouncementSourc
         { warnings.Add($"DuplicateDevicesIgnored:{duplicates}"); }
         if (malformed > 0)
         { warnings.Add($"MalformedDeviceRowsSkipped:{malformed}"); }
-        return new(devices, complete, pages, [.. warnings]);
+        return new(devices, complete && malformed == 0, pages, [.. warnings]);
     }
 
     private sealed record FixtureCollection(string[][]? Pages, string[]? Devices, bool Complete,
@@ -93,8 +93,7 @@ public sealed class FixtureAnnouncementServiceSourceClient(IOptions<Announcement
         { throw new AnnouncementSourceException("AnnouncementSourceUnavailable", true); }
         if (fixture.Rows > 1)
         { return new(null, null, "Ambiguous"); }
-        return new(SourceNames.CleanWindow(fixture.StartText), SourceNames.CleanWindow(fixture.FinishText),
-            fixture.StartText is null && fixture.FinishText is null ? "Missing" : "Resolved");
+        return SourceWindowEvidence.Read(fixture.StartText, fixture.FinishText);
     }
 
     private sealed record FixtureService(string[]? Candidates, bool Fail, int DelayMilliseconds);
@@ -133,12 +132,4 @@ internal static class SourceNames
     public static bool IsService(string? value) => value is { Length: > 0 and <= 256 }
         && value.Trim().Length > 0 && !value.Any(char.IsControl);
 
-    // Source window values arrive without an offset; only fractional seconds and padding are trimmed.
-    public static string? CleanWindow(string? value)
-    {
-        if (value is null)
-        { return null; }
-        string trimmed = value.Trim().Split('.')[0];
-        return trimmed.Length is 0 or > 64 || trimmed.Any(char.IsControl) ? null : trimmed;
-    }
 }

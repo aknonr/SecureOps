@@ -19,9 +19,9 @@ internal sealed record QueryOutcome(IReadOnlyList<Dictionary<string, string?>> R
 /// </summary>
 internal static class AnnouncementSourceQueryParser
 {
-    private const int MaxCellCount = 32;
-    private const int MaxKeyLength = 128;
-    private const int MaxValueLength = 4000;
+    private const int _maxCellCount = 32;
+    private const int _maxKeyLength = 128;
+    private const int _maxValueLength = 4000;
 
     public static QueryOutcome Parse(JsonElement root, IReadOnlyList<string> selects)
     {
@@ -42,7 +42,7 @@ internal static class AnnouncementSourceQueryParser
     private static bool TryRow(JsonElement item, string[] expected, out Dictionary<string, string?> row)
     {
         row = new(StringComparer.Ordinal);
-        if (item.ValueKind != JsonValueKind.Array || item.GetArrayLength() is 0 or > MaxCellCount)
+        if (item.ValueKind != JsonValueKind.Array || item.GetArrayLength() is 0 or > _maxCellCount)
         { return false; }
         foreach (JsonElement cell in item.EnumerateArray())
         {
@@ -58,7 +58,7 @@ internal static class AnnouncementSourceQueryParser
                 || !holder.TryGetProperty("Value", out JsonElement valueElement) || !TryText(valueElement, out string? value))
             { return false; }
             string? key = keyElement.GetString();
-            if (string.IsNullOrWhiteSpace(key) || key.Length > MaxKeyLength || (value?.Length ?? 0) > MaxValueLength)
+            if (string.IsNullOrWhiteSpace(key) || key.Length > _maxKeyLength || (value?.Length ?? 0) > _maxValueLength)
             { return false; }
             // Row metadata is not a field; duplicates of a real key must agree or the row is malformed.
             if (string.Equals(key, "num", StringComparison.Ordinal))

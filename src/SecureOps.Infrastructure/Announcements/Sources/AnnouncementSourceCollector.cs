@@ -77,7 +77,7 @@ public sealed class AnnouncementSourceCollector(
 
         SourceWorkWindow? work = await WindowAsync(ocoReference, warnings, token);
 
-        bool partial = !membership.Complete || failed > 0 || ambiguous > 0
+        bool partial = !membership.Complete || failed > 0 || ambiguous > 0 || missing > 0
             || membership.Devices.Count == 0 || work is null || work.Resolution != "Resolved";
         if (membership.Devices.Count == 0)
         { warnings.Add("CollectionHadNoDevices"); }
@@ -123,12 +123,9 @@ public sealed class AnnouncementSourceCollector(
         { warnings.Add("ChangeWindowUnavailable:" + exception.ErrorCode); return null; }
         if (window.Resolution != "Resolved")
         { warnings.Add("ChangeWindow" + window.Resolution); }
-        // The source states a local wall-clock value with no offset. The date part is reported as a
-        // source-local date; no instant, offset or restart time is derived from either string.
-        string? startDate = window.StartText is { Length: >= 10 } text
-            && DateOnly.TryParseExact(text[..10], "yyyy-MM-dd", out DateOnly parsed)
-            ? parsed.ToString("yyyy-MM-dd") : null;
-        return new SourceWorkWindow(window.StartText, window.FinishText, startDate, "Unresolved",
+        // Raw provenance is retained. The operator chooses draft dates separately from source evidence.
+        return new SourceWorkWindow(window.StartText, window.FinishText, null,
+            window.Resolution == "Resolved" ? "ExplicitOffset" : "Unresolved",
             window.Resolution, time.GetUtcNow());
     }
 }

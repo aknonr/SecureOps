@@ -22,7 +22,7 @@ public sealed record AnnouncementSourceOutcome(string? Error = null, string[]? F
 /// so validation, versioning, provenance and audit stay exactly as the draft module defines them.
 /// </summary>
 public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAnnouncementSourceStore store,
-    AnnouncementService saves, MaintenanceProfileCatalog profiles, IAnnouncementSourceDispatcher dispatcher,
+    AnnouncementService saves, MaintenanceProfileCatalog profiles, AnnouncementSourceRecovery recovery,
     IApplicationAccessService access, IOptions<AnnouncementSourceOptions> options,
     IOptions<AnnouncementOptions> module, TimeProvider time, ILogger<AnnouncementSourceService> logger)
 {
@@ -31,13 +31,19 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
 
     /// <summary>Lists the protected profile allowlist with its configuration state.</summary>
     public Task<AnnouncementSourceOutcome> ProfilesAsync(ClaimsPrincipal principal, AccessOperationContext context, CancellationToken token) =>
-        GuardedAsync(principal, context, _ => Task.FromResult(new AnnouncementSourceOutcome(Profiles: profiles.Choices())), token);
+        GuardedAsync(principal, context, async owner =>
+        {
+            await store.ReadAuditAsync(owner, null, null, "Profiles", context.CorrelationId, token);
+            return new(Profiles: profiles.Choices());
+        }, token);
 
     /// <summary>Records an explicitly owner-authorized job and enqueues it; a repeated key returns the existing job.</summary>
     public Task<AnnouncementSourceOutcome> SubmitAsync(ClaimsPrincipal principal, AccessOperationContext context,
         Guid draftId, AnnouncementSourceSubmission submission, CancellationToken token) =>
         GuardedAsync(principal, context, async owner =>
         {
+            if (!recovery.IsConfigured)
+            { return new(Error: "AnnouncementSourceJobHostUnavailable"); }
             List<string> invalid = [];
             if (!MaintenanceProfiles.IsAllowed(submission.Profile))
             { invalid.Add("Profile"); }
@@ -56,18 +62,7 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
             var job = new AnnouncementSourceJob(Guid.NewGuid(), owner, draftId, submission.Profile,
                 submission.OcoReference.Trim(), AnnouncementSourceJobStates.Queued, now, now, null, null);
             SqlAnnouncementSourceStore.SubmitResult accepted = await store.SubmitAsync(job, submission.SubmissionKey, context.CorrelationId, token);
-            if (!accepted.Duplicate)
-            {
-                try
-                { dispatcher.Enqueue(accepted.Job.JobId); }
-                catch (AnnouncementSourceException exception)
-                {
-                    // The row is recorded Failed rather than left Queued behind an unavailable host.
-                    await store.CompleteAsync(accepted.Job.JobId, AnnouncementSourceJobStates.Failed,
-                        exception.ErrorCode, null, context.CorrelationId, time.GetUtcNow(), token);
-                    return new(Error: exception.ErrorCode);
-                }
-            }
+            await recovery.DispatchAsync(accepted.Job.JobId, token);
             return new(Status: Status(accepted.Job, accepted.Duplicate ? accepted.Job.JobId : null));
         }, token);
 
@@ -78,8 +73,10 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
         {
             AnnouncementSourceJob? job = jobId == Guid.Empty
                 ? await store.LatestAsync(draftId, owner, token) : await store.GetAsync(jobId, owner, token);
-            return job is null || job.DraftId != draftId
-                ? new(Error: "AnnouncementSourceJobNotFound") : new AnnouncementSourceOutcome(Status: Status(job, null));
+            if (job is null || job.DraftId != draftId)
+            { return new(Error: "AnnouncementSourceJobNotFound"); }
+            await store.ReadAuditAsync(owner, draftId, job.JobId, "Status", context.CorrelationId, token);
+            return new(Status: Status(job, null));
         }, token);
 
     /// <summary>Builds a reviewable difference between one snapshot and the live draft.</summary>
@@ -89,7 +86,10 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
         {
             (AnnouncementSourceOutcome? error, AnnouncementSourceJob? job, AnnouncementDraft? draft,
                 MaintenanceProfileOptions? profile, AnnouncementSourceOverrides? overrides) = await LoadAsync(draftId, jobId, owner, token);
-            return error ?? new AnnouncementSourceOutcome(Proposal: Build(job!, job!.Snapshot!, draft!, profile!, overrides!));
+            if (error is not null)
+            { return error; }
+            await store.ReadAuditAsync(owner, draftId, jobId, "Proposal", context.CorrelationId, token);
+            return new(Proposal: Build(job!, job!.Snapshot!, draft!, profile!, overrides!));
         }, token);
 
     /// <summary>
@@ -110,6 +110,8 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
             { return error; }
             if (draft!.Version != request.ExpectedVersion)
             { return new(Error: "AnnouncementConflict"); }
+            if (overrides!.Version != request.ExpectedOverrideVersion)
+            { return new(Error: "AnnouncementSourceOverrideConflict"); }
             if (overrides!.AppliedCapturedAt is { } applied && job!.Snapshot!.CapturedAt <= applied)
             {
                 // A job that finished late must not overwrite content a newer snapshot already produced.
@@ -133,26 +135,21 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
             { content = content with { AffectedServices = proposal.ProposedAffectedServices }; }
             else if (request.ApplyAffectedServices)
             { skipped.Add("AffectedServices"); }
-            AnnouncementSourceOverrides next = overrides with { Profile = job.Profile, AppliedJobId = job.JobId, AppliedCapturedAt = job.Snapshot!.CapturedAt };
+            AnnouncementSourceOverrides next = overrides with { AppliedJobId = job.JobId, AppliedCapturedAt = job.Snapshot!.CapturedAt };
             if (request.ApplyRecipients)
             {
                 MaintenanceProfileOptions? previous = overrides.Profile is null ? null : profiles.Configured(overrides.Profile);
                 ReconciledRecipients to = RecipientReconciler.Reconcile(content.To, profile!.To, previous?.To ?? [], overrides.ManualTo, overrides.RemovedTo);
                 ReconciledRecipients cc = RecipientReconciler.Reconcile(content.Cc, profile.Cc, previous?.Cc ?? [], overrides.ManualCc, overrides.RemovedCc);
                 content = RecipientReconciler.WithRecipients(content, to.Difference.Proposed, cc.Difference.Proposed);
-                next = next with { ManualTo = to.Manual, RemovedTo = to.Removed, ManualCc = cc.Manual, RemovedCc = cc.Removed };
+                next = next with { Profile = job.Profile, ManualTo = to.Manual, RemovedTo = to.Removed, ManualCc = cc.Manual, RemovedCc = cc.Removed };
             }
-            AnnouncementOutcome save = await saves.ExecuteAsync(principal, context, draftId, draft.Version, "save", content, 1, 25, token);
+            AnnouncementOutcome save = await saves.ExecuteAsync(principal, context, draftId, draft.Version, "save", content, 1, 25,
+                (revision, cancellation) => store.ApplyAsync(drafts, revision, next, request.ExpectedOverrideVersion,
+                    [.. written], request.ApplyRecipients, context.CorrelationId, cancellation), token);
             if (save.Error is not null)
             { return new(Error: save.Error, Fields: save.Fields); }
-            if (!await store.SaveOverridesAsync(next, overrides.Version, time.GetUtcNow(), token))
-            {
-                // The revision is saved; only the override record lost a race, so the operator reviews again.
-                logger.LogWarning("Announcement source overrides were stale after save. DraftId: {DraftId}.", draftId);
-                return new(Error: "AnnouncementSourceOverrideConflict");
-            }
-            await store.ApplyAuditAsync(owner, draftId, job.JobId, save.Draft!.Version, [.. written], request.ApplyRecipients, context.CorrelationId, token);
-            return new(Applied: new AnnouncementSourceApplyResult(draftId, save.Draft.Version, [.. written],
+            return new(Applied: new AnnouncementSourceApplyResult(draftId, save.Draft!.Version, [.. written],
                 request.ApplyRecipients, services, [.. skipped.Distinct(StringComparer.Ordinal)]));
         }, token);
 
@@ -207,7 +204,7 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
             to.Difference, cc.Difference, profile.HighPriority, "DistributionRequest",
             new SourceCompletenessView(done.DevicesComplete, done.DeviceCount, done.DevicePagesRead, done.DevicesRequested,
                 done.ServicesResolved, done.ServicesAmbiguous, done.ServicesMissing, done.ServicesFailed, done.Partial, done.Warnings),
-            overrides.AppliedCapturedAt is { } applied && snapshot.CapturedAt <= applied);
+            overrides.AppliedCapturedAt is { } applied && snapshot.CapturedAt <= applied, overrides.Version);
     }
 
     private static ProposedField Text(string field, string? current, string? proposed, string origin) =>
