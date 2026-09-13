@@ -14,7 +14,7 @@ public static class ResourceGuideSteps
             "announcements" =>
             [
                 new("announcement-new", "Yeni taslak", "Yeni duyuru ile başlayın veya listeden kayıtlı taslağınızı açın.", "", ""),
-                new("announcement-details", "Bilgiler ve alıcılar", "Konuyu, çalışma zamanını ve alıcıları girin. İsteğe bağlı ayrıntılar alttadır.", "", ""),
+                new("announcement-details", "Bilgiler ve alıcılar", "Duyuru biçimini seçin; sistemi, çalışma zamanını ve alıcıları girin. Nihai duyuruda etkilenen servisleri ayrı alana satır satır ekleyin.", "", ""),
                 new("announcement-save", "Kaydedin", "Kaydet ile taslağınızı saklayın. Eksik alanları daha sonra tamamlayabilirsiniz.", "", ""),
                 new("announcement-preview", "Önizleyin", "Değişiklikleri kaydettikten sonra Önizle ile son kayıtlı içeriği kontrol edin.", "", ""),
                 new("announcement-download", "Maili indirin", "Maili indir, .eml dosyasını bilgisayarınıza indirir; kimseye mail göndermez.", "", "")

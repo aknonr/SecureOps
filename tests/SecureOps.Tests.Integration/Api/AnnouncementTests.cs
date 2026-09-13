@@ -19,6 +19,7 @@ using Xunit.Abstractions;
 
 namespace SecureOps.Tests.Integration.Api;
 
+[Collection("Announcement SQL")]
 public sealed partial class AnnouncementTests(ITestOutputHelper output)
 {
     private static AnnouncementContent Content() => new("OCO-SYNTHETIC", "Manual scope", "Planlı & çalışma",
@@ -95,7 +96,14 @@ public sealed partial class AnnouncementTests(ITestOutputHelper output)
                 ["Announcements:Enabled"] = "true",
                 ["Announcements:Sender"] = "announcements@example.invalid",
                 ["Announcements:AssetDirectory"] = assets,
-                ["Announcements:Banners:synthetic-v1"] = "banner.bin"
+                ["Announcements:Banners:synthetic-v1"] = "banner.bin",
+                ["Announcements:Bundles:bundle-v1:Footer"] = "Yerel sentetik altbilgi",
+                ["Announcements:Bundles:bundle-v1:Assets:header"] = "synthetic-v1",
+                ["Announcements:Bundles:bundle-v1:Assets:main"] = "synthetic-v1",
+                ["Announcements:Bundles:bundle-v1:Assets:logo"] = "synthetic-v1",
+                ["Announcements:Bundles:bundle-v1:Assets:linkedin"] = "synthetic-v1",
+                ["Announcements:Bundles:bundle-v1:Assets:instagram"] = "synthetic-v1",
+                ["Announcements:Bundles:bundle-v1:Assets:youtube"] = "synthetic-v1"
             })
             { b.UseSetting(key, value); }
         });
@@ -195,10 +203,12 @@ public sealed partial class AnnouncementTests(ITestOutputHelper output)
         (await admin.GetAsync(path + "?format=list")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         output.WriteLine("HTTP list page bytes={0}", (await listed.Content.ReadAsByteArrayAsync()).Length);
         (await admin.GetFromJsonAsync<AnnouncementBanner[]>("/api/v1/announcements/banners"))!.Single().State.Should().Be("PresentNotValidated");
+        await FinalApiAsync(admin, denied, store, owner);
         File.Move(Path.Combine(assets, "banner.bin"), Path.Combine(assets, "banner.retained"));
         (await admin.GetFromJsonAsync<AnnouncementBanner[]>("/api/v1/announcements/banners"))!.Single().State.Should().Be("Missing");
         using HttpResponseMessage absent = await admin.GetAsync(path + "?version=2&format=eml");
         absent.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await absent.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("AnnouncementAssetMissing");
+        (await admin.GetFromJsonAsync<AnnouncementBanner[]>("/api/v1/announcements/banners?templateRevision=oco-table-v2"))!.Single().State.Should().Be("Missing");
     }
 }

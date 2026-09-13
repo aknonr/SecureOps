@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
 using SecureOps.Domain.Announcements;
@@ -42,13 +43,20 @@ public partial class Announcements
     private Task OpenAsync(Guid id) => RunAsync(async () =>
     {
         (AnnouncementContent Content, long Version) draft = await Api.DraftAsync(id, 0, null, _lifetime.Token);
-        _banners = await Api.BannersAsync(_lifetime.Token);
+        _banners = await Api.BannersAsync(_lifetime.Token, draft.Content.TemplateRevision);
         _id = id;
         _version = draft.Version;
         _form = AnnouncementForm.From(draft.Content);
         _dirty = false;
     });
-    private Task BannersAsync() => RunAsync(async () => _banners = await Api.BannersAsync(_lifetime.Token));
+    private Task BannersAsync() => RunAsync(async () => _banners = await Api.BannersAsync(_lifetime.Token, _form!.Template));
+    private async Task TemplateAsync(ChangeEventArgs args)
+    {
+        _form!.Template = args.Value?.ToString() ?? "oco-v1";
+        _banners = [];
+        Changed();
+        await BannersAsync();
+    }
     private async Task<bool> DiscardAsync() => !_dirty || await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikler",
         "Değişiklikleri bırakıp devam edilsin mi?", yesText: "Değişiklikleri bırak", cancelText: "Düzenlemeye dön") == true;
     private async Task LeavingAsync(LocationChangingContext context)
@@ -113,7 +121,14 @@ public partial class Announcements
     private void AcceptComparison()
     { _version = _comparison!.Value.Version; _comparison = null; _problem = null; _dirty = true; _notice = "Düzenlemeleriniz korunuyor. Kaydet ile onaylayın."; }
     private static string FieldLabel(string key) => key switch
-    { "To" => "Alıcılar", "Cc" => "Bilgi", "BannerRevision" => "Görsel", _ => AnnouncementForm.Fields.First(f => f.Key == key).Label };
+    {
+        "To" => "Alıcılar",
+        "Cc" => "Bilgi",
+        "BannerRevision" => "Görsel",
+        "TemplateRevision" => "Duyuru biçimi",
+        "AffectedServices" => "Etkilenen servisler",
+        _ => AnnouncementForm.Fields.First(f => f.Key == key).Label
+    };
     private async Task FocusAsync(string key)
     {
         _optional = AnnouncementForm.Fields.Any(f => f.Key == key && f.Optional) || _optional;

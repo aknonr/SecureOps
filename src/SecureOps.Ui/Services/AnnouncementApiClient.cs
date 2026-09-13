@@ -19,9 +19,9 @@ public sealed class AnnouncementApiClient
         return await ApiResponseReader.ReadBodyAsync<AnnouncementPage>(response, token);
     }
     /// <summary>Reads safe allowlisted metadata only.</summary>
-    public async Task<AnnouncementBanner[]> BannersAsync(CancellationToken token)
+    public async Task<AnnouncementBanner[]> BannersAsync(CancellationToken token, string template = "oco-v1")
     {
-        using HttpResponseMessage response = await SendAsync("/banners", null, token);
+        using HttpResponseMessage response = await SendAsync("/banners?templateRevision=" + Uri.EscapeDataString(template), null, token);
         return await ApiResponseReader.ReadBodyAsync<AnnouncementBanner[]>(response, token);
     }
     /// <summary>Reads or explicitly saves a version; no automatic write retry.</summary>

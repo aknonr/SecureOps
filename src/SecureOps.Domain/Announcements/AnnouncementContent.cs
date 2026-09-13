@@ -4,7 +4,8 @@ namespace SecureOps.Domain.Announcements;
 public sealed record AnnouncementContent(string OcoReference, string Scope, string Subject,
     string AnnouncementDate, string WorkStart, string WorkEnd, string Description, string Impact,
     string Checks, string Notes, string[] To, string[] Cc, string BannerRevision,
-    string? RestartStart = null, string? RestartEnd = null);
+    string? RestartStart = null, string? RestartEnd = null,
+    string TemplateRevision = "oco-v1", string[]? AffectedServices = null);
 
 /// <summary>Immutable local revision; downloading never changes its state into Sent.</summary>
 public sealed record AnnouncementDraft(Guid Id, Guid OwnerId, long Version, DateTimeOffset SavedAt,

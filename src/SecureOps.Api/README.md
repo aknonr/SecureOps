@@ -33,7 +33,8 @@ The canonical UI contract documents version conflicts and filtered set resolutio
 ## Current state
 
 Planned announcement owned draft pagination, banner metadata, safe preview and authenticated .eml export:
-`docs/contracts/planned-announcements-v1.md`. Default-off; no sending or UI yet.
+`docs/contracts/planned-announcements-v1.md`. Default-off; connected owned-draft UI,
+explicit v1/v2 templates and private asset bundles; no sending or source collection.
 
 Phase 1A IdentityLookup is implemented here through `IdentityController`, validation, authorization, correlation ID middleware, rate-limit policy, and safe health endpoints. Phase 1 alert webhook and diagnostic orchestration endpoints are still planned.
 

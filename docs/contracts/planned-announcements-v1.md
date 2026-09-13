@@ -20,7 +20,7 @@ An Outlook-editable draft is not guaranteed. No Outlook COM, SMTP or source call
 
 Response body for save/read is the content below (camelCase); `X-Announcement-Origin`
 is `Manual`. UUID lives in route; version in ETag. Audit actor/time, sender,
-template `oco-v1`, banner hash and provenance are server-owned persisted metadata.
+validated template revision, asset fingerprint and provenance are persisted metadata.
 Source attestation/overrides are not available; OCO and scope are manually entered.
 
 ```json
@@ -292,6 +292,156 @@ Subsequent shell navigation cancellation and comparison-edit guards are not incl
 in attempt4 binaries. The prepared attempt5 replay additionally checks those guards,
 initial Start and mobile re-anchoring, but its invocation returned `rejected: blocked by policy`.
 Do not label that final browser replay passed. Outlook/VDI/SMTP are not tested.
+
+## Versioned final-table increment, 2026-09-13
+
+Base `142a48f41c2faaead2d151486304e0b8f41f0e50`, same isolated worktree.
+Explicit `templateRevision: "oco-table-v2"` selects the new table; omitted means
+`oco-v1`. Old stored JSON, rendering, revisions, hashes and archives are untouched.
+`scope` now labels the system/application separately from `affectedServices`:
+an optional string array, at most 256 nonblank entries, 256 characters per entry,
+16000 total characters including one separator per entry; controls are rejected.
+A v2 draft may save an empty array but cannot preview/export until populated.
+v1 rejects a nonempty array rather than silently dropping services. Existing body
+and serialized-JSON size caps remain. The 155-entry representative case is tested
+without truncation; all entries appear in both MIME alternatives. No HTML decoding.
+
+GET `/api/v1/announcements/banners?templateRevision=oco-table-v2` returns bundle
+metadata in the existing DTO/error/capability contract, at most 16 bundles. Omit
+the parameter for existing banners; unsupported template values return 400.
+Metadata does not decode images or expose paths. Selected Save/Preview/Download
+validates up to six bounded assets sequentially. The persisted hash includes
+template, bundle revision, ordered role/revision/type/hash identities and footer.
+Changed bytes/footer block export until an explicit reviewed save. Missing files
+return 409; invalid configuration fails closed (503). Metadata presence is not
+branding approval. No substitution, URL fetch, new cache or per-keystroke rendering.
+
+The editor offers explicit format selection, a collapsed counted service list,
+saved preview/download and the existing optional tour. Switching formats preserves
+edits; a nonempty service list prevents reverting to v1 until explicitly cleared.
+This is a final-announcement artifact, NOT the legacy distribution-request email
+with an HTML attachment. No legacy distribution recipients are imported or inferred
+as the final audience. Both modes remain unsent; distribution-request output itself
+is not implemented. All content and OCO/scope provenance remain Manual.
+
+### Legacy comparison and remaining parity
+
+Local PowerShell AST/text and MSG HTML fragments were inspected without execution,
+corporate URL fetching or committing private values. HTML and MSG represent different
+OCOs: only structure was compared. The new table follows the MSG heading order,
+alternating rows, bounded width, header/main images and footer roles. Checks remain
+a separate saved field, presented with notes under Notlar/Ozel Durumlar. Restart
+dates remain separate optional rows. Work times retain explicit offsets: source
+LMT/timezone semantics are unverified, so no conversion or LMT attestation is made.
+Tracking script/remote image URLs/private footer text were not copied.
+
+Parity checklist:
+- Implemented: separate system/services, bounded long list, versioned six-role
+  bundle, safe preview/CID MIME correspondence, v1 preservation and manual editing.
+- Pending source slice: configured NonProd/Prod01/Prod02/ProdSingle/ProdRPA maintenance
+  profiles (not hosting environments), protected collection-ID mapping and explicit
+  source action. Script getCollID/getServerList/getRFS/getOCO are evidence only.
+  No SCCM adapter exists and Worker startup is a stub. Reuse Hangfire/SQL and existing
+  Turuncu Hat transport; add bounded jobs, exact/ambiguous/partial outcomes and
+  per-device/service provenance before wiring a source button. Preserve source
+  snapshots separately from overrides; re-fetch requires a reviewed difference.
+- Pending profile defaults: sendMail has two active base To rules, five extra Cc
+  rules for ProdSingle, two Cc rules and High priority for ProdRPA; commented To is
+  excluded. Real addresses/collection IDs belong only in protected configuration.
+  Proposed profile switches must retain additions/removals and require confirmation.
+  Collection membership is not OCO scope; m_active is not approval.
+- Pending final acceptance: six approved originals, approved footer, visual/Outlook
+  comparison. Synthetic assets prove rendering only. SMTP and sending remain absent.
+
+### TEST prerequisites (operator managed, not deployed here)
+
+No new migration or grants. Existing 014-015/access/session/audit prerequisites
+still apply; do not replay 012/013 or any migration chain blindly. No auth/runtime
+dependency update. Existing v1 configuration remains valid. Only v2 requires an
+additional protected `Announcements:Bundles` mapping. Illustrative local-only shape:
+
+```json
+{"Announcements":{"Bundles":{"approved-v1":{"Label":"Approved presentation","Footer":"Approved plain footer","Assets":{"header":"header-v1","main":"main-v1","logo":"logo-v1","linkedin":"linkedin-v1","instagram":"instagram-v1","youtube":"youtube-v1"}}},"Banners":{"header-v1":"header-v1.jpg","main-v1":"main-v1.jpg","logo-v1":"logo-v1.jpg","linkedin-v1":"linkedin-v1.png","instagram-v1":"instagram-v1.png","youtube-v1":"youtube-v1.png"}}}
+```
+
+Example identifiers are not an approval. Supply all six approved files under the
+existing absolute private AssetDirectory outside publish/webroot; flat filenames,
+PNG/JPEG signature, 24..262144 bytes, single frame, max 2048x1024, no reparse points.
+API process identity needs only directory traversal/read and file read; deployment
+custodian controls revisions. UI does not need direct filesystem access. No write,
+upload or executable-content permissions, web endpoint or external image URL.
+Keep all prior immutable assets/config revisions for retained drafts; never overwrite
+bytes under an existing revision. Validate metadata then a saved preview and MIME
+locally; missing/invalid/changed roles stop affected exports, not silently fall back.
+Use existing protected sender, SQL permissions and external-write guards unchanged.
+
+Missing originals requested, not downloaded: `planlimail_duyuru_header.jpg`,
+`planlimail_duyuru_main.jpg`, `turkish_technology_logo.jpg`,
+`planlimail_duyuru_linkedin.png`, `planlimail_duyuru_instagram.png`,
+`planlimail_duyuru_youtube.png`. Confirm dimensions/byte limits before deployment;
+out-of-policy originals need separately reviewed preparation, not silent resizing.
+Windows x64 .NET 8 with the matching existing Skia native assets is the tested
+runtime. No package/deployment, production config edit, source call or SMTP activity.
+
+### Final-table validation evidence
+
+Evidence root `C:\SecureOpsBuild\validation\oco-template-20260913`, outside Git.
+`dotnet build SecureOps.sln -c Release --no-restore`: zero warnings/errors,
+`build-stable.log`. `dotnet test SecureOps.sln -c Release --no-build` with TRX:
+1236 unit + 253 integration passed; 22 opt-in SQL skipped (`tests-stable.log`).
+OpenAPI normal comparison passed; the updated snapshot was generated by the existing
+opt-in contract test (`openapi.log`), not edited by hand. Dependencies unchanged.
+Fresh harness `-DatabaseSuffix OcoTemplateStable20260913 -IncludeAnnouncementDrafts`
+then the ResourceSqlTests/AnnouncementTests filter above: 32 passed, no skips,
+`sql-stable.trx` (20 existing SQL + 12 announcement tests, including two SQL journeys).
+The new tests cover legacy JSON/defaults, size bounds, six-role metadata without
+image reads, hash/asset/role failures, safe long text, MIME byte correspondence,
+version persistence, owner isolation, access denial and export without mutation.
+Contract JSON examples, including protected configuration shape, are executable tests.
+Full `dotnet format SecureOps.sln --verify-no-changes --no-restore` still fails:
+58 baseline files, identical diagnostic records (`format-closeout.json` and
+`format-comparison.json`). Changed-C# scoped format passes (`format-scoped-closeout.log`);
+this is not a waiver of the full gate. Full DoD remains blocked by baseline formatting.
+`dotnet list SecureOps.sln package --vulnerable --include-transitive --source
+https://api.nuget.org/v3/index.json` found no known advisories at execution time
+(`vulnerabilities-stable.log`), not a future-safety guarantee. No package pins changed.
+
+The retained failed `sql-final` run exposed parallel test interference from another
+fixture's database-wide audit-failure trigger. Announcement tests now use an xUnit
+nonparallel collection; existing application concurrency tests still run concurrent
+operations internally. No production SQL or audit code changed. Earlier failed
+build/test attempts (style and newly added documentation-example count) are retained,
+not presented as final success or corporate evidence.
+
+The matched working-tree API/UI were published under `browser-final/api` and
+`browser-final/ui`. `payload-manifest.json` records every file's size/SHA-256;
+application assemblies were compared against the final production build. Later
+edits only affect tests/docs. These are local validation payloads, not release ZIPs.
+`payload-versions.json` retains assembly ProductVersion `0.1.0+142a48f...`:
+it embeds the pre-commit base, not a claim that unchanged base binaries contain v2.
+The working-tree additions are identified by exact payload hashes and this diff.
+Fresh browser harness: `-DatabaseSuffix OcoTemplateBrowserAccept20260913 -Port 5481
+-FinalPresentation -PayloadRoot <evidence-root>/browser-final -EvidenceRoot
+<evidence-root>/browser-acceptance`, after its separate fresh SQL harness.
+Run `node tests/browser/announcements.cjs <existing-playwright-core>
+https://localhost:5482 http://127.0.0.1:5481 https://localhost:5483
+<evidence-root>/browser-acceptance/evidence final-template`.
+`browser-acceptance/evidence/results.json` passes saved v1/v2 preview/download,
+155 services, six loaded data images, Turkish inert markup, native keyboard scroll
+to footer, guide dismissal/reopening/nonmutation, stale-save comparison, retained
+edits, canceled navigation, 25/3 pagination and direct API/UI capability denial.
+Desktop/mobile screenshots are `final-preview-1440.png`, `final-footer-1440.png`,
+`final-preview-390.png`, `final-footer-390.png`; they were visually inspected.
+No previous screenshot was reused. The new allowed replay did not retry the earlier
+policy-rejected `start` command; initial Start remains separately unverified.
+
+The replay caught and fixed MainLayout's literal `Value="this"` cascade: using the
+actual instance allows canceled navigation to clear its progress indicator. Long
+iframe content itself was not missing: off-screen full-page captures and in-frame
+scroll waits were misleading. Visible viewport captures and bounded external
+observation of actual Ctrl+End now verify the footer without weakening sandbox/CSP.
+Synthetic images do not establish original branding; Outlook/VDI/corporate source
+acceptance and full legacy parity remain pending. No release checkout was modified.
 
 ## Bounded dependency decision
 

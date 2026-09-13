@@ -1,7 +1,16 @@
 # ADR-0021: Planned announcement drafts
 
 Status: accepted for this explicitly authorized local draft-only increment.
-Base: `81f5757a869442ae92b0c90a3d7dfebab9796d6d`; branch
+
+Continuation from 142a48f: explicitly selected `oco-table-v2` adds a bounded
+structured affected-service list, separate from the system/application Scope,
+and an immutable six-role private asset bundle. `oco-v1` rendering and old JSON
+defaults stay unchanged. No implicit template migration or distribution-request
+recipient reuse. The bundle fingerprint binds ordered validated assets and footer;
+missing/changed configuration blocks export, never substitutes an image. This
+bounded increment does not implement SCCM/source jobs or profile defaults. Worker
+composition is currently a stub; source work needs a separate Hangfire/SQL slice.
+Initial isolation base: `81f5757a869442ae92b0c90a3d7dfebab9796d6d`; branch
 `feature/planned-oco-drafts-20260912`; worktree
 `C:\SecureOpsBuild\secure-ops-planned-oco-20260912`.
 The release checkout, its hosts and rc6.17 readiness records are excluded.
@@ -9,8 +18,8 @@ The release checkout, its hosts and rc6.17 readiness records are excluded.
 Reuse persisted access/capability validation, owner isolation, SQL optimistic
 versions and transactional audit. New announcement revisions live in their own
 append-only table, not In Use JSON. The API delegates rendering to Infrastructure.
-This increment provides PUT and GET representations by client-generated UUID;
-paginated draft discovery, saved recipient sets, send history and UI follow later.
+The initial increment provided PUT/GET representations by client-generated UUID.
+Discovery and UI are implemented below; saved recipient sets and send history remain pending.
 Only Admin has Announcements.Drafts initially; no user or new role is assigned.
 
 UI continuation from a1818e17 is owned by Codex, including Razor and browser tests.

@@ -20,6 +20,9 @@ public sealed class AnnouncementUiTests
         form.Recipients.Add(new("Cc", "copy@example.invalid"));
         form.Differences(Content()).Select(d => d.Label).Should().Equal("Konu", "Bilgi");
         form.Content().Description.Should().Be(Content().Description);
+        AnnouncementContent final = Content() with { TemplateRevision = "oco-table-v2", AffectedServices = ["Servis & <b>", "İkinci servis"] };
+        AnnouncementForm.From(final).Content().Should().BeEquivalentTo(final);
+        form.Differences(final).Select(d => d.Label).Should().Contain(["Duyuru biçimi", "Etkilenen servisler"]);
         ResourceGuideSteps.For("announcements", false).Should().HaveCount(5);
         ResourceGuideSteps.For("announcements", false).Should().OnlyContain(s => s.Href == "");
     }

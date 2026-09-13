@@ -1,4 +1,4 @@
-// Local published Demo hosts only. Args: playwright-core, UI, API, denied UI, fresh evidence directory, optional start.
+// Local published Demo hosts only. Args: playwright-core, UI, API, denied UI, fresh evidence directory, optional start|final-template.
 const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { chromium, request } = require(process.argv[2]);
 const { loopback, navigate, signIn, capture, apiContext, json } = require('./journey-support.cjs');
@@ -72,6 +72,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         await capture(page, out, 'preview');
         for (const width of [1440, 390]) {
             await page.setViewportSize({ width, height: 844 });
+            if (width === 390) await page.waitForFunction(() => document.querySelector('.so-drawer').getBoundingClientRect().right <= 1);
             await page.locator('iframe').scrollIntoViewIfNeeded();
             await page.screenshot({ path: path.join(out, `preview-visible-${width}.png`) });
         }
@@ -95,13 +96,54 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         await page.locator('a[href="resources"]').click();
         await page.getByRole('button', { name: 'Düzenlemeye dön', exact: true }).click();
         assert.equal(await page.locator('#announcement-Subject').inputValue(), 'Kaydedilmemiş');
-        assert.equal(await page.locator('.so-route-progress.is-active').count(), 0);
+        await page.locator('.so-route-progress.is-active').waitFor({ state: 'hidden' });
         await click('Taslaklar'); await page.getByRole('button', { name: 'Değişiklikleri bırak', exact: true }).click(); await ready();
+        if (process.argv[7] === 'final-template') {
+            const services = Array.from({ length: 155 }, (_, i) => `Sentetik servis ${String(i + 1).padStart(3, '0')} - Türkçe & inceleme <b> uygulama hizmeti`);
+            await click('Yeni duyuru'); await page.locator('#announcement-TemplateRevision').selectOption('oco-table-v2'); await ready();
+            await page.locator('#announcement-BannerRevision').selectOption('bundle-v1');
+            for (const [key, value] of Object.entries(values)) await page.locator('#announcement-' + key).fill(value);
+            for (const [key, label, time] of [['WorkStart','Çalışma başlangıcı','01:00'], ['WorkEnd','Çalışma bitişi','02:00']]) {
+                await page.locator('#announcement-' + key).fill('2026-09-13T' + time);
+                await page.getByLabel(label + ' saat dilimi', { exact: true }).selectOption('+03:00');
+            }
+            await page.getByText('Etkilenen servisler (0)', { exact: true }).click();
+            await page.locator('#announcement-AffectedServices').fill(services.join('\n'));
+            await page.getByLabel('Alıcı adresi', { exact: true }).fill('final-audience@example.invalid');
+            await click('Kaydet'); await click('Önizle');
+            const preview = page.frameLocator('iframe'); await preview.locator('img').first().waitFor();
+            assert.equal(await preview.locator('img').count(), 6);
+            assert.equal(await preview.locator('img').evaluateAll(images => images.every(i => i.complete && i.naturalWidth > 0 && i.src.startsWith('data:'))), true);
+            assert.ok((await preview.locator('body').innerText()).includes(services[154]));
+            assert.equal(await preview.locator('script').count(), 0);
+            for (const width of [1440, 390]) {
+                await page.setViewportSize({ width, height: 844 });
+                if (width === 390) await page.waitForFunction(() => document.querySelector('.so-drawer').getBoundingClientRect().right <= 1);
+                await page.locator('iframe').scrollIntoViewIfNeeded(); await preview.locator('img').first().scrollIntoViewIfNeeded();
+                await page.screenshot({ path: path.join(out, `final-preview-${width}.png`) });
+                await preview.locator('h1').click();
+                await page.keyboard.press('Control+End');
+                // Observe native scrolling without running timer polling inside the no-script sandbox.
+                let reachedFooter = false;
+                for (let attempt = 0; attempt < 50 && !reachedFooter; attempt++) {
+                    reachedFooter = await preview.locator('footer').evaluate(e => e.getBoundingClientRect().bottom <= innerHeight + 1);
+                    if (!reachedFooter) await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                assert.ok(reachedFooter, 'Keyboard reaches the complete footer in the visible sandbox');
+                await page.screenshot({ path: path.join(out, `final-footer-${width}.png`) });
+            }
+            const event = page.waitForEvent('download'); await click('Maili indir');
+            const eml = await event; await eml.saveAs(path.join(out, 'final-template.eml'));
+            await page.setViewportSize({ width: 1440, height: 900 }); await click('Taslaklar');
+            checks.push('Final template: 155 separate services, six image roles, inert markup, saved preview and authenticated email');
+        }
         for (let i = 0; i < 26; i++) await json(client, '/api/v1/announcements/' + crypto.randomUUID(), { method: 'PUT', data: { ...stored, subject: 'Sayfa taslağı ' + i } });
         await navigate(page, ui, 'announcements'); await ready();
         assert.equal(await page.locator('tbody tr').count(), 25);
-        await click('Sonraki sayfa'); assert.equal(await page.locator('tbody tr').count(), 2); await capture(page, out, 'list-page2');
-        await click('Önceki sayfa'); assert.equal(await page.locator('tbody tr').count(), 25);
+        await click('Sonraki sayfa');
+        await page.waitForFunction(n => document.querySelectorAll('tbody tr').length === n, process.argv[7] === 'final-template' ? 3 : 2);
+        await capture(page, out, 'list-page2');
+        await click('Önceki sayfa'); await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 25);
         for (const url of ['/api/v1/announcements', route, route + '?version=4&format=html', route + '?version=4&format=eml', '/api/v1/announcements/banners'])
             assert.equal((await denied.get(url)).status(), 403);
         const deniedContext = await browser.newContext({ ignoreHTTPSErrors: true }); const deniedPage = await deniedContext.newPage();

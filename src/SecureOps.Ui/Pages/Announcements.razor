@@ -30,7 +30,7 @@
         @if (_form is null) { <MudButton OnClick="InitializeAsync" Disabled="_busy">Yeniden dene</MudButton> }
         @if (_form is not null && _version > 0)
         { <MudButton OnClick="CompareAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.CompareArrows">Güncel kayıtla karşılaştır</MudButton> }
-        @foreach (string key in _problem.Fields.Where(k => AnnouncementForm.Fields.Any(f => f.Key == k) || k is "To" or "Cc" or "BannerRevision"))
+        @foreach (string key in _problem.Fields.Where(k => AnnouncementForm.Fields.Any(f => f.Key == k) || k is "To" or "Cc" or "BannerRevision" or "TemplateRevision" or "AffectedServices"))
         { <MudButton OnClick="@(() => FocusAsync(key))">@FieldLabel(key) alanına git</MudButton> }
     }
     @if (_busy) { <SoLoading Message="İşlem sürüyor" /> }
@@ -70,6 +70,12 @@
         }
         <EditForm Model="_form" OnSubmit="SaveAsync">
             <fieldset disabled="@_busy" data-guide="announcement-details">
+                <label class="so-announcement-field" for="announcement-TemplateRevision">Duyuru biçimi
+                    <select id="announcement-TemplateRevision" value="@_form.Template" @onchange="TemplateAsync">
+                        <option value="oco-v1" disabled="@(_form.Services.Length > 0)">Önceki taslak biçimi</option>
+                        <option value="oco-table-v2">Nihai duyuru</option>
+                    </select>
+                </label>
                 <div class="so-announcement-grid">
                     @foreach (var f in AnnouncementForm.Fields.Where(f => !f.Optional))
                     { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" ValueChanged="@(value => Change(f.Key, value))" /> }
@@ -83,6 +89,14 @@
                         </select>
                     </label>
                 </div>
+                @if (_form.Template == "oco-table-v2")
+                {
+                    <details><summary>Etkilenen servisler (@_form.Services.Length)</summary>
+                        <label class="so-announcement-field" for="announcement-AffectedServices">Çalışmadan etkilenen servisler
+                            <textarea id="announcement-AffectedServices" rows="8" maxlength="16000" @bind="_form.ServicesText" @bind:event="oninput" @bind:after="Changed"></textarea>
+                        </label>
+                    </details>
+                }
                 <MudButton OnClick="BannersAsync" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_busy">Görselleri yenile</MudButton>
                 @foreach (string kind in new[] { "To", "Cc" })
                 {

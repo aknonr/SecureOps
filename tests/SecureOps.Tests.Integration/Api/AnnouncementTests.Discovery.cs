@@ -17,7 +17,7 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed partial class AnnouncementTests
 {
     [Fact]
-    public void ClaudeHandoff_JsonExamplesMatchImplementedContracts()
+    public void UiContract_JsonExamplesMatchImplementedContracts()
     {
         DirectoryInfo? root = new(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "SecureOps.sln")))
@@ -26,11 +26,17 @@ public sealed partial class AnnouncementTests
         string document = File.ReadAllText(Path.Combine(root!.FullName, "docs", "contracts", "planned-announcements-v1.md"));
         string[] examples = System.Text.RegularExpressions.Regex.Matches(document, @"```json\s*(.*?)\s*```", System.Text.RegularExpressions.RegexOptions.Singleline)
             .Select(m => m.Groups[1].Value).ToArray();
-        examples.Should().HaveCount(3);
+        examples.Should().HaveCount(4);
         var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         AnnouncementValidation.Errors(JsonSerializer.Deserialize<AnnouncementContent>(examples[0], json)!, true).Should().BeEmpty();
         JsonSerializer.Deserialize<AnnouncementPage>(examples[1], json)!.Items.Single().MissingFieldCount.Should().Be(0);
         JsonSerializer.Deserialize<AnnouncementBanner[]>(examples[2], json)!.Select(b => b.State).Should().Equal("PresentNotValidated", "Missing");
+        using var configuration = JsonDocument.Parse(examples[3]);
+        AnnouncementOptions options = configuration.RootElement.GetProperty("Announcements").Deserialize<AnnouncementOptions>()!;
+        AnnouncementAssetBundle bundle = options.Bundles.Single().Value;
+        bundle.Assets.Keys.Should().BeEquivalentTo(_roles);
+        bundle.Assets.Values.Should().OnlyContain(revision => options.Banners.ContainsKey(revision));
+        bundle.Footer.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]

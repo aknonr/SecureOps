@@ -41,9 +41,9 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
                 await store.DiscoveryAuditAsync(owner, false, found.Items.Count, context.CorrelationId, token);
                 return new(Page: found);
             }
-            if (format == "banners")
+            if (format is "banners" or "bundles")
             {
-                IReadOnlyList<AnnouncementBanner> banners = renderer.Banners(token);
+                IReadOnlyList<AnnouncementBanner> banners = format == "bundles" ? renderer.Bundles(token) : renderer.Banners(token);
                 await store.DiscoveryAuditAsync(owner, true, banners.Count, context.CorrelationId, token);
                 return new(Banners: banners);
             }
@@ -58,10 +58,11 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
                 { return new(Error: "AnnouncementInvalid", Fields: errors); }
                 if (!AnnouncementValidation.Address(options.Value.Sender))
                 { return new(Error: "AnnouncementConfigurationUnavailable"); }
-                (byte[] _, string _, string hash) = await renderer.AssetAsync(input.BannerRevision, token);
+                AnnouncementPresentation presentation = await renderer.PresentationAsync(input, token);
                 string[] to = [.. input.To.Distinct(StringComparer.OrdinalIgnoreCase)];
                 input = input with { To = to, Cc = [.. input.Cc.Except(to, StringComparer.OrdinalIgnoreCase).Distinct(StringComparer.OrdinalIgnoreCase)] };
-                var next = new AnnouncementDraft(id, owner, version + 1, DateTimeOffset.UtcNow, input, options.Value.Sender, hash);
+                var next = new AnnouncementDraft(id, owner, version + 1, DateTimeOffset.UtcNow, input, options.Value.Sender,
+                    presentation.Hash, TemplateRevision: input.TemplateRevision);
                 string? error = await store.SaveAsync(next, context.CorrelationId, token);
                 return error is null ? new(next) : new(Error: error);
             }
@@ -78,15 +79,15 @@ public sealed class AnnouncementService(SqlAnnouncementStore store, Announcement
             string[] missing = AnnouncementValidation.Errors(draft.Content, true);
             if (missing.Length != 0)
             { return new(Error: "AnnouncementIncomplete", Fields: missing); }
-            (byte[] Bytes, string Type, string Hash) asset = await renderer.AssetAsync(draft.Content.BannerRevision, token);
-            if (asset.Hash != draft.BannerHash || draft.TemplateRevision != "oco-v1")
+            AnnouncementPresentation asset = await renderer.PresentationAsync(draft.Content, token);
+            if (asset.Hash != draft.BannerHash || draft.TemplateRevision != draft.Content.TemplateRevision)
             { return new(Error: "AnnouncementAssetChanged"); }
             if (format == "html")
             {
                 await store.ReadAuditAsync(draft, false, context.CorrelationId, token);
-                return new(draft, AnnouncementRenderer.Render(draft, $"data:image/{asset.Type};base64,{Convert.ToBase64String(asset.Bytes)}").Html);
+                return new(draft, AnnouncementRenderer.RenderPresentation(draft, asset, true).Html);
             }
-            byte[] email = await AnnouncementRenderer.EmailAsync(draft, asset.Bytes, asset.Type, token);
+            byte[] email = await AnnouncementRenderer.EmailAsync(draft, asset, token);
             await store.ReadAuditAsync(draft, true, context.CorrelationId, token);
             return new(draft, Email: email);
         }

@@ -13,4 +13,17 @@ public sealed class AnnouncementOptions
     public Dictionary<string, string> Banners { get; set; } = [];
     /// <summary>Optional plain-text choice labels; absent/invalid labels fall back to revision.</summary>
     public Dictionary<string, string> BannerLabels { get; set; } = [];
+    /// <summary>Versioned final-presentation bundles; never SMTP or recipient defaults.</summary>
+    public Dictionary<string, AnnouncementAssetBundle> Bundles { get; set; } = [];
+}
+
+/// <summary>Private approved presentation: six role-to-banner revisions and plain footer.</summary>
+public sealed class AnnouncementAssetBundle
+{
+    /// <summary>Safe operator selection label.</summary>
+    public string Label { get; set; } = "";
+    /// <summary>Header, main, logo, linkedin, instagram and youtube; no remote URLs.</summary>
+    public Dictionary<string, string> Assets { get; set; } = [];
+    /// <summary>Version-bound plain text, never executable HTML.</summary>
+    public string Footer { get; set; } = "";
 }

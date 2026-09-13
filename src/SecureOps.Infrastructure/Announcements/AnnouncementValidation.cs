@@ -18,6 +18,14 @@ public static class AnnouncementValidation
     public static string[] Errors(AnnouncementContent content, bool complete)
     {
         List<string> errors = [];
+        if (content.TemplateRevision is not ("oco-v1" or "oco-table-v2"))
+        { errors.Add("TemplateRevision"); }
+        string[] services = content.AffectedServices ?? [];
+        if (services.Length > 256 || services.Any(s => string.IsNullOrWhiteSpace(s) || s.Length > 256 || s.Any(char.IsControl))
+            || services.Sum(s => (long)(s?.Length ?? 0) + 1) > 16000
+            || content.TemplateRevision == "oco-v1" && services.Length > 0
+            || complete && content.TemplateRevision == "oco-table-v2" && services.Length == 0)
+        { errors.Add("AffectedServices"); }
         foreach ((string key, string? value) in Fields(content))
         {
             int limit = key == "Subject" ? 200 : 4000;

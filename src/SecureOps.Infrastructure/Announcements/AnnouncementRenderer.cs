@@ -10,7 +10,7 @@ using SkiaSharp;
 namespace SecureOps.Infrastructure.Announcements;
 
 /// <summary>Allowlisted private assets and one escaped, non-network template pipeline.</summary>
-public sealed class AnnouncementRenderer(IOptions<AnnouncementOptions> options)
+public sealed partial class AnnouncementRenderer(IOptions<AnnouncementOptions> options)
 {
     private string AssetPath(string revision)
     {
@@ -96,8 +96,12 @@ public sealed class AnnouncementRenderer(IOptions<AnnouncementOptions> options)
 
     /// <summary>Creates a draft email artifact, never invokes SMTP or Outlook.</summary>
     public static async Task<byte[]> EmailAsync(AnnouncementDraft draft, byte[] bytes, string type, CancellationToken token)
+        => await EmailAsync(draft, new("", "", [new("banner", bytes, type, "")]), token);
+
+    /// <summary>Uses exactly the same ordered assets and fields as the browser representation.</summary>
+    public static async Task<byte[]> EmailAsync(AnnouncementDraft draft, AnnouncementPresentation presentation, CancellationToken token)
     {
-        (string html, string text) = Render(draft, "cid:banner");
+        (string html, string text) = RenderPresentation(draft, presentation, false);
         using var message = new MimeMessage { Subject = draft.Content.Subject, Date = draft.SavedAt, MessageId = $"{draft.Id:N}.{draft.Version}@wasas.invalid" };
         message.From.Add(MailboxAddress.Parse(draft.Sender));
         foreach (string recipient in draft.Content.To)
@@ -105,8 +109,11 @@ public sealed class AnnouncementRenderer(IOptions<AnnouncementOptions> options)
         foreach (string recipient in draft.Content.Cc)
         { message.Cc.Add(MailboxAddress.Parse(recipient)); }
         var builder = new BodyBuilder { TextBody = text, HtmlBody = html };
-        MimeEntity image = builder.LinkedResources.Add("banner." + type, bytes, new ContentType("image", type));
-        image.ContentId = "banner";
+        foreach (AnnouncementImage asset in presentation.Images)
+        {
+            MimeEntity image = builder.LinkedResources.Add(asset.Role + "." + asset.Type, asset.Bytes, new ContentType("image", asset.Type));
+            image.ContentId = asset.Role;
+        }
         message.Body = builder.ToMessageBody();
         using var output = new MemoryStream();
         await message.WriteToAsync(output, token);
