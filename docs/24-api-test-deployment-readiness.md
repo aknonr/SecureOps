@@ -1,8 +1,34 @@
 # API TEST Deployment Readiness
 
+## Authorized Combined Delivery, 2026-09-15
+
+The owner granted a one-time task-scoped exception to the 1000-line limit for
+measured formatting, necessary integration/packaging, API/UI plus the existing
+console Worker, verified 001-018 DBA contents, remaining opt-ins, packaged browser
+acceptance and this runbook. Original baseline `f3d052f` and inherited merge `2a81a2b`
+remain fixed for all accounting. Permanent rules are unchanged; no Windows Service
+support, registration script, unattended hosting or new architecture is authorized.
+
+Formatting was applied in dedicated commit `717c7af`: exactly +523/-488 in 59 files,
+preserving the prior log correction. Real full format passes (45.914 s) and Release
+build passes with zero warnings/errors (31.234 s). Final gates, source/assembly/archive
+hashes, opt-in identities, durations and readiness belong to the new delivery's
+`evidence/validation.json`, linked to private evidence under
+`C:\SecureOpsBuild\validation\combined-test-delivery-20260915`. Historical totals
+below are not added to new execution. The current runbook is the single marked
+Turkish section exported by the packager; archived runbooks remain historical.
+
+The existing Worker/Hangfire workflow is retained and packaged as a foreground
+console process. No Worker service-lifetime code was added. API/UI/Worker carry the
+same committed source; the full schema package includes immutable 001-018 files
+and a separate original Hangfire 1.8.6 schema-9 installer. Runtime schema preparation
+stays false. Existing module behavior and external-write fences remain unchanged.
+Installation requires current target inventory and a named foreground Worker session;
+package integrity/local Simulation acceptance is not corporate integration acceptance.
+
 ## Combined Delivery Checkpoint, 2026-09-15
 
-Current preparation, not a delivered package or installation approval. Fixed task
+Historical pre-exception checkpoint, not installation approval. Fixed task
 start: `f3d052f4f66c05c079a392b4581864b9f85b04ff` (accepted OR). In Use
 `5298d5639b148f2a0d343063323efc8633520813` is already its ancestor. Accepted OCO
 `9dc731e0e0c5ea8188bb6281075e348cf35fbae8` was merged at `2a81a2b` on
@@ -161,8 +187,8 @@ test-owned and retained. No corporate collection, deployment or write activation
 <!-- TEST-RELEASE-RUNBOOK:START -->
 ## Eşleşen TEST Teslimatı: {{RELEASE_NAME}}
 
-**Güncel birleşik teslimat runbook taslağıdır; paket henüz üretilmedi ve kurulum
-engellidir.** Build SHA: `{{BUILD_SHA}}`. Üretim sırasında bu token gerçek commit'e
+**Birleşik teslimat adayıdır; ayrıca kurulum onayı gerekir.** Build SHA:
+`{{BUILD_SHA}}`. Üretim sırasında bu token gerçek commit'e
 bağlanır; token içeren veya Worker/001-018 içermeyen eski paket kurulmaz.
 `release-metadata.json` kaynak/payload bilgisini; `evidence/validation.json`
 çalıştırılan, başarısız, atlanan ve yeniden kullanılan kapıları ayırır.
@@ -220,8 +246,6 @@ foreach ($Site in @($ApiSite,$UiSite)) {
 }
 $Ancm = "$env:ProgramFiles\IIS\Asp.Net Core Module\V2\aspnetcorev2.dll"
 if (Test-Path -LiteralPath $Ancm) { (Get-Item -LiteralPath $Ancm).VersionInfo | Select-Object FileVersion,ProductVersion }
-$WorkerService = '<onayli Worker servis adi>'
-Get-Service -Name $WorkerService | Select-Object Name,Status,StartType
 ```
 
 Komutlar yalnız onaylı TEST hostunda ve mevcut yollarla salt okunur çalışır;
@@ -287,10 +311,12 @@ zorunludur. Kurumsal veri üzerinde yerel fixture/harness çalıştırılmaz.
 ### 4. Worker ve Hangfire Önkoşulları
 
 OCO kaynak toplama için ayrı Worker gerekir. API/UI tek başına kaynak işini
-yürütemez. Aynı teslimatın Worker'ı, mevcut onaylı Windows Service yaşam döngüsü
-doğrulandıktan sonra kullanılabilir; bugün source lifetime kaydı ve paket kontrolü
-eksiktir. Servis kurulumu bu hazırlıkta yapılmaz. Hosting sahibi servis adı/yolu,
-mevcut servis kimliği, log/config ACL ve durdurma/kurtarma prosedürünü belirler.
+yürütemez. Bu teslimat mevcut foreground/console hostunu içerir; Windows Service
+desteği, kurulumu ve gözetimsiz işletim ertelenmiştir. Worker için .NET 8
+Microsoft.NETCore.App gerekir; gerçek runtimeconfig/metadata kontrol edilir.
+Hosting sahibi onaylı dizin, çalıştıran kimlik, açık tutulacak operatör oturumu,
+log/config ACL ve durdurma/kurtarma sorumlusunu belirler. Bu şart olmadan OCO kaynak
+işinin çalışabilir olduğu söylenmez; özellik sırf kabul almak için kapatılmaz.
 API ve Worker aynı ayrılmış DB, Hangfire schema, açık queue ve profile ayarlarını
 kullanır. SQL yöneticisi Hangfire.SqlServer 1.8.6 paketinin tools/install.sql
 prosedürüyle schema 9'u ayrı kontrollü adımda hazırlar; runtime PrepareSchema=false
@@ -299,6 +325,20 @@ schema'ların DELETE yasağı değişmez. Var olan başka iş kuyruğu taranmaz.
 Announcements:Enabled, AnnouncementSource:Enabled ve Hangfire:Enabled ayrı
 ayarlar; corporate source/profile izin kanıtı yoksa kaynak işi açılmaz. Fixture,
 Demo, Mock, LocalDB, yerel anahtar veya Start-Local.ps1 sunucuya taşınmaz.
+
+Eşleşen payload ve server-owned Test profili doğrulandıktan, ayrı çalıştırma onayı
+alındıktan sonra mevcut konsol yöntemi:
+
+```powershell
+Set-Location -LiteralPath '<onayli Worker payload dizini>'
+$env:DOTNET_ENVIRONMENT = 'Test' # Yalniz bu onayli foreground sureci
+dotnet .\SecureOps.Worker.dll
+```
+
+Terminal açık tutulur. Ctrl+C graceful shutdown ister; zorla kapatma graceful
+kanıtı değildir. Yeniden aynı dizin/config ile başlatma kayıtlı işler ve aynı
+queue üzerinden devam eder. Bu prosedür servis kurulumu veya otomatik başlatma
+sağlamaz. DB lease/attempt ve eski completion reddi mevcut kurtarma sınırlarıdır.
 
 ### 5. Ayrı Kurulum Onayından Sonra: Eşleşen API/UI/Worker
 

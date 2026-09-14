@@ -17,12 +17,13 @@ if ($allFiles.Count -eq 0)
 $payloadFiles = @($allFiles | Where-Object {
     $_.Name -ne 'web.config' -and $_.Name -notmatch '^appsettings(\..+)?\.json$'
 })
-$forbiddenExtensions = @('.pdb', '.cs', '.csproj', '.sln', '.razor', '.cshtml', '.props', '.targets')
+$forbiddenExtensions = @('.pdb', '.cs', '.csproj', '.sln', '.razor', '.cshtml', '.props', '.targets', '.pfx', '.p12', '.key', '.mdf', '.ldf', '.db', '.sqlite')
 foreach ($file in $payloadFiles)
 {
     $relativePath = $file.FullName.Substring($publishPath.Length).TrimStart('\') -replace '\\', '/'
     if (($forbiddenExtensions -contains $file.Extension.ToLowerInvariant()) -or
-        ($relativePath -match '(^|/)(bin|obj|logs?|tests?)(/|$)') -or
+        ($relativePath -match '(^|/)(bin|obj|logs?|tests?|fixtures|keys|keyrings?)(/|$)') -or
+        ($file.Name -match '^key-.*\.xml$') -or
         ($file.Name -match '(?i)(^|\.)tests?\.') -or
         ($file.Extension -ieq '.log'))
     {

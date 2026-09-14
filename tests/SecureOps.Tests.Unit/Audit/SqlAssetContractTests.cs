@@ -179,7 +179,7 @@ public sealed class SqlAssetContractTests
             .And.Contain("ManagementReportingDurationKeys.ClaimToJiraCreation")
             .And.Contain("ManagementReportingDurationKeys.ClaimToCompletion")
             .And.Contain("OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY")
-            .And.Contain("commandTimeout: CommandTimeoutSeconds")
+            .And.Contain("commandTimeout: _commandTimeoutSeconds")
             .And.Contain("cancellationToken: cancellationToken");
     }
 
@@ -205,7 +205,7 @@ public sealed class SqlAssetContractTests
         migration.Should().Contain(":r ..\\schema\\007-application-session-governance.sql");
         repository.Should().Contain("INSERT INTO security.ApplicationSessions")
             .And.Contain("UPDATE security.ApplicationSessions")
-            .And.Contain("CommandTimeoutSeconds = 15")
+            .And.Contain("_commandTimeoutSeconds = 15")
             .And.Contain("LastSeenAtUtc <= @PersistBeforeUtc")
             .And.Contain("cancellationToken: cancellationToken")
             .And.NotContain("DELETE FROM")
@@ -246,7 +246,7 @@ public sealed class SqlAssetContractTests
             .And.Contain("transaction.CommitAsync(cancellationToken)")
             .And.NotContain("DELETE FROM");
         audit.Should().Contain("INSERT INTO audit.AuditLog")
-            .And.Contain("commandTimeout: CommandTimeoutSeconds")
+            .And.Contain("commandTimeout: _commandTimeoutSeconds")
             .And.NotContain("UPDATE audit.AuditLog")
             .And.NotContain("DELETE FROM audit.AuditLog");
         firstAdmin.Should().Contain("IsolationLevel.Serializable")

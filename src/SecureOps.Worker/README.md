@@ -1,6 +1,7 @@
 # SecureOps.Worker
 
-.NET Worker Service hosting the Hangfire job server. Registered as a Windows Service.
+.NET foreground console host for the existing Hangfire job server. Windows Service
+hosting, registration, installation and unattended operation are deferred, not verified.
 
 The default-off announcement source composition uses one configured Hangfire/SQL queue,
 bounded execution leases and startup/minutely dispatch recovery. API and Worker must share
@@ -38,14 +39,19 @@ No direct in-memory calls, no message broker, no HTTP between them.
 - `SecureOps.Shared`
 - `SecureOps.Infrastructure`
 
-## Service Installation
+## Foreground Hosting
 
-Phase 1 Sprint 6 produces the install script. Outline:
+Use the matched Worker payload, .NET 8 `Microsoft.NETCore.App`, and the approved
+server-owned configuration. No SDK is required. Start from the payload directory
+so its existing configuration is loaded; do not copy local fixtures or keys:
 
 ```powershell
-sc.exe create SecureOpsWorker binPath= "C:\Apps\SecureOps\Worker\SecureOps.Worker.exe" start= auto obj= "CONTOSO\svc-secureops"
-sc.exe description SecureOpsWorker "SecureOps Hangfire job host."
-sc.exe start SecureOpsWorker
+Set-Location -LiteralPath '<approved Worker payload directory>'
+dotnet .\SecureOps.Worker.dll
 ```
 
-See `docs/runbooks/04-deployment.md` (Phase 1).
+Keep the foreground session alive; Ctrl+C requests graceful host/Hangfire shutdown.
+No service or scheduler is installed by these commands. API source submissions
+persist, but collection cannot complete without this host and its matching queue.
+Controlled TEST must therefore name the foreground operator/session and recovery
+procedure. See the current Turkish runbook in `docs/24-api-test-deployment-readiness.md`.

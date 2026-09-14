@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory = $true)][string]$PublishDirectory,
     [Parameter(Mandatory = $true)][string]$ZipPath,
     [Parameter(Mandatory = $true)][string]$ManifestPath,
-    [string[]]$ForbiddenText = @()
+    [string[]]$ForbiddenText = @(),
+    [ValidateSet('Ui','Worker')][string]$Component = 'Ui'
 )
 
 Set-StrictMode -Version Latest
@@ -17,17 +18,40 @@ foreach ($outputPath in @($ZipPath, $ManifestPath)) {
 }
 
 & (Join-Path $PSScriptRoot 'Test-ApiReleasePayload.ps1') -PublishDirectory $publishPath -ForbiddenText $ForbiddenText
-foreach ($required in @('SecureOps.Ui.dll', 'SecureOps.Ui.deps.json', 'SecureOps.Ui.runtimeconfig.json',
-        'wwwroot/css/secureops-theme.css', 'wwwroot/_content/MudBlazor/MudBlazor.min.css')) {
+$requiredFiles = @("SecureOps.$Component.dll", "SecureOps.$Component.deps.json", "SecureOps.$Component.runtimeconfig.json")
+if ($Component -eq 'Ui') { $requiredFiles += @('wwwroot/css/secureops-theme.css','wwwroot/_content/MudBlazor/MudBlazor.min.css') }
+foreach ($required in $requiredFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $publishPath $required) -PathType Leaf)) {
-        throw "Missing UI artifact: $required"
+        throw "Missing $Component artifact: $required"
     }
 }
-$runtime = Get-Content -LiteralPath (Join-Path $publishPath 'SecureOps.Ui.runtimeconfig.json') -Raw | ConvertFrom-Json
-if ($runtime.runtimeOptions.tfm -ne 'net8.0') { throw 'Unexpected UI target framework.' }
-$dependencies = Get-Content -LiteralPath (Join-Path $publishPath 'SecureOps.Ui.deps.json') -Raw | ConvertFrom-Json
-if (-not ($dependencies.libraries.PSObject.Properties.Name -like 'SecureOps.Ui/*')) {
-    throw 'UI dependency manifest does not identify the UI project.'
+$runtime = Get-Content -LiteralPath (Join-Path $publishPath "SecureOps.$Component.runtimeconfig.json") -Raw | ConvertFrom-Json
+if ($runtime.runtimeOptions.tfm -ne 'net8.0') { throw 'Unexpected target framework.' }
+$dependencies = Get-Content -LiteralPath (Join-Path $publishPath "SecureOps.$Component.deps.json") -Raw | ConvertFrom-Json
+if (-not ($dependencies.libraries.PSObject.Properties.Name -like "SecureOps.$Component/*")) {
+    throw 'Dependency manifest does not identify the packaged project.'
+}
+if ($Component -eq 'Worker') {
+    foreach ($name in @('Hangfire.Core','Hangfire.SqlServer','Microsoft.Data.SqlClient','SecureOps.Infrastructure')) {
+        if (!($dependencies.libraries.PSObject.Properties.Name -like "$name/*")) { throw "Missing Worker dependency: $name" }
+    }
+    foreach ($target in $dependencies.targets.PSObject.Properties.Value) {
+        foreach ($library in $target.PSObject.Properties.Value) {
+            foreach ($kind in @('runtime','native','runtimeTargets','resources')) {
+                $group = $library.PSObject.Properties[$kind]
+                if ($null -eq $group) { continue }
+                foreach ($asset in $group.Value.PSObject.Properties) {
+                    if ($asset.Name.EndsWith('/_._')) { continue }
+                    $relative = if ($asset.Name.StartsWith('runtimes/')) { $asset.Name }
+                        elseif ($kind -eq 'resources') { $asset.Value.locale + '/' + [IO.Path]::GetFileName($asset.Name) }
+                        else { [IO.Path]::GetFileName($asset.Name) }
+                    if (!(Test-Path -LiteralPath (Join-Path $publishPath $relative) -PathType Leaf)) {
+                        throw "Missing Worker runtime asset: $relative"
+                    }
+                }
+            }
+        }
+    }
 }
 
 $files = @(Get-ChildItem -LiteralPath $publishPath -Recurse -File | Where-Object {
@@ -47,18 +71,18 @@ try {
 
 $archive = [IO.Compression.ZipFile]::OpenRead($ZipPath)
 try {
-    if ($archive.Entries.Count -ne $expected.Count) { throw 'UI ZIP entry count mismatch.' }
+    if ($archive.Entries.Count -ne $expected.Count) { throw 'ZIP entry count mismatch.' }
     $seen = @{}
     foreach ($entry in $archive.Entries) {
         if (-not $expected.ContainsKey($entry.FullName) -or $seen.ContainsKey($entry.FullName)) {
-            throw 'Unexpected or duplicate UI ZIP entry.'
+            throw 'Unexpected or duplicate ZIP entry.'
         }
         $seen[$entry.FullName] = $true
         $stream = $entry.Open()
         $sha = [Security.Cryptography.SHA256]::Create()
         try { $actual = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '') }
         finally { $sha.Dispose(); $stream.Dispose() }
-        if ($actual -ne $expected[$entry.FullName]) { throw 'UI ZIP content hash mismatch.' }
+        if ($actual -ne $expected[$entry.FullName]) { throw 'ZIP content hash mismatch.' }
     }
 } finally { $archive.Dispose() }
 $lines = @($expected.Keys | Sort-Object | ForEach-Object { "$($expected[$_])  $_" })

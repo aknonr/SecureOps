@@ -21,6 +21,23 @@ public sealed class ApiReleasePackagingContractTests
     }
 
     [Fact]
+    public void CombinedDelivery_IncludesConsoleWorkerAndExactSchemaWithoutServiceInstallation()
+    {
+        string root = FindRepositoryRoot();
+        string paired = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-PairedTestRelease.ps1"));
+        string managed = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-UiDeploymentPackage.ps1"));
+        string worker = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Worker", "Program.cs"));
+        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-018'")
+            .And.Contain("Expected the exact complete 001-018 SQL chain.")
+            .And.Contain("runtimePrepareSchema=$false").And.Contain("-Component Worker")
+            .And.Contain("Foreground console only").And.NotContain("sc.exe");
+        managed.Should().Contain("runtimeTargets").And.Contain("Missing Worker runtime asset")
+            .And.Contain("Hangfire.SqlServer").And.Contain("Test-ApiReleasePayload.ps1");
+        worker.Should().Contain("TryAddSecureOpsJobServer").And.Contain("await host.RunAsync()")
+            .And.NotContain("AddWindowsService").And.NotContain("UseWindowsService");
+    }
+
+    [Fact]
     public void PackagingScript_PreservesRelativePathsAndRunsIntegrityGate()
     {
         string root = FindRepositoryRoot();

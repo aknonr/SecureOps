@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly, [switch]$SourceReview)
+param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly, [switch]$SourceReview, [switch]$OperationalRecordSimulation)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $EvidenceRoot).Path
 $payload = (Resolve-Path -LiteralPath $PayloadRoot).Path
@@ -25,6 +25,7 @@ $env:IdentityLookup__Provider = 'Mock'
 $env:Audit__Provider = 'SqlServer'
 $env:OperationalRecords__SourceProvider = 'Disabled'
 $env:Jira__Provider = 'Disabled'
+if ($OperationalRecordSimulation) { $env:OperationalRecords__SourceProvider = 'Simulation'; $env:Jira__Provider = 'Simulation' }
 $env:OperationalRecords__ReadOnlyIntegrationMode = 'false' # Supported Demo + disabled providers, not corporate read mode.
 $env:OperationalRecords__ControlledTestWritesEnabled = 'false'
 $env:OperationalRecords__SourceCloseEnabled = 'false'

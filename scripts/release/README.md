@@ -2,14 +2,17 @@
 
 `New-PairedTestRelease.ps1 -ReleaseName <reviewed-next-name>` requires a clean
 committed feature branch (pre-existing `.vscode/` is excluded), publishes matching
-API/UI, reuses both payload scanners/validators, exports the canonical Turkish
-runbook and packages DBA 001-013 with per-file sizes/hashes and source metadata.
+API/UI/Worker on the combined delivery branch, reuses the payload scanners/validators,
+exports the canonical Turkish runbook and packages the exact DBA 001-018 inventory
+with per-file sizes/hashes and source metadata. Hangfire.SqlServer 1.8.6's original
+schema-9 installation script is included separately for reviewed DBA provisioning;
+runtime DDL stays disabled. Worker is a foreground console host, not a Windows Service.
 It refuses an existing release directory. Determine the next name from actual
 release metadata first. It does not deploy, activate writes or certify TEST acceptance.
 Payload success is not release approval: `readyForInstallation` stays false;
 the release owner records required gates in `evidence/validation.json`. DoD still
 requires repository-wide format success; historical scoped passes are not a waiver.
-Canonical runbook tokens bind the actual release name/build SHA. DBA 001-013
+Canonical runbook tokens bind the actual release name/build SHA. DBA 001-018
 inclusion is a reference artifact, never an instruction to replay unchanged SQL.
 
 `New-InUseEvidencePackage.ps1 -OutputDirectory <new-absolute-directory>` builds
@@ -38,3 +41,10 @@ writes a per-file SHA256 manifest, and refuses existing output files. It does no
 claim API AD-runtime validation for UI binaries. API and UI packages for a paired
 release must name the same exact build source SHA and required schema level in
 the existing release-directory readiness manifest.
+
+`New-UiDeploymentPackage.ps1 -Component Worker` reuses the same path-preserving
+ZIP/hash/configuration exclusion logic for the existing console Worker. It checks
+the Worker identity/runtime manifest, Hangfire/SQL dependencies and every declared
+runtime/native/resource asset before packaging. The default remains Ui. Shared
+scanning additionally rejects private key/certificate/database and fixture files.
+No service installation or new hosting implementation is included.
