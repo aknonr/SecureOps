@@ -2,6 +2,21 @@
 
 ## Status and Ownership
 
+### Local Acceptance Continuation, 2026-09-15
+
+The current exact-record positive ServerRequest policy is implemented under
+ADR-0018; older negative-only descriptions below are historical foundation scope.
+SoftwareInstallation and ServerRetirement remain mapping-blocked. Detail recovery
+must preserve a review declaration on recoverable failure, discard obsolete reads
+and commands after record/access changes, and revalidate the capability snapshot.
+No automatic external-write retry or corporate activation is introduced.
+Only the existing fixed Simulation happy fixture is typed ServerRequest; other
+synthetic records and the exact corporate-policy boundary are unchanged. The
+numeric policy is independently exercised with real draft/SQL services and
+test-only source/Jira/identity substitutes, not corporate HTTP adapters.
+Current execution evidence and walkthrough belong to the existing SDM handoff in
+`src/SecureOps.Ui/README.md`, not a separate project handoff.
+
 ### Independent Source Close (Source Only, 2026-09-07)
 
 `OperationalRecords:SourceCloseEnabled` defaults to false. Global read-only and

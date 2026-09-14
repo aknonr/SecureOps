@@ -1,5 +1,42 @@
 # API TEST Deployment Readiness
 
+## OR To SDM TEST Continuation, 2026-09-15
+
+OR-to-SDM local acceptance and the running synthetic walkthrough are recorded in
+the existing SDM handoff in `src/SecureOps.Ui/README.md`. They do not grant corporate
+publication or installation readiness. No package/deployment was made. rc6.17 and
+its failed installation gate remain unchanged. Later combined delivery must first
+integrate the accepted sources, resolve shared full-format debt and identify a new
+paired API/UI package; do not install this local Demo payload.
+
+Accessible read-only inventory: this workstation has no IIS `appcmd`; no current
+TEST hostname, installed API/UI paths or approved remote session was identified.
+Historical local publish directories and embedded versions are not installed TEST
+evidence. No endpoint was guessed or contacted, and no credentials were read.
+The **next TEST action** is the existing runbook's read-only target inventory:
+the deployment owner supplies the approved target/API+UI paths and records actual
+DLL hashes/ProductVersions, runtime/Hosting Bundle, current package association,
+SQL schema/grant checks and backup/recovery references in the controlled change.
+Do not replay 012/013 or infer installed content from Git HEAD.
+
+| Requirement | Current disposition / exact remaining input |
+|---|---|
+| Positive policy | Implemented, default empty. Business owner must accept the ADR-0018 single-record tracking rule, including optional server reference, then name numeric SourceRecordId, sourceFingerprint, exact scope excluding 4241, mapping/ruleset versions, ApprovalReference, TrackingReason and UTC expiry. A review declaration is not that decision. |
+| Supported types | ServerRequest only has a positive path. SoftwareInstallation needs approved Jira labels/fields; ServerRetirement needs its own tracking mapping/policy. Neither can inherit SunucuTalep. |
+| Jira mapping | Existing adapter/draft implemented. Obtain current product/version and SDM/issue-type-ID context; summary/description/labels, required fields, team cascading field/option and requester multi-user field shape. Historical ID 3, 12700/11500 and WASAS/SunucuTalep evidence is not current acceptance. |
+| Identity and capabilities | Requester Block and exact authenticated reporter policy implemented. Verify unique requester and publisher identity resolution, actor mapping and service-account Browse/Create/user-search plus applicable Modify Reporter/Assign permissions. Integration account, requester, reporter and assignee remain distinct. Existing application capability assignment is required; no second approver subsystem. |
+| Duplicate correlation | Local durable claims/key/idempotency and unknown-result blocking implemented. Missing remote authoritative OR+attempt correlation, uniqueness/visibility/absence semantics and accountable reconciliation owner. Summary, label or time similarity, zero search results and local Idempotency-Key are insufficient. No automatic second create. |
+| SQL | Local fresh 001-013 passes; corporate inventory unavailable. Verify 013 trusted CHECK, 011 default-false intent, uniqueness and append-only triggers. Runtime: SELECT/INSERT/UPDATE on ops.OperationalRecords/JiraTransfers/CommandExecutions, INSERT workflow history and audit; existing access/session object grants per Database Contract. No new grants, DDL, DELETE or base-audit/history read grants. |
+| Private storage/session | Implemented; current TEST configuration unavailable. Preserve separate persistent API/UI rings, application identities/names, protection and ACLs, private report/log storage and SQL session persistence. Validate real TLS/proxy/auth/antiforgery/session restart using the installed pair, without changing limits. |
+| Backup/rollback | Require paired binary/config backups, SQL recovery point, private reports/rings and an approved rollback decision. Old binaries are not proven compatible writers for newer JSON/policy evidence; suspend writes before rollback. Do not delete audit or additive tables. |
+| Jira-only activation | Separate exact-record TEST decision and complete current evidence above are required. Keep corporate ReadOnlyIntegrationMode=true, ControlledTestWritesEnabled=false, SourceCloseEnabled=false until the separately authorized activation. Local Demo/Simulation settings are not a corporate recipe. |
+| BPM/source closure | Separate owner approval, exact single activity, update result/conditional-write or explicit race-risk decision, authoritative post-state and uncertain-result reconciliation remain pending. Jira success never grants or proves BPM closure. |
+
+The existing bounded collection guide in
+`integrations/turuncu-hat-jira-contract-gaps.md` remains the evidence procedure.
+Original-script discovery is complete; do not request or execute it again.
+No new corporate create is permitted merely to fill these evidence gaps.
+
 ## rc6.17 Gate Follow-up, 2026-09-12
 
 The unchanged paired payloads now pass the supported loopback transport and

@@ -100,6 +100,21 @@ See `docs/agent-guides/090-testing-quality.md`:
 - Each test isolated (no shared mutable state).
 ## Current Test Boundary
 
+Current OR-to-SDM replay uses `browser/sdm-jira-only.cjs` with its existing
+Playwright/UI/API/fresh-database/evidence arguments. Default mode performs the
+three-declaration, actual SQL conflict, denied-role, explicit refresh/stored paging,
+ServerRequest confirmation and uncertain-result journey. Run the guarded 001-013
+harness and SQL opt-ins first. Use a fresh task database; never reset old transfers.
+`--verify-presentation` runs after stopping/restarting only the task API/UI against
+that same database; it reads stored records, verifies source-open linkage and rejects
+unknown-result recreation. `--prepare-walkthrough` uses a different fresh task DB,
+verifies SIM-OR-100 preview/focus/cancel and leaves create for the owner. The numeric
+exact corporate-policy branch is separately tested by
+`ExactPilot_RealDraftSqlAuditAndRestart_PreserveOneJiraOnlyResult` with real draft/SQL
+services and only test substitutes for external interfaces. It never constructs
+corporate HTTP clients. `SdmRecoveryTests` covers actual detail handlers without
+adding a UI package. Canonical current results/launcher are in the SDM UI handoff.
+
 `browser/resource-opening.cjs <playwright-core> <UI> <API> <evidence> <before|after>`
 uses only published loopback Demo hosts and synthetic Resources fixtures. Both
 fresh Chrome profiles explicitly remove `--disable-popup-blocking`; only the allow

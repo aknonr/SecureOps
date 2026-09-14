@@ -618,6 +618,9 @@ OperationalRecordView.Ownership owner =
     private string? _actor;
     private bool _loading;
     private bool _busy;
+    private int _generation;
+    private Guid? _loadedId;
+    private bool _disposed;
 
     // Simulation is reported independently on the record, the preview, and the transfer result. Any
     // of them saying so is enough: the operator must be told before the button, and a preview that
@@ -650,9 +653,29 @@ OperationalRecordView.Ownership owner =
 if (_access.Can(Capabilities.OperationalRecordsView))
         {
             await ResolveActorAsync();
-            await LoadAsync(clearAction: true);
         }
     }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == RecordId) return;
+        _loadedId = RecordId;
+        Invalidate();
+        if (_access?.Can(Capabilities.OperationalRecordsView) == true)
+            await LoadAsync(clearAction: true);
+    }
+
+    private void Invalidate()
+    {
+        ++_generation;
+        _record = null;
+        _loadProblem = null;
+        _declaredType = null;
+        _loading = _busy = false;
+        ClearReviewDraft();
+    }
+
+    private bool Current(int generation) => !_disposed && generation == _generation;
 
     /// <summary>
     /// Reads the operator's identity as the API names it, for comparison against <c>claimedBy</c>.
@@ -676,6 +699,7 @@ if (_access.Can(Capabilities.OperationalRecordsView))
 
     private async Task LoadAsync(bool clearAction)
     {
+        int generation = ++_generation;
         _loading = true;
         _loadProblem = null;
 
@@ -690,6 +714,7 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         try
         {
             OperationalRecordResponse latest = await Records.GetAsync(RecordId, CancellationToken.None);
+            if (!Current(generation)) return;
             if (_record is not null && !SdmEvidenceView.SameSource(_record, latest))
             {
                 _preview = null;
@@ -698,24 +723,29 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         }
         catch (SecureOpsApiException ex)
         {
+            if (!Current(generation)) return;
             _loadProblem = ex.Problem;
             _record = null;
             _preview = null;
         }
         finally
         {
-            _loading = false;
-            StateHasChanged();
+            if (Current(generation))
+            {
+                _loading = false;
+                StateHasChanged();
+            }
         }
     }
 
     private async Task PreviewAsync()
     {
-        if (_busy)
+        if (_busy || _loading)
         {
             return;
         }
 
+        int generation = _generation;
         _busy = true;
         _busyMessage = "Önizleme hazırlanıyor…";
         _actionProblem = null;
@@ -724,21 +754,24 @@ if (_access.Can(Capabilities.OperationalRecordsView))
 
         try
         {
-            _preview = await Records.PreviewAsync(RecordId, CancellationToken.None);
+            JiraPreviewResponse preview = await Records.PreviewAsync(RecordId, CancellationToken.None);
+            if (!Current(generation)) return;
+            _preview = preview;
             _result = "Önizleme hazırlandı";
         }
         catch (SecureOpsApiException ex)
         {
+            if (!Current(generation)) return;
             _actionProblem = ex.Problem;
             // A failed preview must not leave an earlier draft on screen next to a new error.
             _preview = null;
         }
         finally
         {
-            _busy = false;
+            if (Current(generation)) _busy = false;
         }
 
-        await LoadAsync(clearAction: false);
+        if (Current(generation)) await LoadAsync(clearAction: false);
     }
 
     private Task ValidatePilotAsync() { _declaredType = null; ClearReviewDraft(); return PreviewAsync(); }
@@ -752,7 +785,8 @@ if (_access.Can(Capabilities.OperationalRecordsView))
 
     private async Task ReviewAsync()
     {
-        if (_busy || _record is null || _declaredType is null) return;
+        if (_busy || _loading || _record is null || _declaredType is null) return;
+        int generation = _generation;
         _busy = true;
         _busyMessage = "İnceleme taslağı hazırlanıyor…";
         _preview = null;
@@ -760,20 +794,22 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         _actionProblem = null;
         try
         {
-            _preview = await Records.ReviewAsync(RecordId, new(_declaredType.Value, _record.Version), CancellationToken.None);
+            JiraPreviewResponse preview = await Records.ReviewAsync(RecordId, new(_declaredType.Value, _record.Version), CancellationToken.None);
+            if (Current(generation)) _preview = preview;
         }
-        catch (SecureOpsApiException ex) { _actionProblem = ex.Problem; }
-        finally { _busy = false; }
-        await LoadAsync(clearAction: false);
+        catch (SecureOpsApiException ex) { if (Current(generation)) _actionProblem = ex.Problem; }
+        finally { if (Current(generation)) _busy = false; }
+        if (Current(generation)) await LoadAsync(clearAction: false);
     }
 
     private async Task CreateAsync()
     {
-        if (_busy || _record is null || _preview is null || _preview.ReviewOnly || _declaredType is not null)
+        if (_busy || _loading || _record is null || _preview is null || _preview.ReviewOnly || _declaredType is not null)
         {
             return;
         }
 
+        int generation = _generation;
         _busy = true;
         _busyMessage = "Yayımlama kararı bekleniyor…";
         DialogParameters parameters = new()
@@ -788,6 +824,8 @@ if (_access.Can(Capabilities.OperationalRecordsView))
             new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
 
         DialogResult? outcome = await dialog.Result;
+
+        if (!Current(generation)) return;
 
         if (outcome is null || outcome.Canceled)
         {
@@ -806,6 +844,7 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         try
         {
             JiraTransferResponse transfer = await Records.CreateJiraAsync(RecordId, CancellationToken.None);
+            if (!Current(generation)) return;
 
             // Rendered from what the server returned, never from what was requested. A create can
             // succeed as far as Jira and still stop at the source-close stage.
@@ -822,26 +861,28 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         }
         catch (SecureOpsApiException ex)
         {
+            if (!Current(generation)) return;
             _actionProblem = ex.Problem;
         }
         finally
         {
-            _busy = false;
+            if (Current(generation)) _busy = false;
             // The draft is consumed by the attempt; keeping it would let a stale preview justify a
             // second create against a record whose state has moved on.
-            _preview = null;
+            if (Current(generation)) _preview = null;
         }
 
-        await LoadAsync(clearAction: false);
+        if (Current(generation)) await LoadAsync(clearAction: false);
     }
 
     private async Task RetryAsync()
     {
-        if (_busy || _record is null)
+        if (_busy || _loading || _record is null)
         {
             return;
         }
 
+        int generation = _generation;
         _busy = true;
         _busyMessage = "Aktarım sürdürülüyor…";
         _actionProblem = null;
@@ -851,27 +892,51 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         try
         {
             JiraTransferResponse transfer = await Records.RetryAsync(RecordId, CancellationToken.None);
+            if (!Current(generation)) return;
             _result = $"İş akışı durumu: {OperationalRecordView.StateLabel(transfer.WorkflowState)}";
         }
         catch (SecureOpsApiException ex)
         {
+            if (!Current(generation)) return;
             _actionProblem = ex.Problem;
         }
         finally
         {
-            _busy = false;
+            if (Current(generation)) _busy = false;
         }
 
-        await LoadAsync(clearAction: false);
+        if (Current(generation)) await LoadAsync(clearAction: false);
     }
 
     private async Task RefreshAccessAsync()
     {
-        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        await AccessProvider.RefreshAsync(CancellationToken.None);
+        await RevalidateAccessAsync();
+    }
+
+    private async Task RevalidateAccessAsync()
+    {
+        AccessSnapshot latest = await AccessProvider.GetAsync(CancellationToken.None);
+        if (_disposed) return;
+        bool changed = _access?.Access?.UserId != latest.Access?.UserId
+            || _access?.Access?.Version != latest.Access?.Version
+            || _access?.Access?.AccessStatus != latest.Access?.AccessStatus
+            || !(_access?.Access?.Capabilities ?? []).SequenceEqual(latest.Access?.Capabilities ?? []);
+        _access = latest;
+        if (changed || !latest.IsResolved)
+        {
+            Invalidate();
+            if (latest.Can(Capabilities.OperationalRecordsView)) await LoadAsync(clearAction: true);
+        }
         StateHasChanged();
     }
 
-    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+    private void OnAccessChanged() => InvokeAsync(RevalidateAccessAsync);
 
-    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_generation;
+        AccessProvider.Changed -= OnAccessChanged;
+    }
 }

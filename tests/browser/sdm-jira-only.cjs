@@ -12,6 +12,7 @@ const database = process.argv[5];
 const out = path.resolve(process.argv[6]);
 
 (async () => {
+    const started = Date.now();
     query(database, 'SELECT 1');
     const browser = await chromium.launch({ executablePath: process.env.WASAS_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
     const admin = await apiContext(request, api);
@@ -38,7 +39,7 @@ const out = path.resolve(process.argv[6]);
         await page.getByRole('heading', { name: record.orCode, exact: true }).waitFor();
         await page.getByRole('heading', { name: 'Talep incelemesi', exact: true }).waitFor();
     }
-    async function previewAndConfirm(record, name) {
+    async function previewAndConfirm(record, name, confirm = true) {
         await detail(record);
         await page.getByRole('button', { name: 'Jira Taslağını Önizle', exact: true }).click();
         await page.getByRole('heading', { name: 'Önizleme hazırlandı', exact: true }).waitFor();
@@ -53,24 +54,56 @@ const out = path.resolve(process.argv[6]);
         await dialog.waitFor({ state: 'hidden' });
         await page.waitForFunction(() => [...document.querySelectorAll('button')].some(e => e.textContent.trim() === 'Jira Kaydı Oluştur' && !e.disabled));
         assert.equal(await page.getByRole('button', { name: 'Jira Kaydı Oluştur', exact: true }).isEnabled(), true);
+        if (!confirm) return;
         await page.getByRole('button', { name: 'Jira Kaydı Oluştur', exact: true }).click();
         await dialog.getByRole('button', { name: 'Oluştur', exact: true }).evaluate(e => { e.click(); e.click(); });
     }
     try {
-        const records = await json(admin, '/api/v1/operational-records');
+        const records = process.argv[7] === '--verify-presentation'
+            ? (await json(admin, '/api/v1/operational-records/stored?pageSize=100')).items
+            : await json(admin, '/api/v1/operational-records');
+        if (process.argv[7] === '--prepare-walkthrough') {
+            const ready = records.find(r => r.orCode === 'SIM-OR-100');
+            assert.ok(ready?.simulationMode && ready.classification === 0 && !ready.jiraIssueKey);
+            await role(['JiraPublisher']);
+            await previewAndConfirm(ready, 'owner-ready', false);
+            const saved = await json(actor, '/api/v1/operational-records/' + ready.id);
+            assert.equal(saved.jiraExists, false);
+            fs.writeFileSync(path.join(out, 'walkthrough.json'), JSON.stringify({ seconds: (Date.now() - started) / 1000,
+                url: new URL('operational-records/' + ready.id, ui).href, database,
+                state: 'Preview verified; confirmation canceled; no Jira create attempted', sourceCloseEnabled: saved.sourceCloseEnabled }, null, 2));
+            return;
+        }
         if (process.argv[7] === '--verify-presentation') {
-            const published = records.find(r => r.orCode === 'SIM-OR-500');
+            const published = records.find(r => r.orCode === 'SIM-OR-100');
             assert.ok(published?.jiraIssueKey && !published.sourceCloseRequested);
             assert.equal(published.presentationState, 'SourceOpen');
             await role(['JiraPublisher']);
             await detail(published);
             assert.equal(await page.getByText('Kaynak Kaydı Tamamla', { exact: true }).count(), 0);
-            await page.getByText('Jira var, kaynak açık', { exact: true }).waitFor();
+            await page.getByText('Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı.', { exact: true }).first().waitFor();
             await capture(page, out, 'jira-only-result');
             await navigate(page, ui, 'operational-records');
-            await page.getByRole('tab', { name: /Jira var, kaynak açık/ }).click();
+            await page.getByRole('textbox', { name: 'Kayıt ara', exact: true }).fill(published.orCode);
             await page.getByText(published.orCode, { exact: true }).waitFor();
             await capture(page, out, 'jira-only-list');
+            const unknown = records.find(r => r.orCode === 'SIM-OR-400');
+            assert.ok(unknown?.reconciliationRequired && !unknown.retryEligible);
+            await detail(unknown);
+            await page.getByRole('heading', { name: 'Jira sonucu doğrulanmalı', exact: true }).waitFor();
+            assert.equal(await page.getByRole('button', { name: 'Yeniden Dene', exact: true }).isDisabled(), true);
+            assert.equal((await actor.post(`/api/v1/operational-records/${unknown.id}/jira`, {
+                headers: { 'Idempotency-Key': 'synthetic-restart-new-command' }
+            })).status(), 409);
+            const replay = await json(actor, `/api/v1/operational-records/${published.id}/jira`, { method: 'POST' });
+            assert.equal(replay.jiraIssueKey, published.jiraIssueKey);
+            for (const record of [published, unknown]) {
+                assert.equal(query(database, `SELECT COUNT(*) FROM ops.OperationalRecordWorkflowHistory WHERE OperationalRecordId='${record.id}' AND WorkflowState='CreateRequested'`), '1');
+            }
+            fs.writeFileSync(path.join(out, 'restart-results.json'), JSON.stringify({ seconds: (Date.now() - started) / 1000,
+                published: { id: published.id, key: published.jiraIssueKey, sourceCloseRequested: published.sourceCloseRequested },
+                unknown: { id: unknown.id, reconciliationRequired: unknown.reconciliationRequired },
+                checks: ['Fresh hosts reopen persisted key/source-open and unknown outcome; no second create'] }, null, 2));
             console.log('Persisted Jira-only result and list distinguish source open from pending close/completion');
             return;
         }
@@ -81,7 +114,8 @@ const out = path.resolve(process.argv[6]);
             assert.equal(record.sourceCloseEnabled, false);
             return record;
         };
-        const happy = fixture('SIM-OR-500');
+        const happy = fixture('SIM-OR-100');
+        assert.equal(happy.classification, 0, 'The fixed happy fixture is a synthetic ServerRequest');
         assert.ok(blocked, 'Run the existing SQL evaluation test first');
         await role(['ReadOnly']);
         await detail(blocked);
@@ -95,6 +129,22 @@ const out = path.resolve(process.argv[6]);
         checks.push('ReadOnly cannot review or publish; API 403 and absent controls');
 
         await role(['Operator']);
+        await navigate(page, ui, 'operational-records');
+        await page.getByRole('button', { name: 'Kaynağı yenile', exact: true }).click();
+        await page.getByText('Sınırlı kaynak yenilemesi tamamlandı.', { exact: false }).waitFor();
+        const beforeBrowse = query(database, "SELECT CHECKSUM_AGG(BINARY_CHECKSUM(SourceRecordId,UpdatedAt)) FROM ops.OperationalRecords");
+        await page.getByRole('combobox', { name: 'Sayfa boyutu', exact: true }).selectOption('10');
+        await page.getByRole('button', { name: 'Sonraki', exact: true }).click();
+        await page.getByText('Sayfa 2 /', { exact: false }).waitFor();
+        await page.getByRole('button', { name: 'Önceki', exact: true }).click();
+        await page.getByRole('textbox', { name: 'Kayıt ara', exact: true }).fill('SIM-OR-');
+        await page.getByText('5 kayıtlı eşleşme', { exact: true }).waitFor();
+        await page.getByRole('combobox', { name: 'Sıralama', exact: true }).selectOption('code');
+        await page.getByRole('combobox', { name: 'Sayfa boyutu', exact: true }).selectOption('10');
+        await page.getByText('5 kayıtlı eşleşme', { exact: true }).waitFor();
+        assert.equal(query(database, "SELECT CHECKSUM_AGG(BINARY_CHECKSUM(SourceRecordId,UpdatedAt)) FROM ops.OperationalRecords"), beforeBrowse);
+        await capture(page, out, 'stored-browse');
+        checks.push('Explicit UI source refresh; stored search/sort/paging do not mutate source or workflow versions');
         await detail(blocked);
         for (const [label, name] of [['Sunucu Talebi', 'server'], ['Uygulama Kurulumu', 'installation'], ['Sunucu İadesi/Emekliliği', 'retirement']]) {
             const select = page.getByRole('combobox', { name: 'Talep türü (operatör beyanı)', exact: true });
@@ -149,7 +199,8 @@ const out = path.resolve(process.argv[6]);
         assert.equal((await actor.post(`/api/v1/operational-records/${unknown.id}/retry`)).status(), 409);
         await capture(page, out, 'jira-unknown-result');
         checks.push('Ambiguous Simulation result retains reconciliation block with no automatic retry');
-        fs.writeFileSync(path.join(out, 'jira-only-results.json'), JSON.stringify({ checks }, null, 2));
+        fs.writeFileSync(path.join(out, 'jira-only-results.json'), JSON.stringify({ seconds: (Date.now() - started) / 1000,
+            published: { id: created.id, key: created.jiraIssueKey, sourceCloseRequested: created.sourceCloseRequested }, checks }, null, 2));
         console.log(JSON.stringify({ checks }, null, 2));
     } finally {
         const latest = await json(admin, '/api/v1/access/users/' + me.userId);

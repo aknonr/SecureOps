@@ -1124,6 +1124,132 @@ prerequisites remain the separate current list in
 
 ### SDM, Management and TEST Delivery Handoff, 2026-09-07
 
+#### OR To SDM Local Acceptance Closeout, 2026-09-15
+
+This is the current OR-to-SDM continuation; dated delivery notes below retain
+their original scope. Start: `5298d5639b148f2a0d343063323efc8633520813`, branch
+`feature/or-sdm-local-acceptance-20260914`, worktree
+`C:\SecureOpsBuild\secure-ops-or-sdm-local-acceptance-20260914`.
+No newer dedicated OR branch/worktree or second writer was found. The protected
+original remains `81f5757` with its untracked `.vscode/`; accepted In Use and OCO
+worktrees remain unchanged. No merge, push, packaging, deployment or corporate
+call. Final commit/status and fixed-start line accounting are recorded in
+`C:\SecureOpsBuild\validation\or-sdm-closeout-20260914\final-git.json`.
+
+Already implemented: explicit source refresh versus stored search/filter/paging,
+three review declarations, source work/outcome and missing-fact guidance,
+source/version-bound preview, exact requester/reporter resolution, capabilities,
+claims, SQL idempotency/audit, durable Jira-only intent and reconciliation blocks.
+The exact server-owned positive **ServerRequest** policy exists; this is not an
+absent implementation. SoftwareInstallation (ApplicationInstallation in business
+wording) and ServerRetirement remain mapping-blocked; no SunucuTalep fallback.
+In Use reporter, reviewer, actor and cross-assignee semantics are unchanged.
+
+Corrections: detail access notifications now revalidate the actual capability
+snapshot. Record changes and access revocation invalidate obsolete reads/reviews/
+commands; delayed results cannot repopulate old state. Same-access revalidation
+and recoverable review errors retain the declaration. Route parameter changes
+load the requested record. The existing fixed Simulation happy fixture alone is
+now ServerRequest, so its confirmation names the actual synthetic request type.
+No new policy, approval subsystem, dependency, schema or corporate flag was added.
+
+Local acceptance is complete for these supported paths, not corporate publication
+readiness. Two deliberately separate proofs are retained: the numeric exact-record
+policy runs with real draft/SQL services and test-only source/Jira/identity
+substitutes; the published browser uses paired Simulation's fixed allowlist.
+Simulation is not a corporate policy attestation. Its identity defaults are not
+evidence of authenticated corporate reporter acceptance.
+
+Evidence root: `C:\SecureOpsBuild\validation\or-sdm-closeout-20260914`.
+
+| Executed gate | Result | Command seconds |
+|---|---|---:|
+| Release build, `build-accepted` | 0 warnings/errors | 3.653 |
+| Normal regression, `regression-final` | 1247 unit + 243 integration passed; 21 SQL opt-ins skipped | 7.938 |
+| Fresh SQL harness, `sql-harness-final` | 001-013 and upgrade preservation passed | 2.235 |
+| Separate SQL opt-ins, `sql-final` | 21 passed, no skips | 2.800 |
+| Post-normalization SDM unit checks, `focused-accepted` | 75 passed | 2.129 |
+| Published journey, `browser-final` | Passed | 12.360 |
+| Actual host restart, `browser-restart-accepted` | Passed | 2.874 |
+
+Normal OpenAPI comparison passed without snapshot-update opt-in. Regression also
+includes deterministic idle/absolute session-clock and unknown transport-result
+tests. Six new detail-handler cases cover delayed success/failure, 503/network
+review preservation, revoked access and route changes. SQL additionally proves
+exact positive policy/evaluation audit, real source fingerprint rejection,
+read-only create rejection, one key, restart/replay and no close-intent upgrade.
+Existing claim/concurrency, audit rollback and interrupted-key-persistence cases
+passed. `skips-and-optins.json` maps every normal SQL skip to its executed result.
+
+Browser: explicit UI refresh; stored search/sort/paging without workflow changes;
+all three declarations; ReadOnly/Operator API denial; real SQL version conflict
+with preserved selection; confirmation focus/cancel/double-click; one simulated
+key; source-open result; unknown outcome with no retry. At actual restart, stored
+views reopen without source refresh, the known key replays, and a new unknown-case
+command is rejected with only one persisted create request. Desktop 1440x900 and
+mobile 390x844 screenshots have no horizontal overflow. Initial restart assertion
+targeted an old badge inside collapsed details and failed in 33.267 s; the corrected
+visible outcome assertion passed. No product change was needed for that failure.
+
+`final-tested-source.json`, `final-tested-api.json`, `final-tested-ui.json` and
+`final-content-verification.json` bind final source/payload files by SHA-256.
+API DLL: `004CD028BDEC378A04575103C526FCA94EA7A07800883D86C0559FAFE6FB2CAE`.
+UI DLL: `72D135F17112E9E0CBCDAEFE7B734368A9CB19333EC22BE0C94864CD016854B0`.
+Both embed base ProductVersion `0.1.0+5298d5639b148f2a0d343063323efc8633520813`;
+it is not the final commit identity. Full browser confirmation preceded only
+C# line-ending normalization; rebuilding changed Infrastructure DLL/PDB hashes,
+not API/UI DLLs. The final 75 focused checks, restart and fresh-owner preview ran
+on the rebuilt payload. Earlier manifests and the exact four-file difference are
+retained rather than silently reassociated. No full-suite repetition for docs.
+rc6.17 remains the historical `f519b50` package, not this source or walkthrough.
+This branch has no upstream; cached original upstream is `5692c77`, not live remote
+verification. No push was attempted.
+
+Mandatory full format: exit 2 in 33.783 s. Actual start/final reports contain the
+same 123 distinct location/ID/message diagnostics in 58 files, zero introduced or
+removed. `format-comparison.json` and identity lists preserve the comparison.
+The initial baseline wrapper failed to record elapsed time; it is not fabricated.
+Scoped new C# formatting and diff checks pass. Shared full-format debt remains an
+unwaived combined-delivery gate, not release readiness.
+
+**Owner walkthrough:** running UI `https://localhost:64152/operational-records`,
+API `http://127.0.0.1:64151/`; only task-owned processes are retained. Current PIDs
+and guarded stop instructions are in `hosts.json` / `Stop-Local.ps1` in the evidence
+root. `browser-owner-ready/walkthrough.json` gives the verified direct record URL.
+This separate fresh database is `SecureOps_ResourcesV1_orsdmwalkthrough20260915`;
+preview/confirmation cancellation was verified without consuming its create.
+Sign in with the existing Demo button, open **SIM-OR-100**, leave the declaration
+unset (it is not approval), select **Jira Taslağını Önizle**, inspect **Sunucu
+Talebi** and source-open notice, then **Jira Kaydı Oluştur > Oluştur** once.
+The result is explicitly simulated. Reopen to see the stored key; never reset
+completed/uncertain rows to replay. Use only this one-record fresh walkthrough.
+The acceptance result **SIM-1** remains separately preserved in
+`SecureOps_ResourcesV1_orsdmfinal20260915`; the first database is also retained.
+
+Start/restart the same tested payload in two foreground PowerShell terminals:
+
+```powershell
+& C:\SecureOpsBuild\validation\or-sdm-closeout-20260914\Start-Local.ps1 -Role Api
+& C:\SecureOpsBuild\validation\or-sdm-closeout-20260914\Start-Local.ps1 -Role Ui
+```
+
+Run one command per terminal. Stop only these hosts first; default dataset is
+Walkthrough. To inspect accepted history instead, start API with `-Dataset Accepted`
+and reauthenticate. Launcher uses process-only Demo auth/access compatibility,
+Mock identity/PAM, paired Simulation, SQL Access/Audit/Session/OR, synchronous
+audit and private FileSystemDpapi rings. ReadOnlyIntegrationMode=false is required
+only by this supported local composition; ControlledTestWritesEnabled=false and
+SourceCloseEnabled=false remain set. Corporate validators/defaults are unchanged.
+No production session limits or source writes are changed. Actual settings are in
+the private launcher; no credentials, keys, traces or test data enter Git.
+
+Next TEST action and missing inputs: the current section of
+`docs/24-api-test-deployment-readiness.md`. Managed browser/GPO, actual screen reader,
+VDI, corporate authentication, current Jira permissions/mapping/identity and
+authoritative remote duplicate correlation remain external acceptance, not local
+passes. BPM/source closure is separately blocked. Combined source integration,
+shared formatting and a newly identified paired TEST package are later tasks.
+
 **Current packaged delivery, rc6.13 (not deployed):** clean tracked build source
 `1935dc522e70b0fcfe602812bffb06f2858d61b1`, runtime
 `2b895f6e6c66553be52f44471a231892865a9937`. All nine outgoing commits were inspected

@@ -11,7 +11,9 @@ public sealed class SimulationOperationalRecordClassifier : IOperationalRecordCl
         ArgumentNullException.ThrowIfNull(sourceItem);
         return SimulationOperationalRecordClient.IsSimulationSourceId(sourceItem.SourceRecordId)
             ? new OperationalRecordClassificationResult(
-                OperationalRecordClassification.OperationalSupport,
+                sourceItem.SourceRecordId == SimulationOperationalRecordClient.HappySourceId
+                    ? OperationalRecordClassification.ServerRequest
+                    : OperationalRecordClassification.OperationalSupport,
                 true,
                 "Eligible synthetic TEST simulation record.")
             : new OperationalRecordClassificationResult(

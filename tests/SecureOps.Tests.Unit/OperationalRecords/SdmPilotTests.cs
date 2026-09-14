@@ -15,6 +15,16 @@ namespace SecureOps.Tests.Unit.OperationalRecords;
 public sealed class SdmPilotTests
 {
     [Fact]
+    public async Task SimulationHappyFixture_IsServerRequestWithoutBroadeningOtherRecords()
+    {
+        var source = new SimulationOperationalRecordClient();
+        var classifier = new SimulationOperationalRecordClassifier();
+        OperationalRecordSourceItem happy = (await source.GetActiveAsync(10, default)).Single(item => item.OrCode == "SIM-OR-100");
+        classifier.Classify(happy).Classification.Should().Be(OperationalRecordClassification.ServerRequest);
+        classifier.Classify(happy with { SourceRecordId = "unapproved-synthetic" }).JiraEligible.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task PositivePreview_PersistsHumanDecision_CreateAndReplayKeepSourceOpen()
     {
         Fixture f = await Fixture.Create();
