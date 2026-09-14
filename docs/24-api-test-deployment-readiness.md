@@ -26,6 +26,89 @@ stays false. Existing module behavior and external-write fences remain unchanged
 Installation requires current target inventory and a named foreground Worker session;
 package integrity/local Simulation acceptance is not corporate integration acceptance.
 
+### Final Local Delivery Evidence
+
+Final accounting (`git diff --no-renames --numstat`, additions plus deletions):
+inherited OR-to-merge 127 files +9783/-90 = 9873; newly authored merge-to-final
+69 files +964/-547 = 1511, including formatting, tests, tooling and documentation.
+Complete fixed OR-to-final delta: 191 files +10745/-635 = 11380; common-base-to-final
+204 files +11978/-699 = 12677. Net endpoint deltas need not add across overlapping
+edits. `scope.json` retains every path and both immutable baselines; commits never
+reset accounting. The one-time exception applies only to this combined delivery.
+
+Release **2026-09-15-pilot-rc6.19**, build source
+`2fe9d724dc3d3f6a33525a7230e3f6cf48c5c97b`, is retained at
+`C:\SecureOpsBuild\release\2026-09-15-pilot-rc6.19`. API/UI/Worker identify that exact
+commit, not merely the pre-commit ProductVersion. All 799 extracted files match
+their manifests: API 245, UI 262, Worker 253, DBA 39. DBA contains both complete
+001-018 trees (36 files), the original Hangfire installer and two operator documents.
+Archive hashes and assembly hashes are in `release-metadata.json`; per-file hashes
+are under `manifests/`. The exported Turkish runbook is `operator-runbook-tr.md`.
+Final handoff commits only update this evidence and the browser launcher: explicitly
+select SQL for paired OR Simulation and a private report directory. Compiled source,
+contracts, migrations and packaging scripts remain identical to the build commit.
+
+| Final check | Actual result / wall-clock seconds |
+|---|---|
+| Release solution build | 0 warnings/errors; 26.301 s |
+| Full mandatory format | Pass, 43.101 s; 0 remaining diagnostics. Combined baseline 201 raw / 123 unique identities in 58 files is resolved, not waived. |
+| Normal regression | 1288 unit + 267 integration pass; 32 intentional opt-ins; 14.416 s. Normal checked-in OpenAPI comparison passed without update mode. |
+| Supported SQL opt-ins | 30/30 pass, 0 skip; 9.556 s. Includes the 21 Resource/In Use/SDM tests and nine additional OCO SQL tests. |
+| Exact packaged API/Worker opt-in | 1/1 pass, 145.736 s; real interrupted Worker, lease recovery/attempt 2, stale completion rejection, explicit review and immutable preparation. |
+| Browser-download MIME opt-in | 1/1 pass, 3.950 s; Turkish content and six matching CID images, no send. All 11 formerly pending opt-ins are now executed. |
+| Fresh 001-018 upgrade harnesses | Opt-in DB 3.852 s; preparation DB 3.226 s; browser DB 4.391 s; host DB 3.318 s. Predecessor data preserved. Packaged Hangfire installer separately succeeds (0.538/0.587 s). |
+| Packaged browser | OCO source/review/apply/preparation 55.308 s; continuity 26.980 s; reporter/RFC/workbook 8.493 s; In Use workspace 12.747 s; OR SQL confirmation/conflict/unknown 14.800 s. After API restart: OR 4.528 s, identical OCO .eml 2.788 s. |
+| Packaging/dependencies | Matched release 70.694 s; extracted hash verification 21.293 s; five negative payload/dependency checks 1.171 s; Swagger artifact gate 0.652 s; vulnerability audit 21.121 s, none reported by configured feeds. |
+
+`skips-and-optins.json` names every normal skip, reason and passing separate run;
+no supported opt-in remains skipped. Extra fixture runs are not added to unique
+test totals. Focused packaging contract checks pass 4/4 (14.180 s). Actual browser
+viewports are 1440x900 and 390x844, with keyboard confirmation focus, cancel, tour
+nonmutation, denial and persisted version conflicts. Existing detailed In Use/OR
+network/session acceptance remains scoped to their accepted evidence; managed
+browser policy, screen reader/VDI and corporate provider behavior are not newly proved.
+
+The supported local profile is process-only Demo/Mock + paired Simulation,
+isolated LocalDB, SQL repositories and OCO Fixture providers; local
+ReadOnlyIntegrationMode=false is required by this composition, while controlled
+corporate writes/source close remain false. This is NOT the corporate Test profile.
+OR creates only `SIM-1`, retains source-open intent and blocks an uncertain second
+create after restart. ServerRequest has the implemented exact-record policy;
+SoftwareInstallation and ServerRetirement remain mapping-blocked. No SMTP transport,
+In Use executor or BPM operation was enabled. Six synthetic assets are not approved
+corporate branding. All fixture data, traces, rings, reports and databases stay private.
+
+The unchanged console Worker starts its job server and acknowledges Ctrl+C with
+`SecureOps job server stopped`; its Hangfire server registration is absent afterward.
+The console transcript spans 25 s; shutdown acknowledgement returned in 0.126 s.
+PowerShell reports pipeline interruption (exit 1), not a claimed clean shell exit.
+This is graceful idle console-stop evidence, not Windows Service/unattended evidence;
+active-job crash recovery is the separate passing packaged-host test. All new
+verification hosts are stopped; prior OR walkthrough PIDs 13140/22044 are preserved.
+The combined verification URLs on ports 64201-64203 are no longer running.
+
+Failed attempts remain visible in private evidence: rc6.18 correctly rejected native
+dependency PDBs; rc6.19 excludes only those debug symbols from fresh staging. Three
+source-text SQL assertions were updated after formatter private-field renames. One
+introduced ENDOFLINE was normalized and the full formatter rerun. Private helper
+quoting/JSON-array and overlong queue inputs were corrected; the first Hangfire
+provisioning log's exit 0 was invalid (SQL never ran), not counted as a pass. Initial
+browser attempts used deliberately stale reporter fixtures / the default in-memory
+OR repository; fresh additive reporter data and explicit SQL fixed the test setup,
+without weakening assertions or changing application behavior. See validation.json
+for failed and superseding run identities; rc6.18 and all older releases stay intact.
+
+**Source/package local gates: accepted. Installation readiness: false. Corporate
+Jira publication readiness: false.** Next action is the marked runbook's read-only
+inventory on the approved TEST host: target and API/UI/Worker paths, actual installed
+hashes/versions, Hosting Bundle/auth/proxy, schema/runtime grants, persistent rings,
+backup/recovery references, approved OCO source/profile/assets and named console
+Worker operator. No server, credential, policy decision or installed state was guessed.
+Keep corporate ReadOnlyIntegrationMode=true, ControlledTestWritesEnabled=false and
+SourceCloseEnabled=false; a later single-record Jira-only pilot still needs the exact
+policy, field/identity/permission and authoritative duplicate-correlation evidence
+listed below. Original-script discovery is complete. No push or installation occurred.
+
 ## Combined Delivery Checkpoint, 2026-09-15
 
 Historical pre-exception checkpoint, not installation approval. Fixed task

@@ -25,7 +25,12 @@ $env:IdentityLookup__Provider = 'Mock'
 $env:Audit__Provider = 'SqlServer'
 $env:OperationalRecords__SourceProvider = 'Disabled'
 $env:Jira__Provider = 'Disabled'
-if ($OperationalRecordSimulation) { $env:OperationalRecords__SourceProvider = 'Simulation'; $env:Jira__Provider = 'Simulation' }
+if ($OperationalRecordSimulation) {
+    $env:OperationalRecords__SourceProvider = 'Simulation'
+    $env:Jira__Provider = 'Simulation'
+    $env:OperationalRecords__RepositoryProvider = 'SqlServer'
+    $env:InUseReports__Directory = "$root/private-reports"
+}
 $env:OperationalRecords__ReadOnlyIntegrationMode = 'false' # Supported Demo + disabled providers, not corporate read mode.
 $env:OperationalRecords__ControlledTestWritesEnabled = 'false'
 $env:OperationalRecords__SourceCloseEnabled = 'false'
