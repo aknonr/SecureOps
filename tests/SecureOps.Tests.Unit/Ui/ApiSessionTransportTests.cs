@@ -24,7 +24,7 @@ namespace SecureOps.Tests.Unit.Ui;
 /// </remarks>
 public sealed class ApiSessionTransportTests
 {
-    private const string ApiCookie = "__Host-SecureOps.ApplicationSession";
+    private const string _apiCookie = "__Host-SecureOps.ApplicationSession";
 
     [Fact]
     public async Task SecondRequest_ReplaysTheSessionCookieTheApiIssued()
@@ -37,7 +37,7 @@ public sealed class ApiSessionTransportTests
         await client.GetAsync("api/v1/access/me");
 
         handler.SentCookies[0].Should().BeNull();
-        handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
+        handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class ApiSessionTransportTests
         await client.GetAsync("api/v1/access/me");
 
         handler.SentCookies[0].Should().BeNull();
-        handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
+        handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class ApiSessionTransportTests
         handler.SentCookies.Should().HaveCount(20);
         handler.SentCookies.Count(cookie => cookie is null).Should().Be(1);
         handler.SentCookies.Skip(1).Should().OnlyContain(cookie =>
-            cookie!.Contains(ApiCookie + "=session-1", StringComparison.Ordinal));
+            cookie!.Contains(_apiCookie + "=session-1", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class ApiSessionTransportTests
         await first.GetAsync("api/v1/access/me");
         await second.GetAsync("api/v1/access/me");
 
-        firstHandler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
+        firstHandler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
         secondHandler.SentCookies[0].Should().BeNull();
     }
 
@@ -130,7 +130,7 @@ public sealed class ApiSessionTransportTests
         await sessions.GetAsync("api/v1/sessions/current");
         await directory.GetAsync("api/v1/directory/groups/lookup");
 
-        directoryHandler.SentCookies[0].Should().Contain(ApiCookie + "=session-1");
+        directoryHandler.SentCookies[0].Should().Contain(_apiCookie + "=session-1");
     }
 
     [Fact]
@@ -197,8 +197,8 @@ public sealed class ApiSessionTransportTests
         await client.GetAsync("api/v1/access/me");
 
         handler.SentCookies.Should().HaveCount(3);
-        handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
-        handler.SentCookies[2].Should().Contain(ApiCookie + "=session-1");
+        handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
+        handler.SentCookies[2].Should().Contain(_apiCookie + "=session-1");
         reauthenticationKey.Should().Be("browser-a");
         store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
     }
@@ -217,8 +217,8 @@ public sealed class ApiSessionTransportTests
 
         revoke.StatusCode.Should().Be(HttpStatusCode.OK);
         handler.SentCookies.Should().HaveCount(3);
-        handler.SentCookies[1].Should().Contain(ApiCookie + "=session-1");
-        handler.SentCookies[2].Should().Contain(ApiCookie + "=session-1");
+        handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
+        handler.SentCookies[2].Should().Contain(_apiCookie + "=session-1");
         reauthenticationKey.Should().Be("browser-a");
         store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
     }
@@ -479,7 +479,7 @@ public sealed class ApiSessionTransportTests
             {
                 response.Headers.TryAddWithoutValidation(
                     "Set-Cookie",
-                    ApiCookie + "=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; Secure; HttpOnly; SameSite=Lax");
+                    _apiCookie + "=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; Secure; HttpOnly; SameSite=Lax");
             }
             else if (MalformedSetCookie)
             {
@@ -492,7 +492,7 @@ public sealed class ApiSessionTransportTests
                 _issued++;
                 response.Headers.TryAddWithoutValidation(
                     "Set-Cookie",
-                    ApiCookie + "=session-" + _issued + "; Path=/; Secure; HttpOnly; SameSite=Lax");
+                    _apiCookie + "=session-" + _issued + "; Path=/; Secure; HttpOnly; SameSite=Lax");
             }
 
             return Task.FromResult(response);

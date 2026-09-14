@@ -1,4 +1,4 @@
-﻿using SecureOps.Shared.Contracts.Identity;
+using SecureOps.Shared.Contracts.Identity;
 
 namespace SecureOps.Ui.Services;
 

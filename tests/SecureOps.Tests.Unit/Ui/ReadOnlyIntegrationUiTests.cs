@@ -132,7 +132,8 @@ public sealed class ReadOnlyIntegrationUiTests
         // Simulation means synthetic data. Read-only means real data that cannot be written back.
         // A record may report either independently, and they must never collapse into one notice.
         OperationalRecordResponse simulated = Record(
-            OperationalRecordWorkflowState.Eligible, readOnly: false) with { SimulationMode = true };
+            OperationalRecordWorkflowState.Eligible, readOnly: false) with
+        { SimulationMode = true };
         OperationalRecordResponse readOnly = Record(
             OperationalRecordWorkflowState.Eligible, readOnly: true);
 

@@ -50,7 +50,7 @@ public static class AccessIdentityDisplay
             || !string.IsNullOrWhiteSpace(profile.Title)
             || !string.IsNullOrWhiteSpace(profile.Uid));
 
-    private static readonly char[] Separators = [' ', '.', '-', '_', ':', '/', (char)92];
+    private static readonly char[] _separators = [' ', '.', '-', '_', ':', '/', (char)92];
 
     /// <summary>One or two initials derived from the human-facing label.</summary>
     public static string Initials(AccessIdentityProfileResponse? profile, string corporateIdentity)
@@ -61,7 +61,7 @@ public static class AccessIdentityDisplay
             return "?";
         }
 
-        string[] parts = source.Split(Separators, StringSplitOptions.RemoveEmptyEntries);
+        string[] parts = source.Split(_separators, StringSplitOptions.RemoveEmptyEntries);
         return parts.Length switch
         {
             0 => "?",

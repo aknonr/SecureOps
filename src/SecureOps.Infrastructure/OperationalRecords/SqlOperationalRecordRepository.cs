@@ -10,7 +10,7 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>SQL Server repository with transactional workflow acquisition and database idempotency.</summary>
 public sealed partial class SqlOperationalRecordRepository : IOperationalRecordRepository
 {
-    private const int CommandTimeoutSeconds = 15;
+    private const int _commandTimeoutSeconds = 15;
     private readonly string _connectionString;
 
     /// <summary>Initializes the SQL repository.</summary>
@@ -24,7 +24,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
     public async Task<IReadOnlyList<OperationalRecord>> ListAsync(CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        IEnumerable<OperationalRecordRow> rows = await connection.QueryAsync<OperationalRecordRow>(Command(ReadSql, cancellationToken));
+        IEnumerable<OperationalRecordRow> rows = await connection.QueryAsync<OperationalRecordRow>(Command(_readSql, cancellationToken));
         return rows.Select(Map).ToArray();
     }
 
@@ -32,7 +32,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
     public async Task<OperationalRecord?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        OperationalRecordRow? row = await connection.QuerySingleOrDefaultAsync<OperationalRecordRow>(Command($"{ReadSql} WHERE r.OperationalRecordId = @Id", new { Id = id }, cancellationToken));
+        OperationalRecordRow? row = await connection.QuerySingleOrDefaultAsync<OperationalRecordRow>(Command($"{_readSql} WHERE r.OperationalRecordId = @Id", new { Id = id }, cancellationToken));
         return row is null ? null : Map(row);
     }
 
@@ -482,7 +482,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
     }
 
     private static Task<OperationalRecordRow?> GetForUpdateAsync(SqlConnection connection, SqlTransaction transaction, Guid id, CancellationToken cancellationToken) =>
-        connection.QuerySingleOrDefaultAsync<OperationalRecordRow>(Command($"{ReadSql.Replace("FROM ops.OperationalRecords r", "FROM ops.OperationalRecords r WITH (UPDLOCK, HOLDLOCK)", StringComparison.Ordinal)} WHERE r.OperationalRecordId = @Id", new { Id = id }, cancellationToken, transaction));
+        connection.QuerySingleOrDefaultAsync<OperationalRecordRow>(Command($"{_readSql.Replace("FROM ops.OperationalRecords r", "FROM ops.OperationalRecords r WITH (UPDLOCK, HOLDLOCK)", StringComparison.Ordinal)} WHERE r.OperationalRecordId = @Id", new { Id = id }, cancellationToken, transaction));
 
     private static Task<int> UpdateStateAsync(
         SqlConnection connection,
@@ -522,10 +522,10 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
     }
 
     private static CommandDefinition Command(string sql, CancellationToken cancellationToken) =>
-        new(sql, commandTimeout: CommandTimeoutSeconds, cancellationToken: cancellationToken);
+        new(sql, commandTimeout: _commandTimeoutSeconds, cancellationToken: cancellationToken);
 
     private static CommandDefinition Command(string sql, object parameters, CancellationToken cancellationToken, IDbTransaction? transaction = null) =>
-        new(sql, parameters, transaction, CommandTimeoutSeconds, cancellationToken: cancellationToken);
+        new(sql, parameters, transaction, _commandTimeoutSeconds, cancellationToken: cancellationToken);
 
     private static OperationalRecord Map(OperationalRecordRow row) => new()
     {
@@ -572,7 +572,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
             or OperationalRecordWorkflowState.NeedsManualReview
             or OperationalRecordWorkflowState.Eligible;
 
-    private const string ReadSql = """
+    private const string _readSql = """
         SELECT r.OperationalRecordId AS Id, r.SourceRecordId, r.OrCode, r.Title, r.Description, r.Requester,
             r.SourceCreatedAt AS CreatedAt, r.EnvironmentName AS Environment, r.ServerReference,
             r.ApplicationReference, r.Classification, r.JiraEligible, r.EligibilityReason, r.WorkflowState,

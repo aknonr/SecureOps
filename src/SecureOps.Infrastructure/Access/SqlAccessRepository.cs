@@ -10,7 +10,7 @@ namespace SecureOps.Infrastructure.Access;
 /// <summary>SQL Server application-access repository with transactional decisions.</summary>
 public sealed class SqlAccessRepository : IAccessRepository
 {
-    private const int CommandTimeoutSeconds = 15;
+    private const int _commandTimeoutSeconds = 15;
     private readonly string _connectionString;
 
     /// <summary>Initializes the SQL repository.</summary>
@@ -124,7 +124,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     public async Task<ApplicationUser?> GetUserAsync(Guid userId, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        UserRow? row = await connection.QuerySingleOrDefaultAsync<UserRow>(Command($"{ReadUserSql} WHERE u.UserId = @UserId {UserGroupBy}", new { UserId = userId }, null, cancellationToken));
+        UserRow? row = await connection.QuerySingleOrDefaultAsync<UserRow>(Command($"{_readUserSql} WHERE u.UserId = @UserId {_userGroupBy}", new { UserId = userId }, null, cancellationToken));
         return row is null ? null : Map(row);
     }
 
@@ -132,7 +132,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     public async Task<ApplicationUser?> GetUserAsync(string corporateIdentity, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        UserRow? row = await connection.QuerySingleOrDefaultAsync<UserRow>(Command($"{ReadUserSql} WHERE u.CorporateIdentity = @CorporateIdentity {UserGroupBy}", new { CorporateIdentity = corporateIdentity }, null, cancellationToken));
+        UserRow? row = await connection.QuerySingleOrDefaultAsync<UserRow>(Command($"{_readUserSql} WHERE u.CorporateIdentity = @CorporateIdentity {_userGroupBy}", new { CorporateIdentity = corporateIdentity }, null, cancellationToken));
         return row is null ? null : Map(row);
     }
 
@@ -140,7 +140,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     public async Task<IReadOnlyList<ApplicationUser>> ListUsersAsync(CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        IEnumerable<UserRow> rows = await connection.QueryAsync<UserRow>(Command($"{ReadUserSql} {UserGroupBy} ORDER BY u.CorporateIdentity", null, null, cancellationToken));
+        IEnumerable<UserRow> rows = await connection.QueryAsync<UserRow>(Command($"{_readUserSql} {_userGroupBy} ORDER BY u.CorporateIdentity", null, null, cancellationToken));
         return rows.Select(Map).ToArray();
     }
 
@@ -148,7 +148,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     public async Task<ApplicationAccessRequest?> GetPendingRequestAsync(Guid userId, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        RequestRow? row = await connection.QuerySingleOrDefaultAsync<RequestRow>(Command($"{ReadRequestSql} WHERE ar.UserId = @UserId AND ar.Status = 'Pending'", new { UserId = userId }, null, cancellationToken));
+        RequestRow? row = await connection.QuerySingleOrDefaultAsync<RequestRow>(Command($"{_readRequestSql} WHERE ar.UserId = @UserId AND ar.Status = 'Pending'", new { UserId = userId }, null, cancellationToken));
         return row is null ? null : Map(row);
     }
 
@@ -156,7 +156,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     public async Task<IReadOnlyList<ApplicationAccessRequest>> ListRequestsAsync(AccessRequestStatus? status, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        string sql = $"{ReadRequestSql} WHERE (@Status IS NULL OR ar.Status = @Status) ORDER BY ar.RequestedAt DESC;";
+        string sql = $"{_readRequestSql} WHERE (@Status IS NULL OR ar.Status = @Status) ORDER BY ar.RequestedAt DESC;";
         IEnumerable<RequestRow> rows = await connection.QueryAsync<RequestRow>(Command(sql, new { Status = status?.ToString() }, null, cancellationToken));
         return rows.Select(Map).ToArray();
     }
@@ -165,7 +165,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     public async Task<IReadOnlyList<ApplicationAccessRequest>> ListRequestsForUserAsync(Guid userId, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        IEnumerable<RequestRow> rows = await connection.QueryAsync<RequestRow>(Command($"{ReadRequestSql} WHERE ar.UserId = @UserId ORDER BY ar.RequestedAt DESC", new { UserId = userId }, null, cancellationToken));
+        IEnumerable<RequestRow> rows = await connection.QueryAsync<RequestRow>(Command($"{_readRequestSql} WHERE ar.UserId = @UserId ORDER BY ar.RequestedAt DESC", new { UserId = userId }, null, cancellationToken));
         return rows.Select(Map).ToArray();
     }
 
@@ -175,7 +175,7 @@ public sealed class SqlAccessRepository : IAccessRepository
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        RequestRow? request = await connection.QuerySingleOrDefaultAsync<RequestRow>(Command($"{ReadRequestSql.Replace("FROM security.AccessRequests ar", "FROM security.AccessRequests ar WITH (UPDLOCK, HOLDLOCK)", StringComparison.Ordinal)} WHERE ar.AccessRequestId = @RequestId", new { RequestId = requestId }, transaction, cancellationToken));
+        RequestRow? request = await connection.QuerySingleOrDefaultAsync<RequestRow>(Command($"{_readRequestSql.Replace("FROM security.AccessRequests ar", "FROM security.AccessRequests ar WITH (UPDLOCK, HOLDLOCK)", StringComparison.Ordinal)} WHERE ar.AccessRequestId = @RequestId", new { RequestId = requestId }, transaction, cancellationToken));
         if (request is null)
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -307,7 +307,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     private async Task<ApplicationAccessRequest?> GetRequestAsync(Guid requestId, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
-        RequestRow? row = await connection.QuerySingleOrDefaultAsync<RequestRow>(Command($"{ReadRequestSql} WHERE ar.AccessRequestId = @RequestId", new { RequestId = requestId }, null, cancellationToken));
+        RequestRow? row = await connection.QuerySingleOrDefaultAsync<RequestRow>(Command($"{_readRequestSql} WHERE ar.AccessRequestId = @RequestId", new { RequestId = requestId }, null, cancellationToken));
         return row is null ? null : Map(row);
     }
 
@@ -345,7 +345,7 @@ public sealed class SqlAccessRepository : IAccessRepository
 
     private static async Task<ApplicationUser> GetUserWithinTransactionAsync(SqlConnection connection, SqlTransaction transaction, Guid userId, CancellationToken cancellationToken)
     {
-        UserRow row = await connection.QuerySingleAsync<UserRow>(Command($"{ReadUserSql} WHERE u.UserId = @UserId {UserGroupBy}", new { UserId = userId }, transaction, cancellationToken));
+        UserRow row = await connection.QuerySingleAsync<UserRow>(Command($"{_readUserSql} WHERE u.UserId = @UserId {_userGroupBy}", new { UserId = userId }, transaction, cancellationToken));
         return Map(row);
     }
 
@@ -359,9 +359,9 @@ public sealed class SqlAccessRepository : IAccessRepository
     private static string[] NormalizeRoles(IEnumerable<string> roles) => roles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(role => role, StringComparer.OrdinalIgnoreCase).ToArray();
     private static AccessMutationResult Missing() => new(AccessMutationDisposition.NotFound, null, null, [], []);
     private static AccessMutationResult Applied(ApplicationUser user, ApplicationAccessRequest? request, IEnumerable<string> previous, IEnumerable<string> next) => new(AccessMutationDisposition.Applied, user, request, next.Except(previous, StringComparer.OrdinalIgnoreCase).ToArray(), previous.Except(next, StringComparer.OrdinalIgnoreCase).ToArray());
-    private static CommandDefinition Command(string sql, object? parameters, IDbTransaction? transaction, CancellationToken cancellationToken) => new(sql, parameters, transaction, CommandTimeoutSeconds, cancellationToken: cancellationToken);
+    private static CommandDefinition Command(string sql, object? parameters, IDbTransaction? transaction, CancellationToken cancellationToken) => new(sql, parameters, transaction, _commandTimeoutSeconds, cancellationToken: cancellationToken);
 
-    private const string ReadUserSql = """
+    private const string _readUserSql = """
         SELECT u.UserId AS Id, u.CorporateIdentity, u.AuthenticationSource, u.AccessStatus AS Status,
             u.FirstAuthenticatedAt, u.LastAuthenticatedAt, u.DisabledAt, u.AccessVersion AS Version,
             u.LoginName, u.DisplayName, u.Mail, u.Uid, u.ProfileUpdatedAt,
@@ -371,14 +371,14 @@ public sealed class SqlAccessRepository : IAccessRepository
         LEFT JOIN security.Roles r ON r.RoleId = ra.RoleId
         """;
 
-    private const string ReadRequestSql = """
+    private const string _readRequestSql = """
         SELECT ar.AccessRequestId AS Id, ar.UserId, u.CorporateIdentity, ar.Status,
             ar.RequestedAt, ar.DecidedAt, ar.DecisionReason, ar.DecidedByCorporateIdentity, ar.Version
         FROM security.AccessRequests ar
         JOIN security.Users u ON u.UserId = ar.UserId
         """;
 
-    private const string UserGroupBy = "GROUP BY u.UserId, u.CorporateIdentity, u.AuthenticationSource, u.AccessStatus, u.FirstAuthenticatedAt, u.LastAuthenticatedAt, u.DisabledAt, u.AccessVersion, u.LoginName, u.DisplayName, u.Mail, u.Uid, u.ProfileUpdatedAt";
+    private const string _userGroupBy = "GROUP BY u.UserId, u.CorporateIdentity, u.AuthenticationSource, u.AccessStatus, u.FirstAuthenticatedAt, u.LastAuthenticatedAt, u.DisabledAt, u.AccessVersion, u.LoginName, u.DisplayName, u.Mail, u.Uid, u.ProfileUpdatedAt";
 
     private sealed class UserRow
     {

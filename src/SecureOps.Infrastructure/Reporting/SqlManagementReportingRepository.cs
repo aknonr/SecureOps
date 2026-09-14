@@ -10,7 +10,7 @@ namespace SecureOps.Infrastructure.Reporting;
 /// <summary>SQL Server implementation that aggregates reporting data before returning it to the API.</summary>
 public sealed class SqlManagementReportingRepository : IManagementReportingRepository
 {
-    private const int CommandTimeoutSeconds = 30;
+    private const int _commandTimeoutSeconds = 30;
     private readonly string _connectionString;
 
     /// <summary>Initializes the SQL reporting repository.</summary>
@@ -173,7 +173,7 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
         using SqlMapper.GridReader results = await connection.QueryMultipleAsync(new CommandDefinition(
             sql,
             parameters,
-            commandTimeout: CommandTimeoutSeconds,
+            commandTimeout: _commandTimeoutSeconds,
             cancellationToken: cancellationToken));
 
         ReportingAuditCount[] auditCounts = (await results.ReadAsync<ReportingAuditCount>()).ToArray();
@@ -253,7 +253,7 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
         using SqlMapper.GridReader results = await connection.QueryMultipleAsync(new CommandDefinition(
             sql,
             parameters,
-            commandTimeout: CommandTimeoutSeconds,
+            commandTimeout: _commandTimeoutSeconds,
             cancellationToken: cancellationToken));
         DateTimeOffset? coverageFromUtc = await results.ReadSingleAsync<DateTimeOffset?>();
         long totalItems = await results.ReadSingleAsync<long>();

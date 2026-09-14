@@ -13,7 +13,7 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Typed Turuncu Hat Operational Record and BPM activity provider.</summary>
 public sealed partial class TuruncuHatOperationalRecordClient : IOperationalRecordClient
 {
-    private const string Provider = "TuruncuHat";
+    private const string _provider = "TuruncuHat";
     private static readonly string[] _sourceSelects = ["id", "p_code", "p_name", "p_description", "p_rel_requester"];
     private static readonly string[] _activitySelects = ["id", "m_created_dt"];
     private readonly HttpClient _httpClient;
@@ -152,7 +152,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
         }
         catch (TuruncuHatQueryResultException exception)
         {
-            _health.MarkUnavailable(Provider);
+            _health.MarkUnavailable(_provider);
             _logger.LogWarning(
                 "Turuncu Hat source query reported an application error. FailureConditions: {FailureConditions}. ErrorNo: {ErrorNo}. HasErrorDescription: {HasErrorDescription}. HasErrorDetails: {HasErrorDetails}. HasItems: {HasItems}. RecordCount: {RecordCount}. TenantMetadata: {TenantMetadata}. PageNo: {PageNo}. MaxPages: {MaxPages}.",
                 ApplicationErrorConditions(exception),
@@ -168,7 +168,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
         }
         catch (Exception exception) when (exception is InvalidDataException or JsonException)
         {
-            _health.MarkUnavailable(Provider);
+            _health.MarkUnavailable(_provider);
             _logger.LogWarning(
                 "Turuncu Hat source query response parsing failed. BaseObject: {BaseObject}. SelectCount: {SelectCount}. FilterCount: 1.",
                 _options.SourceBaseObject,
@@ -176,7 +176,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
             throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordQueryFailed, false);
         }
 
-        _telemetry.RecordRecords(Provider, "source-query", parsed.Items.Count, parsed.MalformedCount);
+        _telemetry.RecordRecords(_provider, "source-query", parsed.Items.Count, parsed.MalformedCount);
         _logger.LogInformation(
             "Turuncu Hat source query completed. Records: {RecordCount}. MalformedOrAmbiguous: {MalformedCount}.",
             parsed.Items.Count,
@@ -239,20 +239,20 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
                     LogQueryResponseContract(response.StatusCode, readResult.ByteLength, document.RootElement);
                 }
 
-                _health.MarkAvailable(Provider);
-                _telemetry.RecordOperation(Provider, operation, "success", stopwatch.Elapsed);
+                _health.MarkAvailable(_provider);
+                _telemetry.RecordOperation(_provider, operation, "success", stopwatch.Elapsed);
                 return document;
             }
             catch (ExternalIntegrationException)
             {
-                _health.MarkUnavailable(Provider);
-                _telemetry.RecordOperation(Provider, operation, "failure", stopwatch.Elapsed);
+                _health.MarkUnavailable(_provider);
+                _telemetry.RecordOperation(_provider, operation, "failure", stopwatch.Elapsed);
                 throw;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                _health.MarkUnavailable(Provider);
-                _telemetry.RecordOperation(Provider, operation, "timeout", stopwatch.Elapsed);
+                _health.MarkUnavailable(_provider);
+                _telemetry.RecordOperation(_provider, operation, "timeout", stopwatch.Elapsed);
                 _logger.LogWarning(
                     "Turuncu Hat query timed out. Operation: {Operation}. BaseObject: {BaseObject}. FilterCount: {FilterCount}. SelectCount: {SelectCount}.",
                     operation,
@@ -263,8 +263,8 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
             }
             catch (HttpRequestException)
             {
-                _health.MarkUnavailable(Provider);
-                _telemetry.RecordOperation(Provider, operation, "unavailable", stopwatch.Elapsed);
+                _health.MarkUnavailable(_provider);
+                _telemetry.RecordOperation(_provider, operation, "unavailable", stopwatch.Elapsed);
                 _logger.LogWarning(
                     "Turuncu Hat query transport failed. Operation: {Operation}. BaseObject: {BaseObject}. FilterCount: {FilterCount}. SelectCount: {SelectCount}.",
                     operation,
@@ -275,8 +275,8 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
             }
             catch (Exception exception) when (exception is JsonException or InvalidDataException)
             {
-                _health.MarkUnavailable(Provider);
-                _telemetry.RecordOperation(Provider, operation, "invalid-response", stopwatch.Elapsed);
+                _health.MarkUnavailable(_provider);
+                _telemetry.RecordOperation(_provider, operation, "invalid-response", stopwatch.Elapsed);
                 _logger.LogWarning(
                     "Turuncu Hat query returned invalid JSON or exceeded response bounds. Operation: {Operation}. BaseObject: {BaseObject}. FilterCount: {FilterCount}. SelectCount: {SelectCount}.",
                     operation,
@@ -332,33 +332,33 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
                 throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordCloseFailed, true);
             }
 
-            _health.MarkAvailable(Provider);
-            _telemetry.RecordOperation(Provider, "activity-update", "success", stopwatch.Elapsed);
+            _health.MarkAvailable(_provider);
+            _telemetry.RecordOperation(_provider, "activity-update", "success", stopwatch.Elapsed);
             _logger.LogInformation("Turuncu Hat activity update acknowledged; authoritative source closure is not verified.");
         }
         catch (ExternalIntegrationException)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "activity-update", "failure", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "activity-update", "failure", stopwatch.Elapsed);
             _logger.LogWarning("Turuncu Hat source completion failed safely.");
             throw;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "activity-update", "timeout", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "activity-update", "timeout", stopwatch.Elapsed);
             throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordCloseFailed, true);
         }
         catch (HttpRequestException)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "activity-update", "unavailable", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "activity-update", "unavailable", stopwatch.Elapsed);
             throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordCloseFailed, true);
         }
         catch (Exception exception) when (exception is JsonException or InvalidDataException)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "activity-update", "invalid-response", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "activity-update", "invalid-response", stopwatch.Elapsed);
             throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordCloseFailed, true);
         }
     }

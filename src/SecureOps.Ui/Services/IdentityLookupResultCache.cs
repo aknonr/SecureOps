@@ -1,4 +1,4 @@
-﻿using SecureOps.Shared.Contracts.Identity;
+using SecureOps.Shared.Contracts.Identity;
 
 namespace SecureOps.Ui.Services;
 
@@ -37,7 +37,7 @@ public sealed class IdentityLookupResultCache
     /// ASCII unit separator. It cannot occur in an account, purpose, GUID, or event reference, so
     /// joined fields cannot run together and produce a false signature match.
     /// </summary>
-    private const string SignatureSeparator = "\u001F";
+    private const string _signatureSeparator = "\u001F";
 
     private string? _signature;
     private IdentityLookupResponse? _response;
@@ -122,7 +122,7 @@ public sealed class IdentityLookupResultCache
             .ToLowerInvariant();
 
         return string.Join(
-            SignatureSeparator,
+            _signatureSeparator,
             account,
             request.Purpose?.Trim() ?? string.Empty,
             request.AlertId?.ToString() ?? string.Empty,

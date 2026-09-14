@@ -49,14 +49,17 @@ public sealed class DirectorySecurityPrimitiveTests
 
         Func<Task> failing = () => cache.GetOrCreateAsync<int>("key", false, _ =>
         {
-            calls++; throw new DirectoryProviderUnavailableException();
+            calls++;
+            throw new DirectoryProviderUnavailableException();
         }, CancellationToken.None);
         await failing.Should().ThrowAsync<DirectoryProviderUnavailableException>();
         int first = await cache.GetOrCreateAsync("key", false, _ => Task.FromResult(++calls), CancellationToken.None);
         int cached = await cache.GetOrCreateAsync("key", false, _ => Task.FromResult(++calls), CancellationToken.None);
         int refreshed = await cache.GetOrCreateAsync("key", true, _ => Task.FromResult(++calls), CancellationToken.None);
 
-        first.Should().Be(2); cached.Should().Be(2); refreshed.Should().Be(3);
+        first.Should().Be(2);
+        cached.Should().Be(2);
+        refreshed.Should().Be(3);
     }
 
     [Fact]
@@ -68,7 +71,8 @@ public sealed class DirectorySecurityPrimitiveTests
         int calls = 0;
         Task<int> Factory(CancellationToken _)
         {
-            Interlocked.Increment(ref calls); return providerResult.Task;
+            Interlocked.Increment(ref calls);
+            return providerResult.Task;
         }
 
         Task<int>[] requests = Enumerable.Range(0, 8)

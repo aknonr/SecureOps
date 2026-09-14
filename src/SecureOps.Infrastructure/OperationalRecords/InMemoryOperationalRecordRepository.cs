@@ -9,7 +9,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
     public async Task<OperationalRecordPage> BrowseAsync(SecureOps.Shared.Contracts.OperationalRecords.OperationalRecordQuery query, bool excludeSynthetic, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
-        try { return OperationalRecordBrowsing.Query(_records.Values, query, excludeSynthetic); }
+        try
+        { return OperationalRecordBrowsing.Query(_records.Values, query, excludeSynthetic); }
         finally { _gate.Release(); }
     }
 

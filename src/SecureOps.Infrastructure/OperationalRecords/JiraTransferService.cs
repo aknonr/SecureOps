@@ -12,8 +12,8 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Coordinates durable, claimed, source-validated Jira workflows.</summary>
 public sealed class JiraTransferService : IJiraTransferService
 {
-    private const string CreateCommand = "OperationalRecords.CreateJira";
-    private const string RetryCommand = "OperationalRecords.Retry";
+    private const string _createCommand = "OperationalRecords.CreateJira";
+    private const string _retryCommand = "OperationalRecords.Retry";
     private readonly IOperationalRecordRepository _repository;
     private readonly IJiraIssueDraftService _draftService;
     private readonly IJiraClient _jiraClient;
@@ -141,13 +141,13 @@ public sealed class JiraTransferService : IJiraTransferService
     public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
         _operationalOptions.ReadOnlyIntegrationMode
             ? Task.FromResult(ExternalWritesDisabled())
-            : ExecuteCommandAsync(CreateCommand, id, context, ExecuteCreateClaimedAsync, cancellationToken);
+            : ExecuteCommandAsync(_createCommand, id, context, ExecuteCreateClaimedAsync, cancellationToken);
 
     /// <inheritdoc />
     public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
         _operationalOptions.ReadOnlyIntegrationMode
             ? Task.FromResult(ExternalWritesDisabled())
-            : ExecuteCommandAsync(RetryCommand, id, context, ExecuteRetryClaimedAsync, cancellationToken);
+            : ExecuteCommandAsync(_retryCommand, id, context, ExecuteRetryClaimedAsync, cancellationToken);
 
     private static OperationalRecordResult<OperationalRecord> ExternalWritesDisabled() =>
         OperationalRecordResult<OperationalRecord>.Fail(
@@ -170,7 +170,7 @@ public sealed class JiraTransferService : IJiraTransferService
 
         string targetId = id.ToString("D");
         string? key = context.IdempotencyKey;
-        if (key is null && string.Equals(commandName, RetryCommand, StringComparison.Ordinal))
+        if (key is null && string.Equals(commandName, _retryCommand, StringComparison.Ordinal))
         {
             key = CommandIdempotency.Create(context.Actor, commandName, $"{targetId}:{targetRecord.Version}");
         }
@@ -192,7 +192,7 @@ public sealed class JiraTransferService : IJiraTransferService
         {
             OperationalRecord? completed = await _repository.GetAsync(id, cancellationToken);
             if (completed is not null
-                && string.Equals(commandName, CreateCommand, StringComparison.Ordinal)
+                && string.Equals(commandName, _createCommand, StringComparison.Ordinal)
                 && !await TryAuditAsync(
                     AuditActions.JiraDuplicateCreatePrevented,
                     completed,

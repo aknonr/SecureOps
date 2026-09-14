@@ -7,15 +7,15 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Strict parser for direct keyed and legacy nested Turuncu Hat query projections.</summary>
 internal static class TuruncuHatQueryParser
 {
-    private const int MaxSourceProjectionCellCount = 32;
-    private const int MaxProjectionKeyLength = 128;
-    private const string SourceIdKey = "SET.id";
-    private const string OrCodeKey = "SET.p_code";
-    private const string TitleKey = "SET.p_name";
-    private const string DescriptionKey = "SET.p_description";
-    private const string RequesterDisplayKey = "KEY.p_rel_requester";
-    private const string RequesterInternalKey = "SET.p_rel_requester";
-    private const string RowNumberKey = "num";
+    private const int _maxSourceProjectionCellCount = 32;
+    private const int _maxProjectionKeyLength = 128;
+    private const string _sourceIdKey = "SET.id";
+    private const string _orCodeKey = "SET.p_code";
+    private const string _titleKey = "SET.p_name";
+    private const string _descriptionKey = "SET.p_description";
+    private const string _requesterDisplayKey = "KEY.p_rel_requester";
+    private const string _requesterInternalKey = "SET.p_rel_requester";
+    private const string _rowNumberKey = "num";
 
     public static ParsedSourceRecords ParseSource(
         JsonElement root,
@@ -243,7 +243,7 @@ internal static class TuruncuHatQueryParser
         out IReadOnlyList<string?> values)
     {
         values = [];
-        if (!TryReadProjectionCells(item, MaxSourceProjectionCellCount, out IReadOnlyList<ProjectionCell> cells))
+        if (!TryReadProjectionCells(item, _maxSourceProjectionCellCount, out IReadOnlyList<ProjectionCell> cells))
         {
             return false;
         }
@@ -269,7 +269,7 @@ internal static class TuruncuHatQueryParser
         foreach (ProjectionCell cell in cells)
         {
             string key = cell.Key!;
-            if (key.Length > MaxProjectionKeyLength)
+            if (key.Length > _maxProjectionKeyLength)
             {
                 return false;
             }
@@ -284,21 +284,21 @@ internal static class TuruncuHatQueryParser
             }
         }
 
-        if (!keyedValues.ContainsKey(SourceIdKey)
-            || !keyedValues.ContainsKey(OrCodeKey)
-            || !keyedValues.ContainsKey(TitleKey)
-            || !keyedValues.ContainsKey(DescriptionKey))
+        if (!keyedValues.ContainsKey(_sourceIdKey)
+            || !keyedValues.ContainsKey(_orCodeKey)
+            || !keyedValues.ContainsKey(_titleKey)
+            || !keyedValues.ContainsKey(_descriptionKey))
         {
             return false;
         }
 
-        keyedValues.TryGetValue(RequesterDisplayKey, out string? requester);
+        keyedValues.TryGetValue(_requesterDisplayKey, out string? requester);
         values =
         [
-            keyedValues[SourceIdKey],
-            keyedValues[OrCodeKey],
-            keyedValues[TitleKey],
-            keyedValues[DescriptionKey],
+            keyedValues[_sourceIdKey],
+            keyedValues[_orCodeKey],
+            keyedValues[_titleKey],
+            keyedValues[_descriptionKey],
             requester
         ];
         return true;
@@ -388,8 +388,8 @@ internal static class TuruncuHatQueryParser
     }
 
     private static bool IsRecognizedSourceKey(string key) => key is
-        SourceIdKey or OrCodeKey or TitleKey or DescriptionKey or RequesterDisplayKey
-        or RequesterInternalKey or RowNumberKey;
+        _sourceIdKey or _orCodeKey or _titleKey or _descriptionKey or _requesterDisplayKey
+        or _requesterInternalKey or _rowNumberKey;
 
     private static bool TryAsString(JsonElement element, out string? value)
     {

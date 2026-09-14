@@ -12,7 +12,7 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Thread-safe, bounded-lifetime Turuncu Hat session manager.</summary>
 public sealed class TuruncuHatSessionManager : ITuruncuHatSessionManager
 {
-    private const string Provider = "TuruncuHat";
+    private const string _provider = "TuruncuHat";
     private readonly HttpClient _httpClient;
     private readonly TuruncuHatOptions _options;
     private readonly TimeProvider _timeProvider;
@@ -141,34 +141,34 @@ public sealed class TuruncuHatSessionManager : ITuruncuHatSessionManager
             }
 
             string session = loginResult;
-            _health.MarkAvailable(Provider);
-            _telemetry.RecordOperation(Provider, "login", "success", stopwatch.Elapsed);
+            _health.MarkAvailable(_provider);
+            _telemetry.RecordOperation(_provider, "login", "success", stopwatch.Elapsed);
             _logger.LogInformation("Turuncu Hat login succeeded.");
             return new SessionLease(session, _timeProvider.GetUtcNow().AddSeconds(_options.SessionLifetimeSeconds));
         }
         catch (ExternalIntegrationException)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "login", "failure", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "login", "failure", stopwatch.Elapsed);
             _logger.LogWarning("Turuncu Hat login failed safely.");
             throw;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "login", "timeout", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "login", "timeout", stopwatch.Elapsed);
             throw Failure(OperationalErrorCodes.OperationalSourceUnavailable, true);
         }
         catch (HttpRequestException)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "login", "unavailable", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "login", "unavailable", stopwatch.Elapsed);
             throw Failure(OperationalErrorCodes.OperationalSourceUnavailable, true);
         }
         catch (Exception exception) when (exception is JsonException or InvalidDataException)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "login", "invalid-response", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "login", "invalid-response", stopwatch.Elapsed);
             throw Failure(OperationalErrorCodes.OperationalSourceAuthenticationFailed, false);
         }
     }

@@ -7,16 +7,18 @@ namespace SecureOps.Ui.Services;
 /// </summary>
 public sealed class OperationalRecordApiClient : IOperationalRecordApiClient
 {
-    private const string Root = "api/v1/operational-records";
+    private const string _root = "api/v1/operational-records";
 
     private readonly HttpClient _httpClient;
 
     /// <inheritdoc />
     public Task<OperationalRecordPageResponse> BrowseAsync(OperationalRecordQuery query, CancellationToken cancellationToken)
     {
-        string uri = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString($"{Root}/stored", new Dictionary<string, string?>
+        string uri = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString($"{_root}/stored", new Dictionary<string, string?>
         {
-            ["search"] = query.Search, ["state"] = query.State?.ToString(), ["sort"] = query.Sort,
+            ["search"] = query.Search,
+            ["state"] = query.State?.ToString(),
+            ["sort"] = query.Sort,
             ["page"] = query.Page.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["pageSize"] = query.PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)
         });
@@ -37,36 +39,36 @@ public sealed class OperationalRecordApiClient : IOperationalRecordApiClient
     /// <inheritdoc />
     public Task<IReadOnlyList<OperationalRecordResponse>> ListAsync(CancellationToken cancellationToken) =>
         SendAsync<IReadOnlyList<OperationalRecordResponse>>(
-            () => _httpClient.GetAsync(Root, cancellationToken),
+            () => _httpClient.GetAsync(_root, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<OperationalRecordResponse> GetAsync(Guid id, CancellationToken cancellationToken) =>
         SendAsync<OperationalRecordResponse>(
-            () => _httpClient.GetAsync($"{Root}/{id}", cancellationToken),
+            () => _httpClient.GetAsync($"{_root}/{id}", cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<JiraPreviewResponse> PreviewAsync(Guid id, CancellationToken cancellationToken) =>
         SendAsync<JiraPreviewResponse>(
-            () => _httpClient.PostAsync($"{Root}/{id}/jira-preview", content: null, cancellationToken),
+            () => _httpClient.PostAsync($"{_root}/{id}/jira-preview", content: null, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<JiraPreviewResponse> ReviewAsync(Guid id, JiraReviewRequest request, CancellationToken cancellationToken) =>
-        SendAsync<JiraPreviewResponse>(() => _httpClient.PostAsJsonAsync($"{Root}/{id}/jira-review", request, cancellationToken), cancellationToken);
+        SendAsync<JiraPreviewResponse>(() => _httpClient.PostAsJsonAsync($"{_root}/{id}/jira-review", request, cancellationToken), cancellationToken);
 
     /// <inheritdoc />
     public Task<JiraTransferResponse> CreateJiraAsync(Guid id, CancellationToken cancellationToken) =>
         // No Idempotency-Key header on purpose — see IOperationalRecordApiClient.
         SendPublicationAsync(
-            () => _httpClient.PostAsync($"{Root}/{id}/jira", content: null, cancellationToken),
+            () => _httpClient.PostAsync($"{_root}/{id}/jira", content: null, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />
     public Task<JiraTransferResponse> RetryAsync(Guid id, CancellationToken cancellationToken) =>
         SendPublicationAsync(
-            () => _httpClient.PostAsync($"{Root}/{id}/retry", content: null, cancellationToken),
+            () => _httpClient.PostAsync($"{_root}/{id}/retry", content: null, cancellationToken),
             cancellationToken);
 
     private static async Task<JiraTransferResponse> SendPublicationAsync(

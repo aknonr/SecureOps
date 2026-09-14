@@ -20,7 +20,7 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public sealed class ApiSessionCookieHandler : DelegatingHandler
 {
-    private const string ApplicationSessionCookieName = "__Host-SecureOps.ApplicationSession";
+    private const string _applicationSessionCookieName = "__Host-SecureOps.ApplicationSession";
 
     /// <summary>Serializes creation of the first API session handle.</summary>
     /// <remarks>
@@ -140,7 +140,7 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
         Microsoft.Net.Http.Headers.SetCookieHeaderValue.TryParse(
             setCookie,
             out Microsoft.Net.Http.Headers.SetCookieHeaderValue? parsed)
-        && string.Equals(parsed.Name.Value, ApplicationSessionCookieName, StringComparison.Ordinal)
+        && string.Equals(parsed.Name.Value, _applicationSessionCookieName, StringComparison.Ordinal)
         && ((parsed.Expires is { } expires && expires <= DateTimeOffset.UnixEpoch)
             || (parsed.MaxAge is { } maxAge && maxAge <= TimeSpan.Zero));
 

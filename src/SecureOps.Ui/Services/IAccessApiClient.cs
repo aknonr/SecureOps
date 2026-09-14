@@ -1,4 +1,4 @@
-﻿using SecureOps.Shared.Contracts.Access;
+using SecureOps.Shared.Contracts.Access;
 
 namespace SecureOps.Ui.Services;
 

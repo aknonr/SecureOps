@@ -11,7 +11,7 @@ namespace SecureOps.Api.Security;
 /// <summary>Protects Directory Explorer continuation state with persistent Data Protection.</summary>
 public sealed class DataProtectedDirectoryContinuationTokenCodec : IDirectoryContinuationTokenCodec
 {
-    private const string Purpose = "SecureOps.DirectoryExplorer.ContinuationToken.v1";
+    private const string _purpose = "SecureOps.DirectoryExplorer.ContinuationToken.v1";
     private readonly IDataProtector _protector;
     private readonly DirectoryExplorerOptions _options;
     private readonly TimeProvider _timeProvider;
@@ -22,7 +22,7 @@ public sealed class DataProtectedDirectoryContinuationTokenCodec : IDirectoryCon
         IOptions<DirectoryExplorerOptions> options,
         TimeProvider timeProvider)
     {
-        _protector = provider.CreateProtector(Purpose);
+        _protector = provider.CreateProtector(_purpose);
         _options = options.Value;
         _timeProvider = timeProvider;
     }

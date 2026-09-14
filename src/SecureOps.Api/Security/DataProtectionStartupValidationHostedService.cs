@@ -5,7 +5,7 @@ namespace SecureOps.Api.Security;
 /// <summary>Forces a startup Data Protection round-trip so key-ring failures are not deferred to a request.</summary>
 public sealed class DataProtectionStartupValidationHostedService : IHostedService
 {
-    private const string ValidationPurpose = "SecureOps.DataProtection.StartupValidation.v1";
+    private const string _validationPurpose = "SecureOps.DataProtection.StartupValidation.v1";
     private readonly IDataProtectionProvider _provider;
 
     /// <summary>Initializes the startup validator.</summary>
@@ -18,7 +18,7 @@ public sealed class DataProtectionStartupValidationHostedService : IHostedServic
     public Task StartAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IDataProtector protector = _provider.CreateProtector(ValidationPurpose);
+        IDataProtector protector = _provider.CreateProtector(_validationPurpose);
         const string sentinel = "secureops-data-protection-startup-validation";
         string protectedValue = protector.Protect(sentinel);
         if (!string.Equals(protector.Unprotect(protectedValue), sentinel, StringComparison.Ordinal))

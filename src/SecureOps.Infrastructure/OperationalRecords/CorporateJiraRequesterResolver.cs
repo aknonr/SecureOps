@@ -10,7 +10,7 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Resolves one exact Jira user from the evidenced username search endpoint.</summary>
 public sealed class CorporateJiraRequesterResolver : IRequesterResolver
 {
-    private const string Provider = "Jira";
+    private const string _provider = "Jira";
     private readonly HttpClient _httpClient;
     private readonly JiraIntegrationOptions _options;
     private readonly TimeProvider _timeProvider;
@@ -61,8 +61,8 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
                         continue;
                     }
 
-                    _health.MarkUnavailable(Provider);
-                    _telemetry.RecordOperation(Provider, "user-search", "failure", stopwatch.Elapsed);
+                    _health.MarkUnavailable(_provider);
+                    _telemetry.RecordOperation(_provider, "user-search", "failure", stopwatch.Elapsed);
                     return RequesterResolutionResult.Failed();
                 }
 
@@ -71,8 +71,8 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
                     _options.MaxResponseBytes,
                     cancellationToken);
                 RequesterResolutionResult result = ParseExact(document.RootElement, identity);
-                _health.MarkAvailable(Provider);
-                _telemetry.RecordOperation(Provider, "user-search", result.Status.ToString(), stopwatch.Elapsed);
+                _health.MarkAvailable(_provider);
+                _telemetry.RecordOperation(_provider, "user-search", result.Status.ToString(), stopwatch.Elapsed);
                 return result;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -92,8 +92,8 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
                 }
             }
 
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "user-search", "failure", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "user-search", "failure", stopwatch.Elapsed);
             _logger.LogWarning("Jira exact user resolution failed safely after {AttemptCount} attempts.", attempt);
             return RequesterResolutionResult.Failed();
         }

@@ -13,7 +13,7 @@ namespace SecureOps.Infrastructure.DirectoryExplorer;
 /// <summary>Audited exact-input group analysis and formula-safe CSV export.</summary>
 public sealed class DirectoryGroupAnalysisService : IDirectoryGroupAnalysisService
 {
-    private const string AnalysisOperation = "group-analysis";
+    private const string _analysisOperation = "group-analysis";
     private readonly DirectoryExactInputNormalizer _normalizer;
     private readonly DirectoryGroupAnalysisBuilder _builder;
     private readonly DirectoryQueryCache _cache;
@@ -49,13 +49,13 @@ public sealed class DirectoryGroupAnalysisService : IDirectoryGroupAnalysisServi
             request.Purpose, _options.MaxPurposeLength, out string? purpose);
         if (!group.IsValid || group.Value is null || !validPurpose)
         {
-            await AuditAsync(AuditActions.DirectoryGroupQueryRejected, AnalysisOperation, request.Group,
+            await AuditAsync(AuditActions.DirectoryGroupQueryRejected, _analysisOperation, request.Group,
                 purpose, "Rejected", TimeSpan.Zero, null, context, cancellationToken);
             return DirectoryQueryResult<DirectoryGroupAnalysisResponse>.Failure(
                 DirectoryQueryStatus.Invalid, OperationalErrorCodes.DirectoryInvalidInput);
         }
 
-        if (!await AuditAsync(AuditActions.DirectoryGroupQueryRequested, AnalysisOperation, group.Value,
+        if (!await AuditAsync(AuditActions.DirectoryGroupQueryRequested, _analysisOperation, group.Value,
                 purpose, "Requested", TimeSpan.Zero, null, context, cancellationToken))
         {
             return AuditUnavailable<DirectoryGroupAnalysisResponse>();
@@ -83,13 +83,13 @@ public sealed class DirectoryGroupAnalysisService : IDirectoryGroupAnalysisServi
 
             if (response is null)
             {
-                await AuditAsync(AuditActions.DirectoryGroupAnalysisCompleted, AnalysisOperation, group.Value,
+                await AuditAsync(AuditActions.DirectoryGroupAnalysisCompleted, _analysisOperation, group.Value,
                     purpose, "NotFound", stopwatch.Elapsed, null, context, cancellationToken);
                 return DirectoryQueryResult<DirectoryGroupAnalysisResponse>.Failure(
                     DirectoryQueryStatus.NotFound, OperationalErrorCodes.DirectoryGroupNotFound);
             }
 
-            if (!await AuditAsync(AuditActions.DirectoryGroupAnalysisCompleted, AnalysisOperation, group.Value,
+            if (!await AuditAsync(AuditActions.DirectoryGroupAnalysisCompleted, _analysisOperation, group.Value,
                     purpose, response.IsComplete ? "Succeeded" : "SucceededPartial", stopwatch.Elapsed,
                     response, context, cancellationToken))
             {
@@ -102,7 +102,7 @@ public sealed class DirectoryGroupAnalysisService : IDirectoryGroupAnalysisServi
         {
             bool timeout = exception is TimeoutException;
             string code = timeout ? OperationalErrorCodes.DirectoryProviderTimeout : OperationalErrorCodes.DirectoryProviderUnavailable;
-            await AuditAsync(AuditActions.DirectoryGroupQueryFailed, AnalysisOperation, group.Value,
+            await AuditAsync(AuditActions.DirectoryGroupQueryFailed, _analysisOperation, group.Value,
                 purpose, timeout ? "ProviderTimeout" : "ProviderUnavailable", stopwatch.Elapsed,
                 null, context, cancellationToken);
             _logger.LogWarning("Group analysis failed safely. ErrorCode: {ErrorCode}. CorrelationId: {CorrelationId}",

@@ -15,7 +15,7 @@ namespace SecureOps.Tests.Unit.Ui;
 /// </remarks>
 public sealed class SessionViewTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 8, 27, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _now = new(2026, 8, 27, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void Name_PrefersTheDisplayName()
@@ -95,8 +95,8 @@ public sealed class SessionViewTests
     {
         // A session past its absolute lifetime must not be offered with a "Sonlandır" button; the
         // command could only fail, and the failure would read as a fault in the page.
-        SessionView.IsActive(Session(expiresIn: TimeSpan.FromMinutes(-1)), Now).Should().BeFalse();
-        SessionView.IsActive(Session(expiresIn: TimeSpan.FromMinutes(1)), Now).Should().BeTrue();
+        SessionView.IsActive(Session(expiresIn: TimeSpan.FromMinutes(-1)), _now).Should().BeFalse();
+        SessionView.IsActive(Session(expiresIn: TimeSpan.FromMinutes(1)), _now).Should().BeTrue();
     }
 
     [Theory]
@@ -105,7 +105,7 @@ public sealed class SessionViewTests
     [InlineData(-5, "Süresi doldu")]
     public void Remaining_IsStatedInPlainTerms(int minutes, string expected)
     {
-        SessionView.Remaining(Session(expiresIn: TimeSpan.FromMinutes(minutes)), Now)
+        SessionView.Remaining(Session(expiresIn: TimeSpan.FromMinutes(minutes)), _now)
             .Should().Be(expected);
     }
 
@@ -119,9 +119,9 @@ public sealed class SessionViewTests
         new(
             SessionId: Guid.Parse("11111111-1111-1111-1111-111111111111"),
             UserId: Guid.Parse("22222222-2222-2222-2222-222222222222"),
-            StartedAtUtc: Now.AddHours(-1),
-            LastSeenAtUtc: Now.AddMinutes(-5),
-            AbsoluteExpiresAtUtc: Now.Add(expiresIn ?? TimeSpan.FromHours(11)),
+            StartedAtUtc: _now.AddHours(-1),
+            LastSeenAtUtc: _now.AddMinutes(-5),
+            AbsoluteExpiresAtUtc: _now.Add(expiresIn ?? TimeSpan.FromHours(11)),
             AuthenticationMethod: "Negotiate",
             AccessVersion: 3,
             Principal: principal,

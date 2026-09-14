@@ -28,7 +28,9 @@ public sealed class ResourceViewTests
     [Fact]
     public void Move_SwapsAdjacentEntries()
     {
-        var a = Guid.NewGuid(); var b = Guid.NewGuid(); var c = Guid.NewGuid();
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var c = Guid.NewGuid();
 
         ResourceView.Move([a, b, c], 0, 1).Should().Equal(b, a, c);
         ResourceView.Move([a, b, c], 2, -1).Should().Equal(a, c, b);
@@ -37,7 +39,8 @@ public sealed class ResourceViewTests
     [Fact]
     public void Move_LeavesTheListUnchangedAtTheBounds()
     {
-        var a = Guid.NewGuid(); var b = Guid.NewGuid();
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
 
         ResourceView.Move([a, b], 0, -1).Should().Equal(a, b);
         ResourceView.Move([a, b], 1, 1).Should().Equal(a, b);

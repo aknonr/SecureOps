@@ -14,10 +14,10 @@ namespace SecureOps.Tests.Integration.Api;
 
 public sealed class OidcFirstAdminBootstrapTests
 {
-    private const string Issuer = "https://identity.example.test";
-    private const string LoginName = "bootstrap.operator";
-    private const string SystemActor = "system:oidc-first-admin-bootstrap";
-    private const string BootstrapReason = "One-time validated OIDC first-Admin bootstrap.";
+    private const string _issuer = "https://identity.example.test";
+    private const string _loginName = "bootstrap.operator";
+    private const string _systemActor = "system:oidc-first-admin-bootstrap";
+    private const string _bootstrapReason = "One-time validated OIDC first-Admin bootstrap.";
 
     [Fact]
     public async Task DisabledByDefault_LeavesEligibleOidcUserPending()
@@ -48,8 +48,8 @@ public sealed class OidcFirstAdminBootstrapTests
     }
 
     [Theory]
-    [InlineData("https://other-issuer.example.test", LoginName)]
-    [InlineData(Issuer, "other.operator")]
+    [InlineData("https://other-issuer.example.test", _loginName)]
+    [InlineData(_issuer, "other.operator")]
     public async Task ExactIssuerOrLoginMismatch_LeavesUserPending(string issuer, string loginName)
     {
         Fixture fixture = new();
@@ -81,7 +81,7 @@ public sealed class OidcFirstAdminBootstrapTests
         List<Claim> claims =
         [
             new(ExternalIdentityClaimTypes.StableIdentifier, "oidc:synthetic-invalid"),
-            new(ExternalIdentityClaimTypes.Issuer, Issuer),
+            new(ExternalIdentityClaimTypes.Issuer, _issuer),
             new(ExternalIdentityClaimTypes.AuthenticationProvider, "OIDC"),
             new("secureops:auth_source", "oidc")
         ];
@@ -91,7 +91,7 @@ public sealed class OidcFirstAdminBootstrapTests
         }
         if (includeLoginName)
         {
-            claims.Add(new Claim(ExternalIdentityClaimTypes.LoginName, LoginName));
+            claims.Add(new Claim(ExternalIdentityClaimTypes.LoginName, _loginName));
         }
         ClaimsPrincipal principal = new(new ClaimsIdentity(claims, "OIDC"));
 
@@ -115,7 +115,7 @@ public sealed class OidcFirstAdminBootstrapTests
         result.Value.User.Capabilities.Should().Contain(Capabilities.AccessManageUsers);
         fixture.Audit.Events.Should().Contain(audit =>
             audit.Action == AuditActions.FirstAdminBootstrapped
-            && audit.Actor == SystemActor);
+            && audit.Actor == _systemActor);
     }
 
     [Fact]
@@ -193,8 +193,8 @@ public sealed class OidcFirstAdminBootstrapTests
 
     private static ClaimsPrincipal OidcPrincipal(
         string subject,
-        string issuer = Issuer,
-        string loginName = LoginName)
+        string issuer = _issuer,
+        string loginName = _loginName)
     {
         OidcExternalIdentityNormalizer normalizer = new(Options.Create(new OidcOptions()));
         ClaimsPrincipal raw = new(new ClaimsIdentity(
@@ -223,8 +223,8 @@ public sealed class OidcFirstAdminBootstrapTests
                 Options.Create(new BootstrapAdminOptions
                 {
                     Enabled = enabled,
-                    LoginName = LoginName,
-                    AllowedIssuer = Issuer
+                    LoginName = _loginName,
+                    AllowedIssuer = _issuer
                 }),
                 Options.Create(new SessionSecurityOptions()),
                 NullLogger<ApplicationAccessService>.Instance);
@@ -279,9 +279,9 @@ public sealed class OidcFirstAdminBootstrapTests
                     command.AccessRequestId,
                     AccessRequestStatus.Approved,
                     command.AccessRequestVersion,
-                    SystemActor,
+                    _systemActor,
                     ["Admin"],
-                    BootstrapReason,
+                    _bootstrapReason,
                     cancellationToken);
                 if (mutation.Disposition != AccessMutationDisposition.Applied)
                 {
@@ -290,7 +290,7 @@ public sealed class OidcFirstAdminBootstrapTests
 
                 await audit.WriteAsync(new AuditEvent
                 {
-                    Actor = SystemActor,
+                    Actor = _systemActor,
                     Action = AuditActions.FirstAdminBootstrapped,
                     CorrelationId = command.CorrelationId,
                     Details = new { targetUserId = command.UserId, role = "Admin", bootstrapMechanism = "ValidatedOidcFirstAdmin" }

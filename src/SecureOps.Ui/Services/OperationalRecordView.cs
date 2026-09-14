@@ -84,7 +84,7 @@ public static class OperationalRecordView
         "Gerçek veri read-only TEST modunda kullanılıyor. Dış sistemlere yazma işlemleri kapalıdır.";
 
     /// <summary>Shown when the workflow stalled but the server does not permit resuming it.</summary>
-    private const string RetryBlocked =
+    private const string _retryBlocked =
         "Sunucu bu kayıt için yeniden denemeye izin vermiyor.";
 
     /// <summary>Ownership as the contract represents it.</summary>
@@ -414,16 +414,16 @@ public static class OperationalRecordView
 
             // A Jira issue exists. Only the source side is outstanding, and only retry may touch it.
             OperationalRecordWorkflowState.OperationalRecordCloseFailed =>
-                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : RetryBlocked),
+                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : _retryBlocked),
             OperationalRecordWorkflowState.JiraCreated =>
                 new Actions(false, false, record.RetryEligible, record.RetryEligible ? null :
-                    !record.SourceCloseRequested ? "Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı." : RetryBlocked),
+                    !record.SourceCloseRequested ? "Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı." : _retryBlocked),
             OperationalRecordWorkflowState.ClosingOperationalRecord =>
                 new Actions(false, false, false, "Kaynak kapatma aşaması sürüyor."),
 
             // Failed before any trusted key was stored, so resuming is the safe move — not a new create.
             OperationalRecordWorkflowState.JiraCreateFailed =>
-                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : RetryBlocked),
+                new Actions(false, false, record.RetryEligible, record.RetryEligible ? null : _retryBlocked),
 
             // Unknown outcome. Deliberately offers nothing: see StateDetail.
             OperationalRecordWorkflowState.CreatingJira =>

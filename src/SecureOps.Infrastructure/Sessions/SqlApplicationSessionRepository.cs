@@ -10,7 +10,7 @@ namespace SecureOps.Infrastructure.Sessions;
 /// <summary>SQL Server application-session repository.</summary>
 public sealed class SqlApplicationSessionRepository : IApplicationSessionRepository
 {
-    private const int CommandTimeoutSeconds = 15;
+    private const int _commandTimeoutSeconds = 15;
     private readonly string _connectionString;
 
     /// <summary>Initializes SQL session persistence.</summary>
@@ -36,7 +36,7 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
     /// <inheritdoc />
     public async Task<ApplicationSession?> GetAsync(Guid sessionId, CancellationToken cancellationToken)
     {
-        const string sql = $"{ReadSql} WHERE SessionId = @SessionId;";
+        const string sql = $"{_readSql} WHERE SessionId = @SessionId;";
         await using SqlConnection connection = new(_connectionString);
         SessionRow? row = await connection.QuerySingleOrDefaultAsync<SessionRow>(Command(sql, new { SessionId = sessionId }, null, cancellationToken));
         return row is null ? null : Map(row);
@@ -73,7 +73,7 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
     /// <inheritdoc />
     public async Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken)
     {
-        const string select = $"{ReadSql} WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @UserId AND EndedAtUtc IS NULL;";
+        const string select = $"{_readSql} WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @UserId AND EndedAtUtc IS NULL;";
         const string update = "UPDATE security.ApplicationSessions SET EndedAtUtc = @EndedAtUtc, EndReason = @EndReason WHERE UserId = @UserId AND EndedAtUtc IS NULL;";
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
@@ -118,7 +118,7 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
     public async Task<IReadOnlyList<ApplicationSession>> ListActiveAsync(DateTimeOffset absoluteCutoffUtc, DateTimeOffset idleCutoffUtc, int skip, int take, CancellationToken cancellationToken)
     {
         const string sql = $"""
-            {ReadSql}
+            {_readSql}
             WHERE EndedAtUtc IS NULL
               AND AbsoluteExpiresAtUtc > @AbsoluteCutoffUtc
               AND LastSeenAtUtc > @IdleCutoffUtc
@@ -142,9 +142,9 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
         row.AccessVersion);
 
     private static CommandDefinition Command(string sql, object? parameters, IDbTransaction? transaction, CancellationToken cancellationToken) =>
-        new(sql, parameters, transaction, CommandTimeoutSeconds, cancellationToken: cancellationToken);
+        new(sql, parameters, transaction, _commandTimeoutSeconds, cancellationToken: cancellationToken);
 
-    private const string ReadSql = """
+    private const string _readSql = """
         SELECT SessionId, UserId, StartedAtUtc, LastSeenAtUtc, AbsoluteExpiresAtUtc,
             EndedAtUtc, EndReason, AuthenticationMethod, AccessVersion
         FROM security.ApplicationSessions

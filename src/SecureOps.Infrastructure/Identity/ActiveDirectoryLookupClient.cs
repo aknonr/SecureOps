@@ -56,7 +56,9 @@ public sealed class ActiveDirectoryLookupClient : IActiveDirectoryLookupClient
         {
             return null;
         }
-        try { using DirectoryEntry manager = new($"LDAP://{dn}"); return GetProperty(manager, "displayName"); } catch (DirectoryServicesCOMException) { return null; }
+        try
+        { using DirectoryEntry manager = new($"LDAP://{dn}"); return GetProperty(manager, "displayName"); }
+        catch (DirectoryServicesCOMException) { return null; }
     }
 }
 #pragma warning restore CA1416

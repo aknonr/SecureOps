@@ -13,8 +13,8 @@ public sealed class SqlFirstAdminBootstrapStore : IFirstAdminBootstrapStore
 {
     internal const string SystemActor = "system:oidc-first-admin-bootstrap";
     internal const string Reason = "One-time validated OIDC first-Admin bootstrap.";
-    private const string AdminRoleCode = "Admin";
-    private const int CommandTimeoutSeconds = 15;
+    private const string _adminRoleCode = "Admin";
+    private const int _commandTimeoutSeconds = 15;
     private readonly string _connectionString;
 
     /// <summary>Initializes the SQL bootstrap store.</summary>
@@ -36,7 +36,7 @@ public sealed class SqlFirstAdminBootstrapStore : IFirstAdminBootstrapStore
 
         short[] adminRoleIds = (await connection.QueryAsync<short>(Command(
             "SELECT RoleId FROM security.Roles WITH (UPDLOCK, HOLDLOCK) WHERE RoleCode = @RoleCode;",
-            new { RoleCode = AdminRoleCode },
+            new { RoleCode = _adminRoleCode },
             transaction,
             cancellationToken))).ToArray();
         if (adminRoleIds.Length != 1)
@@ -122,7 +122,7 @@ public sealed class SqlFirstAdminBootstrapStore : IFirstAdminBootstrapStore
         {
             targetUserId = command.UserId,
             accessRequestId = command.AccessRequestId,
-            role = AdminRoleCode,
+            role = _adminRoleCode,
             bootstrapMechanism = "ValidatedOidcFirstAdmin"
         }, AuditJson.SerializerOptions);
         const string auditSql = """
@@ -158,5 +158,5 @@ public sealed class SqlFirstAdminBootstrapStore : IFirstAdminBootstrapStore
         object? parameters,
         IDbTransaction transaction,
         CancellationToken cancellationToken) =>
-        new(sql, parameters, transaction, CommandTimeoutSeconds, cancellationToken: cancellationToken);
+        new(sql, parameters, transaction, _commandTimeoutSeconds, cancellationToken: cancellationToken);
 }

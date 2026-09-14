@@ -34,10 +34,12 @@ public sealed class DirectoryExplorerHostedTests
 
         groupsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         DirectoryGroupPageResponse? groups = await groupsResponse.Content.ReadFromJsonAsync<DirectoryGroupPageResponse>();
-        groups!.Items.Should().ContainSingle(); groups.ContinuationToken.Should().NotBeNullOrWhiteSpace();
+        groups!.Items.Should().ContainSingle();
+        groups.ContinuationToken.Should().NotBeNullOrWhiteSpace();
         detailResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         DirectoryGroupDetailResponse? detail = await detailResponse.Content.ReadFromJsonAsync<DirectoryGroupDetailResponse>();
-        detail!.Group.Category.Should().Be("Security"); detail.Group.Scope.Should().Be("Global");
+        detail!.Group.Category.Should().Be("Security");
+        detail.Group.Scope.Should().Be("Global");
     }
 
     [Fact]
@@ -48,12 +50,12 @@ public sealed class DirectoryExplorerHostedTests
 
         HttpResponseMessage overviewResponse = await client.PostAsJsonAsync(
             "/api/v1/directory/groups/lookup",
-            new DirectoryGroupLookupRequest("Operations Readers", Purpose));
+            new DirectoryGroupLookupRequest("Operations Readers", _purpose));
         DirectoryGroupDetailResponse overview = (await overviewResponse.Content
             .ReadFromJsonAsync<DirectoryGroupDetailResponse>())!;
         HttpResponseMessage membersResponse = await client.PostAsJsonAsync(
             "/api/v1/directory/groups/members",
-            new DirectoryGroupMembersRequest(overview.Group.LookupKey, Purpose, 25));
+            new DirectoryGroupMembersRequest(overview.Group.LookupKey, _purpose, 25));
         DirectoryMemberPageResponse members = (await membersResponse.Content
             .ReadFromJsonAsync<DirectoryMemberPageResponse>())!;
 
@@ -74,14 +76,15 @@ public sealed class DirectoryExplorerHostedTests
 
         HttpResponseMessage firstResponse = await client.PostAsJsonAsync(
             "/api/v1/directory/groups/members",
-            new { group = "ops-read", purpose = Purpose, pageSize = 2 });
+            new { group = "ops-read", purpose = _purpose, pageSize = 2 });
         DirectoryMemberPageResponse? first = await firstResponse.Content.ReadFromJsonAsync<DirectoryMemberPageResponse>();
         HttpResponseMessage secondResponse = await client.PostAsJsonAsync(
             "/api/v1/directory/groups/members",
-            new { group = "ops-read", purpose = Purpose, pageSize = 2, continuationToken = first!.ContinuationToken });
+            new { group = "ops-read", purpose = _purpose, pageSize = 2, continuationToken = first!.ContinuationToken });
         DirectoryMemberPageResponse? second = await secondResponse.Content.ReadFromJsonAsync<DirectoryMemberPageResponse>();
 
-        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK); secondResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         first.Items.Concat(second!.Items).Select(item => item.MemberType).Should().BeEquivalentTo("User", "Group", "Computer");
         second.ContinuationToken.Should().BeNull();
     }
@@ -111,7 +114,7 @@ public sealed class DirectoryExplorerHostedTests
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
             "/api/v1/directory/groups/lookup",
-            new { group, purpose = Purpose });
+            new { group, purpose = _purpose });
         var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync());
 
         response.StatusCode.Should().Be(status);
@@ -160,7 +163,7 @@ public sealed class DirectoryExplorerHostedTests
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
             "/api/v1/directory/groups/lookup",
-            new { group = "ops-read", purpose = Purpose });
+            new { group = "ops-read", purpose = _purpose });
         var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync());
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
@@ -232,7 +235,7 @@ public sealed class DirectoryExplorerHostedTests
             .And.Contain("/api/v1/directory/groups/export");
     }
 
-    private const string Purpose = "Approved synthetic directory verification";
+    private const string _purpose = "Approved synthetic directory verification";
 
     private static WebApplicationFactory<Program> CreateFactory(
         int groupQueryLimit = 100,

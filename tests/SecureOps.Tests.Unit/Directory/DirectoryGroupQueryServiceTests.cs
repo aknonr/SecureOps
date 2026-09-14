@@ -20,16 +20,19 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(CreateMock(upn: true), out InMemoryAuditWriter audit);
 
         DirectoryQueryResult<DirectoryGroupPageResponse> first = await service.GetPrincipalGroupsAsync(
-            new DirectoryPrincipalGroupsRequest("CONTOSO\\pam12356", Purpose, 1), Context, CancellationToken.None);
+            new DirectoryPrincipalGroupsRequest("CONTOSO\\pam12356", _purpose, 1), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupPageResponse> second = await service.GetPrincipalGroupsAsync(
-            new DirectoryPrincipalGroupsRequest("pam12356", Purpose, 1, first.Value!.ContinuationToken), Context, CancellationToken.None);
+            new DirectoryPrincipalGroupsRequest("pam12356", _purpose, 1, first.Value!.ContinuationToken), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupPageResponse> third = await service.GetPrincipalGroupsAsync(
-            new DirectoryPrincipalGroupsRequest("pam12356", Purpose, 1, second.Value!.ContinuationToken), Context, CancellationToken.None);
+            new DirectoryPrincipalGroupsRequest("pam12356", _purpose, 1, second.Value!.ContinuationToken), _context, CancellationToken.None);
 
         first.Status.Should().Be(DirectoryQueryStatus.Success);
-        first.Value!.Items.Should().ContainSingle(); first.Value.ContinuationToken.Should().NotBeNullOrWhiteSpace();
-        second.Value!.Items.Should().ContainSingle(); second.Value.ContinuationToken.Should().NotBeNullOrWhiteSpace();
-        third.Value!.Items.Should().ContainSingle(); third.Value.ContinuationToken.Should().BeNull();
+        first.Value!.Items.Should().ContainSingle();
+        first.Value.ContinuationToken.Should().NotBeNullOrWhiteSpace();
+        second.Value!.Items.Should().ContainSingle();
+        second.Value.ContinuationToken.Should().NotBeNullOrWhiteSpace();
+        third.Value!.Items.Should().ContainSingle();
+        third.Value.ContinuationToken.Should().BeNull();
         new[] { first.Value.Items[0].SamAccountName, second.Value.Items[0].SamAccountName, third.Value.Items[0].SamAccountName }
             .Should().OnlyHaveUniqueItems();
         audit.Events.Select(item => item.Action).Should().Contain(AuditActions.DirectoryGroupQueryCompleted);
@@ -45,7 +48,7 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(CreateMock(upn), out _, upn: upn);
 
         DirectoryQueryResult<DirectoryGroupPageResponse> result = await service.GetPrincipalGroupsAsync(
-            new DirectoryPrincipalGroupsRequest(account, Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalGroupsRequest(account, _purpose), _context, CancellationToken.None);
 
         result.Status.Should().Be(expected);
     }
@@ -56,9 +59,9 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
 
         DirectoryQueryResult<DirectoryGroupDetailResponse> found = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("Operations Announcements", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("Operations Announcements", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupDetailResponse> missing = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("missing-group", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("missing-group", _purpose), _context, CancellationToken.None);
 
         found.Value!.Group.Category.Should().Be("Distribution");
         found.Value.Group.Scope.Should().Be("Universal");
@@ -73,11 +76,11 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(CreateMock(), out InMemoryAuditWriter audit);
 
         DirectoryQueryResult<DirectoryGroupPageResponse> principal = await service.GetPrincipalGroupsAsync(
-            new DirectoryPrincipalGroupsRequest("pam12356"), Context, CancellationToken.None);
+            new DirectoryPrincipalGroupsRequest("pam12356"), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupDetailResponse> group = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("ops-read", "   "), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("ops-read", "   "), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest("ops-read", "  optional context  "), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest("ops-read", "  optional context  "), _context, CancellationToken.None);
 
         principal.Status.Should().Be(DirectoryQueryStatus.Success);
         group.Status.Should().Be(DirectoryQueryStatus.Success);
@@ -97,7 +100,7 @@ public sealed class DirectoryGroupQueryServiceTests
         string purpose = inputKind == "oversized" ? new string('x', 257) : "context continuation\n";
 
         DirectoryQueryResult<DirectoryGroupDetailResponse> result = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("ops-read", purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("ops-read", purpose), _context, CancellationToken.None);
 
         result.Status.Should().Be(DirectoryQueryStatus.Invalid);
         provider.Calls.Should().Be(0);
@@ -113,8 +116,8 @@ public sealed class DirectoryGroupQueryServiceTests
         };
         DirectoryGroupQueryService service = CreateService(provider, new InMemoryAuditWriter(), options);
 
-        _ = await service.GetGroupAsync(new DirectoryGroupLookupRequest("ops-read", "first context"), Context, CancellationToken.None);
-        _ = await service.GetGroupAsync(new DirectoryGroupLookupRequest("ops-read", "second context"), Context, CancellationToken.None);
+        _ = await service.GetGroupAsync(new DirectoryGroupLookupRequest("ops-read", "first context"), _context, CancellationToken.None);
+        _ = await service.GetGroupAsync(new DirectoryGroupLookupRequest("ops-read", "second context"), _context, CancellationToken.None);
 
         provider.Calls.Should().Be(1);
     }
@@ -125,9 +128,9 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
 
         DirectoryQueryResult<DirectoryMemberPageResponse> found = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest("ops-read", Purpose, 100), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest("ops-read", _purpose, 100), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryMemberPageResponse> invalid = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest("ops-read", Purpose, 101), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest("ops-read", _purpose, 101), _context, CancellationToken.None);
 
         found.Value!.Items.Select(item => item.MemberType).Should().BeEquivalentTo("User", "Group", "Computer");
         found.Value.Items.Single(item => item.MemberType == "Group").LookupKey.Should().Be("nested-ops");
@@ -144,7 +147,7 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
 
         DirectoryQueryResult<DirectoryMemberPageResponse> result = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest("ops-read", Purpose, pageSize), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest("ops-read", _purpose, pageSize), _context, CancellationToken.None);
 
         result.Status.Should().Be(DirectoryQueryStatus.Success);
         result.Value!.PageSize.Should().Be(pageSize);
@@ -155,11 +158,11 @@ public sealed class DirectoryGroupQueryServiceTests
     {
         DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
         DirectoryQueryResult<DirectoryGroupDetailResponse> overview = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("Operations Readers", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("Operations Readers", _purpose), _context, CancellationToken.None);
 
         DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, Purpose, 25),
-            Context,
+            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, _purpose, 25),
+            _context,
             CancellationToken.None);
 
         overview.Status.Should().Be(DirectoryQueryStatus.Success);
@@ -176,9 +179,9 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(provider, out _);
 
         DirectoryQueryResult<DirectoryGroupDetailResponse> overview = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("similar-group-a", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("similar-group-a", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, Purpose), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, _purpose), _context, CancellationToken.None);
 
         overview.Status.Should().Be(DirectoryQueryStatus.Success);
         overview.Value.Group.Name.Should().Be("Similar Group A");
@@ -192,9 +195,9 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(CreateMock(), out _);
 
         DirectoryQueryResult<DirectoryGroupDetailResponse> overview = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("Operations Announcements", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("Operations Announcements", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, Purpose), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, _purpose), _context, CancellationToken.None);
 
         overview.Status.Should().Be(DirectoryQueryStatus.Success);
         members.Status.Should().Be(DirectoryQueryStatus.Success);
@@ -214,9 +217,9 @@ public sealed class DirectoryGroupQueryServiceTests
             new TimeoutMembersProvider(), new InMemoryAuditWriter(), options);
 
         DirectoryQueryResult<DirectoryGroupDetailResponse> overview = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("timeout-group", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("timeout-group", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryMemberPageResponse> members = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, Purpose), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest(overview.Value!.Group.LookupKey, _purpose), _context, CancellationToken.None);
 
         overview.Status.Should().Be(DirectoryQueryStatus.Success);
         members.Status.Should().Be(DirectoryQueryStatus.ProviderTimeout);
@@ -229,17 +232,17 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(new NavigationProvider(), out _);
 
         DirectoryQueryResult<DirectoryGroupDetailResponse> equal = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("same-name", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("same-name", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupDetailResponse> spaced = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("Display Name With Spaces", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("Display Name With Spaces", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupDetailResponse> similarA = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("Very Similar Group", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("Very Similar Group", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupDetailResponse> similarB = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("Very Similar Group 2", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("Very Similar Group 2", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryGroupPageResponse> fromUser = await service.GetPrincipalGroupsAsync(
-            new DirectoryPrincipalGroupsRequest("pam12356", Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalGroupsRequest("pam12356", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryMemberPageResponse> nested = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest("different-sam", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest("different-sam", _purpose), _context, CancellationToken.None);
 
         equal.Value!.Group.LookupKey.Should().Be("same-name");
         spaced.Value!.Group.LookupKey.Should().Be("different-sam");
@@ -256,10 +259,11 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(new FailingProvider(), out _);
 
         DirectoryQueryResult<DirectoryGroupDetailResponse> failed = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("ops-read", Purpose), Context, CancellationToken.None);
-        using CancellationTokenSource cancelled = new(); cancelled.Cancel();
+            new DirectoryGroupLookupRequest("ops-read", _purpose), _context, CancellationToken.None);
+        using CancellationTokenSource cancelled = new();
+        cancelled.Cancel();
         Func<Task> cancel = () => service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("ops-read", Purpose, true), Context, cancelled.Token);
+            new DirectoryGroupLookupRequest("ops-read", _purpose, true), _context, cancelled.Token);
 
         failed.Status.Should().Be(DirectoryQueryStatus.ProviderUnavailable);
         failed.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryProviderUnavailable);
@@ -272,11 +276,11 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(CreateMock(), out InMemoryAuditWriter audit);
 
         _ = await service.GetGroupMembersAsync(
-            new DirectoryGroupMembersRequest("ops-read", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupMembersRequest("ops-read", _purpose), _context, CancellationToken.None);
 
         string serialized = JsonSerializer.Serialize(audit.Events);
         serialized.Should().Contain("targetHash").And.Contain("resultCount");
-        serialized.Should().NotContain("ops-read").And.NotContain("pam12356").And.NotContain(Purpose);
+        serialized.Should().NotContain("ops-read").And.NotContain("pam12356").And.NotContain(_purpose);
     }
 
     [Fact]
@@ -286,14 +290,14 @@ public sealed class DirectoryGroupQueryServiceTests
         DirectoryGroupQueryService service = CreateService(provider, new ThrowingAuditWriter());
 
         DirectoryQueryResult<DirectoryGroupDetailResponse> result = await service.GetGroupAsync(
-            new DirectoryGroupLookupRequest("ops-read", Purpose), Context, CancellationToken.None);
+            new DirectoryGroupLookupRequest("ops-read", _purpose), _context, CancellationToken.None);
 
         result.Status.Should().Be(DirectoryQueryStatus.AuditUnavailable);
         provider.Calls.Should().Be(0);
     }
 
-    private const string Purpose = "Approved synthetic incident verification";
-    private static readonly DirectoryQueryExecutionContext Context = new("CONTOSO\\lead.user", "10.0.0.5", "directory-test");
+    private const string _purpose = "Approved synthetic incident verification";
+    private static readonly DirectoryQueryExecutionContext _context = new("CONTOSO\\lead.user", "10.0.0.5", "directory-test");
 
     private static MockDirectoryGroupProvider CreateMock(bool upn = false) =>
         new(Options.Create(new IdentityLookupOptions { EnableUpnLookup = upn }));
@@ -338,7 +342,8 @@ public sealed class DirectoryGroupQueryServiceTests
         public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectGroupsAsync(string normalizedAccount, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) => throw new DirectoryProviderUnavailableException();
         public Task<DirectoryGroupRecord?> FindGroupAsync(string normalizedGroup, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested(); throw new DirectoryProviderUnavailableException();
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new DirectoryProviderUnavailableException();
         }
         public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersAsync(string normalizedGroup, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) => throw new DirectoryProviderUnavailableException();
     }
@@ -369,7 +374,7 @@ public sealed class DirectoryGroupQueryServiceTests
 
     private sealed class NavigationProvider : IDirectoryGroupProvider
     {
-        private static readonly DirectoryGroupRecord[] Groups =
+        private static readonly DirectoryGroupRecord[] _groups =
         [
             new("S-1", "same-name", "same-name", null, null, "Security", "Global"),
             new("S-2", "Display Name With Spaces", "different-sam", null, null, "Security", "Global"),
@@ -381,9 +386,9 @@ public sealed class DirectoryGroupQueryServiceTests
         public bool SupportsUpnLookup => false;
         public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectGroupsAsync(string normalizedAccount, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) =>
             Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(
-                new DirectoryProviderPage<DirectoryGroupRecord>(Groups.Take(pageSize).ToArray(), false));
+                new DirectoryProviderPage<DirectoryGroupRecord>(_groups.Take(pageSize).ToArray(), false));
         public Task<DirectoryGroupRecord?> FindGroupAsync(string normalizedGroup, CancellationToken cancellationToken) =>
-            Task.FromResult<DirectoryGroupRecord?>(Groups.SingleOrDefault(group =>
+            Task.FromResult<DirectoryGroupRecord?>(_groups.SingleOrDefault(group =>
                 string.Equals(group.Name, normalizedGroup, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(group.SamAccountName, normalizedGroup, StringComparison.OrdinalIgnoreCase)));
         public Task<DirectoryProviderPage<DirectoryMemberRecord>?> GetDirectMembersAsync(string normalizedGroup, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken) =>

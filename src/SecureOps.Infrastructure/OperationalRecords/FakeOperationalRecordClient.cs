@@ -12,7 +12,7 @@ public sealed class FakeOperationalRecordClient : IOperationalRecordClient
     internal const string MissingSourceId = "synthetic-or-missing";
     internal const string Requester = "synthetic.requester";
 
-    private static readonly DateTimeOffset CreatedAt = new(2026, 8, 1, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _createdAt = new(2026, 8, 1, 10, 0, 0, TimeSpan.Zero);
     private readonly ConcurrentDictionary<string, OperationalRecordSourceItem> _stableRecords = new(StringComparer.Ordinal);
 
     /// <summary>Initializes a fresh deterministic source dataset.</summary>
@@ -57,7 +57,7 @@ public sealed class FakeOperationalRecordClient : IOperationalRecordClient
             StaleSourceId => Create(StaleSourceId, "SYN-OR-200", "Synthetic changed request", "stale-v2") with
             {
                 Description = "Synthetic source content changed after import.",
-                LastModifiedAt = CreatedAt.AddHours(2)
+                LastModifiedAt = _createdAt.AddHours(2)
             },
             ClosedSourceId => Create(ClosedSourceId, "SYN-OR-300", "Synthetic closed request", "closed-v1") with { IsOpen = false },
             MissingSourceId => null,
@@ -77,7 +77,7 @@ public sealed class FakeOperationalRecordClient : IOperationalRecordClient
             return Task.FromException(new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordCloseFailed, false));
         }
 
-        _stableRecords[sourceRecordId] = record with { IsOpen = false, LastModifiedAt = CreatedAt.AddHours(3) };
+        _stableRecords[sourceRecordId] = record with { IsOpen = false, LastModifiedAt = _createdAt.AddHours(3) };
         return Task.CompletedTask;
     }
 
@@ -90,11 +90,11 @@ public sealed class FakeOperationalRecordClient : IOperationalRecordClient
         title,
         "Synthetic operational record for local workflow verification.",
         Requester,
-        CreatedAt,
+        _createdAt,
         "SYNTHETIC",
         "synthetic-server",
         "synthetic-application",
         true,
         versionToken,
-        CreatedAt.AddHours(1));
+        _createdAt.AddHours(1));
 }

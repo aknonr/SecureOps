@@ -7,7 +7,7 @@ namespace SecureOps.Tests.Unit.InUse;
 
 public sealed class InUseServiceItemParserTests
 {
-    private const string Prefix = "(LCSIMS_ServiceInstance)m_rid.";
+    private const string _prefix = "(LCSIMS_ServiceInstance)m_rid.";
     internal static List<Dictionary<string, string?>> Row(int index)
     {
         var cells = new List<Dictionary<string, string?>>();
@@ -15,15 +15,15 @@ public sealed class InUseServiceItemParserTests
             "p_SI_def_network_segment", "p_SI_def_os_name", "p_def_os_version", "c_new_SI_major_project.p_rel_obs",
             "p_rel_asset_item.p_rel_lbs", "p_rel_asset_item.p_rel_lbs.m_parent", "p_def_category"];
         void Cell(string key, string value) => cells.Add(new() { ["Key"] = key, ["Value"] = value });
-        Cell("SET." + Prefix + "id", (1000 + index).ToString());
-        Cell("SET." + Prefix + "p_name", "synthetic-server-" + index);
+        Cell("SET." + _prefix + "id", (1000 + index).ToString());
+        Cell("SET." + _prefix + "p_name", "synthetic-server-" + index);
         foreach (string property in references)
         {
-            Cell("KEY." + Prefix + property, $"display-{index}-{property}");
-            Cell("SET." + Prefix + property, property == "c_new_SI_major_project" ? (2000 + index).ToString() : $"reference-{index}-{property}");
+            Cell("KEY." + _prefix + property, $"display-{index}-{property}");
+            Cell("SET." + _prefix + property, property == "c_new_SI_major_project" ? (2000 + index).ToString() : $"reference-{index}-{property}");
         }
-        Cell("SET." + Prefix + "p_SI_ip_SI_address_1", "192.0.2." + (index + 1));
-        Cell("SET." + Prefix + "c_new_SI_major_project.id", (2000 + index).ToString());
+        Cell("SET." + _prefix + "p_SI_ip_SI_address_1", "192.0.2." + (index + 1));
+        Cell("SET." + _prefix + "c_new_SI_major_project.id", (2000 + index).ToString());
         Cell("num", (index + 1).ToString());
         return cells;
     }
@@ -60,7 +60,7 @@ public sealed class InUseServiceItemParserTests
     public void Parse_MissingDisplayOrScalar_NeverSubstitutesAnotherCell(string suffix, string field)
     {
         List<Dictionary<string, string?>> row = Row(0);
-        string key = suffix[..4] + Prefix + suffix[4..];
+        string key = suffix[..4] + _prefix + suffix[4..];
         row.RemoveAll(c => c["Key"] == key);
         InUseEvidence value = Parse([row]).Single().Fields[field];
         value.Value.Should().BeNull();
@@ -85,7 +85,7 @@ public sealed class InUseServiceItemParserTests
         row.RemoveAt(0);
         FluentActions.Invoking(() => Parse([row])).Should().Throw<InvalidDataException>();
         row = Row(0);
-        row.Single(c => c["Key"] == "SET." + Prefix + "c_new_SI_major_project.id")["Value"] = "9999";
+        row.Single(c => c["Key"] == "SET." + _prefix + "c_new_SI_major_project.id")["Value"] = "9999";
         FluentActions.Invoking(() => Parse([row])).Should().Throw<InvalidDataException>();
     }
 

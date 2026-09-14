@@ -15,7 +15,8 @@ public sealed class ActiveDirectoryIdentityDirectoryProviderTests
         FakeClient client = new() { SamResult = Record(account) };
         ActiveDirectoryIdentityDirectoryProvider provider = Create(client);
         DirectoryUserRecord? result = await provider.FindUserAsync(account, CancellationToken.None);
-        result!.SamAccountName.Should().Be(account); client.SamInputs.Should().ContainSingle().Which.Should().Be(account);
+        result!.SamAccountName.Should().Be(account);
+        client.SamInputs.Should().ContainSingle().Which.Should().Be(account);
     }
 
     [Fact]
@@ -23,7 +24,8 @@ public sealed class ActiveDirectoryIdentityDirectoryProviderTests
     {
         FakeClient client = new() { UpnResult = Record("test.user") };
         DirectoryUserRecord? result = await Create(client, upn: true).FindUserAsync("test.user@example.invalid", CancellationToken.None);
-        result.Should().NotBeNull(); client.UpnInputs.Should().ContainSingle().Which.Should().Be("test.user@example.invalid");
+        result.Should().NotBeNull();
+        client.UpnInputs.Should().ContainSingle().Which.Should().Be("test.user@example.invalid");
     }
 
     [Theory]
@@ -52,7 +54,8 @@ public sealed class ActiveDirectoryIdentityDirectoryProviderTests
     {
         FakeClient client = new();
         Func<Task> action = () => Create(client).FindUserAsync("pam*", CancellationToken.None);
-        await action.Should().ThrowAsync<IdentityProviderInputRejectedException>(); client.SamInputs.Should().BeEmpty();
+        await action.Should().ThrowAsync<IdentityProviderInputRejectedException>();
+        client.SamInputs.Should().BeEmpty();
     }
 
     [Fact]
@@ -60,7 +63,8 @@ public sealed class ActiveDirectoryIdentityDirectoryProviderTests
     {
         FakeClient client = new() { SamTask = Task.Delay(3000).ContinueWith<DirectoryUserRecord?>(_ => null) };
         await Assert.ThrowsAsync<TimeoutException>(() => Create(client, timeout: 1).FindUserAsync("test.user", CancellationToken.None));
-        using CancellationTokenSource cancelled = new(); cancelled.Cancel();
+        using CancellationTokenSource cancelled = new();
+        cancelled.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Create(new FakeClient()).FindUserAsync("test.user", cancelled.Token));
     }
 
@@ -69,7 +73,9 @@ public sealed class ActiveDirectoryIdentityDirectoryProviderTests
     private sealed class FakeClient : IActiveDirectoryLookupClient
     {
         public List<string> SamInputs { get; } = []; public List<string> UpnInputs { get; } = [];
-        public DirectoryUserRecord? SamResult { get; init; } public DirectoryUserRecord? UpnResult { get; init; } public Task<DirectoryUserRecord?>? SamTask { get; init; }
+        public DirectoryUserRecord? SamResult { get; init; }
+        public DirectoryUserRecord? UpnResult { get; init; }
+        public Task<DirectoryUserRecord?>? SamTask { get; init; }
         public Task<DirectoryUserRecord?> FindBySamAccountNameAsync(string account, CancellationToken cancellationToken) { SamInputs.Add(account); return SamTask ?? Task.FromResult(SamResult); }
         public Task<DirectoryUserRecord?> FindByUserPrincipalNameAsync(string account, CancellationToken cancellationToken) { UpnInputs.Add(account); return Task.FromResult(UpnResult); }
     }

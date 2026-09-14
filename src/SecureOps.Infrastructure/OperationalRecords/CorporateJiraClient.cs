@@ -12,7 +12,7 @@ namespace SecureOps.Infrastructure.OperationalRecords;
 /// <summary>Creates Jira issues using the reviewed legacy field mapping.</summary>
 public sealed class CorporateJiraClient : IJiraClient
 {
-    private const string Provider = "Jira";
+    private const string _provider = "Jira";
     private readonly HttpClient _httpClient;
     private readonly JiraIntegrationOptions _options;
     private readonly OperationalRecordsOptions _operationalOptions;
@@ -105,15 +105,15 @@ public sealed class CorporateJiraClient : IJiraClient
                 throw new ExternalIntegrationException(OperationalErrorCodes.JiraCreateFailed, false, outcomeUnknown: true);
             }
 
-            _health.MarkAvailable(Provider);
-            _telemetry.RecordOperation(Provider, "issue-create", "success", stopwatch.Elapsed);
+            _health.MarkAvailable(_provider);
+            _telemetry.RecordOperation(_provider, "issue-create", "success", stopwatch.Elapsed);
             _logger.LogInformation("Jira issue creation returned a confirmed key.");
             return new JiraIssueCreationResult(keyElement.GetString()!);
         }
         catch (ExternalIntegrationException)
         {
-            _health.MarkUnavailable(Provider);
-            _telemetry.RecordOperation(Provider, "issue-create", "failure", stopwatch.Elapsed);
+            _health.MarkUnavailable(_provider);
+            _telemetry.RecordOperation(_provider, "issue-create", "failure", stopwatch.Elapsed);
             throw;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -142,8 +142,8 @@ public sealed class CorporateJiraClient : IJiraClient
 
     private void MarkUnknown(Stopwatch stopwatch)
     {
-        _health.MarkUnavailable(Provider);
-        _telemetry.RecordOperation(Provider, "issue-create", "outcome-unknown", stopwatch.Elapsed);
+        _health.MarkUnavailable(_provider);
+        _telemetry.RecordOperation(_provider, "issue-create", "outcome-unknown", stopwatch.Elapsed);
         _logger.LogWarning("Jira issue creation outcome is unknown; reconciliation is required.");
     }
 

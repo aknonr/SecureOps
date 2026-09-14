@@ -8,7 +8,7 @@ namespace SecureOps.Infrastructure.Persistence;
 /// <summary>Validates the shared SQL Server persistence connection contract.</summary>
 public static class SqlPersistenceConfigurationValidator
 {
-    private const int MaximumConnectTimeoutSeconds = 60;
+    private const int _maximumConnectTimeoutSeconds = 60;
 
     /// <summary>Validates a bounded SQL connection when any durable SQL provider is selected.</summary>
     public static void Validate(IConfiguration configuration)
@@ -46,9 +46,9 @@ public static class SqlPersistenceConfigurationValidator
             throw new InvalidOperationException("ConnectionStrings:SecureOpsDb must use Integrated Security without SQL login credentials.");
         }
 
-        if (builder.ConnectTimeout is < 1 or > MaximumConnectTimeoutSeconds)
+        if (builder.ConnectTimeout is < 1 or > _maximumConnectTimeoutSeconds)
         {
-            throw new InvalidOperationException($"ConnectionStrings:SecureOpsDb Connect Timeout must be between 1 and {MaximumConnectTimeoutSeconds} seconds.");
+            throw new InvalidOperationException($"ConnectionStrings:SecureOpsDb Connect Timeout must be between 1 and {_maximumConnectTimeoutSeconds} seconds.");
         }
     }
 

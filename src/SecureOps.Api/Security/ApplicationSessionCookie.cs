@@ -8,14 +8,14 @@ namespace SecureOps.Api.Security;
 /// <summary>Protects and manages the opaque browser-session handle.</summary>
 public sealed class ApplicationSessionCookie
 {
-    private const string Purpose = "SecureOps.ApplicationSession.Cookie.v1";
+    private const string _purpose = "SecureOps.ApplicationSession.Cookie.v1";
     private readonly IDataProtector _protector;
     private readonly SessionSecurityOptions _options;
 
     /// <summary>Initializes the purpose-isolated cookie protector.</summary>
     public ApplicationSessionCookie(IDataProtectionProvider provider, IOptions<SessionSecurityOptions> options)
     {
-        _protector = provider.CreateProtector(Purpose);
+        _protector = provider.CreateProtector(_purpose);
         _options = options.Value;
     }
 

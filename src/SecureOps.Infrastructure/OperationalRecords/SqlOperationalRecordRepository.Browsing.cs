@@ -40,7 +40,7 @@ public sealed partial class SqlOperationalRecordRepository
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         int total = await connection.QuerySingleAsync<int>(Command($"SELECT COUNT(*) FROM ops.OperationalRecords r {where}", parameters, cancellationToken, transaction));
         IEnumerable<OperationalRecordRow> rows = await connection.QueryAsync<OperationalRecordRow>(Command(
-            $"{ReadSql} {where} ORDER BY {order}, r.SourceRecordId ASC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY",
+            $"{_readSql} {where} ORDER BY {order}, r.SourceRecordId ASC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY",
             parameters, cancellationToken, transaction));
         OperationalRecordPage page = new(rows.Select(Map).ToArray(), total);
         await transaction.CommitAsync(cancellationToken);

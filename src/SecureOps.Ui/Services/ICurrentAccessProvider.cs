@@ -1,4 +1,4 @@
-﻿namespace SecureOps.Ui.Services;
+namespace SecureOps.Ui.Services;
 
 /// <summary>
 /// Circuit-scoped access to the caller's application access projection.

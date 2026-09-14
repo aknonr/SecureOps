@@ -59,10 +59,10 @@ public sealed class DirectoryExplorerPhase2HostedTests
 
         HttpResponseMessage unknown = await client.PostAsJsonAsync(
             "/api/v1/directory/principals/membership-paths",
-            new { account = "pam12356", targetGroup = "missing-group", purpose = Purpose });
+            new { account = "pam12356", targetGroup = "missing-group", purpose = _purpose });
         HttpResponseMessage unrelated = await client.PostAsJsonAsync(
             "/api/v1/directory/principals/membership-paths",
-            new { account = "pam12356", targetGroup = "unrelated-group", purpose = Purpose });
+            new { account = "pam12356", targetGroup = "unrelated-group", purpose = _purpose });
         DirectoryMembershipPathResponse? result =
             await unrelated.Content.ReadFromJsonAsync<DirectoryMembershipPathResponse>();
 
@@ -78,7 +78,7 @@ public sealed class DirectoryExplorerPhase2HostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
-        var request = new { account = "pam12356", purpose = Purpose };
+        var request = new { account = "pam12356", purpose = _purpose };
 
         HttpResponseMessage allowed = await admin.PostAsJsonAsync(
             "/api/v1/directory/principals/privileged-memberships", request);
@@ -144,7 +144,7 @@ public sealed class DirectoryExplorerPhase2HostedTests
             .And.Contain("/api/v1/directory/principals/privileged-memberships");
     }
 
-    private const string Purpose = "Approved synthetic directory enrichment verification";
+    private const string _purpose = "Approved synthetic directory enrichment verification";
 
     private static WebApplicationFactory<Program> CreateFactory(
         int enrichmentLimit = 100,

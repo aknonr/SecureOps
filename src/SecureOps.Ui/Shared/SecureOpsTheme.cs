@@ -187,7 +187,7 @@ public static class SecureOpsTheme
     /// red" is indistinguishable from a button, so the two must differ on more than hue — and every
     /// error surface additionally carries an icon and explicit text.
     /// </remarks>
-    private static readonly PaletteDark DeepDarkPalette = new()
+    private static readonly PaletteDark _deepDarkPalette = new()
     {
         Primary = BrandRedOnDark,
         PrimaryDarken = "#C90119",
@@ -232,12 +232,12 @@ public static class SecureOpsTheme
     /// MudBlazor carries one light and one dark palette per theme. Light and Dark keep the same
     /// light palette, so switching away from Dark and back does not change Light.
     /// </remarks>
-    public static MudTheme For(AppearanceMode mode) => mode == AppearanceMode.Dark ? DeepDarkTheme : Theme;
+    public static MudTheme For(AppearanceMode mode) => mode == AppearanceMode.Dark ? _deepDarkTheme : Theme;
 
-    private static readonly MudTheme DeepDarkTheme = new()
+    private static readonly MudTheme _deepDarkTheme = new()
     {
         Palette = Theme.Palette,
-        PaletteDark = DeepDarkPalette,
+        PaletteDark = _deepDarkPalette,
         LayoutProperties = Theme.LayoutProperties,
         Typography = Theme.Typography
     };

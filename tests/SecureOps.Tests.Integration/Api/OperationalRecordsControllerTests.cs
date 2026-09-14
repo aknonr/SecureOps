@@ -23,7 +23,7 @@ public sealed class OperationalRecordsControllerTests
             ValidId: true, ValidCode: true, ValidTitle: true, ValidDescription: true,
             Category: OperationalRecordClassification.ServerRequest, RequesterPresent: true,
             RequesterResolved: true, ReporterResolved: true, ApprovalGranted: true,
-            PolicyApproved: true, MappingComplete: true), Now);
+            PolicyApproved: true, MappingComplete: true), _now);
         OperationalRecordResponse response = await GetResponseAsync(CreateController(record, true), record.Id);
         response.SdmCandidateRecommended.Should().BeTrue();
         response.JiraEligible.Should().BeTrue();
@@ -42,12 +42,12 @@ public sealed class OperationalRecordsControllerTests
         absent.EvaluationStale.Should().BeTrue();
         absent.ExternalWriteEligible.Should().BeFalse();
         record = SdmEvaluationEvidence.Apply(record, new SdmEvaluationInput(new string('a', 64),
-            ProviderSupported: true, Active: true, ValidId: true, ValidCode: true, ValidTitle: true, ValidDescription: true), Now);
+            ProviderSupported: true, Active: true, ValidId: true, ValidCode: true, ValidTitle: true, ValidDescription: true), _now);
         OperationalRecordResponse response = await GetResponseAsync(CreateController(record, true), record.Id);
         response.RuleSetVersion.Should().Be(SdmEvaluator.RuleSetVersion);
         response.ReasonCodes.Should().Equal(record.SdmEvaluation!.Result.ReasonCodes);
         response.BlockingConditions.Should().Equal(record.SdmEvaluation.Result.BlockingConditions);
-        response.EvaluatedAt.Should().Be(Now);
+        response.EvaluatedAt.Should().Be(_now);
         response.ReadOnlyIntegrationMode.Should().BeTrue();
         response.SdmCandidateRecommended.Should().BeFalse();
         response.JiraEligible.Should().BeFalse();
@@ -59,7 +59,7 @@ public sealed class OperationalRecordsControllerTests
         System.Text.Json.JsonSerializer.Deserialize<OperationalRecordResponse>(json, options).Should().BeEquivalentTo(response);
     }
 
-    private static readonly DateTimeOffset Now = new(2026, 8, 21, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _now = new(2026, 8, 21, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task PreviewAsync_WhenRequesterIsAmbiguous_ReturnsSafeProblemDetails()
@@ -176,7 +176,7 @@ public sealed class OperationalRecordsControllerTests
             Options.Create(new CommandIdempotencyOptions()),
             Options.Create(new OperationalRecordsOptions()),
             Options.Create(new JiraIntegrationOptions()),
-            new FixedTimeProvider(Now))
+            new FixedTimeProvider(_now))
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };
@@ -251,8 +251,8 @@ public sealed class OperationalRecordsControllerTests
         OperationalRecord record = Record() with
         {
             ClaimedBy = "operator-b",
-            ClaimedAt = Now.AddMinutes(-1),
-            ClaimExpiresAt = Now.AddMinutes(1),
+            ClaimedAt = _now.AddMinutes(-1),
+            ClaimExpiresAt = _now.AddMinutes(1),
             Version = 7
         };
         OperationalRecordsController controller = CreateController(record);
@@ -261,8 +261,8 @@ public sealed class OperationalRecordsControllerTests
 
         response.Claimed.Should().BeTrue();
         response.ClaimedBy.Should().Be("operator-b");
-        response.ClaimedAt.Should().Be(Now.AddMinutes(-1));
-        response.ClaimExpiresAt.Should().Be(Now.AddMinutes(1));
+        response.ClaimedAt.Should().Be(_now.AddMinutes(-1));
+        response.ClaimExpiresAt.Should().Be(_now.AddMinutes(1));
         response.Version.Should().Be(7);
     }
 
@@ -272,8 +272,8 @@ public sealed class OperationalRecordsControllerTests
         OperationalRecord record = Record() with
         {
             ClaimedBy = "operator-a",
-            ClaimedAt = Now.AddMinutes(-3),
-            ClaimExpiresAt = Now.AddSeconds(-1)
+            ClaimedAt = _now.AddMinutes(-3),
+            ClaimExpiresAt = _now.AddSeconds(-1)
         };
         OperationalRecordsController controller = CreateController(record);
 
@@ -281,7 +281,7 @@ public sealed class OperationalRecordsControllerTests
 
         response.Claimed.Should().BeFalse();
         response.ClaimedBy.Should().Be("operator-a");
-        response.ClaimExpiresAt.Should().Be(Now.AddSeconds(-1));
+        response.ClaimExpiresAt.Should().Be(_now.AddSeconds(-1));
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public sealed class OperationalRecordsControllerTests
             Options.Create(new CommandIdempotencyOptions()),
             Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode }),
             Options.Create(new JiraIntegrationOptions()),
-            new FixedTimeProvider(Now))
+            new FixedTimeProvider(_now))
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };
@@ -355,7 +355,7 @@ public sealed class OperationalRecordsControllerTests
             Options.Create(new CommandIdempotencyOptions()),
             Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode, SourceCloseEnabled = true }),
             Options.Create(new JiraIntegrationOptions()),
-            new FixedTimeProvider(Now))
+            new FixedTimeProvider(_now))
         {
             ControllerContext = new ControllerContext { HttpContext = httpContext }
         };
@@ -374,12 +374,12 @@ public sealed class OperationalRecordsControllerTests
         OrCode = "SYN-OR-TEST",
         Title = "Synthetic record",
         Description = "Synthetic description.",
-        CreatedAt = Now.AddDays(-1),
+        CreatedAt = _now.AddDays(-1),
         Classification = OperationalRecordClassification.OperationalSupport,
         JiraEligible = true,
         EligibilityReason = "Synthetic test rule.",
         WorkflowState = OperationalRecordWorkflowState.Eligible,
-        UpdatedAt = Now,
+        UpdatedAt = _now,
         SourceConcurrencyToken = "synthetic-token",
         Version = 1
     };

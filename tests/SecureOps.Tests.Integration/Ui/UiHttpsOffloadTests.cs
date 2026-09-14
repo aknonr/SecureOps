@@ -22,15 +22,15 @@ namespace SecureOps.Tests.Integration.Ui;
 
 public sealed class UiHttpsOffloadTests
 {
-    private const string TrustedProxyIp = "192.0.2.10";
-    private const string DirectClientIp = "192.0.2.20";
-    private const string ExpectedHost = "ui.example.test";
-    private const int ExpectedLocalPort = 8080;
+    private const string _trustedProxyIp = "192.0.2.10";
+    private const string _directClientIp = "192.0.2.20";
+    private const string _expectedHost = "ui.example.test";
+    private const int _expectedLocalPort = 8080;
 
     [Fact]
     public async Task InvokeAsync_WhenCompleteTrustBoundaryMatches_ChangesSchemeToHttps()
     {
-        DefaultHttpContext context = CreateContext(TrustedProxyIp, ExpectedHost, ExpectedLocalPort);
+        DefaultHttpContext context = CreateContext(_trustedProxyIp, _expectedHost, _expectedLocalPort);
 
         await CreateMiddleware().InvokeAsync(context);
 
@@ -38,9 +38,9 @@ public sealed class UiHttpsOffloadTests
     }
 
     [Theory]
-    [InlineData(DirectClientIp, ExpectedHost, ExpectedLocalPort)]
-    [InlineData(TrustedProxyIp, "wrong.example.test", ExpectedLocalPort)]
-    [InlineData(TrustedProxyIp, ExpectedHost, 8081)]
+    [InlineData(_directClientIp, _expectedHost, _expectedLocalPort)]
+    [InlineData(_trustedProxyIp, "wrong.example.test", _expectedLocalPort)]
+    [InlineData(_trustedProxyIp, _expectedHost, 8081)]
     public async Task InvokeAsync_WhenTrustBoundaryDoesNotMatch_LeavesSchemeHttp(
         string remoteIp,
         string host,
@@ -56,7 +56,7 @@ public sealed class UiHttpsOffloadTests
     [Fact]
     public async Task InvokeAsync_WhenFeatureDisabled_LeavesSchemeHttp()
     {
-        DefaultHttpContext context = CreateContext(TrustedProxyIp, ExpectedHost, ExpectedLocalPort);
+        DefaultHttpContext context = CreateContext(_trustedProxyIp, _expectedHost, _expectedLocalPort);
 
         await CreateMiddleware(enabled: false).InvokeAsync(context);
 
@@ -66,7 +66,7 @@ public sealed class UiHttpsOffloadTests
     [Fact]
     public async Task InvokeAsync_WhenUntrustedSourceSpoofsForwardedProto_LeavesSchemeHttp()
     {
-        DefaultHttpContext context = CreateContext(DirectClientIp, ExpectedHost, ExpectedLocalPort);
+        DefaultHttpContext context = CreateContext(_directClientIp, _expectedHost, _expectedLocalPort);
         context.Request.Headers["X-Forwarded-Proto"] = Uri.UriSchemeHttps;
 
         await CreateMiddleware().InvokeAsync(context);
@@ -77,7 +77,7 @@ public sealed class UiHttpsOffloadTests
     [Fact]
     public async Task InvokeAsync_WhenRemoteAddressIsIpv4MappedIpv6_ChangesSchemeToHttps()
     {
-        DefaultHttpContext context = CreateContext($"::ffff:{TrustedProxyIp}", ExpectedHost, ExpectedLocalPort);
+        DefaultHttpContext context = CreateContext($"::ffff:{_trustedProxyIp}", _expectedHost, _expectedLocalPort);
 
         await CreateMiddleware().InvokeAsync(context);
 
@@ -85,9 +85,9 @@ public sealed class UiHttpsOffloadTests
     }
 
     [Theory]
-    [InlineData("not-an-ip", ExpectedHost, ExpectedLocalPort, "invalid IP address")]
-    [InlineData(null, ExpectedHost, ExpectedLocalPort, "TrustedProxyIps must contain")]
-    [InlineData(TrustedProxyIp, null, ExpectedLocalPort, "ExpectedHosts must contain")]
+    [InlineData("not-an-ip", _expectedHost, _expectedLocalPort, "invalid IP address")]
+    [InlineData(null, _expectedHost, _expectedLocalPort, "TrustedProxyIps must contain")]
+    [InlineData(_trustedProxyIp, null, _expectedLocalPort, "ExpectedHosts must contain")]
     public void StartupValidation_WhenConfigurationIsUnsafe_FailsClearly(
         string? proxyIp,
         string? host,
@@ -124,7 +124,7 @@ public sealed class UiHttpsOffloadTests
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
-            BaseAddress = new Uri($"http://{ExpectedHost}"),
+            BaseAddress = new Uri($"http://{_expectedHost}"),
             HandleCookies = false
         });
 
@@ -155,7 +155,7 @@ public sealed class UiHttpsOffloadTests
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
-            BaseAddress = new Uri($"http://{ExpectedHost}"),
+            BaseAddress = new Uri($"http://{_expectedHost}"),
             HandleCookies = false
         });
         HttpResponseMessage login = await client.GetAsync("/login");
@@ -185,7 +185,7 @@ public sealed class UiHttpsOffloadTests
             .Where(pair => Uri.UnescapeDataString(pair[0]) == "redirect_uri")
             .Select(pair => Uri.UnescapeDataString(pair[1]))
             .Single();
-        redirectUri.Should().Be($"https://{ExpectedHost}/signin-oidc");
+        redirectUri.Should().Be($"https://{_expectedHost}/signin-oidc");
     }
 
     [Fact]
@@ -207,9 +207,9 @@ public sealed class UiHttpsOffloadTests
         HttpsOffloadOptions options = new()
         {
             Enabled = enabled,
-            TrustedProxyIps = [TrustedProxyIp],
-            ExpectedHosts = [ExpectedHost],
-            ExpectedLocalPort = ExpectedLocalPort
+            TrustedProxyIps = [_trustedProxyIp],
+            ExpectedHosts = [_expectedHost],
+            ExpectedLocalPort = _expectedLocalPort
         };
         return new HttpsOffloadMiddleware(_ => Task.CompletedTask, Options.Create(options));
     }
@@ -238,8 +238,8 @@ public sealed class UiHttpsOffloadTests
                 builder.ConfigureServices(services =>
                 {
                     services.AddSingleton<IStartupFilter>(new ConnectionInfoStartupFilter(
-                        IPAddress.Parse(TrustedProxyIp),
-                        ExpectedLocalPort));
+                        IPAddress.Parse(_trustedProxyIp),
+                        _expectedLocalPort));
                     services.PostConfigure<HttpsRedirectionOptions>(options => options.HttpsPort = 8443);
                 });
             });
@@ -256,8 +256,8 @@ public sealed class UiHttpsOffloadTests
             builder.ConfigureServices(services =>
             {
                 services.AddSingleton<IStartupFilter>(new ConnectionInfoStartupFilter(
-                    IPAddress.Parse(TrustedProxyIp),
-                    ExpectedLocalPort));
+                    IPAddress.Parse(_trustedProxyIp),
+                    _expectedLocalPort));
                 services.PostConfigure<HttpsRedirectionOptions>(options => options.HttpsPort = 8443);
                 services.PostConfigure<OpenIdConnectOptions>(ExternalIdentityClaimTypes.OidcInteractiveScheme, options =>
                 {
@@ -277,9 +277,9 @@ public sealed class UiHttpsOffloadTests
     private static Dictionary<string, string?> EnabledSettings()
     {
         Dictionary<string, string?> settings = BaseSettings();
-        settings["ReverseProxy:HttpsOffload:TrustedProxyIps:0"] = TrustedProxyIp;
-        settings["ReverseProxy:HttpsOffload:ExpectedHosts:0"] = ExpectedHost;
-        settings["ReverseProxy:HttpsOffload:ExpectedLocalPort"] = ExpectedLocalPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        settings["ReverseProxy:HttpsOffload:TrustedProxyIps:0"] = _trustedProxyIp;
+        settings["ReverseProxy:HttpsOffload:ExpectedHosts:0"] = _expectedHost;
+        settings["ReverseProxy:HttpsOffload:ExpectedLocalPort"] = _expectedLocalPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
         return settings;
     }
 

@@ -19,7 +19,7 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateMockService(out _);
 
         DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> result = await service.GetMembershipsAsync(
-            new DirectoryPrincipalEnrichmentRequest("pam12356", Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("pam12356", _purpose), _context, CancellationToken.None);
 
         result.Status.Should().Be(DirectoryQueryStatus.Success);
         result.Value!.DirectGroups.Select(item => item.Group.SamAccountName)
@@ -39,9 +39,9 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateMockService(out _);
 
         DirectoryQueryResult<DirectoryMembershipPathResponse> member = await service.GetMembershipPathsAsync(
-            new DirectoryMembershipPathRequest("pam12356", "nested-ops", Purpose), Context, CancellationToken.None);
+            new DirectoryMembershipPathRequest("pam12356", "nested-ops", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryMembershipPathResponse> notMember = await service.GetMembershipPathsAsync(
-            new DirectoryMembershipPathRequest("pam12356", "unrelated-group", Purpose), Context, CancellationToken.None);
+            new DirectoryMembershipPathRequest("pam12356", "unrelated-group", _purpose), _context, CancellationToken.None);
 
         member.Value!.IsMember.Should().BeTrue();
         member.Value.IsDirect.Should().BeFalse();
@@ -59,9 +59,9 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateMockService(out _);
 
         DirectoryQueryResult<DirectoryMembershipPathResponse> principal = await service.GetMembershipPathsAsync(
-            new DirectoryMembershipPathRequest("missing.user", "ops-read", Purpose), Context, CancellationToken.None);
+            new DirectoryMembershipPathRequest("missing.user", "ops-read", _purpose), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryMembershipPathResponse> target = await service.GetMembershipPathsAsync(
-            new DirectoryMembershipPathRequest("pam12356", "missing-group", Purpose), Context, CancellationToken.None);
+            new DirectoryMembershipPathRequest("pam12356", "missing-group", _purpose), _context, CancellationToken.None);
 
         principal.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryPrincipalNotFound);
         target.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryGroupNotFound);
@@ -82,7 +82,7 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateService(new RecordProvider(evidence), Options(), now, out _);
 
         DirectoryQueryResult<DirectoryAccountHealthResponse> result = await service.GetAccountHealthAsync(
-            new DirectoryPrincipalEnrichmentRequest("sample.user", Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("sample.user", _purpose), _context, CancellationToken.None);
 
         result.Value!.Enabled.Should().BeTrue();
         result.Value.Locked.Should().BeTrue();
@@ -98,10 +98,10 @@ public sealed class DirectoryEnrichmentQueryServiceTests
     public async Task AccountHealth_MissingTimestampsRemainNull()
     {
         DirectoryEnrichmentQueryService service = CreateService(
-            new RecordProvider(Principal()), Options(), Now, out _);
+            new RecordProvider(Principal()), Options(), _now, out _);
 
         DirectoryQueryResult<DirectoryAccountHealthResponse> result = await service.GetAccountHealthAsync(
-            new DirectoryPrincipalEnrichmentRequest("sample.user", Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("sample.user", _purpose), _context, CancellationToken.None);
 
         result.Value!.PasswordLastSetUtc.Should().BeNull();
         result.Value.PasswordAgeDays.Should().BeNull();
@@ -116,10 +116,10 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryExplorerOptions options = Options();
         options.ProviderTimeoutSeconds = 1;
         var provider = new BlockingProvider();
-        DirectoryEnrichmentQueryService service = CreateService(provider, options, Now, out _);
+        DirectoryEnrichmentQueryService service = CreateService(provider, options, _now, out _);
 
         DirectoryQueryResult<DirectoryAccountHealthResponse> result = await service.GetAccountHealthAsync(
-            new DirectoryPrincipalEnrichmentRequest("sample.user", Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("sample.user", _purpose), _context, CancellationToken.None);
 
         result.Status.Should().Be(DirectoryQueryStatus.ProviderTimeout);
         result.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryProviderTimeout);
@@ -140,10 +140,10 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryExplorerOptions options = Options();
         options.MaxSpnsPerPrincipal = maximum;
         DirectoryEnrichmentQueryService service = CreateService(
-            new RecordProvider(Principal(spns: spns)), options, Now, out _);
+            new RecordProvider(Principal(spns: spns)), options, _now, out _);
 
         DirectoryQueryResult<DirectoryServiceEvidenceResponse> result = await service.GetServiceEvidenceAsync(
-            new DirectoryPrincipalEnrichmentRequest("sample.user", Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("sample.user", _purpose), _context, CancellationToken.None);
 
         result.Value!.ServicePrincipalNameCount.Should().Be(available);
         result.Value.ServicePrincipalNames.Should().HaveCount(returned);
@@ -163,9 +163,9 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateMockService(out _);
 
         DirectoryQueryResult<DirectoryServiceEvidenceResponse> evidence = await service.GetServiceEvidenceAsync(
-            new DirectoryPrincipalEnrichmentRequest(account), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest(account), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryAccountHealthResponse> health = await service.GetAccountHealthAsync(
-            new DirectoryPrincipalEnrichmentRequest(account), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest(account), _context, CancellationToken.None);
 
         evidence.Status.Should().Be(DirectoryQueryStatus.Success);
         evidence.Value!.ServicePrincipalNames.Should().BeEmpty();
@@ -179,10 +179,10 @@ public sealed class DirectoryEnrichmentQueryServiceTests
     public async Task ServiceEvidence_PrincipalReadSurvivesIndependentMembershipFailure()
     {
         DirectoryEnrichmentQueryService service = CreateService(
-            new PrincipalOnlyProvider(Principal()), Options(), Now, out _);
+            new PrincipalOnlyProvider(Principal()), Options(), _now, out _);
 
         DirectoryQueryResult<DirectoryServiceEvidenceResponse> result = await service.GetServiceEvidenceAsync(
-            new DirectoryPrincipalEnrichmentRequest("sample.user"), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("sample.user"), _context, CancellationToken.None);
 
         result.Status.Should().Be(DirectoryQueryStatus.Success);
         result.Value!.ServicePrincipalNames.Should().BeEmpty();
@@ -201,7 +201,7 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateMockService(out _, options);
 
         DirectoryQueryResult<DirectoryPrivilegedMembershipResponse> result = await service.GetPrivilegedMembershipsAsync(
-            new DirectoryPrincipalEnrichmentRequest("pam12356", Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("pam12356", _purpose), _context, CancellationToken.None);
 
         result.Value!.Groups.Single(item => item.ConfiguredIdentifier == "ops-read").Direct.Should().BeTrue();
         result.Value.Groups.Single(item => item.ConfiguredIdentifier == "ops-read").Transitive.Should().BeTrue();
@@ -215,12 +215,12 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateMockService(out InMemoryAuditWriter audit);
 
         _ = await service.GetServiceEvidenceAsync(
-            new DirectoryPrincipalEnrichmentRequest("pam12356", Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("pam12356", _purpose), _context, CancellationToken.None);
 
         string json = JsonSerializer.Serialize(audit.Events);
         json.Should().Contain("DirectCount").And.Contain("EdgesVisited").And.Contain("limitReached");
         json.Should().NotContain("pam12356").And.NotContain("nested-ops").And.NotContain("MSSQLSvc")
-            .And.NotContain("PasswordLastSetUtc").And.NotContain(Purpose);
+            .And.NotContain("PasswordLastSetUtc").And.NotContain(_purpose);
     }
 
     [Fact]
@@ -229,11 +229,11 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateMockService(out InMemoryAuditWriter audit);
 
         DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> missing = await service.GetMembershipsAsync(
-            new DirectoryPrincipalEnrichmentRequest("pam12356"), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("pam12356"), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryAccountHealthResponse> blank = await service.GetAccountHealthAsync(
-            new DirectoryPrincipalEnrichmentRequest("pam12356", "  "), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("pam12356", "  "), _context, CancellationToken.None);
         DirectoryQueryResult<DirectoryServiceEvidenceResponse> supplied = await service.GetServiceEvidenceAsync(
-            new DirectoryPrincipalEnrichmentRequest("pam12356", "  optional context  "), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("pam12356", "  optional context  "), _context, CancellationToken.None);
 
         missing.Status.Should().Be(DirectoryQueryStatus.Success);
         blank.Status.Should().Be(DirectoryQueryStatus.Success);
@@ -251,7 +251,7 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         string purpose = inputKind == "oversized" ? new string('x', 257) : "context\u0001continuation";
 
         DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> result = await service.GetMembershipsAsync(
-            new DirectoryPrincipalEnrichmentRequest("pam12356", purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest("pam12356", purpose), _context, CancellationToken.None);
 
         result.Status.Should().Be(DirectoryQueryStatus.Invalid);
     }
@@ -264,7 +264,7 @@ public sealed class DirectoryEnrichmentQueryServiceTests
         DirectoryEnrichmentQueryService service = CreateMockService(out _);
 
         DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> result = await service.GetMembershipsAsync(
-            new DirectoryPrincipalEnrichmentRequest(account, Purpose), Context, CancellationToken.None);
+            new DirectoryPrincipalEnrichmentRequest(account, _purpose), _context, CancellationToken.None);
 
         result.Status.Should().Be(DirectoryQueryStatus.Invalid);
     }
@@ -275,7 +275,7 @@ public sealed class DirectoryEnrichmentQueryServiceTests
     {
         IOptions<IdentityLookupOptions> identity = Microsoft.Extensions.Options.Options.Create(
             new IdentityLookupOptions { EnableUpnLookup = true });
-        return CreateService(new MockDirectoryEnrichmentProvider(identity), directoryOptions ?? Options(), Now, out audit);
+        return CreateService(new MockDirectoryEnrichmentProvider(identity), directoryOptions ?? Options(), _now, out audit);
     }
 
     private static DirectoryEnrichmentQueryService CreateService(
@@ -334,9 +334,9 @@ public sealed class DirectoryEnrichmentQueryServiceTests
             false,
             "User");
 
-    private const string Purpose = "Approved synthetic directory verification";
-    private static readonly DateTimeOffset Now = new(2026, 8, 23, 12, 0, 0, TimeSpan.Zero);
-    private static readonly DirectoryQueryExecutionContext Context = new(
+    private const string _purpose = "Approved synthetic directory verification";
+    private static readonly DateTimeOffset _now = new(2026, 8, 23, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DirectoryQueryExecutionContext _context = new(
         "CONTOSO\\lead.user", "10.0.0.5", "phase2-test");
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

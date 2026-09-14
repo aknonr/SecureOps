@@ -18,10 +18,10 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public static class UiProblemFactory
 {
-    private const string RefreshStep = "Kaydı yenileyip güncel durumu görün.";
-    private const string RetryStep = "Birkaç saniye bekleyip tekrar deneyin.";
-    private const string ContactAdminStep = "Sorun sürerse platform yöneticinize başvurun.";
-    private const string ReferenceStep = "Destek talebinde aşağıdaki referans numarasını paylaşın.";
+    private const string _refreshStep = "Kaydı yenileyip güncel durumu görün.";
+    private const string _retryStep = "Birkaç saniye bekleyip tekrar deneyin.";
+    private const string _contactAdminStep = "Sorun sürerse platform yöneticinize başvurun.";
+    private const string _referenceStep = "Destek talebinde aşağıdaki referans numarasını paylaşın.";
 
     /// <summary>
     /// Builds a problem from a parsed API error body.
@@ -81,7 +81,7 @@ public static class UiProblemFactory
         "ApiUnreachable",
         "Servise ulaşılamıyor",
         "SecureOps servisine şu anda bağlanılamıyor. Bu genellikle geçici bir ağ veya servis kesintisidir.",
-        [RetryStep, ContactAdminStep],
+        [_retryStep, _contactAdminStep],
         Retryable: true,
         RequiresRefresh: false,
         CorrelationId: null,
@@ -97,7 +97,7 @@ public static class UiProblemFactory
         "RequestTimeout",
         "İstek zaman aşımına uğradı",
         "Servis beklenen sürede yanıt vermedi. İşlem tamamlanmamış olabilir.",
-        [RetryStep, "İşlem tekrarlanmadan önce güncel durumu kontrol edin.", ContactAdminStep],
+        [_retryStep, "İşlem tekrarlanmadan önce güncel durumu kontrol edin.", _contactAdminStep],
         Retryable: true,
         RequiresRefresh: true,
         CorrelationId: null,
@@ -228,7 +228,7 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, code,
             "Talep durumu değişmiş",
             "Bu erişim talebi artık beklemede değil; başka bir yönetici tarafından sonuçlandırılmış olabilir.",
-            [RefreshStep],
+            [_refreshStep],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.AccessRecordNotFound => Build(
@@ -257,21 +257,21 @@ public static class UiProblemFactory
             UiProblemKind.UpstreamUnavailable, code,
             "Active Directory hizmetine şu anda ulaşılamıyor",
             "Hesap sorgusu için dizin sağlayıcısına bağlanılamadı. Sorgunuz çalıştırılmadı.",
-            [RetryStep, ContactAdminStep],
+            [_retryStep, _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         OperationalErrorCodes.IdentityProviderTimeout => Build(
             UiProblemKind.UpstreamUnavailable, code,
             "Dizin servisi zaman aşımına uğradı",
             "Kimlik sağlayıcısı beklenen sürede yanıt vermedi.",
-            [RetryStep, ContactAdminStep],
+            [_retryStep, _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         OperationalErrorCodes.IdentityProviderBadResponse => Build(
             UiProblemKind.UpstreamUnavailable, code,
             "Dizin servisi beklenmeyen yanıt verdi",
             "Kimlik sağlayıcısından gelen yanıt işlenemedi. Sonuç güvenilir olmadığı için gösterilmiyor.",
-            [RetryStep, ReferenceStep, ContactAdminStep],
+            [_retryStep, _referenceStep, _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         // ---- Directory Explorer ---------------------------------------------------------------
@@ -312,7 +312,7 @@ public static class UiProblemFactory
             UiProblemKind.UpstreamUnavailable, code,
             "Active Directory hizmetine şu anda ulaşılamıyor",
             "Dizin sağlayıcısına bağlanılamadı. Sorgunuz çalıştırılmadı.",
-            [RetryStep, ContactAdminStep],
+            [_retryStep, _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         // Distinct from unavailable on purpose. The directory answered other calls; this one ran
@@ -324,8 +324,8 @@ public static class UiProblemFactory
             "Sorgu, sunucu tarafındaki süre sınırına takıldı. Bu, dizin hizmetinin çalışmadığı "
             + "anlamına gelmez; sorgu bu grup için beklenenden uzun sürmüş olabilir.",
             ["Daha dar bir grup veya hesap ile tekrar deneyin.",
-             RetryStep,
-             ContactAdminStep],
+             _retryStep,
+             _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         // A result, not a failure: the server walked as far as its bounds allowed and said so. The
@@ -337,7 +337,7 @@ public static class UiProblemFactory
             + "Elde edilen kanıt eksiktir.",
             ["Kısmi sonuç, üyelik yok kararı için kullanılmamalıdır.",
              "Daha dar bir grup ile analiz etmeyi deneyin.",
-             ContactAdminStep],
+             _contactAdminStep],
             retryable: false, requiresRefresh: false),
 
         // ---- Application sessions ---------------------------------------------------------------
@@ -376,7 +376,7 @@ public static class UiProblemFactory
             UiProblemKind.UpstreamUnavailable, code,
             "Oturum kayıt deposuna ulaşılamıyor",
             "Oturum bilgileri okunamadığı için işlem güvenli şekilde durduruldu.",
-            [RetryStep, ReferenceStep, ContactAdminStep],
+            [_retryStep, _referenceStep, _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         // ---- Cross-cutting ------------------------------------------------------------------
@@ -391,14 +391,14 @@ public static class UiProblemFactory
             UiProblemKind.UpstreamUnavailable, code,
             "Denetim kaydı alınamadı",
             "Denetim kaydı yazılamadığı için işlem güvenli şekilde durduruldu. SecureOps, kayıt altına alınamayan işlemi tamamlamaz.",
-            [RetryStep, ReferenceStep, ContactAdminStep],
+            [_retryStep, _referenceStep, _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         OperationalErrorCodes.InvalidIdempotencyKey => Build(
             UiProblemKind.Validation, code,
             "İşlem anahtarı geçersiz",
             "İşlemin tekrarlanmasını önleyen anahtar kabul edilmedi.",
-            ["Sayfayı yenileyip işlemi yeniden başlatın.", ContactAdminStep],
+            ["Sayfayı yenileyip işlemi yeniden başlatın.", _contactAdminStep],
             retryable: false, requiresRefresh: true),
 
         // ---- Operational record source ------------------------------------------------------
@@ -406,21 +406,21 @@ public static class UiProblemFactory
             UiProblemKind.UpstreamUnavailable, code,
             "Kaynak sistem yanıt vermiyor",
             "Operasyonel kayıtların alındığı kaynak sisteme ulaşılamıyor. Liste güncellenemedi.",
-            [RetryStep, ContactAdminStep],
+            [_retryStep, _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         OperationalErrorCodes.OperationalSourceAuthenticationFailed => Build(
             UiProblemKind.UpstreamUnavailable, code,
             "Kaynak sistem kimlik doğrulaması başarısız",
             "SecureOps kaynak sisteme bağlanamadı. Bu bir yapılandırma sorunudur, sizin yetkinizle ilgili değildir.",
-            [ReferenceStep, ContactAdminStep],
+            [_referenceStep, _contactAdminStep],
             retryable: false, requiresRefresh: false),
 
         OperationalErrorCodes.OperationalRecordQueryFailed => Build(
             UiProblemKind.UpstreamUnavailable, code,
             "Kayıtlar getirilemedi",
             "Operasyonel kayıt sorgusu tamamlanamadı.",
-            [RetryStep, ReferenceStep],
+            [_retryStep, _referenceStep],
             retryable: true, requiresRefresh: true),
 
         OperationalErrorCodes.OperationalRecordNotFound => Build(
@@ -434,7 +434,7 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, code,
             "Kayıt bu işlem için uygun durumda değil",
             "Kaydın mevcut iş akışı durumu bu işleme izin vermiyor.",
-            [RefreshStep],
+            [_refreshStep],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.OperationalRecordAlreadyClaimed => Build(
@@ -448,14 +448,14 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, code,
             "Kaynak kayıt değişmiş",
             "Kaynak kayıt önizlemeden sonra değişti. Jira kaydı oluşturulmadı. Kaydı yeniden inceleyin.",
-            [RefreshStep, "Güncel içeriği doğruladıktan sonra işlemi tekrarlayın."],
+            [_refreshStep, "Güncel içeriği doğruladıktan sonra işlemi tekrarlayın."],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.OperationalRecordNoLongerOpen => Build(
             UiProblemKind.Conflict, code,
             "Kaynak kayıt kapanmış",
             "Kaynak sistemdeki kayıt artık açık değil; kapalı bir kayıt için Jira oluşturulmaz.",
-            [RefreshStep, "Kayıt yeniden açıldıysa işlemi tekrar başlatın."],
+            [_refreshStep, "Kayıt yeniden açıldıysa işlemi tekrar başlatın."],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.OperationalRecordCloseFailed => Build(
@@ -463,14 +463,14 @@ public static class UiProblemFactory
             "Kaynak kayıt tamamlanamadı",
             "Jira kaydı oluşturuldu ancak kaynak kayıt tamamlanamadı. Jira tekrar oluşturulmadan "
                 + "kaynak tamamlama işlemi yeniden denenebilir.",
-            ["Kaynak tamamlama işlemini yeniden deneyin.", ReferenceStep, ContactAdminStep],
+            ["Kaynak tamamlama işlemini yeniden deneyin.", _referenceStep, _contactAdminStep],
             retryable: true, requiresRefresh: true),
 
         OperationalErrorCodes.OperationalRecordCommentUpdateFailed => Build(
             UiProblemKind.Conflict, code,
             "Kaynak kayda not eklenemedi",
             "Jira tarafı tamamlandı, ancak kaynak kayda açıklama yazılamadı.",
-            ["Mutabakat için işlemi yeniden deneyin.", ReferenceStep],
+            ["Mutabakat için işlemi yeniden deneyin.", _referenceStep],
             retryable: true, requiresRefresh: true),
 
         // ---- Requester resolution ------------------------------------------------------------
@@ -478,21 +478,21 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, code,
             "Talep sahibi çözümlenemedi",
             "Kayıttaki talep sahibi dizinde eşleştirilemedi. Jira kaydı doğru kişiye bağlanamayacağı için işlem durduruldu.",
-            ["Kaynak kayıttaki talep sahibi bilgisini kontrol edin.", ContactAdminStep],
+            ["Kaynak kayıttaki talep sahibi bilgisini kontrol edin.", _contactAdminStep],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.RequesterResolutionAmbiguous => Build(
             UiProblemKind.Conflict, code,
             "Talep sahibi için birden fazla eşleşme var",
             "Dizinde birden fazla tam eşleşme bulundu. Yanlış kişiye kayıt açılmaması için işlem durduruldu.",
-            ["Talep sahibini kaynak sistemde netleştirin.", ContactAdminStep],
+            ["Talep sahibini kaynak sistemde netleştirin.", _contactAdminStep],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.OperatorReporterResolutionFailed => Build(
             UiProblemKind.Conflict, code,
             "Jira raporlayıcısı doğrulanamadı",
             "İşlemi yapan kullanıcı Jira üzerinde doğrulanamadığı için kayıt oluşturulmadı.",
-            ["Kurumsal oturum hesabınızın Jira kullanıcısıyla eşleştiğini doğrulayın.", ContactAdminStep],
+            ["Kurumsal oturum hesabınızın Jira kullanıcısıyla eşleştiğini doğrulayın.", _contactAdminStep],
             retryable: false, requiresRefresh: true),
 
         // ---- Jira -----------------------------------------------------------------------------
@@ -500,42 +500,42 @@ public static class UiProblemFactory
             UiProblemKind.UpstreamUnavailable, code,
             "Jira yanıt vermiyor",
             "Jira servisine ulaşılamıyor. Kayıt oluşturulmadı.",
-            [RetryStep, ContactAdminStep],
+            [_retryStep, _contactAdminStep],
             retryable: true, requiresRefresh: false),
 
         OperationalErrorCodes.JiraUnauthorized => Build(
             UiProblemKind.UpstreamUnavailable, code,
             "Jira entegrasyon yetkisi reddedildi",
             "SecureOps'un Jira entegrasyon kimliği kabul edilmedi. Bu bir yapılandırma sorunudur, sizin yetkinizle ilgili değildir.",
-            [ReferenceStep, ContactAdminStep],
+            [_referenceStep, _contactAdminStep],
             retryable: false, requiresRefresh: false),
 
         OperationalErrorCodes.JiraValidationFailed => Build(
             UiProblemKind.Validation, code,
             "Jira alanları kabul edilmedi",
             "Jira, önerilen kayıt alanlarını reddetti. Eşleme ile Jira proje yapılandırması uyuşmuyor olabilir.",
-            ["Önizlemedeki alanları kontrol edin.", ReferenceStep, ContactAdminStep],
+            ["Önizlemedeki alanları kontrol edin.", _referenceStep, _contactAdminStep],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.JiraReporterRejected => Build(
             UiProblemKind.Validation, code,
             "Jira raporlayıcıyı kabul etmedi",
             "Doğrulanan kullanıcı raporlayıcı olarak Jira tarafından reddedildi. Entegrasyon hesabına raporlayıcıyı değiştirme yetkisi gerekebilir.",
-            [ReferenceStep, ContactAdminStep],
+            [_referenceStep, _contactAdminStep],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.JiraCreateFailed => Build(
             UiProblemKind.Conflict, code,
             "Jira kaydı oluşturulamadı",
             "Jira kaydı oluşturma işlemi tamamlanamadı. Kaydın oluşup oluşmadığı doğrulanmalıdır.",
-            [RefreshStep, "Yalnızca sunucu güncel durumda yeniden denemeye izin veriyorsa devam edin.", ReferenceStep],
+            [_refreshStep, "Yalnızca sunucu güncel durumda yeniden denemeye izin veriyorsa devam edin.", _referenceStep],
             retryable: true, requiresRefresh: true),
 
         OperationalErrorCodes.JiraAlreadyCreated => Build(
             UiProblemKind.Conflict, code,
             "Bu kayıt için Jira zaten oluşturulmuş",
             "Bu kayıt için daha önce işlem başlatıldığı için ikinci bir Jira kaydı oluşturulmadı.",
-            [RefreshStep, "Mevcut Jira kaydını inceleyin."],
+            [_refreshStep, "Mevcut Jira kaydını inceleyin."],
             retryable: false, requiresRefresh: true),
 
         // ---- Durable workflow ------------------------------------------------------------------
@@ -543,21 +543,21 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, code,
             "İş akışı başka bir işlemde",
             "Bu kayıt üzerinde başka bir iş akışı işlemi sürüyor.",
-            [RefreshStep, RetryStep],
+            [_refreshStep, _retryStep],
             retryable: true, requiresRefresh: true),
 
         OperationalErrorCodes.WorkflowAlreadyCompleted => Build(
             UiProblemKind.Conflict, code,
             "İş akışı zaten tamamlanmış",
             "Bu iş akışı daha önce tamamlandı; tekrar çalıştırılmasına gerek yok.",
-            [RefreshStep],
+            [_refreshStep],
             retryable: false, requiresRefresh: true),
 
         OperationalErrorCodes.WorkflowAlreadyInProgress => Build(
             UiProblemKind.Conflict, code,
             "Aynı işlem hâlihazırda çalışıyor",
             "Aynı kapsamda bir komut zaten yürütülüyor. Mükerrer çalıştırma engellendi.",
-            ["İşlem tamamlanana kadar bekleyin.", RefreshStep],
+            ["İşlem tamamlanana kadar bekleyin.", _refreshStep],
             retryable: true, requiresRefresh: true),
 
         // ---- Resource catalogue and personal shift sets -------------------------------------------
@@ -591,7 +591,7 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, code,
             "Kayıt siz düzenlerken değişti",
             "Bu kayıt başka bir yerden güncellendi. Değişikliğin üzerine yazılmaması için işlem durduruldu.",
-            [RefreshStep, "Güncel hâli inceleyip değişikliğinizi tekrar uygulayın."],
+            [_refreshStep, "Güncel hâli inceleyip değişikliğinizi tekrar uygulayın."],
             retryable: true, requiresRefresh: true),
 
         // ---- Real-data read-only integration ----------------------------------------------------
@@ -602,7 +602,7 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, code,
             "Yazma işlemi bu modda kapalı",
             "Bu TEST modunda dış sistemlere yazma işlemleri kapalıdır.",
-            ["Kaydı inceleyebilir ve Jira taslağını önizleyebilirsiniz.", ReferenceStep],
+            ["Kaydı inceleyebilir ve Jira taslağını önizleyebilirsiniz.", _referenceStep],
             retryable: false, requiresRefresh: true),
 
         // ---- Management reporting --------------------------------------------------------------
@@ -622,7 +622,7 @@ public static class UiProblemFactory
             "Raporlama servisi şu anda yanıt vermiyor",
             "Raporlama verisi geçici olarak okunamadı. Bu bir yapılandırma eksikliği değil; "
                 + "tekrar denenebilir.",
-            [RetryStep, ReferenceStep, ContactAdminStep],
+            [_retryStep, _referenceStep, _contactAdminStep],
             retryable: true, requiresRefresh: true),
 
         OperationalErrorCodes.ReportingValidationFailed => Build(
@@ -669,7 +669,7 @@ public static class UiProblemFactory
             UiProblemKind.Conflict, "Conflict",
             "Durum değişmiş",
             "Kaydın durumu siz görüntülerken değişti. İşlem güvenli şekilde durduruldu.",
-            [RefreshStep],
+            [_refreshStep],
             retryable: false, requiresRefresh: true),
 
         429 => Build(
@@ -683,7 +683,7 @@ public static class UiProblemFactory
             UiProblemKind.UpstreamUnavailable, "ServiceUnavailable",
             "Servis şu anda yanıt veremiyor",
             "İşlem sunucu tarafında tamamlanamadı.",
-            [RetryStep, ReferenceStep, ContactAdminStep],
+            [_retryStep, _referenceStep, _contactAdminStep],
             retryable: true, requiresRefresh: true),
 
         // The last resort. It says the one thing that is certainly true and nothing else: an
@@ -693,7 +693,7 @@ public static class UiProblemFactory
             UiProblemKind.Unexpected, "UnexpectedError",
             "İşlem tamamlanamadı.",
             "Beklenmeyen bir durum oluştu ve işlem tamamlanmadı.",
-            [RetryStep, ReferenceStep, ContactAdminStep],
+            [_retryStep, _referenceStep, _contactAdminStep],
             retryable: true, requiresRefresh: true)
     };
 

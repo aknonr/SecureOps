@@ -72,8 +72,10 @@ public sealed class DirectoryProviderTests
         DirectoryProviderPage<DirectoryMemberRecord>? empty = await provider.GetDirectMembersAsync(
             "domain-local-empty", 0, 2, 100, CancellationToken.None);
 
-        first!.Items.Should().HaveCount(2); first.HasMore.Should().BeTrue();
-        second!.Items.Should().ContainSingle(); second.HasMore.Should().BeFalse();
+        first!.Items.Should().HaveCount(2);
+        first.HasMore.Should().BeTrue();
+        second!.Items.Should().ContainSingle();
+        second.HasMore.Should().BeFalse();
         empty!.Items.Should().BeEmpty();
     }
 
@@ -124,12 +126,14 @@ public sealed class DirectoryProviderTests
 
         public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectGroupsBySamAccountNameAsync(string account, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken)
         {
-            SamInputs.Add(account); return Task.FromResult(SamResult);
+            SamInputs.Add(account);
+            return Task.FromResult(SamResult);
         }
 
         public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectGroupsByUpnAsync(string userPrincipalName, int offset, int pageSize, int resultLimit, CancellationToken cancellationToken)
         {
-            UpnInputs.Add(userPrincipalName); return Task.FromResult(UpnResult);
+            UpnInputs.Add(userPrincipalName);
+            return Task.FromResult(UpnResult);
         }
 
         public Task<DirectoryGroupRecord?> FindGroupAsync(string group, CancellationToken cancellationToken) => Task.FromResult<DirectoryGroupRecord?>(null);

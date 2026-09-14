@@ -16,7 +16,7 @@ public interface ISqlPersistenceProbe
 /// <summary>SQL Server implementation of the persistence readiness probe.</summary>
 public sealed class SqlPersistenceProbe : ISqlPersistenceProbe
 {
-    private const int ProbeTimeoutSeconds = 5;
+    private const int _probeTimeoutSeconds = 5;
     private readonly string _connectionString;
 
     /// <summary>Initializes the probe from server-owned runtime configuration.</summary>
@@ -30,13 +30,13 @@ public sealed class SqlPersistenceProbe : ISqlPersistenceProbe
     public async Task ProbeAsync(CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(ProbeTimeoutSeconds));
+        timeout.CancelAfter(TimeSpan.FromSeconds(_probeTimeoutSeconds));
 
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(timeout.Token);
         await using SqlCommand command = connection.CreateCommand();
         command.CommandText = "SELECT 1;";
-        command.CommandTimeout = ProbeTimeoutSeconds;
+        command.CommandTimeout = _probeTimeoutSeconds;
         object? result = await command.ExecuteScalarAsync(timeout.Token);
         if (!Equals(result, 1))
         {

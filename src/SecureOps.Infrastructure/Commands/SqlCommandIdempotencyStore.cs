@@ -9,7 +9,7 @@ namespace SecureOps.Infrastructure.Commands;
 /// <summary>SQL Server command execution store for retry and restart durability.</summary>
 public sealed class SqlCommandIdempotencyStore : ICommandIdempotencyStore
 {
-    private const int CommandTimeoutSeconds = 15;
+    private const int _commandTimeoutSeconds = 15;
     private readonly string _connectionString;
 
     /// <summary>Initializes the SQL store.</summary>
@@ -104,6 +104,6 @@ public sealed class SqlCommandIdempotencyStore : ICommandIdempotencyStore
         await connection.ExecuteAsync(Command(sql, new { CommandName = commandName, TargetId = targetId, IdempotencyKey = idempotencyKey, ExecutionToken = executionToken, Status = status, ErrorCode = errorCode }, null, cancellationToken));
     }
 
-    private static CommandDefinition Command(string sql, object parameters, IDbTransaction? transaction, CancellationToken cancellationToken) => new(sql, parameters, transaction, CommandTimeoutSeconds, cancellationToken: cancellationToken);
+    private static CommandDefinition Command(string sql, object parameters, IDbTransaction? transaction, CancellationToken cancellationToken) => new(sql, parameters, transaction, _commandTimeoutSeconds, cancellationToken: cancellationToken);
     private sealed record ExecutionRow(string Actor, string Status, DateTimeOffset LeaseExpiresAt, string? ErrorCode, Guid ExecutionToken);
 }

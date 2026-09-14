@@ -35,7 +35,8 @@ public sealed class ReverseProxyConfigurationTests
     {
         Dictionary<string, string?> values = new() { ["ReverseProxy:ForwardedHeaders:Enabled"] = enabled };
         int index = 0;
-        foreach (string ip in ips) { values[$"ReverseProxy:ForwardedHeaders:TrustedProxyIps:{index++}"] = ip; }
+        foreach (string ip in ips)
+        { values[$"ReverseProxy:ForwardedHeaders:TrustedProxyIps:{index++}"] = ip; }
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
     }
 }

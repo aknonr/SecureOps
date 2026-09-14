@@ -15,7 +15,7 @@ public sealed class SimulationOperationalRecordClient : IOperationalRecordClient
     internal const string UnknownOutcomeSourceId = "simulation-jira-unknown";
     internal const string CloseFailureSourceId = "simulation-source-close-failure";
 
-    private static readonly DateTimeOffset CreatedAt = new(2026, 8, 1, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset _createdAt = new(2026, 8, 1, 10, 0, 0, TimeSpan.Zero);
     private readonly ConcurrentDictionary<string, OperationalRecordSourceItem> _records;
     private int _closeFailureAttempts;
 
@@ -66,7 +66,7 @@ public sealed class SimulationOperationalRecordClient : IOperationalRecordClient
                 "stale-v2") with
             {
                 Description = "Synthetic source content changed after preview.",
-                LastModifiedAt = CreatedAt.AddHours(2)
+                LastModifiedAt = _createdAt.AddHours(2)
             });
         }
 
@@ -101,7 +101,7 @@ public sealed class SimulationOperationalRecordClient : IOperationalRecordClient
         _records[sourceRecordId] = record with
         {
             IsOpen = false,
-            LastModifiedAt = CreatedAt.AddHours(3)
+            LastModifiedAt = _createdAt.AddHours(3)
         };
         return Task.CompletedTask;
     }
@@ -119,11 +119,11 @@ public sealed class SimulationOperationalRecordClient : IOperationalRecordClient
             title,
             "Synthetic operational record for deterministic TEST simulation.",
             Requester,
-            CreatedAt,
+            _createdAt,
             "SIMULATION",
             "synthetic-server",
             "synthetic-application",
             true,
             versionToken,
-            CreatedAt.AddHours(1));
+            _createdAt.AddHours(1));
 }

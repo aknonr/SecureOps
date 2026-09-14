@@ -16,8 +16,8 @@ namespace SecureOps.Tests.Unit.Ui;
 /// </remarks>
 public sealed class OperationalRecordViewTests
 {
-    private const string Me = "demo:platform-admin";
-    private const string Other = "demo:team-lead";
+    private const string _me = "demo:platform-admin";
+    private const string _other = "demo:team-lead";
 
     [Theory]
     [InlineData(OperationalRecordWorkflowState.Eligible)]
@@ -221,7 +221,7 @@ public sealed class OperationalRecordViewTests
         Assert.Equal(
             OperationalRecordView.Ownership.Available,
             OperationalRecordView.OwnershipOf(
-                Record(OperationalRecordWorkflowState.Eligible), DateTimeOffset.UtcNow, Me));
+                Record(OperationalRecordWorkflowState.Eligible), DateTimeOffset.UtcNow, _me));
     }
 
     [Fact]
@@ -230,9 +230,9 @@ public sealed class OperationalRecordViewTests
         DateTimeOffset now = DateTimeOffset.UtcNow;
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: Me);
+            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: _me);
 
-        Assert.Equal(OperationalRecordView.Ownership.Mine, OperationalRecordView.OwnershipOf(record, now, Me));
+        Assert.Equal(OperationalRecordView.Ownership.Mine, OperationalRecordView.OwnershipOf(record, now, _me));
     }
 
     [Fact]
@@ -241,9 +241,9 @@ public sealed class OperationalRecordViewTests
         DateTimeOffset now = DateTimeOffset.UtcNow;
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: Other);
+            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: _other);
 
-        Assert.Equal(OperationalRecordView.Ownership.Other, OperationalRecordView.OwnershipOf(record, now, Me));
+        Assert.Equal(OperationalRecordView.Ownership.Other, OperationalRecordView.OwnershipOf(record, now, _me));
     }
 
     [Fact]
@@ -253,10 +253,10 @@ public sealed class OperationalRecordViewTests
         // Reading ownership from claimedBy alone would block a record nobody holds.
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: false, claimedBy: Me);
+            claimed: false, claimedBy: _me);
 
         OperationalRecordView.Ownership owner =
-            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow, Me);
+            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow, _me);
 
         Assert.Equal(OperationalRecordView.Ownership.Lapsed, owner);
         Assert.NotEqual(OperationalRecordView.Ownership.Mine, owner);
@@ -268,11 +268,11 @@ public sealed class OperationalRecordViewTests
     {
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: false, claimedBy: Other);
+            claimed: false, claimedBy: _other);
 
         Assert.Equal(
             OperationalRecordView.Ownership.Lapsed,
-            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow, Me));
+            OperationalRecordView.OwnershipOf(record, DateTimeOffset.UtcNow, _me));
     }
 
     [Fact]
@@ -281,9 +281,9 @@ public sealed class OperationalRecordViewTests
         DateTimeOffset now = DateTimeOffset.UtcNow;
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: true, claimExpires: now.AddMinutes(-1), claimedBy: Other);
+            claimed: true, claimExpires: now.AddMinutes(-1), claimedBy: _other);
 
-        Assert.Equal(OperationalRecordView.Ownership.Lapsed, OperationalRecordView.OwnershipOf(record, now, Me));
+        Assert.Equal(OperationalRecordView.Ownership.Lapsed, OperationalRecordView.OwnershipOf(record, now, _me));
     }
 
     [Fact]
@@ -293,7 +293,7 @@ public sealed class OperationalRecordViewTests
         DateTimeOffset now = DateTimeOffset.UtcNow;
         OperationalRecordResponse record = Record(
             OperationalRecordWorkflowState.Eligible,
-            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: Me);
+            claimed: true, claimExpires: now.AddMinutes(2), claimedBy: _me);
 
         Assert.Equal(OperationalRecordView.Ownership.Other, OperationalRecordView.OwnershipOf(record, now, null));
     }
@@ -306,7 +306,7 @@ public sealed class OperationalRecordViewTests
             OperationalRecordWorkflowState.Eligible,
             claimed: true, claimExpires: now.AddMinutes(2), claimedBy: "DEMO:Platform-Admin");
 
-        Assert.Equal(OperationalRecordView.Ownership.Mine, OperationalRecordView.OwnershipOf(record, now, Me));
+        Assert.Equal(OperationalRecordView.Ownership.Mine, OperationalRecordView.OwnershipOf(record, now, _me));
     }
 
     // ------------------------------------------------- reconciliation and retry eligibility

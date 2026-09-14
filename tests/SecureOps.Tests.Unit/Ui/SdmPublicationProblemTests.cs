@@ -16,7 +16,10 @@ public sealed class SdmPublicationProblemTests
     {
         UiProblem problem = UiProblemFactory.FromResponse(503, new ProblemDetailsPayload
         {
-            Code = code, Stage = "jira-reconciliation", Retryable = true, CorrelationId = "synthetic-support"
+            Code = code,
+            Stage = "jira-reconciliation",
+            Retryable = true,
+            CorrelationId = "synthetic-support"
         });
         problem.Title.Should().Be("Jira sonucu doğrulanmalı");
         problem.Retryable.Should().BeFalse();
