@@ -9,7 +9,7 @@ using SecureOps.Ui.Services;
 
 namespace SecureOps.Ui.Pages;
 
-/// <summary>Explicit, owner-authorized draft journey; no source calls or mail sending.</summary>
+/// <summary>Explicit, owner-authorized draft and source review journey; no mail sending.</summary>
 public partial class Announcements
 {
     /// <summary>Resets shell feedback when unsaved-edit protection cancels navigation.</summary>
@@ -23,7 +23,7 @@ public partial class Announcements
     private (AnnouncementContent Content, long Version)? _comparison;
     private Guid _id;
     private long _version;
-    private bool _allowed, _busy, _dirty, _optional;
+    private bool _allowed, _busy, _dirty, _optional, _sourceOpen;
     private string? _html, _notice;
     private UiProblem? _problem;
     /// <inheritdoc />
@@ -41,6 +41,7 @@ public partial class Announcements
     private Task PageAsync(int number) => RunAsync(async () => _page = await Api.ListAsync(number, _lifetime.Token));
     private Task NewAsync() => RunAsync(async () =>
     {
+        _sourceOpen = false;
         CancelPreview(true);
         _savedContent = null;
         _banners = await Api.BannersAsync(_lifetime.Token, "oco-table-v2");
@@ -54,6 +55,7 @@ public partial class Announcements
     });
     private Task OpenAsync(Guid id) => RunAsync(async () =>
     {
+        _sourceOpen = false;
         CancelPreview(true);
         (AnnouncementContent Content, long Version) draft = await Api.DraftAsync(id, 0, null, _lifetime.Token);
         _banners = await Api.BannersAsync(_lifetime.Token, draft.Content.TemplateRevision);
@@ -64,6 +66,21 @@ public partial class Announcements
         _dirty = false;
     });
     private Task BannersAsync() => RunAsync(async () => _banners = await Api.BannersAsync(_lifetime.Token, _form!.Template));
+    private Task ApplySourceAsync(AnnouncementSourceApply request) => RunAsync(async () =>
+    {
+        if (_dirty || _comparison is not null || request.ExpectedVersion != _version)
+        { return; }
+        AnnouncementSourceApplyResult applied = await Api.ApplySourceAsync(_id, request, _lifetime.Token);
+        (AnnouncementContent Content, long Version) saved = await Api.DraftAsync(_id, applied.Version, null, _lifetime.Token);
+        if (!_allowed || _lifetime.IsCancellationRequested)
+        { return; }
+        _form = AnnouncementForm.From(saved.Content);
+        _savedContent = saved.Content;
+        _version = saved.Version;
+        _dirty = false;
+        _preparationKey = null;
+        _notice = "İncelenen değişiklikler yeni sürüme kaydedildi.";
+    });
     private async Task UpgradeAsync()
     {
         if (await Dialogs.ShowMessageBox("Taslağı yükselt", "Düzenlemeler korunacak. Yeni biçim yalnızca Kaydet ile yeni sürüme işlenecek.", yesText: "Yükselt", cancelText: "Vazgeç") != true)

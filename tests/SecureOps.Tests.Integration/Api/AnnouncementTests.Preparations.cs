@@ -20,6 +20,31 @@ public sealed class PreparationSqlFactAttribute : FactAttribute
 }
 public sealed partial class AnnouncementTests
 {
+    [Fact]
+    public void Preparation_LegacyFingerprintSurvivesOptionalSourceReviewMetadata()
+    {
+        var legacy = new
+        {
+            Id = Guid.NewGuid(),
+            Draft = new AnnouncementDraft(Guid.NewGuid(), Guid.NewGuid(), 1, DateTimeOffset.UnixEpoch, FinalContent(), "sender@example.invalid", "hash"),
+            PreparedAt = DateTimeOffset.UnixEpoch,
+            PreparedBy = "Synthetic",
+            Fingerprint = "",
+            Html = "<p>Local</p>",
+            Email = new byte[] { 1, 2, 3 },
+            AssetRevisions = new Dictionary<string, string>(),
+            ArtifactType = "FinalAnnouncement",
+            State = "Prepared"
+        };
+        string original = System.Text.Json.JsonSerializer.Serialize(legacy);
+        string fingerprint = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(original)));
+        System.Text.Json.Nodes.JsonNode document = System.Text.Json.Nodes.JsonNode.Parse(original)!;
+        document["Fingerprint"] = fingerprint;
+        PreparedAnnouncement restored = System.Text.Json.JsonSerializer.Deserialize<PreparedAnnouncement>(document.ToJsonString())!;
+        restored.SourceReview.Should().BeNull();
+        AnnouncementService.PreparationFingerprint(restored).Should().Be(fingerprint);
+    }
+
     [PreparationSqlFact]
     public async Task Preparation_ExactPersistedBytesOwnerPagingIdempotencyAndAuditRollback()
     {

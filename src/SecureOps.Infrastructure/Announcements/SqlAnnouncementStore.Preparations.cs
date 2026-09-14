@@ -12,9 +12,6 @@ public sealed partial class SqlAnnouncementStore
     /// <summary>Atomic preparation/audit with the existing owner lock and revision fence.</summary>
     public async Task<PreparationOutcome> PrepareAsync(PreparedAnnouncement snapshot, string correlation, CancellationToken token)
     {
-        string json = JsonSerializer.Serialize(snapshot);
-        if (System.Text.Encoding.Unicode.GetByteCount(json) > 24000000 || snapshot.Email.Length > 3000000)
-        { return new(Error: "AnnouncementInvalid"); }
         await using var sql = new SqlConnection(_connection);
         await sql.OpenAsync(token);
         await using var tx = (SqlTransaction)await sql.BeginTransactionAsync(IsolationLevel.Serializable, token);
@@ -35,6 +32,16 @@ public sealed partial class SqlAnnouncementStore
             "SELECT MAX(Version) FROM announcements.DraftRevisions WHERE Id=@Id AND OwnerId=@OwnerId;", new { snapshot.Draft.Id, snapshot.Draft.OwnerId }, tx, commandTimeout: 15, cancellationToken: token));
         if (latest != snapshot.Draft.Version)
         { return new(Error: "AnnouncementConflict"); }
+        AnnouncementSourceOverrides review = await Sources.SqlAnnouncementSourceStore.ReadOverridesAsync(
+            sql, tx, snapshot.Draft.Id, snapshot.Draft.OwnerId, token);
+        if (review.AppliedJobId is not null)
+        {
+            snapshot = snapshot with { SourceReview = review };
+            snapshot = snapshot with { Fingerprint = AnnouncementService.PreparationFingerprint(snapshot) };
+        }
+        string json = JsonSerializer.Serialize(snapshot);
+        if (System.Text.Encoding.Unicode.GetByteCount(json) > 24000000 || snapshot.Email.Length > 3000000)
+        { return new(Error: "AnnouncementInvalid"); }
         await sql.ExecuteAsync(new CommandDefinition("""
             INSERT INTO announcements.Preparations(Id,OwnerId,DraftId,DraftVersion,PreparedAt,PreparedBy,Subject,DocumentJson)
             VALUES(@Id,@OwnerId,@DraftId,@Version,@PreparedAt,@PreparedBy,@Subject,@json);

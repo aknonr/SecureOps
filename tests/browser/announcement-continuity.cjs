@@ -136,7 +136,8 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
             const sessions = await json(client,'/api/v1/sessions/active');
             for (const session of sessions.items.filter(s=>!s.isCurrent))
                 await json(client,'/api/v1/sessions/revoke',{method:'POST',data:{sessionId:session.sessionId,reason:'Local announcement access-loss acceptance'}});
-            await page.locator('#announcement-Subject').fill('Session revoked');
+            // Access refresh may already have cleared the editor before another input event.
+            if (await page.locator('#announcement-Subject').count()) await page.locator('#announcement-Subject').fill('Session revoked');
             await page.locator('.so-announcement-workspace').waitFor({state:'hidden'}); assert.equal(await page.locator('iframe').count(),0);
         }
         fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({after,evidence,frameMissingSamples:samples.filter(s=>!s.frame).length},null,2));

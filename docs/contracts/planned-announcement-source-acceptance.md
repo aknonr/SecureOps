@@ -1,5 +1,8 @@
 # Announcement source repair acceptance, 2026-09-14
 
+Combined editor/source/preparation integration has a separate
+[local handoff](planned-announcement-integration.md); this document retains source-task evidence.
+
 ## Scope and verdict
 
 Local source acceptance passed; editor/send integration and release readiness are not certified.

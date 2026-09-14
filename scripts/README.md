@@ -30,6 +30,7 @@ scripts/
   test database for inspection and never changes a shared SQL service.
   Announcement opt-in `-IncludeAnnouncementDrafts` adds 014-015 to that fresh DB;
   `-IncludeAnnouncementSources` includes drafts plus 016-017. Hangfire schema provisioning is separate.
+  `-IncludeAnnouncementPreparations` includes sources plus 018; existing databases are refused.
   executable announcement contract commands are in `docs/contracts/planned-announcements-v1.md`.
 
 - `release/New-ApiDeploymentPackage.ps1` creates and validates a path-preserving deployment ZIP and payload manifest.

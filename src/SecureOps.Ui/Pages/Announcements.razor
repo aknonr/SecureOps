@@ -62,6 +62,12 @@
     }
     @if (_allowed && _form is not null)
     {
+        <MudButton StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="@(() => _sourceOpen = !_sourceOpen)">Kaynak incelemesi</MudButton>
+        @if (_sourceOpen)
+        {
+            <AnnouncementSourceReview @key="_id" DraftId="_id" Version="_version" OcoReference="@_form.Values["OcoReference"]"
+                Services="_form.Services" Locked="@(_busy || _dirty || _comparison is not null)" ApplyRequested="ApplySourceAsync" AccessLost="@(p => LoseAccess(p))" />
+        }
         @if (_comparison is { } current)
         {
             <section aria-label="Kayıt karşılaştırması">

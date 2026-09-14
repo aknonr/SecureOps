@@ -31,6 +31,7 @@ sql/
 | 015 | Announcement owner/latest-version index only; requires 014; no JSON rewrite or new runtime grant |
 | 016 | Durable announcement source jobs and versioned operator overrides; requires 014-015. Adds `announcements.SourceJobs` (unique OwnerId/DraftId/SubmissionKey, no-delete trigger) and mutable `announcements.SourceOverrides`. Runtime delta: `GRANT SELECT, INSERT, UPDATE` on those two objects only; no DELETE or DDL grant. Hangfire's schema is provisioned separately using its published 1.8.6 installation script; runtime `Hangfire:PrepareSchema` must be false. |
 | 017 | Additive SourceJobs dispatch reservation, Hangfire acknowledgment, expiring attempt identity/count and recovery index; requires 016. No new runtime object grants; no rewrite or deletion of snapshots/revisions. |
+| 018 | Append-only announcement preparation snapshots; requires 017. Runtime SELECT/INSERT on announcements.Preparations only, plus existing grants. Promoted from the local unnumbered candidate. |
 
 013 uses `migrations/013-sdm-pilot-policy.sql` in SQLCMD mode. Existing NULL/v1
 evidence and append-only triggers remain untouched; WITH CHECK validates stored
@@ -76,9 +77,8 @@ Application-session governance uses `schema/007-application-session-governance.s
 
 ## Test Harness
 
-`pending/announcement-preparations.sql` is an unnumbered local-test candidate,
-not a deployment migration. Use the fresh `Test-AnnouncementPreparationsSql.ps1`
-wrapper; numbering must be coordinated after Claude's source-job 016. Runtime needs
+Use the fresh `Test-AnnouncementPreparationsSql.ps1` wrapper for 001-018,
+or `Test-ResourceCatalogueSql.ps1 -IncludeAnnouncementPreparations`. Runtime needs
 SELECT/INSERT on announcements.Preparations plus existing audit/access grants only.
 
 Announcement drafts use additive 014 (separate append-only revisions). Runtime

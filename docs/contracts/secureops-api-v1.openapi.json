@@ -9547,6 +9547,70 @@
         },
         "additionalProperties": false
       },
+      "AnnouncementSourceOverrides": {
+        "type": "object",
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "profile": {
+            "type": "string",
+            "nullable": true
+          },
+          "manualTo": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "manualCc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "removedTo": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "removedCc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "appliedJobId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "appliedCapturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "AnnouncementSourceProposal": {
         "type": "object",
         "properties": {
@@ -11869,6 +11933,9 @@
           "state": {
             "type": "string",
             "nullable": true
+          },
+          "sourceReview": {
+            "$ref": "#/components/schemas/AnnouncementSourceOverrides"
           }
         },
         "additionalProperties": false

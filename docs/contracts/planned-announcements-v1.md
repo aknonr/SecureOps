@@ -1,5 +1,10 @@
 # Planned announcements: implemented API and UI
 
+Current combined workflow and acceptance: [integration handoff](planned-announcement-integration.md).
+Preparation optionally freezes `sourceReview` (the existing accepted override record);
+null is omitted so legacy preparation fingerprints retain their original representation.
+Historical increments below describe their original branch boundaries, not current gaps.
+
 ## Preparation/history from 72a503a
 
 This increment adds persisted **Prepared** final-announcement snapshots, not a send
@@ -22,11 +27,10 @@ under the existing owner lock, with latest-revision fence and append-only trigge
 Runtime needs only SELECT/INSERT on the new table plus existing access/audit grants.
 No startup DDL, role assignment, production configuration or SMTP switch is added.
 
-SQL numbering remains pending: Claude's committed source branch owns 016. The
-unnumbered `sql/pending/announcement-preparations.sql` is applied ONLY by the
-fresh isolated `scripts/powershell/Test-AnnouncementPreparationsSql.ps1` wrapper.
-Deployment integration must assign a coordinated number and reviewed entrypoint;
-do not replay 012/013 or apply this candidate on a corporate database.
+Preparation storage is promoted to 018 after immutable source migrations 016/017.
+The fresh isolated `Test-AnnouncementPreparationsSql.ps1` wrapper includes 001-018.
+Existing installations apply only missing reviewed migrations; no corporate execution
+is authorized here. An already-applied candidate requires inventory reconciliation.
 
 UI: saved clean editor -> **İncelemeye hazırla** -> read-only recipients/sender,
 saved artifact preview/download -> **Hazırlık geçmişi**. Unsaved edits must be saved

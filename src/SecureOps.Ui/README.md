@@ -2,6 +2,9 @@
 
 ## Planned Announcements UI
 
+Explicit source review now joins the saved editor and immutable preparation history.
+See `docs/contracts/planned-announcement-integration.md` for combined acceptance and limits.
+
 `/announcements` now connects owner-scoped paging, structured drafts, banners,
 explicit saved preview/download, conflict comparison and per-user guided help.
 Codex owns this module's UI and backend by explicit user instruction. Owned immutable

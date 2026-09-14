@@ -210,7 +210,7 @@
             // Revoked on the next tick so the click has already been handled.
             setTimeout(function () { URL.revokeObjectURL(url); }, 0);
         };
-        window.secureOpsAnnouncements = { focus: function (id) {
+        window.secureOpsAnnouncements = { visible: function () { return !document.hidden; }, focus: function (id) {
             var target = document.getElementById(id);
             if (!target) return;
             var details = target.closest('details');

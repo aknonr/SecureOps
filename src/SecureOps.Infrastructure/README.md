@@ -2,6 +2,9 @@
 
 External integrations and data access.
 
+Combined announcement persistence requires reviewed migrations 014-018 and separately
+provisioned Hangfire. See `docs/contracts/planned-announcement-integration.md` for grants.
+
 `Resources/` provides the shared link catalogue and personal preferences with
 capability-checked services, SQL transactions and a local in-memory substitute.
 It requires migration 010 when Access persistence is SqlServer; see its README.

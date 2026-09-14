@@ -83,6 +83,12 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
         applied.To.Should().Contain("manual@example.invalid").And.Contain("remove@example.invalid");
         applied.Cc.Should().NotIntersectWith(applied.To);
         applied.AffectedServices.Should().Equal("Service A", "Service B");
+        string preparedPath = "/api/v1/announcements/preparations/" + Guid.NewGuid();
+        using HttpResponseMessage preparedResponse = await admin.PutAsync(preparedPath + "?draftId=" + id + "&version=2", null);
+        preparedResponse.EnsureSuccessStatusCode();
+        PreparedAnnouncement prepared = (await preparedResponse.Content.ReadFromJsonAsync<PreparedAnnouncement>())!;
+        prepared.SourceReview!.AppliedJobId.Should().Be(first.JobId);
+        prepared.SourceReview.Profile.Should().Be("NonProd");
         string html = await admin.GetStringAsync(path + "?version=2&format=html");
         byte[] eml = await admin.GetByteArrayAsync(path + "?version=2&format=eml");
         await File.WriteAllTextAsync(Path.Combine(hosts.Root, "reviewed-v2.html"), html);
@@ -139,6 +145,10 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
         (await hosts.Database.ScalarAsync<int>("SELECT AttemptCount FROM announcements.SourceJobs WHERE JobId=@id", new { id = interrupted.JobId })).Should().Be(2);
         (await hosts.Database.Sources.CompleteAsync(interrupted.JobId, obsolete, "Failed", "Obsolete", null, "late", DateTimeOffset.UtcNow, default)).Should().BeFalse();
         (await hosts.Database.Drafts.GetAsync(id, owner, default))!.Version.Should().Be(5);
+        PreparedAnnouncement retained = (await admin.GetFromJsonAsync<PreparedAnnouncement>(preparedPath))!;
+        retained.Email.Should().Equal(prepared.Email);
+        retained.SourceReview.Should().BeEquivalentTo(prepared.SourceReview);
+        retained.Fingerprint.Should().Be(prepared.Fingerprint);
         var storage = new SqlServerStorage(hosts.Database.Connection, new SqlServerStorageOptions { PrepareSchemaIfNecessary = false });
         new HangfireAnnouncementSourceDispatcher(new BackgroundJobClient(storage), hosts.Queue).Enqueue(interrupted.JobId);
         await AnnouncementSourceHosts.UntilAsync(async () => await hosts.Database.ScalarAsync<int>(

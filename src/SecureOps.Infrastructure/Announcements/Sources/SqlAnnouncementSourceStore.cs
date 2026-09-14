@@ -137,10 +137,16 @@ public sealed partial class SqlAnnouncementSourceStore(IConfiguration configurat
     public async Task<AnnouncementSourceOverrides> OverridesAsync(Guid draftId, Guid owner, CancellationToken token)
     {
         await using SqlConnection connection = new(_connection);
+        return await ReadOverridesAsync(connection, null, draftId, owner, token);
+    }
+
+    internal static async Task<AnnouncementSourceOverrides> ReadOverridesAsync(SqlConnection connection, SqlTransaction? transaction,
+        Guid draftId, Guid owner, CancellationToken token)
+    {
         OverrideRow? row = await connection.QuerySingleOrDefaultAsync<OverrideRow>(Command("""
             SELECT Version,OverridesJson,AppliedJobId,AppliedCapturedAt,UpdatedAt
             FROM announcements.SourceOverrides WHERE DraftId=@draftId AND OwnerId=@owner;
-            """, new { draftId, owner }, null, token));
+            """, new { draftId, owner }, transaction, token));
         if (row is null)
         { return AnnouncementSourceOverrides.Empty(draftId, owner); }
         OverrideDocument document = JsonSerializer.Deserialize<OverrideDocument>(row.OverridesJson, _json) ?? new(null, [], [], [], []);

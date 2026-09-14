@@ -19,7 +19,7 @@
         <MudTable T="PreparationSummary" Items="_page.Items" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0">
             <HeaderContent><MudTh>Konu</MudTh><MudTh>Hazırlayan / zaman</MudTh><MudTh>Durum</MudTh><MudTh /></HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Konu">@context.Subject <small>v@context.Version</small></MudTd>
+                <MudTd DataLabel="Konu">@context.Subject <small>v@(context.Version)</small></MudTd>
                 <MudTd DataLabel="Hazırlayan / zaman">@context.PreparedBy<br />@context.PreparedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
                 <MudTd DataLabel="Durum">Hazırlandı; gönderilmedi</MudTd>
                 <MudTd><MudButton Href="@($"/announcements/preparations/{context.Id}")" StartIcon="@Icons.Material.Filled.Visibility">İncele</MudButton></MudTd>
@@ -34,11 +34,13 @@
     @if (_snapshot is { } s)
     {
         <h2>@s.Draft.Content.Subject</h2><p role="status">Hazırlandı; gönderilmedi. Gönderim onayı verilmedi.</p>
+        @if (s.SourceReview is { } review)
+        { <p>Kaynak inceleme v@(review.Version) · @review.AppliedCapturedAt · Alıcı profili: @(review.Profile ?? "Elle düzenlendi"). Dağıtım talebi alıcıları, onaylanmış nihai gönderim listesi değildir.</p> }
         <dl><dt>Gönderen</dt><dd>@s.Draft.Sender</dd><dt>Alıcı</dt><dd>@string.Join("; ", s.Draft.Content.To)</dd>
             <dt>Bilgi</dt><dd>@string.Join("; ", s.Draft.Content.Cc)</dd><dt>Hazırlayan</dt><dd>@s.PreparedBy · @s.PreparedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd></dl>
         <div class="so-inline-actions"><MudButton OnClick="DownloadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Hazırlanan maili indir</MudButton>
             <MudButton Href="/announcements/preparations" StartIcon="@Icons.Material.Filled.History">Geçmiş</MudButton></div>
-        <details><summary>Kayıt ayrıntıları</summary><p>Nihai duyuru · @s.Draft.TemplateRevision · @s.Draft.Content.BannerRevision · v@s.Draft.Version</p><p>@s.Fingerprint</p></details>
+        <details><summary>Kayıt ayrıntıları</summary><p>Nihai duyuru · @s.Draft.TemplateRevision · @s.Draft.Content.BannerRevision · v@(s.Draft.Version)</p><p>@s.Fingerprint</p></details>
         <iframe title="Hazırlanan duyuru" sandbox="" referrerpolicy="no-referrer" style="width:100%;height:650px;border:1px solid var(--mud-palette-lines-default)"
                 srcdoc="@(_policy + s.Html)"></iframe>
     }

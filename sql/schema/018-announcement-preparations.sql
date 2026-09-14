@@ -1,8 +1,8 @@
--- Unnumbered candidate, outside reviewed schema/migration pairs; isolated test application only.
+-- Additive preparation storage; retain existing draft/source data.
 SET XACT_ABORT ON;
-IF OBJECT_ID(N'announcements.DraftRevisions') IS NULL THROW 51170, 'Announcement drafts required.', 1;
+IF COL_LENGTH(N'announcements.SourceJobs', N'AttemptId') IS NULL THROW 51180, 'Migration 017 required.', 1;
 BEGIN TRANSACTION;
-IF OBJECT_ID(N'announcements.Preparations') IS NOT NULL THROW 51171, 'Refuse existing preparation storage.', 1;
+IF OBJECT_ID(N'announcements.Preparations') IS NOT NULL THROW 51181, 'Refuse existing preparation storage.', 1;
 CREATE TABLE announcements.Preparations (
     Id uniqueidentifier NOT NULL PRIMARY KEY,
     OwnerId uniqueidentifier NOT NULL REFERENCES security.Users(UserId),
@@ -18,6 +18,6 @@ CREATE INDEX IX_Preparations_Owner ON announcements.Preparations(OwnerId,Prepare
     INCLUDE(Subject,DraftVersion,PreparedBy);
 GO
 CREATE TRIGGER announcements.TR_Preparations_AppendOnly ON announcements.Preparations
-INSTEAD OF UPDATE, DELETE AS BEGIN THROW 51172, 'Preparations are append-only.', 1; END;
+INSTEAD OF UPDATE, DELETE AS BEGIN THROW 51182, 'Preparations are append-only.', 1; END;
 GO
 COMMIT;

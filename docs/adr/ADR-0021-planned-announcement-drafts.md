@@ -1,5 +1,9 @@
 # ADR-0021: Planned announcement drafts
 
+Combined local integration connects explicit source review to the existing editor
+and immutable preparation, without confirmation/dispatch/sending. See
+[integration acceptance](../contracts/planned-announcement-integration.md).
+
 Status: accepted for this explicitly authorized local draft-only increment.
 
 Send preparation from 72a503a: append an owner-authorized exact saved snapshot,

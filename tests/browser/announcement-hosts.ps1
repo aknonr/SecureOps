@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly)
+param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly, [switch]$SourceReview)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $EvidenceRoot).Path
 $payload = (Resolve-Path -LiteralPath $PayloadRoot).Path
@@ -54,6 +54,30 @@ $env:DataProtection__Mode = 'FileSystemDpapi' # Test-owned persistent keys keep 
 $env:DataProtection__ApplicationName = 'SecureOps.Api'
 $env:DataProtection__KeyRingPath = "$root/private-api-keys"
 $env:Oidc__Enabled = 'false'
+$env:Hangfire__Enabled = $SourceReview.ToString()
+$env:AnnouncementSource__Enabled = $SourceReview.ToString()
+if ($SourceReview) {
+    if (!(Test-Path "$payload/worker/SecureOps.Worker.dll")) { throw 'Publish the isolated Worker first.' }
+    $env:Hangfire__Queue = 'oco-' + $DatabaseSuffix.Substring($DatabaseSuffix.Length-8).ToLowerInvariant()
+    $env:Hangfire__SchemaName = 'HangFire'
+    $env:Hangfire__PrepareSchema = 'false'
+    $env:Hangfire__WorkerCount = '2'
+    $env:Hangfire__QueuePollIntervalSeconds = '1'
+    $env:AnnouncementSource__CollectionProvider = 'Fixture'
+    $env:AnnouncementSource__ServiceProvider = 'Fixture'
+    $env:AnnouncementSource__FixtureDirectory = "$root/fixtures"
+    foreach ($area in @('collections','services','changes')) { New-Item -ItemType Directory "$root/fixtures/$area" -Force | Out-Null }
+    foreach ($profile in @('NonProd','Prod01','Prod02')) {
+        $values = @{ CollectionId=$profile;Scope="$profile scope";Impact='Local impact';Checks='Local checks';Description='Local description';'To__0'="$profile@example.invalid";'To__1'='remove@example.invalid';'Cc__0'='copy@example.invalid' }
+        foreach ($key in $values.Keys) { [Environment]::SetEnvironmentVariable("AnnouncementSource__Profiles__${profile}__$key",$values[$key],'Process') }
+        $devices = if ($profile -eq 'Prod02') { @('AMBIGUOUS','MISSING') } else { @(1..155 | ForEach-Object { 'DEVICE-'+$_ }) }
+        @{ devices=$devices;complete=$true;delayMilliseconds=4000 } | ConvertTo-Json -Depth 4 | Set-Content "$root/fixtures/collections/$profile.json" -Encoding UTF8
+    }
+    foreach ($n in 1..155) { @{candidates=@("Service $n <b>")} | ConvertTo-Json | Set-Content "$root/fixtures/services/DEVICE-$n.json" -Encoding UTF8 }
+    @{candidates=@('Candidate A','Candidate B')} | ConvertTo-Json | Set-Content "$root/fixtures/services/AMBIGUOUS.json" -Encoding UTF8
+    @{rows=1;startText='2026-09-15T01:00:00.123+03:00';finishText='2026-09-15T02:00:00.456+03:00'} | ConvertTo-Json | Set-Content "$root/fixtures/changes/OCO-SYNTHETIC.json" -Encoding UTF8
+    if (!$ResumeApiOnly) { $worker = Start-Process dotnet -ArgumentList 'SecureOps.Worker.dll' -WorkingDirectory "$payload/worker" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/worker-host.log" -RedirectStandardError "$root/worker-host.err" }
+}
 $log = if ($ResumeApiOnly) { 'api-resumed-' + [guid]::NewGuid().ToString('N') } else { 'api-host' }
 $api = Start-Process dotnet -ArgumentList @('SecureOps.Api.dll',"--urls=http://127.0.0.1:$Port") -WorkingDirectory "$payload/api" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/$log.log" -RedirectStandardError "$root/$log.err"
 if ($ResumeApiOnly) { @{Api=$api.Id;Port=$Port} | ConvertTo-Json | Set-Content "$root/$log.json"; return }
@@ -66,4 +90,4 @@ $env:DemoMode__ApiDemoActor = 'platform-admin'
 $ui = Start-Process dotnet -ArgumentList @('SecureOps.Ui.dll',"--urls=https://localhost:$($Port+1)") -WorkingDirectory "$payload/ui" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/ui-host.log" -RedirectStandardError "$root/ui-host.err"
 $env:DemoMode__ApiDemoActor = 'team-lead'
 $denied = Start-Process dotnet -ArgumentList @('SecureOps.Ui.dll',"--urls=https://localhost:$($Port+2)") -WorkingDirectory "$payload/ui" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/denied-host.log" -RedirectStandardError "$root/denied-host.err"
-@{ Api = $api.Id; Ui = $ui.Id; Denied = $denied.Id; Database = "SecureOps_ResourcesV1_$DatabaseSuffix" } | ConvertTo-Json | Set-Content "$root/hosts.json"
+@{ Api = $api.Id; Ui = $ui.Id; Denied = $denied.Id; Worker = $worker.Id; Database = "SecureOps_ResourcesV1_$DatabaseSuffix" } | ConvertTo-Json | Set-Content "$root/hosts.json"

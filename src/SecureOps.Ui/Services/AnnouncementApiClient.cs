@@ -65,7 +65,23 @@ public sealed class AnnouncementApiClient
         { throw new SecureOpsApiException(UiProblemFactory.FromResponse(502, null)); }
         return (await response.Content.ReadAsByteArrayAsync(token), name);
     }
-    private async Task<HttpResponseMessage> SendAsync(string path, AnnouncementContent? content, CancellationToken token, HttpMethod? method = null)
+    /// <summary>Reads protected profile choices through the current browser session.</summary>
+    public Task<MaintenanceProfileChoice[]> ProfilesAsync(CancellationToken token) => SourceAsync<MaintenanceProfileChoice[]>("/source/profiles", null, token);
+    /// <summary>Submits explicit retrieval, or reads status without enqueueing.</summary>
+    public Task<AnnouncementSourceJobStatus> SourceJobAsync(Guid id, AnnouncementSourceSubmission? submission, CancellationToken token) =>
+        SourceAsync<AnnouncementSourceJobStatus>($"/{id}/source/jobs", submission, token);
+    /// <summary>Reads a review bound to one job and both concurrency versions.</summary>
+    public Task<AnnouncementSourceProposal> SourceProposalAsync(Guid id, Guid job, CancellationToken token) =>
+        SourceAsync<AnnouncementSourceProposal>($"/{id}/source/jobs/{job}/proposal", null, token);
+    /// <summary>Applies exactly the explicitly reviewed request; never retries with substituted versions.</summary>
+    public Task<AnnouncementSourceApplyResult> ApplySourceAsync(Guid id, AnnouncementSourceApply request, CancellationToken token) =>
+        SourceAsync<AnnouncementSourceApplyResult>($"/{id}/source/apply", request, token);
+    private async Task<T> SourceAsync<T>(string path, object? input, CancellationToken token)
+    {
+        using HttpResponseMessage response = await SendAsync(path, input, token, input is null ? HttpMethod.Get : HttpMethod.Post);
+        return await ApiResponseReader.ReadBodyAsync<T>(response, token);
+    }
+    private async Task<HttpResponseMessage> SendAsync(string path, object? content, CancellationToken token, HttpMethod? method = null)
     {
         try
         {
