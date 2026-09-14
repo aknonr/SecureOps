@@ -20,6 +20,13 @@ try {
         & dotnet publish "src/SecureOps.$component/SecureOps.$component.csproj" -c Release --no-restore -o "$destination/staging/$($component.ToLowerInvariant())" `
             -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true "-p:PathMap=$repo=/_/" "-p:SourceRevisionId=$sha"
         if ($LASTEXITCODE -ne 0) { throw 'Publish failed; partial delivery retained, not ready.' }
+        $publishRoot = [IO.Path]::GetFullPath("$destination/staging/$($component.ToLowerInvariant())")
+        # Native NuGet packages can publish symbols even when project symbols are disabled.
+        foreach ($symbol in Get-ChildItem -LiteralPath $publishRoot -Recurse -File -Filter '*.pdb') {
+            if (!$symbol.FullName.StartsWith($publishRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Symbol outside fresh staging.' }
+            Write-Output "Excluding debug symbol: $($symbol.FullName.Substring($publishRoot.Length+1))"
+            Remove-Item -LiteralPath $symbol.FullName
+        }
         $version = [Diagnostics.FileVersionInfo]::GetVersionInfo("$destination/staging/$($component.ToLowerInvariant())/SecureOps.$component.dll")
         if ($version.ProductVersion -ne "0.1.0+$sha") { throw 'Assembly does not identify exact build source.' }
         $runtime = Get-Content -LiteralPath "$destination/staging/$($component.ToLowerInvariant())/SecureOps.$component.runtimeconfig.json" -Raw | ConvertFrom-Json

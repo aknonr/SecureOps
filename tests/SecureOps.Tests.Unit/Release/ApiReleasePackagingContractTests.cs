@@ -30,7 +30,7 @@ public sealed class ApiReleasePackagingContractTests
         paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-018'")
             .And.Contain("Expected the exact complete 001-018 SQL chain.")
             .And.Contain("runtimePrepareSchema=$false").And.Contain("-Component Worker")
-            .And.Contain("Foreground console only").And.NotContain("sc.exe");
+            .And.Contain("Foreground console only").And.Contain("Symbol outside fresh staging.").And.NotContain("sc.exe");
         managed.Should().Contain("runtimeTargets").And.Contain("Missing Worker runtime asset")
             .And.Contain("Hangfire.SqlServer").And.Contain("Test-ApiReleasePayload.ps1");
         worker.Should().Contain("TryAddSecureOpsJobServer").And.Contain("await host.RunAsync()")

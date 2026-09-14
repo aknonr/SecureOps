@@ -42,6 +42,7 @@ if ($Component -eq 'Worker') {
                 if ($null -eq $group) { continue }
                 foreach ($asset in $group.Value.PSObject.Properties) {
                     if ($asset.Name.EndsWith('/_._')) { continue }
+                    if ([IO.Path]::GetExtension($asset.Name) -eq '.pdb') { continue } # Debug symbols are not runtime dependencies.
                     $relative = if ($asset.Name.StartsWith('runtimes/')) { $asset.Name }
                         elseif ($kind -eq 'resources') { $asset.Value.locale + '/' + [IO.Path]::GetFileName($asset.Name) }
                         else { [IO.Path]::GetFileName($asset.Name) }
