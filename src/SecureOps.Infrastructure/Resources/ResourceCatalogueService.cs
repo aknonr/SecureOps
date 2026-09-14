@@ -105,12 +105,16 @@ public sealed class ResourceCatalogueService(IResourceRepository repository, IAp
     public Task<ResourceResult<ResourcePreferencesResponse>> DismissGuideAsync(ClaimsPrincipal principal, AccessOperationContext context,
         DismissResourceGuideRequest request, CancellationToken cancellationToken) => ExecuteAsync(principal, context, false, async user =>
         {
-            if (request.ExpectedVersion is < 0 or long.MaxValue)
+            if (request.ExpectedVersion is < 0 or long.MaxValue || request.Guide is not ("resources" or "announcements"))
             {
                 return ResourceResult<ResourcePreferencesResponse>.Fail(ResourceErrors.Invalid);
             }
             ResourcePreferences current = await repository.PreferencesAsync(user.Id, cancellationToken);
-            return await SavePersonalAsync(current with { GuideDismissed = true }, request.ExpectedVersion, user, context, cancellationToken);
+            if (request.Guide == "announcements" && !user.Capabilities.Contains(Capabilities.AnnouncementDrafts))
+            { return ResourceResult<ResourcePreferencesResponse>.Fail("AccessDenied"); }
+            return await SavePersonalAsync(request.Guide == "announcements"
+                ? current with { AnnouncementGuideDismissed = true } : current with { GuideDismissed = true },
+                request.ExpectedVersion, user, context, cancellationToken);
         }, cancellationToken);
 
     /// <summary>Saves only caller-owned layout, preserving groups, hidden membership and favourites.</summary>
@@ -235,7 +239,7 @@ public sealed class ResourceCatalogueService(IResourceRepository repository, IAp
         ResourceLink[] Resolve(IEnumerable<Guid> references) => [.. references.Where(byId.ContainsKey).Select(id => byId[id])];
         return new(value.Version, Resolve(value.FavouriteIds), [.. value.Sets.Select(s => new ShiftSetResponse(s.Id, s.Name,
             Resolve(s.LinkIds), s.Id == value.DefaultSetId))], value.DefaultSetId, value.GuideDismissed,
-            ResourceWorkspacePolicy.Project(value.WorkspaceLayout, user.Capabilities));
+            ResourceWorkspacePolicy.Project(value.WorkspaceLayout, user.Capabilities), value.AnnouncementGuideDismissed);
     }
 
     private async Task<ResourceResult<T>> ExecuteAsync<T>(ClaimsPrincipal principal, AccessOperationContext context, bool manage,

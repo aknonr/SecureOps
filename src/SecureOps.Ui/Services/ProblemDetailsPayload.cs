@@ -17,6 +17,8 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public sealed class ProblemDetailsPayload
 {
+    /// <summary>Field identifiers for validation navigation.</summary>
+    public string[]? Fields { get; set; }
     /// <summary>RFC 7807 problem type URI.</summary>
     [JsonPropertyName("type")]
     public string? Type { get; set; }

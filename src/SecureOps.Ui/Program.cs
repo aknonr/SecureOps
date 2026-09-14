@@ -29,6 +29,7 @@ if (!builder.Environment.IsDevelopment() && !builder.Environment.IsProduction())
 }
 
 builder.Services.Configure<DemoModeOptions>(builder.Configuration.GetSection(DemoModeOptions.SectionName));
+builder.Services.Configure<AnnouncementOptions>(builder.Configuration.GetSection("Announcements"));
 
 // Trusted HTTPS-offload recognition. Validated at startup so a misconfigured trust boundary stops
 // the host rather than silently degrading to cleartext behaviour behind the load balancer.
@@ -111,6 +112,7 @@ AddSecureOpsApiClient<IDirectoryApiClient, DirectoryApiClient>(builder.Services)
 AddSecureOpsApiClient<ISessionApiClient, SessionApiClient>(builder.Services);
 AddSecureOpsApiClient<IResourceApiClient, ResourceApiClient>(builder.Services);
 AddSecureOpsApiClient<InUseApiClient, InUseApiClient>(builder.Services);
+AddSecureOpsApiClient<AnnouncementApiClient, AnnouncementApiClient>(builder.Services);
 
 WebApplication app = builder.Build();
 

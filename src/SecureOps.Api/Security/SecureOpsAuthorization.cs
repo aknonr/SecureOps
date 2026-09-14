@@ -24,6 +24,7 @@ public static class SecureOpsAuthorization
         services.AddScoped<IAuthorizationHandler, CapabilityAuthorizationHandler>();
         services.AddAuthorization(options =>
         {
+            AddCapability(options, Policies.CanDraftAnnouncements, Capabilities.AnnouncementDrafts);
             AddCapability(options, Policies.CanViewResources, Capabilities.ResourcesView);
             AddCapability(options, Policies.CanViewInUse, Capabilities.InUseView);
             AddCapability(options, Policies.CanReviewInUse, Capabilities.InUseReview);

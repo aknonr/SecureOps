@@ -27,6 +27,11 @@ sql/
 | 011 | Default-off durable source-close intent on JiraTransfers; requires 001-010; legacy transfers remain source-open |
 | 012 | Independent local In Use records/refresh state; unassigned role seeds 8 InUseReviewer and 9 InUseCoordinator; requires 001-011 |
 | 013 | Transactional SDM evidence CHECK replacement admits the exact positive pilot policy version; requires 001-012; no new objects, columns, roles or runtime grants |
+| 014 | Independent append-only announcement draft revisions; requires 001-013 |
+| 015 | Announcement owner/latest-version index only; requires 014; no JSON rewrite or new runtime grant |
+| 016 | Durable announcement source jobs and versioned operator overrides; requires 014-015. Adds `announcements.SourceJobs` (unique OwnerId/DraftId/SubmissionKey, no-delete trigger) and mutable `announcements.SourceOverrides`. Runtime delta: `GRANT SELECT, INSERT, UPDATE` on those two objects only; no DELETE or DDL grant. Hangfire's schema is provisioned separately using its published 1.8.6 installation script; runtime `Hangfire:PrepareSchema` must be false. |
+| 017 | Additive SourceJobs dispatch reservation, Hangfire acknowledgment, expiring attempt identity/count and recovery index; requires 016. No new runtime object grants; no rewrite or deletion of snapshots/revisions. |
+| 018 | Append-only announcement preparation snapshots; requires 017. Runtime SELECT/INSERT on announcements.Preparations only, plus existing grants. Promoted from the local unnumbered candidate. |
 
 013 uses `migrations/013-sdm-pilot-policy.sql` in SQLCMD mode. Existing NULL/v1
 evidence and append-only triggers remain untouched; WITH CHECK validates stored
@@ -71,6 +76,23 @@ The Operational Record/Jira workflow uses `schema/002-operational-record-jira-wo
 Application-session governance uses `schema/007-application-session-governance.sql`. Runtime requires `SELECT`, `INSERT`, and `UPDATE` on `security.ApplicationSessions` and `SELECT` on `reporting.ManagementSessionStatus`. It requires no `DELETE`, DDL, schema ownership, or migration permission.
 
 ## Test Harness
+
+Use the fresh `Test-AnnouncementPreparationsSql.ps1` wrapper for 001-018,
+or `Test-ResourceCatalogueSql.ps1 -IncludeAnnouncementPreparations`. Runtime needs
+SELECT/INSERT on announcements.Preparations plus existing audit/access grants only.
+
+Announcement drafts use additive 014 (separate append-only revisions). Runtime
+needs SELECT/INSERT on announcements.DraftRevisions plus existing audit INSERT;
+no UPDATE/DELETE/DDL. No grants are applied automatically. Retain additive data on
+rollback; older binaries cannot operate this module. Do not replay 012/013.
+The harness opt-in `-IncludeAnnouncementDrafts` adds 014-015 only to its fresh local DB.
+`-IncludeAnnouncementSources` includes drafts and extends that inventory through 017.
+It does not install Hangfire: provision that schema separately before starting either host.
+Runtime Hangfire needs SELECT/INSERT/UPDATE/DELETE on its dedicated schema, not DDL.
+Source apply keeps draft INSERT, source override writes and audit INSERT in one transaction.
+The existing append-only audit UPDATE/DELETE restrictions remain enforced.
+See [source acceptance](../docs/contracts/planned-announcement-source-acceptance.md) for tested grants,
+isolated databases and integration requirements. No corporate migration was executed.
 
 Resource v1 adds `scripts/powershell/Test-ResourceCatalogueSql.ps1`, an explicitly
 invoked isolated LocalDB-only harness. It refuses an existing database name,

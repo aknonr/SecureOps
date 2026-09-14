@@ -1,0 +1,38 @@
+<div class="so-announcement-frame">
+    @foreach (var frame in Frames)
+    {
+        <iframe @key="frame" title="Duyuru önizlemesi" class="@(frame == _active ? "so-preview-active" : "so-preview-staging")"
+                tabindex="@(frame == _active ? 0 : -1)" aria-hidden="@(frame != _active)" sandbox="" referrerpolicy="no-referrer"
+                srcdoc="@frame.Html" @onload="@(() => LoadedAsync(frame))"></iframe>
+    }
+</div>
+@code {
+    [Parameter] public string? Html { get; set; }
+    [Parameter] public long Generation { get; set; }
+    [Parameter] public long HtmlGeneration { get; set; }
+    [Parameter] public EventCallback<long> Presented { get; set; }
+    private sealed record Frame(string Html, long Generation);
+    private Frame? _active, _pending;
+    private long _acknowledged = -1;
+    private IEnumerable<Frame> Frames => new[] { _active, _pending }.OfType<Frame>();
+    protected override void OnParametersSet()
+    {
+        if (_pending?.Generation != Generation) { _pending = null; }
+        if (Html is null) { _active = _pending = null; return; }
+        if (HtmlGeneration == Generation && _active?.Html != Html && _pending?.Html != Html)
+        { _pending = new(Html, Generation); }
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (HtmlGeneration == Generation && _active?.Html == Html && _acknowledged != Generation)
+        { _acknowledged = Generation; await Presented.InvokeAsync(Generation); }
+    }
+    private async Task LoadedAsync(Frame frame)
+    {
+        if (!ReferenceEquals(frame, _pending) || frame.Generation != Generation) { return; }
+        _active = frame;
+        _pending = null;
+        _acknowledged = Generation;
+        await Presented.InvokeAsync(Generation);
+    }
+}

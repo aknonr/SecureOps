@@ -67,7 +67,8 @@ public static class UiProblemFactory
             Retryable = retryable,
             CorrelationId = correlationId,
             Stage = stage,
-            StatusCode = statusCode
+            StatusCode = statusCode,
+            Fields = payload?.Fields ?? []
         };
     }
 
@@ -139,6 +140,14 @@ public static class UiProblemFactory
 
     private static UiProblem FromCode(string code, int statusCode) => code switch
     {
+        "AnnouncementInvalid" or "AnnouncementIncomplete" => Build(UiProblemKind.Validation, code,
+            "Duyuru alanlarını kontrol edin", "Eksik veya geçersiz alanları düzeltin. Düzenlemeleriniz korunuyor.", [], false, false),
+        "AnnouncementConflict" => Build(UiProblemKind.Conflict, code,
+            "Taslağın daha yeni bir kaydı var", "Düzenlemeleriniz korunuyor. Güncel kayıtla karşılaştırıp devam edin.", [], false, true),
+        "AnnouncementAssetChanged" or "AnnouncementAssetMissing" => Build(UiProblemKind.Conflict, code,
+            "Görsel kullanılamıyor", "Görseli yeniden seçip kaydedin. Sorun sürerse yöneticinize bildirin.", [], false, false),
+        "AnnouncementsDisabled" or "AnnouncementConfigurationUnavailable" => Build(UiProblemKind.NotConfigured, code,
+            "Duyurular kullanıma açık değil", "Yöneticiniz modül ayarlarını kontrol etmelidir.", [], false, false),
         "InUseConflict" => Build(UiProblemKind.Conflict, code, "In Use veri sürümü değişti",
             "Bu taslak veya önizleme artık güncel değil. İşlem tekrarlanmadı.",
             ["Kayıtlı veriyi yeniden okuyun, cevapları kontrol edip tekrar kaydedin."], retryable: true, requiresRefresh: true),

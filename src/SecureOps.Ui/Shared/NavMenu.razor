@@ -43,6 +43,9 @@
                 <MudNavLink Href="in-use" Icon="@Icons.Material.Filled.FactCheck">In Use</MudNavLink>
             }
 
+            @if (Can(Capabilities.AnnouncementDrafts))
+            { <MudNavLink Href="announcements" Icon="@Icons.Material.Filled.Email">Planlı Çalışma Duyuruları</MudNavLink> }
+
             @if (Can(Capabilities.ResourcesView))
             {
                 <div class="so-nav-group">KAYNAKLAR</div>

@@ -50,7 +50,7 @@ public sealed record ResourceEnvironmentQuery(
     [StringLength(40)] string? Search = null, Guid? CategoryId = null, bool IncludeArchived = false);
 
 /// <summary>Dismisses the first-use invitation; replay remains available. No training activity is recorded.</summary>
-public sealed record DismissResourceGuideRequest([Range(0, long.MaxValue)] long ExpectedVersion);
+public sealed record DismissResourceGuideRequest([Range(0, long.MaxValue)] long ExpectedVersion, string Guide = "resources");
 
 /// <summary>Replaces only the caller's bounded presentation settings at an expected aggregate version.</summary>
 public sealed record SaveResourceLayoutRequest(

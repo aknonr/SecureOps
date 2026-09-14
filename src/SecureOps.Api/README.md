@@ -2,6 +2,9 @@
 
 ASP.NET Core Web API. Hosted on IIS in-process.
 
+Planned-announcement source/editor/preparation integration and local evidence:
+`docs/contracts/planned-announcement-integration.md`. No sending route is enabled.
+
 `ResourcesController` exposes `/api/v1/resources` for shared catalogue management
 and caller-owned favourites/shift sets. Destination URLs are never fetched.
 The canonical UI contract documents version conflicts and filtered set resolution.
@@ -31,6 +34,14 @@ The canonical UI contract documents version conflicts and filtered set resolutio
 - `SecureOps.Infrastructure`
 
 ## Current state
+
+Planned announcement owned draft pagination, banner metadata, safe preview and authenticated .eml export:
+`docs/contracts/planned-announcements-v1.md`. Default-off; connected owned-draft UI,
+explicit v1/v2 templates and private asset bundles; no sending. Source routes submit durable work,
+read status/proposals and apply reviewed fields atomically; source collection runs only in Worker.
+See `docs/contracts/planned-announcement-source-acceptance.md` for contracts and executed local evidence.
+POST announcement preview is a bounded authenticated caller-input transformation;
+it neither reads draft records nor saves/sends. Saved exports remain version-bound.
 
 Phase 1A IdentityLookup is implemented here through `IdentityController`, validation, authorization, correlation ID middleware, rate-limit policy, and safe health endpoints. Phase 1 alert webhook and diagnostic orchestration endpoints are still planned.
 

@@ -15,7 +15,7 @@ public sealed record ShiftStartSet(Guid Id, string Name, IReadOnlyList<Guid> Lin
 /// <summary>Bounded owner-scoped aggregate; its version guards every personal mutation.</summary>
 public sealed record ResourcePreferences(long Version, IReadOnlyList<Guid> FavouriteIds,
     IReadOnlyList<ShiftStartSet> Sets, Guid? DefaultSetId, bool GuideDismissed = false,
-    ResourceWorkspaceLayout? WorkspaceLayout = null)
+    ResourceWorkspaceLayout? WorkspaceLayout = null, bool AnnouncementGuideDismissed = false)
 {
     /// <summary>Unevaluated personal state, with no database write on read.</summary>
     public static ResourcePreferences Empty => new(0, [], [], null);

@@ -1,0 +1,71 @@
+@implements IDisposable
+@using SecureOps.Shared.Contracts.Announcements
+@inject AnnouncementApiClient Api
+@inject IJSRuntime Js
+
+<section aria-label="Kaynak incelemesi" style="overflow-wrap:anywhere">
+    <h2>Kaynak incelemesi</h2>
+    @if (Locked || Version == 0) { <p role="status">Kaynak sorgusu ve uygulama için önce düzenlemeleri kaydedin.</p> }
+    @if (_problem is not null)
+    {
+        <SoProblemPanel Problem="_problem" />
+        @if (_problem.Code is "AnnouncementSourceDisabled" or "AnnouncementSourceJobHostUnavailable")
+        { <p>Kaynak bağlantısı kapalı. Elle düzenleme kullanılabilir.</p> }
+    }
+    <MudButton StartIcon="@Icons.Material.Filled.Refresh" Disabled="_working" OnClick="RefreshAsync">Durumu yenile</MudButton>
+    <fieldset disabled="@(_working || Locked || Version == 0 || _job?.Terminal == false)">
+        <label class="so-announcement-field" for="source-profile">Bakım profili
+            <select id="source-profile" @bind="_profile">
+                <option value="">Seçin</option>
+                @foreach (var p in _profiles)
+                { <option value="@p.Name" disabled="@(p.State != "Configured")">@p.Label · @StateLabel(p.State) @string.Join(", ", p.Missing)</option> }
+            </select>
+        </label>
+        <label class="so-announcement-field" for="source-oco">Kaynak OCO kaydı<input id="source-oco" maxlength="64" @bind="_oco" /></label>
+        <MudButton StartIcon="@Icons.Material.Filled.CloudDownload" Disabled="@(_profile.Length == 0 || _submission is not null)" OnClick="SubmitAsync">Kaynağı sorgula</MudButton>
+        @if (_submission is not null)
+        {
+            <p>@_submission.Profile · @_submission.OcoReference</p>
+            <MudButton OnClick="RetryAsync" StartIcon="@Icons.Material.Filled.Refresh">Aynı isteği yeniden dene</MudButton>
+            <MudButton OnClick="@(() => _submission = null)" StartIcon="@Icons.Material.Filled.Close">Yeni istek seç</MudButton>
+        }
+    </fieldset>
+    @if (_job is { } job) { <p role="status" data-source-state="@job.State">@StateLabel(job.State) · @job.Profile @job.ErrorCode</p> }
+    @if (_proposal is { } review)
+    {
+        <p>Dağıtım talebi alıcıları; nihai duyuru için onaylanmış gönderim listesi değildir.</p>
+        <p>v@(review.DraftVersion) · kaynak inceleme v@(review.OverrideVersion) · @review.CapturedAt.ToLocalTime()</p>
+        <p>@review.Completeness.DeviceCount cihaz · @review.Completeness.DevicePagesRead sayfa · @review.Completeness.ServicesResolved servis ·
+            @review.Completeness.ServicesAmbiguous belirsiz · @review.Completeness.ServicesMissing eksik · @review.Completeness.ServicesFailed başarısız</p>
+        @if (review.Completeness.Partial) { <p role="alert">Kaynak sonucu kısmi; kapsam tamamlanmış kabul edilmez.</p> }
+        @if (review.Stale || review.DraftVersion != Version) { <p role="alert">İnceleme güncel değil. Yeni bir inceleme gerekli.</p> }
+        <p>@string.Join("; ", review.Completeness.Warnings)</p>
+        <fieldset disabled="@(Locked || _working || review.Stale || review.DraftVersion != Version)">
+            @foreach (var field in review.Fields)
+            {
+                <details><summary>@Label(field.Field) · @StateLabel(field.State)</summary>
+                    <dl><dt>Mevcut</dt><dd>@field.Current</dd><dt>Önerilen</dt><dd>@field.Proposed</dd><dt>Kaynak (@field.Origin)</dt><dd style="white-space:pre-wrap">@field.SourceText</dd></dl>
+                    @if (field.Proposed is not null && field.Field is "Scope" or "Impact" or "Checks" or "Description" or "AnnouncementDate" or "OcoReference")
+                    { <MudCheckBox T="bool" Label="@($"{Label(field.Field)} uygula")" Value="@_fields.Contains(field.Field)" ValueChanged="@((bool selected) => Select(field.Field, selected))" /> }
+                </details>
+            }
+            <details><summary>Etkilenen servisler (@review.ProposedAffectedServices.Length)</summary>
+                <p>Mevcut: @string.Join("; ", Services)</p>
+                <p>Önerilen: @string.Join("; ", review.ProposedAffectedServices)</p>
+                <p>Belirsiz adaylar: @string.Join("; ", review.AmbiguousServices)</p>
+                <p>Çözümlenemeyen cihazlar: @string.Join("; ", review.UnresolvedDevices)</p>
+            </details>
+            <MudCheckBox T="bool" Label="Servis değişikliklerini uygula" @bind-Value="_services" Disabled="@(review.ProposedAffectedServices.Length == 0)" />
+            @foreach (var pair in new[] { ("Alıcı", review.To), ("Bilgi", review.Cc) })
+            {
+                <details><summary>@pair.Item1 farkları</summary><dl>
+                    <dt>Mevcut</dt><dd>@string.Join("; ", pair.Item2.Current)</dd><dt>Önerilen</dt><dd>@string.Join("; ", pair.Item2.Proposed)</dd>
+                    <dt>Eklenecek</dt><dd>@string.Join("; ", pair.Item2.Added)</dd><dt>Çıkarılacak</dt><dd>@string.Join("; ", pair.Item2.Removed)</dd>
+                    <dt>Korunan elle eklemeler</dt><dd>@string.Join("; ", pair.Item2.PreservedManual)</dd><dt>Korunan çıkarmalar</dt><dd>@string.Join("; ", pair.Item2.PreservedRemoval)</dd>
+                </dl></details>
+            }
+            <MudCheckBox T="bool" Label="Alıcı değişikliklerini uygula" @bind-Value="_recipients" />
+            <MudButton StartIcon="@Icons.Material.Filled.Check" Disabled="@(_fields.Count == 0 && !_services && !_recipients)" OnClick="ApplyAsync">Seçili değişiklikleri uygula</MudButton>
+        </fieldset>
+    }
+</section>

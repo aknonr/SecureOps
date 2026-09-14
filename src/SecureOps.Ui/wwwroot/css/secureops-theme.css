@@ -2550,6 +2550,9 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
     color-scheme: light;
 }
 
+.so-announcements input[type=date] { color-scheme: light; }
+:root.so-dark .so-announcements input[type=date] { color-scheme: dark; }
+
 :root.so-dark .so-window-date input {
     color-scheme: dark;
 }

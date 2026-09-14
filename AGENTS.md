@@ -16,7 +16,7 @@ This file is the canonical repository-wide entry point for Codex, Claude, Zed, a
 ## Local Development and Ownership
 
 - Read the project README and mandatory context documents before implementation; backend changes update relevant documentation in the same task.
-- Codex owns backend, API, domain, infrastructure, hosting, middleware, security, SQL, integrations, contracts, release engineering, and backend tests.
+- Codex owns backend, API, domain, infrastructure, hosting, middleware, security, SQL, integrations, contracts, release engineering, and backend tests. For Planned OCO Announcements, explicit user authorization also assigns Codex UI/UX and UI tests; no Claude handoff is required.
 - Claude owns UI/UX, Razor, CSS, layout, theme, navigation, and visual UI files. Claude must report backend contract needs instead of changing backend-owned layers.
 - Never put real corporate identities, PAM accounts, employee details, secrets, or runtime configuration values in source, fixtures, examples, or documentation.
 - Security-sensitive behavior must fail closed when validation, authorization, audit, identity, configuration, or integration state is missing, ambiguous, or unavailable.

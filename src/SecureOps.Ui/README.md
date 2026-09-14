@@ -1,5 +1,22 @@
 # SecureOps.Ui
 
+## Planned Announcements UI
+
+Explicit source review now joins the saved editor and immutable preparation history.
+See `docs/contracts/planned-announcement-integration.md` for combined acceptance and limits.
+
+`/announcements` now connects owner-scoped paging, structured drafts, banners,
+explicit saved preview/download, conflict comparison and per-user guided help.
+Codex owns this module's UI and backend by explicit user instruction. Owned immutable
+preparation history is implemented; sending/confirmation and ordinary-user roles are not. See `docs/contracts/planned-announcements-v1.md`
+for API behavior, local browser replay, evidence and remaining quality gates.
+New drafts default to the final table; existing v1 requires explicit versioned upgrade.
+System/application and the collapsed service list stay separate. Debounced unsaved
+preview shares the saved-preview/export renderer, with responsive tabs and cancellation.
+Date/hour/minute controls retain seconds and explicit offsets. Source/profile flow is pending.
+Acceptance repair retains stale same-draft previews during edits/errors, stages loaded
+sandbox frames and explains date validation inline. Access loss clears private state.
+
 ## Current RFC Reporter Acceptance, 2026-09-12
 
 The preparation-only statements below are historical. Operator-approved RFC

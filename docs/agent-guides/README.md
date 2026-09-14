@@ -18,7 +18,7 @@ The former Cursor frontmatter used `description` for the guide purpose, `globs` 
 | Worker and Hangfire | `030-worker-service.md`, `src/SecureOps.Worker/README.md` |
 | PowerShell, JEA, or future Ansible work | `040-automation-ansible-powershell.md`, `scripts/README.md`, `docs/05-security-model.md` |
 | Security, authentication, authorization, audit, or secrets | `050-security-audit.md` and the applicable security/ADR documents |
-| Claude-owned UI/UX | `CLAUDE.md`, `060-ui.md`, `src/SecureOps.Ui/README.md`, and `docs/contracts/` |
+| UI/UX (Planned OCO: Codex; otherwise Claude) | `CLAUDE.md`, `060-ui.md`, `src/SecureOps.Ui/README.md`, and `docs/contracts/` |
 | Deterministic analysis | `070-analysis.md` and the applicable Phase 6 and audit documents |
 | Future AI/RAG | `080-ai-rag-future-phase.md` and `docs/10-ai-rag-strategy.md` |
 | Testing and quality | `090-testing-quality.md`, `tests/README.md`, `docs/13-definition-of-done.md` |
