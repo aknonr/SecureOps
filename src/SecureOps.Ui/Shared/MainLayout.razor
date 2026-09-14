@@ -98,6 +98,7 @@
     private AppearanceMode _mode = AppearanceMode.Dark;
     private bool _isDesktop = true;
     private bool _routeNavigating;
+    private CancellationTokenRegistration _routeNavigation;
     private int _redirectingForReauthentication;
 
     // The dark choice drives MudBlazor's deep corporate palette.
@@ -144,6 +145,11 @@
     private Task OnBeforeInternalNavigation(LocationChangingContext context)
     {
         _routeNavigating = true;
+        _routeNavigation.Dispose();
+        _routeNavigation = context.CancellationToken.Register(() =>
+        {
+            _ = InvokeAsync(() => { _routeNavigating = false; StateHasChanged(); });
+        });
         StateHasChanged();
         return Task.CompletedTask;
     }
@@ -239,6 +245,7 @@
 
     public void Dispose()
     {
+        _routeNavigation.Dispose();
         Navigation.LocationChanged -= OnLocationChanged;
         ApiSessions.ReauthenticationRequired -= OnReauthenticationRequired;
     }

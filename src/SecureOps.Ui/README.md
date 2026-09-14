@@ -533,6 +533,110 @@ active LOCAL work; the combined milestone is NOT complete.
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 
+#### Recovery And Local Acceptance Closeout, 2026-09-14
+
+**Latest local status: ACCEPTED for the bounded In Use journey; not release readiness.**
+This subsection supersedes older remaining-work statements below for recovery and
+local acceptance. The RFC mapping was already implemented before this continuation:
+`SET.c_rfc_record` with exact referenced OR resolution and `KEY.p_rel_requester`
+display; `SET.p_rel_requester` remains reference evidence. The September 11
+"runtime mapping not implemented" statement below is historical, not current.
+Reporter identity still does not imply ownership or Virtual PC User.
+
+Recovered starting HEAD: `81f5757a869442ae92b0c90a3d7dfebab9796d6d`, branch
+`feature/sql-runtime-hardening-20260902`, registered checkout
+`C:\Users\dmtak\Desktop\Yeni Otomasyon\secure-ops-repo`. It contained only the
+pre-existing untracked `.vscode/launch.json` and also served the protected release
+tip. One continuation worktree was created from that exact HEAD:
+`C:\SecureOpsBuild\secure-ops-inuse-local-acceptance-20260914`, branch
+`feature/inuse-local-acceptance-20260914`. Historical SHAs were checked for ancestry,
+never reset/cherry-pick targets. No other writer or parallel implementation was used.
+The commit containing this subsection is the source closeout; fixed-start change
+accounting includes tests/docs and deletions, without reusing an earlier exception.
+Scope: 668 changed lines (+634/-34), 9 files; no scope exception.
+
+Already implemented and retained: refresh/search/filter, stable application-ID
+assignment/reason, per-server three-answer editing, explicit bulk differences and
+confirmation, persisted reopening, preview/archive/download, conflict comparison,
+optional tour and trusted reporter/profile display. The review capability does
+not require assignment to the caller: cross-assignee review remains permitted by
+contract. Missing capabilities, stale versions and audit failures remain rejected.
+No API/schema/source mapping, ownership, production limits, dependencies or visual
+design changes were needed. OCO and OR-to-SDM worktrees/data/hosts remain untouched.
+
+Corrected actual gaps: identical access revalidation and same-record reload no
+longer silently discard local answers or assignment intent; obsolete API results
+and errors cannot replace newer filter/access state. Assignment-only conflict
+recovery retains identity/reason without overwriting newer saved answers. Commands
+disable editable controls while pending. Unsaved navigation can be canceled, with
+the existing shell progress indicator cleared. Authorization loss clears protected
+state; forced session reauthentication bypasses the unsaved-navigation guard.
+503/transport failures preserve recoverable edits without automatic write retries.
+
+Evidence root: `C:\SecureOpsBuild\validation\inuse-closeout-20260914` (private,
+outside Git). Fresh supported LocalDB harness applied inventory 001-013 plus its
+upgrade checks to `SecureOps_ResourcesV1_inusecloseout20260914` on
+`(localdb)\SecureOpsResourcesV1`; no other database or migration package was replayed.
+`Start-Local.ps1` records actual process-only composition: Demo auth/access,
+SQL Access/Audit/SessionSecurity/OperationalRecords, synchronous audit, Mock identity
+and PAM, OIDC off, paired Simulation source/Jira, controlled writes/source close off.
+`ReadOnlyIntegrationMode=false` belongs only to this supported Demo/Simulation
+profile. The shipped Test+TuruncuHat+Corporate read-only validators/defaults were
+not changed. The historical incompatible Demo+read-only attempt was superseded by
+rc6.17 loopback-adapter evidence; neither it nor this run proves corporate access.
+Task ports: API 64041, UI 64042, test-owned fault proxy 64043; only task hosts stopped.
+Database, synthetic reports and private DPAPI keys are retained outside Git.
+
+Actual checks, seconds are command wall time unless stated otherwise:
+- Final Release solution build: PASS, 0 warnings/errors, 5.965 s.
+- Normal solution regression: 1,240 unit + 243 integration PASS, 11.409 s;
+  20 explicit SQL opt-ins skipped because the normal process had no SQL connection.
+  `skips-and-optins.json` records every identity/reason and its separate PASS:
+  all 20 SQL tests, 3.253 s, zero remaining SQL skips. Fresh harness: 2.755 s.
+- Normal `Test_OpenApiDocument_MatchesCheckedInUiContractSnapshot`: PASS;
+  `SECUREOPS_UPDATE_OPENAPI` unset; no snapshot regeneration.
+- After scoped line-ending normalization, 21 recovery/manual-clock session cases
+  PASS (12 recovery + 9 session), 2.645 s. Idle and absolute expiry use existing
+  manual-time tests, not changed production timeouts. Full regression predates
+  only that whitespace normalization; no duplicate full suite for documentation.
+- `browser-recovery-accepted/result.json`: PASS, 7.450 s inside browser harness.
+  Actual refresh through SQL, reason/answer 503 and transport, held save/list,
+  real assignment conflict, canceled navigation, explicit bulk, persisted reopen,
+  per-server exception, preview/download/archive, repeated persisted 403 and actual
+  server session revocation to reauthentication while edits were unsaved.
+- `browser-reporter-accepted/result.json`: PASS, 5.815 s. Existing fake-HTTP
+  adapter/SQL fixture opt-in PASS (1 case, 1.841 s); four-server stored journey,
+  shared/different/null RFC, retained denied evidence, trusted reviewer labels,
+  single-pass display, real answer conflict accepted/saved, reopened download/archive.
+  `workbook-verification.json` confirms four server columns/NMS rows and retained
+  review evidence. This complements, not replaces, the adapter-to-SQL regression.
+- Browser screenshots/keyboard checks cover 1440x900 and 390x844, light/dark,
+  labels, missing-answer focus and tour reopening/focus return/nonmutation.
+  Failed intermediate attempts remain in evidence, separate from the accepted runs.
+
+Mandatory full `dotnet format --verify-no-changes --no-restore --report <path>`:
+exit 2 at baseline (37.833 s) and final (34.440 s). Both have the same 201 unique
+diagnostics in 58 files, compared by path/line/column/ID/full message, including
+unfixable console diagnostics. All introduced line-ending findings were fixed;
+`format-accepted-comparison.json` has zero added/removed diagnostics. The shared
+full-format gate remains unresolved and is not waived by this local acceptance.
+
+`final-tested-payloads.json` binds 430 payload/static files and
+`final-tested-source.json` binds 478 non-document source files. API DLL SHA-256:
+`4630AB5C6E45D489EBD23A3917EB84BEEE3C9D1323C7D0CA6DE8B6E4870954E2`;
+UI DLL: `AD94B6664061C9E4497753302F896E07F41A8043B62DAF4766B152A833A19E72`.
+The pre-commit build embeds ProductVersion `0.1.0+81f5757...`; content hashes,
+not that embedded base SHA, establish the tested changed source. Historical rc6.17
+still identifies build `f519b5022760e71cc3a7edf6b3c87f3b7c943dce`; all three archive
+hashes match its existing manifest read-only. It does not contain this continuation.
+Cached upstream remains `5692c77fbab0aea542d6408dfc1756ee8d965140`; the new branch
+has no upstream. Current remote state was not queried and no push is claimed.
+
+Remaining external gates: corporate source/AD/OIDC and destination authentication,
+managed-browser popup policy variants, actual screen reader/VDI and shared full
+format. In Use currently has no configured source navigation link, so no destination
+popup claim is made. No package, push, deployment, main merge or branch cleanup.
+
 #### Display Acceptance Correction, 2026-09-11 (Source Only)
 
 Scope: 19 files, 584 changed lines (+536/-48); no scope exception.

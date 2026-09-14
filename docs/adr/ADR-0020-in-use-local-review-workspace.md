@@ -1,5 +1,22 @@
 # ADR-0020: In Use Local Review Workspace
 
+## 2026-09-14 Local Recovery Continuation
+
+Preserve the implemented source mapping and versioned review contract. Recoverable
+HTTP/transport failures retain unsaved answers and assignment intent. Conflict
+recovery explicitly compares the current version before preserving same-identity
+edits; it never retries a write automatically. Pending responses must not apply
+after route/filter/access changes or disposal. Unchanged access revalidation must
+not discard edits; confirmed denial clears protected state. Navigation with unsaved
+work requires confirmation, and navigation during a command waits for its outcome.
+Session expiry retains the existing terminal-session/reauthentication boundary;
+no draft is copied into browser storage or across authentication sessions.
+
+Acceptance uses fresh task-owned SQL and the supported local paired Simulation
+composition. Corporate adapters, production limits, schema and shipped read-only
+protections are unchanged. Controlled local transport faults belong only to the
+test harness. Full-format debt remains a separate required shared-delivery gate.
+
 ## Related Request Reporter, 2026-09-11
 
 The observed SMSS_oRFF form labels p_rel_requester as Bildiren. Existing

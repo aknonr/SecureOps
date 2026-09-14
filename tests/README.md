@@ -147,6 +147,28 @@ the actual migration upgrade and then runs SQL round-trip, concurrency,
 transactional audit rollback, append-only, and SDM persistence tests. Corporate
 SQL/AD/HTTP endpoints remain forbidden. Offline SQL asset assertions are separate.
 
+In Use recovery acceptance uses `tests/browser/in-use-recovery.cjs` with arguments
+`<playwright-core> <ui-loopback> <api-loopback> <fresh-evidence-directory> <proxy-port>`.
+Use the same fresh LocalDB harness and foreground Demo/paired Simulation composition
+above, with controlled writes and source close disabled. `ReadOnlyIntegrationMode`
+is false only in this local Simulation process; its true mode requires the distinct
+Test/real-adapter profile. Never alter shipped validators/configuration to combine them.
+Point the UI API base address to the unused loopback proxy port. The script owns
+that proxy and injects 503/transport/held responses only for In Use requests; it
+adds no runtime endpoints and records no authentication headers. It changes only
+synthetic fixtures in the task database. Existing fixtures/archives are retained.
+The final session-expiry browser check uses actual application-session revocation;
+`ApplicationSessionServiceTests` separately verifies idle/absolute clocks.
+
+For reporter acceptance, stop only that task UI and restart it directly against
+the same API. Opt into `InUse_ReporterAcceptance_NewFixtureOnly_PreservesExistingData`
+with a new synthetic `SECUREOPS_INUSE_ACCEPTANCE_SOURCE_ID` in its guarded range;
+run `in-use-reporter.cjs` with the existing header arguments and that OR code.
+It now completes answer conflict acceptance, persisted reopening and four-server
+workbook download/archive. Fake-HTTP mapping/SQL tests and local browser acceptance
+do not prove corporate integration. See the existing In Use canonical handoff in
+`src/SecureOps.Ui/README.md` for the latest results and remaining external gates.
+
 All identity, Swagger, authorization, forwarded-header, and SQL schema tests are local. They use mocks/fakes, offline assertions, or the explicitly guarded disposable LocalDB facility. They must not contact corporate AD, PAM, LDAP, SQL Server, IIS, or load balancers. Real provider validation is a separately authorized test-server activity.
 
 Release validation additionally checks the published Active Directory dependency closure, manifest hashes, and ZIP paths without contacting a domain controller.

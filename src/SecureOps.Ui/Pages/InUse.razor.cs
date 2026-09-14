@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Contracts.InUse;
@@ -27,6 +28,7 @@ public partial class InUse
     private int? _focusAnswer;
     private bool _busy, _dirty, _reloadRequested;
     private int _number = 1, _size = 25, _sheet;
+    private int _generation;
     private List<AnswerEdit> _answers = [];
     private readonly HashSet<string> _selected = [];
     private readonly CancellationTokenSource _lifetime = new();
@@ -42,6 +44,9 @@ public partial class InUse
         _ => "Henüz sorgulanmadı / sözleşme bekleniyor"
     };
     private bool CanEdit => Can(Capabilities.InUseReview) && _record is not null;
+    private bool AssignmentEdited => _record is not null && (!string.IsNullOrWhiteSpace(_reason)
+        || _assignee != (_record.AssigneeId?.ToString("D") ?? ""));
+    private bool HasUnsaved => _dirty || AssignmentEdited;
     private void ReviewServer(string id)
     {
         _editingServer = id;
@@ -58,49 +63,57 @@ public partial class InUse
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
-    { AccessProvider.Changed += AccessChanged; await InitializeAsync(); }
+    { AccessProvider.Changed += AccessChanged; _access = await AccessProvider.GetAsync(_lifetime.Token); }
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync() { if (_access is not null) { await LoadAsync(); } }
     private async Task InitializeAsync()
-    { _access = await AccessProvider.GetAsync(_lifetime.Token); if (Can(Capabilities.InUseView)) { await LoadAsync(); } }
+    { _access = await AccessProvider.RefreshAsync(_lifetime.Token); if (Can(Capabilities.InUseView)) { await LoadAsync(); } }
     private Task FilterAsync() { _number = 1; return LoadAsync(); }
     private Task SearchAsync(string value) { _search = value; return FilterAsync(); }
     private Task PreviousAsync() { _number = Math.Max(1, _number - 1); return LoadAsync(); }
     private Task NextAsync() { _number++; return LoadAsync(); }
     private Task LoadAsync()
     {
+        ++_generation;
         if (_busy)
         { _reloadRequested = true; return Task.CompletedTask; }
+        if (!Can(Capabilities.InUseView))
+        { return Task.CompletedTask; }
+        if (_record?.Id == Id && HasUnsaved)
+        { return CompareAsync(); }
         return ExecuteAsync(async () =>
         {
             _report = null;
-            _record = null;
+            if (_record?.Id != Id || Id is null)
+            { ClearRecord(); }
             if (Id is Guid id)
             {
-                SetRecord(await Api.GetAsync<InUseRecord>($"/{id}", _lifetime.Token));
+                InUseRecord record = await ReadAsync<InUseRecord>($"/{id}");
                 if (Can(Capabilities.InUseAssign))
-                { _assignees = await Api.GetAsync<InUseAssignee[]>("/assignees", _lifetime.Token); }
+                { _assignees = await ReadAsync<InUseAssignee[]>("/assignees"); }
+                SetRecord(record);
             }
             else
             {
-                _page = await Api.GetAsync<InUsePage>($"?search={Uri.EscapeDataString(_search)}&view={_view}&page={_number}&pageSize={_size}"
-                    + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status), _lifetime.Token);
+                _page = null;
+                _page = await ReadAsync<InUsePage>($"?search={Uri.EscapeDataString(_search)}&view={_view}&page={_number}&pageSize={_size}"
+                    + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status));
             }
         });
     }
     private Task RefreshAsync() => ExecuteAsync(async () =>
     {
-        InUseRefreshState state = await Api.SendAsync<InUseRefreshState>(HttpMethod.Post, "/refresh", new RefreshInUseRequest(Guid.NewGuid()), _lifetime.Token);
+        InUseRefreshState state = await SendAsync<InUseRefreshState>(HttpMethod.Post, "/refresh", new RefreshInUseRequest(Guid.NewGuid()));
         _notice = state.Issue is null ? "Sınırlı kaynak okuması tamamlandı." : RefreshIssue(state.Issue);
-        _page = await Api.GetAsync<InUsePage>($"?page={_number}&pageSize={_size}&view={_view}&search={Uri.EscapeDataString(_search)}"
-            + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status), _lifetime.Token);
+        _page = await ReadAsync<InUsePage>($"?page={_number}&pageSize={_size}&view={_view}&search={Uri.EscapeDataString(_search)}"
+            + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status));
     });
     private Task AssignAsync() => ExecuteAsync(async () =>
     {
         if (_record is null)
         { return; }
-        SetRecord(await Api.SendAsync<InUseRecord>(HttpMethod.Put, $"/{_record.Id}/assignment",
-            new AssignInUseRequest(_record.Version, Guid.TryParse(_assignee, out Guid userId) ? userId : null, _reason), _lifetime.Token));
+        SetRecord(await SendAsync<InUseRecord>(HttpMethod.Put, $"/{_record.Id}/assignment",
+            new AssignInUseRequest(_record.Version, Guid.TryParse(_assignee, out Guid userId) ? userId : null, _reason)));
         _reason = "";
         _notice = "Yerel atama kaydedildi.";
     });
@@ -108,30 +121,38 @@ public partial class InUse
     {
         if (_record is null)
         { return; }
-        SetRecord(await Api.SendAsync<InUseRecord>(HttpMethod.Put, $"/{_record.Id}/draft",
+        string assignee = _assignee;
+        bool assignmentEdited = AssignmentEdited;
+        SetRecord(await SendAsync<InUseRecord>(HttpMethod.Put, $"/{_record.Id}/draft",
             new SaveInUseDraftRequest(_record.Version, _record.SourceVersion,
-                _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence)).ToArray(), _notes), _lifetime.Token));
+                _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence)).ToArray(), _notes)));
+        if (assignmentEdited)
+        { _assignee = assignee; }
         _notice = "Yerel inceleme taslağı kaydedildi.";
     });
     private Task CompareAsync() => ExecuteAsync(async () =>
     {
         if (_record is not null)
-        { _comparison = await Api.GetAsync<InUseRecord>($"/{_record.Id}", _lifetime.Token); }
+        { _comparison = await ReadAsync<InUseRecord>($"/{_record.Id}"); }
     });
     private void AcceptComparison()
     {
         if (_comparison is null || _record is null)
         { return; }
         AnswerEdit[] local = _answers.ToArray();
+        bool answersEdited = _dirty, assignmentEdited = AssignmentEdited;
+        string assignee = _assignee;
         SetRecord(_comparison);
-        foreach (AnswerEdit answer in _answers)
+        foreach (AnswerEdit answer in _answers.Where(_ => answersEdited))
         {
             AnswerEdit? retained = local.SingleOrDefault(a => a.ServerId == answer.ServerId && a.Check == answer.Check);
             if (retained is not null)
-            { answer.Value = retained.Value; }
+            { answer.Value = retained.Value; answer.Evidence = retained.Evidence; }
         }
+        if (assignmentEdited)
+        { _assignee = assignee; }
         _problem = null;
-        Dirty();
+        _dirty = answersEdited;
         _notice = "Güncel sürüm alındı; yerel cevaplarınız korunuyor. Gösterilen farkları doğruladıktan sonra taslağı kaydedin.";
     }
     private static IEnumerable<(string Server, string Field, string Before, string After)> SourceChanges(InUseRecord old, InUseRecord current)
@@ -165,8 +186,8 @@ public partial class InUse
             return;
         }
 
-        SetRecord(await Api.SendAsync<InUseRecord>(HttpMethod.Post, $"/{_record.Id}/completion-intent",
-            new ConfirmInUseRequest(_record.Version, Guid.NewGuid(), report.Sha256), _lifetime.Token));
+        SetRecord(await SendAsync<InUseRecord>(HttpMethod.Post, $"/{_record.Id}/completion-intent",
+            new ConfirmInUseRequest(_record.Version, Guid.NewGuid(), report.Sha256)));
     });
     private static string Waiting(InUseRecord record) => InUseProgress.Created(record.Source, DateTimeOffset.UtcNow) is { } created
         ? $"Kaynak açılışından beri {(DateTimeOffset.UtcNow - created).Days} gün"
@@ -175,8 +196,8 @@ public partial class InUse
     {
         if (archivedVersion is null && !Ready())
         { return; }
-        _report = await Api.SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
-            new ExportInUseRequest(_record.Version, Archive: archivedVersion is null, ArchivedVersion: archivedVersion), _lifetime.Token);
+        _report = await SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
+            new ExportInUseRequest(_record.Version, Archive: archivedVersion is null, ArchivedVersion: archivedVersion));
         _record = _record with { ArchivedVersions = _record.ArchivedVersions.Append(_report.Version).Distinct().OrderDescending().ToArray() };
         await Js.InvokeVoidAsync("secureOpsDownload", _report.FileName,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(_report.Content));
@@ -199,8 +220,18 @@ public partial class InUse
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     { if (_focusAnswer is int index) { _focusAnswer = null; await _answerElements[index].FocusAsync(); } }
-    private Task<InUseReport> ReportAsync() => Api.SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
-        new ExportInUseRequest(_record.Version), _lifetime.Token);
+    private Task<InUseReport> ReportAsync() => SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
+        new ExportInUseRequest(_record.Version));
+    private Task<T> ReadAsync<T>(string path) => CurrentAsync(Api.GetAsync<T>(path, _lifetime.Token));
+    private Task<T> SendAsync<T>(HttpMethod method, string path, object body) => CurrentAsync(Api.SendAsync<T>(method, path, body, _lifetime.Token));
+    private async Task<T> CurrentAsync<T>(Task<T> pending)
+    {
+        int generation = _generation;
+        T result = await pending;
+        if (generation != _generation || _lifetime.IsCancellationRequested)
+        { throw new OperationCanceledException(); }
+        return result;
+    }
     private void SetRecord(InUseRecord record)
     {
         _record = record;
@@ -239,27 +270,70 @@ public partial class InUse
         if (_busy)
         { return; }
         _busy = true;
+        int generation = _generation;
         _problem = null;
         _notice = null;
         try
         { await operation(); }
-        catch (SecureOpsApiException ex) { _problem = ex.Problem; _report = null; }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (SecureOpsApiException ex)
+        {
+            if (generation == _generation && !_lifetime.IsCancellationRequested)
+            {
+                _problem = ex.Problem;
+                _report = null;
+                if (ex.Problem.Kind is UiProblemKind.Forbidden or UiProblemKind.AccessDisabled or UiProblemKind.AccessPending or UiProblemKind.SessionExpired)
+                { ++_generation; ClearRecord(); _access = new(null, ex.Problem, DateTimeOffset.UtcNow); }
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested || generation != _generation) { }
         finally { _busy = false; }
         if (_reloadRequested && !_lifetime.IsCancellationRequested)
         { _reloadRequested = false; await LoadAsync(); }
     }
     private void AccessChanged() => InvokeAsync(async () =>
     {
+        await RevalidateAccessAsync();
+        StateHasChanged();
+    });
+    private async Task RevalidateAccessAsync()
+    {
+        AccessSnapshot access = await AccessProvider.GetAsync(_lifetime.Token);
+        if (_lifetime.IsCancellationRequested)
+        { return; }
+        bool changed = _access is not null && (_access.Access?.UserId != access.Access?.UserId
+            || _access.Access?.Version != access.Access?.Version || _access.Status != access.Status
+            || !_access.Capabilities.Order().SequenceEqual(access.Capabilities.Order()));
+        _access = access;
+        if (changed)
+        { ++_generation; _reloadRequested = false; ClearRecord(); if (Can(Capabilities.InUseView)) { await LoadAsync(); } }
+    }
+    private void ClearRecord()
+    {
         _record = null;
         _page = null;
         _report = null;
+        _comparison = null;
+        _assignees = [];
         _answers.Clear();
-        _access = await AccessProvider.GetAsync(_lifetime.Token);
-        StateHasChanged();
-    });
+        _selected.Clear();
+        _reason = _assignee = _notes = _editingServer = "";
+        _dirty = false;
+        _changes = null;
+        _notice = _validation = null;
+    }
+    private async Task BeforeNavigationAsync(LocationChangingContext context)
+    {
+        // Authentication termination cannot wait for the command that detected it.
+        if (Navigation.ToAbsoluteUri(context.TargetLocation).GetLeftPart(UriPartial.Path) == Navigation.ToAbsoluteUri("session-expired").GetLeftPart(UriPartial.Path))
+        { ++_generation; ClearRecord(); return; }
+        if (_busy)
+        { context.PreventNavigation(); _notice = "İşlem sürüyor. Sonucu gördükten sonra sayfadan ayrılabilirsiniz."; return; }
+        if (HasUnsaved && await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikler",
+            "Kaydedilmemiş cevaplar ve atama gerekçesi silinecek.", yesText: "Ayrıl", cancelText: "Sayfada kal") != true)
+        { context.PreventNavigation(); }
+    }
     /// <inheritdoc />
-    public void Dispose() { AccessProvider.Changed -= AccessChanged; _lifetime.Cancel(); _lifetime.Dispose(); }
+    public void Dispose() { AccessProvider.Changed -= AccessChanged; ++_generation; _lifetime.Cancel(); _lifetime.Dispose(); }
     private static string Evidence(InUseEvidence evidence) => (evidence.Value ?? "Bilinmiyor") + " · " + evidence.Source;
     private static string CompletionStatus(InUseCompletion intent) => intent.Stage switch
     {

@@ -6,6 +6,10 @@
 @inject InUseApiClient Api
 @inject ICurrentAccessProvider AccessProvider
 @inject IJSRuntime Js
+@inject IDialogService Dialogs
+@inject NavigationManager Navigation
+
+<NavigationLock ConfirmExternalNavigation="HasUnsaved" OnBeforeInternalNavigation="BeforeNavigationAsync" />
 
 <PageTitle>Sunucu Kullanıma Alma Kontrolleri · @WasasBrand.Name</PageTitle>
 <div class="so-page so-page--wide so-inuse">
@@ -22,7 +26,7 @@
     else
     {
         @if (_problem is not null) { <SoProblemPanel Problem="_problem" />
-            @if (_dirty && _record is not null)
+            @if (HasUnsaved && _record is not null)
             { <MudButton OnClick="CompareAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.CompareArrows">Cevapları koru ve güncel kayıtla karşılaştır</MudButton> }
             else { <MudButton OnClick="LoadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Refresh">Kayıtlı veriyi yeniden oku</MudButton> } }
         @if (_comparison is { } current && _record is { } previous)
@@ -117,9 +121,9 @@
                 @if (Can(Capabilities.InUseAssign))
                 {
                     <details class="so-inuse-assignment"><summary>İnceleyici ata / değiştir (isteğe bağlı)</summary><div class="so-inuse-filters">
-                        <label>İnceleyici<select aria-label="In Use inceleyicisi" @bind="_assignee"><option value="">Atanmamış</option>
+                        <label>İnceleyici<select aria-label="In Use inceleyicisi" disabled="@_busy" @bind="_assignee"><option value="">Atanmamış</option>
                             @foreach (InUseAssignee person in _assignees) { <option value="@person.Id">@person.Label</option> }</select></label>
-                        <label>Atama gerekçesi<input aria-label="Atama gerekçesi" maxlength="500" @bind="_reason" @bind:event="oninput" /></label>
+                        <label>Atama gerekçesi<input aria-label="Atama gerekçesi" maxlength="500" disabled="@_busy" @bind="_reason" @bind:event="oninput" /></label>
                         <MudButton OnClick="AssignAsync" Disabled="@(_busy || _dirty || string.IsNullOrWhiteSpace(_reason))" StartIcon="@Icons.Material.Filled.PersonAdd">Atamayı kaydet</MudButton>
                     </div>
                     @if (_assignees.Any(p => p.Label.StartsWith("Profil adı bekleniyor", StringComparison.Ordinal)))
