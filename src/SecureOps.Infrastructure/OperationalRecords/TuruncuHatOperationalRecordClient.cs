@@ -334,7 +334,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
 
             _health.MarkAvailable(Provider);
             _telemetry.RecordOperation(Provider, "activity-update", "success", stopwatch.Elapsed);
-            _logger.LogInformation("Turuncu Hat source completion succeeded.");
+            _logger.LogInformation("Turuncu Hat activity update acknowledged; authoritative source closure is not verified.");
         }
         catch (ExternalIntegrationException)
         {
