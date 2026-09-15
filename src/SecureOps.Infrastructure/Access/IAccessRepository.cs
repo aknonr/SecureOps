@@ -22,7 +22,7 @@ public interface IAccessRepository
     /// <summary>Atomically approves or rejects one pending request.</summary>
     public Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, long expectedVersion, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken);
     /// <summary>Atomically replaces active roles for an approved user.</summary>
-    public Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, string reason, CancellationToken cancellationToken);
+    public Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken);
     /// <summary>Disables application access and revokes active roles.</summary>
     public Task<AccessMutationResult> DisableUserAsync(Guid userId, long expectedVersion, string actor, string reason, CancellationToken cancellationToken);
 }

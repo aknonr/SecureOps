@@ -41,7 +41,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         string userId = access.GetProperty("userId").GetString()!;
         JsonElement user = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/users/" + userId);
         (await admin.PutAsJsonAsync("/api/v1/access/users/" + userId + "/roles", new
-        { roles = new[] { "ResourceCurator" }, expectedVersion = user.GetProperty("version").GetInt64(), reason = "Synthetic browse denial" })).EnsureSuccessStatusCode();
+        { roles = new[] { "ResourceCurator" }, expectedVersion = user.GetProperty("version").GetInt64() })).EnsureSuccessStatusCode();
         using HttpClient refreshed = Client(factory, DemoApiAuthentication.TeamLeadActor);
         (await refreshed.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }

@@ -1,5 +1,18 @@
 # ADR-0021: Planned announcement drafts
 
+## Authorized continuation, 2026-09-15
+
+The owner now authorizes actor-derived sender, reviewed SMTP/self-test commands
+and access administration redesign. Historical preparation-only scope below does
+not prohibit that implementation; it does not prove dispatch is implemented.
+New draft revisions capture the authenticated actor's trusted persisted Mail, or
+an empty sender when unavailable. Draft editing and HTML preview remain usable.
+New MIME/preparation requires valid current Mail matching the saved revision;
+profile changes require explicit resave. Historical preparations remain immutable.
+No client From, username inference, integration-account fallback or SMTP activation.
+The current task retains its own 1,000-line limit from 4a1700a; the prior combined
+delivery exception is exhausted. Remaining scope is tracked in the canonical handoffs.
+
 Combined local integration connects explicit source review to the existing editor
 and immutable preparation, without confirmation/dispatch/sending. See
 [integration acceptance](../contracts/planned-announcement-integration.md).

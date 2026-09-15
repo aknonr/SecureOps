@@ -93,14 +93,12 @@ public interface IAccessAdminApiClient
     /// </remarks>
     /// <param name="userId">User whose roles change.</param>
     /// <param name="roles">The complete role set the user should end up with.</param>
-    /// <param name="reason">Justification recorded in the audit trail.</param>
     /// <param name="expectedVersion">The <b>user's</b> version.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The user's resulting access, including effective capabilities.</returns>
     public Task<CurrentAccessResponse> ReplaceRolesAsync(
         Guid userId,
         IReadOnlyList<string> roles,
-        string reason,
         long expectedVersion,
         CancellationToken cancellationToken);
 

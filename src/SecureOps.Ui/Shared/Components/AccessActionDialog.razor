@@ -66,7 +66,11 @@
             </fieldset>
         }
 
+        @if (Action != AccessAction.ReplaceRoles)
+        {
         <MudTextField @bind-Value="_reason"
+                      InputId="access-decision-reason"
+                      aria-label="Gerekçe"
                       Label="Gerekçe"
                       Variant="Variant.Outlined"
                       Lines="3"
@@ -79,6 +83,7 @@
         @if (_reasonError is not null)
         {
             <p class="so-dialog-error" role="alert">@_reasonError</p>
+        }
         }
     </DialogContent>
 
@@ -228,7 +233,7 @@
             ? AccessDecisionRules.AssignableRoles.Where(_selectedRoles.Contains).ToArray()
             : [];
 
-        _reasonError = AccessDecisionRules.ValidateReason(_reason);
+        _reasonError = Action == AccessAction.ReplaceRoles ? null : AccessDecisionRules.ValidateReason(_reason);
         _roleError = NeedsRoles ? AccessDecisionRules.ValidateRoles(roles) : null;
 
         if (_reasonError is not null || _roleError is not null)

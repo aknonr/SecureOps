@@ -154,7 +154,6 @@ public sealed class OidcFirstAdminBootstrapTests
             [],
             admin.Version,
             "system:test-admin-review",
-            "Synthetic revocation verification.",
             CancellationToken.None);
 
         AccessServiceResult<EnsureAccessUserResult> second = await fixture.CurrentAsync(OidcPrincipal("subject-after-revoke"));

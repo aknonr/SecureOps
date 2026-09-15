@@ -18,6 +18,72 @@ OIDC handlers are present but `Oidc:Enabled=false` by default. Enabling requires
 
 ## Capability Matrix
 
+### Current Matrix And Expanded Continuation, 2026-09-15
+
+Fixed start: `4a1700a6c0e346edf2c47a24fe6402538678db1d`, clean combined worktree.
+Sources: AccessRoleCatalog, API policy registration/controllers and execution
+services. SQL stores role IDs/assignments; capability bundles remain compiled,
+not database-managed. Corporate permission inventory was not accessible.
+This table supersedes the abbreviated historical paragraph following it.
+
+| Rol | Amacı ve mevcut yetkileri |
+|---|---|
+| Admin / Sistem Yöneticisi | Aşağıdaki 26 yetkinin tamamı; erişim yönetimi ve OCO hazırlama dahil. SMTP gönderimi henüz yok. |
+| Lead / Takım Lideri | Bağlantılar; kimlik/temel grup sorguları; OR görüntüleme/önizleme/Jira oluşturma/yeniden deneme/tanılama. TeamView ve SystemDiagnostics de atanır. Erişim yöneticisi veya In Use koordinatörü değildir. |
+| Operator / Operasyon Uzmanı | Bağlantılar, OR görüntüleme, salt okunur Jira önizleme/inceleme beyanı; TeamView. Jira oluşturamaz; OCO/In Use yetkisi vermez. |
+| JiraPublisher / Jira İşlem Yetkilisi | Bağlantılar ve OR görüntüleme/önizleme/oluşturma/yeniden deneme; Lead'in kimlik/grup/tanılama hakları yok. |
+| Auditor / Denetim Görüntüleyicisi | Bağlantılar, OR görüntüleme/tanılama, yönetim raporu; AuditView ve Access.ViewAudit kodları. Kullanıcı değiştirmez. |
+| ReadOnly / Sadece Görüntüleme | OR ve bağlantıları görüntüler; kendi favori/gruplarını düzenler. Tüm uygulamada mutlak yazma yasağı değildir. |
+| ResourceCurator / Bağlantı Yöneticisi | Bağlantıları kullanır, paylaşılan bağlantı/kategorileri yönetir; hedef sistemlerde yetki vermez. |
+| InUseReviewer / In Use İnceleyicisi | In Use görüntüleme, yerel inceleme/rapor; atama zorunlu değil, başka inceleyicinin atandığı kayıt da incelenebilir. |
+| InUseCoordinator / In Use Koordinatörü | İnceleyici haklarına ek açık kaynak yenileme ve isteğe bağlı inceleyici atama. |
+
+Yetkiler rol kümelerinin birleşimidir; ordinal rol sıralaması yoktur. Profil
+Mail/unvan/bölüm yetki kazandırmaz. Mevcut atamalar değiştirilmedi. Rol kaldırmak,
+başka bir rolün sağladığı aynı yetkiyi kaldırmaz. Yeni hassas işlemler varsayılan
+kapalı kalacak; dinamik sunucu işlem kataloğu henüz uygulanmadı.
+
+| Yetki | Gerçek rota / işlem (`/api/v1` altında) |
+|---|---|
+| Announcements.Drafts | announcements: kendi taslak/preview/eml/preparations/source profiles/jobs/proposal/apply; göndermez. |
+| InUse.View | in-use liste/detay/rapor okuma; diğer In Use işlemlerinin ortak koşulu. |
+| InUse.Review | in-use draft/report ve yalnızca engelli completion-intent günlüğü. |
+| InUse.Assign | in-use assignees/assignment. |
+| InUse.Refresh | in-use refresh; relationship-evidence ayrıca OR tanılama ister. |
+| Resources.View | resources liste/resolve/me/favori/kişisel grup. |
+| Resources.Manage | resources categories/links ortak katalog mutasyonları; View da gerekir. |
+| Identity.Lookup | identity lookup/bulk-lookup/lookup-capabilities; Bulk aynı yetkinin alias'ı. |
+| Identity.Groups.View | directory principals groups/memberships/membership-paths/account-health/service-evidence ve groups/lookup. |
+| Identity.Groups.Members.View | directory groups/members ve groups/analysis. |
+| Identity.PrivilegedGroups.View | directory principals/privileged-memberships. |
+| Identity.Groups.Export | directory groups/export; ilgili üyelik erişimi ayrıca denetlenir. |
+| TeamView | Atanmış kod; ayrı ekip CRUD/sorgu endpoint'i bulunmadı. |
+| AuditView | Atanmış kod; genel audit sorgu ekranı gelecekteki aşama, çalışan sorgu API'si değil. |
+| AccessAdministration | Uyumluluk kodu; ayrı kullanıcı/talep yetkilerinin yerine geçmez. |
+| SystemDiagnostics | identity/lookup/cache-diagnostics ve güvenli sağlık/tanılama; hedef sunucuda komut çalıştırmaz. |
+| OperationalRecords.View | OR import/stored browse/detay; salt okunur kaynak. |
+| OperationalRecords.CreateJiraPreview | OR jira-preview/jira-review; onay/pozitif politika değildir. |
+| OperationalRecords.CreateJira | OR jira; exact-record politika, sürüm ve dış yazma kapıları ayrıca gerekir. |
+| OperationalRecords.Retry | OR retry; belirsiz sonuç otomatik tekrar anlamına gelmez. |
+| OperationalRecords.ViewDiagnostics | OR tanılama alanları ve ayrıca yetkili In Use ilişki kanıtı. |
+| Access.ManageUsers | access/users liste/detay/disable ve sessions active/revoke. |
+| Access.ApproveRequests | access/requests liste/approve/reject; kullanıcı yönetiminden bağımsız. |
+| Access.AssignRoles | access/users/{id}/roles; kullanıcı sürümüyle tam rol kümesi değişimi. |
+| Access.ViewAudit | Atanmış kod; ayrı erişim audit sorgu endpoint'i bulunmadı. |
+| Reporting.ManagementView | reporting/management summary/operators; in-use overview ayrıca InUse.View ister. |
+
+Ordinary role replacement omits Reason in DTO/client/service/repository. Legacy
+extra JSON reason is ignored, not represented as new human justification. SQL
+commits AccessRolesChanged (old/new roles/capabilities, actor, UTC time, versions,
+Applied outcome, SystemGenerated description) with the mutation. Per-role audit
+and session termination remain. Approval/rejection/disable and historical reasons
+are preserved. SQL audit failure rolls back roles/version.
+
+Remaining: versioned role bundles and impact preview; grant authority/self-edit/
+last-admin guards; definition revocation propagation; bounded SQL search/filter/
+count/paging; late-response/unsaved-edit recovery across the three redesigned
+screens. Current lists still fetch complete inventories, not server-side pages.
+
 Roles are application records, not direct AD-group grants. `Admin` has all implemented capabilities. `Lead` has identity lookup, Operational Record view/create/retry/diagnostics, team view, and diagnostics. `Operator` can view records and create previews. `JiraPublisher` can view/preview/create/retry. `Auditor` can view audit and Operational Record diagnostics. `ReadOnly` can only view Operational Records.
 
 ## Reliability Controls

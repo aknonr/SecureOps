@@ -1,5 +1,15 @@
 # SecureOps API v1 UI Integration Contract
 
+## OCO Sender And Role Assignment, 2026-09-15
+
+PUT access/users/{id}/roles takes roles and expectedVersion, no Reason. Unknown
+legacy reason JSON is ignored. Approval/rejection/disable reasons are unchanged.
+GET announcements adds nullable currentSender from valid persisted actor Mail.
+Draft saves no longer require Announcements.Sender. MIME/new preparations reject
+missing/invalid actor Mail (400 AnnouncementSenderUnavailable) or changed Mail
+(409 AnnouncementSenderChanged); explicit resave is required. HTML/draft work and
+immutable preparation history remain available. No send endpoint is introduced.
+
 ## Current Reporter Contract, 2026-09-12
 
 The preparation gate below was satisfied by operator A/B evidence and connected

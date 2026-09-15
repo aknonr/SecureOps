@@ -2,6 +2,13 @@
 
 ## Planned Announcements UI
 
+2026-09-15 sender/access continuation: API currentSender uses stored Mail and is
+read-only; missing Mail permits drafts but blocks new email artifacts. Ordinary
+role replacement no longer asks for justification; rejection/disable still do.
+User detail groups returned actions, with technical codes secondary. The matrix
+and pending dynamic role/paging work are in docs/23. Real SMTP and full access
+redesign are not complete or packaged by this bounded checkpoint.
+
 Explicit source review now joins the saved editor and immutable preparation history.
 See `docs/contracts/planned-announcement-integration.md` for combined acceptance and limits.
 

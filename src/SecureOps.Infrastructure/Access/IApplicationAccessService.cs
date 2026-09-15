@@ -21,7 +21,7 @@ public interface IApplicationAccessService
     /// <summary>Rejects a pending request.</summary>
     public Task<AccessServiceResult<AccessMutationResult>> RejectAsync(Guid requestId, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken);
     /// <summary>Replaces active roles for an approved user.</summary>
-    public Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken);
+    public Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken);
     /// <summary>Disables user access and active roles.</summary>
     public Task<AccessServiceResult<AccessMutationResult>> DisableAsync(Guid userId, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken);
 }

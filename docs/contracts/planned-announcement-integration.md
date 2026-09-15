@@ -1,5 +1,10 @@
 # OCO local integration
 
+Current continuation: [OCO mail/access status and operator runbook](../24-api-test-deployment-readiness.md#oco-mail-and-access-continuation-2026-09-15).
+The expanded 2026-09-15 request supersedes the historical no-send authorization
+below, but SMTP is not yet implemented. Accepted source/preparation history remains
+preserved; current local evidence is `C:\SecureOpsBuild\validation\oco-mail-access-20260915`.
+
 Inputs: editor `422c940cd642537570f23f1e052dd4e0a01195cb`, source
 `90300f09d37223fe10694b7dc8aa4781943edaff`; both clean at inspection.
 Integration: `feature/planned-oco-integration-closeout`, isolated worktree

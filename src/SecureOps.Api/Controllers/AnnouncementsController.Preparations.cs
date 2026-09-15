@@ -32,7 +32,8 @@ public sealed partial class AnnouncementsController
             "AccessDenied" => 403,
             "AnnouncementNotFound" => 404,
             "AnnouncementConflict" or "AnnouncementPreparationConflict" or "AnnouncementAssetChanged" or "AnnouncementAssetMissing" => 409,
-            "AnnouncementInvalid" or "AnnouncementIncomplete" => 400,
+            "AnnouncementInvalid" or "AnnouncementIncomplete" or "AnnouncementSenderUnavailable" => 400,
+            "AnnouncementSenderChanged" => 409,
             _ => 503
         };
         return new ObjectResult(new ProblemDetails

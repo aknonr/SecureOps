@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -236,7 +237,7 @@ public sealed class SqlAccessRepository : IAccessRepository
     }
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, string reason, CancellationToken cancellationToken)
+    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
@@ -264,8 +265,30 @@ public sealed class SqlAccessRepository : IAccessRepository
         string[] next = NormalizeRoles(roles);
         await ReplaceRolesWithinTransactionAsync(connection, transaction, userId, next, actor, cancellationToken);
         await connection.ExecuteAsync(Command("UPDATE security.Users SET AccessVersion = AccessVersion + 1 WHERE UserId = @UserId;", new { UserId = userId }, transaction, cancellationToken));
+        await connection.ExecuteAsync(Command("""
+            INSERT INTO audit.AuditLog(OccurredAt,Actor,Action,CorrelationId,DetailsJson)
+            VALUES(SYSUTCDATETIME(),@actor,'AccessRolesChanged',@correlation,@details);
+            """, new
+        {
+            actor,
+            correlation = $"access-role-version:{userId:D}:{expectedVersion + 1}",
+            details = JsonSerializer.Serialize(new
+            {
+                targetUserId = userId,
+                oldRoles = previous,
+                newRoles = next,
+                oldCapabilities = AccessRoleCatalog.GetCapabilities(previous),
+                newCapabilities = AccessRoleCatalog.GetCapabilities(next),
+                previousVersion = expectedVersion,
+                version = expectedVersion + 1,
+                descriptionSource = "SystemGenerated",
+                description = "Ordinary role assignment.",
+                outcome = "Applied"
+            })
+        }, transaction, cancellationToken));
         await transaction.CommitAsync(cancellationToken);
-        return Applied((await GetUserAsync(userId, cancellationToken))!, null, previous, next);
+        // Do not let a later writer's state replace this operation's result/audit snapshot.
+        return Applied(current with { Version = expectedVersion + 1, Roles = next, Capabilities = AccessRoleCatalog.GetCapabilities(next) }, null, previous, next);
     }
 
     /// <inheritdoc />

@@ -7,7 +7,7 @@ public sealed class AnnouncementOptions
     public bool Enabled { get; set; }
     /// <summary>UI default for newly entered manual times only; never source timezone evidence.</summary>
     public string DefaultDisplayOffset { get; set; } = "+00:00";
-    /// <summary>Approved server-owned bare sender address.</summary>
+    /// <summary>Legacy configuration retained for compatibility; new revisions use the actor's persisted Mail.</summary>
     public string Sender { get; set; } = "";
     /// <summary>Private read-only directory outside application payloads.</summary>
     public string AssetDirectory { get; set; } = "";

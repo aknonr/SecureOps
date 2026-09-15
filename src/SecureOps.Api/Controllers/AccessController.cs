@@ -152,7 +152,7 @@ public sealed class AccessController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<CurrentAccessResponse>> ReplaceRolesAsync(Guid id, [FromBody] AssignRolesRequest request, CancellationToken cancellationToken)
     {
-        AccessServiceResult<AccessMutationResult> result = await _accessService.ReplaceRolesAsync(id, request.Roles, request.Reason, request.ExpectedVersion, Context(), cancellationToken);
+        AccessServiceResult<AccessMutationResult> result = await _accessService.ReplaceRolesAsync(id, request.Roles, request.ExpectedVersion, Context(), cancellationToken);
         if (!result.IsSuccess)
         {
             return Failure<CurrentAccessResponse>(result.ErrorCode!);

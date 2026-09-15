@@ -84,6 +84,7 @@ public sealed partial class AnnouncementTests
         using HttpClient admin = factory.CreateClient(), denied = factory.CreateClient(), anonymous = factory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
         denied.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "team-lead");
+        await SeedSenderAsync(admin, connection);
         await using var sql = new SqlConnection(connection);
         string draft = "/api/v1/announcements/" + Guid.NewGuid(), root = "/api/v1/announcements/preparations";
         (await admin.PutAsJsonAsync(draft, FinalContent())).EnsureSuccessStatusCode();
@@ -107,6 +108,7 @@ public sealed partial class AnnouncementTests
         PreparedAnnouncement first = (await concurrent[0].Content.ReadFromJsonAsync<PreparedAnnouncement>())!;
         (await concurrent[1].Content.ReadFromJsonAsync<PreparedAnnouncement>())!.Fingerprint.Should().Be(first.Fingerprint);
         first.State.Should().Be("Prepared");
+        first.Draft.Sender.Should().Be("actor@example.invalid");
         (await sql.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM audit.AuditLog WHERE Action='AnnouncementDownloadPrepared'")).Should().Be(downloads);
         first.ArtifactType.Should().Be("FinalAnnouncement");
         first.AssetRevisions.Keys.Should().BeEquivalentTo(_roles);
@@ -148,6 +150,7 @@ public sealed partial class AnnouncementTests
         finally { await sql.ExecuteAsync($"DROP TRIGGER audit.[{trigger}];"); }
         (await sql.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM announcements.Preparations")).Should().Be(2);
         await FluentActions.Awaiting(() => sql.ExecuteAsync("UPDATE announcements.Preparations SET Subject='changed';")).Should().ThrowAsync<SqlException>();
+        await SenderChangesAsync(admin, sql, draftId, path, first);
         File.Move(Path.Combine(assets, "banner.bin"), Path.Combine(assets, "retained.bin"));
         PreparedAnnouncement historical = (await admin.GetFromJsonAsync<PreparedAnnouncement>(path))!;
         historical.Email.Should().Equal(first.Email);
@@ -155,6 +158,48 @@ public sealed partial class AnnouncementTests
         historical.Draft.Version.Should().Be(1);
         (await denied.GetAsync(path)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await admin.PutAsync(root + "/" + Guid.NewGuid() + $"?draftId={draftId}&version=2", null)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+    private static async Task SeedSenderAsync(HttpClient admin, string connection)
+    {
+        var guard = new SqlConnectionStringBuilder(connection);
+        guard.DataSource.Should().Be("(localdb)\\SecureOpsResourcesV1");
+        guard.InitialCatalog.Should().StartWith("SecureOps_ResourcesV1_Oco");
+        Guid owner = (await admin.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/v1/access/me")).GetProperty("userId").GetGuid();
+        await using var sql = new SqlConnection(connection);
+        await sql.ExecuteAsync("UPDATE security.Users SET Mail='actor@example.invalid' WHERE UserId=@owner", new { owner });
+    }
+
+    private static async Task SenderChangesAsync(HttpClient admin, SqlConnection sql, Guid draftId, string historicalPath, PreparedAnnouncement first)
+    {
+        string draft = "/api/v1/announcements/" + draftId;
+        async Task SetMail(string? mail) => await sql.ExecuteAsync("UPDATE security.Users SET Mail=@mail WHERE UserId=@owner", new { mail, owner = first.Draft.OwnerId });
+        await SetMail("changed@example.invalid");
+        AnnouncementPage? page = await admin.GetFromJsonAsync<AnnouncementPage>("/api/v1/announcements");
+        page!.CurrentSender.Should().Be("changed@example.invalid");
+        using HttpResponseMessage changed = await admin.GetAsync(draft + "?version=2&format=eml");
+        changed.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await changed.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("code").GetString().Should().Be("AnnouncementSenderChanged");
+        (await admin.PutAsJsonAsync(draft + "?version=2", FinalContent())).EnsureSuccessStatusCode();
+        string preparedPath = "/api/v1/announcements/preparations/" + Guid.NewGuid();
+        (await admin.PutAsync(preparedPath + $"?draftId={draftId}&version=3", null)).EnsureSuccessStatusCode();
+        PreparedAnnouncement latest = (await admin.GetFromJsonAsync<PreparedAnnouncement>(preparedPath))!;
+        latest.Draft.Sender.Should().Be("changed@example.invalid");
+        using var message = MimeMessage.Load(new MemoryStream(latest.Email));
+        message.From.Mailboxes.Single().Address.Should().Be("changed@example.invalid");
+        foreach (string? mail in new[] { null, "bad", "x@example.invalid\r\nBcc:y@example.invalid" })
+        {
+            await SetMail(mail);
+            string missingDraft = "/api/v1/announcements/" + Guid.NewGuid();
+            (await admin.PutAsJsonAsync(missingDraft, FinalContent())).EnsureSuccessStatusCode();
+            (await admin.GetAsync(missingDraft + "?version=1&format=html")).EnsureSuccessStatusCode();
+            using HttpResponseMessage failed = await admin.GetAsync(missingDraft + "?version=1&format=eml");
+            failed.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await failed.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("code").GetString().Should().Be("AnnouncementSenderUnavailable");
+            PreparedAnnouncement historical = (await admin.GetFromJsonAsync<PreparedAnnouncement>(historicalPath))!;
+            historical.Email.Should().Equal(first.Email);
+            historical.Fingerprint.Should().Be(first.Fingerprint);
+        }
+        await SetMail("actor@example.invalid");
     }
     [Theory]
     [InlineData("LocalCapture")]

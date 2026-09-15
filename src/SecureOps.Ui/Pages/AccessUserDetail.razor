@@ -236,7 +236,7 @@
                     </span>
                 }
 
-                <h3 class="so-subhead">Geçerli yetkiler (@_user.Capabilities.Count)</h3>
+                <h3 class="so-subhead">Bu kullanıcı neler yapabilir? (@_user.Capabilities.Count)</h3>
                 @* Backend-derived. Never computed from the role names above. *@
                 @if (_user.Capabilities.Count == 0)
                 {
@@ -244,14 +244,14 @@
                 }
                 else
                 {
-                    <span class="so-chip-row">
-                        @foreach (string capability in _user.Capabilities)
-                        {
-                            <span class="so-chip so-chip--quiet" title="@capability">
-                                @AccessLabels.Describe(capability).Label
-                            </span>
-                        }
-                    </span>
+                    @foreach (var group in AccessLabels.Group(_user.Capabilities))
+                    {
+                        <details>
+                            <summary>@group.Key (@group.Count())</summary>
+                            <dl>@foreach (var capability in group)
+                                { <dt>@capability.Label</dt><dd>@capability.Description <details><summary>Teknik kod</summary><code>@capability.Capability</code></details></dd> }</dl>
+                        </details>
+                    }
                 }
 
                 <div class="so-panel-actions so-panel-actions--wrap">
@@ -419,7 +419,7 @@
         async confirmed =>
         {
             await AccessAdmin.ReplaceRolesAsync(
-                UserId, confirmed.Roles, confirmed.Reason, _user!.Version, CancellationToken.None);
+                UserId, confirmed.Roles, _user!.Version, CancellationToken.None);
 
             return "Roller güncellendi";
         });

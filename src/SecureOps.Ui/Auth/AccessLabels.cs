@@ -75,6 +75,7 @@ public static class AccessLabels
         [Roles.JiraPublisher] = "Jira İşlem Yetkilisi",
         [Roles.Auditor] = "Denetim Görüntüleyicisi",
         [Roles.ReadOnly] = "Sadece Görüntüleme",
+        ["ResourceCurator"] = "Bağlantı Yöneticisi",
         ["InUseReviewer"] = "In Use İnceleyicisi",
         ["InUseCoordinator"] = "In Use Koordinatörü"
     };
@@ -86,13 +87,17 @@ public static class AccessLabels
         [Roles.Operator] = "Ekip ve operasyonel kayıtları görüntüler; Jira önizlemesi hazırlar ancak Jira kaydı oluşturamaz.",
         [Roles.JiraPublisher] = "Operasyonel kayıtları görüntüler, Jira önizlemesi hazırlar, Jira kaydı oluşturur ve başarısız aktarımı yeniden dener.",
         [Roles.Auditor] = "Denetim, yönetim raporları ve operasyonel tanılama bilgilerini salt okunur olarak görüntüler.",
-        [Roles.ReadOnly] = "Yalnızca operasyonel kayıtları görüntüler.",
-        ["InUseReviewer"] = "Atandığı In Use kayıtlarını yerel olarak inceler ve Excel taslağı hazırlar; kaynak sistemde yazma yetkisi vermez.",
+        [Roles.ReadOnly] = "Operasyonel kayıtları ve uygulama bağlantılarını görüntüler; kişisel bağlantı gruplarını düzenler.",
+        ["ResourceCurator"] = "Paylaşılan uygulama bağlantılarını ve kategorilerini yönetir; hedef uygulamalarda yetki vermez.",
+        ["InUseReviewer"] = "In Use kayıtlarını yerel olarak inceler ve Excel raporu hazırlar; inceleyici ataması zorunlu değildir, kaynak sistemde yazma yetkisi vermez.",
         ["InUseCoordinator"] = "In Use salt okunur keşfi, yerel atama, inceleme ve Excel hazırlığı; kaynak sistemde yazma yetkisi vermez."
     };
 
     private static readonly Dictionary<string, CapabilityDescriptor> _capabilities = new(StringComparer.Ordinal)
     {
+        [Capabilities.AnnouncementDrafts] = new(Capabilities.AnnouncementDrafts, "Planlı duyurular", "Duyuru hazırlama", "Kendi kaynak önerilerini inceler, taslak ve değişmez hazırlık oluşturur; mail göndermez."),
+        [Capabilities.ResourcesView] = new(Capabilities.ResourcesView, "Uygulama bağlantıları", "Bağlantıları kullanma", "Bağlantıları görüntüler; kendi favorilerini ve gruplarını düzenler."),
+        [Capabilities.ResourcesManage] = new(Capabilities.ResourcesManage, "Uygulama bağlantıları", "Bağlantı kataloğunu yönetme", "Paylaşılan bağlantıları ve kategorileri düzenler."),
         [Capabilities.InUseView] = new(Capabilities.InUseView, "In Use", "Kayıtları görüntüleme", "Kayıtlı In Use verisini okur."),
         [Capabilities.InUseReview] = new(Capabilities.InUseReview, "In Use", "Yerel inceleme", "Yerel inceleme taslağı ve Excel hazırlığı."),
         [Capabilities.InUseAssign] = new(Capabilities.InUseAssign, "In Use", "İnceleyici atama", "Onaylı uygulama kimliğine yerel atama."),

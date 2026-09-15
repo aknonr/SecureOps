@@ -57,7 +57,7 @@ public sealed partial class AnnouncementService(SqlAnnouncementStore store, Anno
                 { return new(Error: "AnnouncementInvalid", Fields: ["Page", "PageSize"]); }
                 AnnouncementPage found = await store.ListAsync(owner, page, pageSize, token);
                 await store.DiscoveryAuditAsync(owner, false, found.Items.Count, context.CorrelationId, token);
-                return new(Page: found);
+                return new(Page: found with { CurrentSender = AnnouncementValidation.Address(current.Value.User.Mail) ? current.Value.User.Mail : null });
             }
             if (format is "banners" or "bundles")
             {
@@ -74,12 +74,11 @@ public sealed partial class AnnouncementService(SqlAnnouncementStore store, Anno
                 string[] errors = AnnouncementValidation.Errors(input, false);
                 if (errors.Length != 0)
                 { return new(Error: "AnnouncementInvalid", Fields: errors); }
-                if (!AnnouncementValidation.Address(options.Value.Sender))
-                { return new(Error: "AnnouncementConfigurationUnavailable"); }
                 AnnouncementPresentation presentation = await renderer.PresentationAsync(input, token);
                 string[] to = [.. input.To.Distinct(StringComparer.OrdinalIgnoreCase)];
                 input = input with { To = to, Cc = [.. input.Cc.Except(to, StringComparer.OrdinalIgnoreCase).Distinct(StringComparer.OrdinalIgnoreCase)] };
-                var next = new AnnouncementDraft(id, owner, version + 1, DateTimeOffset.UtcNow, input, options.Value.Sender,
+                string sender = AnnouncementValidation.Address(current.Value.User.Mail) ? current.Value.User.Mail! : "";
+                var next = new AnnouncementDraft(id, owner, version + 1, DateTimeOffset.UtcNow, input, sender,
                     presentation.Hash, TemplateRevision: input.TemplateRevision);
                 string? error = reviewedSave is null ? await store.SaveAsync(next, context.CorrelationId, token)
                     : await reviewedSave(next, token);
@@ -106,6 +105,10 @@ public sealed partial class AnnouncementService(SqlAnnouncementStore store, Anno
                 await store.ReadAuditAsync(draft, false, context.CorrelationId, token);
                 return new(draft, AnnouncementRenderer.RenderPresentation(draft, asset, true).Html);
             }
+            if (!AnnouncementValidation.Address(current.Value.User.Mail))
+            { return new(Error: "AnnouncementSenderUnavailable"); }
+            if (!string.Equals(draft.Sender, current.Value.User.Mail, StringComparison.Ordinal))
+            { return new(Error: "AnnouncementSenderChanged"); }
             byte[] email = await AnnouncementRenderer.EmailAsync(draft, asset, token);
             if (format != "prepare")
             { await store.ReadAuditAsync(draft, true, context.CorrelationId, token); }

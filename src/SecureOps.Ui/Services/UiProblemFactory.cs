@@ -140,6 +140,11 @@ public static class UiProblemFactory
 
     private static UiProblem FromCode(string code, int statusCode) => code switch
     {
+        "AnnouncementSenderUnavailable" => Build(UiProblemKind.Validation, code,
+            "Profil e-postası gerekli", "Taslağınız korunuyor. Kayıtlı e-postanız eksik veya geçersiz.",
+            ["Taslağı kaydedin; kurumsal oturumu yeniden açarak profilinizi güncelleyin. Sorun sürerse yöneticinize bildirin."], false, false),
+        "AnnouncementSenderChanged" => Build(UiProblemKind.Conflict, code,
+            "Gönderen değişti", "Eski hazırlıklar korunuyor. Güncel profil e-postanızla devam etmek için taslağı yeniden kaydedip yeni hazırlık oluşturun.", [], false, true),
         "AnnouncementInvalid" or "AnnouncementIncomplete" => Build(UiProblemKind.Validation, code,
             "Duyuru alanlarını kontrol edin", "Eksik veya geçersiz alanları düzeltin. Düzenlemeleriniz korunuyor.", [], false, false),
         "AnnouncementConflict" => Build(UiProblemKind.Conflict, code,

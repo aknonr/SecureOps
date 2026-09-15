@@ -25,6 +25,15 @@ Source refresh may update bounded source data but cannot reapply classification 
 
 ## Consequences
 
+Ordinary role replacement no longer requests human justification (2026-09-15).
+The request carries roles and expectedVersion only. Audit identifies a system
+description separately and records old/new role and effective capability sets;
+existing decision reasons are preserved. Approval/rejection/disable rules remain.
+SQL also commits AccessRolesChanged evidence in the role mutation transaction;
+failure rolls back assignment/version. Existing per-role service audit remains.
+Dynamic role bundles and administrator lockout protections are separate pending
+work in this expanded task; existing role IDs and grants are not rewritten.
+
 - AD group claims no longer grant application capabilities directly.
 - Authentication-provider activation remains deployment-owned and separate from authorization.
 - OIDC readiness is disabled by default and requires an approved issuer/client/token/logout contract before activation.

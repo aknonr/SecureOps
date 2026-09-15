@@ -219,15 +219,16 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         DecideAsync(requestId, AccessRequestStatus.Rejected, [], reason, expectedVersion, context, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken)
+    public async Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken)
     {
-        if (!ValidReason(reason) || !ValidRoles(roles, requireAtLeastOne: true) || expectedVersion <= 0)
+        if (!ValidRoles(roles, requireAtLeastOne: true) || expectedVersion <= 0)
         {
             return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AccessValidationFailed);
         }
 
-        AccessMutationResult mutation = await _repository.ReplaceRolesAsync(userId, NormalizeRoles(roles), expectedVersion, context.Actor, reason.Trim(), cancellationToken);
-        return await MapMutationAsync(mutation, null, context, reason.Trim(), cancellationToken);
+        const string description = "System-generated: ordinary role assignment.";
+        AccessMutationResult mutation = await _repository.ReplaceRolesAsync(userId, NormalizeRoles(roles), expectedVersion, context.Actor, cancellationToken);
+        return await MapMutationAsync(mutation, null, context, description, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -295,7 +296,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
 
         foreach (string role in mutation.AddedRoles)
         {
-            if (!await TryAuditAsync(AuditActions.RoleAssigned, context, mutation.User!.Id, mutation.Request?.Id, role, reason, cancellationToken))
+            if (!await TryAuditAsync(AuditActions.RoleAssigned, context, mutation.User!.Id, mutation.Request?.Id, role, reason, cancellationToken, mutation, action is null))
             {
                 return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AuditStoreUnavailable);
             }
@@ -303,7 +304,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
 
         foreach (string role in mutation.RemovedRoles)
         {
-            if (!await TryAuditAsync(AuditActions.RoleRemoved, context, mutation.User!.Id, mutation.Request?.Id, role, reason, cancellationToken))
+            if (!await TryAuditAsync(AuditActions.RoleRemoved, context, mutation.User!.Id, mutation.Request?.Id, role, reason, cancellationToken, mutation, action is null))
             {
                 return AccessServiceResult<AccessMutationResult>.Fail(OperationalErrorCodes.AuditStoreUnavailable);
             }
@@ -315,7 +316,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
     private Task<bool> AuditMutationAsync(string action, AccessMutationResult mutation, AccessOperationContext context, string reason, CancellationToken cancellationToken) =>
         TryAuditAsync(action, context, mutation.User?.Id, mutation.Request?.Id, null, reason, cancellationToken);
 
-    private async Task<bool> TryAuditAsync(string action, AccessOperationContext context, Guid? userId, Guid? requestId, string? role, string? reason, CancellationToken cancellationToken)
+    private async Task<bool> TryAuditAsync(string action, AccessOperationContext context, Guid? userId, Guid? requestId, string? role, string? reason, CancellationToken cancellationToken, AccessMutationResult? mutation = null, bool systemDescription = false)
     {
         try
         {
@@ -325,7 +326,21 @@ public sealed class ApplicationAccessService : IApplicationAccessService
                 Action = action,
                 CorrelationId = context.CorrelationId,
                 SourceIp = context.SourceIp,
-                Details = new { targetUserId = userId, accessRequestId = requestId, role, reason }
+                Details = new
+                {
+                    targetUserId = userId,
+                    accessRequestId = requestId,
+                    role,
+                    reason = systemDescription ? null : reason,
+                    descriptionSource = systemDescription ? "SystemGenerated" : mutation is null ? null : "Operator",
+                    description = systemDescription ? reason : null,
+                    oldRoles = mutation?.User?.Roles.Except(mutation.AddedRoles).Concat(mutation.RemovedRoles).Order().ToArray(),
+                    newRoles = mutation?.User?.Roles,
+                    oldCapabilities = mutation is null ? null : AccessRoleCatalog.GetCapabilities(mutation.User!.Roles.Except(mutation.AddedRoles).Concat(mutation.RemovedRoles)),
+                    newCapabilities = mutation?.User?.Capabilities,
+                    version = mutation?.User?.Version,
+                    outcome = mutation is null ? null : "Applied"
+                }
             }, cancellationToken);
             return true;
         }

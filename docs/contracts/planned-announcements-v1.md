@@ -1,5 +1,35 @@
 # Planned announcements: implemented API and UI
 
+## Mail And Access Continuation, 2026-09-15
+
+The owner now authorizes real self-test/send and dynamic access management.
+Implementation is NOT complete. The bounded correction uses trusted persisted
+actor Mail for new saved revisions; legacy Announcements.Sender is ignored.
+GET list adds currentSender (valid persisted Mail or null), displayed read-only.
+Draft/HTML work remains available without valid Mail. MIME/new preparation returns
+400 AnnouncementSenderUnavailable, or 409 AnnouncementSenderChanged when current
+Mail differs from the saved revision. Explicit resave/new preparation is required;
+historical downloads never re-render or resolve new Mail/assets/recipients.
+No client From, username inference, shared-account fallback or SMTP activation.
+Existing editable To/Cc, overlap normalization and reviewed source apply remain.
+
+All six supplied images were acquired without credentials/redirects; originals
+and hashes are private in task evidence source-assets/manifest.json. The main
+.jpg is actually PNG, 924x530, 554652 bytes, exceeding the current 262144-byte
+bound. Header: JPEG 1600x472, 54212 bytes; logo: JPEG 482x96, 16240 bytes;
+social PNGs: 61x47, 593/860/540 bytes. No artwork or runtime limit was changed.
+Approved bounded main artwork/asset handling remains required. MIME tests alone
+cannot establish corporate Outlook appearance.
+
+No SMTP options/transport exists in current application code; MimeKit renders.
+The unregistered dispatch boundary is not an outbox or real send implementation.
+Remaining: persisted actor/preparation-bound intent, dedicated authorization,
+reviewed confirmation/self-only envelope, SMTP options/transport/validation,
+durable unknown/partial results without auto-retry, Worker revalidation, local
+sink/restart acceptance and a fresh matched delivery. Inventory ends at 018;
+019 was free at inspection, not assigned/applied. Corporate relay identity,
+envelope/From permissions and final audience policy require private evidence.
+
 Current combined workflow and acceptance: [integration handoff](planned-announcement-integration.md).
 Preparation optionally freezes `sourceReview` (the existing accepted override record);
 null is omitted so legacy preparation fingerprints retain their original representation.

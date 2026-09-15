@@ -153,7 +153,7 @@ public sealed class InMemoryAccessRepository : IAccessRepository
     }
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, string reason, CancellationToken cancellationToken)
+    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try

@@ -36,6 +36,7 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
         }, TimeSpan.FromSeconds(40));
         Guid owner = (await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/me")).GetProperty("userId").GetGuid();
         Guid other = (await lead.GetFromJsonAsync<JsonElement>("/api/v1/access/me")).GetProperty("userId").GetGuid();
+        await hosts.Database.ExecuteAsync("UPDATE security.Users SET Mail='actor@example.invalid' WHERE UserId=@owner", new { owner });
         var id = Guid.NewGuid();
         string path = "/api/v1/announcements/" + id;
         AnnouncementContent content = SourceTestDatabase.Content() with

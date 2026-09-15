@@ -34,8 +34,8 @@ public sealed partial class AnnouncementService
                 AnnouncementOutcome saved = await ExecuteAsync(principal, context, draftId.Value, version, "prepare", null, 1, 25, token);
                 if (saved.Error is not null)
                 { return new(Error: saved.Error, Fields: saved.Fields); }
-                if (saved.Draft!.Sender != options.Value.Sender)
-                { return new(Error: "AnnouncementConflict"); }
+                if (saved.Draft!.Sender != owner.Mail)
+                { return new(Error: "AnnouncementSenderChanged"); }
                 string label = new[] { owner.DisplayName, owner.LoginName }.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s)) ?? "WASAS kullanıcısı";
                 Dictionary<string, string> revisions = saved.Draft.TemplateRevision == "oco-v1"
                     ? new() { ["banner"] = saved.Draft.Content.BannerRevision } : new(options.Value.Bundles[saved.Draft.Content.BannerRevision].Assets);

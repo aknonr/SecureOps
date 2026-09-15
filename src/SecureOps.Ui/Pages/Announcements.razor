@@ -62,6 +62,7 @@
     }
     @if (_allowed && _form is not null)
     {
+        <dl><dt>Profil e-postası / yeni hazırlığın göndereni</dt><dd>@(_page?.CurrentSender ?? "Kayıtlı e-posta eksik veya geçersiz; taslak kaydedilebilir.")</dd></dl>
         <MudButton StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="@(() => _sourceOpen = !_sourceOpen)">Kaynak incelemesi</MudButton>
         @if (_sourceOpen)
         {

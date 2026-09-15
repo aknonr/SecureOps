@@ -110,6 +110,7 @@ public sealed partial class AnnouncementTests(ITestOutputHelper output)
         using HttpClient admin = factory.CreateClient(), denied = factory.CreateClient(), anonymous = factory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
         denied.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "team-lead");
+        await SeedSenderAsync(admin, connection);
         Shared.Contracts.Resources.ResourcePreferencesResponse? preferences = await admin.GetFromJsonAsync<SecureOps.Shared.Contracts.Resources.ResourcePreferencesResponse>("/api/v1/resources/me");
         (await admin.PutAsJsonAsync("/api/v1/resources/me/guide", new { expectedVersion = preferences!.Version, guide = "announcements" })).EnsureSuccessStatusCode();
         Shared.Contracts.Resources.ResourcePreferencesResponse? persistedPreferences = await admin.GetFromJsonAsync<SecureOps.Shared.Contracts.Resources.ResourcePreferencesResponse>("/api/v1/resources/me");
@@ -136,6 +137,7 @@ public sealed partial class AnnouncementTests(ITestOutputHelper output)
         download.Content.Headers.ContentDisposition!.FileNameStar.Should().EndWith("-v1.eml");
         using MimeMessage message = await MimeMessage.LoadAsync(await download.Content.ReadAsStreamAsync());
         message.Subject.Should().Be(Content().Subject);
+        message.From.Mailboxes.Single().Address.Should().Be("actor@example.invalid");
         message.HtmlBody.Should().Contain("cid:banner");
         message.TextBody.Should().Contain(Content().Description);
         MimePart image = message.BodyParts.OfType<MimePart>().Single(p => p.ContentId == "banner");

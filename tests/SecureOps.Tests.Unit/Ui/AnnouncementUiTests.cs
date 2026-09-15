@@ -8,6 +8,15 @@ namespace SecureOps.Tests.Unit.Ui;
 
 public sealed class AnnouncementUiTests
 {
+    [Theory]
+    [InlineData("AnnouncementSenderUnavailable", 400, UiProblemKind.Validation)]
+    [InlineData("AnnouncementSenderChanged", 409, UiProblemKind.Conflict)]
+    public void Sender_ProblemsPreserveDraftAndNeverAutomaticallyRetry(string code, int status, UiProblemKind kind)
+    {
+        UiProblem problem = UiProblemFactory.FromResponse(status, new() { Code = code });
+        problem.Kind.Should().Be(kind);
+        problem.Retryable.Should().BeFalse();
+    }
     private static AnnouncementContent Content() => new("OCO-SYNTHETIC", "Kapsam", "Şule & Işık", "2026-09-12",
         "2026-09-13T01:00+03:00", "2026-09-13T02:00+03:00", "&lt;b&gt; <script>test</script>", "Etki", "Kontrol", "",
         ["reader@example.invalid"], [], "synthetic-v1");

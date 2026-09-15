@@ -166,7 +166,11 @@ public partial class Announcements
         await Js.InvokeVoidAsync("secureOpsDownload", _lifetime.Token, file.Name, "message/rfc822", Convert.ToBase64String(file.Bytes));
         _notice = "Mail dosyası indirildi; gönderim yapılmadı.";
     });
-    private Task CompareAsync() => RunAsync(async () => _comparison = await Api.DraftAsync(_id, 0, null, _lifetime.Token));
+    private Task CompareAsync() => RunAsync(async () =>
+    {
+        _comparison = await Api.DraftAsync(_id, 0, null, _lifetime.Token);
+        _page = await Api.ListAsync(_page?.Page ?? 1, _lifetime.Token);
+    });
     private Guid? _preparationKey;
     private Task PrepareAsync() => RunAsync(async () =>
     {

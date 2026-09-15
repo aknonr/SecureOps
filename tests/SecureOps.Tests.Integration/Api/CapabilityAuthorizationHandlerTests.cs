@@ -158,20 +158,26 @@ public sealed class CapabilityAuthorizationHandlerTests
         AccessServiceResult<AccessMutationResult> first = await fixture.Service.ReplaceRolesAsync(
             user.Id,
             ["Lead", "Operator"],
-            "Updated for deterministic role testing.",
             user.Version,
             Fixture.AdminContext,
             CancellationToken.None);
         AccessServiceResult<AccessMutationResult> second = await fixture.Service.ReplaceRolesAsync(
             user.Id,
             ["operator", "lead", "Lead"],
-            "Repeated deterministic role update.",
             first.Value!.User!.Version,
             Fixture.AdminContext,
             CancellationToken.None);
 
         first.IsSuccess.Should().BeTrue();
         second.IsSuccess.Should().BeTrue();
+        AuditEvent audit = fixture.Audit.Events.Last(e => e.Action == AuditActions.RoleAssigned);
+        System.Text.Json.JsonElement details = System.Text.Json.JsonSerializer.SerializeToElement(audit.Details);
+        details.GetProperty("reason").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Null);
+        details.GetProperty("descriptionSource").GetString().Should().Be("SystemGenerated");
+        details.GetProperty("oldRoles").EnumerateArray().Select(v => v.GetString()).Should().Equal("Operator");
+        details.GetProperty("newRoles").EnumerateArray().Select(v => v.GetString()).Should().BeEquivalentTo("Lead", "Operator");
+        details.GetProperty("newCapabilities").EnumerateArray().Select(v => v.GetString()).Should().Contain(Capabilities.IdentityLookup);
+        details.GetProperty("version").GetInt64().Should().Be(first.Value!.User!.Version);
         second.Value!.AddedRoles.Should().BeEmpty();
         second.Value.RemovedRoles.Should().BeEmpty();
         second.Value.User!.Roles.Should().BeEquivalentTo("Lead", "Operator");

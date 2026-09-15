@@ -1,5 +1,151 @@
 # API TEST Deployment Readiness
 
+## OCO Mail And Access Continuation, 2026-09-15
+
+Current task baseline: `4a1700a6c0e346edf2c47a24fe6402538678db1d`, existing
+`feature/combined-test-delivery-20260915` worktree. The expanded request authorizes
+mail implementation and access redesign, but does not extend the prior one-time
+1000-line exception. This section supersedes older preparation-only authorization,
+not historical package evidence. rc6.19 still identifies build `2fe9d724`; it does
+not contain this continuation. No new release or server change is claimed here.
+
+The reviewable subset resolves new draft sender from the authenticated user's
+persisted Mail, exposes it read-only, preserves work without valid Mail, and blocks
+new MIME/preparation until profile refresh and explicit resave. Historical prepared
+bytes remain unchanged. Ordinary role replacement no longer accepts a reason at
+DTO/service/repository/UI boundaries. SQL records actor, old/new roles/capabilities,
+version and system-generated description transactionally; audit failure rolls back.
+Rejection/disable reasons remain. The actual nine-role/action matrix is in
+[the access contract](23-platform-access-concurrency-and-release-safety.md).
+
+### Sunucuda Kalan Worker Adimlari
+
+1. Operator API/UI gecisini ve 001-018 uygulamasini bildirdi; bunlari yeniden
+   calistirmayin. API yolu `D:\Applications\api\wasasyonetimapi.thy.com`, Worker
+   yolu `D:\secureops_worker`. Kurulu API/UI hashleri ve Worker heartbeat bu yerel
+   calismada sunucudan bagimsiz dogrulanmadi. Onceki Worker DLL dogrulamasi rc6.19
+   icindi; sonraki paketle ayni kabul edilmez.
+2. DBA, mevcut onayli DB baglaminda asagidaki salt-okunur kontrolu yapar. Schema
+   9 zaten mevcutsa install.sql tekrarlanmaz. Eksikse yalniz arsivdeki
+   DBA arsivindeki `hangfire/install.sql` (Hangfire.SqlServer 1.8.6) hedef adiyla
+   karsilastirilir; mevcut onayli prosedur ve yedekle DBA uygular. `[HangFire]`
+   uygulamaya ozel olmalidir; baska uygulamanin kuyrugu kullanilmaz.
+
+```sql
+SELECT DB_NAME() AS CurrentDatabase, ORIGINAL_LOGIN() AS LoginIdentity;
+SELECT [Version] FROM [HangFire].[Schema];
+SELECT [Id], LastHeartbeat FROM [HangFire].[Server];
+SELECT Queue, COUNT_BIG(*) AS Jobs FROM [HangFire].[JobQueue] GROUP BY Queue;
+SELECT TOP (10) JobId, State, AttemptCount, HangfireJobId, UpdatedAt
+FROM announcements.SourceJobs ORDER BY UpdatedAt DESC, JobId;
+```
+
+3. DBA kimligi ile runtime kimligi ayridir. Runtime yalniz ayrilmis Hangfire
+   schema'sinda SELECT/INSERT/UPDATE/DELETE; `SourceJobs`/`SourceOverrides` icin
+   SELECT/INSERT/UPDATE, `announcements.Preparations` icin SELECT/INSERT kullanir.
+   `audit.AuditLog` INSERT ve mevcut diger 001-018 izinleri korunur. DDL/db_owner
+   verilmez. Eksik izin sadece ilgili nesne ve onayli runtime principal icin DBA
+   tarafindan tamamlanir; tum schema'lara DELETE verilmez.
+4. Eslesen Worker arsivinin manifest/hash kontrolunden sonra server-owned
+   `D:\secureops_worker\appsettings.Test.json` korunarak hazirlanir. Konsol IIS
+   web.config veya AppPool kimligini devralmaz. Mevcut onayli SQL/secret degerleri
+   ozel konfigurasyonda kalir; web.config'in tamami kopyalanmaz. Gercek anahtarlar:
+   `ConnectionStrings:SecureOpsDb`, `Hangfire:Enabled`, `Hangfire:SchemaName`,
+   `Hangfire:Queue`, `Hangfire:PrepareSchema=false`, `AnnouncementSource:Enabled`,
+   `AnnouncementSource:CollectionProvider`, `AnnouncementSource:ServiceProvider`,
+   `AnnouncementSource:Profiles:{profile}:CollectionId`. API ile DB/schema/queue
+   ve onayli kaynak profilleri eslesir; tum profil alanlari mevcut kaynak
+   sozlesmesine gore doldurulur. Fixture/Demo/Mock/LocalDB sunucuya tasinmaz.
+5. Operatorde zaten kayitli runtime hesabinin GERCEK yerel oturumuyla calistirin;
+   `whoami` sonucu ve SQL ORIGINAL_LOGIN ayrica kontrol edilir. `runas /netonly`
+   yerel kimligi/DPAPI erisimini degistirmez. Hesaba config/asset okuma ve kendi
+   log/ring dizininde gerekli dar ACL verilir; API/UI kalici ringleri ayridir.
+
+```powershell
+whoami
+Set-Location -LiteralPath 'D:\secureops_worker'
+$env:DOTNET_ENVIRONMENT = 'Test'
+dotnet .\SecureOps.Worker.dll
+```
+
+6. .NET 8 runtime gerekir. `SecureOps job server started` ve yeni SQL heartbeat
+   birlikte gorulmelidir; acik konsol tek basina kanit degildir. UI'den tek OCO
+   kaynak isi baslatin, ayni queue/job ve terminal SourceJobs sonucunu dogrulayin;
+   oneriyi acikca inceleyip uygulayin. Ctrl+C ile `job server stopped` beklenir;
+   ayni kimlik/dizin/config ile tekrar baslatilir. Konsol oturumu acik tutulur;
+   Windows Service, scheduler veya gozetimsiz calisma saglanmaz. Kaynak isi
+   basarisi SMTP veya gelen kutusu teslim kaniti degildir.
+
+### Exact Remaining Implementation Scope
+
+Not implemented: persisted/versioned role bundles and Turkish server action
+catalog; impact counts/preview, self-escalation and last-admin guards; SQL-bounded
+access search/filter/count/paging and three-screen redesign; narrow source/prepare/
+self-test/send capabilities; durable send intent/results, SMTP transport, replay/
+unknown/partial-outcome handling and restart-time authorization; final send UI,
+local sink and packaged acceptance, new matched API/UI/Worker/DBA release.
+Next unused migration is 019 at this baseline, not an instruction to change it
+or replay 001-018. No SMTP option exists in the current application; enabling
+Announcements or Hangfire does not implement sending.
+
+Private evidence: `C:\SecureOpsBuild\validation\oco-mail-access-20260915`.
+Six original branding files and format/dimension/SHA256 manifest are in
+`source-assets/`; main.jpg is PNG, 554652 bytes, above the current 262144 bound.
+No original bytes were changed. Renderer-compatible branding, real Outlook,
+corporate relay user-From/envelope/auth permissions and operator self-test remain
+separate checks. No corporate credentials, ring, fixture or message was committed.
+
+### Verified Subset And Scope Boundary
+
+| Check | Actual result / wall seconds |
+|---|---|
+| Release build | 0 warnings/errors, 6.830 s; final role-result snapshot correction rebuilt cleanly in 4.369 s. |
+| Mandatory full format | Final pass, 0 diagnostics, 37.610 s. Initial introduced IDE0008/whitespace/end-of-line findings were corrected, not waived as baseline. |
+| Normal regression / OpenAPI | 1290 unit + 267 integration pass, 33 explicit opt-ins, 8.696 s. Normal OpenAPI comparison passed; intentional snapshot update was separately 22.005 s. |
+| SQL opt-ins | 29 regression checks pass, 6.915 s; 2 fresh preparation/audit checks pass, 2.854 s. Final snapshot patch: 37 focused checks including simultaneous real SQL role writers, 3.856 s. Overlapping runs are not added to unique totals. |
+| API/Worker published host | 1 pass, 132.415 s: interrupted console Worker, lease recovery, stale completion rejection, explicit apply and preparation. This precedes the final role-result-only correction; source/Worker implementation is unchanged. |
+| Browser MIME opt-in | 1 pass, 1.601 s; actual browser download, Turkish text, 155 service rows and six matching synthetic CID images. All 33 normal opt-ins have separate passing evidence. |
+| Browser | Access baseline 3.102 s; final access 5.169 s, preparation/history/download/denial 4.150 s; continuity/current preview/session revocation 22.171 s. Editor/conflict/recipient checks also pass; their duration was not captured. |
+| Fresh isolated harnesses | Source 001-018 upgrade 3.320 s; separate Hangfire schema 9 install 1.834 s. Final preparation harness 2.461 s. No server fixtures/migrations executed. |
+
+The access inventory contains 120 synthetic users plus 3 Demo actors, 60 pending,
+20 rejected and 42 approved request rows. Screens measure 1440x900 / 390x844,
+zoom and DPR 1, 14px computed text, content width 1180 / 390, no horizontal
+overflow. No VDI zoom or corporate load/Outlook/screen-reader acceptance is claimed.
+Role labels/grouping improved; server-paged access administration is still absent.
+Early browser failures were test timing, wrong historical `before` mode and a
+wrong MIME evidence directory; corrected runs and private traces remain retained.
+
+`payload-final/` is a private local publish, NOT a deployable release archive.
+`payload-final-manifest.json` and `compiled-source-files.json` bind bytes to the
+tested source; embedded ProductVersion identifies the pre-commit baseline only.
+Final access/preparation browser checks used this payload. SQL sender-change tests
+preserve historical From/bytes and keep HTML/draft work available without valid Mail.
+No SMTP sink, real self-test/send or new dynamic role model exists yet; their
+required acceptance cannot be represented by the passing existing opt-ins.
+
+Local walkthrough: `https://localhost:64432/announcements` and `/access/users`;
+API `http://127.0.0.1:64431/`, task-owned PIDs 4604/25024. Synthetic Demo only.
+Only these two continuation hosts are left available; earlier OR hosts are preserved.
+Stop these PIDs only after confirming their command lines still identify these
+ports. Restart uses `tests/browser/announcement-hosts.ps1`, existing private
+`final-browser` evidence directory, `OcoAccessUi15`, `payload-final`, port 64431
+and `-FinalPresentation`; it also starts a denied-test UI on 64433. This launcher
+is local-only, never the corporate Test recipe above. No release/push/deploy.
+
+Scope accounting remains fixed at `4a1700a`, including deletions, tests, docs,
+OpenAPI and new files; no inherited merge occurred in this continuation. The
+measured checkpoint is +585/-51 = 636 lines in 39 files, leaving 364 of 1000.
+Commits do not reset this counter. A new task-scoped exception is needed for the
+remaining cross-layer work; no invented exact line count is claimed for unwritten code.
+Concrete remaining edit map: `AccessRoleCatalog`, access services/repositories and
+`AccessController` plus additive schema after 018 for versioned bundles/impact;
+`AccessRequests.razor`, `AccessUsers.razor`, `AccessUserDetail.razor` and typed clients
+for real SQL paging/role editing; `AnnouncementDispatchBoundary`, new durable mail
+store/SMTP options/transport and guarded API/Worker commands, announcement UI, and
+renderer compatibility. SQL/sink/restart/browser tests, OpenAPI and release/runbook
+changes belong to that same outstanding scope, not a new unrelated feature task.
+
 ## Authorized Combined Delivery, 2026-09-15
 
 The owner granted a one-time task-scoped exception to the 1000-line limit for

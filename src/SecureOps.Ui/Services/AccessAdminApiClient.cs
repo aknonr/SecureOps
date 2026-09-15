@@ -69,14 +69,13 @@ public sealed class AccessAdminApiClient : IAccessAdminApiClient
     public async Task<CurrentAccessResponse> ReplaceRolesAsync(
         Guid userId,
         IReadOnlyList<string> roles,
-        string reason,
         long expectedVersion,
         CancellationToken cancellationToken)
     {
         HttpResponseMessage response = await SendAsync(
             () => _httpClient.PutAsJsonAsync(
                 $"api/v1/access/users/{userId}/roles",
-                new AssignRolesRequest(roles, reason, expectedVersion),
+                new AssignRolesRequest(roles, expectedVersion),
                 cancellationToken),
             cancellationToken);
 
