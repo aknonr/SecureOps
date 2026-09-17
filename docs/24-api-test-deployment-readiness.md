@@ -1,5 +1,29 @@
 # API TEST Deployment Readiness
 
+## rc6.22 Defect Completion, 2026-09-18
+
+Local implementation and matched package acceptance are complete for the approved
+rc6.21 continuation. Build source `9ec65eb377ea020916bab8c803601e237153f34c`, release
+`C:\SecureOpsBuild\release\2026-09-18-pilot-rc6.22`. rc6.21 is preserved. This is
+not installation approval or corporate source/Outlook/SMTP acceptance. No push,
+deployment, corporate call, source write or service installation occurred.
+
+The repaired journeys cover canonical Admin identity, role guards and Turkish
+capabilities; distinct source/readiness/error states and source-driven OCO review;
+versioned vertical Outlook-oriented v3 markup with six unchanged original assets;
+explicit time offsets/seconds; In Use reporter search, reviewer/progress, versioned
+NMS proposals, attributable immutable archive and recoverable download. Exact
+owner/aspect wire contracts remain unresolved, not populated with invented people
+or example IDs. See [root causes](rc621-root-causes.md), [script parity](rc621-script-parity.md)
+and [acceptance evidence](rc622-local-acceptance.md).
+
+Upgrade uses the packaged `operator-runbook-tr.md`, exported from
+[rc621-upgrade-tr.md](rc621-upgrade-tr.md). No SQL or Branding delta is necessary:
+do not replay installed 001-021/Hangfire 9 or replace original artwork. Preserve
+server-owned settings/secrets and separate rings; compare effective API/Worker
+settings using the new diagnostic before applying an explicit approved delta.
+`release-metadata.json` remains `readyForInstallation=false` pending that decision.
+
 ## Owner Operations Continuation, 2026-09-15
 
 The owner has now explicitly approved a one-time task-size exception for the

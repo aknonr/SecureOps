@@ -1,5 +1,16 @@
 # SecureOps.Ui
 
+## rc6.22 Operator Completion
+
+The repaired OCO, In Use and access journeys are packaged at build source
+`9ec65eb377ea020916bab8c803601e237153f34c`. Current acceptance and remaining
+corporate checks are in `docs/rc622-local-acceptance.md`; historical totals below
+are not evidence for these repairs. Turkish upgrade instructions are in
+`docs/rc621-upgrade-tr.md`. This continuation explicitly includes the affected UI.
+The local packaged walkthrough uses synthetic data only at
+`https://localhost:64652/announcements` and `/in-use`; its private host record is
+under `rc621-completion-20260917/packaged-acceptance2/hosts`. It is not TEST configuration.
+
 ### Kısa Rol Ve İş Akışı Rehberi
 
 Güncel rol içeriği SQL'deki sürümlü tanımdır; iş unvanı yetki vermez. Dokuz eski

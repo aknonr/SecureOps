@@ -9,6 +9,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         ignoreHTTPSErrors: true, viewport: null, reducedMotion: 'reduce', args: ['--window-size=1366,768']
     });
     const client = await apiContext(request, api), page = await context.newPage(), measurements = [];
+    const capture = await context.newCDPSession(page);
     try {
         // Set native browser zoom in this disposable profile, not CSS zoom or CDP pinch emulation.
         await page.goto('chrome://settings/appearance');
@@ -40,7 +41,13 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
                 await page.keyboard.press('Tab');
                 assert.equal(await page.evaluate(() => document.activeElement === document.body), false);
                 measurements.push({ route, theme, zoom: 2, method: 'native Chrome default zoom, isolated profile', ...metric });
-                await page.screenshot({ path: path.join(out, route.replaceAll('/', '-') + '-' + theme + '.png'), fullPage: true });
+                // Native zoom needs physical content metrics; CSS-sized clips crop the right half.
+                const layout = await capture.send('Page.getLayoutMetrics');
+                const screenshot = await capture.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true,
+                    clip: { ...layout.contentSize, scale: 1 } });
+                const bytes = Buffer.from(screenshot.data, 'base64');
+                assert.ok(bytes.readUInt32BE(16) >= metric.outer - 40, 'Native zoom capture must include the full physical width');
+                fs.writeFileSync(path.join(out, route.replaceAll('/', '-') + '-' + theme + '.png'), bytes);
             }
         }
         fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify({ passed: true, measurements }, null, 2));
