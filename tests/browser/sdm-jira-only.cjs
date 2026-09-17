@@ -203,6 +203,13 @@ const out = path.resolve(process.argv[6]);
         fs.writeFileSync(path.join(out, 'jira-only-results.json'), JSON.stringify({ seconds: (Date.now() - started) / 1000,
             published: { id: created.id, key: created.jiraIssueKey, sourceCloseRequested: created.sourceCloseRequested }, checks }, null, 2));
         console.log(JSON.stringify({ checks }, null, 2));
+    } catch (error) {
+        fs.mkdirSync(out, { recursive: true });
+        if (page && !page.isClosed()) {
+            fs.writeFileSync(path.join(out, 'failure.html'), await page.content());
+            await page.screenshot({ path: path.join(out, 'failure.png'), fullPage: true });
+        }
+        throw error;
     } finally {
         const latest = await json(admin, '/api/v1/access/users/' + me.userId);
         const catalog = await json(admin, '/api/v1/access/roles');

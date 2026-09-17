@@ -22,6 +22,92 @@ self-test/SMTP and typed verified-closure boundary are described in current
 module contracts and ADR-0022. Historical results below are not new feature tests.
 Design decision: ADR-0022. Current installed state remains operator-reported.
 
+### Final Operations Delivery, 2026-09-17
+
+Local source/package acceptance is complete. Build source:
+`5166eaaf7fb43a9fcf58358845b3ef7ca3bfada7` (implementation `81b2bdf`, then packaging
+manifest-array correction). Final handoff changes only docs/browser diagnostics,
+not compiled source, contracts or SQL. Release:
+`C:\SecureOpsBuild\release\2026-09-17-pilot-rc6.21`. Components: matched API/UI/
+console Worker, full 001-021 DBA reference, separate 019-021 upgrade delta and six
+original branding assets. Disabled sample configuration is outside payloads.
+Exact archive/assembly/per-file hashes: `release-metadata.json`,
+`release-artifacts.sha256`, `manifests/`. All **822 extracted files** match:
+API 246, UI 263, Worker 254, DBA 45, delta 8, branding 6. All 42 SQL files match
+source; 001-018 is unchanged. The marked Turkish runbook was exported with the
+actual build SHA. Historical archives, including the failed rc6.20, are retained.
+
+| Final check | Actual result / wall seconds |
+|---|---|
+| Release | 0 warnings/errors, 13.395 s after final navigation correction |
+| Full format | 0 diagnostics, 44.019 s; zero baseline preserved, no waiver |
+| Normal regression/OpenAPI | 1294 unit + 274 integration passed, 36 opt-ins, 7.577 s; normal snapshot comparison passed |
+| Final navigation regression | 640 overlapping checks, 3.898 s; not added to normal totals |
+| SQL opt-ins | 34/34, no skips, 7.923 s; roles/concurrency/audit, sender/profile, mail uncertainty, actor history and OR persistence |
+| Packaged API/Worker opt-in | 1/1, 144.679 s; actual interruption, lease recovery, stale completion rejection, review/apply/preparation |
+| Packaged browser MIME opt-in | 1/1, 2.140 s; Turkish content, 155 service rows and six original CID images/bytes/types |
+| Packaged browser | OCO source/apply/recipient retention/preparation 50.312 s; SMTP 81.255 s; access/role impact/conflict/revocation 13.533 s; RFC/answers/bulk/conflict/Excel 8.865 s; assignment/filter/cross-assignee attribution 6.408 s; OR Jira-only/conflict/unknown 10.627 s |
+| After API/Worker restart | Assignment and immutable events 7.007 s; identical OCO MIME/Unknown/no second send 12.160 s; Jira-only/unknown 5.668 s |
+| Packaging | 70.772 s; five negative payload/dependency cases 1.702 s; four packaging contract checks 1.908 s |
+| Vulnerability audit | 21.082 s, none reported by configured public feed, including MailKit |
+
+`evidence/skips-and-optins.json` names each normal skip/reason and separate passing
+TRX: **36/36 supported opt-ins passed**, none remaining. SMTP tests include reject,
+partial recipients, uncertain DATA and accepted DATA followed by QUIT failure.
+Mail browser time includes 61 s respecting the real rate limit. Fresh final SQL
+harnesses took 3.272/3.292/3.239/3.344 s; packaged browser/host databases 4.202/3.289 s.
+All use new synthetic LocalDB databases, 001-021 and predecessor preservation.
+Separate packaged Hangfire schema-9 installs passed. `packaged-prepare21` includes
+host lifetime (642.573 s), not pure extraction/SQL duration. No corporate fixture.
+
+Console Worker emitted started plus current SQL heartbeat; Ctrl+C emitted stopped
+in 0.139 s and registration count became zero. PowerShell exit 1 is pipeline
+interruption, not claimed clean shell exit. Active-job crash recovery is the separate
+host test. No Windows Service, scheduler or unattended operation was added/proved.
+Actor tests separate assignee, initiating human, API/Worker executor and verifier;
+profile-at-action survives profile changes, stale/forged actors/audit failures reject.
+Corporate source post-state remains unavailable: close adapter calls are blocked,
+and historical Completed without evidence is unverified. ServerRequest is supported;
+SoftwareInstallation and ServerRetirement still need their own mappings/policies.
+
+Rendered desktop 1440x900, VDI-sized 1366x768 and narrow 390x844, light/dark, zoom/DPR 1
+were inspected with no horizontal overflow. Assignment acceptance observed self/mine,
+retained list context, reassignment, unassignment, cross-assignee save and restart.
+The header shows assignment, saved progress and next action before technical detail.
+Baseline images remain in `baseline-browser` / `access-browser`; final captures are
+in `browser-packaged21` under the private evidence root. No invented improvement
+percentage, corporate VDI, screen-reader or Outlook acceptance is claimed.
+
+Failed attempts remain visible: rc6.20 nested JSON-array parsing corrected without
+changing branding; literal `ListUrl` navigation fixed before the build source;
+assignment overlapping intentional source-test session revocation passed in isolation;
+first packaged OR refresh wait did not issue a request, unchanged-payload rerun and
+restart passed; unauthenticated restart probe correctly returned 401, authenticated
+health/restart passed. Earlier focused failures remain in private `validation.json`.
+
+Current local synthetic walkthrough: `https://localhost:64622/in-use`, `/announcements`,
+`/access/users`; API `http://127.0.0.1:64621`. API PID 24676, UI 1856, denied-test UI
+19064, console Worker 3928, loopback sink 23556. Restart/stop:
+`C:\SecureOpsBuild\validation\operations-completion-20260915\Start-VerifiedLocal.ps1`
+and `Stop-TaskHosts.ps1` (PID/time ownership checks). Earlier temporary task hosts
+were stopped; other accepted hosts/worktrees are untouched. Sample `OR-930091721`
+has distinct assignee/saver; OCO history includes Accepted and Unknown commands.
+The local sink never forwards mail; this launcher is not a corporate TEST recipe.
+
+Fixed accounting baseline remains `4a1700a`, including prior 636 lines at `5bb50092`.
+No inherited merge occurred here. Final additions/deletions, all paths and OpenAPI
+are recorded in private `scope.json`; commits do not reset task accounting.
+Final fixed-baseline delta: 152 files, +6707/-1298 = 8005 lines. Since `5bb50092`:
+134 files, +6149/-1274 = 7423 lines; prior checkpoint +585/-51 = 636. Overlapping
+endpoint deltas do not add arithmetically. No inherited merge or omitted generated diff.
+**Installation readiness: false. Corporate publication readiness: false.** Next
+server action: the runbook's read-only installed-pair/backup/grant inventory for the
+**019-021-only** upgrade, not replaying 001-018 or Hangfire 9. Known API/Worker paths
+are retained; UI physical path, current pairing/rings/grants/recovery and foreground
+operator need target evidence. Relay/self-only activation, exact Jira policy/mapping/
+correlation and BPM post-state remain named-owner gates in sections 6-7 below.
+No push, installation or corporate SMTP/Jira/source operation was performed.
+
 ## OCO Mail And Access Continuation, 2026-09-15
 
 Current task baseline: `4a1700a6c0e346edf2c47a24fe6402538678db1d`, existing

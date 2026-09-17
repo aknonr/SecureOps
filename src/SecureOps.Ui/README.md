@@ -1,5 +1,25 @@
 # SecureOps.Ui
 
+### Kısa Rol Ve İş Akışı Rehberi
+
+Güncel rol içeriği SQL'deki sürümlü tanımdır; iş unvanı yetki vermez. Dokuz eski
+rolün kimlikleri korunur. Yönetici kullanıcı/erişim yönetimini ve korumalı Admin'i
+görür; yeni iş rolünü eylemlerden oluşturur, etki farkını inceler, açıkça uygular.
+Sıradan rol değişiminde gerekçe yok; ret/kapatma gerekçesi korunur. Kendi hakkını
+yükseltme ve eşzamanlı son Admin kaybı engellenir.
+
+| İş | Gerekli başlangıç yetkisi ve kısa akış |
+|---|---|
+| In Use | Reviewer: görüntüle/cevapla; Coordinator veya Admin: ayrıca ata/yenile. Liste → kayıt → isteğe bağlı kişi/gerekçe → üç kontrol → taslağı kaydet → Excel. Başka atanmış kaydı inceleme yetkiyle mümkündür. |
+| Operasyon Uzmanı | OR görüntüleme/önizleme; Jira create hakkı yok. İş unvanı veya tür beyanı yayın onayı değildir. |
+| OR yayımlama | JiraPublisher/Lead/Admin, ayrıca exact policy ve kapılar. Kayıt → kaynak/engeller → önizleme → tek onay → kayıtlı Jira key; Jira-only kaynak açık. |
+| OCO hazırlık | Drafts + ayrı Source/Prepare eylemleri: kaynak önerisini incele/uygula → alıcıları düzenle → kaydet → hazırlık/.eml. |
+| OCO mail | Ayrı SelfTest/Send hakları ve yapılandırma kapıları; Admin dahil otomatik verilmez. Hazırlıktan önizleme → From/alıcı/içerik → tek açık onay → kayıtlı sonuç. Kendime deneme yalnız kendi kayıtlı Mail'ine; Unknown/Partial yeni gönderimi engeller. |
+
+Kaydetmek, rapor hazırlamak, SMTP kabulü ve doğrulanmış kaynak kapanışı ayrı
+sonuçlardır. Aktör geçmişi bu ayrımı korur. Kurumsal aktivasyon ve güncel paket
+kanıtı `docs/24-api-test-deployment-readiness.md` içindeki son teslimat bölümündedir.
+
 ## Current Operations Continuation, 2026-09-17
 
 The owner explicitly assigns this bounded backend/UI continuation to Codex.
