@@ -3,7 +3,7 @@
 `New-PairedTestRelease.ps1 -ReleaseName <reviewed-next-name>` requires a clean
 committed feature branch (pre-existing `.vscode/` is excluded), publishes matching
 API/UI/Worker on the combined delivery branch, reuses the payload scanners/validators,
-exports the canonical Turkish runbook and packages the exact DBA 001-018 inventory
+exports the canonical Turkish runbook and packages the exact DBA 001-021 inventory
 with per-file sizes/hashes and source metadata. Hangfire.SqlServer 1.8.6's original
 schema-9 installation script is included separately for reviewed DBA provisioning;
 runtime DDL stays disabled. Worker is a foreground console host, not a Windows Service.
@@ -12,8 +12,14 @@ release metadata first. It does not deploy, activate writes or certify TEST acce
 Payload success is not release approval: `readyForInstallation` stays false;
 the release owner records required gates in `evidence/validation.json`. DoD still
 requires repository-wide format success; historical scoped passes are not a waiver.
-Canonical runbook tokens bind the actual release name/build SHA. DBA 001-018
+Canonical runbook tokens bind the actual release name/build SHA. DBA 001-021
 inclusion is a reference artifact, never an instruction to replay unchanged SQL.
+
+For this already deployed rc6.21 with 001-021/Hangfire 9, `-UpgradeFromRc621`
+exports `docs/rc621-upgrade-tr.md` instead and emits no unnecessary DBA archives.
+Original installed Branding can be retained; omit `-BrandingDirectory` when no
+artwork changed. The effective-configuration comparator is included and hashed
+under configuration/. None of these files overwrites server-owned settings.
 
 `New-InUseEvidencePackage.ps1 -OutputDirectory <new-absolute-directory>` builds
 only the standalone diagnostic on the development machine from committed HEAD.

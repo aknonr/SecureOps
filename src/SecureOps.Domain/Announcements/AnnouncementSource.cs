@@ -38,7 +38,11 @@ public sealed record SourceCompleteness(bool DevicesComplete, int DeviceCount, i
 public sealed record AnnouncementSourceSnapshot(Guid JobId, Guid DraftId, Guid OwnerId, string Profile,
     string OcoReference, DateTimeOffset CapturedAt, string CollectionId,
     IReadOnlyList<SourceDevice> Devices, IReadOnlyList<SourceService> Services,
-    SourceWorkWindow? Work, SourceCompleteness Completeness);
+    SourceWorkWindow? Work, SourceCompleteness Completeness)
+{
+    /// <summary>Worker profile identity; absent only on historical snapshots.</summary>
+    public string? ProfileFingerprint { get; init; }
+}
 
 /// <summary>Durable source job. State survives process restart because it lives in SQL, not memory.</summary>
 public sealed record AnnouncementSourceJob(Guid JobId, Guid OwnerId, Guid DraftId, string Profile,

@@ -52,7 +52,11 @@ public enum AccessMutationDisposition
     /// <summary>The role set contains an unregistered role.</summary>
     InvalidRoles,
     /// <summary>Self-escalation or last-administrator protection rejected the change.</summary>
-    AdministrativeGuard
+    AdministrativeGuard,
+    /// <summary>The caller cannot add capabilities to their own identity.</summary>
+    SelfEscalationDenied,
+    /// <summary>At least one approved administrator must remain.</summary>
+    LastAdministratorDenied
 }
 
 /// <summary>Result of an access mutation.</summary>

@@ -20,13 +20,13 @@ public static class AnnouncementValidation
         List<string> errors = [];
         if (content.DateTextRevision is not ("iso-v1" or "tr-v1") || content.TemplateRevision == "oco-v1" && content.DateTextRevision != "iso-v1")
         { errors.Add("DateTextRevision"); }
-        if (content.TemplateRevision is not ("oco-v1" or "oco-table-v2"))
+        if (content.TemplateRevision is not ("oco-v1" or "oco-table-v2" or "oco-table-v3"))
         { errors.Add("TemplateRevision"); }
         string[] services = content.AffectedServices ?? [];
         if (services.Length > 256 || services.Any(s => string.IsNullOrWhiteSpace(s) || s.Length > 256 || s.Any(char.IsControl))
             || services.Sum(s => (long)(s?.Length ?? 0) + 1) > 16000
             || content.TemplateRevision == "oco-v1" && services.Length > 0
-            || complete && content.TemplateRevision == "oco-table-v2" && services.Length == 0)
+            || complete && content.TemplateRevision != "oco-v1" && services.Length == 0)
         { errors.Add("AffectedServices"); }
         foreach ((string key, string? value) in Fields(content))
         {
@@ -35,7 +35,7 @@ public static class AnnouncementValidation
                 || key == "Subject" && value.Any(char.IsControl) || complete && key != "Notes" && string.IsNullOrWhiteSpace(value))
             { errors.Add(key); }
         }
-        bool Date(string? value) => value is not null && Regex.IsMatch(value, @"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})\z")
+        bool Date(string? value) => value is not null && Regex.IsMatch(value, @"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,7})?)?(Z|[+-]\d{2}:\d{2})\z")
             && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
         if (!string.IsNullOrEmpty(content.AnnouncementDate) && !DateOnly.TryParseExact(content.AnnouncementDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
         { errors.Add("AnnouncementDate"); }
@@ -48,7 +48,7 @@ public static class AnnouncementValidation
         { errors.Add("RestartEnd"); }
         foreach ((string key, string[]? values) in new[] { ("To", content.To), ("Cc", content.Cc) })
         { if (values is null || values.Length > 50 || values.Any(v => !Address(v)) || complete && key == "To" && values.Length == 0) { errors.Add(key); } }
-        if (content.BannerRevision is null || !Regex.IsMatch(content.BannerRevision, @"\A[a-z0-9-]{1,64}\z"))
+        if (content.BannerRevision is null || (complete || content.BannerRevision.Length > 0) && !Regex.IsMatch(content.BannerRevision, @"\A[a-z0-9-]{1,64}\z"))
         { errors.Add("BannerRevision"); }
         return [.. errors.Distinct()];
     }

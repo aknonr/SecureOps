@@ -58,7 +58,7 @@ public sealed partial class AnnouncementRenderer
             (byte[] bytes, string type, string hash) = await AssetAsync(content.BannerRevision, token);
             return new(hash, "", [new("banner", bytes, type, hash)]);
         }
-        if (content.TemplateRevision != "oco-table-v2")
+        if (content.TemplateRevision is not ("oco-table-v2" or "oco-table-v3"))
         { throw new InvalidOperationException("Unknown template."); }
         AnnouncementAssetBundle bundle = Bundle(content.BannerRevision);
         List<AnnouncementImage> images = [];
@@ -89,7 +89,7 @@ public sealed partial class AnnouncementRenderer
         string Source(AnnouncementImage image) => inline ? $"data:image/{image.Type};base64,{Convert.ToBase64String(image.Bytes)}" : "cid:" + image.Role;
         if (draft.TemplateRevision == "oco-v1")
         { return Render(draft, Source(presentation.Images.Single())); }
-        if (draft.TemplateRevision != "oco-table-v2" || !presentation.Images.Select(i => i.Role).SequenceEqual(_bundleRoles))
+        if (draft.TemplateRevision is not ("oco-table-v2" or "oco-table-v3") || !presentation.Images.Select(i => i.Role).SequenceEqual(_bundleRoles))
         { throw new InvalidOperationException("Unknown presentation."); }
         AnnouncementContent c = draft.Content;
         string DateText(string value)
@@ -122,6 +122,8 @@ public sealed partial class AnnouncementRenderer
             + "<table style=\"width:100%;table-layout:fixed;border-collapse:collapse;text-align:center\">" + rows + "</table>"
             + "<footer><p style=\"white-space:pre-wrap\">" + WebUtility.HtmlEncode(presentation.Footer) + "</p>" + Image("logo", 150)
             + string.Concat(_bundleRoles.Skip(3).Select(role => Image(role, 24))) + "</footer></main></body></html>";
+        if (draft.TemplateRevision == "oco-table-v3")
+        { html = RenderTableV3(fields, presentation, inline); }
         return (html, string.Join("\r\n\r\n", fields.Select(f => f.Label + ": " + f.Value)) + "\r\n\r\n" + presentation.Footer);
     }
 }

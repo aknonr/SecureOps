@@ -15,7 +15,7 @@ namespace SecureOps.Infrastructure.InUse;
 /// <summary>Authorized local In Use workflow. There is deliberately no external-write dependency.</summary>
 public sealed partial class InUseService(IInUseRepository repository, IInUseSourceClient source,
     IApplicationAccessService access, IAccessRepository users, ICommandIdempotencyStore commands,
-    ILogger<InUseService> logger, InUseReportArchive? archive = null, SqlInUseIdentities? identities = null)
+    ILogger<InUseService> logger, InUseReportArchive? archive = null, SqlInUseIdentities? identities = null, InUsePolicy? policy = null)
 {
     /// <summary>Queries only persisted records.</summary>
     public Task<InUseResult<InUsePage>> QueryAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -37,7 +37,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             return record is null ? InUseResult<InUseRecord>.Fail("InUseNotFound")
                 : new(Label(record, await LabelsAsync([record], token))
                     with
-                { ArchivedVersions = archive?.Versions(id) ?? [] });
+                { ArchivedVersions = archive?.Versions(id) ?? [], PolicyProposal = policy?.Propose(record) });
         }, token);
 
     /// <summary>Minimal approved-reviewer picker; never resolves source display names into users.</summary>
@@ -139,8 +139,17 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             { return InUseResult<InUseRecord>.Fail("InUseConflict"); }
             if (!ValidDraft(request, old))
             { return InUseResult<InUseRecord>.Fail("InUseInvalid"); }
+            InUsePolicyProposal? accepted = old.Draft?.SourceVersion == old.SourceVersion ? old.Draft.Policy : null;
+            if (request.ReviewedPolicyFingerprint is not null)
+            {
+                InUsePolicyProposal? current = policy?.Propose(old);
+                if (current is null || current.Fingerprint != request.ReviewedPolicyFingerprint)
+                { return InUseResult<InUseRecord>.Fail("InUsePolicyChanged"); }
+                accepted = current;
+            }
             InUseRecord next = old with
             {
+                PolicyProposal = null,
                 Version = old.Version + 1,
                 Draft = new(old.SourceVersion,
                 (old.Draft?.Answers ?? []).Where(a => !request.Answers.Any(n => n.ServerId == a.ServerId && n.Check == a.Check))
@@ -148,10 +157,10 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                         ? a with { Evidence = old.Draft?.Answers.FirstOrDefault(o => o.ServerId == a.ServerId && o.Check == a.Check)?.Evidence ?? "" } : a))
                     .OrderBy(a => a.ServerId, StringComparer.Ordinal).ThenBy(a => a.Check, StringComparer.Ordinal).ToArray(),
                 string.IsNullOrWhiteSpace(request.Notes) ? old.Draft?.Notes ?? "" : request.Notes.Trim(), user.Id, DateTimeOffset.UtcNow)
-                { ReviewedByLabel = ActorLabel(user) }
+                { ReviewedByLabel = ActorLabel(user), Policy = accepted }
             };
             return await SaveAsync(next, request.ExpectedVersion, Audit(user, context, "DraftSaved",
-                new { id, next.Version, next.SourceVersion, AnswerCount = request.Answers.Count }, id, request.ExpectedVersion, assigneeId: old.AssigneeId), token);
+                new { id, next.Version, next.SourceVersion, AnswerCount = request.Answers.Count, PolicyFingerprint = accepted?.Fingerprint }, id, request.ExpectedVersion, assigneeId: old.AssigneeId), token);
         }, token);
 
     /// <summary>Prepares one version-bound text-only workbook and audits its hash before returning it.</summary>
@@ -182,7 +191,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             }
             if (request.Archive && !InUseChecks.RelationshipReady(record.Source))
             { return InUseResult<InUseReport>.Fail("InUseIncomplete"); }
-            InUseReport report = InUseWorkbook.Create(record, user.Id, DateTimeOffset.UtcNow);
+            InUseReport report = InUseWorkbook.Create(record, user.Id, DateTimeOffset.UtcNow) with { PreparedByLabel = ActorLabel(user) };
             if (request.Archive)
             {
                 InUseReport? stored = await (archive ?? throw new InvalidOperationException("Archive unavailable.")).AccessAsync(id, record.Version, report,
@@ -198,7 +207,8 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
     private async Task<InUseResult<InUseRecord>> SaveAsync(InUseRecord next, long expected, AuditEvent audit, CancellationToken token)
     {
         IReadOnlyDictionary<Guid, string> labels = await LabelsAsync([next], token);
-        return await repository.SaveAsync(next, expected, audit, token) ? new(Label(next, labels)) : InUseResult<InUseRecord>.Fail("InUseConflict");
+        return await repository.SaveAsync(next with { PolicyProposal = null }, expected, audit, token)
+            ? new(Label(next, labels) with { PolicyProposal = policy?.Propose(next) }) : InUseResult<InUseRecord>.Fail("InUseConflict");
     }
 
     /// <summary>Audited bounded diagnostic; no enrichment, assignment or source mutation.</summary>
@@ -240,9 +250,14 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             { return InUseResult<T>.Fail("AccessDenied"); }
             return await operation(user);
         }
+        catch (InUseArchiveException ex)
+        {
+            logger.LogError("In Use archive failed. Code: {Code}. CorrelationId: {CorrelationId}", ex.Code, context.CorrelationId);
+            return InUseResult<T>.Fail(ex.Code);
+        }
         catch (Exception ex) when (ex is DbException or IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException or JsonException)
         {
-            logger.LogError("In Use local operation failed. FailureType: {FailureType}", ex.GetType().Name);
+            logger.LogError("In Use local operation failed. FailureType: {FailureType}. CorrelationId: {CorrelationId}", ex.GetType().Name, context.CorrelationId);
             return InUseResult<T>.Fail("PersistenceUnavailable");
         }
     }

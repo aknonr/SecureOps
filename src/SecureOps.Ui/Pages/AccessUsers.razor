@@ -6,7 +6,7 @@
 @inject NavigationManager Navigation
 
 <PageTitle>Kullanıcılar · @WasasBrand.Name</PageTitle>
-<div class="so-page so-access-workspace">
+<div class="so-page so-page--wide so-access-workspace">
     <SoPageHeader Title="Kullanıcılar">
         <Actions>
             @if (_access?.Can(Capabilities.AccessAssignRoles) == true && _access.Can(Capabilities.AccessManageUsers))

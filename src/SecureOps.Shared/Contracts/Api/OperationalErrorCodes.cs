@@ -9,6 +9,12 @@ public static class OperationalErrorCodes
     public const string IdentityNotFound = "IdentityNotFound";
     /// <summary>The caller lacks required access.</summary>
     public const string AccessDenied = "AccessDenied";
+    /// <summary>Protected role definitions cannot be edited.</summary>
+    public const string AccessProtectedRole = "AccessProtectedRole";
+    /// <summary>Self-escalation requires a different authorized administrator.</summary>
+    public const string AccessSelfEscalationDenied = "AccessSelfEscalationDenied";
+    /// <summary>The final approved administrator cannot be removed or disabled.</summary>
+    public const string AccessLastAdministratorDenied = "AccessLastAdministratorDenied";
     /// <summary>A caller exceeded the permitted request rate.</summary>
     public const string RateLimitExceeded = "RateLimitExceeded";
     /// <summary>An identity provider is unavailable.</summary>

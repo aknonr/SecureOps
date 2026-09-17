@@ -20,7 +20,7 @@ public sealed partial class AnnouncementsController(AnnouncementService service)
     /// <summary>Lists bounded allowlisted banner choices without exposing paths or decoding images.</summary>
     [HttpGet("banners"), ProducesResponseType(typeof(IReadOnlyList<AnnouncementBanner>), 200)]
     public Task<IActionResult> BannersAsync(string templateRevision = "oco-v1", CancellationToken token = default) =>
-        ExecuteAsync(Guid.Empty, 0, templateRevision == "oco-v1" ? "banners" : templateRevision == "oco-table-v2" ? "bundles" : "invalid", null, 1, 25, token);
+        ExecuteAsync(Guid.Empty, 0, templateRevision == "oco-v1" ? "banners" : templateRevision is "oco-table-v2" or "oco-table-v3" ? "bundles" : "invalid", null, 1, 25, token);
 
     /// <summary>Reads stored content or a version-bound safe preview/email representation.</summary>
     [HttpGet("{id:guid}")]

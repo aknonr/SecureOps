@@ -41,7 +41,13 @@ public sealed record AnnouncementSourceProposal(Guid JobId, Guid DraftId, string
     string State, DateTimeOffset CapturedAt, long DraftVersion, ProposedField[] Fields,
     string[] ProposedAffectedServices, string[] AmbiguousServices, string[] UnresolvedDevices,
     RecipientDifference To, RecipientDifference Cc, bool HighPriority, string Audience,
-    SourceCompletenessView Completeness, bool Stale, long OverrideVersion = 0);
+    SourceCompletenessView Completeness, bool Stale, long OverrideVersion = 0)
+{
+    /// <summary>Reviewed server-owned profile fingerprint; never grants authority.</summary>
+    public string? ProfileFingerprint { get; init; }
+    /// <summary>Explicit operator-selected offset used only for source values without an offset.</summary>
+    public string? ReviewedSourceOffset { get; init; }
+}
 
 /// <summary>
 /// Reviewed application request. Only listed fields are written; <c>expectedVersion</c> must equal
@@ -49,7 +55,13 @@ public sealed record AnnouncementSourceProposal(Guid JobId, Guid DraftId, string
 /// </summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record AnnouncementSourceApply(Guid JobId, long ExpectedVersion, string[] Fields,
-    bool ApplyRecipients, bool ApplyAffectedServices, long ExpectedOverrideVersion = 0);
+    bool ApplyRecipients, bool ApplyAffectedServices, long ExpectedOverrideVersion = 0)
+{
+    /// <summary>Must match the captured profile for new source snapshots.</summary>
+    public string? ProfileFingerprint { get; init; }
+    /// <summary>Explicit operator confirmation for offset-free source times, not a default inference.</summary>
+    public string? ReviewedSourceOffset { get; init; }
+}
 
 /// <summary>Result of a reviewed application: the new draft version and what was actually written.</summary>
 public sealed record AnnouncementSourceApplyResult(Guid DraftId, long Version, string[] AppliedFields,

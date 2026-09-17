@@ -94,7 +94,11 @@ public sealed class AnnouncementSourceCollector(
             membership.Devices, affected, work,
             new SourceCompleteness(membership.Complete, membership.Devices.Count, membership.PagesRead,
                 membership.Devices.Count, affected.Count(service => service.Resolution == "Resolved"),
-                ambiguous, missing, failed, partial, [.. warnings.Distinct(StringComparer.Ordinal)]));
+                ambiguous, missing, failed, partial, [.. warnings.Distinct(StringComparer.Ordinal)]))
+        {
+            ProfileFingerprint = settings.Profiles.FirstOrDefault(p => string.Equals(p.Key, profile, StringComparison.OrdinalIgnoreCase)).Value is { } configured
+            ? MaintenanceProfileCatalog.Fingerprint(configured) : null
+        };
     }
 
     private async Task<ServiceLookupResult> LookupAsync(string device, AnnouncementSourceOptions settings, CancellationToken token)

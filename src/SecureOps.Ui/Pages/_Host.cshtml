@@ -69,6 +69,19 @@
             }
         };
 
+        // Only a scroll position is retained in this page instance; no report or actor data is stored.
+        window.secureOpsInUseScroll = { position: null, restore: function () {
+            const saved = this.position;
+            this.position = null;
+            if (saved && saved.query === location.search) requestAnimationFrame(() => scrollTo(0, saved.y));
+        }};
+        document.addEventListener('click', function (event) {
+            const link = event.target.closest('a[href]');
+            if (location.pathname === '/in-use' && link && /^\/in-use\/[a-f0-9-]+(?:\?|$)/i.test(link.getAttribute('href'))) {
+                window.secureOpsInUseScroll.position = { query: location.search, y: scrollY };
+            }
+        });
+
         // FocusOnNavigate keeps page changes accessible. Track the initiating input so its heading
         // ring is retained for keyboard navigation but suppressed after a pointer click.
         document.documentElement.dataset.soInputModality = "pointer";

@@ -6,7 +6,7 @@ public sealed class AnnouncementOptions
     /// <summary>Default-off module activation, independent of external write gates.</summary>
     public bool Enabled { get; set; }
     /// <summary>UI default for newly entered manual times only; never source timezone evidence.</summary>
-    public string DefaultDisplayOffset { get; set; } = "+00:00";
+    public string DefaultDisplayOffset { get; set; } = "+03:00";
     /// <summary>Legacy configuration retained for compatibility; new revisions use the actor's persisted Mail.</summary>
     public string Sender { get; set; } = "";
     /// <summary>Private read-only directory outside application payloads.</summary>

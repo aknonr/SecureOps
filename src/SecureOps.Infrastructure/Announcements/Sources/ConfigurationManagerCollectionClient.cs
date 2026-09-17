@@ -33,7 +33,10 @@ public sealed class ConfigurationManagerCollectionClient(IOptions<AnnouncementSo
         shell.AddCommand("Import-Module").AddParameter("Name", "ConfigurationManager").AddParameter("ErrorAction", "Stop");
         shell.AddStatement().AddCommand("New-PSDrive").AddParameter("Name", settings.SiteCode)
             .AddParameter("PSProvider", "CMSite").AddParameter("Root", settings.ProviderMachineName)
-            .AddParameter("Scope", "Private").AddParameter("ErrorAction", "Stop");
+            .AddParameter("Scope", "Private").AddParameter("ErrorAction", "Stop")
+            .AddCommand("Out-Null");
+        shell.AddStatement().AddCommand("Set-Location").AddParameter("LiteralPath", settings.SiteCode + ":\\")
+            .AddParameter("ErrorAction", "Stop");
         shell.AddStatement().AddCommand("Get-CMDevice")
             .AddParameter("CollectionId", collectionId).AddParameter("ErrorAction", "Stop")
             .AddCommand("Select-Object").AddParameter("Property", "Name")
@@ -49,12 +52,12 @@ public sealed class ConfigurationManagerCollectionClient(IOptions<AnnouncementSo
         {
             // Module, drive and provider failures are indistinguishable from absence; never guess membership.
             logger.LogWarning("SCCM collection membership read failed. FailureType: {FailureType}", exception.GetType().Name);
-            throw new AnnouncementSourceException("AnnouncementSourceUnavailable", true);
+            throw new AnnouncementSourceException("AnnouncementSourceCollectionUnavailable", true);
         }
         if (shell.HadErrors && output.Count == 0)
         {
             logger.LogWarning("SCCM collection membership read reported errors. ErrorCount: {ErrorCount}", shell.Streams.Error.Count);
-            throw new AnnouncementSourceException("AnnouncementSourceUnavailable", true);
+            throw new AnnouncementSourceException("AnnouncementSourceCollectionUnavailable", true);
         }
 
         List<SourceDevice> devices = [];

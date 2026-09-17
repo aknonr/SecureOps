@@ -8,13 +8,14 @@
         <label>Dakika<select aria-label="@(Label + " dakika")" @bind="_time.Minute" @bind:after="EmitAsync"><option value="">--</option>
             @foreach (int m in Enumerable.Range(0, 60)) { <option value="@(m.ToString("00"))">@m.ToString("00")</option> }</select></label>
     </div>
-    <details><summary>Saniye ve saat dilimi</summary>
+    <div class="so-announcement-clock">
         <label>Saniye<input aria-label="@(Label + " saniye")" type="number" min="0" max="59" step="1" value="@_time.Second" @onchange="SecondsAsync" /></label>
         <label>Gösterim saat dilimi<select aria-label="@(Label + " gösterim saat dilimi")" value="@_time.Offset" @onchange="OffsetAsync">
             @foreach (string offset in Offsets) { <option value="@offset">UTC @offset</option> }
         </select></label>
         @if (_offsetError) { <span role="alert">Önce tarih ve saati tamamlayın.</span> }
-    </details>
+    </div>
+    <small>Saat dilimi değişikliği aynı anı farklı saatte gösterir; çalışma anını değiştirmez.</small>
     @if (!AnnouncementTime.ValidOffset(_time.Offset)) { <span role="alert">Varsayılan saat dilimi yapılandırılmalı.</span> }
     <span class="so-announcement-field-error" id="@($"announcement-error-{Key}")">@Error</span>
 </div>

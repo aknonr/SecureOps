@@ -36,6 +36,14 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
         }, TimeSpan.FromSeconds(40));
         Guid owner = (await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/me")).GetProperty("userId").GetGuid();
         Guid other = (await lead.GetFromJsonAsync<JsonElement>("/api/v1/access/me")).GetProperty("userId").GetGuid();
+        const string readinessPath = "/api/v1/announcements/source/readiness";
+        (await admin.GetFromJsonAsync<AnnouncementSourceReadiness>(readinessPath))!.State.Should().Be("NoWorker");
+        await hosts.Database.ExecuteAsync("INSERT INTO [HangFire].[Server](Id,Data,LastHeartbeat) VALUES('wrong-queue-test',@data,GETUTCDATE())",
+            new { data = "{\"Queues\":[\"different-queue\"]}" });
+        try
+        { (await admin.GetFromJsonAsync<AnnouncementSourceReadiness>(readinessPath))!.State.Should().Be("WrongQueue"); }
+        finally { await hosts.Database.ExecuteAsync("DELETE FROM [HangFire].[Server] WHERE Id='wrong-queue-test'"); }
+        (await anonymous.GetAsync("/api/v1/diagnostics/operations")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         await hosts.Database.ExecuteAsync("UPDATE security.Users SET Mail='actor@example.invalid' WHERE UserId=@owner", new { owner });
         var id = Guid.NewGuid();
         string path = "/api/v1/announcements/" + id;
@@ -59,6 +67,7 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
         (await admin.PostAsJsonAsync(path + "/source/jobs", new { profile = "NonProd", ocoReference = "OCO-TEST", submissionKey = "unknown-key", ownerId = other })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         hosts.Start("SecureOps.Worker");
         await CompletedAsync(admin, path, first.JobId);
+        (await admin.GetFromJsonAsync<AnnouncementSourceReadiness>(readinessPath))!.State.Should().Be("Ready");
         (await hosts.Database.Drafts.GetAsync(id, owner, default))!.Version.Should().Be(1);
         AnnouncementSourceProposal proposal = await ProposalAsync(admin, path, first.JobId);
         string readFailure = await hosts.Database.FailureAsync("audit.AuditLog", $"Actor='{owner}' AND Action='AnnouncementSourceRead'");
@@ -77,9 +86,12 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
         proposal.Audience.Should().Be("DistributionRequest");
         proposal.Fields.Single(f => f.Field == "WorkStart").SourceText.Should().Be("2026-09-15T01:00:00.123+03:00");
         proposal.Fields.Where(f => f.Field.StartsWith("Restart", StringComparison.Ordinal)).Should().OnlyContain(f => f.Proposed == null);
-        await ApplyAsync(admin, path, proposal, true);
+        proposal.ProfileFingerprint.Should().NotBeNullOrEmpty();
+        proposal.Fields.Single(f => f.Field == "WorkStart").Proposed.Should().Be("2026-09-15T01:00:00.123+03:00");
+        await ApplyAsync(admin, path, proposal, true, sourceFields: true);
         AnnouncementContent applied = (await admin.GetFromJsonAsync<AnnouncementContent>(path))!;
-        applied.WorkStart.Should().Be(content.WorkStart);
+        applied.WorkStart.Should().Be("2026-09-15T01:00:00.123+03:00");
+        applied.WorkEnd.Should().Be("2026-09-15T02:00:00.456+03:00");
         applied.Scope.Should().Be("NonProd scope");
         applied.To.Should().Contain("manual@example.invalid").And.Contain("remove@example.invalid");
         applied.Cc.Should().NotIntersectWith(applied.To);
@@ -97,7 +109,7 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
         using MimeMessage message = await MimeMessage.LoadAsync(new MemoryStream(eml));
         message.To.Mailboxes.Select(m => m.Address).Should().BeEquivalentTo(applied.To);
         html.Should().Contain("Service A").And.Contain("Service B");
-        message.Subject.Should().Be(content.Subject);
+        message.Subject.Should().Be(applied.Subject);
         (await admin.PostAsJsonAsync(path + "/source/apply", new AnnouncementSourceApply(first.JobId, 1, [], false, false))).StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await admin.PostAsJsonAsync(path + "/source/apply", new AnnouncementSourceApply(first.JobId, 2, ["Unexpected"], false, false, 1))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
@@ -170,10 +182,11 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
     }
     private static Task<AnnouncementSourceProposal> ProposalAsync(HttpClient client, string path, Guid jobId) =>
         client.GetFromJsonAsync<AnnouncementSourceProposal>(path + "/source/jobs/" + jobId + "/proposal")!;
-    private static async Task ApplyAsync(HttpClient client, string path, AnnouncementSourceProposal proposal, bool recipients)
+    private static async Task ApplyAsync(HttpClient client, string path, AnnouncementSourceProposal proposal, bool recipients, bool sourceFields = false)
     {
         using HttpResponseMessage response = await client.PostAsJsonAsync(path + "/source/apply", new AnnouncementSourceApply(
-            proposal.JobId, proposal.DraftVersion, ["Scope"], recipients, true, proposal.OverrideVersion));
+            proposal.JobId, proposal.DraftVersion, sourceFields ? ["Scope", "Subject", "WorkStart", "WorkEnd", "AnnouncementDate", "Impact", "Description", "Checks"] : ["Scope"], recipients, true, proposal.OverrideVersion)
+        { ProfileFingerprint = proposal.ProfileFingerprint, ReviewedSourceOffset = proposal.ReviewedSourceOffset });
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
     private static async Task CompletedAsync(HttpClient client, string path, Guid id, TimeSpan? timeout = null)

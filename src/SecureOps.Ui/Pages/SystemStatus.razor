@@ -104,16 +104,8 @@
             }
         </section>
 
-        <section class="so-panel">
-            <div class="so-panel-head">
-                <h2 class="so-panel-title">Kapsam dışı</h2>
-            </div>
-            <p class="so-panel-text so-panel-text--sm">
-                Veritabanı, arka plan işleri ve denetim kaydı deposu için bu sürümde durum uç noktası
-                bulunmuyor. Bu bileşenler için burada bir gösterge üretilmemiştir; olmayan bir kontrolü
-                yeşil göstermemek adına bilinçli olarak boş bırakılmıştır.
-            </p>
-        </section>
+        @if (_access.Can(Capabilities.SystemDiagnostics))
+        { <OperationsReadinessPanel /> }
     }
 </div>
 

@@ -301,11 +301,14 @@ public sealed partial class SqlAccessRepository : IAccessRepository
         {
             return new(AccessMutationDisposition.ConcurrencyConflict, current, null, [], []);
         }
-        if ((string.Equals(current.CorporateIdentity, actor, StringComparison.OrdinalIgnoreCase)
+        if (string.Equals(current.CorporateIdentity, actor, StringComparison.OrdinalIgnoreCase)
                 && nextCapabilities.Except(current.Capabilities, StringComparer.Ordinal).Any())
-            || await RemovesLastAdminAsync(connection, transaction, current, next, cancellationToken))
         {
-            return new(AccessMutationDisposition.AdministrativeGuard, current, null, [], []);
+            return new(AccessMutationDisposition.SelfEscalationDenied, current, null, [], []);
+        }
+        if (await RemovesLastAdminAsync(connection, transaction, current, next, cancellationToken))
+        {
+            return new(AccessMutationDisposition.LastAdministratorDenied, current, null, [], []);
         }
 
         await ReplaceRolesWithinTransactionAsync(connection, transaction, userId, next, actor, cancellationToken);
@@ -364,10 +367,13 @@ public sealed partial class SqlAccessRepository : IAccessRepository
             return new AccessMutationResult(AccessMutationDisposition.ConcurrencyConflict, current, null, [], []);
         }
 
-        if (!await ActorAuthorizedAsync(connection, transaction, actor, Capabilities.AccessManageUsers, cancellationToken)
-            || await RemovesLastAdminAsync(connection, transaction, current, [], cancellationToken))
+        if (!await ActorAuthorizedAsync(connection, transaction, actor, Capabilities.AccessManageUsers, cancellationToken))
         {
             return new(AccessMutationDisposition.AdministrativeGuard, current, null, [], []);
+        }
+        if (await RemovesLastAdminAsync(connection, transaction, current, [], cancellationToken))
+        {
+            return new(AccessMutationDisposition.LastAdministratorDenied, current, null, [], []);
         }
 
         const string update = """

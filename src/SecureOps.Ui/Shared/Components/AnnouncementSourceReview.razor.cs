@@ -14,6 +14,8 @@ public partial class AnnouncementSourceReview
     [Parameter] public long Version { get; set; }
     /// <summary>Dirty, busy or conflicted editor prevents mutations.</summary>
     [Parameter] public bool Locked { get; set; }
+    /// <summary>Explicit retrieval first persists current operator work; zero means save failed.</summary>
+    [Parameter] public Func<Task<long>>? EnsureSaved { get; set; }
     /// <summary>Initial source reference from the editor.</summary>
     [Parameter] public string OcoReference { get; set; } = "";
     /// <summary>Current editor service list for comparison.</summary>
@@ -26,36 +28,45 @@ public partial class AnnouncementSourceReview
     private AnnouncementSourceSubmission? _submission;
     private AnnouncementSourceJobStatus? _job;
     private AnnouncementSourceProposal? _proposal;
+    private AnnouncementSourceReadiness? _readiness;
     private readonly HashSet<string> _fields = new(StringComparer.Ordinal);
     private CancellationTokenSource _pending = new();
     private UiProblem? _problem;
-    private string _profile = "", _oco = "";
+    private string _profile = "";
     private long _loadedVersion = -1;
-    private bool _working, _services, _recipients, _disposed;
+    private bool _working, _services, _recipients, _disposed, _starting;
+    private string _reviewedOffset = "+03:00";
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
-        if (_loadedVersion == Version)
+        if (_loadedVersion == Version || _starting)
         { return; }
         _loadedVersion = Version;
-        _oco = OcoReference;
         await RefreshAsync();
     }
     private void ClearReview()
     { _proposal = null; _fields.Clear(); _services = false; _recipients = false; }
     private Task RefreshAsync() => ReadAsync(false);
     private Task RetryAsync() => ReadAsync(true);
-    private Task SubmitAsync()
+    private async Task SubmitAsync()
     {
-        if (Locked || Version == 0 || _submission is not null)
-        { return Task.CompletedTask; }
-        _submission = new(_profile, _oco, Guid.NewGuid().ToString("N"));
-        return ReadAsync(true);
+        if (_starting || _working || _submission is not null)
+        { return; }
+        _starting = true;
+        try
+        {
+            long saved = EnsureSaved is null ? Version : await EnsureSaved();
+            if (saved == 0)
+            { return; }
+            _submission = new(_profile, OcoReference, Guid.NewGuid().ToString("N"));
+            await ReadAsync(true);
+        }
+        finally { _starting = false; }
     }
     private async Task ReadAsync(bool submit)
     {
-        if (_disposed || submit && (Locked || Version == 0))
+        if (_disposed || submit && _submission is null)
         { return; }
         _pending.Cancel();
         _pending.Dispose();
@@ -63,14 +74,18 @@ public partial class AnnouncementSourceReview
         CancellationToken token = _pending.Token;
         _working = true;
         _problem = null;
+        _readiness = null;
+        _profiles = [];
         ClearReview();
         try
         {
+            AnnouncementSourceReadiness readiness = await Api.SourceReadinessAsync(token);
             MaintenanceProfileChoice[] choices = await Api.ProfilesAsync(token);
             if (token.IsCancellationRequested)
             { return; }
+            _readiness = readiness;
             _profiles = choices;
-            if (Version == 0)
+            if (Version == 0 && !submit)
             { return; }
             AnnouncementSourceJobStatus job = await Api.SourceJobAsync(DraftId, submit ? _submission : null, token);
             if (token.IsCancellationRequested)
@@ -115,11 +130,54 @@ public partial class AnnouncementSourceReview
         if (Locked || _working || _proposal is not { Stale: false } review || review.DraftVersion != Version)
         { return Task.CompletedTask; }
         return ApplyRequested.InvokeAsync(new AnnouncementSourceApply(review.JobId, review.DraftVersion,
-            [.. _fields], _recipients, _services, review.OverrideVersion));
+            [.. _fields], _recipients, _services, review.OverrideVersion)
+        { ProfileFingerprint = review.ProfileFingerprint, ReviewedSourceOffset = review.ReviewedSourceOffset });
+    }
+    private async Task ReviewOffsetAsync()
+    {
+        if (_proposal is null || _working)
+        { return; }
+        _working = true;
+        try
+        { _proposal = await Api.SourceProposalAsync(DraftId, _proposal.JobId, _pending.Token, _reviewedOffset); _fields.Clear(); }
+        catch (SecureOpsApiException exception) { _problem = exception.Problem; }
+        catch (OperationCanceledException) { }
+        finally { _working = false; }
     }
     private void Select(string field, bool selected)
     { if (selected) { _fields.Add(field); } else { _fields.Remove(field); } }
     private static string Label(string field) => AnnouncementForm.Fields.FirstOrDefault(f => f.Key == field).Label ?? field;
+    private static string OriginLabel(string origin) => origin switch
+    {
+        "Profile" => "Bakım profili",
+        "Submission" => "İncelenen OCO",
+        "SourceStartDateProposal" => "Kaynak başlangıç günü önerisi",
+        "SourceExplicitOffset" => "Kaynak ve açık UTC farkı",
+        "SourceLocalText" => "Kaynak yerel saati",
+        "OperatorReviewedOffset" => "Operatörün onayladığı UTC farkı",
+        _ => "Kaynakta doğrulanmadı"
+    };
+    private static string IssueLabel(string? code) => code?.Split(':')[0] switch
+    {
+        null or "" => "",
+        "CollectionHadNoDevices" => "Koleksiyonda sunucu bulunamadı",
+        "AmbiguousDeviceRelationships" => "Birden fazla servis eşleşmesi var",
+        "DevicesWithoutService" => "Servisi bulunamayan sunucular var",
+        "DeviceRelationshipReadFailures" => "Bazı servis ilişkileri okunamadı",
+        "ChangeWindowMissing" => "OCO çalışma tarihleri bulunamadı",
+        "ChangeWindowAmbiguous" => "OCO için birden fazla kayıt bulundu",
+        "ChangeWindowInvalid" => "OCO çalışma tarihleri geçersiz; bitiş başlangıçtan sonra olmalı",
+        "ChangeWindowUnresolved" => "Kaynak tarihinin saat dilimi incelenmeli",
+        "ChangeWindowUnavailable" or "ChangeWindowTimeout" => "OCO tarih kaynağına erişilemedi",
+        "DeviceCeilingReached" or "DevicePageCeilingReached" => "Sorgu sınırına ulaşıldı; kapsam kısmi",
+        "PartialCollectionErrors" => "Koleksiyon sorgusu kısmen tamamlandı",
+        "DuplicateDevicesIgnored" => "Tekrarlanan sunucular birleştirildi",
+        "MalformedDeviceRowsSkipped" => "Geçersiz sunucu satırları atlandı",
+        "AnnouncementSourceCollectionUnavailable" => "Koleksiyon sorgusu başarısız; yönetici Worker sağlayıcı ayarlarını kontrol etmeli",
+        "AnnouncementSourceConfigurationUnavailable" => "Kaynak yapılandırması eksik",
+        "AnnouncementSourceAccessDenied" => "Kaynak sorgulama yetkisi yok",
+        _ => "Kaynak işlemi tamamlanamadı; yönetici işlem kaydını kontrol etmeli"
+    };
     private static string StateLabel(string state) => state switch
     {
         "Configured" => "Tanımlı",
@@ -134,6 +192,12 @@ public partial class AnnouncementSourceReview
         "Changed" => "Değişiklik var",
         "RequiresOperatorOffset" => "Elle tarih incelemesi gerekli",
         "SourceUnavailable" => "Kaynak değeri yok",
+        "Ready" => "İş kuyruğu hazır; kaynak bağlantısı henüz doğrulanmadı",
+        "NoWorker" => "Güncel Worker kaydı yok; işler bekleyebilir",
+        "WrongQueue" => "Çalışan Worker bu kuyruğu dinlemiyor",
+        "ConfigurationMissing" => "Kaynak yapılandırması eksik",
+        "Unknown" => "Kaynak durumu doğrulanamadı",
+        "Disabled" => "Kaynak toplama kapalı",
         _ => state
     };
     /// <inheritdoc />

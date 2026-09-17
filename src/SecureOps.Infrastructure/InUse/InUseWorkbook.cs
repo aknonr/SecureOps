@@ -78,6 +78,11 @@ public static class InUseWorkbook
                 .Select(f => new[] { server.Id, f.Key, InUseDisplayText.Field(f.Key, f.Value.Value), f.Value.Source }));
             evidenceRows.AddRange(record.Draft.Answers.Where(a => a.ServerId == server.Id)
                 .Select(a => new[] { a.ServerId, a.Check, a.Value, a.Evidence }));
+            if (record.Draft.Policy is { } policy)
+            {
+                evidenceRows.AddRange(policy.Fields.Where(f => f.ServerId == server.Id)
+                    .Select(f => new[] { f.ServerId, f.Field, f.Value ?? "Bilinmiyor", $"{f.Origin}; {policy.Revision}; {policy.Fingerprint}; öneri, kurulum veya doğrulama kanıtı değildir" }));
+            }
         }
         InUseSheet[] sheets = [new("Sunucular", serverRows), new("CheckList_TEKNIK", []), new("CheckList_THY", []),
             new("NMS", nmsRows), new("Provenance", provenance), new("ReviewEvidence", evidenceRows)];
@@ -103,12 +108,16 @@ public static class InUseWorkbook
     };
     private static string Value(InUseRecord record, InUseServer server, string field)
     {
+        InUsePolicyField? proposal = record.Draft?.Policy?.Fields.SingleOrDefault(f => f.ServerId == server.Id && f.Field == field);
         if (!field.StartsWith("check:", StringComparison.Ordinal))
-        { return server.Fields.TryGetValue(field, out InUseEvidence? value) ? InUseDisplayText.Field(field, value.Value) : "Unknown"; }
+        {
+            string? observed = server.Fields.GetValueOrDefault(field)?.Value;
+            return !string.IsNullOrWhiteSpace(observed) ? InUseDisplayText.Field(field, observed) : proposal?.Value ?? "Bilinmiyor";
+        }
         if (!InUseChecks.OperatorCodes.Contains(field[6..]))
-        { return "Unknown / not verified"; }
+        { return proposal?.Value ?? "Bilinmiyor / doğrulanmadı"; }
         string? answer = record.Draft!.Answers.SingleOrDefault(a => a.ServerId == server.Id && a.Check == field[6..])?.Value;
-        return answer switch { "Yes" => "Evet", "No" => "Hayır", "NotApplicable" => "Not applicable", _ => "Unknown / not verified" };
+        return answer switch { "Yes" => "Evet", "No" => "Hayır", "NotApplicable" => "Uygulanamaz", _ => "Bilinmiyor / doğrulanmadı" };
     }
     private static string Safe(string value)
     {

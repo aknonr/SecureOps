@@ -1,5 +1,16 @@
 # ADR-0020: In Use Local Review Workspace
 
+## rc6.21 Completion, 2026-09-17
+
+The owner authorizes the bounded completion exception from 778dca3, including the
+preserved checkpoint. A server-owned InUsePolicy revision produces per-server
+monitoring and organizational proposals. Explicit acceptance binds its fingerprint
+to the current source version and authenticated review actor; ordinary saves retain
+the accepted snapshot. Source changes require a fresh review. Unknown environments
+remain unresolved. Proposals never set Verified, individual ownership or OS release.
+Existing JSON persistence and immutable archive envelopes remain; no SQL delta or
+external-write implementation is introduced. See ../rc621-completion.md.
+
 ## 2026-09-14 Local Recovery Continuation
 
 Preserve the implemented source mapping and versioned review contract. Recoverable

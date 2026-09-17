@@ -1,0 +1,62 @@
+@using System.Text.Json
+@using SecureOps.Shared.Contracts.Announcements
+@implements IDisposable
+@inject OperationsDiagnosticsApiClient Diagnostics
+@inject IJSRuntime Js
+
+<section aria-label="Operasyon çalışma durumu" style="overflow-wrap:anywhere;padding-block:24px">
+    <h2>OCO ve rapor arşivi</h2>
+    <MudButton OnClick="ReadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.FactCheck" Variant="Variant.Outlined">Salt okunur denetimi çalıştır</MudButton>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    @if (_result is { } result)
+    {
+        <dl>
+            <dt>API çalışma kimliği / işlem</dt><dd>@result.RuntimeIdentity · @result.ProcessId</dd>
+            <dt>Kaynak iş kuyruğu</dt><dd>@State(result.Source.State) · @result.Source.MatchingWorkers eşleşen Worker · @result.Source.LastHeartbeat?.ToString("O")</dd>
+            <dt>Eksik ayarlar</dt><dd>@(result.Source.Missing.Length == 0 ? "Eksik anahtar saptanmadı; dış bağlantı sınanmadı" : string.Join(", ", result.Source.Missing))</dd>
+            <dt>Görsel dizini</dt><dd>@result.AssetDirectory</dd>
+            <dt>Özel rapor arşivi</dt><dd>@result.ReportDirectory · @State(result.ReportState)</dd>
+        </dl>
+        <p>Arşiv, XLSX içeren değişmez JSON kayıtları tutar. Dizin yazma izni bu salt okunur denetimde sınanmaz.</p>
+        <h3>Görseller ve eşlemeler</h3>
+        <ul>@foreach (var asset in result.Assets) { <li>@asset.Revision: @State(asset.State) · @asset.Format</li> }
+        @foreach (var bundle in result.Bundles) { <li>Paket @bundle.Label: @State(bundle.State)</li> }</ul>
+        <details><summary>Etkin ayarlar ve karşılaştırma</summary>
+            <dl>@foreach (var setting in result.Settings) { <dt>@setting.Key</dt><dd>@setting.Value · @setting.Provider</dd> }</dl>
+            <p>Yapılandırma özeti: @result.ConfigurationFingerprint</p>
+        </details>
+        <MudButton OnClick="DownloadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Tanılama kaydını indir</MudButton>
+    }
+</section>
+
+@code {
+    private OperationsReadiness? _result;
+    private UiProblem? _problem;
+    private bool _busy;
+    private readonly CancellationTokenSource _lifetime = new();
+    private async Task ReadAsync()
+    {
+        if (_busy) { return; }
+        _busy = true; _problem = null; _result = null;
+        try { _result = await Diagnostics.ReadAsync(_lifetime.Token); }
+        catch (SecureOpsApiException exception) { _problem = exception.Problem; }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { _busy = false; }
+    }
+    private async Task DownloadAsync()
+    {
+        if (_result is null) { return; }
+        try { await Js.InvokeVoidAsync("secureOpsDownload", _lifetime.Token, "wasas-api-operations.json", "application/json",
+            Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(_result, new JsonSerializerOptions { WriteIndented = true }))); }
+        catch (JSException) { _problem = UiProblemFactory.FromResponse(0, null); }
+    }
+    private static string State(string state) => state switch
+    {
+        "Ready" => "Kuyruk hazır; kaynak bağlantısı sınanmadı", "NoWorker" => "Güncel Worker yok", "WrongQueue" => "Worker kuyruğu farklı",
+        "Disabled" => "Kapalı", "ConfigurationMissing" => "Yapılandırma eksik", "Validated" => "Biçim ve baytlar doğrulandı",
+        "Missing" => "Dosya yok", "PermissionDenied" => "Dosya erişim izni yok", "Invalid" => "Eşleme veya biçim geçersiz",
+        "PresentNotValidated" => "Eşleme mevcut; tekil dosya sonuçlarını inceleyin", "ReadableWriteNotTested" => "Okunabiliyor; yazma sınanmadı",
+        "NotConfigured" => "Yapılandırılmadı", "DirectoryMissing" => "Dizin henüz yok", _ => "Doğrulanamadı"
+    };
+    public void Dispose() { _lifetime.Cancel(); _lifetime.Dispose(); }
+}

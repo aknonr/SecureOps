@@ -5,6 +5,9 @@ namespace SecureOps.Ui.Services;
 /// <summary>Manual wall-time editing and explicit instant-preserving offset conversion.</summary>
 public sealed class AnnouncementTime
 {
+    /// <summary>Reads a persisted explicit instant for comparison without changing its representation.</summary>
+    public static bool TryRead(string value, out DateTimeOffset instant) =>
+        DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out instant);
     /// <summary>Incomplete components stay incomplete until explicitly entered.</summary>
     public string Day { get; set; } = "";
     /// <summary>24-hour component.</summary>
@@ -38,7 +41,7 @@ public sealed class AnnouncementTime
         if (!ValidOffset(offset) || !DateTimeOffset.TryParse(Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTimeOffset current))
         { return false; }
         TimeSpan target = DateTimeOffset.Parse("2000-01-01T00:00:00" + offset, CultureInfo.InvariantCulture).Offset;
-        Load(current.ToOffset(target).ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture), offset);
+        Load(current.ToOffset(target).ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture), offset);
         return true;
     }
 }

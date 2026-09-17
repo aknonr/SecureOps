@@ -42,13 +42,28 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
         try
         {
             InUseRecord[] rows = [.. _records.Values.Where(r =>
-                (string.IsNullOrWhiteSpace(query.Search) || (r.Source.Code + " " + r.Source.Title).Contains(query.Search.Trim(), StringComparison.OrdinalIgnoreCase))
+                Matches(r.Source, query.Search)
                 && (query.Status is null || r.Status == query.Status)
                 && (query.View == "all" || query.View == "mine" && r.AssigneeId == actorId || query.View == "unassigned" && r.AssigneeId is null))
                 .OrderBy(r => r.Source.Code, StringComparer.Ordinal).ThenBy(r => r.Id)];
             return new(rows.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray(), rows.Length, query.Page, query.PageSize, _state);
         }
         finally { _gate.Release(); }
+    }
+
+    private static bool Matches(InUseSource source, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+        { return true; }
+        string term = search.Trim();
+        bool Match(string? value, bool turkish = false) => value is not null && (turkish
+            ? System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo.IndexOf(value, term, System.Globalization.CompareOptions.IgnoreCase) >= 0
+            : value.Contains(term, StringComparison.OrdinalIgnoreCase));
+        return Match(source.Code) || Match(source.Title, true) || source.Servers.Any(server =>
+            Match(server.Fields.GetValueOrDefault("HOSTNAME")?.Value)
+            || (server.RelatedRequestReporter is { State: "ExactMatch" or "Stale" } reporter
+                && ((reporter.DisplayState == "Returned" && Match(reporter.Display, true))
+                    || (reporter.ReferenceState == "Returned" && Match(reporter.UserReference)))));
     }
 
     /// <inheritdoc />

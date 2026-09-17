@@ -80,7 +80,13 @@ public sealed partial class InUseTests
         if (failure == "pending")
         { Directory.CreateDirectory(Path.Combine(directory, record.Id.ToString("D"), record.Version + ".json.pending")); }
         Func<Task> write = async () => await archive.AccessAsync(record.Id, record.Version, report, _ => Task.FromResult(true), _token);
-        await write.Should().ThrowAsync<Exception>();
+        InUseArchiveException exception = (await write.Should().ThrowAsync<InUseArchiveException>()).Which;
+        exception.Code.Should().Be(failure switch
+        {
+            "deployment" => "InUseArchiveNotConfigured",
+            "pending" => "InUseArchivePermissionDenied",
+            _ => "InUseArchiveUnavailable"
+        });
         File.Exists(Path.Combine(directory, record.Id.ToString("D"), record.Version + ".json")).Should().BeFalse();
     }
 
@@ -278,7 +284,7 @@ public sealed partial class InUseTests
         report.Sheets[0].Rows.Should().HaveCount(29);
         report.Sheets[3].Rows[0].Should().HaveCount(22);
         report.Sheets[0].Rows[2][1].Should().StartWith("'");
-        report.Sheets[3].Rows[1][0].Should().Be("Unknown / not verified");
+        report.Sheets[3].Rows[1][0].Should().Be("Bilinmiyor / doğrulanmadı");
         report.Sheets[1].Rows.Should().BeEmpty();
         report.Sheets[4].Rows.Should().Contain(r => r.Contains(record.SourceHash));
         report.Sheets[4].Rows.Should().Contain(r => r[0] == "Relationships" && r[1] == record.Source.RelationshipEvidence);
@@ -398,7 +404,7 @@ public sealed partial class InUseTests
         public InUseService Service { get; }
         public ApplicationUser User { get; }
         public IAccessRepository Users { get; } = Substitute.For<IAccessRepository>();
-        public Fixture(string role = "Admin", InUseReportArchive? archive = null)
+        public Fixture(string role = "Admin", InUseReportArchive? archive = null, InUsePolicy? policy = null)
         {
             Repository = new(Audit);
             User = new(Guid.NewGuid(), "synthetic:reviewer", "test", AccessStatus.Approved, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, 1, [role], AccessRoleCatalog.GetCapabilities([role]));
@@ -408,7 +414,7 @@ public sealed partial class InUseTests
             IAccessRepository users = Users;
             users.GetUserAsync(User.Id, Arg.Any<CancellationToken>()).Returns(User);
             users.ListUsersAsync(Arg.Any<CancellationToken>()).Returns(new[] { User });
-            Service = new(Repository, Source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance, archive);
+            Service = new(Repository, Source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance, archive, policy: policy);
         }
         public async Task<InUseRecord> ImportAsync()
         {

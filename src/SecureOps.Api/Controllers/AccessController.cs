@@ -29,6 +29,7 @@ public sealed partial class AccessController : ControllerBase
     private readonly ApplicationSessionCookie _sessionCookie;
     private readonly SessionSecurityOptions _sessionOptions;
     private readonly ILogger<AccessController> _logger;
+    private readonly ICorporatePrincipalResolver _principalResolver;
 
     /// <summary>Initializes the controller.</summary>
     public AccessController(
@@ -37,7 +38,8 @@ public sealed partial class AccessController : ControllerBase
         ApplicationSessionContext sessionContext,
         ApplicationSessionCookie sessionCookie,
         IOptions<SessionSecurityOptions> sessionOptions,
-        ILogger<AccessController> logger)
+        ILogger<AccessController> logger,
+        ICorporatePrincipalResolver principalResolver)
     {
         _accessService = accessService;
         _sessionService = sessionService;
@@ -45,6 +47,7 @@ public sealed partial class AccessController : ControllerBase
         _sessionCookie = sessionCookie;
         _sessionOptions = sessionOptions.Value;
         _logger = logger;
+        _principalResolver = principalResolver;
     }
 
     /// <summary>Returns current Pending, Approved, or Disabled application access.</summary>
@@ -217,7 +220,8 @@ public sealed partial class AccessController : ControllerBase
     private ActionResult<AccessRequestResponse> MutationResponse(AccessServiceResult<AccessMutationResult> result) =>
         result.IsSuccess ? Ok(ToResponse(result.Value!.Request!)) : Failure<AccessRequestResponse>(result.ErrorCode!);
 
-    private AccessOperationContext Context() => new(User.Identity?.Name ?? "unknown", CorrelationId(), HttpContext.Connection.RemoteIpAddress?.ToString());
+    private AccessOperationContext Context() => new(_principalResolver.Resolve(User)?.Identifier ?? "",
+        CorrelationId(), HttpContext.Connection.RemoteIpAddress?.ToString());
     private string CorrelationId() => Activity.Current?.Id ?? HttpContext.TraceIdentifier;
 
     private ActionResult<T> Failure<T>(string code)
@@ -227,6 +231,9 @@ public sealed partial class AccessController : ControllerBase
             OperationalErrorCodes.AccessValidationFailed => (StatusCodes.Status400BadRequest, "validation", false),
             OperationalErrorCodes.AccessRecordNotFound => (StatusCodes.Status404NotFound, "access", false),
             OperationalErrorCodes.AccessSelfApprovalDenied => (StatusCodes.Status403Forbidden, "authorization", false),
+            OperationalErrorCodes.AccessProtectedRole or OperationalErrorCodes.AccessSelfEscalationDenied or OperationalErrorCodes.AccessLastAdministratorDenied
+                => (StatusCodes.Status403Forbidden, "administrative-guard", false),
+            OperationalErrorCodes.AccessDenied => (StatusCodes.Status403Forbidden, "authorization", false),
             OperationalErrorCodes.AccessRequestAlreadyDecided => (StatusCodes.Status409Conflict, "lifecycle", false),
             OperationalErrorCodes.AccessUserInvalidState => (StatusCodes.Status409Conflict, "lifecycle", false),
             OperationalErrorCodes.AccessConcurrencyConflict => (StatusCodes.Status409Conflict, "concurrency", true),

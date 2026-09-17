@@ -45,11 +45,12 @@ public sealed partial class AnnouncementService(SqlAnnouncementStore store, Anno
                 string[] invalid = AnnouncementValidation.Errors(input, false);
                 if (invalid.Length > 0)
                 { return new(Error: "AnnouncementInvalid", Fields: invalid); }
-                AnnouncementPresentation presentation = await renderer.PresentationAsync(input, token);
+                AnnouncementPresentation? presentation = await DraftPresentationAsync(input, token);
                 var transient = new AnnouncementDraft(Guid.Empty, owner, 0, DateTimeOffset.UnixEpoch, input, "",
-                    presentation.Hash, TemplateRevision: input.TemplateRevision);
-                return new(Html: AnnouncementRenderer.RenderPresentation(transient, presentation, true).Html,
-                    Fields: AnnouncementValidation.Errors(input, true));
+                    presentation?.Hash ?? "", TemplateRevision: input.TemplateRevision);
+                return new(Html: presentation is null ? AnnouncementRenderer.RenderUnbranded(input)
+                    : AnnouncementRenderer.RenderPresentation(transient, presentation, true).Html,
+                    Fields: [.. AnnouncementValidation.Errors(input, true), .. presentation is null ? new[] { "BannerRevision" } : []]);
             }
             if (format == "list")
             {
@@ -74,12 +75,12 @@ public sealed partial class AnnouncementService(SqlAnnouncementStore store, Anno
                 string[] errors = AnnouncementValidation.Errors(input, false);
                 if (errors.Length != 0)
                 { return new(Error: "AnnouncementInvalid", Fields: errors); }
-                AnnouncementPresentation presentation = await renderer.PresentationAsync(input, token);
+                AnnouncementPresentation? presentation = await DraftPresentationAsync(input, token);
                 string[] to = [.. input.To.Distinct(StringComparer.OrdinalIgnoreCase)];
                 input = input with { To = to, Cc = [.. input.Cc.Except(to, StringComparer.OrdinalIgnoreCase).Distinct(StringComparer.OrdinalIgnoreCase)] };
                 string sender = AnnouncementValidation.Address(current.Value.User.Mail) ? current.Value.User.Mail! : "";
                 var next = new AnnouncementDraft(id, owner, version + 1, DateTimeOffset.UtcNow, input, sender,
-                    presentation.Hash, TemplateRevision: input.TemplateRevision);
+                    presentation?.Hash ?? "", TemplateRevision: input.TemplateRevision);
                 string? error = reviewedSave is null ? await store.SaveAsync(next, context.CorrelationId, token)
                     : await reviewedSave(next, token);
                 return error is null ? new(next) : new(Error: error);
@@ -124,5 +125,15 @@ public sealed partial class AnnouncementService(SqlAnnouncementStore store, Anno
             logger.LogError("Announcement operation failed. FailureType: {FailureType}", exception.GetType().Name);
             return new(Error: "AnnouncementUnavailable");
         }
+    }
+
+    // A missing presentation must not prevent durable draft/source work. Preparation still requires
+    // a validated hash bound by an explicit save, so recovering assets cannot promote an old draft.
+    private async Task<AnnouncementPresentation?> DraftPresentationAsync(AnnouncementContent input, CancellationToken token)
+    {
+        try
+        { return await renderer.PresentationAsync(input, token); }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or UnauthorizedAccessException)
+        { return null; }
     }
 }

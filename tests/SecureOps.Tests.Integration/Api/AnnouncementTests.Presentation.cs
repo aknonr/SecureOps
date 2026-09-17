@@ -32,8 +32,8 @@ public sealed partial class AnnouncementTests
         using var mail = MimeMessage.Load(path);
         string preview = File.ReadAllText(Path.Combine(root, "saved-preview.html"));
         AnnouncementContent saved = JsonSerializer.Deserialize<AnnouncementContent>(File.ReadAllText(Path.Combine(root, "saved-draft.json")), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
-        mail.To.Mailboxes.Select(m => m.Address).Should().Equal("reader@example.invalid");
-        mail.Cc.Mailboxes.Select(m => m.Address).Should().Equal("copy@example.invalid");
+        mail.To.Mailboxes.Select(m => m.Address).Should().Equal(saved.To);
+        mail.Cc.Mailboxes.Select(m => m.Address).Should().Equal(saved.Cc);
         mail.Subject.Should().Be(saved.Subject);
         mail.TextBody.Should().Contain(saved.Description);
         mail.HtmlBody.Should().Contain(WebUtility.HtmlEncode(saved.Description)).And.NotContain("<script");

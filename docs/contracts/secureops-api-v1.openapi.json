@@ -2110,6 +2110,14 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "reviewedSourceOffset",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6538,6 +6546,64 @@
         }
       }
     },
+    "/api/v1/diagnostics/operations": {
+      "get": {
+        "tags": [
+          "OperationsDiagnostics"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsReadiness"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsReadiness"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsReadiness"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/announcements/source/readiness": {
+      "get": {
+        "tags": [
+          "OperationsDiagnostics"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementSourceReadiness"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementSourceReadiness"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementSourceReadiness"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/resources/me/layout": {
       "put": {
         "tags": [
@@ -10583,6 +10649,14 @@
           "expectedOverrideVersion": {
             "type": "integer",
             "format": "int64"
+          },
+          "profileFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedSourceOffset": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -10808,6 +10882,52 @@
           "overrideVersion": {
             "type": "integer",
             "format": "int64"
+          },
+          "profileFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedSourceOffset": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnnouncementSourceReadiness": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "stage": {
+            "type": "string",
+            "nullable": true
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "workerState": {
+            "type": "string",
+            "nullable": true
+          },
+          "matchingWorkers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastHeartbeat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -11929,6 +12049,24 @@
         },
         "additionalProperties": false
       },
+      "EffectiveOperationSetting": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ExportInUseRequest": {
         "type": "object",
         "properties": {
@@ -12254,6 +12392,10 @@
           "preparedBy": {
             "type": "string",
             "format": "uuid"
+          },
+          "preparedByLabel": {
+            "type": "string",
+            "nullable": true
           },
           "preparedAt": {
             "type": "string",
@@ -12581,6 +12723,28 @@
             "nullable": true
           },
           "mail": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperationAssetReadiness": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "nullable": true
+          },
+          "format": {
+            "type": "string",
+            "nullable": true
+          },
+          "sha256": {
             "type": "string",
             "nullable": true
           }
@@ -12997,6 +13161,64 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DurationStatisticsResponse"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "OperationsReadiness": {
+        "type": "object",
+        "properties": {
+          "runtimeIdentity": {
+            "type": "string",
+            "nullable": true
+          },
+          "processId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "configurationFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EffectiveOperationSetting"
+            },
+            "nullable": true
+          },
+          "source": {
+            "$ref": "#/components/schemas/AnnouncementSourceReadiness"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationAssetReadiness"
+            },
+            "nullable": true
+          },
+          "assetDirectory": {
+            "type": "string",
+            "nullable": true
+          },
+          "reportDirectory": {
+            "type": "string",
+            "nullable": true
+          },
+          "reportState": {
+            "type": "string",
+            "nullable": true
+          },
+          "bundles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementBanner"
             },
             "nullable": true
           }
@@ -13638,6 +13860,10 @@
             "nullable": true
           },
           "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedPolicyFingerprint": {
             "type": "string",
             "nullable": true
           }

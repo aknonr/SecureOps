@@ -51,6 +51,7 @@ const { chromium, request } = require(driver);
         await navigate(page, ui, 'access/users?q=ops082&status=Approved');
         await ready();
         await page.locator('.so-access-table-row').first().click();
+        await page.waitForURL(url => /^\/access\/users\/[a-f0-9-]+$/.test(url.pathname));
         await ready();
         const targetId = new URL(page.url()).pathname.split('/').pop();
         await capture('user-detail');

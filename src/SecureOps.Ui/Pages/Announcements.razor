@@ -62,14 +62,23 @@
     }
     @if (_allowed && _form is not null)
     {
-        <dl><dt>Profil e-postası / yeni hazırlığın göndereni</dt><dd>@(_page?.CurrentSender ?? "Kayıtlı e-posta eksik veya geçersiz; taslak kaydedilebilir.")</dd></dl>
+        <div class="so-announcement-summary" aria-label="Güncel duyuru">
+            <strong>@(_form.Values["OcoReference"].Length == 0 ? "Yeni duyuru" : _form.Values["OcoReference"])</strong>
+            <span role="status">@(_dirty ? "Kaydedilmemiş değişiklikler" : _version > 0 ? $"Kaydedildi · Sürüm {_version}" : "Yeni taslak")</span>
+            <span>Gönderen: @(_page?.CurrentSender ?? "Kayıtlı e-posta eksik; taslak kaydedilebilir")</span>
+        </div>
+        <section class="so-announcement-stage" aria-labelledby="announcement-stage-work">
+        <h2 id="announcement-stage-work">1. Çalışma bilgileri</h2>
+        <AnnouncementField Key="OcoReference" Label="OCO kayıt numarası" Type="text" Value="@_form.Values["OcoReference"]" Error="@FieldError("OcoReference")" ValueChanged="@(value => Change("OcoReference", value))" />
         @if (_canSource)
-        { <MudButton StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="@(() => _sourceOpen = !_sourceOpen)">Kaynak incelemesi</MudButton> }
+        { <MudButton StartIcon="@(_sourceOpen ? Icons.Material.Filled.Edit : Icons.Material.Filled.CloudDownload)" OnClick="@(() => _sourceOpen = !_sourceOpen)">@(_sourceOpen ? "Elle düzenlemeye geç" : "Kaynaktan getir")</MudButton> }
         @if (_sourceOpen && _canSource)
         {
             <AnnouncementSourceReview @key="_id" DraftId="_id" Version="_version" OcoReference="@_form.Values["OcoReference"]"
-                Services="_form.Services" Locked="@(_busy || _dirty || _comparison is not null || !_canSource)" ApplyRequested="ApplySourceAsync" AccessLost="@(p => LoseAccess(p))" />
+                Services="_form.Services" EnsureSaved="SaveForSourceAsync" Locked="@(_busy || _dirty || _comparison is not null || !_canSource)" ApplyRequested="ApplySourceAsync" AccessLost="SourceAccessLostAsync" />
         }
+        @if (!_sourceOpen) { <p role="status">Elle düzenleme · Girilen bilgiler kaynak doğrulaması değildir.</p> }
+        </section>
         @if (_comparison is { } current)
         {
             <section aria-label="Kayıt karşılaştırması">
@@ -90,12 +99,13 @@
         <div hidden="@(!_wide && _previewTab)">
         <EditForm Model="_form" OnSubmit="SaveAsync">
             <fieldset disabled="@_busy" data-guide="announcement-details">
-                @if (_form.Template == "oco-v1")
+                @if (_form.Template != "oco-table-v3")
                 { <MudButton id="announcement-TemplateRevision" StartIcon="@Icons.Material.Filled.Upgrade" OnClick="UpgradeAsync">Yeni duyuru biçimine yükselt</MudButton> }
                 @if (!_banners.Any(b => b.State == "PresentNotValidated"))
                 { <p role="alert">Kullanılabilir görsel paketi yok. Yöneticiniz görsel kurulumunu tamamladıktan sonra görselleri yenileyin.</p> }
+                <h2>2. Duyuru ve alıcılar</h2>
                 <div class="so-announcement-grid">
-                    @foreach (var f in AnnouncementForm.Fields.Where(f => !f.Optional))
+                    @foreach (var f in AnnouncementForm.Fields.Where(f => !f.Optional && f.Key != "OcoReference"))
                     { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" Error="@FieldError(f.Key)" ValueChanged="@(value => Change(f.Key, value))" /> }
                     <label class="so-announcement-field" for="announcement-BannerRevision">Görsel
                         <select id="announcement-BannerRevision" @bind="_form.Banner" @bind:after="Changed">
@@ -107,14 +117,16 @@
                         </select>
                     </label>
                 </div>
-                @if (_form.Template == "oco-table-v2")
+                @if (_form.Template is "oco-table-v2" or "oco-table-v3")
                 {
-                    <details><summary>Etkilenen servisler (@_form.Services.Length)</summary>
+                    <section aria-label="Etkilenen servisler"><h2>Etkilenen servisler (@_form.Services.Length)</h2>
                         <label class="so-announcement-field" for="announcement-AffectedServices">Çalışmadan etkilenen servisler
                             <textarea id="announcement-AffectedServices" rows="8" maxlength="16000" @bind="_form.ServicesText" @bind:event="oninput" @bind:after="Changed"></textarea>
                         </label>
-                    </details>
+                    </section>
                 }
+                @if (AnnouncementTime.TryRead(_form.Values["WorkStart"], out var start) && AnnouncementTime.TryRead(_form.Values["WorkEnd"], out var finish) && start.Offset != finish.Offset)
+                { <p role="status">Başlangıç ve bitiş farklı UTC farkları kullanıyor. Sıralama gerçek zamanlarına göre denetlenir; hazırlamadan önce iki saat dilimini de inceleyin.</p> }
                 <MudButton OnClick="BannersAsync" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_busy">Görselleri yenile</MudButton>
                 @foreach (string kind in new[] { "To", "Cc" })
                 {
@@ -146,12 +158,15 @@
         </EditForm>
         </div>
             <section class="so-announcement-preview" aria-label="Duyuru önizlemesi" hidden="@(!PreviewVisible)">
-                <h2>Önizleme</h2>
+                <h2>3. Önizleme ve hazırlık</h2>
                 <div class="so-preview-status" role="status" aria-live="polite">
                     <span>@PreviewStatus</span>
                     <span>@(_previewStale && _html is not null ? "Önceki önizleme; güncel alanları yansıtmıyor" : "")</span>
                 </div>
-                <AnnouncementPreviewFrame @key="_id" Html="@_html" HtmlGeneration="_htmlGeneration" Generation="_previewRequests.Generation" Presented="PreviewPresented" />
+                @if (_html is null)
+                { <div class="so-preview-empty"><MudIcon Icon="@Icons.Material.Filled.Description" /><p>Taslak önizlemesi bekleniyor</p><p>Eksik alanlar aşağıda listelenir. Taslağınızı kaydetmeye devam edebilirsiniz.</p></div> }
+                @if (_html is not null)
+                { <AnnouncementPreviewFrame @key="_id" Html="@_html" HtmlGeneration="_htmlGeneration" Generation="_previewRequests.Generation" Presented="PreviewPresented" /> }
                 <div class="so-preview-feedback">
                 @if (_previewProblem is not null && _previewFields.Count == 0)
                 { <p>@_previewProblem.Explanation <MudButton OnClick="SchedulePreview">Yeniden dene</MudButton></p> }

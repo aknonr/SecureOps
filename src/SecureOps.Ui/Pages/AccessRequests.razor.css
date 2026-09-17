@@ -1,3 +1,6 @@
+.so-page { max-width:1440px;font-size:16px;line-height:1.5; }
+.so-page ::deep .mud-table-cell,.so-page label,.so-page input,.so-page select { font-size:16px; }
+.so-page ::deep .mud-button-root,.so-page input,.so-page select { min-height:44px; }
 .so-access-requests ::deep .so-panel { background:transparent;box-shadow:none;border-radius:0;padding:16px 0; }
 .so-access-requests ::deep .so-admin-grid { gap:24px; }
 .so-access-requests ::deep .so-admin-detail { border-left:1px solid var(--mud-palette-divider);padding-left:24px; }

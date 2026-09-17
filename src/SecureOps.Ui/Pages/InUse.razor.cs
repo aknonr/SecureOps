@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
 using SecureOps.Shared.Auth;
+using SecureOps.Shared.Contracts.Api;
 using SecureOps.Shared.Contracts.InUse;
 using SecureOps.Ui.Services;
 
@@ -38,6 +39,7 @@ public partial class InUse
     private readonly ElementReference[] _answerElements = new ElementReference[3];
     private int? _focusAnswer;
     private bool _busy, _dirty, _reloadRequested;
+    private bool _assignmentOpen, _acceptPolicy;
     private int _number = 1, _size = 25, _sheet;
     private int _generation;
     private List<AnswerEdit> _answers = [];
@@ -159,7 +161,8 @@ public partial class InUse
         bool assignmentEdited = AssignmentEdited;
         SetRecord(await SendAsync<InUseRecord>(HttpMethod.Put, $"/{_record.Id}/draft",
             new SaveInUseDraftRequest(_record.Version, _record.SourceVersion,
-                _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence)).ToArray(), _notes)));
+                _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence)).ToArray(), _notes)
+            { ReviewedPolicyFingerprint = _acceptPolicy ? _record.PolicyProposal?.Fingerprint : null }));
         if (assignmentEdited)
         { _assignee = assignee; }
         _notice = "Yerel inceleme taslağı kaydedildi.";
@@ -233,8 +236,16 @@ public partial class InUse
         _report = await SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
             new ExportInUseRequest(_record.Version, Archive: archivedVersion is null, ArchivedVersion: archivedVersion));
         _record = _record with { ArchivedVersions = _record.ArchivedVersions.Append(_report.Version).Distinct().OrderDescending().ToArray() };
-        await Js.InvokeVoidAsync("secureOpsDownload", _report.FileName,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(_report.Content));
+        _notice = "Rapor WASAS arşivinde korunuyor. İndirme konumunu tarayıcınız belirler.";
+        try
+        {
+            await Js.InvokeVoidAsync("secureOpsDownload", _report.FileName,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(_report.Content));
+        }
+        catch (Exception exception) when (exception is JSException or TaskCanceledException)
+        {
+            _problem = UiProblemFactory.FromResponse(0, new ProblemDetailsPayload { Code = "InUseDownloadFailed" });
+        }
     });
     private bool Ready()
     {
@@ -253,7 +264,16 @@ public partial class InUse
     }
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
-    { if (_focusAnswer is int index) { _focusAnswer = null; await _answerElements[index].FocusAsync(); } }
+    {
+        if (_focusAnswer is int index)
+        { _focusAnswer = null; await _answerElements[index].FocusAsync(); }
+        if (Id is null && _page is not null && !_busy)
+        {
+            try
+            { await Js.InvokeVoidAsync("secureOpsInUseScroll.restore"); }
+            catch (JSDisconnectedException) { }
+        }
+    }
     private Task<InUseReport> ReportAsync() => SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
         new ExportInUseRequest(_record.Version));
     private Task<T> ReadAsync<T>(string path) => CurrentAsync(Api.GetAsync<T>(path, _lifetime.Token));
@@ -269,6 +289,7 @@ public partial class InUse
     private void SetRecord(InUseRecord record)
     {
         _record = record;
+        _acceptPolicy = false;
         _comparison = null;
         _assignee = record.AssigneeId?.ToString("D") ?? "";
         _notes = record.Draft?.Notes ?? "";
@@ -369,6 +390,36 @@ public partial class InUse
     /// <inheritdoc />
     public void Dispose() { AccessProvider.Changed -= AccessChanged; ++_generation; _lifetime.Cancel(); _lifetime.Dispose(); }
     private static string Evidence(InUseEvidence evidence) => (evidence.Value ?? "Bilinmiyor") + " · " + evidence.Source;
+    private static string BusinessEvidence(InUseEvidence evidence) => string.IsNullOrWhiteSpace(evidence.Value)
+        ? "Kaynak eşlemesi henüz doğrulanmadı" : InUseDisplayText.Decode(evidence.Value);
+    private static string ReporterSummary(InUseRecord record) => string.Join("; ", record.Source.Servers
+        .Select(s => s.RelatedRequestReporter).Where(r => r is not null)
+        .Select(r => InUseDisplayText.Decode(r!.Display)).Distinct(StringComparer.Ordinal).Take(3)) is { Length: > 0 } names
+        ? names : "Bildiren bilgisi henüz doğrulanmadı";
+    private static string PolicyField(string field) => field switch
+    {
+        "check:NmsRequested" => "NMS kapsamı",
+        "check:MemoryAlarm" => "Bellek alarmı",
+        "check:CpuAlarm" => "CPU alarmı",
+        "check:UpDownAlarm" => "Erişilebilirlik alarmı",
+        "check:DiskAlarm" => "Disk alarmı",
+        "COUNTRY" => "Ülke",
+        "Department" => "Bölüm",
+        "Sub_Department" => "Ekip",
+        "Contact_email" => "İletişim e-postası",
+        "ITMC_Event_Owner_Group" => "Olay sorumlu grubu",
+        "Device_Type" => "Cihaz türü",
+        _ => field
+    };
+    private static string PolicyOrigin(string origin) => origin switch
+    {
+        "EnvironmentPolicy" => "Ortam kuralı önerisi",
+        "MonitoringProposal" => "İzleme önerisi",
+        "ConfiguredProposal" => "Yönetici tanımlı öneri",
+        "Source" => "Kaynak verisi",
+        "UnresolvedEnvironment" => "Ortam sınıflandırması gerekli",
+        _ => "Onaylı yapılandırma gerekli"
+    };
     private static string CompletionStatus(InUseCompletion intent) => intent.Stage switch
     {
         "Blocked" => "Tamamlama: sözleşme nedeniyle engelli. Ek yüklenmedi; görev tamamlanmadı; OR son durumu doğrulanmadı.",

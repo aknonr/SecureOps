@@ -27,7 +27,7 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
     IOptions<AnnouncementOptions> module, TimeProvider time, ILogger<AnnouncementSourceService> logger)
 {
     /// <summary>Draft fields a reviewed application is allowed to write.</summary>
-    public static readonly string[] Applicable = ["Scope", "Impact", "Checks", "Description", "AnnouncementDate", "OcoReference"];
+    public static readonly string[] Applicable = ["Subject", "Scope", "Impact", "Checks", "Description", "AnnouncementDate", "OcoReference", "WorkStart", "WorkEnd"];
 
     /// <summary>Lists the protected profile allowlist with its configuration state.</summary>
     public Task<AnnouncementSourceOutcome> ProfilesAsync(ClaimsPrincipal principal, AccessOperationContext context, CancellationToken token) =>
@@ -81,7 +81,7 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
 
     /// <summary>Builds a reviewable difference between one snapshot and the live draft.</summary>
     public Task<AnnouncementSourceOutcome> ProposalAsync(ClaimsPrincipal principal, AccessOperationContext context,
-        Guid draftId, Guid jobId, CancellationToken token) =>
+        Guid draftId, Guid jobId, CancellationToken token, string? reviewedSourceOffset = null) =>
         GuardedAsync(principal, context, async owner =>
         {
             (AnnouncementSourceOutcome? error, AnnouncementSourceJob? job, AnnouncementDraft? draft,
@@ -89,7 +89,7 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
             if (error is not null)
             { return error; }
             await store.ReadAuditAsync(owner, draftId, jobId, "Proposal", context.CorrelationId, token);
-            return new(Proposal: Build(job!, job!.Snapshot!, draft!, profile!, overrides!));
+            return new(Proposal: Build(job!, job!.Snapshot!, draft!, profile!, overrides!, reviewedSourceOffset));
         }, token);
 
     /// <summary>
@@ -112,13 +112,16 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
             { return new(Error: "AnnouncementConflict"); }
             if (overrides!.Version != request.ExpectedOverrideVersion)
             { return new(Error: "AnnouncementSourceOverrideConflict"); }
+            if (job!.Snapshot!.ProfileFingerprint is not null
+                && !string.Equals(request.ProfileFingerprint, job.Snapshot.ProfileFingerprint, StringComparison.Ordinal))
+            { return new(Error: "AnnouncementSourceProfileChanged"); }
             if (overrides!.AppliedCapturedAt is { } applied && job!.Snapshot!.CapturedAt <= applied)
             {
                 // A job that finished late must not overwrite content a newer snapshot already produced.
                 logger.LogInformation("Refused a stale announcement source application. JobId: {JobId}.", job.JobId);
                 return new(Error: "AnnouncementSourceStale");
             }
-            AnnouncementSourceProposal proposal = Build(job!, job!.Snapshot!, draft, profile!, overrides);
+            AnnouncementSourceProposal proposal = Build(job!, job!.Snapshot!, draft, profile!, overrides, request.ReviewedSourceOffset);
             AnnouncementContent content = draft.Content;
             List<string> written = [], skipped = [];
             foreach (string field in requested)
@@ -130,7 +133,7 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
                 written.Add(field);
             }
             bool services = request.ApplyAffectedServices
-                && content.TemplateRevision == "oco-table-v2" && proposal.ProposedAffectedServices.Length > 0;
+                && content.TemplateRevision is "oco-table-v2" or "oco-table-v3" && proposal.ProposedAffectedServices.Length > 0;
             if (services)
             { content = content with { AffectedServices = proposal.ProposedAffectedServices }; }
             else if (request.ApplyAffectedServices)
@@ -167,27 +170,40 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
         if (draft is null)
         { return (new(Error: "AnnouncementNotFound"), null, null, null, null); }
         MaintenanceProfileOptions? profile = profiles.Configured(job.Profile);
+        if (profile is not null && job.Snapshot.ProfileFingerprint is { } captured
+            && !string.Equals(captured, MaintenanceProfileCatalog.Fingerprint(profile), StringComparison.Ordinal))
+        { return (new(Error: "AnnouncementSourceProfileChanged"), null, null, null, null); }
         return profile is null
             ? (new(Error: "AnnouncementSourceProfileUnavailable", Fields: profiles.Resolve(job.Profile).Missing), null, null, null, null)
             : (null, job, draft, profile, await store.OverridesAsync(draftId, owner, token));
     }
 
     private AnnouncementSourceProposal Build(AnnouncementSourceJob job, AnnouncementSourceSnapshot snapshot,
-        AnnouncementDraft draft, MaintenanceProfileOptions profile, AnnouncementSourceOverrides overrides)
+        AnnouncementDraft draft, MaintenanceProfileOptions profile, AnnouncementSourceOverrides overrides, string? reviewedOffset = null)
     {
         AnnouncementContent content = draft.Content;
+        string? start = SourceWindowEvidence.Resolve(snapshot.Work?.ProposedStartText, reviewedOffset);
+        string? finish = SourceWindowEvidence.Resolve(snapshot.Work?.ProposedFinishText, reviewedOffset);
+        if (snapshot.Work?.Resolution is "Invalid" or "Ambiguous" or "Failed" or "Missing")
+        { start = null; finish = null; }
+        if (start is not null && finish is not null && DateTimeOffset.Parse(finish, System.Globalization.CultureInfo.InvariantCulture)
+            <= DateTimeOffset.Parse(start, System.Globalization.CultureInfo.InvariantCulture))
+        { start = null; finish = null; }
+        string? description = profile.DescriptionTemplate.Length == 0 ? profile.Description : start is null || finish is null ? null
+            : profile.DescriptionTemplate.Replace("{WorkStart}", DisplayTime(start), StringComparison.Ordinal)
+                .Replace("{WorkEnd}", DisplayTime(finish), StringComparison.Ordinal);
         ProposedField[] fields =
         [
+            Text("Subject", content.Subject, $"{job.OcoReference} - Planlı Çalışma Duyurusu", "Profile"),
             Text("Scope", content.Scope, profile.Scope, "Profile"),
             Text("Impact", content.Impact, profile.Impact, "Profile"),
             Text("Checks", content.Checks, profile.Checks, "Profile"),
-            Text("Description", content.Description, profile.Description, "Profile"),
+            Text("Description", content.Description, description, "Profile"),
             Text("OcoReference", content.OcoReference, job.OcoReference, "Submission"),
             // A source-local calendar date needs no timezone resolution; an instant would.
-            Text("AnnouncementDate", content.AnnouncementDate, snapshot.Work?.ProposedStartDate, "SourceLocalDate"),
-            // The source window carries no offset, so it can never become a draft instant automatically.
-            Window("WorkStart", content.WorkStart, snapshot.Work?.ProposedStartText),
-            Window("WorkEnd", content.WorkEnd, snapshot.Work?.ProposedFinishText),
+            Text("AnnouncementDate", content.AnnouncementDate, start?[..10] ?? snapshot.Work?.ProposedStartDate, "SourceStartDateProposal"),
+            Window("WorkStart", content.WorkStart, snapshot.Work?.ProposedStartText, start, reviewedOffset, snapshot.Work?.Resolution),
+            Window("WorkEnd", content.WorkEnd, snapshot.Work?.ProposedFinishText, finish, reviewedOffset, snapshot.Work?.Resolution),
             // Restart times are never inferred from an OCO finish time; the source does not state them.
             new("RestartStart", content.RestartStart, null, null, "NotDerivable", "SourceUnavailable"),
             new("RestartEnd", content.RestartEnd, null, null, "NotDerivable", "SourceUnavailable")
@@ -204,20 +220,30 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
             to.Difference, cc.Difference, profile.HighPriority, "DistributionRequest",
             new SourceCompletenessView(done.DevicesComplete, done.DeviceCount, done.DevicePagesRead, done.DevicesRequested,
                 done.ServicesResolved, done.ServicesAmbiguous, done.ServicesMissing, done.ServicesFailed, done.Partial, done.Warnings),
-            overrides.AppliedCapturedAt is { } applied && snapshot.CapturedAt <= applied, overrides.Version);
+            overrides.AppliedCapturedAt is { } applied && snapshot.CapturedAt <= applied, overrides.Version)
+        { ProfileFingerprint = snapshot.ProfileFingerprint, ReviewedSourceOffset = reviewedOffset };
     }
+
+    private static string DisplayTime(string value) => DateTimeOffset.Parse(value, System.Globalization.CultureInfo.InvariantCulture)
+        .ToString("dd.MM.yyyy HH:mm:ss 'UTC' zzz", System.Globalization.CultureInfo.InvariantCulture);
 
     private static ProposedField Text(string field, string? current, string? proposed, string origin) =>
         new(field, current, string.IsNullOrWhiteSpace(proposed) ? null : proposed, null, origin,
             string.IsNullOrWhiteSpace(proposed) ? "SourceUnavailable"
                 : string.Equals(current, proposed, StringComparison.Ordinal) ? "Unchanged" : "Changed");
 
-    private static ProposedField Window(string field, string? current, string? sourceText) =>
-        new(field, current, null, sourceText, "SourceLocalText",
-            sourceText is null ? "SourceUnavailable" : "RequiresOperatorOffset");
+    private static ProposedField Window(string field, string? current, string? sourceText, string? proposed, string? reviewedOffset, string? resolution) =>
+        new(field, current, proposed, sourceText, SourceWindowEvidence.TryInstant(sourceText, out _) ? "SourceExplicitOffset"
+            : reviewedOffset is null ? "SourceLocalText" : "OperatorReviewedOffset",
+            sourceText is null ? "SourceUnavailable" : proposed is null
+                ? resolution is "Unresolved" && reviewedOffset is null ? "RequiresOperatorOffset" : "Invalid"
+                : proposed == current ? "Unchanged" : "Changed");
 
     private static AnnouncementContent Write(AnnouncementContent content, string field, string value) => field switch
     {
+        "Subject" => content with { Subject = value },
+        "WorkStart" => content with { WorkStart = value },
+        "WorkEnd" => content with { WorkEnd = value },
         "Scope" => content with { Scope = value },
         "Impact" => content with { Impact = value },
         "Checks" => content with { Checks = value },
@@ -239,9 +265,10 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
         {
             AccessServiceResult<EnsureAccessUserResult> current = await access.GetCurrentAsync(principal, context, token);
             if (!current.IsSuccess || current.Value!.User.Status != AccessStatus.Approved
-                || !current.Value.User.Capabilities.Contains(Capabilities.AnnouncementDrafts)
-                || !current.Value.User.Capabilities.Contains(Capabilities.AnnouncementSource))
+                || !current.Value.User.Capabilities.Contains(Capabilities.AnnouncementDrafts))
             { return new(Error: "AccessDenied"); }
+            if (!current.Value.User.Capabilities.Contains(Capabilities.AnnouncementSource))
+            { return new(Error: "AnnouncementSourceAccessDenied"); }
             if (!module.Value.Enabled)
             { return new(Error: "AnnouncementsDisabled"); }
             if (!options.Value.Enabled)

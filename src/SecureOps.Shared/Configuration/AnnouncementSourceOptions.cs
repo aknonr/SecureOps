@@ -43,6 +43,10 @@ public sealed class AnnouncementSourceOptions
 /// <summary>One protected maintenance profile. Recipients are a distribution-request audience only.</summary>
 public sealed class MaintenanceProfileOptions
 {
+    /// <summary>Explicit business-profile revision; captured with source proposals.</summary>
+    public string Revision { get; set; } = "1";
+    /// <summary>Optional plain text template; only {WorkStart} and {WorkEnd} are substituted after time review.</summary>
+    public string DescriptionTemplate { get; set; } = "";
     /// <summary>Operator-visible label; falls back to the profile name when blank.</summary>
     public string Label { get; set; } = "";
     /// <summary>SCCM collection identifier; corporate value, configuration-owned only.</summary>
@@ -53,7 +57,7 @@ public sealed class MaintenanceProfileOptions
     public string Impact { get; set; } = "";
     /// <summary>Proposed operator check text.</summary>
     public string Checks { get; set; } = "";
-    /// <summary>Proposed description text; no date placeholder is interpolated from source values.</summary>
+    /// <summary>Proposed literal description when no reviewed template is configured.</summary>
     public string Description { get; set; } = "";
     /// <summary>Base distribution-request To addresses.</summary>
     public string[] To { get; set; } = [];

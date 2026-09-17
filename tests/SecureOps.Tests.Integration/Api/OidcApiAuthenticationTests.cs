@@ -4,11 +4,14 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using Dapper;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
@@ -17,9 +20,12 @@ using Microsoft.IdentityModel.Tokens;
 using SecureOps.Api.Security;
 using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Access;
+using SecureOps.Infrastructure.Audit;
+using SecureOps.Shared.Audit;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Contracts.Access;
 using SecureOps.Shared.Contracts.Sessions;
+using SecureOps.Tests.Integration.Sql;
 
 namespace SecureOps.Tests.Integration.Api;
 
@@ -210,10 +216,65 @@ public sealed class OidcApiAuthenticationTests
         session.Uid.Should().Be("uid-requester");
     }
 
+    [Fact]
+    public async Task OidcAdmin_RemovingAnotherUsersCoordinatorRole_UsesPersistedActorNotLoginName()
+        => await VerifyRoleActorAsync(null);
+
+    [Rc621DefectSqlFact]
+    public async Task OidcAdmin_SqlRoleRemoval_UsesCanonicalActorAndRevokesEffectivePermission()
+        => await VerifyRoleActorAsync(Environment.GetEnvironmentVariable("SECUREOPS_RC621_DEFECT_CONNECTION"));
+
+    private static async Task VerifyRoleActorAsync(string? sqlConnection)
+    {
+        string subject = "synthetic-role-admin-" + Guid.NewGuid().ToString("N");
+        string actor = OidcExternalIdentityNormalizer.StableIdentifier(_issuer, subject);
+        if (sqlConnection is not null)
+        {
+            var guard = new SqlConnectionStringBuilder(sqlConnection);
+            guard.DataSource.Should().Be("(localdb)\\SecureOpsResourcesV1");
+            guard.InitialCatalog.Should().StartWith("SecureOps_ResourcesV1_Rc621Defects");
+        }
+        using WebApplicationFactory<Program> factory = CreateFactory(sqlConnection: sqlConnection);
+        if (sqlConnection is null)
+        { await SeedAdminAsync(factory, actor, "oidc"); }
+        else
+        { await SqlAccessTestActors.AdminAsync(factory.Services.GetRequiredService<IConfiguration>(), actor); }
+        using IServiceScope scope = factory.Services.CreateScope();
+        IAccessRepository repository = scope.ServiceProvider.GetRequiredService<IAccessRepository>();
+        EnsureAccessUserResult pending = await repository.EnsureUserAsync(
+            new("synthetic:ordinary-target-" + Guid.NewGuid().ToString("N"), "test"), true, TimeSpan.Zero, default);
+        ApplicationUser target = (await repository.DecideRequestAsync(pending.PendingRequest!.Id,
+            AccessRequestStatus.Approved, pending.PendingRequest.Version, actor,
+            ["Operator", "InUseReviewer", "InUseCoordinator"], "Synthetic target", default)).User!;
+        using HttpClient admin = Client(factory, Token(subject, "same.login.not.an.identity"));
+        CurrentAccessResponse current = (await admin.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        current.Capabilities.Should().Contain(Capabilities.AccessAssignRoles);
+        using HttpResponseMessage response = await admin.PutAsJsonAsync($"/api/v1/access/users/{target.Id}/roles",
+            new AssignRolesRequest(["Operator", "InUseReviewer"], target.Version));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await repository.GetUserAsync(target.Id, default))!.Roles.Should().NotContain("InUseCoordinator");
+        (await repository.GetUserAsync(target.Id, default))!.Capabilities.Should().NotContain(Capabilities.InUseAssign);
+        if (sqlConnection is null)
+        {
+            factory.Services.GetRequiredService<InMemoryAuditWriter>().Events
+                .Where(item => item.Action == AuditActions.RoleRemoved).Should().ContainSingle()
+                .Which.Actor.Should().Be(actor);
+        }
+        else
+        {
+            await using var connection = new SqlConnection(sqlConnection);
+            (await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM audit.AuditLog WHERE Action='AccessRolesChanged' AND Actor=@actor", new { actor }))
+                .Should().Be(1);
+            using HttpResponseMessage stale = await admin.PutAsJsonAsync($"/api/v1/access/users/{target.Id}/roles",
+                new AssignRolesRequest(["InUseCoordinator"], target.Version));
+            stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        }
+    }
+
     private const string _issuer = "https://identity.example.test";
     private const string _audience = "secureops-api-test";
 
-    private static WebApplicationFactory<Program> CreateFactory(bool demoEnabled = false) =>
+    private static WebApplicationFactory<Program> CreateFactory(bool demoEnabled = false, string? sqlConnection = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Test");
@@ -226,6 +287,14 @@ public sealed class OidcApiAuthenticationTests
             builder.UseSetting("Audit:Provider", "InMemory");
             builder.UseSetting("IdentityLookup:Provider", "Mock");
             builder.UseSetting("Access:DemoCompatibilityEnabled", "false");
+            if (sqlConnection is not null)
+            {
+                builder.UseSetting("ConnectionStrings:SecureOpsDb", sqlConnection);
+                builder.UseSetting("Access:RepositoryProvider", "SqlServer");
+                builder.UseSetting("SessionSecurity:RepositoryProvider", "SqlServer");
+                builder.UseSetting("Audit:Provider", "SqlServer");
+                builder.UseSetting("Audit:Queue:Enabled", "false");
+            }
             builder.ConfigureServices(services =>
                 services.PostConfigure<JwtBearerOptions>(ExternalIdentityClaimTypes.OidcBearerScheme, options =>
                 {

@@ -31,7 +31,7 @@ const code = process.argv[6], resumed = process.argv[7] === 'resumed';
         }
         async function assign(id) {
             await detail();
-            await page.getByText('İnceleyici ata / değiştir (isteğe bağlı)', { exact: true }).click();
+            await page.getByRole('button', { name: 'İnceleyici ata/değiştir', exact: true }).click();
             await page.getByLabel('In Use inceleyicisi', { exact: true }).selectOption(id || '');
             await page.getByLabel('Atama gerekçesi', { exact: true }).fill('Synthetic assignment visibility acceptance');
             await page.getByRole('button', { name: 'Atamayı kaydet', exact: true }).click();
@@ -50,7 +50,7 @@ const code = process.argv[6], resumed = process.argv[7] === 'resumed';
             await page.locator('.inuse-assignee').waitFor();
             await list('unassigned', false);
             await detail();
-            await page.getByText('İnceleyici ata / değiştir (isteğe bağlı)', { exact: true }).click();
+            await page.getByRole('button', { name: 'İnceleyici ata/değiştir', exact: true }).click();
             const other = await page.getByLabel('In Use inceleyicisi', { exact: true }).locator('option').evaluateAll(options => options.find(o => o.textContent.startsWith('Sentetik İnceleyici')).value);
             assert.notEqual(other, me.userId);
             await assign(other);

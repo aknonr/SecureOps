@@ -31,8 +31,8 @@ public sealed class AccessAdministrationSqlTests
         concurrent.Count(result => result.Disposition == AccessMutationDisposition.Applied).Should().Be(1);
         concurrent.Count(result => result.Disposition == AccessMutationDisposition.AdministrativeGuard).Should().Be(1);
         ApplicationUser survivor = (await repository.GetUserAsync(concurrent[0].Disposition == AccessMutationDisposition.Applied ? second.Id : first.Id, default))!;
-        (await repository.DisableUserAsync(survivor.Id, survivor.Version, survivor.CorporateIdentity, "Synthetic last admin", default)).Disposition.Should().Be(AccessMutationDisposition.AdministrativeGuard);
-        (await repository.ReplaceRolesAsync(survivor.Id, ["ReadOnly"], survivor.Version, survivor.CorporateIdentity, default)).Disposition.Should().Be(AccessMutationDisposition.AdministrativeGuard);
+        (await repository.DisableUserAsync(survivor.Id, survivor.Version, survivor.CorporateIdentity, "Synthetic last admin", default)).Disposition.Should().Be(AccessMutationDisposition.LastAdministratorDenied);
+        (await repository.ReplaceRolesAsync(survivor.Id, ["ReadOnly"], survivor.Version, survivor.CorporateIdentity, default)).Disposition.Should().Be(AccessMutationDisposition.LastAdministratorDenied);
         (await repository.ReplaceRolesAsync(survivor.Id, ["Admin"], survivor.Version, "forged:actor", default)).Disposition.Should().Be(AccessMutationDisposition.AdministrativeGuard);
         EnsureAccessUserResult pending = await repository.EnsureUserAsync(new("synthetic:role-target", "test"), true, TimeSpan.Zero, default);
         ApplicationUser target = (await repository.DecideRequestAsync(pending.PendingRequest!.Id, AccessRequestStatus.Approved, pending.PendingRequest.Version,

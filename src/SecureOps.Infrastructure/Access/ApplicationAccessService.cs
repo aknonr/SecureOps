@@ -285,6 +285,8 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             AccessMutationDisposition.SelfApprovalDenied => OperationalErrorCodes.AccessSelfApprovalDenied,
             AccessMutationDisposition.InvalidRoles => OperationalErrorCodes.AccessValidationFailed,
             AccessMutationDisposition.AdministrativeGuard => OperationalErrorCodes.AccessDenied,
+            AccessMutationDisposition.SelfEscalationDenied => OperationalErrorCodes.AccessSelfEscalationDenied,
+            AccessMutationDisposition.LastAdministratorDenied => OperationalErrorCodes.AccessLastAdministratorDenied,
             _ => throw new InvalidOperationException($"Unknown access mutation disposition: {mutation.Disposition}.")
         };
         if (error is not null)

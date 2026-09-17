@@ -1,3 +1,7 @@
+.so-page { max-width:1440px;font-size:16px;line-height:1.5; }
+.so-page label,.so-page legend,.so-page input,.so-page textarea { font-size:16px; }
+.so-page small { font-size:14px; }
+.so-page ::deep .mud-button-root,.so-page input:not([type=checkbox]) { min-height:44px; }
 .role-workspace { display:grid;grid-template-columns:240px minmax(0,1fr);gap:28px;padding-top:20px; }
 aside { border-right:1px solid var(--mud-palette-divider);padding-right:16px; }
 aside ul { list-style:none;margin:16px 0;padding:0; }

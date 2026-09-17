@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SecureOps.Domain.Announcements;
 using SecureOps.Shared.Configuration;
@@ -12,6 +14,10 @@ namespace SecureOps.Infrastructure.Announcements.Sources;
 public sealed class MaintenanceProfileCatalog(IOptions<AnnouncementSourceOptions> options)
 {
     private AnnouncementSourceOptions Options => options.Value;
+
+    /// <summary>Stable identity over reviewed business values, without exposing addresses.</summary>
+    public static string Fingerprint(MaintenanceProfileOptions profile) =>
+        Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(profile)));
 
     /// <summary>Every allowlisted profile with its configuration state; never exposes collection IDs.</summary>
     public IReadOnlyList<MaintenanceProfileChoice> Choices() =>
@@ -35,13 +41,18 @@ public sealed class MaintenanceProfileCatalog(IOptions<AnnouncementSourceOptions
         { return new(name, name, "Unconfigured", ["Profile"]); }
         MaintenanceProfileOptions profile = Options.Profiles[key];
         List<string> missing = [];
+        if (string.IsNullOrWhiteSpace(profile.Revision) || profile.Revision.Length > 64)
+        { missing.Add("Revision"); }
+        if (profile.DescriptionTemplate.Length > 3800 || profile.DescriptionTemplate
+            .Replace("{WorkStart}", "", StringComparison.Ordinal).Replace("{WorkEnd}", "", StringComparison.Ordinal).IndexOfAny(['{', '}']) >= 0)
+        { missing.Add("DescriptionTemplate"); }
         if (string.IsNullOrWhiteSpace(profile.CollectionId) || profile.CollectionId.Length > 64
             || !profile.CollectionId.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
         { missing.Add("CollectionId"); }
         foreach ((string field, string value) in new[] { ("Scope", profile.Scope), ("Impact", profile.Impact),
-            ("Checks", profile.Checks), ("Description", profile.Description) })
+            ("Checks", profile.Checks), ("Description", string.IsNullOrWhiteSpace(profile.DescriptionTemplate) ? profile.Description : profile.DescriptionTemplate) })
         { if (string.IsNullOrWhiteSpace(value) || value.Length > 4000) { missing.Add(field); } }
-        if (profile.To.Length == 0 || profile.To.Length > 50 || !profile.To.All(AnnouncementValidation.Address))
+        if (profile.To.Length > 50 || !profile.To.All(AnnouncementValidation.Address))
         { missing.Add("To"); }
         if (profile.Cc.Length > 50 || !profile.Cc.All(AnnouncementValidation.Address))
         { missing.Add("Cc"); }

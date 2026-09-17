@@ -90,7 +90,7 @@ public sealed class AnnouncementTimeTests
         AnnouncementTime.ValidOffset("+14:30").Should().BeFalse();
         AnnouncementTime.ValidOffset("source-LMT").Should().BeFalse();
         var form = new AnnouncementForm();
-        form.Template.Should().Be("oco-table-v2");
+        form.Template.Should().Be("oco-table-v3");
         form.Values["WorkStart"] = "2026-09-13T23:59:37+05:45";
         SecureOps.Domain.Announcements.AnnouncementContent legacy = form.Content() with { TemplateRevision = "oco-v1", DateTextRevision = "iso-v1", AffectedServices = null };
         AnnouncementForm.From(legacy).Content().Should().BeEquivalentTo(legacy);

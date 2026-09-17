@@ -170,6 +170,8 @@ public static class DependencyInjection
         services.AddScoped<Announcements.Mail.AnnouncementMailWorker>();
         services.AddScoped<Announcements.Mail.AnnouncementMailRecovery>();
         AddAnnouncementSource(services, configuration);
+        services.Configure<InUsePolicyOptions>(configuration.GetSection("InUsePolicy"));
+        services.AddSingleton<InUsePolicy>();
         services.AddScoped<InUseService>();
         services.AddSingleton<InUseReportArchive>();
         if (string.Equals(configuration[$"{SessionSecurityOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))
@@ -300,6 +302,7 @@ public static class DependencyInjection
     // working provider: an unset or unknown provider stays Disabled and fails closed on first use.
     private static void AddAnnouncementSource(IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton(new Announcements.OperationsDiagnostics(configuration));
         services.Configure<AnnouncementSourceOptions>(configuration.GetSection(AnnouncementSourceOptions.SectionName));
         services.Configure<HangfireOptions>(configuration.GetSection(HangfireOptions.SectionName));
         services.AddSingleton<Announcements.Sources.MaintenanceProfileCatalog>();

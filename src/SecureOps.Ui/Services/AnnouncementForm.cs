@@ -22,7 +22,7 @@ public sealed class AnnouncementForm
     /// <summary>Explicit allowlisted choice.</summary>
     public string Banner { get; set; } = "";
     /// <summary>Explicit template choice; existing drafts retain oco-v1.</summary>
-    public string Template { get; set; } = "oco-table-v2";
+    public string Template { get; set; } = "oco-table-v3";
     /// <summary>New readable dates are explicit; existing revisions retain their presentation.</summary>
     public string DateTextRevision { get; set; } = "tr-v1";
     /// <summary>One service per line; API enforces item and aggregate bounds.</summary>

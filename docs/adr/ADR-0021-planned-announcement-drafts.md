@@ -1,5 +1,16 @@
 # ADR-0021: Planned announcement drafts
 
+## rc6.21 Completion, 2026-09-17
+
+The owner-approved bounded exception from 778dca3 supersedes the historical cap
+status below for this completion only. New drafts use explicit oco-table-v3, with
+Outlook-compatible vertical table artwork. v1/v2 and stored preparations remain
+unchanged. Missing assets cannot prevent an incomplete draft/source lookup, but
+preparation requires a validated presentation bound by explicit resave. Reviewed
+source offsets establish wall-clock semantics; profile fingerprints detect API/
+Worker drift. Read-only effective diagnostics never activate a source or mail send.
+See ../rc621-completion.md and ../rc621-upgrade-tr.md.
+
 ## Authorized continuation, 2026-09-15
 
 The owner now authorizes actor-derived sender, reviewed SMTP/self-test commands

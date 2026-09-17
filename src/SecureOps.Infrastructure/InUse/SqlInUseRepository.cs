@@ -38,7 +38,19 @@ public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRep
     {
         const string where = """
              FROM ops.InUseRecords WHERE
-             (@Search IS NULL OR CHARINDEX(@Search, Code) > 0 OR CHARINDEX(@Search, Title) > 0)
+             (@Search IS NULL OR CHARINDEX(@Search, Code COLLATE Latin1_General_100_CI_AS) > 0
+              OR CHARINDEX(@Search, Title COLLATE Turkish_100_CI_AS) > 0
+              OR EXISTS (SELECT 1 FROM OPENJSON(RecordJson, '$.Source.Servers') WITH (
+                  Hostname nvarchar(4000) '$.Fields.HOSTNAME.Value',
+                  Reporter nvarchar(4000) '$.RelatedRequestReporter.Display',
+                  Account nvarchar(4000) '$.RelatedRequestReporter.UserReference',
+                  ReporterState nvarchar(64) '$.RelatedRequestReporter.State',
+                  DisplayState nvarchar(64) '$.RelatedRequestReporter.DisplayState',
+                  ReferenceState nvarchar(64) '$.RelatedRequestReporter.ReferenceState') AS server
+                  WHERE CHARINDEX(@Search, server.Hostname COLLATE Latin1_General_100_CI_AS) > 0
+                  OR (server.ReporterState IN ('ExactMatch', 'Stale') AND (
+                      (server.DisplayState = 'Returned' AND CHARINDEX(@Search, server.Reporter COLLATE Turkish_100_CI_AS) > 0)
+                      OR (server.ReferenceState = 'Returned' AND CHARINDEX(@Search, server.Account COLLATE Latin1_General_100_CI_AS) > 0)))))
              AND (@Status IS NULL OR ReviewStatus = @Status)
              AND (@View = 'all' OR (@View = 'mine' AND AssigneeId = @ActorId) OR (@View = 'unassigned' AND AssigneeId IS NULL))
             """;

@@ -33,8 +33,8 @@ public sealed class AnnouncementSourceController(AnnouncementSourceService servi
 
     /// <summary>Returns the reviewable difference between one completed snapshot and the live draft.</summary>
     [HttpGet("{id:guid}/source/jobs/{jobId:guid}/proposal"), ProducesResponseType(typeof(AnnouncementSourceProposal), 200)]
-    public Task<IActionResult> ProposalAsync(Guid id, Guid jobId, CancellationToken token = default) =>
-        RespondAsync(context => service.ProposalAsync(User, context, id, jobId, token));
+    public Task<IActionResult> ProposalAsync(Guid id, Guid jobId, string? reviewedSourceOffset = null, CancellationToken token = default) =>
+        RespondAsync(context => service.ProposalAsync(User, context, id, jobId, token, reviewedSourceOffset));
 
     /// <summary>Applies reviewed source values as a new draft revision under the expected version.</summary>
     [HttpPost("{id:guid}/source/apply"), Consumes("application/json"), RequestSizeLimit(8192)]
@@ -51,9 +51,9 @@ public sealed class AnnouncementSourceController(AnnouncementSourceService servi
         {
             int status = result.Error switch
             {
-                "AccessDenied" => 403,
+                "AccessDenied" or "AnnouncementSourceAccessDenied" => 403,
                 "AnnouncementNotFound" or "AnnouncementSourceJobNotFound" => 404,
-                "AnnouncementConflict" or "AnnouncementSourceStale" or "AnnouncementSourceOverrideConflict" or "AnnouncementSourceSubmissionConflict" => 409,
+                "AnnouncementConflict" or "AnnouncementSourceStale" or "AnnouncementSourceOverrideConflict" or "AnnouncementSourceSubmissionConflict" or "AnnouncementSourceProfileChanged" => 409,
                 "AnnouncementSourceInvalid" or "AnnouncementInvalid" or "AnnouncementIncomplete" => 400,
                 _ => 503
             };

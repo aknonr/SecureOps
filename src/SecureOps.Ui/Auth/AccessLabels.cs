@@ -82,7 +82,7 @@ public static class AccessLabels
 
     private static readonly Dictionary<string, string> _roleDescriptions = new(StringComparer.Ordinal)
     {
-        [Roles.Admin] = "Erişim yönetimi, operasyonel akışlar, Jira işlemleri, raporlama ve tanılama dahil tüm yetkilere sahiptir.",
+        [Roles.Admin] = "Erişim yönetimini yürütür. Geçerli işlem yetkileri aşağıda listelenir; mail denemesi ve gönderimi ayrıca yetkilendirilir.",
         [Roles.Lead] = "Kimlik ve ekip bilgilerini görüntüler; operasyonel kayıtları yönetir, Jira işlemlerini yürütür ve tanılama yapar.",
         [Roles.Operator] = "Ekip ve operasyonel kayıtları görüntüler; Jira önizlemesi hazırlar ancak Jira kaydı oluşturamaz.",
         [Roles.JiraPublisher] = "Operasyonel kayıtları görüntüler, Jira önizlemesi hazırlar, Jira kaydı oluşturur ve başarısız aktarımı yeniden dener.",
@@ -95,7 +95,16 @@ public static class AccessLabels
 
     private static readonly Dictionary<string, CapabilityDescriptor> _capabilities = new(StringComparer.Ordinal)
     {
-        [Capabilities.AnnouncementDrafts] = new(Capabilities.AnnouncementDrafts, "Planlı duyurular", "Duyuru hazırlama", "Kendi kaynak önerilerini inceler, taslak ve değişmez hazırlık oluşturur; mail göndermez."),
+        [Capabilities.AnnouncementDrafts] = new(Capabilities.AnnouncementDrafts, "Planlı duyurular", "Duyuru taslağı", "Kendi duyuru taslaklarını düzenler ve okur; kaynak sorgulama, hazırlama ve gönderme ayrı yetkilerdir."),
+        [Capabilities.AnnouncementSource] = new(Capabilities.AnnouncementSource, "Planlı duyurular", "Kaynak inceleme", "Kaynak toplama işi ister, öneriyi inceler ve seçtiği değişiklikleri uygular."),
+        [Capabilities.AnnouncementPrepare] = new(Capabilities.AnnouncementPrepare, "Planlı duyurular", "Değişmez hazırlık", "Kaydedilmiş duyurudan sürüme bağlı mail hazırlar ve indirir; göndermez."),
+        [Capabilities.AnnouncementSelfTest] = new(Capabilities.AnnouncementSelfTest, "Planlı duyurular", "Kendime mail denemesi", "Ayrı açık onayla yalnız kendi kayıtlı e-posta adresine deneme ister."),
+        [Capabilities.AnnouncementSend] = new(Capabilities.AnnouncementSend, "Planlı duyurular", "Duyuru gönderimi", "İncelenen hazırlığı seçili alıcılara açık onayla gönderme talebi oluşturur."),
+        [Capabilities.DirectoryGroupsView] = new(Capabilities.DirectoryGroupsView, Groups.Identity, "Grup sorgulama", "Tam grup ve doğrudan üyelik bilgilerini okur."),
+        [Capabilities.DirectoryGroupMembersView] = new(Capabilities.DirectoryGroupMembersView, Groups.Identity, "Grup üyelerini görüntüleme", "Tek grubun sınırlı doğrudan üyelerini okur."),
+        [Capabilities.DirectoryPrivilegedGroupsView] = new(Capabilities.DirectoryPrivilegedGroupsView, Groups.Identity, "Ayrıcalıklı grupları görüntüleme", "Onaylı ayrıcalıklı grup kanıtını okur; üyelik değiştirmez."),
+        [Capabilities.DirectoryGroupExport] = new(Capabilities.DirectoryGroupExport, Groups.Identity, "Grup raporu indirme", "Sınırlı üyelik raporu hazırlar ve indirir."),
+        [Capabilities.ManagementReportingView] = new(Capabilities.ManagementReportingView, Groups.Oversight, "Yönetim raporları", "Yetkili toplu operasyon raporlarını görüntüler."),
         [Capabilities.ResourcesView] = new(Capabilities.ResourcesView, "Uygulama bağlantıları", "Bağlantıları kullanma", "Bağlantıları görüntüler; kendi favorilerini ve gruplarını düzenler."),
         [Capabilities.ResourcesManage] = new(Capabilities.ResourcesManage, "Uygulama bağlantıları", "Bağlantı kataloğunu yönetme", "Paylaşılan bağlantıları ve kategorileri düzenler."),
         [Capabilities.InUseView] = new(Capabilities.InUseView, "In Use", "Kayıtları görüntüleme", "Kayıtlı In Use verisini okur."),

@@ -5,6 +5,12 @@ namespace SecureOps.Shared.Contracts.InUse;
 /// <summary>A value and its exact source; null is unresolved, never inferred.</summary>
 public sealed record InUseEvidence(string? Value, string Source);
 
+/// <summary>One proposed field; null means classification or approved configuration is still missing.</summary>
+public sealed record InUsePolicyField(string ServerId, string Field, string? Value, string Origin);
+
+/// <summary>Version-bound proposals reviewed explicitly; not successful checks or source ownership.</summary>
+public sealed record InUsePolicyProposal(string Revision, string Fingerprint, IReadOnlyList<InUsePolicyField> Fields);
+
 /// <summary>One related server, retaining independent service/environment evidence.</summary>
 public sealed record InUseServer(string Id, IReadOnlyDictionary<string, InUseEvidence> Fields)
 {
@@ -44,6 +50,8 @@ public sealed record InUseDraft(long SourceVersion, IReadOnlyList<InUseAnswer> A
     /// <summary>Trusted profile-at-save display. Historical missing labels are not invented.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReviewedByLabel { get; init; }
+    /// <summary>Server-generated proposal snapshot accepted by the saving actor.</summary>
+    public InUsePolicyProposal? Policy { get; init; }
 }
 
 /// <summary>Persisted independent In Use aggregate.</summary>
@@ -67,6 +75,8 @@ public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash,
     public DateTimeOffset? FirstSeenAt { get; init; }
     /// <summary>Last locally confirmed completion intent, never proof of an external operation.</summary>
     public InUseCompletion? Completion { get; init; }
+    /// <summary>Current proposal for explicit review; supplied on detail reads, not persisted as source evidence.</summary>
+    public InUsePolicyProposal? PolicyProposal { get; init; }
 }
 
 /// <summary>Bounded persisted query; mine is resolved from the authenticated user.</summary>
@@ -92,7 +102,11 @@ public sealed record RefreshInUseRequest(Guid CommandId);
 public sealed record AssignInUseRequest(long ExpectedVersion, Guid? AssigneeId, string Reason);
 
 /// <summary>Replace a review draft without altering source data.</summary>
-public sealed record SaveInUseDraftRequest(long ExpectedVersion, long SourceVersion, IReadOnlyList<InUseAnswer> Answers, string Notes);
+public sealed record SaveInUseDraftRequest(long ExpectedVersion, long SourceVersion, IReadOnlyList<InUseAnswer> Answers, string Notes)
+{
+    /// <summary>Only the exact displayed proposal may be accepted. Null retains the prior source-bound snapshot.</summary>
+    public string? ReviewedPolicyFingerprint { get; init; }
+}
 
 /// <summary>Export only the exact reviewed aggregate shown to the operator.</summary>
 public sealed record ExportInUseRequest(long ExpectedVersion, bool Archive = false, long? ArchivedVersion = null);
@@ -112,6 +126,8 @@ public sealed record InUseReport(Guid RecordId, long Version, long SourceVersion
 {
     /// <summary>Verified application actor, never supplied by the caller.</summary>
     public Guid PreparedBy { get; init; }
+    /// <summary>Trusted profile snapshot; absent on historical archives.</summary>
+    public string? PreparedByLabel { get; init; }
     /// <summary>Preparation timestamp retained on repeated archive requests.</summary>
     public DateTimeOffset PreparedAt { get; init; }
     /// <summary>Exact source identity bound to this artifact.</summary>

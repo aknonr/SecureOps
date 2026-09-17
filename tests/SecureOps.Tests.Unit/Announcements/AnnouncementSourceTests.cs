@@ -17,9 +17,9 @@ public sealed class AnnouncementSourceTests
     [InlineData("14.09.2026 01:02:03", "Unresolved")]
     [InlineData("2026-09-14T01:02:03", "Unresolved")]
     [InlineData("2026-09-14T01:02:03.1234567", "Unresolved")]
-    [InlineData("2026-09-14T01:02:03.123+03:00", "Resolved")]
-    [InlineData("2026-09-14T01:02:03Z", "Resolved")]
-    [InlineData(" 2026-09-14T01:02+03:00 ", "Resolved")]
+    [InlineData("2026-09-14T01:02:03.123+03:00", "Invalid")]
+    [InlineData("2026-09-14T01:02:03Z", "Invalid")]
+    [InlineData(" 2026-09-14T01:02+03:00 ", "Invalid")]
     [InlineData(null, "Missing")]
     [InlineData("  ", "Missing")]
     [InlineData("not.a.date", "Invalid")]
@@ -71,7 +71,7 @@ public sealed class AnnouncementSourceTests
         catalog.Resolve("NonProd").State.Should().Be("Configured");
         catalog.Resolve("nonprod").State.Should().Be("Invalid");
         settings.Profiles["NonProd"].To = [];
-        catalog.Resolve("NonProd").Missing.Should().Contain("To");
+        catalog.Resolve("NonProd").State.Should().Be("Configured", "source collection is independent of distribution recipients");
         catalog.Resolve("Prod01").State.Should().Be("Unconfigured");
     }
 

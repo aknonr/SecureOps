@@ -43,10 +43,10 @@ public partial class Announcements
     private Task PageAsync(int number) => RunAsync(async () => _page = await Api.ListAsync(number, _lifetime.Token));
     private Task NewAsync() => RunAsync(async () =>
     {
-        _sourceOpen = false;
+        _sourceOpen = true;
         CancelPreview(true);
         _savedContent = null;
-        _banners = await Api.BannersAsync(_lifetime.Token, "oco-table-v2");
+        _banners = await Api.BannersAsync(_lifetime.Token, "oco-table-v3");
         _id = Guid.NewGuid();
         _version = 0;
         _form = new();
@@ -57,7 +57,7 @@ public partial class Announcements
     });
     private Task OpenAsync(Guid id) => RunAsync(async () =>
     {
-        _sourceOpen = false;
+        _sourceOpen = true;
         CancelPreview(true);
         (AnnouncementContent Content, long Version) draft = await Api.DraftAsync(id, 0, null, _lifetime.Token);
         _banners = await Api.BannersAsync(_lifetime.Token, draft.Content.TemplateRevision);
@@ -87,7 +87,7 @@ public partial class Announcements
     {
         if (await Dialogs.ShowMessageBox("Taslağı yükselt", "Düzenlemeler korunacak. Yeni biçim yalnızca Kaydet ile yeni sürüme işlenecek.", yesText: "Yükselt", cancelText: "Vazgeç") != true)
         { return; }
-        _form!.Template = "oco-table-v2";
+        _form!.Template = "oco-table-v3";
         _form.DateTextRevision = "tr-v1";
         _form.Banner = "";
         _banners = [];
@@ -145,6 +145,27 @@ public partial class Announcements
         _dirty = false;
         _notice = "Taslak kaydedildi.";
     });
+    private async Task<long> SaveForSourceAsync()
+    {
+        if (_busy || _comparison is not null || !_canSource)
+        { return 0; }
+        if (_dirty || _version == 0)
+        { await SaveAsync(); }
+        return _problem is null && !_dirty ? _version : 0;
+    }
+    private Task SourceAccessLostAsync(UiProblem problem)
+    {
+        if (problem.Code == "AnnouncementSourceAccessDenied")
+        {
+            _canSource = false;
+            _sourceOpen = false;
+            _problem = problem;
+            _notice = "Kaynak sorgulama yetkiniz yok. Duyuru düzenlemeleriniz korunuyor.";
+        }
+        else
+        { LoseAccess(problem); }
+        return Task.CompletedTask;
+    }
     private Task PreviewAsync() => RunAsync(async () =>
     {
         if (_dirty || _version == 0)

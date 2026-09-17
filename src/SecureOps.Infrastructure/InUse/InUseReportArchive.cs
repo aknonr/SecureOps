@@ -9,6 +9,16 @@ namespace SecureOps.Infrastructure.InUse;
 public sealed class InUseReportArchive(IConfiguration configuration)
 {
     private const int _maximumBytes = 16 * 1024 * 1024;
+    /// <summary>Read-only directory inspection; never creates files or claims write authorization.</summary>
+    public string InspectDirectory()
+    {
+        string root = Root();
+        if (!Directory.Exists(root))
+        { return "Missing"; }
+        using IEnumerator<string> entries = Directory.EnumerateFileSystemEntries(root).GetEnumerator();
+        _ = entries.MoveNext();
+        return "ReadableWriteNotTested";
+    }
     private string Root()
     {
         string path = configuration["InUseReports:Directory"] ?? "";
@@ -45,6 +55,34 @@ public sealed class InUseReportArchive(IConfiguration configuration)
     }
     /// <summary>Serializes competing writers across processes; audit must succeed before committing bytes.</summary>
     public async Task<InUseReport?> AccessAsync(Guid id, long version, InUseReport? candidate,
+        Func<InUseReport, Task<bool>> authorize, CancellationToken token)
+    {
+        bool authorizing = false;
+        try
+        {
+            return await AccessCoreAsync(id, version, candidate, async report =>
+            {
+                authorizing = true;
+                bool allowed = await authorize(report);
+                authorizing = false;
+                return allowed;
+            }, token);
+        }
+        catch (Exception exception) when (!authorizing && exception is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
+        {
+            string code = exception switch
+            {
+                UnauthorizedAccessException => "InUseArchivePermissionDenied",
+                InvalidOperationException => "InUseArchiveNotConfigured",
+                InvalidDataException or JsonException => "InUseArchiveIntegrityFailed",
+                FileNotFoundException => "InUseArchiveNotFound",
+                _ => "InUseArchiveUnavailable"
+            };
+            throw new InUseArchiveException(code, exception);
+        }
+    }
+
+    private async Task<InUseReport?> AccessCoreAsync(Guid id, long version, InUseReport? candidate,
         Func<InUseReport, Task<bool>> authorize, CancellationToken token)
     {
         if (id == Guid.Empty || version < 1)

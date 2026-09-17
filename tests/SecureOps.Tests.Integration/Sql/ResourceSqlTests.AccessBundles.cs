@@ -47,7 +47,7 @@ public sealed partial class ResourceSqlTests
         ApplicationUser changed = (await repository.GetUserAsync(user.Id, _token))!;
         changed.Version.Should().Be(user.Version + 1);
         changed.Capabilities.Should().Equal(Capabilities.InUseView);
-        (await repository.ChangeRoleAsync(new("Admin", "Changed", "Denied", roles.Single(role => role.Code == "Admin").Version, []), admin.CorporateIdentity, false, _token)).ErrorCode.Should().Be(OperationalErrorCodes.AccessDenied);
+        (await repository.ChangeRoleAsync(new("Admin", "Changed", "Denied", roles.Single(role => role.Code == "Admin").Version, []), admin.CorporateIdentity, false, _token)).ErrorCode.Should().Be(OperationalErrorCodes.AccessProtectedRole);
         (await repository.ChangeRoleAsync(edit, user.CorporateIdentity, false, _token)).ErrorCode.Should().Be(OperationalErrorCodes.AccessDenied);
         for (int index = 0; index < 31; index++)
         {

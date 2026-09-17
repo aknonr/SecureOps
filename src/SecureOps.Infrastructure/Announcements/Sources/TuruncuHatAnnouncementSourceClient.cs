@@ -93,7 +93,7 @@ public sealed class TuruncuHatAnnouncementSourceClient(
             {
                 Content = JsonContent.Create(new
                 {
-                    req = new { BaseObject = baseObject, Filters = filters, Selects = selects, SessionID = session, wire.TenantId }
+                    req = new { BaseObject = baseObject, Filters = filters, Selects = selects, NoEncode = true, SessionID = session, wire.TenantId }
                 }, options: LegacyContractJson.Options)
             };
             TuruncuHatSessionManager.ApplyHeaders(request, wire.Authorization);

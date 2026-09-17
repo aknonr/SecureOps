@@ -5,24 +5,28 @@
 
 <section aria-label="Kaynak incelemesi" style="overflow-wrap:anywhere">
     <h2>Kaynak incelemesi</h2>
-    @if (Locked || Version == 0) { <p role="status">Kaynak sorgusu ve uygulama için önce düzenlemeleri kaydedin.</p> }
+    @if (_readiness is { } readiness)
+    { <p role="status">@StateLabel(readiness.State)</p> }
+    <p>Koleksiyondaki sunucuların servisleri ve OCO çalışma tarihleri ayrı kaynaklardan önerilir. Değişiklikler incelemenizden sonra uygulanır.</p>
     @if (_problem is not null)
     {
         <SoProblemPanel Problem="_problem" />
-        @if (_problem.Code is "AnnouncementSourceDisabled" or "AnnouncementSourceJobHostUnavailable")
+        @if (_problem.Code == "AnnouncementSourceDisabled")
         { <p>Kaynak bağlantısı kapalı. Elle düzenleme kullanılabilir.</p> }
+        else
+        { <p>Kaynak kullanılabilirliği doğrulanamadı. Elle düzenlemeleriniz korunur.</p> }
     }
     <MudButton StartIcon="@Icons.Material.Filled.Refresh" Disabled="_working" OnClick="RefreshAsync">Durumu yenile</MudButton>
-    <fieldset disabled="@(_working || Locked || Version == 0 || _job?.Terminal == false)">
+    <fieldset disabled="@(_working || _starting || _job?.Terminal == false)">
         <label class="so-announcement-field" for="source-profile">Bakım profili
             <select id="source-profile" @bind="_profile">
                 <option value="">Seçin</option>
                 @foreach (var p in _profiles)
-                { <option value="@p.Name" disabled="@(p.State != "Configured")">@p.Label · @StateLabel(p.State) @string.Join(", ", p.Missing)</option> }
+                { <option value="@p.Name" disabled="@(p.State != "Configured")">@p.Label · @StateLabel(p.State)</option> }
             </select>
         </label>
-        <label class="so-announcement-field" for="source-oco">Kaynak OCO kaydı<input id="source-oco" maxlength="64" @bind="_oco" /></label>
-        <MudButton StartIcon="@Icons.Material.Filled.CloudDownload" Disabled="@(_profile.Length == 0 || _submission is not null)" OnClick="SubmitAsync">Kaynağı sorgula</MudButton>
+        <p>OCO: <strong>@OcoReference</strong></p>
+        <MudButton StartIcon="@Icons.Material.Filled.CloudDownload" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_profile.Length == 0 || string.IsNullOrWhiteSpace(OcoReference) || _submission is not null)" OnClick="SubmitAsync">Kaydet ve kaynağı sorgula</MudButton>
         @if (_submission is not null)
         {
             <p>@_submission.Profile · @_submission.OcoReference</p>
@@ -30,7 +34,7 @@
             <MudButton OnClick="@(() => _submission = null)" StartIcon="@Icons.Material.Filled.Close">Yeni istek seç</MudButton>
         }
     </fieldset>
-    @if (_job is { } job) { <p role="status" data-source-state="@job.State">@StateLabel(job.State) · @job.Profile @job.ErrorCode</p> }
+    @if (_job is { } job) { <p role="status" data-source-state="@job.State">@StateLabel(job.State) · @job.Profile @IssueLabel(job.ErrorCode)</p> }
     @if (_proposal is { } review)
     {
         <p>Dağıtım talebi alıcıları; nihai duyuru için onaylanmış gönderim listesi değildir.</p>
@@ -39,13 +43,25 @@
             @review.Completeness.ServicesAmbiguous belirsiz · @review.Completeness.ServicesMissing eksik · @review.Completeness.ServicesFailed başarısız</p>
         @if (review.Completeness.Partial) { <p role="alert">Kaynak sonucu kısmi; kapsam tamamlanmış kabul edilmez.</p> }
         @if (review.Stale || review.DraftVersion != Version) { <p role="alert">İnceleme güncel değil. Yeni bir inceleme gerekli.</p> }
-        <p>@string.Join("; ", review.Completeness.Warnings)</p>
+        <p>@string.Join("; ", review.Completeness.Warnings.Select(IssueLabel))</p>
+        @if (review.Fields.Any(field => field.State == "RequiresOperatorOffset"))
+        {
+            <div role="group" aria-label="Kaynak saat dilimi incelemesi">
+                <p>Kaynak saati kesin bir zaman dilimi belirtmiyor. Ham tarihleri inceleyin; aşağıdaki UTC farkını onaylamak kayıtlı saatleri değiştirmez, yeni öneri oluşturur.</p>
+                <label for="source-offset">Kaynak saatinin UTC farkı</label>
+                <select id="source-offset" @bind="_reviewedOffset">
+                    @foreach (int hour in Enumerable.Range(-12, 27))
+                    { string offset = (hour < 0 ? "-" : "+") + Math.Abs(hour).ToString("00") + ":00"; <option value="@offset">UTC @offset</option> }
+                </select>
+                <MudButton OnClick="ReviewOffsetAsync" Disabled="_working" StartIcon="@Icons.Material.Filled.Schedule">Saat dilimini onayla ve öneriyi yenile</MudButton>
+            </div>
+        }
         <fieldset disabled="@(Locked || _working || review.Stale || review.DraftVersion != Version)">
             @foreach (var field in review.Fields)
             {
-                <details><summary>@Label(field.Field) · @StateLabel(field.State)</summary>
-                    <dl><dt>Mevcut</dt><dd>@field.Current</dd><dt>Önerilen</dt><dd>@field.Proposed</dd><dt>Kaynak (@field.Origin)</dt><dd style="white-space:pre-wrap">@field.SourceText</dd></dl>
-                    @if (field.Proposed is not null && field.Field is "Scope" or "Impact" or "Checks" or "Description" or "AnnouncementDate" or "OcoReference")
+                <details open><summary>@Label(field.Field) · @StateLabel(field.State)</summary>
+                    <dl><dt>Mevcut</dt><dd>@field.Current</dd><dt>Önerilen</dt><dd>@field.Proposed</dd><dt>Kaynak (@OriginLabel(field.Origin))</dt><dd style="white-space:pre-wrap">@field.SourceText</dd></dl>
+                    @if (field.Proposed is not null && field.Field is "Subject" or "Scope" or "Impact" or "Checks" or "Description" or "AnnouncementDate" or "OcoReference" or "WorkStart" or "WorkEnd")
                     { <MudCheckBox T="bool" Label="@($"{Label(field.Field)} uygula")" Value="@_fields.Contains(field.Field)" ValueChanged="@((bool selected) => Select(field.Field, selected))" /> }
                 </details>
             }

@@ -84,11 +84,11 @@ public sealed class InUseController(InUseService service) : ControllerBase
         {
             "InUseInvalid" or "InUseAssigneeUnavailable" or "InUseIncomplete" => 400,
             "InUseNotFound" => 404,
-            "InUseConflict" => 409,
+            "InUseConflict" or "InUsePolicyChanged" => 409,
             "AccessDenied" or "AccessPending" or "AccessDisabled" or "InUseAssignmentRequired" => 403,
             _ => 503
         };
         return OperationalProblemDetails.Create(status, result.Error, result.Detail ?? "The In Use operation could not be completed.",
-            HttpContext.TraceIdentifier, status == 409 ? "concurrency" : "in-use", status is 409 or 503);
+            HttpContext.TraceIdentifier, result.Error.StartsWith("InUseArchive", StringComparison.Ordinal) ? "report-archive" : status == 409 ? "concurrency" : "in-use", status is 409 or 503);
     }
 }

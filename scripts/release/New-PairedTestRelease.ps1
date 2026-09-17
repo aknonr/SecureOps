@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][ValidatePattern('^\d{4}-\d{2}-\d{2}-pilot-rc6\.\d+$')][string]$ReleaseName,
-    [string]$BrandingDirectory)
+    [string]$BrandingDirectory,
+    [switch]$UpgradeFromRc621)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -40,6 +41,9 @@ try {
     $to = $doc.IndexOf($end, [StringComparison]::Ordinal)
     if ($from -lt $start.Length -or $to -le $from) { throw 'Canonical runbook export markers missing.' }
     $runbook = $doc.Substring($from, $to-$from).Trim().Replace('{{RELEASE_NAME}}', $ReleaseName).Replace('{{BUILD_SHA}}', $sha)
+    if ($UpgradeFromRc621) {
+        $runbook = "# $ReleaseName`r`n`r`nKaynak: $sha`r`n`r`n" + (Get-Content -LiteralPath 'docs/rc621-upgrade-tr.md' -Raw -Encoding UTF8)
+    }
     [IO.File]::WriteAllText("$destination/operator-runbook-tr.md", $runbook, [Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath "$destination/operator-runbook-tr.md" -Destination "$destination/staging/database/operator-runbook-tr.md"
     Copy-Item -LiteralPath 'sql/README.md' -Destination "$destination/staging/database/DBA-README.md"
@@ -86,12 +90,14 @@ try {
     }
     New-Item -ItemType Directory -Path "$destination/configuration" | Out-Null
     Copy-Item -LiteralPath "$PSScriptRoot/announcement-mail.disabled.example.json" -Destination "$destination/configuration/announcement-mail.disabled.example.json"
+    Copy-Item -LiteralPath 'scripts/powershell/Compare-OperationsReadiness.ps1' -Destination "$destination/configuration/Compare-OperationsReadiness.ps1"
     & "$PSScriptRoot/New-ApiDeploymentPackage.ps1" -PublishDirectory "$destination\staging\api" -ZipPath $apiZip -ManifestPath "$destination/manifests/api-payload.sha256" -ForbiddenText @($env:USERPROFILE)
     & "$PSScriptRoot/Validate-ApiAdRuntimeDependencies.ps1" -PublishDirectory "$destination\staging\api" -ZipPath $apiZip -ManifestPath "$destination/manifests/api-payload.sha256"
     & "$PSScriptRoot/New-UiDeploymentPackage.ps1" -PublishDirectory "$destination\staging\ui" -ZipPath $uiZip -ManifestPath "$destination/manifests/ui-payload.sha256" -ForbiddenText @($env:USERPROFILE)
     & "$PSScriptRoot/New-UiDeploymentPackage.ps1" -Component Worker -PublishDirectory "$destination\staging\worker" -ZipPath $workerZip -ManifestPath "$destination/manifests/worker-payload.sha256" -ForbiddenText @($env:USERPROFILE)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $dataPackages = @(@('database',$dbZip),@('database-delta',$deltaZip))
+    if ($UpgradeFromRc621) { $dataPackages = @() }
     foreach ($extra in $extraPackages) { $dataPackages += ,@($extra[1],$extra[2]) }
     foreach ($databasePackage in $dataPackages) {
     $databaseRoot = "$destination\staging\$($databasePackage[0])"
@@ -104,7 +110,9 @@ try {
     } finally { $archive.Dispose() }
     }
     $packages = @()
-    foreach ($item in (@(@('API','api',$apiZip), @('UI','ui',$uiZip), @('Worker','worker',$workerZip), @('DBA','database',$dbZip), @('DBA-DELTA','database-delta',$deltaZip)) + $extraPackages)) {
+    $payloads = @(@('API','api',$apiZip), @('UI','ui',$uiZip), @('Worker','worker',$workerZip))
+    if (!$UpgradeFromRc621) { $payloads += @(@('DBA','database',$dbZip), @('DBA-DELTA','database-delta',$deltaZip)) }
+    foreach ($item in ($payloads + $extraPackages)) {
         $root = "$destination\staging\$($item[1])"
         $files = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Name -ne 'web.config' -and $_.Name -notmatch '^appsettings(\..+)?\.json$' } | Sort-Object FullName | ForEach-Object {
             [ordered]@{ path=$_.FullName.Substring($root.Length+1).Replace('\','/'); bytes=$_.Length; sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
@@ -126,6 +134,13 @@ try {
     }
     $metadata = [ordered]@{ release=$ReleaseName; branch=$branch; buildSource=$sha; requiredSchema='001-021'; upgradeFromVerified018='019-021'; productVersion="0.1.0+$sha"; fileVersion='0.1.0.0'; targetFramework='net8.0'; selfContained=$false; packages=$packages; corporateCallsPerformed=$false; deploymentPerformed=$false; requiredFences=@{ ReadOnlyIntegrationMode=$true; ControlledTestWritesEnabled=$false; SourceCloseEnabled=$false; AnnouncementMailEnabled=$false } }
     $metadata.workerHosting = 'Foreground console only; Windows Service/unattended hosting deferred'
+    if ($UpgradeFromRc621) {
+        $metadata.Remove('upgradeFromVerified018')
+        $metadata.upgradeFrom = 'rc6.21 with verified 001-021 and Hangfire schema 9; no SQL migration delta'
+    }
+    $metadata.operatorFiles = @(Get-Item "$destination/operator-runbook-tr.md"; Get-ChildItem "$destination/configuration" -File) | ForEach-Object {
+        [ordered]@{ path=$_.FullName.Substring($destination.Length+1); sha256=(Get-FileHash -LiteralPath $_.FullName).Hash }
+    }
     $metadata.hangfire = @{ packageVersion=$hangfireVersion; schemaVersion=9; runtimePrepareSchema=$false; installationScriptSha256=(Get-FileHash -LiteralPath $install[0]).Hash }
     $metadata.assemblies = $assemblies
     $metadata.requiredHost = 'API/UI: Windows x64 IIS Hosting Bundle, NETCore.App 8.0 and AspNetCore.App 8.0; Worker: NETCore.App 8.0 console, persistent foreground session; no SDK'

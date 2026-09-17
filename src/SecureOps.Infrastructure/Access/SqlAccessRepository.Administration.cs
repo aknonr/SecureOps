@@ -55,7 +55,7 @@ public sealed partial class SqlAccessRepository
 
         if (row?.Protected == true)
         {
-            return AccessServiceResult<AccessRoleImpact>.Fail(OperationalErrorCodes.AccessDenied);
+            return AccessServiceResult<AccessRoleImpact>.Fail(OperationalErrorCodes.AccessProtectedRole);
         }
 
         AccessRoleDefinition? previous = row is null ? null : Role(row);
@@ -68,7 +68,7 @@ public sealed partial class SqlAccessRepository
 
         if (human.Roles.Contains(change.Code, StringComparer.OrdinalIgnoreCase) && capabilities.Except(human.Capabilities).Any())
         {
-            return AccessServiceResult<AccessRoleImpact>.Fail(OperationalErrorCodes.AccessDenied);
+            return AccessServiceResult<AccessRoleImpact>.Fail(OperationalErrorCodes.AccessSelfEscalationDenied);
         }
 
         string code = previous?.Code ?? change.Code;

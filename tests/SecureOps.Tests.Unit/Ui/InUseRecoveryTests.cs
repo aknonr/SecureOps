@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using FluentAssertions;
+using Microsoft.JSInterop;
 using NSubstitute;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Shared.Contracts.InUse;
@@ -13,6 +14,30 @@ namespace SecureOps.Tests.Unit.Ui;
 
 public sealed class InUseRecoveryTests
 {
+    [Fact]
+    public async Task ArchivedDownload_JavascriptFailureRetainsArchiveAndRetryDoesNotCreateAnother()
+    {
+        InUseRecord record = Record();
+        var report = new InUseReport(record.Id, record.Version, record.SourceVersion, "synthetic-hash",
+            "synthetic.xlsx", [1, 2], [])
+        { Archived = true, PreparedBy = Guid.NewGuid(), PreparedAt = DateTimeOffset.UtcNow };
+        using var f = new Fixture(_ => Task.FromResult(Response(report)));
+        f.SetProperty("Js", new FailedDownload());
+        await (Task)f.Invoke("DownloadAsync", (long?)report.Version)!;
+        f.Get<InUseReport>("_report").Should().BeEquivalentTo(report);
+        f.Get<InUseRecord>("_record").ArchivedVersions.Should().ContainSingle().Which.Should().Be(report.Version);
+        f.Get<UiProblem>("_problem").Code.Should().Be("InUseDownloadFailed");
+        await (Task)f.Invoke("DownloadAsync", (long?)report.Version)!;
+        f.Get<InUseRecord>("_record").ArchivedVersions.Should().ContainSingle().Which.Should().Be(report.Version);
+        f.Handler.Calls.Should().Be(2);
+    }
+
+    private sealed class FailedDownload : IJSRuntime
+    {
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => throw new JSException("Synthetic download failure");
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args) => InvokeAsync<TValue>(identifier, args);
+    }
+
     [Theory]
     [InlineData("SaveAsync", "503")]
     [InlineData("SaveAsync", "transport")]

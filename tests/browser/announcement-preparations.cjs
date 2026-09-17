@@ -38,6 +38,9 @@ const ui=loopback(process.argv[3]), api=loopback(process.argv[4]), deniedUi=loop
         const downloadEvent=page.waitForEvent('download'); await page.getByRole('button',{name:'Hazırlanan maili indir',exact:true}).click();
         const file=path.join(out,'prepared.eml'); await (await downloadEvent).saveAs(file);
         assert.deepEqual(fs.readFileSync(file),Buffer.from(prepared.email,'base64'));
+        fs.copyFileSync(file,path.join(out,'representative.eml'));
+        fs.writeFileSync(path.join(out,'saved-preview.html'),prepared.html);
+        fs.writeFileSync(path.join(out,'saved-draft.json'),JSON.stringify(prepared.draft.content));
         await json(client,draft+'?version=1',{method:'PUT',data:{...content,subject:'Sonraki taslak'}});
         await navigate(page,ui,'announcements/preparations/'+preparedId); await frame.getByText('Türkçe & <b> düz metin',{exact:true}).waitFor();
         assert.equal((await json(client,root+'/'+preparedId)).fingerprint,prepared.fingerprint);

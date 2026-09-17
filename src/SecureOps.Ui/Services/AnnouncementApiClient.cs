@@ -67,12 +67,15 @@ public sealed class AnnouncementApiClient
     }
     /// <summary>Reads protected profile choices through the current browser session.</summary>
     public Task<MaintenanceProfileChoice[]> ProfilesAsync(CancellationToken token) => SourceAsync<MaintenanceProfileChoice[]>("/source/profiles", null, token);
+    /// <summary>Source configuration/queue observations, not a live provider call.</summary>
+    public Task<AnnouncementSourceReadiness> SourceReadinessAsync(CancellationToken token) => SourceAsync<AnnouncementSourceReadiness>("/source/readiness", null, token);
     /// <summary>Submits explicit retrieval, or reads status without enqueueing.</summary>
     public Task<AnnouncementSourceJobStatus> SourceJobAsync(Guid id, AnnouncementSourceSubmission? submission, CancellationToken token) =>
         SourceAsync<AnnouncementSourceJobStatus>($"/{id}/source/jobs", submission, token);
     /// <summary>Reads a review bound to one job and both concurrency versions.</summary>
-    public Task<AnnouncementSourceProposal> SourceProposalAsync(Guid id, Guid job, CancellationToken token) =>
-        SourceAsync<AnnouncementSourceProposal>($"/{id}/source/jobs/{job}/proposal", null, token);
+    public Task<AnnouncementSourceProposal> SourceProposalAsync(Guid id, Guid job, CancellationToken token, string? reviewedSourceOffset = null) =>
+        SourceAsync<AnnouncementSourceProposal>($"/{id}/source/jobs/{job}/proposal"
+            + (reviewedSourceOffset is null ? "" : "?reviewedSourceOffset=" + Uri.EscapeDataString(reviewedSourceOffset)), null, token);
     /// <summary>Applies exactly the explicitly reviewed request; never retries with substituted versions.</summary>
     public Task<AnnouncementSourceApplyResult> ApplySourceAsync(Guid id, AnnouncementSourceApply request, CancellationToken token) =>
         SourceAsync<AnnouncementSourceApplyResult>($"/{id}/source/apply", request, token);

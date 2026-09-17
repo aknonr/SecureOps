@@ -10,7 +10,7 @@
 <NavigationLock ConfirmExternalNavigation="Dirty" OnBeforeInternalNavigation="BeforeNavigateAsync" />
 
 <PageTitle>Rol tanımları · @WasasBrand.Name</PageTitle>
-<div class="so-page">
+<div class="so-page so-page--wide">
     <SoPageHeader Title="Rol tanımları"><Actions><MudButton Href="access/users" StartIcon="@Icons.Material.Filled.ArrowBack">Kullanıcılar</MudButton></Actions></SoPageHeader>
     @if (_access is null) { <SoLoading Message="Yetkiler doğrulanıyor" /> }
     else if (!_access.Can(Capabilities.AccessManageUsers) || !_access.Can(Capabilities.AccessAssignRoles))
