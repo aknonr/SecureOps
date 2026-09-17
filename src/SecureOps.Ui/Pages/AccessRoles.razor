@@ -1,0 +1,174 @@
+@page "/access/roles"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Routing
+@using SecureOps.Ui.Shared
+@inject ICurrentAccessProvider AccessProvider
+@inject IAccessAdminApiClient AccessAdmin
+@inject IJSRuntime Js
+
+<NavigationLock ConfirmExternalNavigation="Dirty" OnBeforeInternalNavigation="BeforeNavigateAsync" />
+
+<PageTitle>Rol tanımları · @WasasBrand.Name</PageTitle>
+<div class="so-page">
+    <SoPageHeader Title="Rol tanımları"><Actions><MudButton Href="access/users" StartIcon="@Icons.Material.Filled.ArrowBack">Kullanıcılar</MudButton></Actions></SoPageHeader>
+    @if (_access is null) { <SoLoading Message="Yetkiler doğrulanıyor" /> }
+    else if (!_access.Can(Capabilities.AccessManageUsers) || !_access.Can(Capabilities.AccessAssignRoles))
+    { <MudAlert Severity="Severity.Warning">Rol tanımı için kullanıcı yönetimi ve rol atama yetkileri gerekir.</MudAlert> }
+    else
+    {
+        @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+        @if (_message is not null) { <MudAlert Severity="Severity.Success" role="status">@_message</MudAlert> }
+        <div class="role-workspace">
+            <aside aria-label="Rol tanımları">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Disabled="_busy" OnClick="NewRole">Yeni rol</MudButton>
+                <ul>@foreach (AccessRoleDefinition role in _roles)
+                    { <li><button type="button" class="@(_selected?.Code == role.Code ? "selected" : "")" disabled="@_busy" @onclick="() => SelectReviewedAsync(role)"><strong>@RoleName(role)</strong><small>@role.Capabilities.Count yetki @if (role.Protected) { <span>· Korumalı</span> }</small></button></li> }
+                </ul>
+            </aside>
+            <section aria-label="Rol ayrıntısı">
+                @if (_selected is null) { <p>Rol seçilmedi.</p> }
+                else
+                {
+                    <h2>@RoleName(_selected)</h2>
+                    @if (_selected.Protected) { <MudAlert Severity="Severity.Info">Çekirdek yönetici rolü değiştirilemez.</MudAlert> }
+                    <label class="role-field" for="role-name">Rol adı</label>
+                    <input id="role-name" @bind="_name" @bind:event="oninput" maxlength="100" disabled="@Locked" />
+                    <label class="role-field" for="role-purpose">Amaç</label>
+                    <textarea id="role-purpose" @bind="_purpose" @bind:event="oninput" maxlength="500" rows="2" disabled="@Locked"></textarea>
+                    @if (_validation is not null) { <p role="alert" class="role-error">@_validation</p> }
+                    @if (_current is not null)
+                    {
+                        <div role="alert" class="role-impact">
+                            <h3>Rol başka bir işlemde değişti</h3>
+                            <p>Girdiğiniz değişiklikler korunuyor. Güncel rol: @RoleName(_current), v@_current.Version.</p>
+                            <p>Güncel amaç: @_current.Purpose</p>
+                            <p>Güncel yetkiler: @ActionNames(_current.Capabilities)</p>
+                            <MudButton StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="Rebase">Bu sürümle farkları yeniden incele</MudButton>
+                        </div>
+                    }
+                    <h3>İzin verilen işlemler</h3>
+                    @foreach (var group in _actions.GroupBy(action => action.Module))
+                    {
+                        <fieldset><legend>@group.Key</legend>
+                            @foreach (AccessActionDefinition action in group)
+                            {
+                                <label class="role-capability"><input type="checkbox" checked="@_capabilities.Contains(action.Code)" disabled="@(Locked || (!action.Assignable && !_selected.Capabilities.Contains(action.Code)))" @onchange="e => Toggle(action.Code, e.Value is true)" />
+                                    <span><strong>@action.Name</strong><small>@action.Description</small></span>
+                                </label>
+                            }
+                        </fieldset>
+                    }
+                    @if (_impact is not null)
+                    {
+                        <section class="role-impact" aria-label="Yetki değişikliği önizlemesi" role="status" tabindex="-1" @ref="_impactElement">
+                            <h3>Uygulanacak değişiklik</h3>
+                            <p>@_impact.AffectedUsers kullanıcı · @_impact.UsersGaining yetki kazanacak · @_impact.UsersLosing yetki kaybedecek</p>
+                            <dl><dt>Eklenecek yetkiler</dt><dd>@ActionNames(_impact.AddedCapabilities)</dd><dt>Kaldırılacak yetkiler</dt><dd>@ActionNames(_impact.RemovedCapabilities)</dd></dl>
+                            <p>Etkin erişim yeniden doğrulanacak. Bekleyen işlemler yeni yetkilerle değerlendirilecek.</p>
+                            <MudButton StartIcon="@Icons.Material.Filled.Edit" Disabled="_busy" OnClick="() => _impact = null">Düzelt</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Check" Disabled="_busy" OnClick="SaveAsync">Değişikliği uygula</MudButton>
+                        </section>
+                    }
+                    else if (!_selected.Protected && _current is null)
+                    { <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Preview" Disabled="_busy" OnClick="PreviewAsync">Etkiyi incele</MudButton> }
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+    private IReadOnlyList<AccessRoleDefinition> _roles = [];
+    private IReadOnlyList<AccessActionDefinition> _actions = [];
+    private AccessRoleDefinition? _selected;
+    private AccessRoleDefinition? _current;
+    private AccessRoleChange? _reviewed;
+    private AccessRoleImpact? _impact;
+    private UiProblem? _problem;
+    private string? _validation, _message;
+    private string _name = "", _purpose = "";
+    private HashSet<string> _capabilities = [];
+    private bool _busy;
+    private ElementReference _impactElement;
+    private bool Locked => _busy || _impact is not null || _selected?.Protected == true;
+    [CascadingParameter] public MainLayout? Shell { get; set; }
+    private bool Dirty => _selected is { Protected: false } && (_name != RoleName(_selected) || _purpose != _selected.Purpose || !_capabilities.SetEquals(_selected.Capabilities));
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += AccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        if (!_access.Can(Capabilities.AccessManageUsers) || !_access.Can(Capabilities.AccessAssignRoles)) { return; }
+        try { _roles = await AccessAdmin.RolesAsync(CancellationToken.None); _actions = await AccessAdmin.ActionsAsync(CancellationToken.None); }
+        catch (SecureOpsApiException exception) { _problem = exception.Problem; }
+    }
+    private void Select(AccessRoleDefinition role)
+    {
+        _selected = role; _name = RoleName(role); _purpose = role.Purpose; _capabilities = role.Capabilities.ToHashSet(StringComparer.Ordinal);
+        _impact = null; _reviewed = null; _current = null; _validation = null; _problem = null; _message = null;
+    }
+    private Task NewRole() => SelectReviewedAsync(new("Business_" + Guid.NewGuid().ToString("N"), "", "", 0, false, []));
+    private async Task SelectReviewedAsync(AccessRoleDefinition role)
+    { if (!Dirty || await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş rol değişiklikleri var. Değişiklikleri bırakmak istiyor musunuz?")) { Select(role); } }
+    private async Task BeforeNavigateAsync(LocationChangingContext context)
+    {
+        if (Dirty && !await Js.InvokeAsync<bool>("confirm", "Kaydedilmemiş rol değişiklikleri var. Sayfadan ayrılmak istiyor musunuz?"))
+        { context.PreventNavigation(); Shell?.CancelPendingNavigation(); }
+    }
+    private void AccessChanged() => _ = InvokeAsync(async () =>
+    {
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        if (!_access.Can(Capabilities.AccessManageUsers) || !_access.Can(Capabilities.AccessAssignRoles)) { _selected = null; _impact = null; _roles = []; }
+        StateHasChanged();
+    });
+    public void Dispose() => AccessProvider.Changed -= AccessChanged;
+    private void Toggle(string capability, bool selected) { if (selected) { _capabilities.Add(capability); } else { _capabilities.Remove(capability); } _impact = null; }
+    private async Task PreviewAsync()
+    {
+        if (_busy || _selected is null) { return; }
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_purpose)) { _validation = "Rol adı ve amacı boş bırakılamaz."; return; }
+        _busy = true; _problem = null; _validation = null;
+        try
+        {
+            AccessRoleChange proposed = new(_selected.Code, _name, _purpose, _selected.Version, _capabilities.Order().ToArray());
+            _impact = await AccessAdmin.PreviewRoleAsync(proposed, CancellationToken.None);
+            _reviewed = proposed with { PreviewToken = _impact.PreviewToken };
+            StateHasChanged();
+        }
+        catch (SecureOpsApiException exception) { await HandleFailureAsync(exception); }
+        finally { _busy = false; }
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_impact is not null && _focusToken != _impact.PreviewToken) { _focusToken = _impact.PreviewToken; await _impactElement.FocusAsync(); }
+    }
+    private string? _focusToken;
+    private async Task SaveAsync()
+    {
+        if (_busy || _reviewed is null || _impact is null) { return; }
+        _busy = true; _problem = null;
+        try
+        {
+            AccessRoleImpact saved = await AccessAdmin.SaveRoleAsync(_reviewed, CancellationToken.None);
+            _roles = await AccessAdmin.RolesAsync(CancellationToken.None);
+            Select(saved.Proposed); _message = "Rol tanımı kaydedildi.";
+        }
+        catch (SecureOpsApiException exception) { await HandleFailureAsync(exception); }
+        finally { _busy = false; }
+    }
+    private void Rebase() { if (_current is not null) { _selected = _current; _current = null; _problem = null; } }
+    private async Task HandleFailureAsync(SecureOpsApiException exception)
+    {
+        _problem = exception.Problem; _impact = null; _reviewed = null;
+        if (exception.Problem.StatusCode != 409 || _selected is null) { return; }
+        try
+        {
+            _roles = await AccessAdmin.RolesAsync(CancellationToken.None);
+            _current = _roles.FirstOrDefault(role => role.Code == _selected.Code);
+        }
+        catch (SecureOpsApiException refresh) { _problem = refresh.Problem; }
+    }
+    private static string RoleName(AccessRoleDefinition role) => role.Name == role.Code ? AccessLabels.RoleLabel(role.Code) : role.Name;
+    private string ActionNames(IReadOnlyList<string> codes) => codes.Count == 0 ? "Yok" : string.Join(", ", codes.Select(code => _actions.FirstOrDefault(action => action.Code == code)?.Name ?? code));
+}

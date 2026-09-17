@@ -1,5 +1,47 @@
 # SecureOps.Ui
 
+## Current Operations Continuation, 2026-09-17
+
+The owner explicitly assigns this bounded backend/UI continuation to Codex.
+Current source supersedes the incomplete implementation statements in historical
+sections below. Canonical validation/release status is the current section of
+docs/24-api-test-deployment-readiness.md, not an older local payload version.
+
+In Use list/detail exposes assigned reviewer, saved versus local progress, freshness
+and next missing action before technical evidence. Assignment remains optional;
+cross-assignee review is allowed. A bounded persisted-profile picker, distinct
+assignment actor/time and saving actor remain separate from RFC/Bildiren. Selected
+bulk differences, missing-answer focus, draft preservation/conflict comparison,
+immutable reports and optional non-mutating tour remain. Assignment is no closure.
+
+Access requests/users use SQL search/filter/count/paging and retain list context.
+User detail groups effective actions by the role providing them. Roles can be
+created from registered actions; impact, concurrent version comparison and explicit
+apply precede changes. Ordinary role replacement has no reason field. Rejection and
+disable still do. Protected Admin, no self-escalation, last Admin and current access
+are enforced by SQL, not UI labels. Request approval is not user-management access.
+
+OCO source proposal review/apply remains explicit. Saved preparation now offers
+separate capability-controlled self-test/send previews: exact actor-Mail From,
+audience, version and visible effect; one confirmation queues the frozen command.
+Uncertain/pending results block another command; refresh reads status, not resend.
+SMTP acknowledgment is not inbox delivery. History retains original preparation
+bytes and initiator even after profile change or Worker restart. Source, preparation,
+self-test and send are separately authorized; all corporate activation remains off.
+Original six images are embedded with byte-derived types and bounded sizes.
+
+OR retains one reviewed ServerRequest confirmation, prominent stored Jira result,
+source-open Jira-only intent and uncertain-result blocking. Corporate source closure
+and other request-type mappings remain blocked. Typed record history shows known
+initiator/executor/verifier and leaves unavailable source closer unknown.
+
+Operator journeys: In Use filter -> assignment when useful -> server checks ->
+save -> missing checks/bulk differences -> preview/report; Access search -> detail
+-> reviewed role change; OCO source review -> edit audience -> save -> preparation
+-> self-only preview/confirm -> recorded SMTP result -> separately authorized final
+audience preview/confirm; OR stored record -> declaration -> eligibility/blockers ->
+source-bound preview -> explicit Jira-only confirmation -> persisted key/status.
+
 ## Planned Announcements UI
 
 2026-09-15 sender/access continuation: API currentSender uses stored Mail and is

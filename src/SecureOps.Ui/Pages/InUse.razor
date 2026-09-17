@@ -13,9 +13,9 @@
 
 <PageTitle>Sunucu Kullanıma Alma Kontrolleri · @WasasBrand.Name</PageTitle>
 <div class="so-page so-page--wide so-inuse">
-    <SoPageHeader Title="Sunucu Kullanıma Alma Kontrolleri" Lead="Sunucuları kontrol edin, üç soruyu yanıtlayın ve Excel raporunu hazırlayın.">
+    <SoPageHeader Title="Sunucu Kullanıma Alma Kontrolleri">
         <Actions>
-            @if (Id.HasValue) { <MudButton Href="in-use" StartIcon="@Icons.Material.Filled.ArrowBack">Listeye dön</MudButton> }
+            @if (Id.HasValue) { <MudButton Href="@ListUrl" StartIcon="@Icons.Material.Filled.ArrowBack">Listeye dön</MudButton> }
             @if (Can(Capabilities.InUseView)) { <ResourceHelp Surface="@(Id.HasValue ? "inuse-review" : "inuse-list")" Disabled="_busy" /> }
         </Actions>
     </SoPageHeader>
@@ -80,16 +80,18 @@
                     <ul class="so-inuse-records">
                     @foreach (InUseRecord record in _page.Items)
                     {
-                        <li><div><a href="@($"in-use/{record.Id}")">@record.Source.Code</a><h2>@record.Source.Title</h2>
+                        <li><div><a href="@RecordUrl(record.Id)">@record.Source.Code</a><h2>@record.Source.Title</h2>
                             @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }</div>
-                            <div><strong>@record.Source.Servers.Count sunucu · @Status(record.Status)</strong>
-                                <p>@InUseRelatedRequestReporter.Label</p>
+                            <div class="inuse-row-state"><strong class="inuse-assignee">Atanan inceleyici: @(record.AssigneeLabel ?? "Atanmamış")</strong>
+                                <p>@SavedCompleted(record) / @record.Source.Servers.Count sunucu kaydedildi · @Status(record.Status)</p>
+                                <p class="inuse-next">@RowNext(record)</p><small>Son okuma: @Time(record.LastSeenAt)</small>
+                                <details><summary>@InUseRelatedRequestReporter.Label · RFC</summary>
                                 @foreach (var group in record.Source.Servers.GroupBy(s => new { s.RelatedRequestReporter?.RfcReference, s.RelatedRequestReporter?.Display, s.RelatedRequestReporter?.UserReference, State = s.RelatedRequestReporter?.EffectiveState(DateTimeOffset.UtcNow) }))
                                 { <div>@group.Count() sunucu <InUseReporter Value="group.First().RelatedRequestReporter" /></div> }
-                                <span>WASAS inceleyicisi: @(record.AssigneeLabel ?? "Atanmamış (isteğe bağlı)")</span><br />@Waiting(record)
+                                <p>@Waiting(record)</p></details>
                                 @if (record.Source.ServiceItemsState is "Partial" or "Failed" or "Forbidden" or "Ambiguous")
                                 { <p>@Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p> }</div>
-                            <MudButton Href="@($"in-use/{record.Id}")" EndIcon="@Icons.Material.Filled.ArrowForward">İncele</MudButton></li>
+                            <MudButton Href="@RecordUrl(record.Id)" EndIcon="@Icons.Material.Filled.ArrowForward">İncele</MudButton></li>
                     }
                     </ul>
                     <footer class="so-inuse-pager">
@@ -104,16 +106,23 @@
         else if (_record is { } record)
         {
             <h2>@record.Source.Code · @record.Source.Title</h2>
-            <p>@Status(record.Status) · Son okuma @Time(record.LastSeenAt) · @Waiting(record)</p>
+            <section class="inuse-ticket-summary" aria-label="İnceleme durumu">
+                <div><span>Atanan inceleyici</span><strong>@(record.AssigneeLabel ?? "Atanmamış")</strong></div>
+                <div><span>Kaydedilen ilerleme</span><strong>@SavedCompleted(record) / @record.Source.Servers.Count sunucu · @Status(record.Status)</strong></div>
+                <div><span>Kaynak okuma zamanı</span><strong>@Time(record.LastSeenAt)</strong></div>
+                <p class="inuse-next" role="status">Sonraki adım: @NextAction</p>
+                @if (_dirty) { <p role="status">Yerel cevaplar değişti; henüz kaydedilmedi. Formdaki ilerleme: @CompletedServers / @record.Source.Servers.Count.</p> }
+                @if (record.Draft is { } saved) { <p>Son kaydeden: @(saved.ReviewedByLabel ?? "Geçmiş kaydın profil adı yok") · @Time(saved.ReviewedAt)</p> }
+            </section>
             @if (record.Source.Synthetic) { <MudAlert Severity="Severity.Info">Sentetik yerel veri; kurumsal doğrulama değildir.</MudAlert> }
             @if (record.Status == "Stale") { <MudAlert Severity="Severity.Warning">Kaynak değişti. Önceki taslak güncel değildir; cevapları yeniden doğrulayın.</MudAlert> }
             <section class="so-inuse-band" data-guide="inuse-owner">
-                <h3>Kayıt özeti</h3>
-                <dl class="so-inuse-evidence">
+                <details><summary>Kaynak kimlikleri ve atama geçmişi</summary><dl class="so-inuse-evidence">
                     <dt>In Use kaydındaki talep eden</dt><dd>@InUseDisplayText.Decode(record.Source.Requester.Value)</dd>
-                    <dt>WASAS inceleyicisi</dt><dd>@(record.AssigneeLabel ?? "Atanmamış (isteğe bağlı)")</dd>
+                    <dt>Atamayı değiştiren</dt><dd>@(record.AssignedByLabel ?? "Geçmiş aktör bilgisi yok") · @Time(record.AssignedAt)</dd>
+                    <dt>Kaynak yaşı</dt><dd>@Waiting(record)</dd>
                 </dl>
-                <details><summary>Diğer kaynak kimlikleri</summary><dl class="so-inuse-evidence">
+                <dl class="so-inuse-evidence">
                     <dt>Teknik kayıt oluşturucusu</dt><dd>@Evidence(record.Source.Creator ?? new(null, "Kaynak sözleşmesi doğrulanmadı"))</dd>
                     <dt>Servis / uygulama sahibi</dt><dd>@Evidence(record.Source.ServiceOwner)</dd>
                     <dt>Kurulum operatörü / ekibi</dt><dd>@Evidence(record.Source.ProvisioningTeam)</dd>
@@ -121,7 +130,9 @@
                 @if (Can(Capabilities.InUseAssign))
                 {
                     <details class="so-inuse-assignment"><summary>İnceleyici ata / değiştir (isteğe bağlı)</summary><div class="so-inuse-filters">
+                        <MudTextField T="string" Label="İnceleyici ara" Value="_assigneeSearch" ValueChanged="SearchAssigneesAsync" MaxLength="100" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="_busy" />
                         <label>İnceleyici<select aria-label="In Use inceleyicisi" disabled="@_busy" @bind="_assignee"><option value="">Atanmamış</option>
+                            @if (record.AssigneeId is { } selected && !_assignees.Any(p => p.Id == selected)) { <option value="@selected">@record.AssigneeLabel</option> }
                             @foreach (InUseAssignee person in _assignees) { <option value="@person.Id">@person.Label</option> }</select></label>
                         <label>Atama gerekçesi<input aria-label="Atama gerekçesi" maxlength="500" disabled="@_busy" @bind="_reason" @bind:event="oninput" /></label>
                         <MudButton OnClick="AssignAsync" Disabled="@(_busy || _dirty || string.IsNullOrWhiteSpace(_reason))" StartIcon="@Icons.Material.Filled.PersonAdd">Atamayı kaydet</MudButton>
@@ -130,7 +141,6 @@
                     { <p>Profil adı eksik kullanıcılar sonraki başarılı OIDC girişinde güncellenir. Kimliğinden emin olmadığınız kullanıcıya atama yapmayın.</p> }
                     </details>
                 }
-                <p role="status">Sonraki adım: @NextAction</p>
             </section>
             <section class="so-inuse-band" data-guide="inuse-servers">
                 <h3>1. Sunucuları kontrol et</h3>
@@ -150,6 +160,7 @@
                 {
                     <h3>2. Soruları yanıtla</h3>
                     <p role="status">@CompletedServers / @record.Source.Servers.Count sunucunun üç cevabı tamamlandı.</p>
+                    @if (CanEdit && CompletedServers < record.Source.Servers.Count) { <MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">İlk eksik cevaba git</MudButton> }
                     <label>Yanıtlanacak sunucu<select aria-label="Yanıtlanacak sunucu" @bind="_editingServer" @bind:after="() => _changes = null">
                         @foreach (InUseServer server in record.Source.Servers) { <option value="@server.Id">@Field(server, "HOSTNAME") · @server.Id · @_answers.Count(a => a.ServerId == server.Id && a.Value == "Unknown") eksik</option> }
                     </select></label>
@@ -163,6 +174,7 @@
                             </select></label>
                         }
                     </div>
+                    @if (CanEdit) { <MudButton OnClick="SaveAsync" Disabled="_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">Taslağı kaydet</MudButton> }
                     @if (CanEdit && record.Source.Servers.Count > 1)
                     {
                         <details class="so-inuse-bulk"><summary>Bu üç cevabı seçili sunuculara uygula</summary>
@@ -193,8 +205,8 @@
             </section>
             <section class="so-inuse-band" data-guide="inuse-report">
                 <h3>3. Önizle ve raporu arşivle</h3>
+                <OperationHistoryPanel RecordType="InUse" RecordId="record.Id" />
                 <div class="so-inline-actions">
-                    @if (CanEdit) { <MudButton OnClick="SaveAsync" Disabled="_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">Taslağı kaydet</MudButton> }
                     @if (Can(Capabilities.InUseReview)) { <MudButton OnClick="PreviewAsync" Disabled="@(_busy || _dirty || record.Draft is null || record.Status == "Stale")" StartIcon="@Icons.Material.Filled.TableView">Excel önizleme</MudButton> }
                 </div>
                 @if (_dirty) { <p role="status">Kaydedilmemiş değişiklikler var.</p> }

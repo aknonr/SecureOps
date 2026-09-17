@@ -32,6 +32,7 @@ public sealed class SqlFirstAdminBootstrapStore : IFirstAdminBootstrapStore
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await SqlAccessRepository.LockAdministrationAsync(connection, transaction, cancellationToken);
         await connection.ExecuteAsync(Command("SET XACT_ABORT ON;", null, transaction, cancellationToken));
 
         short[] adminRoleIds = (await connection.QueryAsync<short>(Command(

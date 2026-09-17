@@ -19,6 +19,18 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public interface IAccessAdminApiClient
 {
+    /// <summary>Reads a bounded server-side user page.</summary>
+    public Task<AccessPage<AccessUserResponse>> PageUsersAsync(AccessPageQuery query, CancellationToken cancellationToken);
+    /// <summary>Reads a bounded server-side request page.</summary>
+    public Task<AccessPage<AccessRequestResponse>> PageRequestsAsync(AccessPageQuery query, CancellationToken cancellationToken);
+    /// <summary>Reads persisted role definitions.</summary>
+    public Task<IReadOnlyList<AccessRoleDefinition>> RolesAsync(CancellationToken cancellationToken);
+    /// <summary>Reads implemented server-owned actions.</summary>
+    public Task<IReadOnlyList<AccessActionDefinition>> ActionsAsync(CancellationToken cancellationToken);
+    /// <summary>Computes a current effective-permission preview.</summary>
+    public Task<AccessRoleImpact> PreviewRoleAsync(AccessRoleChange change, CancellationToken cancellationToken);
+    /// <summary>Saves only a matching reviewed role impact.</summary>
+    public Task<AccessRoleImpact> SaveRoleAsync(AccessRoleChange change, CancellationToken cancellationToken);
     /// <summary>
     /// Lists authoritative access-user records.
     /// </summary>
@@ -59,12 +71,14 @@ public interface IAccessAdminApiClient
     /// <param name="expectedVersion">The <b>request's</b> version from the read that populated the form.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The decided request as the server recorded it.</returns>
+    /// <param name="roleVersions">Definitions reviewed in the permission preview.</param>
     public Task<AccessRequestResponse> ApproveAsync(
         Guid requestId,
         string reason,
         IReadOnlyList<string> roles,
         long expectedVersion,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, long>? roleVersions = null);
 
     /// <summary>
     /// Rejects a pending access request.
@@ -96,11 +110,13 @@ public interface IAccessAdminApiClient
     /// <param name="expectedVersion">The <b>user's</b> version.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The user's resulting access, including effective capabilities.</returns>
+    /// <param name="roleVersions">Definitions reviewed in the permission preview.</param>
     public Task<CurrentAccessResponse> ReplaceRolesAsync(
         Guid userId,
         IReadOnlyList<string> roles,
         long expectedVersion,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, long>? roleVersions = null);
 
     /// <summary>
     /// Disables a user's application access.

@@ -54,12 +54,20 @@ public sealed class OperationalRecordPresentationTests
     [InlineData(OperationalRecordWorkflowState.JiraCreateFailed, 3)]
     [InlineData(OperationalRecordWorkflowState.JiraCreated, 4)]
     [InlineData(OperationalRecordWorkflowState.OperationalRecordCloseFailed, 4)]
-    [InlineData(OperationalRecordWorkflowState.Completed, 5)]
+    [InlineData(OperationalRecordWorkflowState.Completed, 4)]
     public void CurrentStep_ComesFromDurableStateNotFromWhatWasClicked(
         OperationalRecordWorkflowState state,
         int expected)
     {
         OperationalRecordView.CurrentStep(Record(state)).Should().Be(expected);
+    }
+
+    [Fact]
+    public void CompletedLabelWithoutVerifiedEvidence_DoesNotClaimSourceClosure()
+    {
+        OperationalRecordResponse legacy = Record(OperationalRecordWorkflowState.Completed);
+        OperationalRecordView.StateLabel(legacy).Should().Contain("doğrulanmadı");
+        OperationalRecordView.CurrentStep(legacy with { SourceClosureVerified = true }).Should().Be(5);
     }
 
     [Fact]

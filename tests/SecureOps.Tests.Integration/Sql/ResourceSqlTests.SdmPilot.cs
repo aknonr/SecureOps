@@ -26,7 +26,7 @@ public sealed partial class ResourceSqlTests
         var item = new OperationalRecordSourceItem(sourceId, "OR-" + sourceId,
             "Synthetic exact policy", "Synthetic provisioning outcome for tracking only",
             "synthetic.requester", null, "SIMULATION", null, null);
-        var context = new OperationalRecordCommandContext("synthetic.publisher", Guid.NewGuid().ToString("N"), null);
+        var context = new OperationalRecordCommandContext(await SqlAccessTestActors.AdminAsync(configuration, "synthetic.publisher." + Guid.NewGuid().ToString("N")), Guid.NewGuid().ToString("N"), null);
         var audit = new InMemoryAuditWriter();
         OperationalRecord record = await repository.UpsertImportedAsync(item, context.CorrelationId, _token);
         record = await repository.EvaluateAsync(record.Id, SdmEvaluationEvidence.FromSource(item, true, true), context, audit, _token);

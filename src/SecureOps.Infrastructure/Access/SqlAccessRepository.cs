@@ -5,18 +5,21 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Audit;
+using SecureOps.Shared.Auth;
 
 namespace SecureOps.Infrastructure.Access;
 
 /// <summary>SQL Server application-access repository with transactional decisions.</summary>
-public sealed class SqlAccessRepository : IAccessRepository
+public sealed partial class SqlAccessRepository : IAccessRepository
 {
     private const int _commandTimeoutSeconds = 15;
     private readonly string _connectionString;
+    private readonly bool _demoCompatibility;
 
     /// <summary>Initializes the SQL repository.</summary>
     public SqlAccessRepository(IConfiguration configuration)
     {
+        _demoCompatibility = configuration.GetValue<bool>("Access:DemoCompatibilityEnabled") && configuration.GetValue<bool>("DemoAuth:Enabled");
         _connectionString = configuration.GetConnectionString(AuditConnectionStrings.SecureOpsDb)
             ?? throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required for SQL access persistence.");
     }
@@ -171,11 +174,12 @@ public sealed class SqlAccessRepository : IAccessRepository
     }
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, long expectedVersion, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken)
+    public async Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, long expectedVersion, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null)
     {
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockAdministrationAsync(connection, transaction, cancellationToken);
         RequestRow? request = await connection.QuerySingleOrDefaultAsync<RequestRow>(Command($"{_readRequestSql.Replace("FROM security.AccessRequests ar", "FROM security.AccessRequests ar WITH (UPDLOCK, HOLDLOCK)", StringComparison.Ordinal)} WHERE ar.AccessRequestId = @RequestId", new { RequestId = requestId }, transaction, cancellationToken));
         if (request is null)
         {
@@ -198,6 +202,14 @@ public sealed class SqlAccessRepository : IAccessRepository
         }
 
         ApplicationUser targetUser = await GetUserWithinTransactionAsync(connection, transaction, request.UserId, cancellationToken);
+        bool demoBootstrap = _demoCompatibility && actor == "system:demo-compatibility" && decision == AccessRequestStatus.Approved
+            && targetUser.AuthenticationSource == "demo-api-bridge" && roles.Count == 1
+            && ((targetUser.CorporateIdentity == "demo:platform-admin" && roles.Single() == "Admin")
+                || (targetUser.CorporateIdentity == "demo:team-lead" && roles.Single() == "Lead"));
+        if (!demoBootstrap && !await ActorAuthorizedAsync(connection, transaction, actor, Capabilities.AccessApproveRequests, cancellationToken))
+        {
+            return new(AccessMutationDisposition.AdministrativeGuard, targetUser, Map(request), [], []);
+        }
         if (decision == AccessRequestStatus.Approved && targetUser.Status == AccessStatus.Disabled)
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -212,6 +224,15 @@ public sealed class SqlAccessRepository : IAccessRepository
 
         string[] previous = await GetActiveRolesAsync(connection, transaction, request.UserId, cancellationToken);
         string[] next = decision == AccessRequestStatus.Approved ? NormalizeRoles(roles) : [];
+        if (!await KnownRolesAsync(connection, transaction, next, cancellationToken))
+        {
+            return new(AccessMutationDisposition.InvalidRoles, targetUser, Map(request), [], []);
+        }
+        if (!demoBootstrap && !await ReviewedRolesAsync(connection, transaction, next, roleVersions, cancellationToken))
+        {
+            return new(AccessMutationDisposition.ConcurrencyConflict, targetUser, Map(request), [], []);
+        }
+
         const string update = """
             UPDATE security.AccessRequests SET Status = @Decision, DecidedAt = SYSUTCDATETIME(),
                 DecidedByCorporateIdentity = @Actor, DecisionReason = @Reason, Version = Version + 1
@@ -230,6 +251,8 @@ public sealed class SqlAccessRepository : IAccessRepository
             Reason = reason
         }, transaction, cancellationToken));
         await ReplaceRolesWithinTransactionAsync(connection, transaction, request.UserId, next, actor, cancellationToken);
+        await AuditAccessChangeAsync(connection, transaction, actor, "AccessDecisionCommitted", request.UserId, expectedVersion,
+            new { requestId, decision, previous, next, reason }, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         ApplicationUser user = (await GetUserAsync(request.UserId, cancellationToken))!;
         ApplicationAccessRequest updatedRequest = (await GetRequestAsync(requestId, cancellationToken))!;
@@ -237,11 +260,12 @@ public sealed class SqlAccessRepository : IAccessRepository
     }
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken)
+    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null)
     {
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockAdministrationAsync(connection, transaction, cancellationToken);
         ApplicationUser? current = await GetUserForUpdateAsync(connection, transaction, userId, cancellationToken);
         if (current is null)
         {
@@ -262,7 +286,28 @@ public sealed class SqlAccessRepository : IAccessRepository
         }
 
         string[] previous = current.Roles.ToArray();
+        if (!await ActorAuthorizedAsync(connection, transaction, actor, Capabilities.AccessAssignRoles, cancellationToken))
+        {
+            return new(AccessMutationDisposition.AdministrativeGuard, current, null, [], []);
+        }
         string[] next = NormalizeRoles(roles);
+        if (!await KnownRolesAsync(connection, transaction, next, cancellationToken))
+        {
+            return new(AccessMutationDisposition.InvalidRoles, current, null, [], []);
+        }
+
+        string[] nextCapabilities = await CapabilitiesAsync(connection, transaction, next, cancellationToken);
+        if (!await ReviewedRolesAsync(connection, transaction, next, roleVersions, cancellationToken))
+        {
+            return new(AccessMutationDisposition.ConcurrencyConflict, current, null, [], []);
+        }
+        if ((string.Equals(current.CorporateIdentity, actor, StringComparison.OrdinalIgnoreCase)
+                && nextCapabilities.Except(current.Capabilities, StringComparer.Ordinal).Any())
+            || await RemovesLastAdminAsync(connection, transaction, current, next, cancellationToken))
+        {
+            return new(AccessMutationDisposition.AdministrativeGuard, current, null, [], []);
+        }
+
         await ReplaceRolesWithinTransactionAsync(connection, transaction, userId, next, actor, cancellationToken);
         await connection.ExecuteAsync(Command("UPDATE security.Users SET AccessVersion = AccessVersion + 1 WHERE UserId = @UserId;", new { UserId = userId }, transaction, cancellationToken));
         await connection.ExecuteAsync(Command("""
@@ -277,8 +322,8 @@ public sealed class SqlAccessRepository : IAccessRepository
                 targetUserId = userId,
                 oldRoles = previous,
                 newRoles = next,
-                oldCapabilities = AccessRoleCatalog.GetCapabilities(previous),
-                newCapabilities = AccessRoleCatalog.GetCapabilities(next),
+                oldCapabilities = current.Capabilities,
+                newCapabilities = nextCapabilities,
                 previousVersion = expectedVersion,
                 version = expectedVersion + 1,
                 descriptionSource = "SystemGenerated",
@@ -286,9 +331,11 @@ public sealed class SqlAccessRepository : IAccessRepository
                 outcome = "Applied"
             })
         }, transaction, cancellationToken));
+        await AuditAccessChangeAsync(connection, transaction, actor, "AccessRoleAssignmentCommitted", userId, expectedVersion,
+            new { previous, next, previousCapabilities = current.Capabilities, nextCapabilities }, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         // Do not let a later writer's state replace this operation's result/audit snapshot.
-        return Applied(current with { Version = expectedVersion + 1, Roles = next, Capabilities = AccessRoleCatalog.GetCapabilities(next) }, null, previous, next);
+        return Applied(current with { Version = expectedVersion + 1, Roles = next, Capabilities = nextCapabilities }, null, previous, next);
     }
 
     /// <inheritdoc />
@@ -297,6 +344,7 @@ public sealed class SqlAccessRepository : IAccessRepository
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockAdministrationAsync(connection, transaction, cancellationToken);
         ApplicationUser? current = await GetUserForUpdateAsync(connection, transaction, userId, cancellationToken);
         if (current is null)
         {
@@ -316,6 +364,12 @@ public sealed class SqlAccessRepository : IAccessRepository
             return new AccessMutationResult(AccessMutationDisposition.ConcurrencyConflict, current, null, [], []);
         }
 
+        if (!await ActorAuthorizedAsync(connection, transaction, actor, Capabilities.AccessManageUsers, cancellationToken)
+            || await RemovesLastAdminAsync(connection, transaction, current, [], cancellationToken))
+        {
+            return new(AccessMutationDisposition.AdministrativeGuard, current, null, [], []);
+        }
+
         const string update = """
             UPDATE security.Users SET AccessStatus = 'Disabled', DisabledAt = SYSUTCDATETIME(),
                 DisabledByCorporateIdentity = @Actor, AccessVersion = AccessVersion + 1 WHERE UserId = @UserId;
@@ -323,6 +377,8 @@ public sealed class SqlAccessRepository : IAccessRepository
                 WHERE UserId = @UserId AND RevokedAt IS NULL;
             """;
         await connection.ExecuteAsync(Command(update, new { UserId = userId, Actor = actor }, transaction, cancellationToken));
+        await AuditAccessChangeAsync(connection, transaction, actor, "AccessDisableCommitted", userId, expectedVersion,
+            new { reason, previous = current.Roles, next = Array.Empty<string>() }, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Applied((await GetUserAsync(userId, cancellationToken))!, null, current.Roles, []);
     }
@@ -375,7 +431,9 @@ public sealed class SqlAccessRepository : IAccessRepository
     private static ApplicationUser Map(UserRow row)
     {
         string[] roles = string.IsNullOrWhiteSpace(row.Roles) ? [] : row.Roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return new ApplicationUser(row.Id, row.CorporateIdentity, row.AuthenticationSource, Enum.Parse<AccessStatus>(row.Status, true), row.FirstAuthenticatedAt, row.LastAuthenticatedAt, row.DisabledAt, row.Version, roles, AccessRoleCatalog.GetCapabilities(roles), row.LoginName, row.DisplayName, row.Mail, row.Uid, row.ProfileUpdatedAt);
+        string[] capabilities = (JsonSerializer.Deserialize<string[][]>($"[{row.CapabilitySets}]") ?? [])
+            .SelectMany(value => value).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        return new ApplicationUser(row.Id, row.CorporateIdentity, row.AuthenticationSource, Enum.Parse<AccessStatus>(row.Status, true), row.FirstAuthenticatedAt, row.LastAuthenticatedAt, row.DisabledAt, row.Version, roles, capabilities, row.LoginName, row.DisplayName, row.Mail, row.Uid, row.ProfileUpdatedAt);
     }
 
     private static ApplicationAccessRequest Map(RequestRow row) => new(row.Id, row.UserId, row.CorporateIdentity, Enum.Parse<AccessRequestStatus>(row.Status, true), row.RequestedAt, row.DecidedAt, row.DecisionReason, row.DecidedByCorporateIdentity, row.Version);
@@ -388,7 +446,8 @@ public sealed class SqlAccessRepository : IAccessRepository
         SELECT u.UserId AS Id, u.CorporateIdentity, u.AuthenticationSource, u.AccessStatus AS Status,
             u.FirstAuthenticatedAt, u.LastAuthenticatedAt, u.DisabledAt, u.AccessVersion AS Version,
             u.LoginName, u.DisplayName, u.Mail, u.Uid, u.ProfileUpdatedAt,
-            STRING_AGG(r.RoleCode, ',') AS Roles
+            STRING_AGG(r.RoleCode, ',') AS Roles,
+            STRING_AGG(CONVERT(nvarchar(max),r.CapabilitiesJson), ',') AS CapabilitySets
         FROM security.Users u
         LEFT JOIN security.RoleAssignments ra ON ra.UserId = u.UserId AND ra.RevokedAt IS NULL
         LEFT JOIN security.Roles r ON r.RoleId = ra.RoleId
@@ -414,6 +473,7 @@ public sealed class SqlAccessRepository : IAccessRepository
         public DateTimeOffset? DisabledAt { get; init; }
         public long Version { get; init; }
         public string? Roles { get; init; }
+        public string? CapabilitySets { get; init; }
         public string? LoginName { get; init; }
         public string? DisplayName { get; init; }
         public string? Mail { get; init; }

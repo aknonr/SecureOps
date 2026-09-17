@@ -76,6 +76,15 @@ public sealed class AnnouncementApiClient
     /// <summary>Applies exactly the explicitly reviewed request; never retries with substituted versions.</summary>
     public Task<AnnouncementSourceApplyResult> ApplySourceAsync(Guid id, AnnouncementSourceApply request, CancellationToken token) =>
         SourceAsync<AnnouncementSourceApplyResult>($"/{id}/source/apply", request, token);
+    /// <summary>Returns a server-owned exact mail preview; never sends.</summary>
+    public Task<AnnouncementMailPreview> MailPreviewAsync(Guid preparationId, string kind, CancellationToken token) =>
+        SourceAsync<AnnouncementMailPreview>("/mail/preview", new AnnouncementMailPreviewRequest(preparationId, kind), token);
+    /// <summary>One explicit confirmation. A replay token reads the original command, never a second send.</summary>
+    public Task<AnnouncementMailStatus> MailConfirmAsync(string previewToken, CancellationToken token) =>
+        SourceAsync<AnnouncementMailStatus>("/mail/confirm", new AnnouncementMailConfirmation(previewToken), token);
+    /// <summary>Reads owner-only command outcomes; no resend or inferred delivery.</summary>
+    public Task<AnnouncementMailStatus[]> MailHistoryAsync(Guid draftId, CancellationToken token) =>
+        SourceAsync<AnnouncementMailStatus[]>($"/{draftId}/mail", null, token);
     private async Task<T> SourceAsync<T>(string path, object? input, CancellationToken token)
     {
         using HttpResponseMessage response = await SendAsync(path, input, token, input is null ? HttpMethod.Get : HttpMethod.Post);

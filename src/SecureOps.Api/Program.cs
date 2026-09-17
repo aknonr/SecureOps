@@ -84,6 +84,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(ApiRateLimits.JiraCreate, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraCreate, configuredRateLimits.JiraCreate));
     options.AddPolicy(ApiRateLimits.WorkflowRetry, context => ApiRateLimits.Partition(context, ApiRateLimits.WorkflowRetry, configuredRateLimits.WorkflowRetry));
     options.AddPolicy(ApiRateLimits.AnnouncementPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.AnnouncementPreview, new OperationRateLimitOptions { PermitLimit = 120, WindowSeconds = 60 }));
+    options.AddPolicy("AnnouncementMailConfirm", context => ApiRateLimits.Partition(context, "AnnouncementMailConfirm", new OperationRateLimitOptions { PermitLimit = 6, WindowSeconds = 60 }));
 });
 
 builder.Services.AddControllers();
@@ -164,7 +165,9 @@ builder.Services.AddSwaggerGen(options =>
         });
     }
 });
-builder.Services.AddSecureOpsInfrastructure(builder.Configuration);
+builder.Services.AddSecureOpsInfrastructure(builder.Configuration, builder.Environment.EnvironmentName);
+builder.Services.AddSingleton<SecureOps.Infrastructure.Announcements.Mail.IAnnouncementMailPreviewCodec, AnnouncementMailPreviewCodec>();
+builder.Services.AddScoped<SecureOps.Infrastructure.Announcements.Mail.AnnouncementMailService>();
 // The API only enqueues announcement source work; the Worker hosts the Hangfire job server.
 builder.Services.AddSecureOpsJobClient(builder.Configuration);
 builder.Services.AddSingleton<IDirectoryContinuationTokenCodec, DataProtectedDirectoryContinuationTokenCodec>();

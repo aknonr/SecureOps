@@ -2,6 +2,38 @@
 
 ## Status and Ownership
 
+### Attributed Outcomes And Closure Boundary, 2026-09-17
+
+Migration 021 captures the original persisted human initiator/profile and input
+version on a new transfer; subsequent SQL stages retain that identity. Append-only
+ops.OperationEvents (020) separates API executor and technical verifier from the
+human and optional authoritative source closer. Historical NULL stays unknown.
+`GET /api/v1/operations/OperationalRecord/{id}/events` is an authorized, audited,
+bounded record history, not an employee report or execution/reconciliation write.
+InUse history requires InUse.View; Announcement history stays Drafts/owner-only.
+SchemaVersion 1 includes command/record/action/input version/server UTC/outcome,
+profile-at-action, executor, verifier, correlation/causation and external reference.
+No agent identity/delegation is active. Future callers use the same capability,
+version, preview, confirmation and status services, never direct workflow SQL.
+
+SourceClosureObservation binds source ID, OR code, Jira key, attempt, observed UTC,
+source version, evidence contract and optional closer. Only matching recent
+VerifiedClosed evidence can produce a newly verified Completed state. Acknowledged
+BPM update is insufficient. Simulation/Fake can reread their exact source state;
+the corporate adapter has no approved authoritative post-state contract, so closing
+is blocked BEFORE the update even if a flag is misconfigured. Unknown Closing
+after restart cannot blindly retry. Legacy Completed without new evidence is shown
+as unverified, not silently promoted. Known Jira keys always block another create.
+
+SourceCloseEnabled=false still suppresses the entire BPM activity operation and
+its associated comment. Corporate comment destination remains only m_comments on
+the uniquely selected BPM_Actvty, conditional on a future supported close intent;
+not a Jira comment or assignment. No native watcher operation exists. Requester
+custom field, authenticated reporter policy, project-default/verified-operator
+assignee policy and distinct transport credentials remain unchanged. Missing
+corporate mapping/correlation/post-state inputs are enumerated in the current
+deployment runbook; no request type is promoted to bypass them.
+
 ### Local Acceptance Continuation, 2026-09-15
 
 The current exact-record positive ServerRequest policy is implemented under

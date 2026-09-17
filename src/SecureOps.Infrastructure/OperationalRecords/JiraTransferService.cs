@@ -23,6 +23,7 @@ public sealed class JiraTransferService : IJiraTransferService
     private readonly OperationalRecordsOptions _operationalOptions;
     private readonly CommandIdempotencyOptions _commandOptions;
     private readonly ILogger<JiraTransferService> _logger;
+    private readonly ISourceClosureVerifier _closureVerifier;
 
     /// <summary>Initializes the transfer service.</summary>
     public JiraTransferService(
@@ -34,7 +35,7 @@ public sealed class JiraTransferService : IJiraTransferService
         IAuditWriter auditWriter,
         IOptions<OperationalRecordsOptions> operationalOptions,
         IOptions<CommandIdempotencyOptions> commandOptions,
-        ILogger<JiraTransferService> logger)
+        ILogger<JiraTransferService> logger, ISourceClosureVerifier? closureVerifier = null)
     {
         _repository = repository;
         _draftService = draftService;
@@ -45,6 +46,7 @@ public sealed class JiraTransferService : IJiraTransferService
         _operationalOptions = operationalOptions.Value;
         _commandOptions = commandOptions.Value;
         _logger = logger;
+        _closureVerifier = closureVerifier ?? new SourceClosureVerifier(sourceClient, _operationalOptions.SourceProvider);
     }
 
     /// <inheritdoc />
@@ -468,6 +470,11 @@ public sealed class JiraTransferService : IJiraTransferService
             return ExternalWritesDisabled();
         }
 
+        if (!_closureVerifier.CanVerify)
+        { return OperationalRecordResult<OperationalRecord>.Fail("SourceCloseVerificationUnavailable", "source-close-contract", false); }
+        if (record.ReconciliationRequired || record.WorkflowState == OperationalRecordWorkflowState.ClosingOperationalRecord)
+        { return OperationalRecordResult<OperationalRecord>.Fail("SourceCloseUnverified", "source-close-reconciliation", false); }
+
         OperationalRecordResult<OperationalRecord> freshness = await ValidateFreshnessAsync(record, WorkflowFailureStage.OperationalRecordClose, context, cancellationToken);
         if (!freshness.IsSuccess)
         {
@@ -499,15 +506,23 @@ public sealed class JiraTransferService : IJiraTransferService
         }
         catch (ExternalIntegrationException ex)
         {
-            return await RecordCloseFailureAsync(closing, ex.ErrorCode, ex.Retryable, context, cancellationToken);
+            return await RecordCloseFailureAsync(closing, ex.ErrorCode, ex.Retryable, context, cancellationToken, ex.OutcomeUnknown);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Operational-record close failed. OperationalRecordId: {OperationalRecordId}. CorrelationId: {CorrelationId}", closing.Id, context.CorrelationId);
-            return await RecordCloseFailureAsync(closing, OperationalErrorCodes.OperationalRecordCloseFailed, true, context, cancellationToken);
+            return await RecordCloseFailureAsync(closing, OperationalErrorCodes.OperationalRecordCloseFailed, false, context, cancellationToken, true);
         }
-
-        OperationalRecord completed = await _repository.RecordCompletedAsync(closing.Id, context.Actor, context.CorrelationId, cancellationToken);
+        SecureOps.Shared.Contracts.OperationalRecords.SourceClosureObservation observation;
+        try
+        { observation = await _closureVerifier.VerifyAsync(closing.SourceRecordId, closing.OrCode, closing.JiraIssueKey!, context.CorrelationId, cancellationToken); }
+        catch (Exception)
+        { return await RecordCloseFailureAsync(closing, "SourceCloseUnverified", false, context, CancellationToken.None, true); }
+        if (!observation.Matches(closing.SourceRecordId, closing.OrCode, closing.JiraIssueKey!, context.CorrelationId))
+        { return await RecordCloseFailureAsync(closing, "SourceCloseUnverified", false, context, cancellationToken, true); }
+        if (!await TryAuditAsync("SourceClosePostStateVerified", closing, context, "VerifiedClosed", null, cancellationToken))
+        { return await RecordCloseFailureAsync(closing, OperationalErrorCodes.AuditStoreUnavailable, false, context, CancellationToken.None, true); }
+        OperationalRecord completed = await _repository.RecordCompletedAsync(closing.Id, context.Actor, context.CorrelationId, cancellationToken, observation);
         _ = await TryAuditAsync(AuditActions.OperationalRecordClosed, completed, context, "Closed", null, cancellationToken);
         _ = await TryAuditAsync(AuditActions.WorkflowCompleted, completed, context, "Completed", null, cancellationToken);
         return OperationalRecordResult<OperationalRecord>.Success(completed);
@@ -568,11 +583,11 @@ public sealed class JiraTransferService : IJiraTransferService
         string errorCode,
         bool retryable,
         OperationalRecordCommandContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool uncertain = false)
     {
-        OperationalRecord failed = await _repository.RecordFailureAsync(record.Id, WorkflowFailureStage.OperationalRecordClose, errorCode, false, context.Actor, context.CorrelationId, cancellationToken);
+        OperationalRecord failed = await _repository.RecordFailureAsync(record.Id, WorkflowFailureStage.OperationalRecordClose, errorCode, uncertain, context.Actor, context.CorrelationId, cancellationToken);
         _ = await TryAuditAsync(AuditActions.OperationalRecordCloseFailed, failed, context, "Failed", errorCode, cancellationToken);
-        return OperationalRecordResult<OperationalRecord>.Fail(errorCode, "source-close", retryable);
+        return OperationalRecordResult<OperationalRecord>.Fail(errorCode, "source-close", retryable && !uncertain);
     }
 
     private async Task<bool> TryAuditAsync(

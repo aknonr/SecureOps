@@ -32,6 +32,32 @@ sql/
 | 016 | Durable announcement source jobs and versioned operator overrides; requires 014-015. Adds `announcements.SourceJobs` (unique OwnerId/DraftId/SubmissionKey, no-delete trigger) and mutable `announcements.SourceOverrides`. Runtime delta: `GRANT SELECT, INSERT, UPDATE` on those two objects only; no DELETE or DDL grant. Hangfire's schema is provisioned separately using its published 1.8.6 installation script; runtime `Hangfire:PrepareSchema` must be false. |
 | 017 | Additive SourceJobs dispatch reservation, Hangfire acknowledgment, expiring attempt identity/count and recovery index; requires 016. No new runtime object grants; no rewrite or deletion of snapshots/revisions. |
 | 018 | Append-only announcement preparation snapshots; requires 017. Runtime SELECT/INSERT on announcements.Preparations only, plus existing grants. Promoted from the local unnumbered candidate. |
+| 019 | Versioned persisted role bundles and bounded access paging indexes; preserves existing role IDs/permissions. Requires 018; refuses replay. |
+| 020 | Immutable mail intent/bytes, one-distribution index, recovery states and append-only typed operation events. Existing OCO Source/Prepare rights become explicit; no SelfTest/Send grant. Requires 019; refuses replay. |
+| 021 | Nullable original initiator, input version and authoritative closure evidence on JiraTransfers; legacy rows remain NULL. Requires 020; refuses replay. |
+
+### Upgrade From Verified 018
+
+Use the new delivery's **019-021 delta**, not the full reference archive. Confirm
+the operator-reported 018 objects and backup before applying only missing scripts
+in order through SQLCMD (`-I -b`, migrations working directory). Existing 001-018
+files are unchanged; never replay them or the already provisioned Hangfire schema 9.
+No application startup DDL, down migration, trigger disabling or automatic repair.
+
+Narrow runtime delta, assigned by DBA to the existing approved principal only:
+security.Roles adds INSERT/UPDATE to existing SELECT; announcements.MailCommands
+needs SELECT/INSERT/UPDATE; ops.OperationEvents needs SELECT/INSERT. Existing
+JiraTransfers/Users/RoleAssignments access, audit INSERT, preparation SELECT/INSERT,
+source-job grants and dedicated Hangfire DML remain. No DELETE on these new
+objects, audit/history mutation, schema ownership, db_owner or runtime DDL.
+The same application lock already uses SQL public sp_getapplock permissions.
+API requires event SELECT; Worker only appends events. Split identities can have
+these grants narrowed separately after actual host inventory.
+
+019/020 access-version changes require access revalidation. 021 does not invent
+historical profile/closure facts. Old binaries are not approved writers for new
+role/command/JSON contracts; suspend writes and use the paired backup/recovery plan
+before rollback. Retain all additive objects, mail intents and audit evidence.
 
 013 uses `migrations/013-sdm-pilot-policy.sql` in SQLCMD mode. Existing NULL/v1
 evidence and append-only triggers remain untouched; WITH CHECK validates stored

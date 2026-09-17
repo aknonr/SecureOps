@@ -1,3 +1,4 @@
+@inject IAccessAdminApiClient AccessAdmin
 @*
     Deliberate confirmation for the four access-administration writes.
 
@@ -30,12 +31,14 @@
 
         @if (NeedsRoles)
         {
+            @if (_loadProblem is not null) { <SoProblemPanel Problem="_loadProblem" /> }
             <fieldset class="so-role-picker">
                 <legend>Roller</legend>
                 <p class="so-role-picker-note">@RoleNote</p>
 
-                @foreach (string role in AccessDecisionRules.AssignableRoles)
+                @foreach (AccessRoleDefinition definition in _definitions)
                 {
+                    string role = definition.Code;
                     <label class="so-role-option">
                         <MudCheckBox T="bool"
                                      Value="@_selectedRoles.Contains(role)"
@@ -43,8 +46,8 @@
                                      Dense="true"
                                      Color="Color.Primary" />
                         <span class="so-role-option-text">
-                            <span class="so-role-option-name">@AccessLabels.RoleLabel(role)</span>
-                            @if (AccessLabels.RoleDescription(role) is { Length: > 0 } description)
+                            <span class="so-role-option-name">@(definition.Name == role ? AccessLabels.RoleLabel(role) : definition.Name)</span>
+                            @if (definition.Purpose is { Length: > 0 } description)
                             {
                                 <span class="so-role-option-desc">@description</span>
                             }
@@ -52,12 +55,11 @@
                     </label>
                 }
 
-                @* Role descriptions above are written guidance, not a computed permission list. The
-                   capabilities a role actually confers are only ever shown from an API response. *@
-                <p class="so-role-picker-caveat">
-                    Yukarıdaki açıklamalar yol göstericidir. Geçerli yetkiler, işlem tamamlandıktan
-                    sonra API'nin döndürdüğü listeden gösterilir.
-                </p>
+                <div class="so-role-picker-caveat" aria-live="polite">
+                    <strong>Yetki farkı</strong>
+                    <p>Eklenecek: @PermissionDifference(true)</p>
+                    <p>Kaldırılacak: @PermissionDifference(false)</p>
+                </div>
 
                 @if (_roleError is not null)
                 {
@@ -90,6 +92,7 @@
     <DialogActions>
         <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
         <MudButton OnClick="Confirm"
+                   Disabled="@(NeedsRoles && (_loading || _loadProblem is not null))"
                    Variant="Variant.Filled"
                    Color="@ConfirmColor"
                    StartIcon="@ActionIcon">
@@ -118,7 +121,8 @@
     /// <summary>What the administrator confirmed.</summary>
     /// <param name="Reason">Justification for the audit trail.</param>
     /// <param name="Roles">Selected roles; empty for actions that take none.</param>
-    public sealed record Result(string Reason, IReadOnlyList<string> Roles);
+    /// <param name="RoleVersions">Server-owned definitions whose impact was reviewed.</param>
+    public sealed record Result(string Reason, IReadOnlyList<string> Roles, IReadOnlyDictionary<string, long>? RoleVersions = null);
 
     [CascadingParameter]
     private MudDialogInstance Dialog { get; set; } = null!;
@@ -137,11 +141,18 @@
     /// </summary>
     [Parameter]
     public IReadOnlyList<string>? InitialRoles { get; set; }
+    /// <summary>Retained local selection after a rejected operation, separate from current roles.</summary>
+    [Parameter] public IReadOnlyList<string>? ProposedRoles { get; set; }
+    /// <summary>Retained rejection or disable reason; ordinary role changes do not use a reason.</summary>
+    [Parameter] public string? InitialReason { get; set; }
 
     private readonly HashSet<string> _selectedRoles = new(StringComparer.Ordinal);
     private string _reason = string.Empty;
     private string? _reasonError;
     private string? _roleError;
+    private IReadOnlyList<AccessRoleDefinition> _definitions = [];
+    private UiProblem? _loadProblem;
+    private bool _loading;
 
     private bool NeedsRoles => Action is AccessAction.Approve or AccessAction.ReplaceRoles;
 
@@ -200,16 +211,19 @@
         ? "so-dialog--grant"
         : "so-dialog--restrict";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        if (InitialRoles is null)
+        _reason = InitialReason ?? "";
+        if ((ProposedRoles ?? InitialRoles) is { } selected)
         {
-            return;
+            foreach (string role in selected) { _selectedRoles.Add(role); }
         }
-
-        foreach (string role in InitialRoles)
+        if (NeedsRoles)
         {
-            _selectedRoles.Add(role);
+            _loading = true;
+            try { _definitions = await AccessAdmin.RolesAsync(CancellationToken.None); }
+            catch (SecureOpsApiException exception) { _loadProblem = exception.Problem; }
+            finally { _loading = false; }
         }
     }
 
@@ -230,18 +244,26 @@
     private void Confirm()
     {
         string[] roles = NeedsRoles
-            ? AccessDecisionRules.AssignableRoles.Where(_selectedRoles.Contains).ToArray()
+            ? _definitions.Select(role => role.Code).Where(_selectedRoles.Contains).ToArray()
             : [];
 
         _reasonError = Action == AccessAction.ReplaceRoles ? null : AccessDecisionRules.ValidateReason(_reason);
-        _roleError = NeedsRoles ? AccessDecisionRules.ValidateRoles(roles) : null;
+        _roleError = NeedsRoles && (roles.Length is < 1 or > 16) ? "Bir ile 16 arasında rol seçin." : null;
 
         if (_reasonError is not null || _roleError is not null)
         {
             return;
         }
 
-        Dialog.Close(DialogResult.Ok(new Result(_reason.Trim(), roles)));
+        Dialog.Close(DialogResult.Ok(new Result(_reason.Trim(), roles, _definitions.Where(role => roles.Contains(role.Code)).ToDictionary(role => role.Code, role => role.Version))));
+    }
+
+    private string PermissionDifference(bool added)
+    {
+        string[] before = _definitions.Where(role => InitialRoles?.Contains(role.Code) == true).SelectMany(role => role.Capabilities).Distinct().ToArray();
+        string[] after = _definitions.Where(role => _selectedRoles.Contains(role.Code)).SelectMany(role => role.Capabilities).Distinct().ToArray();
+        string[] difference = (added ? after.Except(before) : before.Except(after)).ToArray();
+        return difference.Length == 0 ? "Yok" : string.Join(", ", AccessLabels.Group(difference).SelectMany(group => group).Select(item => item.Label));
     }
 
     private void Cancel() => Dialog.Cancel();

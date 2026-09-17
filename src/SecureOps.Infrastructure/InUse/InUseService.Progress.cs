@@ -38,7 +38,7 @@ public sealed partial class InUseService
                     updated.AttachmentId,
                     updated.TaskId,
                     updated.FinalOrState
-                }), token);
+                }, id, expectedVersion, commandId, current.AssigneeId), token);
         }, token);
 
     /// <summary>Authorized stored overview. The existing transactional audit gates its release.</summary>
@@ -78,7 +78,8 @@ public sealed partial class InUseService
                 Completion = new(request.CommandId, user.Id, report.Version, report.SourceVersion, report.Sha256, DateTimeOffset.UtcNow)
             };
             InUseResult<InUseRecord> saved = await SaveAsync(next, old.Version, Audit(user, context, "CompletionIntentBlocked",
-                new { id, request.CommandId, report.Version, report.SourceVersion, report.Sha256, Stage = "Blocked" }), token);
+                new { id, request.CommandId, report.Version, report.SourceVersion, report.Sha256, Stage = "Blocked" },
+                id, old.Version, request.CommandId, old.AssigneeId), token);
             if (saved.Error is null)
             { await commands.CompleteAsync("InUseCompletionIntent", target, key, begin.ExecutionToken!.Value, token); }
             else

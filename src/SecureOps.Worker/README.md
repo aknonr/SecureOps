@@ -6,9 +6,21 @@ hosting, registration, installation and unattended operation are deferred, not v
 The default-off announcement source composition uses one configured Hangfire/SQL queue,
 bounded execution leases and startup/minutely dispatch recovery. API and Worker must share
 the same dedicated source database, preinstalled Hangfire schema and queue. Runtime schema
-preparation is rejected; no email is sent. Fixture-backed process interruption/restart is
+preparation is rejected. Source jobs never send email. Fixture-backed process interruption/restart is
 locally exercised; corporate adapter/service-installation acceptance remains separate.
 See `docs/contracts/planned-announcement-source-acceptance.md` for configuration and evidence.
+
+The owner-authorized operations continuation also registers default-off
+AnnouncementMail commands on this same server/queue. Mail requires separate
+Enabled/SelfTestEnabled/SendEnabled fences and persisted narrow capabilities.
+No automatic SMTP retry: startup/minutely recovery re-enqueues only undispatched
+Queued intents and classifies expired Dispatching as Unknown. Original initiator
+survives Worker restart; current authorization is checked again before dispatch.
+SQL intent/audit precedes SMTP, recorded acceptance does not prove inbox delivery.
+See the current planned-announcements contract and Turkish upgrade runbook.
+The console needs .NET 8, the same private DB/schema/queue/profile/relay policy as
+API, its actual Windows runtime identity, and private config/assets/log ACLs. It
+does not inherit IIS web.config or AppPool identity. No Windows Service support.
 
 ## Responsibilities
 

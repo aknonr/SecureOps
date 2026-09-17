@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <PackageVersion Include="MimeKit" Version="4.17.0" />
+    <PackageVersion Include="MailKit" Version="4.17.0" />
     <PackageVersion Include="SkiaSharp" Version="4.151.2" />
     <!-- ASP.NET Core / Hosting -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.30" />

@@ -51,8 +51,8 @@ public sealed class InUseController(InUseService service) : ControllerBase
     /// <summary>Returns approved local assignment candidates.</summary>
     [HttpGet("assignees")]
     [Authorize(Policy = Policies.CanAssignInUse)]
-    public async Task<ActionResult<IReadOnlyList<InUseAssignee>>> AssigneesAsync(CancellationToken token) =>
-        Reply(await service.AssigneesAsync(User, Context(), token));
+    public async Task<ActionResult<IReadOnlyList<InUseAssignee>>> AssigneesAsync(CancellationToken token, string? search = null) =>
+        Reply(await service.AssigneesAsync(User, Context(), token, search));
     /// <summary>Explicit read-only discovery; never routes records into Jira.</summary>
     [HttpPost("refresh")]
     [EnableRateLimiting(ApiRateLimits.OperationalRecordRefresh)]

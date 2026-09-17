@@ -33,7 +33,8 @@ public interface IOperationalRecordRepository
     /// <summary>Atomically acquires source-close ownership.</summary>
     public Task<WorkflowAcquireResult> TryAcquireCloseAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken);
     /// <summary>Persists successful completion.</summary>
-    public Task<OperationalRecord> RecordCompletedAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken);
+    public Task<OperationalRecord> RecordCompletedAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken,
+        SecureOps.Shared.Contracts.OperationalRecords.SourceClosureObservation observation);
     /// <summary>Persists a safe failure state.</summary>
     public Task<OperationalRecord> RecordFailureAsync(Guid id, WorkflowFailureStage stage, string errorCode, bool reconciliationRequired, string actor, string correlationId, CancellationToken cancellationToken);
     /// <summary>Increments retry metadata and returns the current workflow.</summary>

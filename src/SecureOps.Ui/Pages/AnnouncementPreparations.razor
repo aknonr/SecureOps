@@ -21,7 +21,7 @@
             <RowTemplate>
                 <MudTd DataLabel="Konu">@context.Subject <small>v@(context.Version)</small></MudTd>
                 <MudTd DataLabel="Hazırlayan / zaman">@context.PreparedBy<br />@context.PreparedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
-                <MudTd DataLabel="Durum">Hazırlandı; gönderilmedi</MudTd>
+                <MudTd DataLabel="Durum">Değişmez hazırlık</MudTd>
                 <MudTd><MudButton Href="@($"/announcements/preparations/{context.Id}")" StartIcon="@Icons.Material.Filled.Visibility">İncele</MudButton></MudTd>
             </RowTemplate>
         </MudTable>
@@ -33,22 +33,25 @@
     }
     @if (_snapshot is { } s)
     {
-        <h2>@s.Draft.Content.Subject</h2><p role="status">Hazırlandı; gönderilmedi. Gönderim onayı verilmedi.</p>
+        <h2>@s.Draft.Content.Subject</h2><p role="status">Değişmez hazırlık · v@(s.Draft.Version)</p>
         @if (s.SourceReview is { } review)
         { <p>Kaynak inceleme v@(review.Version) · @review.AppliedCapturedAt · Alıcı profili: @(review.Profile ?? "Elle düzenlendi"). Dağıtım talebi alıcıları, onaylanmış nihai gönderim listesi değildir.</p> }
-        <dl><dt>Gönderen</dt><dd>@s.Draft.Sender</dd><dt>Alıcı</dt><dd>@string.Join("; ", s.Draft.Content.To)</dd>
+        <dl class="preparation-summary"><dt>Gönderen</dt><dd>@s.Draft.Sender</dd><dt>Alıcı</dt><dd>@string.Join("; ", s.Draft.Content.To)</dd>
             <dt>Bilgi</dt><dd>@string.Join("; ", s.Draft.Content.Cc)</dd><dt>Hazırlayan</dt><dd>@s.PreparedBy · @s.PreparedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd></dl>
         <div class="so-inline-actions"><MudButton OnClick="DownloadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Hazırlanan maili indir</MudButton>
             <MudButton Href="/announcements/preparations" StartIcon="@Icons.Material.Filled.History">Geçmiş</MudButton></div>
         <details><summary>Kayıt ayrıntıları</summary><p>Nihai duyuru · @s.Draft.TemplateRevision · @s.Draft.Content.BannerRevision · v@(s.Draft.Version)</p><p>@s.Fingerprint</p></details>
+        <AnnouncementMailPanel @key="s.Id" PreparationId="s.Id" DraftId="s.Draft.Id" />
+        <OperationHistoryPanel RecordType="Announcement" RecordId="s.Draft.Id" />
         <iframe title="Hazırlanan duyuru" sandbox="" referrerpolicy="no-referrer" style="width:100%;height:650px;border:1px solid var(--mud-palette-lines-default)"
-                srcdoc="@(_policy + s.Html)"></iframe>
+                srcdoc="@_previewHtml"></iframe>
     }
 </div>
 @code {
     [Parameter] public Guid? Id { get; set; }
     private PreparationPage? _page;
     private PreparedAnnouncement? _snapshot;
+    private string? _previewHtml;
     private UiProblem? _problem;
     private bool _busy, _disposed;
     private CancellationTokenSource _pending = new();
@@ -60,10 +63,10 @@
         if (_disposed) { return; }
         _pending.Cancel(); _pending.Dispose(); _pending = new();
         CancellationToken token = _pending.Token;
-        _snapshot = null; _page = null; _problem = null; _busy = true;
+        _snapshot = null; _previewHtml = null; _page = null; _problem = null; _busy = true;
         try
         {
-            if (Id is { } id) { PreparedAnnouncement result = await Api.PreparedAsync(id, null, 0, token); if (!token.IsCancellationRequested) { _snapshot = result; } }
+            if (Id is { } id) { PreparedAnnouncement result = await Api.PreparedAsync(id, null, 0, token); if (!token.IsCancellationRequested) { _snapshot = result; _previewHtml = _policy + result.Html; } }
             else { PreparationPage result = await Api.PreparationsAsync(page, token); if (!token.IsCancellationRequested) { _page = result; } }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }

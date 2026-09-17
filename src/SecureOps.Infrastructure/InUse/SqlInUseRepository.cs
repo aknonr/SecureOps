@@ -127,6 +127,26 @@ public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRep
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        if (audit.Operation is { } operation)
+        {
+            await Access.SqlAccessRepository.LockAdministrationAsync(connection, transaction, cancellationToken);
+            string capability = operation.Action == "InUseAssigned" ? "InUse.Assign" : "InUse.Review";
+            const string authority = """
+                SELECT COUNT(*) FROM security.Users u WHERE u.UserId=@userId AND u.AccessStatus='Approved' AND EXISTS(
+                    SELECT 1 FROM security.RoleAssignments a JOIN security.Roles r ON r.RoleId=a.RoleId CROSS APPLY OPENJSON(r.CapabilitiesJson) c
+                    WHERE a.UserId=u.UserId AND a.RevokedAt IS NULL AND c.value=@capability);
+                """;
+            if (await connection.ExecuteScalarAsync<int>(Command(authority, new { userId = operation.Initiator.Id, capability }, cancellationToken, transaction)) != 1)
+            { return false; }
+            if (operation.Action == "InUseAssigned" && next?.AssigneeId is { } assignee)
+            {
+                foreach (string assigneeCapability in new[] { "InUse.View", "InUse.Review" })
+                {
+                    if (await connection.ExecuteScalarAsync<int>(Command(authority, new { userId = assignee, capability = assigneeCapability }, cancellationToken, transaction)) != 1)
+                    { return false; }
+                }
+            }
+        }
         await ReadStateAsync(connection, transaction, cancellationToken);
         long? version = await connection.QuerySingleOrDefaultAsync<long?>(Command(
             "SELECT Version FROM ops.InUseRecords WITH (UPDLOCK, HOLDLOCK) WHERE Id = @Id;", new { Id = id }, cancellationToken, transaction));
@@ -135,6 +155,8 @@ public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRep
         if (next is not null)
         { await PersistAsync(connection, transaction, next, false, cancellationToken); }
         await AuditAsync(connection, transaction, audit, cancellationToken);
+        if (audit.Operation is not null)
+        { await Commands.SqlOperationEvidence.AppendAsync(connection, transaction, audit.Operation, cancellationToken, writeAudit: false); }
         await transaction.CommitAsync(cancellationToken);
         return true;
     }

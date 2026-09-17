@@ -1,0 +1,13 @@
+.so-inuse-records > li { grid-template-columns: minmax(0,1.25fr) minmax(0,1fr) auto; align-items: start; padding-block: 1.25rem; }
+.so-inuse-records h2 { font-size: 16px; line-height: 1.45; margin-top: .45rem; }
+.inuse-row-state p { margin-block: .35rem; }
+.inuse-assignee { display: block; font-size: 15px; }
+.inuse-next { color: var(--mud-palette-primary); font-weight: 600; }
+.inuse-ticket-summary { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: .8rem 1.5rem; border-block: 1px solid var(--mud-palette-lines-default); padding-block: 1rem; margin-block: 1rem; }
+.inuse-ticket-summary div { display: flex; flex-direction: column; gap: .3rem; }
+.inuse-ticket-summary span { color: var(--mud-palette-text-secondary); font-size: 13px; }
+.inuse-ticket-summary strong { font-size: 15px; overflow-wrap: anywhere; }
+.inuse-ticket-summary p { grid-column: 1 / -1; margin: 0; }
+.inuse-row-state details { margin-top: .7rem; }
+@media(max-width: 900px) { .inuse-ticket-summary { grid-template-columns: 1fr 1fr; } }
+@media(max-width: 600px) { .so-inuse-records > li,.inuse-ticket-summary { grid-template-columns: minmax(0,1fr); } }

@@ -9,12 +9,56 @@ using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Audit;
 using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Api;
+using SecureOps.Shared.Contracts.OperationalRecords;
 
 namespace SecureOps.Tests.Unit.OperationalRecords;
 
 public sealed class JiraTransferServiceTests
 {
     private static readonly OperationalRecordCommandContext _context = new("test:publisher", "correlation-transfer", null);
+
+    [Fact]
+    public async Task AcknowledgmentWithoutClosedPostState_IsUncertainAndCannotRepeatClose()
+    {
+        CountingSourceClient source = new(acknowledgeOnly: true);
+        TestFixture fixture = await TestFixture.CreateAsync(source: source);
+        await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+        OperationalRecord stored = (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!;
+        stored.ReconciliationRequired.Should().BeTrue();
+        stored.SourceClosureVerified.Should().BeFalse();
+        stored.JiraIssueKey.Should().Be("TEST-100");
+        await fixture.Service.RetryAsync(fixture.RecordId, _context, CancellationToken.None);
+        fixture.Jira.Calls.Should().Be(1);
+        source.CloseCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CorporateClosureWithoutAuthoritativeContract_DoesNotUpdateOrInventCloser()
+    {
+        CountingSourceClient source = new();
+        TestFixture fixture = await TestFixture.CreateAsync(source: source, closureVerifier: new SourceClosureVerifier(source, "TuruncuHat"));
+        await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+        fixture.Source.CloseCalls.Should().Be(0);
+        (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!.SourceClosureVerified.Should().BeFalse();
+        SourceClosureVerifier verifier = new(fixture.Source, "TuruncuHat");
+        SourceClosureObservation observed = await verifier.VerifyAsync("1", "OR-1", "TEST-100", "attempt", CancellationToken.None);
+        observed.State.Should().Be("Unavailable");
+        observed.AuthoritativeCloser.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ClosureVerification_BindsExactRecordAttemptAndTime()
+    {
+        CountingSourceClient source = new();
+        source.CloseExternally();
+        OperationalRecordSourceItem record = TestRecord.SourceItem();
+        SourceClosureVerifier verifier = new(source, "Fake");
+        SourceClosureObservation observed = await verifier.VerifyAsync(record.SourceRecordId, record.OrCode, "TEST-100", "attempt", CancellationToken.None);
+        observed.Matches(record.SourceRecordId, record.OrCode, "TEST-100", "attempt").Should().BeTrue();
+        observed.Matches(record.SourceRecordId, record.OrCode, "TEST-100", "other-attempt").Should().BeFalse();
+        (observed with { ObservedAt = DateTimeOffset.UtcNow.AddHours(-1) }).Matches(record.SourceRecordId, record.OrCode, "TEST-100", "attempt").Should().BeFalse();
+        (await verifier.VerifyAsync("wrong", record.OrCode, "TEST-100", "attempt", CancellationToken.None)).State.Should().Be("Uncertain");
+    }
 
     [Fact]
     public async Task CreateAsync_WhenRepeated_DoesNotCreateDuplicateJira()
@@ -302,9 +346,9 @@ public sealed class JiraTransferServiceTests
             CountingSourceClient? source = null,
             bool readOnlyIntegrationMode = false,
             OperationalRecordSourceItem? sourceItem = null,
-            string sourceProvider = "Disabled",
+            string sourceProvider = "Fake",
             bool initializePreview = true,
-            bool sourceCloseEnabled = true)
+            bool sourceCloseEnabled = true, ISourceClosureVerifier? closureVerifier = null)
         {
             InMemoryOperationalRecordRepository repository = new();
             OperationalRecord record;
@@ -349,7 +393,7 @@ public sealed class JiraTransferServiceTests
                     SourceProvider = sourceProvider
                 }),
                 Options.Create(new CommandIdempotencyOptions()),
-                NullLogger<JiraTransferService>.Instance);
+                NullLogger<JiraTransferService>.Instance, closureVerifier);
             if (initializePreview)
             {
                 OperationalRecordResult<JiraIssueDraft> preview = await service.PreviewAsync(record.Id, _context, CancellationToken.None);
@@ -393,7 +437,7 @@ public sealed class JiraTransferServiceTests
         }
     }
 
-    private sealed class CountingSourceClient(int failCloseCount = 0) : IOperationalRecordClient
+    private sealed class CountingSourceClient(int failCloseCount = 0, bool acknowledgeOnly = false) : IOperationalRecordClient
     {
         private int _remainingFailures = failCloseCount;
         private OperationalRecordSourceItem _current = TestRecord.SourceItem();
@@ -416,7 +460,8 @@ public sealed class JiraTransferServiceTests
             {
                 throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordCloseFailed, true);
             }
-
+            if (!acknowledgeOnly)
+            { _current = _current with { IsOpen = false }; }
             return Task.CompletedTask;
         }
     }

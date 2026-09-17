@@ -12,6 +12,8 @@ namespace SecureOps.Infrastructure.Announcements;
 /// <summary>Allowlisted private assets and one escaped, non-network template pipeline.</summary>
 public sealed partial class AnnouncementRenderer(IOptions<AnnouncementOptions> options)
 {
+    internal const int MaxAssetBytes = 1024 * 1024;
+    internal const int MaxPresentationBytes = 2 * 1024 * 1024;
     // Only 32 successful content-hash/type receipts; never paths, bytes, drafts or access decisions.
     private readonly Dictionary<string, string> _validatedImages = [];
     private string AssetPath(string revision)
@@ -41,19 +43,19 @@ public sealed partial class AnnouncementRenderer(IOptions<AnnouncementOptions> o
             { label = revision; }
             string state;
             try
-            { state = new FileInfo(AssetPath(revision)).Length is >= 24 and <= 262144 ? "PresentNotValidated" : "Invalid"; }
+            { state = new FileInfo(AssetPath(revision)).Length is >= 24 and <= MaxAssetBytes ? "PresentNotValidated" : "Invalid"; }
             catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException) { state = "Missing"; }
             catch (Exception e) when (e is IOException or InvalidOperationException or UnauthorizedAccessException) { state = "Unavailable"; }
             return new AnnouncementBanner(revision, label, state);
         }).ToArray();
     }
 
-    /// <summary>Reads at most 256 KiB; codec checks type, dimensions and complete decode before use.</summary>
+    /// <summary>Reads at most 1 MiB; codec checks type, dimensions and complete decode before use.</summary>
     public async Task<(byte[] Bytes, string Type, string Hash)> AssetAsync(string revision, CancellationToken token)
     {
         string path = AssetPath(revision);
         await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (file.Length is < 24 or > 262144)
+        if (file.Length is < 24 or > MaxAssetBytes)
         { throw new InvalidOperationException("Banner size invalid."); }
         byte[] bytes = new byte[(int)file.Length];
         await file.ReadExactlyAsync(bytes, token);

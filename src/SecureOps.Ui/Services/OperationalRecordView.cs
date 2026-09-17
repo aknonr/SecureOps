@@ -31,19 +31,23 @@ public static class OperationalRecordView
 {
     /// <summary>Describes authoritative uncertainty before the persisted workflow stage.</summary>
     public static string StateLabel(OperationalRecordResponse record) =>
-        OutcomeUnknown(record) ? "Jira sonucu belirsiz" : StateLabel(CurrentStage(record));
+        OutcomeUnknown(record) ? (HasJira(record) ? "Kaynak sonucu belirsiz" : "Jira sonucu belirsiz")
+            : record.WorkflowState == OperationalRecordWorkflowState.Completed && !record.SourceClosureVerified ? "Geçmiş tamamlanma; kapanış doğrulanmadı" : StateLabel(CurrentStage(record));
 
     /// <summary>Uncertain outcomes need reconciliation, not a definitive failure indicator.</summary>
     public static SoStatusBadge.BadgeTone StateTone(OperationalRecordResponse record) =>
-        OutcomeUnknown(record) ? SoStatusBadge.BadgeTone.Caution : StateTone(CurrentStage(record));
+        OutcomeUnknown(record) || record.WorkflowState == OperationalRecordWorkflowState.Completed && !record.SourceClosureVerified
+            ? SoStatusBadge.BadgeTone.Caution : StateTone(CurrentStage(record));
 
     /// <summary>Provides a matching non-colour signal for uncertain outcomes.</summary>
     public static string StateIcon(OperationalRecordResponse record) =>
-        OutcomeUnknown(record) ? Icons.Material.Filled.HelpOutline : StateIcon(CurrentStage(record));
+        OutcomeUnknown(record) || record.WorkflowState == OperationalRecordWorkflowState.Completed && !record.SourceClosureVerified
+            ? Icons.Material.Filled.HelpOutline : StateIcon(CurrentStage(record));
 
     /// <summary>Does not describe an unconfirmed publication as a known failure.</summary>
     public static string? StateDetail(OperationalRecordResponse record) =>
-        OutcomeUnknown(record) ? "Jira sonucu doğrulanamadı. Yeni kayıt oluşturmadan önce mutabakat gerekir."
+        OutcomeUnknown(record) ? (HasJira(record) ? "Jira kaydı var. Kaynak son durumu doğrulanmalı; kapatma tekrar edilmez." : "Jira sonucu doğrulanamadı. Yeni kayıt oluşturmadan önce mutabakat gerekir.")
+            : record.WorkflowState == OperationalRecordWorkflowState.Completed && !record.SourceClosureVerified ? "Geçmiş iş akışı tamamlandı olarak kayıtlı; otoritatif kapanış kanıtı yok."
             : StateDetail(CurrentStage(record));
 
     private static OperationalRecordWorkflowState CurrentStage(OperationalRecordResponse record) =>
@@ -238,7 +242,7 @@ public static class OperationalRecordView
     /// </remarks>
     public static int CurrentStep(OperationalRecordResponse record) => record.WorkflowState switch
     {
-        OperationalRecordWorkflowState.Completed => OperatorSteps.Count,
+        OperationalRecordWorkflowState.Completed => record.SourceClosureVerified ? OperatorSteps.Count : OperatorSteps.Count - 1,
 
         OperationalRecordWorkflowState.JiraCreated
             or OperationalRecordWorkflowState.ClosingOperationalRecord
@@ -410,7 +414,7 @@ public static class OperationalRecordView
         {
             // Terminal success. Nothing to do, and nothing that could be mistaken for something to do.
             OperationalRecordWorkflowState.Completed =>
-                new Actions(false, false, false, "Aktarım tamamlandı."),
+                new Actions(false, false, false, record.SourceClosureVerified ? "Kaynak kapanışı doğrulandı." : "Geçmiş tamamlanma kaydı; kaynak kapanış kanıtı yok."),
 
             // A Jira issue exists. Only the source side is outstanding, and only retry may touch it.
             OperationalRecordWorkflowState.OperationalRecordCloseFailed =>

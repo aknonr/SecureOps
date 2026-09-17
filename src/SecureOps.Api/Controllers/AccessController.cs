@@ -21,7 +21,7 @@ namespace SecureOps.Api.Controllers;
 [Authorize]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
-public sealed class AccessController : ControllerBase
+public sealed partial class AccessController : ControllerBase
 {
     private readonly IApplicationAccessService _accessService;
     private readonly IApplicationSessionService _sessionService;
@@ -130,7 +130,7 @@ public sealed class AccessController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AccessRequestResponse>> ApproveAsync(Guid id, [FromBody] AccessDecisionRequest request, CancellationToken cancellationToken)
     {
-        AccessServiceResult<AccessMutationResult> result = await _accessService.ApproveAsync(id, request.Roles ?? [], request.Reason, request.ExpectedVersion, Context(), cancellationToken);
+        AccessServiceResult<AccessMutationResult> result = await _accessService.ApproveAsync(id, request.Roles ?? [], request.Reason, request.ExpectedVersion, Context(), cancellationToken, request.RoleVersions);
         return MutationResponse(result);
     }
 
@@ -152,7 +152,7 @@ public sealed class AccessController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<CurrentAccessResponse>> ReplaceRolesAsync(Guid id, [FromBody] AssignRolesRequest request, CancellationToken cancellationToken)
     {
-        AccessServiceResult<AccessMutationResult> result = await _accessService.ReplaceRolesAsync(id, request.Roles, request.ExpectedVersion, Context(), cancellationToken);
+        AccessServiceResult<AccessMutationResult> result = await _accessService.ReplaceRolesAsync(id, request.Roles, request.ExpectedVersion, Context(), cancellationToken, request.RoleVersions);
         if (!result.IsSuccess)
         {
             return Failure<CurrentAccessResponse>(result.ErrorCode!);

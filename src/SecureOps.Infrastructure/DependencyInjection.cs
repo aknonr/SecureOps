@@ -27,10 +27,11 @@ public static class DependencyInjection
     /// </summary>
     /// <param name="services">Service collection.</param>
     /// <param name="configuration">Application configuration.</param>
+    /// <param name="environmentName">Host-verified environment; defaults to restrictive Production.</param>
     /// <returns>The same service collection.</returns>
     public static IServiceCollection AddSecureOpsInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration, string environmentName = "Production")
     {
         services.Configure<AuditOptions>(configuration.GetSection(AuditOptions.SectionName));
         services.Configure<IdentityLookupOptions>(configuration.GetSection(IdentityLookupOptions.SectionName));
@@ -157,8 +158,17 @@ public static class DependencyInjection
         services.AddScoped<ResourceCatalogueService>();
         services.Configure<AnnouncementOptions>(configuration.GetSection("Announcements"));
         services.AddScoped<Announcements.SqlAnnouncementStore>();
+        services.AddScoped<SqlInUseIdentities>();
         services.AddSingleton<Announcements.AnnouncementRenderer>();
         services.AddScoped<Announcements.AnnouncementService>();
+        services.Configure<AnnouncementMailOptions>(configuration.GetSection(AnnouncementMailOptions.SectionName));
+        services.AddScoped<Announcements.Mail.SqlAnnouncementMailStore>();
+        services.AddScoped<Commands.SqlOperationHistory>();
+        services.AddSingleton(provider => new Announcements.Mail.AnnouncementMailPolicy(provider.GetRequiredService<IOptions<AnnouncementMailOptions>>(), environmentName));
+        services.AddScoped<Announcements.Mail.IAnnouncementMailTransport, Announcements.Mail.SmtpAnnouncementTransport>();
+        services.AddScoped<Announcements.Mail.IAnnouncementMailDispatcher, Announcements.Mail.AnnouncementMailDispatcher>();
+        services.AddScoped<Announcements.Mail.AnnouncementMailWorker>();
+        services.AddScoped<Announcements.Mail.AnnouncementMailRecovery>();
         AddAnnouncementSource(services, configuration);
         services.AddScoped<InUseService>();
         services.AddSingleton<InUseReportArchive>();

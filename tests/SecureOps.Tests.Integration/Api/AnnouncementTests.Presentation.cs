@@ -48,6 +48,16 @@ public sealed partial class AnnouncementTests
             image.Content!.DecodeTo(bytes);
             preview.Should().Contain(Convert.ToBase64String(bytes.ToArray()));
             mail.HtmlBody.Should().Contain("cid:" + image.ContentId);
+            if (Environment.GetEnvironmentVariable("SECUREOPS_ANNOUNCEMENT_ORIGINAL_ASSETS") is { } originals)
+            {
+                string name = image.ContentId == "logo" ? "turkish_technology_logo.jpg"
+                    : "planlimail_duyuru_" + image.ContentId + (image.ContentId is "header" or "main" ? ".jpg" : ".png");
+                using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(originals, "manifest.json")));
+                JsonElement entry = manifest.RootElement.EnumerateArray().Single(x => x.GetProperty("Name").GetString() == name);
+                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes.ToArray())).Should().Be(entry.GetProperty("Sha256").GetString());
+                image.ContentType.MimeType.Should().Be("image/" + entry.GetProperty("Format").GetString());
+                bytes.ToArray().Should().Equal(File.ReadAllBytes(Path.Combine(originals, name)));
+            }
         }
     }
     private static readonly string[] _roles = ["header", "main", "logo", "linkedin", "instagram", "youtube"];

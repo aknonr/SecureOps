@@ -22,7 +22,7 @@ const ui=loopback(process.argv[3]), api=loopback(process.argv[4]), deniedUi=loop
         await page.getByText('Güncel içerik kaydedildi',{exact:true}).waitFor();
         await page.getByRole('button',{name:'İncelemeye hazırla',exact:true}).click();
         await page.waitForURL(/announcements\/preparations\/[a-f0-9-]+$/);
-        await page.getByText('Hazırlandı; gönderilmedi. Gönderim onayı verilmedi.',{exact:true}).waitFor();
+        await page.getByText('Değişmez hazırlık · v1',{exact:true}).waitFor();
         const preparedId=new URL(page.url()).pathname.split('/').at(-1), prepared=await json(client,root+'/'+preparedId);
         assert.equal(prepared.state,'Prepared'); assert.equal(prepared.artifactType,'FinalAnnouncement');
         const frame=page.frameLocator('iframe[title="Hazırlanan duyuru"]');

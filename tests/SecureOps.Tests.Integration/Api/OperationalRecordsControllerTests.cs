@@ -302,7 +302,7 @@ public sealed class OperationalRecordsControllerTests
     [InlineData(OperationalRecordWorkflowState.JiraCreateFailed, null, false, true, false)]
     [InlineData(OperationalRecordWorkflowState.JiraCreateFailed, null, true, false, false)]
     [InlineData(OperationalRecordWorkflowState.OperationalRecordCloseFailed, "FAKE-1", false, true, true)]
-    [InlineData(OperationalRecordWorkflowState.ClosingOperationalRecord, "FAKE-1", false, true, true)]
+    [InlineData(OperationalRecordWorkflowState.ClosingOperationalRecord, "FAKE-1", false, false, true)]
     [InlineData(OperationalRecordWorkflowState.Completed, "FAKE-1", false, false, true)]
     public async Task GetAsync_ProjectsAuthoritativeRetryReconciliationAndJiraState(
         OperationalRecordWorkflowState state,
@@ -353,7 +353,7 @@ public sealed class OperationalRecordsControllerTests
             new StubRecordService(record),
             new StubTransferService(OperationalRecordResult<JiraIssueDraft>.Fail(OperationalErrorCodes.WorkflowConflict, "test", false)),
             Options.Create(new CommandIdempotencyOptions()),
-            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode, SourceCloseEnabled = true }),
+            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode, SourceCloseEnabled = true, SourceProvider = "Fake" }),
             Options.Create(new JiraIntegrationOptions()),
             new FixedTimeProvider(_now))
         {

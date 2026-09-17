@@ -1,0 +1,8 @@
+.so-access-requests ::deep .so-panel { background:transparent;box-shadow:none;border-radius:0;padding:16px 0; }
+.so-access-requests ::deep .so-admin-grid { gap:24px; }
+.so-access-requests ::deep .so-admin-detail { border-left:1px solid var(--mud-palette-divider);padding-left:24px; }
+.request-search { display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0; }
+.request-search input { flex:1;min-width:180px;max-width:480px;height:40px;padding:0 12px;border:1px solid var(--mud-palette-lines-inputs);background:var(--mud-palette-surface);color:var(--mud-palette-text-primary);border-radius:4px; }
+.request-search input:focus { outline:2px solid var(--mud-palette-primary);outline-offset:2px; }
+.request-pagination { display:flex;align-items:center;justify-content:flex-start;gap:12px;min-height:56px; }
+@media(max-width:700px) { .so-access-requests ::deep .so-admin-detail { border-left:0;border-top:1px solid var(--mud-palette-divider);padding:16px 0; } .request-search label { width:100%; } }

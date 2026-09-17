@@ -42,6 +42,8 @@ public sealed record OperationalRecordResponse(
     public bool SourceCloseRequested { get; init; }
     /// <summary>Whether the current deployment permits source-close dispatch below global fences.</summary>
     public bool SourceCloseEnabled { get; init; }
+    /// <summary>Separately persisted final-state evidence; old Completed stages do not imply verification.</summary>
+    public bool SourceClosureVerified { get; init; }
     /// <summary>Current stored source digest for exact-version policy review; not an authorization token.</summary>
     public string? SourceFingerprint { get; init; }
     /// <summary>Nullable recommendation; null means no durable SDM evaluation.</summary>

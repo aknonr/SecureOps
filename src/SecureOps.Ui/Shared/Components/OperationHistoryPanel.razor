@@ -1,0 +1,52 @@
+@implements IDisposable
+@using SecureOps.Shared.Contracts.OperationalRecords
+@inject OperationHistoryApiClient Api
+
+<details class="operation-history">
+    <summary>İşlem ve aktör kanıtı</summary>
+    <MudButton StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync" Disabled="_busy">İşlem geçmişini oku</MudButton>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    @if (_history is { } history)
+    {
+        @if (history.Closure is { } closure)
+        { <p>Kaynak doğrulaması: @closure.State · @closure.ObservedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @closure.EvidenceContract</p><p>Kaynakta kapatan kişi: @(closure.AuthoritativeCloser ?? "Kaynakta doğrulanmadı")</p> }
+        @if (history.Events.Count == 0) { <p>Bu kayıt için yeni sözleşmeyle kaydedilmiş işlem kanıtı yok; geçmiş aktörler tahmin edilmez.</p> }
+        <ol>
+            @foreach (var entry in history.Events)
+            {
+                <li><strong>@Action(entry.Action) · @Outcome(entry.Outcome)</strong><p>@entry.OccurredAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @(entry.Initiator.DisplayName ?? entry.Initiator.Account ?? "Kayıtlı kullanıcı")</p>
+                    <details><summary>Doğrulama ayrıntıları</summary><p>Başlatan kimliği: @entry.Initiator.Id · @entry.Initiator.Kind</p>
+                        <p>Çalıştıran: @entry.Executor?.Component · @entry.Executor?.Principal</p><p>Atanan inceleyici kimliği: @(entry.AssigneeId?.ToString() ?? "Bu olayda yok")</p>
+                        <p>Doğrulayan kişi: @(entry.Verifier?.DisplayName ?? "İnsan doğrulayıcı kaydı yok") · Kaynakta kapatan: @(entry.SourceCloser ?? "Doğrulanmadı")</p>
+                        @if (entry.VerificationExecutor is { } verifier) { <p>Teknik doğrulayıcı: @verifier.Component · @verifier.Principal</p> }
+                        <p>Komut: @entry.CommandId · Girdi sürümü: @entry.InputVersion · Dış referans: @entry.ExternalReference</p></details></li>
+            }
+        </ol>
+    }
+</details>
+@code {
+    [Parameter, EditorRequired] public string RecordType { get; set; } = "";
+    [Parameter, EditorRequired] public Guid RecordId { get; set; }
+    private OperationHistoryResponse? _history;
+    private UiProblem? _problem;
+    private bool _busy;
+    private CancellationTokenSource _pending = new();
+    private (string Type, Guid Id) _loaded;
+    protected override void OnParametersSet()
+    {
+        if (_loaded == (RecordType, RecordId)) { return; }
+        _loaded = (RecordType, RecordId);
+        _pending.Cancel(); _pending.Dispose(); _pending = new(); _history = null; _problem = null; _busy = false;
+    }
+    private async Task LoadAsync()
+    {
+        _busy = true; CancellationToken token = _pending.Token;
+        try { OperationHistoryResponse value = await Api.GetAsync(RecordType, RecordId, token); if (!token.IsCancellationRequested) { _history = value; _problem = null; } }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (SecureOpsApiException ex) { if (!token.IsCancellationRequested) { _history = null; _problem = ex.Problem; } }
+        finally { if (!token.IsCancellationRequested) { _busy = false; } }
+    }
+    private static string Action(string value) => value switch { "InUseAssigned" => "İnceleyici ataması", "InUseDraftSaved" => "Cevap kaydı", "InUseReportArchiveAuthorized" => "Rapor arşivi", "InUseReportPrepared" => "Rapor önizlemesi", "AnnouncementSelfTest" => "Mail denemesi", "AnnouncementSend" => "Duyuru gönderimi", "CreatingJira" => "Jira oluşturma", "JiraCreated" => "Jira kaydı", "ClosingOperationalRecord" => "Kaynak kapatma", "Completed" => "Son durum doğrulaması", _ => value };
+    private static string Outcome(string value) => value switch { "Saved" => "Kaydedildi", "Requested" => "İstendi", "Dispatched" => "Deneme başlatıldı", "Acknowledged" => "Yanıt alındı", "VerifiedClosed" => "Kaynak kapanışı doğrulandı", "Accepted" => "SMTP kabul etti", "Partial" => "Kısmi kabul", "Unknown" or "Uncertain" => "Sonuç belirsiz", "Failed" => "Başarısız", "Denied" => "Engellendi", _ => value };
+    public void Dispose() { _pending.Cancel(); _pending.Dispose(); }
+}

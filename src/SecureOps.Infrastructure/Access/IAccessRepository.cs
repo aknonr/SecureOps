@@ -20,9 +20,9 @@ public interface IAccessRepository
     /// <summary>Lists the complete request history for one application user.</summary>
     public Task<IReadOnlyList<ApplicationAccessRequest>> ListRequestsForUserAsync(Guid userId, CancellationToken cancellationToken);
     /// <summary>Atomically approves or rejects one pending request.</summary>
-    public Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, long expectedVersion, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken);
+    public Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, long expectedVersion, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null);
     /// <summary>Atomically replaces active roles for an approved user.</summary>
-    public Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken);
+    public Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null);
     /// <summary>Disables application access and revokes active roles.</summary>
     public Task<AccessMutationResult> DisableUserAsync(Guid userId, long expectedVersion, string actor, string reason, CancellationToken cancellationToken);
 }
@@ -48,7 +48,11 @@ public enum AccessMutationDisposition
     /// <summary>The user lifecycle rejects the mutation.</summary>
     UserInvalidState,
     /// <summary>The actor attempted to approve their own request.</summary>
-    SelfApprovalDenied
+    SelfApprovalDenied,
+    /// <summary>The role set contains an unregistered role.</summary>
+    InvalidRoles,
+    /// <summary>Self-escalation or last-administrator protection rejected the change.</summary>
+    AdministrativeGuard
 }
 
 /// <summary>Result of an access mutation.</summary>

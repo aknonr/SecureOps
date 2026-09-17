@@ -5,6 +5,14 @@ public static class Capabilities
 {
     /// <summary>Prepare and download owned local announcement drafts; never send.</summary>
     public const string AnnouncementDrafts = "Announcements.Drafts";
+    /// <summary>Explicit source retrieval and proposal review/apply; no sending.</summary>
+    public const string AnnouncementSource = "Announcements.Source";
+    /// <summary>Freeze an owned reviewed preparation; no sending.</summary>
+    public const string AnnouncementPrepare = "Announcements.Prepare";
+    /// <summary>Submit a self-test only to the initiating user's trusted Mail.</summary>
+    public const string AnnouncementSelfTest = "Announcements.SelfTest";
+    /// <summary>Explicit distribution mail command, additionally fenced by server relay policy.</summary>
+    public const string AnnouncementSend = "Announcements.Send";
     /// <summary>Read local In Use records; no source writes.</summary>
     public const string InUseView = "InUse.View";
     /// <summary>Save local reviews and prepare reports.</summary>

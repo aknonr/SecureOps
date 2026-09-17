@@ -9,6 +9,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Current workflow persistence requires 021 and its full predecessor inventory.
+$IncludeAnnouncementPreparations = $true
 if ($IncludeAnnouncementPreparations) { $IncludeAnnouncementSources = $true }
 if ($IncludeAnnouncementSources) { $IncludeAnnouncementDrafts = $true }
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -82,6 +84,9 @@ try {
     if ($IncludeAnnouncementSources) { Invoke-ResourceTestSql -File '016-announcement-source-jobs.sql' }
     if ($IncludeAnnouncementSources) { Invoke-ResourceTestSql -File '017-announcement-source-recovery.sql' }
     if ($IncludeAnnouncementPreparations) { Invoke-ResourceTestSql -File '018-announcement-preparations.sql' }
+    Invoke-ResourceTestSql -File '019-access-role-bundles.sql'
+    Invoke-ResourceTestSql -File '020-operational-mail-commands.sql'
+    Invoke-ResourceTestSql -File '021-workflow-actor-and-closure-evidence.sql'
 }
 finally { Pop-Location }
 
@@ -102,4 +107,4 @@ if ($RunTests) {
         } finally { Pop-Location }
     } finally { $env:SECUREOPS_SQL_TEST_CONNECTION = $previous }
 }
-[PSCustomObject]@{ Database = $database; Migrations = $(if ($IncludeAnnouncementPreparations) { '001-018' } elseif ($IncludeAnnouncementSources) { '001-017' } elseif ($IncludeAnnouncementDrafts) { '001-015' } else { '001-013' }); UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }
+[PSCustomObject]@{ Database = $database; Migrations = '001-021'; UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }

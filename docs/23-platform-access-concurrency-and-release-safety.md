@@ -1,5 +1,39 @@
 # Platform Access, Concurrency, and Release Safety
 
+## Current Administration, 2026-09-17
+
+Migration 019 persists role code/ID, display name, purpose, registered capability
+bundle, version and protected status without changing the nine-role baseline below.
+Migration 020 makes existing OCO source/preparation rights explicit, not new send
+grants. Admin stays protected. A business role needs no deployment; an executable
+action still needs server implementation and a registered Turkish action definition.
+Historical TeamView/AuditView/AccessAdministration/Access.ViewAudit are retained but
+are not advertised as independently implemented new actions.
+
+`GET /api/v1/access/users/page` needs ManageUsers; `requests/page` needs
+ApproveRequests. SQL applies literal bounded search, status/role filters, stable
+ordering, total/counts and page size <=100 before materialization. UI preserves
+query/page while opening details. Rejected request is not a new pending request.
+Current details and role choices come from persisted identity/role definitions.
+
+`GET roles` supports authorized management/decision callers; `GET roles/actions`
+needs AssignRoles. `POST roles/preview` and `PUT roles` require both ManageUsers
+and AssignRoles. Impact binds proposed definition, role version, affected users'
+access versions and actor/version. Changed assignments invalidate the preview.
+Response distinguishes affected users from effective gains/losses through all roles.
+Ordinary replacement has no human reason; rejection and disable retain theirs.
+Assignment/approval accepts reviewed roleVersions so a changed bundle cannot be
+silently assigned. Legacy requests are accepted only for unchanged built-ins at v1.
+
+All administrative mutations share transaction-owned `SecureOps.Access.Administration.v1`;
+persisted actor authorization, self-escalation, final Admin removal/disable and
+version checks serialize together. Audit failure rolls back the mutation. Bundle
+edits advance affected users' AccessVersion; sessions and queued mail revalidate.
+An Admin may create a mail role for another approved person, but cannot escalate
+their own role assignment or their own existing bundle. No real user is granted
+rights by migration or local fixture. Role definition UI retains local edits on
+conflict and requires explicit comparison/re-preview. Labels never confer access.
+
 ## Access and Session Boundary
 
 The configured authentication handler authenticates the current corporate principal. `ICorporatePrincipalResolver` translates authentication data into a provider-neutral identifier; `IApplicationAccessService` then resolves `Pending`, `Approved`, or `Disabled` status, roles, and capabilities. New users are pending. `GET /api/v1/access/me` exposes that state. Approval, rejection, role replacement, and disable endpoints require explicit access capabilities.

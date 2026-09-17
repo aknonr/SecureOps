@@ -18,6 +18,7 @@ public sealed partial class AnnouncementTests
         guard.InitialCatalog.Should().StartWith("SecureOps_ResourcesV1_OcoPreparation");
         IConfigurationRoot config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:SecureOpsDb"] = connection }).Build();
         var repository = new SqlAccessRepository(config);
+        await Sql.SqlAccessTestActors.AdminAsync(config, "synthetic-admin");
         EnsureAccessUserResult pending = await repository.EnsureUserAsync(new("synthetic-role:" + Guid.NewGuid(), "test"), true, TimeSpan.Zero, default);
         AccessMutationResult approved = await repository.DecideRequestAsync(pending.PendingRequest!.Id, AccessRequestStatus.Approved,
             pending.PendingRequest.Version, "synthetic-admin", ["Operator"], "Original approval retained", default);

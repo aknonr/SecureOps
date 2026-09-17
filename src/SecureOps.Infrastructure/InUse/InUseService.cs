@@ -15,7 +15,7 @@ namespace SecureOps.Infrastructure.InUse;
 /// <summary>Authorized local In Use workflow. There is deliberately no external-write dependency.</summary>
 public sealed partial class InUseService(IInUseRepository repository, IInUseSourceClient source,
     IApplicationAccessService access, IAccessRepository users, ICommandIdempotencyStore commands,
-    ILogger<InUseService> logger, InUseReportArchive? archive = null)
+    ILogger<InUseService> logger, InUseReportArchive? archive = null, SqlInUseIdentities? identities = null)
 {
     /// <summary>Queries only persisted records.</summary>
     public Task<InUseResult<InUsePage>> QueryAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -25,7 +25,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                 || query.View is not ("all" or "mine" or "unassigned") || query.Status is not (null or "Unreviewed" or "Draft" or "Stale"))
             { return InUseResult<InUsePage>.Fail("InUseInvalid"); }
             InUsePage page = await repository.QueryAsync(query, user.Id, token);
-            IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
+            IReadOnlyDictionary<Guid, string> labels = await LabelsAsync(page.Items, token);
             return new(page with { Items = page.Items.Select(r => Label(r, labels)).ToArray() });
         }, token);
 
@@ -35,19 +35,24 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         {
             InUseRecord? record = await repository.GetAsync(id, token);
             return record is null ? InUseResult<InUseRecord>.Fail("InUseNotFound")
-                : new(Label(record, InUseAssigneeLabels.Create(await users.ListUsersAsync(token)))
+                : new(Label(record, await LabelsAsync([record], token))
                     with
                 { ArchivedVersions = archive?.Versions(id) ?? [] });
         }, token);
 
     /// <summary>Minimal approved-reviewer picker; never resolves source display names into users.</summary>
     public Task<InUseResult<IReadOnlyList<InUseAssignee>>> AssigneesAsync(ClaimsPrincipal principal,
-        AccessOperationContext context, CancellationToken token) => RunAsync<IReadOnlyList<InUseAssignee>>(principal, context,
+        AccessOperationContext context, CancellationToken token, string? search = null) => RunAsync<IReadOnlyList<InUseAssignee>>(principal, context,
         Capabilities.InUseAssign, async _ =>
         {
+            if (search?.Length > 100)
+            { return InUseResult<IReadOnlyList<InUseAssignee>>.Fail("InUseInvalid"); }
+            if (users is SqlAccessRepository && identities is not null)
+            { return new(await identities.ReadAsync(null, search, token)); }
             ApplicationUser[] eligible = (await users.ListUsersAsync(token)).Where(Reviewer).ToArray();
             IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(eligible);
-            return new(eligible.OrderBy(u => labels[u.Id], StringComparer.Ordinal).ThenBy(u => u.Id).Take(200)
+            return new(eligible.Where(u => string.IsNullOrWhiteSpace(search) || labels[u.Id].Contains(search, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(u => labels[u.Id], StringComparer.Ordinal).ThenBy(u => u.Id).Take(50)
                 .Select(u => new InUseAssignee(u.Id, labels[u.Id])).ToArray());
         }, token);
 
@@ -109,15 +114,18 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             ApplicationUser? assignee = request.AssigneeId is Guid target ? await users.GetUserAsync(target, token) : null;
             if (request.AssigneeId.HasValue && (assignee is null || !Reviewer(assignee)))
             { return InUseResult<InUseRecord>.Fail("InUseAssigneeUnavailable"); }
-            IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
+            IReadOnlyDictionary<Guid, string> labels = await LabelsAsync([old with { AssigneeId = assignee?.Id }], token);
             InUseRecord next = old with
             {
                 Version = old.Version + 1,
                 AssigneeId = assignee?.Id,
-                AssigneeLabel = assignee is null ? null : labels.GetValueOrDefault(assignee.Id) ?? InUseAssigneeLabels.Create([assignee])[assignee.Id]
+                AssigneeLabel = assignee is null ? null : labels.GetValueOrDefault(assignee.Id) ?? InUseAssigneeLabels.Create([assignee])[assignee.Id],
+                AssignedBy = user.Id,
+                AssignedByLabel = ActorLabel(user),
+                AssignedAt = DateTimeOffset.UtcNow
             };
             return await SaveAsync(next, request.ExpectedVersion, Audit(user, context, "Assigned",
-                new { id, PreviousAssignee = old.AssigneeId, next.AssigneeId, request.Reason, next.Version }), token);
+                new { id, PreviousAssignee = old.AssigneeId, next.AssigneeId, request.Reason, next.Version }, id, request.ExpectedVersion, assigneeId: next.AssigneeId), token);
         }, token);
 
     /// <summary>An approved review-capable actor can save a version-protected draft; assignment is optional.</summary>
@@ -140,9 +148,10 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                         ? a with { Evidence = old.Draft?.Answers.FirstOrDefault(o => o.ServerId == a.ServerId && o.Check == a.Check)?.Evidence ?? "" } : a))
                     .OrderBy(a => a.ServerId, StringComparer.Ordinal).ThenBy(a => a.Check, StringComparer.Ordinal).ToArray(),
                 string.IsNullOrWhiteSpace(request.Notes) ? old.Draft?.Notes ?? "" : request.Notes.Trim(), user.Id, DateTimeOffset.UtcNow)
+                { ReviewedByLabel = ActorLabel(user) }
             };
             return await SaveAsync(next, request.ExpectedVersion, Audit(user, context, "DraftSaved",
-                new { id, next.Version, next.SourceVersion, AnswerCount = request.Answers.Count }), token);
+                new { id, next.Version, next.SourceVersion, AnswerCount = request.Answers.Count }, id, request.ExpectedVersion, assigneeId: old.AssigneeId), token);
         }, token);
 
     /// <summary>Prepares one version-bound text-only workbook and audits its hash before returning it.</summary>
@@ -160,7 +169,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                 { return InUseResult<InUseReport>.Fail("InUseInvalid"); }
                 InUseReport? stored = await (archive ?? throw new InvalidOperationException("Archive unavailable.")).AccessAsync(id, historical, null,
                     report => repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ArchivedReportDownloadAuthorized",
-                        new { id, report.Version, report.Sha256 }), token), token);
+                        new { id, report.Version, report.Sha256 }, id, request.ExpectedVersion), token), token);
                 return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(stored);
             }
             if (record.Version != request.ExpectedVersion || record.Draft is null || record.Draft.SourceVersion != record.SourceVersion)
@@ -178,17 +187,17 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             {
                 InUseReport? stored = await (archive ?? throw new InvalidOperationException("Archive unavailable.")).AccessAsync(id, record.Version, report,
                     artifact => repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ReportArchiveAuthorized",
-                        new { id, record.Version, record.SourceVersion, artifact.Sha256 }), token), token);
+                        new { id, record.Version, record.SourceVersion, artifact.Sha256 }, id, request.ExpectedVersion), token), token);
                 return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(stored);
             }
             bool saved = await repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ReportPrepared",
-                new { id, record.Version, record.SourceVersion, report.Sha256 }), token);
+                new { id, record.Version, record.SourceVersion, report.Sha256 }, id, request.ExpectedVersion), token);
             return saved ? new(report) : InUseResult<InUseReport>.Fail("InUseConflict");
         }, token);
 
     private async Task<InUseResult<InUseRecord>> SaveAsync(InUseRecord next, long expected, AuditEvent audit, CancellationToken token)
     {
-        IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
+        IReadOnlyDictionary<Guid, string> labels = await LabelsAsync([next], token);
         return await repository.SaveAsync(next, expected, audit, token) ? new(Label(next, labels)) : InUseResult<InUseRecord>.Fail("InUseConflict");
     }
 
@@ -240,6 +249,12 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
 
     private static bool Reviewer(ApplicationUser user) => user.Status == AccessStatus.Approved
         && user.Capabilities.Contains(Capabilities.InUseView) && user.Capabilities.Contains(Capabilities.InUseReview);
+    private async Task<IReadOnlyDictionary<Guid, string>> LabelsAsync(IReadOnlyList<InUseRecord> records, CancellationToken token) =>
+        users is SqlAccessRepository && identities is not null
+            ? (await identities.ReadAsync(records.Where(r => r.AssigneeId.HasValue).Select(r => r.AssigneeId!.Value).Distinct().ToArray(), null, token)).ToDictionary(p => p.Id, p => p.Label)
+            : InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
+    private static string ActorLabel(ApplicationUser user) => (string.IsNullOrWhiteSpace(user.DisplayName) ? user.LoginName ?? "Kayıtlı kullanıcı" : user.DisplayName)
+        + " · " + user.Id.ToString("N")[..8];
     private static bool Text(string? value, int max, bool required = false) => value is not null && value.Length <= max
         && (!required || !string.IsNullOrWhiteSpace(value)) && !value.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t'));
     private static bool ValidDraft(SaveInUseDraftRequest request, InUseRecord record) =>
@@ -249,6 +264,18 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         && request.Answers.All(a => record.Source.Servers.Any(s => s.Id == a.ServerId)
             && InUseChecks.Codes.Contains(a.Check) && InUseChecks.Values.Contains(a.Value)
             && Text(a.Evidence, 500));
-    private static AuditEvent Audit(ApplicationUser user, AccessOperationContext context, string action, object details) => new()
-    { Actor = user.Id.ToString("D"), Action = "InUse" + action, CorrelationId = context.CorrelationId, Details = details };
+    private static AuditEvent Audit(ApplicationUser user, AccessOperationContext context, string action, object details,
+        Guid? recordId = null, long inputVersion = 0, Guid? commandId = null, Guid? assigneeId = null) => new()
+        {
+            Actor = user.Id.ToString("D"),
+            Action = "InUse" + action,
+            CorrelationId = context.CorrelationId,
+            Details = details,
+            Operation = recordId is null ? null : new(Guid.NewGuid(), commandId ?? Guid.NewGuid(), "InUse", recordId.Value.ToString("D"),
+            "InUse" + action, inputVersion, DateTimeOffset.UtcNow, action switch
+            { "CompletionIntentBlocked" => "Blocked", "ReportPrepared" => "Prepared", "ReportArchiveAuthorized" => "Archived", "CompletionResult" => "Recorded", _ => "Saved" },
+            new(user.Id, "Human", user.DisplayName, user.LoginName, null),
+            new("SecureOps.Api", Environment.MachineName + ":" + Environment.ProcessId, Environment.UserDomainName + "\\" + Environment.UserName),
+            null, context.CorrelationId, AssigneeId: assigneeId)
+        };
 }

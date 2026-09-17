@@ -17,11 +17,11 @@ public interface IApplicationAccessService
     /// <summary>Gets one authoritative access-user projection for an authorized administrator.</summary>
     public Task<AccessServiceResult<AccessUserReadModel>> GetUserAsync(Guid userId, AccessOperationContext context, CancellationToken cancellationToken);
     /// <summary>Approves a pending request with reviewed roles.</summary>
-    public Task<AccessServiceResult<AccessMutationResult>> ApproveAsync(Guid requestId, IReadOnlyCollection<string> roles, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken);
+    public Task<AccessServiceResult<AccessMutationResult>> ApproveAsync(Guid requestId, IReadOnlyCollection<string> roles, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null);
     /// <summary>Rejects a pending request.</summary>
     public Task<AccessServiceResult<AccessMutationResult>> RejectAsync(Guid requestId, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken);
     /// <summary>Replaces active roles for an approved user.</summary>
-    public Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken);
+    public Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null);
     /// <summary>Disables user access and active roles.</summary>
     public Task<AccessServiceResult<AccessMutationResult>> DisableAsync(Guid userId, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken);
 }

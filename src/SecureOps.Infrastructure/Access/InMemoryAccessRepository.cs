@@ -107,8 +107,12 @@ public sealed class InMemoryAccessRepository : IAccessRepository
             .ToArray());
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, long expectedVersion, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken)
+    public async Task<AccessMutationResult> DecideRequestAsync(Guid requestId, AccessRequestStatus decision, long expectedVersion, string actor, IReadOnlyCollection<string> roles, string reason, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null)
     {
+        if (roles.Any(role => !AccessRoleCatalog.IsKnownRole(role)))
+        {
+            return new(AccessMutationDisposition.InvalidRoles, null, null, [], []);
+        }
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -153,8 +157,13 @@ public sealed class InMemoryAccessRepository : IAccessRepository
     }
 
     /// <inheritdoc />
-    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken)
+    public async Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null)
     {
+        if (roles.Any(role => !AccessRoleCatalog.IsKnownRole(role)))
+        {
+            return new(AccessMutationDisposition.InvalidRoles, null, null, [], []);
+        }
+
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -253,7 +262,9 @@ public sealed class InMemoryAccessRepository : IAccessRepository
         return new ApplicationAccessRequest(request.Id, request.UserId, user.CorporateIdentity, request.Status, request.RequestedAt, request.DecidedAt, request.DecisionReason, request.DecidedByCorporateIdentity, request.Version);
     }
 
-    private static string[] NormalizeRoles(IEnumerable<string> roles) => roles.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(role => role, StringComparer.OrdinalIgnoreCase).ToArray();
+    private static string[] NormalizeRoles(IEnumerable<string> roles) => roles
+        .Select(role => AccessRoleCatalog.RoleCodes.Single(code => code.Equals(role, StringComparison.OrdinalIgnoreCase)))
+        .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(role => role, StringComparer.OrdinalIgnoreCase).ToArray();
     private static AccessMutationResult Missing() => new(AccessMutationDisposition.NotFound, null, null, [], []);
     private AccessMutationResult Conflict(AccessMutationDisposition disposition, StoredUser user, StoredRequest? request) => new(disposition, ToUser(user), request is null ? null : ToRequest(request), [], []);
     private AccessMutationResult Applied(StoredUser user, StoredRequest? request, IEnumerable<string> previous, IEnumerable<string> next) => new(

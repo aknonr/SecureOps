@@ -33,6 +33,8 @@ public sealed record OperationalRecord
     public required OperationalRecordWorkflowState WorkflowState { get; init; }
     /// <summary>Jira issue key after confirmed creation.</summary>
     public string? JiraIssueKey { get; init; }
+    /// <summary>True only for new exact-attempt authoritative post-state evidence, not historical Completed labels.</summary>
+    public bool SourceClosureVerified { get; init; }
     /// <summary>Close intent persisted before Jira dispatch; false cannot be upgraded by retry.</summary>
     public bool SourceCloseRequested { get; init; }
     /// <summary>Stable last failure code.</summary>

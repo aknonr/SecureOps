@@ -8,7 +8,7 @@ using SecureOps.Worker;
 // The Worker hosts the Hangfire job server per ADR-0003. It serves no HTTP traffic and never calls
 // into the API or UI: coordination is only the shared SQL database and the Hangfire queue.
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddSecureOpsInfrastructure(builder.Configuration);
+builder.Services.AddSecureOpsInfrastructure(builder.Configuration, builder.Environment.EnvironmentName);
 
 // Absent or incomplete job configuration leaves the host running without a job server rather than
 // starting one against a guessed connection string or schema.

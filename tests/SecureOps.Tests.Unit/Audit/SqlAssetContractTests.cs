@@ -63,7 +63,10 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(18)
+            .And.HaveCount(21)
+            .And.ContainSingle(name => name == "019-access-role-bundles.sql")
+            .And.ContainSingle(name => name == "020-operational-mail-commands.sql")
+            .And.ContainSingle(name => name == "021-workflow-actor-and-closure-evidence.sql")
             .And.ContainSingle(name => name == "018-announcement-preparations.sql")
             .And.ContainSingle(name => name == "017-announcement-source-recovery.sql")
             .And.ContainSingle(name => name == "016-announcement-source-jobs.sql")

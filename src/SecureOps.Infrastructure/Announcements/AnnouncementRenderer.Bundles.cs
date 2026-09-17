@@ -50,7 +50,7 @@ public sealed partial class AnnouncementRenderer
         }).ToArray();
     }
 
-    /// <summary>Sequential bounded validation: at most six 256-KiB images; footer and ordered roles are fingerprinted.</summary>
+    /// <summary>Six sequential images, at most 1 MiB each and 2 MiB total; footer and ordered roles are fingerprinted.</summary>
     public async Task<AnnouncementPresentation> PresentationAsync(AnnouncementContent content, CancellationToken token)
     {
         if (content.TemplateRevision == "oco-v1")
@@ -66,6 +66,8 @@ public sealed partial class AnnouncementRenderer
         {
             token.ThrowIfCancellationRequested();
             (byte[] bytes, string type, string hash) = await AssetAsync(bundle.Assets[role], token);
+            if (images.Sum(image => image.Bytes.Length) + bytes.Length > MaxPresentationBytes)
+            { throw new InvalidOperationException("Presentation image budget exceeded."); }
             images.Add(new(role, bytes, type, hash));
         }
         byte[] identity = JsonSerializer.SerializeToUtf8Bytes(new

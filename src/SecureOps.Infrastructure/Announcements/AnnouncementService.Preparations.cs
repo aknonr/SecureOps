@@ -29,6 +29,8 @@ public sealed partial class AnnouncementService
             ApplicationUser owner = current.Value.User;
             if (draftId is not null)
             {
+                if (!owner.Capabilities.Contains(Capabilities.AnnouncementPrepare))
+                { return new(Error: "AccessDenied"); }
                 if (id == Guid.Empty || draftId == Guid.Empty || version < 1)
                 { return new(Error: "AnnouncementInvalid"); }
                 AnnouncementOutcome saved = await ExecuteAsync(principal, context, draftId.Value, version, "prepare", null, 1, 25, token);

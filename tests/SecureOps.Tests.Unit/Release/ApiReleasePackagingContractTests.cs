@@ -27,8 +27,9 @@ public sealed class ApiReleasePackagingContractTests
         string paired = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-PairedTestRelease.ps1"));
         string managed = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-UiDeploymentPackage.ps1"));
         string worker = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Worker", "Program.cs"));
-        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-018'")
-            .And.Contain("Expected the exact complete 001-018 SQL chain.")
+        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-021'")
+            .And.Contain("Expected the exact complete 001-021 SQL chain.")
+            .And.Contain("upgradeFromVerified018='019-021'").And.Contain("database-delta")
             .And.Contain("runtimePrepareSchema=$false").And.Contain("-Component Worker")
             .And.Contain("Foreground console only").And.Contain("Symbol outside fresh staging.").And.NotContain("sc.exe");
         managed.Should().Contain("runtimeTargets").And.Contain("Missing Worker runtime asset")

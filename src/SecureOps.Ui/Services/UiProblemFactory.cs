@@ -140,6 +140,16 @@ public static class UiProblemFactory
 
     private static UiProblem FromCode(string code, int statusCode) => code switch
     {
+        "AnnouncementMailDisabled" or "AnnouncementMailConfigurationInvalid" or "AnnouncementMailWorkerUnavailable" => Build(UiProblemKind.NotConfigured, code,
+            "Mail gönderimi hazır değil", "Taslak ve hazırlık korunuyor. Gönderim yetkisi, onaylı relay ayarları ve Worker bağlantısı ayrı doğrulanmalıdır.", [], false, false),
+        "AnnouncementMailPreviewExpired" or "AnnouncementMailPreviewChanged" => Build(UiProblemKind.Conflict, code,
+            "Gönderim önizlemesi güncel değil", "Taslak, yetki, profil veya gönderim ayarı değişmiş olabilir. Güncel hazırlığı yeniden inceleyin; bu onay gönderilmedi.", [], false, true),
+        "AnnouncementMailAlreadyRequested" => Build(UiProblemKind.Conflict, code,
+            "Bu duyuru için gönderim talebi var", "Yeni mail oluşturulmadı. Kayıtlı sonucu kontrol edin; belirsiz veya kısmi sonuçta relay mutabakatı gerekir.", [], false, true),
+        "AnnouncementMailAudienceInvalid" => Build(UiProblemKind.Validation, code,
+            "Alıcıları kontrol edin", "E-posta biçimi, onaylı alıcı alan adı veya alıcı sayısı uygun değil. Taslağı düzeltip yeni hazırlık oluşturun.", [], false, false),
+        "SourceCloseVerificationUnavailable" or "SourceCloseUnverified" => Build(UiProblemKind.Conflict, code,
+            "Kaynak kapanışı doğrulanmadı", "Jira anahtarı ayrı korunur. Kaynakta yetkili son durum kanıtı olmadan kapanış veya kapatan kişi atanmaz; kapatma işlemini tekrarlamayın.", [], false, true),
         "AnnouncementSenderUnavailable" => Build(UiProblemKind.Validation, code,
             "Profil e-postası gerekli", "Taslağınız korunuyor. Kayıtlı e-postanız eksik veya geçersiz.",
             ["Taslağı kaydedin; kurumsal oturumu yeniden açarak profilinizi güncelleyin. Sorun sürerse yöneticinize bildirin."], false, false),
@@ -162,9 +172,9 @@ public static class UiProblemFactory
         "InUseIncomplete" => Build(UiProblemKind.Validation, code, "Rapor henüz hazır değil",
             "Her doğrulanmış sunucu için üç soruyu yanıtlayın. Bilinmeyen cevaplar taslakta korunabilir.",
             ["Sunucu seçiciden eksik cevapları kontrol edin."], retryable: false, requiresRefresh: false),
-        "InUseAssigneeUnavailable" or "InUseAssignmentRequired" => Build(UiProblemKind.Forbidden, code, "In Use ataması gerekli",
-            "İnceleme yalnızca onaylı ve bu kayda atanmış uygulama kullanıcısı tarafından kaydedilebilir.",
-            ["Yetkili koordinatörden güncel inceleyici atamasını kontrol etmesini isteyin."], retryable: false, requiresRefresh: true),
+        "InUseAssigneeUnavailable" or "InUseAssignmentRequired" => Build(UiProblemKind.Forbidden, code, "İnceleyici uygun değil",
+            "Seçilen kullanıcı güncel inceleme yetkisine sahip değil. Atama isteğe bağlıdır; yetkili başka bir inceleyici de cevapları kaydedebilir.",
+            ["Güncel inceleyici listesini kontrol edin."], retryable: false, requiresRefresh: true),
         // ---- Application access -------------------------------------------------------------
         OperationalErrorCodes.AccessPending => Build(
             UiProblemKind.AccessPending, code,

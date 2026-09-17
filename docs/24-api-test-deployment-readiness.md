@@ -1,5 +1,27 @@
 # API TEST Deployment Readiness
 
+## Owner Operations Continuation, 2026-09-15
+
+The owner has now explicitly approved a one-time task-size exception for the
+enumerated operations continuation: access bundles and administration, In Use
+assignment/workspace, attributable durable commands, OCO self-test/SMTP, supported
+OR verification boundaries, additive SQL and matched API/UI/console Worker delivery.
+This supersedes the cap blocker below, not previous acceptance or package evidence.
+Accounting remains cumulative from `4a1700a6c0e346edf2c47a24fe6402538678db1d`,
+including the 636 lines already committed at `5bb50092`. Permanent rules are unchanged.
+No corporate send, Jira create, source closure, installation, push, Windows Service
+or autonomous execution is authorized. Source gates now pass: Release 23.209 s,
+1294 unit / 274 integration tests (36 named opt-ins) 7.577 s, normal OpenAPI,
+full format zero diagnostics 39.779 s; all 34 SQL opt-ins pass in 7.923 s on fresh
+001-021 databases. Original six-asset browser MIME opt-in passes in 2.138 s.
+Exact release-payload browser and API/Worker process-recovery acceptance follow
+the committed build source; this paragraph alone is not their completion evidence.
+Private evidence: `C:\SecureOpsBuild\validation\operations-completion-20260915`.
+New dynamic role administration, assignment/actor evidence, default-disabled
+self-test/SMTP and typed verified-closure boundary are described in current
+module contracts and ADR-0022. Historical results below are not new feature tests.
+Design decision: ADR-0022. Current installed state remains operator-reported.
+
 ## OCO Mail And Access Continuation, 2026-09-15
 
 Current task baseline: `4a1700a6c0e346edf2c47a24fe6402538678db1d`, existing
@@ -414,223 +436,212 @@ must be reported separately from reused historical evidence. SQL fixtures remain
 test-owned and retained. No corporate collection, deployment or write activation.
 
 <!-- TEST-RELEASE-RUNBOOK:START -->
-## Eşleşen TEST Teslimatı: {{RELEASE_NAME}}
 
-**Birleşik teslimat adayıdır; ayrıca kurulum onayı gerekir.** Build SHA:
-`{{BUILD_SHA}}`. Üretim sırasında bu token gerçek commit'e
-bağlanır; token içeren veya Worker/001-018 içermeyen eski paket kurulmaz.
-`release-metadata.json` kaynak/payload bilgisini; `evidence/validation.json`
-çalıştırılan, başarısız, atlanan ve yeniden kullanılan kapıları ayırır.
-`readyForInstallation=false` veya açık zorunlu kapı varsa kurulumda durun.
-Depo geneli format hatası için onaylı istisna varsaymayın.
+## Güncel Operatör Yükseltmesi: {{RELEASE_NAME}}
 
-### 1. Build / Operatör Makinesi: İlk İşlem
+Build kaynağı: `{{BUILD_SHA}}`. Tek eşleşen API/UI/Worker teslimatıdır.
+`release-metadata.json`, `release-artifacts.sha256`, `manifests/*` ve
+`evidence/validation.json` gerçek paket/kapı kanıtlarıdır. Yerel kabul,
+kurulum onayı veya kurumsal SMTP/Jira/BPM başarısı değildir. Açık zorunlu
+kapıda durun. Eski rc6.19 (`2fe9d724`) bu yeni özellikleri içermez.
 
-Teslimat sahibi yeni API, UI, Worker ve DBA arşivlerinin boyut/hash değerini doğrular.
-Henüz paket yoksa bu adımı çalıştırmayın; rc6.17 yerine yeni paket varsaymayın:
+### 1. Mevcut Durumu Koruyun
+
+Operatör API/UI ve 001–018 geçişini bildirdi; 001–018'i tekrar çalıştırmayın.
+Hangfire kurulum çıktısı schema 9'a ulaştı; mevcut doğru schema'da installer
+tekrarlanmaz. Bilinen API yolu `D:\Applications\api\wasasyonetimapi.thy.com`,
+Worker yolu `D:\secureops_worker`. Worker Windows Service değildir; mevcut
+foreground konsol yöntemi kullanılır. Bilinen yollar/özgün script/görseller
+yeniden istenmez. UI fiziksel yolu, gerçek kurulu hash'ler, runtime grant'leri,
+güncel heartbeat ve yedek referansı hâlâ hedefte doğrulanmalıdır.
+
+Hosting sahibi onaylı hedefte yalnız gerekli alanları kaydeder; tüm config,
+environment, token, parola veya anahtar içeriği paylaşılmaz:
 
 ```powershell
-$Release = 'C:\SecureOpsBuild\release\{{RELEASE_NAME}}' # Teslim alınan kopya
-$Metadata = Get-Content -LiteralPath "$Release\release-metadata.json" -Raw | ConvertFrom-Json
-$Metadata | Select-Object release, buildSource, productVersion, fileVersion, readyForInstallation
-foreach ($Package in $Metadata.packages) {
-    $File = Get-Item -LiteralPath (Join-Path $Release $Package.path)
-    if ($File.Length -ne $Package.bytes -or
-        (Get-FileHash -LiteralPath $File.FullName -Algorithm SHA256).Hash -ne $Package.sha256) {
-        throw 'DUR: paket boyutu/hash uyusmazligi.'
+$Api = 'D:\Applications\api\wasasyonetimapi.thy.com'
+$Worker = 'D:\secureops_worker'
+$Ui = '<mevcut onayli UI fiziksel yolu>'
+foreach ($dll in @("$Api\SecureOps.Api.dll","$Ui\SecureOps.Ui.dll","$Worker\SecureOps.Worker.dll")) {
+    if (Test-Path -LiteralPath $dll) {
+        (Get-Item -LiteralPath $dll).VersionInfo | Select-Object FileName,ProductVersion,FileVersion
+        Get-FileHash -LiteralPath $dll -Algorithm SHA256
     }
 }
-Get-Content -LiteralPath "$Release\evidence\validation.json"
-```
-
-API/UI/Worker aynı build SHA ve `0.1.0.0` FileVersion taşımalıdır. Windows x64 TEST hostunda
-.NET 8 `Microsoft.NETCore.App` ve `Microsoft.AspNetCore.App` ile IIS Hosting Bundle
-gerekir; SDK gerekmez. Gerçek framework sürümleri metadata/runtimeconfig içindedir.
-ZIP'ler server-owned `web.config`, `appsettings*.json`, sır, ring, log, rapor veya
-test verisi içermez. `staging`, `evidence`, `DBA` ve metadata runtime'a kopyalanmaz.
-
-### 2. TEST Hostu: Salt Okunur Envanter ve Yedek Referansları
-
-Aşağıdaki yer tutucuları mevcut onaylı hedeflerle doldurun; sır paylaşmayın:
-
-```powershell
-$ApiPath = '<mevcut API dizini>'
-$UiPath = '<mevcut UI dizini>'
-$WorkerPath = '<onayli Worker dizini; kurulu degilse envantere yok yazin>'
-foreach ($Dll in @("$ApiPath\SecureOps.Api.dll", "$UiPath\SecureOps.Ui.dll", "$WorkerPath\SecureOps.Worker.dll")) {
-    if (!(Test-Path -LiteralPath $Dll)) { Write-Output 'Bilesen kurulu degil veya onayli yol eksik'; continue }
-    (Get-Item -LiteralPath $Dll).VersionInfo | Select-Object FileName, ProductVersion, FileVersion
-    Get-FileHash -LiteralPath $Dll -Algorithm SHA256
-}
 dotnet --list-runtimes
-$AppCmd = "$env:windir\System32\inetsrv\appcmd.exe"
-& $AppCmd list site
-& $AppCmd list app
-& $AppCmd list vdir
-$ApiSite = '<onayli API site/uygulama>'
-$UiSite = '<onayli UI site/uygulama>'
-foreach ($Site in @($ApiSite,$UiSite)) {
-    & $AppCmd list config $Site /section:system.webServer/security/authentication/windowsAuthentication
-    & $AppCmd list config $Site /section:system.webServer/security/authentication/anonymousAuthentication
-}
-$Ancm = "$env:ProgramFiles\IIS\Asp.Net Core Module\V2\aspnetcorev2.dll"
-if (Test-Path -LiteralPath $Ancm) { (Get-Item -LiteralPath $Ancm).VersionInfo | Select-Object FileVersion,ProductVersion }
+whoami
 ```
 
-Komutlar yalnız onaylı TEST hostunda ve mevcut yollarla salt okunur çalışır;
-bu iş istasyonunda appcmd yok, hedef/API/UI/Worker yolları veya uzaktan oturum
-tanımlı değil. Çıktılar özel değişiklik kaydında kalır; config'in tamamı, environment
-variables, bağlantı dizesi, servis parolası veya anahtar içerikleri paylaşılmaz.
-Hosting yöneticisi ayrıca uygulama havuzu kimliği/bitness, mevcut auth türü,
-TLS/binding, güvenilen proxy/F5 ve forwarded-header sınırlarını yalnız gerekli
-alanlar üzerinden kaydeder. Git veya yerel arşiv kurulu sürüm kanıtı değildir.
+API/UI için .NET 8 NETCore.App + AspNetCore.App ve IIS Hosting Bundle,
+Worker için .NET 8 NETCore.App gerekir. SDK gerekmez. Mevcut IIS auth,
+OIDC/TLS/proxy sınırları, API/UI'nin ayrı kalıcı ringleri ve kimlikleri korunur.
+Paket runtimeconfig/metadata ile gerçek host karşılaştırılır. Git HEAD ve
+yerel paket klasörü kurulu sunucu kanıtı değildir.
 
-Kurulu SHA'yı Git HEAD'den çıkarmayın. Değişiklik kaydına API/UI binary ve config
-yedeği, SQL recovery point, özel `InUseReports:Directory` arşivi, ayrı API/UI kalıcı
-Data Protection ring yedek referanslarını yazın. Sır veya key içeriğini dışarı almayın.
-Mevcut işlem kimliklerini, ring yollarını, ApplicationName ve koruma modunu koruyun.
+### 2. Paket ve Yedek
 
-### 3. DBA: Birleşik 001-018 Envanteri ve Asgari İzinler
+Teslimat sahibi arşivlerin boyut/SHA256 değerini metadata ile, açılmış her
+dosyayı ilgili `*-files.json` ile doğrular. Bir uyuşmazlıkta kurulum durur.
+API/UI/Worker aynı build SHA taşımalıdır. DBA full 001–021 yalnız referanstır;
+mevcut doğrulanmış 018 hedefi için **019–021 delta arşivi** kullanılır.
+Altı özgün görsel ayrı Branding arşivindedir; runtime/webroot içine açılmaz.
+`configuration/announcement-mail.disabled.example.json` yalnız birleştirilecek
+örnek parçadır, mevcut config'in yerine konmaz. Boş alanları etkinleştirmeyin.
 
-001-013 eski modül zinciridir; birleşik teslimatın tamamı değildir. 014 taslak
-revision tablosu/append-only trigger, 015 owner/latest index, 016 SourceJobs ve
-SourceOverrides, 017 dispatch/lease/attempt kurtarma alanları ve index, 018 immutable
-Preparations tablosu/index/trigger ekler. Gerçek hedef seviyesi bilinmiyor; DBA
-dosya hash'leri, sys.columns/indexes/check_constraints/triggers tanımları ve önceki
-değişiklik kaydını karşılaştırıp yalnız eksik migration'ları planlar. 012/013 veya
-zincir tekrar çalıştırılmaz. Numarasız preparation adayı varsa önce 018 ile envanter
-uzlaştırılır. Bu sorgular yetki/şema değiştirmez:
+Binary ve server-owned config yedekleri, geri yüklenebilir SQL recovery point,
+ayrı API/UI ringleri, rapor/preparation ve özel asset dizinleri için tarih,
+sahip ve geri dönüş referansı değişiklik kaydında olmalıdır. Eski binary'nin
+yeni rol/JSON/mail state verisine güvenli yazdığı varsayılmaz. Runtime paketler
+appsettings/web.config/sır/log/ring/fixture/veritabanı içermez. Metadata, evidence,
+DBA, configuration ve staging uygulama payload'ı değildir.
+
+### 3. DBA: Yalnız Eksik 019 → 020 → 021
+
+DBA doğru DB ve mevcut 018 tanımlarını karşılaştırır; numara tahminiyle çalışmaz.
+DDL hesabı runtime kimliğinden ayrıdır. SQLCMD modunda, arşivin
+`sql/migrations` çalışma dizininden `-I -b` ile sırasıyla:
+
+1. `019-access-role-bundles.sql`: mevcut dokuz rol kimliği/hakları korunur;
+   sürümlü rol paketleri ve erişim sayfalama indexleri.
+2. `020-operational-mail-commands.sql`: değişmez mail niyeti/bytes, tek dağıtım
+   indexi, kurtarma durumları ve append-only işlem olayları. Önceden var olan
+   OCO kaynak/hazırlama hakları açık hale gelir; SelfTest/Send kimseye verilmez.
+3. `021-workflow-actor-and-closure-evidence.sql`: transferde ilk başlatan,
+   girdi sürümü ve son-durum kanıtı. Geçmiş NULL değerler tahmin edilmez.
+
+Migration'lar mevcut nesnede durur; otomatik repair/replay yoktur. 001–018 ve
+Hangfire installer bu delta içinde yoktur. Uyuşmayan tanımda DBA incelemesi gerekir.
+Yükseltmeden sonra kolon/index/check ve aşağıdaki trigger'ların etkinliği doğrulanır:
+`TR_OperationEvents_AppendOnly`, `TR_MailCommands_NoDelete`,
+`TR_MailCommands_ImmutableIntent`; eski audit/history korumaları korunur.
+
+Runtime dar izin farkı: `security.Roles` mevcut SELECT'e ek INSERT/UPDATE;
+`announcements.MailCommands` SELECT/INSERT/UPDATE;
+`ops.OperationEvents` SELECT/INSERT. Eski Users/RoleAssignments/JiraTransfers,
+audit INSERT, SourceJobs/Overrides, DraftRevisions/Preparations izinleri korunur.
+Worker event SELECT gerektirmez; ayrı kimliklerde DBA buna göre daraltabilir.
+Yeni nesnelerde DELETE, DDL, schema ownership, db_owner ve audit/history
+UPDATE/DELETE verilmez. Dedicated Hangfire schema DML ayrı mevcut sınırdır.
 
 ```sql
-SELECT name, is_disabled, is_not_trusted, definition
-FROM sys.check_constraints
-WHERE parent_object_id = OBJECT_ID(N'ops.OperationalRecords')
-  AND name = N'CK_OperationalRecords_SdmEvaluation';
-SELECT OBJECT_ID(N'ops.InUseRecords') AS InUseRecords,
-       OBJECT_ID(N'ops.InUseRefresh') AS InUseRefresh;
-SELECT Id, Version FROM ops.InUseRefresh WHERE Id = 1;
-SELECT name, is_disabled FROM sys.triggers
-WHERE name IN (N'TR_AuditLog_AppendOnly', N'TR_OperationalRecordWorkflowHistory_AppendOnly',
- N'TR_DraftRevisions_AppendOnly',N'TR_SourceJobs_NoDelete',N'TR_Preparations_AppendOnly');
-SELECT s.name AS SchemaName,t.name AS TableName,c.name AS ColumnName,ty.name AS TypeName,
- c.max_length,c.is_nullable FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
- JOIN sys.columns c ON c.object_id=t.object_id JOIN sys.types ty ON ty.user_type_id=c.user_type_id
- WHERE s.name=N'announcements' ORDER BY t.name,c.column_id;
-SELECT s.name AS SchemaName,o.name AS ObjectName,i.name,i.is_unique,i.is_disabled
- FROM sys.indexes i JOIN sys.objects o ON i.object_id=o.object_id
- JOIN sys.schemas s ON o.schema_id=s.schema_id WHERE s.name=N'announcements';
-SELECT s.name AS SchemaName,o.name AS ObjectName,t.name,OBJECT_DEFINITION(t.object_id) AS Definition
- FROM sys.triggers t JOIN sys.objects o ON t.parent_id=o.object_id
- JOIN sys.schemas s ON o.schema_id=s.schema_id WHERE s.name=N'announcements';
--- Mevcut runtime baglaminda; DBA kimligi sonucu runtime yetkisi sayilmaz.
-SELECT * FROM sys.fn_my_permissions(N'announcements.SourceJobs',N'OBJECT');
-SELECT * FROM sys.fn_my_permissions(N'announcements.SourceOverrides',N'OBJECT');
-SELECT * FROM sys.fn_my_permissions(N'announcements.DraftRevisions',N'OBJECT');
-SELECT * FROM sys.fn_my_permissions(N'announcements.Preparations',N'OBJECT');
+SELECT DB_NAME() AS CurrentDatabase, ORIGINAL_LOGIN() AS LoginIdentity;
+SELECT [Version] FROM [HangFire].[Schema];
+SELECT Id,LastHeartbeat FROM [HangFire].[Server];
+SELECT Queue,COUNT_BIG(*) AS Jobs FROM [HangFire].[JobQueue] GROUP BY Queue;
+SELECT * FROM sys.fn_my_permissions(N'security.Roles',N'OBJECT');
+SELECT * FROM sys.fn_my_permissions(N'announcements.MailCommands',N'OBJECT');
+SELECT * FROM sys.fn_my_permissions(N'ops.OperationEvents',N'OBJECT');
 ```
 
-Mevcut Database Contract erişim/session/audit/ops/resources izinleri korunur.
-In Use: InUseRecords SELECT/INSERT/UPDATE, InUseRefresh SELECT/UPDATE; audit INSERT.
-OCO delta: DraftRevisions ve Preparations SELECT/INSERT; SourceJobs ve SourceOverrides
-SELECT/INSERT/UPDATE. Audit/history UPDATE/DELETE, db_owner veya runtime DDL verilmez.
-Eksik/disabled/untrusted kısıt veya izin farkı kurulum engelidir; envanter sırasında
-repair/grant verilmez. 014-018 mevcut kayıtları silmez; upgrade koruma testi ve yedek
-zorunludur. Kurumsal veri üzerinde yerel fixture/harness çalıştırılmaz.
+İzin sorgusu runtime bağlamında yapılır; DBA sonucu runtime yetkisi sayılmaz.
+Kurumsal DB'de yerel harness/fixture kesinlikle çalıştırılmaz.
 
-### 4. Worker ve Hangfire Önkoşulları
+### 4. Eşleşen Kurulum ve Foreground Worker
 
-OCO kaynak toplama için ayrı Worker gerekir. API/UI tek başına kaynak işini
-yürütemez. Bu teslimat mevcut foreground/console hostunu içerir; Windows Service
-desteği, kurulumu ve gözetimsiz işletim ertelenmiştir. Worker için .NET 8
-Microsoft.NETCore.App gerekir; gerçek runtimeconfig/metadata kontrol edilir.
-Hosting sahibi onaylı dizin, çalıştıran kimlik, açık tutulacak operatör oturumu,
-log/config ACL ve durdurma/kurtarma sorumlusunu belirler. Bu şart olmadan OCO kaynak
-işinin çalışabilir olduğu söylenmez; özellik sırf kabul almak için kapatılmaz.
-API ve Worker aynı ayrılmış DB, Hangfire schema, açık queue ve profile ayarlarını
-kullanır. SQL yöneticisi Hangfire.SqlServer 1.8.6 paketinin tools/install.sql
-prosedürüyle schema 9'u ayrı kontrollü adımda hazırlar; runtime PrepareSchema=false
-kalır. Yalnız o Hangfire schema'sına SELECT/INSERT/UPDATE/DELETE gerekir; diğer
-schema'ların DELETE yasağı değişmez. Var olan başka iş kuyruğu taranmaz.
-Announcements:Enabled, AnnouncementSource:Enabled ve Hangfire:Enabled ayrı
-ayarlar; corporate source/profile izin kanıtı yoksa kaynak işi açılmaz. Fixture,
-Demo, Mock, LocalDB, yerel anahtar veya Start-Local.ps1 sunucuya taşınmaz.
+Ayrı onaylı bakım penceresinde uygulama yazıları ve kuyruk tüketimi durdurulur.
+Yedek ve DBA kontrollerinden sonra aynı SHA API/UI/Worker kurulur; eski/yeni
+karışımında kullanıcı kabulü yapılmaz. Mevcut web.config/appsettings.Test.json,
+bağlantı/secret, ring, API adresi ve proxy ayarları korunur. Sadece gözden
+geçirilmiş fark uygulanır; web.config JSON değildir.
 
-Eşleşen payload ve server-owned Test profili doğrulandıktan, ayrı çalıştırma onayı
-alındıktan sonra mevcut konsol yöntemi:
+API ve Worker'da aynı `ConnectionStrings:SecureOpsDb`, `Hangfire:Enabled`,
+`Hangfire:SchemaName`, `Hangfire:Queue`, `Hangfire:PrepareSchema=false`,
+`AnnouncementSource:Enabled`, `CollectionProvider`, `ServiceProvider` ve
+`AnnouncementSource:Profiles:{profile}:CollectionId`/diğer onaylı profil alanları
+kullanılır. Worker IIS ortamını/AppPool kimliğini devralmaz. Mevcut onaylı
+runtime hesabının gerçek yerel oturumu gerekir; runas /netonly DPAPI kimliğini
+değiştirmez. Config/asset okuma, kendi log dizinine yazma için dar ACL sağlanır.
+Yerel Demo/Mock/Simulation/Fixture/LocalDB ve test ringleri sunucuya taşınmaz.
 
 ```powershell
-Set-Location -LiteralPath '<onayli Worker payload dizini>'
-$env:DOTNET_ENVIRONMENT = 'Test' # Yalniz bu onayli foreground sureci
+whoami
+Set-Location -LiteralPath 'D:\secureops_worker'
+$env:DOTNET_ENVIRONMENT = 'Test'
 dotnet .\SecureOps.Worker.dll
 ```
 
-Terminal açık tutulur. Ctrl+C graceful shutdown ister; zorla kapatma graceful
-kanıtı değildir. Yeniden aynı dizin/config ile başlatma kayıtlı işler ve aynı
-queue üzerinden devam eder. Bu prosedür servis kurulumu veya otomatik başlatma
-sağlamaz. DB lease/attempt ve eski completion reddi mevcut kurtarma sınırlarıdır.
+`SecureOps job server started` **ve güncel SQL heartbeat** birlikte görülmeli.
+Bir yetkili OCO kaynak işi aynı queue üzerinden terminal SourceJobs sonucuna
+ulaşmalı; öneri ayrıca incelenip uygulanmalı. Konsol açık kalır. Ctrl+C sonrası
+`SecureOps job server stopped` beklenir; aynı kimlik/dizin/config ile yeniden
+başlatılır. Servis kurulumu/otomatik başlatma/gözetimsiz işletim sağlanmaz.
 
-### 5. Ayrı Kurulum Onayından Sonra: Eşleşen API/UI/Worker
+### 5. İlk Kabul: Dış Yazılar Kapalı
 
-Bu adım bu hazırlık görevinin kapsamında çalıştırılmaz. Zorunlu kapılar ve yedekler
-onaylandıktan sonra bakım penceresinde uygulama yazıları/kuyruk tüketimi durdurulur;
-binary/config, SQL recovery point, ring/rapor/preparation/asset yedekleri doğrulanır.
-DBA yalnız eksik onaylı şema farkını uygular; sonra aynı SHA'nın API/UI/Worker
-payload'ları mevcut kontrollü prosedürle kurulur. Worker eski binary ile yeni
-schema'ya başlatılmaz. Eski/yeni bileşen karışımı desteklenmez; bakım penceresi içinde
-eşleşme tamamlanmadan kullanıcı kabulü başlatılmaz. Server-owned `web.config`,
-`appsettings*.json`, pilot politikası, sırlar, ring/log/rapor dizinleri korunur.
-Yeni approval veya pilot aktivasyonu eklenmez. Açılmış payload için her bileşenin
-`manifests/{api,ui,worker}-files.json` dosyasındaki göreli yol/boyut/hash doğrulanır:
+`ReadOnlyIntegrationMode=true`, `ControlledTestWritesEnabled=false`,
+`SourceCloseEnabled=false` korunur. `AnnouncementMail:Enabled=false`,
+`SelfTestEnabled=false`, `SendEnabled=false` kalır. Kaynak okuma ve yerel
+atama/cevap/taslak/rol/preparation kayıtları dış Jira/BPM/mail yazıları değildir.
 
-```powershell
-$Payload = '<yalniz yeni payload dosyalarinin acildigi dizin>'
-$Manifest = '<ilgili api-files.json, ui-files.json veya worker-files.json>'
-foreach ($Entry in (Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json)) {
-    $File = Get-Item -LiteralPath (Join-Path $Payload $Entry.path)
-    if ($File.Length -ne $Entry.bytes -or
-        (Get-FileHash -LiteralPath $File.FullName -Algorithm SHA256).Hash -ne $Entry.sha256) {
-        throw 'DUR: payload uyusmazligi.'
-    }
-}
-```
+Gerçek login, capability, session restart, kayıtlı arama/sayfalama, yetkisiz
+doğrudan route/API reddi ve audit kontrol edilir. In Use atanan kişi, kaydeden
+ve RFC/Bildiren ayrı görülmeli; kısmi kayıt, eksik kontrol odağı, seçili toplu
+fark, çakışmada girdilerin korunması ve Excel denenir. Atama opsiyoneldir;
+başka atanmış kaydı incelemek yetki varsa mümkündür. Kaydetmek kaynak kapatmaz.
 
-### 6. Operatör Kabulü ve Durma Koşulları
+Erişim talepleri/kullanıcılar filtre/sayfa/detail dönüşü; yeni iş rolü için
+etkilenen kullanıcı/etkin hak farkı ve açık uygulama denenir. Admin korumalı;
+kendi yetkisini yükseltme ve son Admin'i kaldırma/kapama reddedilir. Yeni mail
+rolleri başka yetkili yönetici tarafından gözden geçirilerek atanır; SQL'den
+kullanıcı rolü eklenmez. Operator rolünün kapsamı iş unvanından türetilmez.
 
-- Mevcut onaylı oturumla health, access/capability, audit-store, SignalR ve statik
-  CSS/JS/font/marka dosyaları kontrol edilir. Yeni giriş akışı kurulmaz; antiforgery
-  kapatılmaz. Onaylı restart sonrası kalıcı ring/oturum davranışı ayrıca doğrulanır.
-- `ReadOnlyIntegrationMode=true`, `ControlledTestWritesEnabled=false`,
-  `SourceCloseEnabled=false` korunur. Mevcut provider/session ayarı yeniden istenmez.
-  Kaynak okuma ve WASAS yerel kalıcılığı, Jira/upload/BPM/source-close yazıları değildir.
-- Yetkili operatör yalnız açık In Use yenilemeyi çalıştırır: her sunucunun kendi RFC'si,
-  exact bağlı OR ve `İlgili talebi bildiren` görünümü kontrol edilir. Ardından liste/
-  detaya tekrar giriş yalnız kayıtlı DB verisini göstermelidir. Dört sunucu ve seçim
-  listesi aynı kimlikleri taşımalı; klavye, üç soru, seçili toplu fark onayı, eksik soru
-  yönlendirmesi, taslak, çatışma, isteğe bağlı inceleyici ve Excel denenmelidir.
-- Bildiren, İstem Sahibi/sunucu sahibi/kurulum operatörü/inceleyici değildir. Erişim
-  reddi, eksik/belirsiz RFC ve saklanan eski kanıt görünür kalmalıdır. Türkçe/ampersand
-  tek geçişte okunur; kodlanmış markup düz metindir. İnceleyici kayıtlı güvenilir
-  profilden gelir; eksik/aynı adlar kimlikleri birleştirmez. Otomatik atama yapılmaz.
-- Resources kişisel/grup erişimi ve SDM mevcut salt-okunur durumları korunur.
-  Jira, upload, BPM veya kaynak kapama etkinleştirilmez. Dolu Virtual PC User ve
-  ayrı İstem Sahibi eşlemesi bağımsız eksiklerdir; bunlar tekrar A/B toplama sebebi değildir.
-- OR: kaynak yenileme açık eylemdir; arama/sayfalama kayıtlı veriyi okur. Üç beyan
-  onay değildir. ServerRequest exact-record policy yoluna sahiptir; SoftwareInstallation
-  ve ServerRetirement eşleme engelleri korunur. İlk kabulde gerçek Jira POST yapılmaz.
-- OCO: yetkili sahip kayıtlı taslaktan kaynak işi ister; Worker sonucu kendiliğinden
-  uygulamaz. Sürüm kontrollü proposal review/apply, alıcı seçimi, preparation history
-  ve değişmez indirme denenir. Bunlar uygulama DB yazılarıdır, mail gönderimi değildir.
-  Corporate kaynak profili doğrulanmadıysa bu adım eksik yazılır, Simulation başarı
-  sayılmaz. SMTP/dispatch fence ve kayıtları değişmez; gerçek mail gönderilmez.
-- Hash/sürüm, auth, şema, ring, varlık, yetki veya kanıt kaybında durun. Eski binary'nin
-  yeni JSON kanıtını koruyan güvenli bir yazar olduğu kanıtlanmadı. Geri dönüşten önce
-  yerel/dış yazmaları durdurma ve binary/config/SQL recovery kararı ayrı onay ister.
-  Audit, raporlar ve additive tablolar silinmez; SQL restore veri kaybı riski taşır.
-- Sonraki tek ServerRequest Jira-only pilotu için yukarıdaki güncel positive-policy,
-  Jira alan/kimlik/izin ve otoritatif duplicate-correlation checklist tamamlanmalıdır.
-  Exact source ID/fingerprint/scope, mapping/ruleset, ApprovalReference/TrackingReason
-  ve UTC expiry iş sahibinden gelir; operatör beyanı bunların yerine geçmez.
-  Kaynak yorum/kapama, native watcher ve dış mail ayrı kapsamdır.
+OCO kaynak → öneri incele/uygula → alıcı düzenleme → kaydet → hazırlık → .eml
+indirme doğrulanır. Alıcı silme sonraki kaynak yenilemesinde geri gelmemeli.
+Özgün altı görselin bytes/hash'i doğrulanır; main.jpg PNG olarak gömülür.
+AssetDirectory özel mutlak dizindir; onaylı Footer ve bundle eşlemesi ayrı
+server-owned config'tir. Hazırlık arşivi gönderilmiş mail anlamına gelmez.
+
+### 6. Ayrı Kontrollü Kendime Mail Denemesi
+
+Mail/relay sahibi şu somut bilgileri doğrular: onaylı host/port, StartTls veya
+SslOnConnect, güvenilir sertifika, kimlik doğrulama yöntemi, kullanıcı Mail'inin
+From olarak kabulü, Actor veya Configured envelope politikası, izinli tam alıcı
+domainleri, Message-ID/queue-ID ile yetkili relay sonuç sorgusu ve uzlaştırma sahibi.
+`PolicyRevision` bu karara bağlanır. Gerekiyorsa UserName/Password yalnız
+server-owned korumalı config'te kalır; görünür From değildir.
+
+Onaydan sonra API/Worker'ın eşleşen `AnnouncementMail` ayarlarında yalnız
+Enabled/SelfTestEnabled açılır, **SendEnabled=false** kalır. Operatörde Drafts,
+Prepare ve SelfTest gerekir. Kendi kayıtlı Mail'i olmayan kişi için sessiz
+ortak gönderen kullanılmaz; güvenilir profil güncellenir ve taslak açıkça kaydedilir.
+Tek onaylı sentetik TEST duyurusu hazırlanır; başlık/içerik, From, **yalnız
+operatörün Mail'i**, boş Cc, envelope ve sürüm ekranda incelenir. Denemeyi onayla
+tek kez kullanılır; kayıtlı sonuç aynı komuttan okunur. Relay kabulü, Outlook
+görünümü ve gerçek gelen kutusu ayrı kanıtlardır. Dağıtım listesine gönderilmez.
+
+Timeout/Unknown/Partial durumunda yeni deneme/dağıtım yapılmaz. Mail yöneticisi
+Message-ID, komut, UTC ve kabul/red alıcılarını yetkili relay kaydıyla uzlaştırır.
+Sıfır arama sonucu yokluk kanıtı değildir; SQL satırı silme/state reset veya
+otomatik retry yoktur. Ayrı gerçek dağıtım, nihai alıcı/içerik onayı ve Send
+yetkisi/fence kararı olmadan açılmaz. Tek draft için tek dağıtım niyeti kalıcıdır.
+
+### 7. OR ve Kaynak Kapatma: Kalan Somut Girdiler
+
+| Sahip | Eksik kanıt/karar | Engellenen işlem |
+|---|---|---|
+| İş sahibi | Exact ServerRequest kaynak ID/fingerprint/kapsam, mapping/ruleset, karar referansı/gerekçe ve UTC süre; mevcut ADR-0018 kararı | Tek gerçek Jira-only pilotu |
+| Jira sahibi | Güncel SDM ürün/proje/issue-type zorunlu alanları, team/requester custom field şekli, tam requester/operator eşlemesi, Browse/Create ve gerekiyorsa reporter/assign izinleri | Gerçek Jira create |
+| Jira işletim sahibi | OR + attempt için otoritatif benzersiz correlation/arama görünürlüğü, yokluk semantiği ve sorumlu uzlaştırıcı | Belirsiz sonuçtan sonraki karar |
+| Turuncu Hat/BPM sahibi | Exact OR final-state selector/yanıtı, açık/kapalı durum geçişi, benzersiz activity, koşullu güncelleme veya açık yarış-risk kararı, kaynak sürümü/kanıt zamanı ve varsa gerçek kapatan aktör alanı | BPM yorum/kapatma ve doğrulanmış closure |
+| Mapping sahibi | SoftwareInstallation için kendi alan/etiket politikası; ServerRetirement için kendi takip/alan politikası | Bu iki türün yayını |
+
+ServerRequest pozitif yolu uygulanmıştır; diğer türler SunucuTalep'e çevrilmez.
+Beyan onay değildir; kullanıcıdan hash yazması istenmez. Jira-only niyet sonradan
+close flag açıldığı için yükselmez. Bilinen key veya belirsiz create ikinci
+create'i engeller. Requester custom field native watcher değildir. Reporter/
+assignee mevcut yapılandırılmış politika ve tam eşleme ile belirlenir; transport
+kimliği ayrıdır. Kaynak yorum yalnız desteklenen close işleminde seçilen
+BPM_Actvty.m_comments'e gider; SourceCloseEnabled=false iken bu çağrı da yoktur.
+Şu an corporate post-state sözleşmesi olmadığından close adapter çağrısı engellidir.
+Acknowledgment veya geçmiş Completed etiketi doğrulanmış kapanış sayılmaz.
+
+### 8. Durma ve Geri Dönüş
+
+Hash/auth/schema/grant/ring/asset farkı, beklenmeyen dış yazı veya kanıt kaybında
+durun. Geri dönüş öncesi yazıları/tüketimi durdurun; eşleşen binary/config ve SQL
+recovery kararı ayrı onay ister. Yeni kolon/tablo/audit/mail intent silinmez.
+SQL restore yeni kayıt kaybı riski taşır ve dış SMTP/Jira etkisini geri almaz.
+Kurulum, push, kurumsal self-test/Jira/BPM bu teslimat hazırlığında yapılmadı.
 <!-- TEST-RELEASE-RUNBOOK:END -->
 
 ## RFC Reporter Source/UI Acceptance, 2026-09-12

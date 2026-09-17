@@ -432,7 +432,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
         });
 
     /// <inheritdoc />
-    public async Task<OperationalRecord> RecordCompletedAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken)
+    public async Task<OperationalRecord> RecordCompletedAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken,
+        SecureOps.Shared.Contracts.OperationalRecords.SourceClosureObservation observation)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -442,10 +443,13 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
             {
                 throw new InvalidOperationException("Workflow completion cannot be persisted from the current state.");
             }
+            if (!observation.Matches(current.SourceRecordId, current.OrCode, current.JiraIssueKey!, correlationId))
+            { throw new InvalidOperationException("Exact verified source closure evidence required."); }
 
             OperationalRecord updated = current with
             {
                 WorkflowState = OperationalRecordWorkflowState.Completed,
+                SourceClosureVerified = true,
                 LastErrorCode = null,
                 CorrelationId = correlationId,
                 UpdatedAt = _timeProvider.GetUtcNow(),

@@ -239,7 +239,8 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
         {
             AccessServiceResult<EnsureAccessUserResult> current = await access.GetCurrentAsync(principal, context, token);
             if (!current.IsSuccess || current.Value!.User.Status != AccessStatus.Approved
-                || !current.Value.User.Capabilities.Contains(Capabilities.AnnouncementDrafts))
+                || !current.Value.User.Capabilities.Contains(Capabilities.AnnouncementDrafts)
+                || !current.Value.User.Capabilities.Contains(Capabilities.AnnouncementSource))
             { return new(Error: "AccessDenied"); }
             if (!module.Value.Enabled)
             { return new(Error: "AnnouncementsDisabled"); }

@@ -18,6 +18,7 @@ public sealed partial class ResourceSqlTests
         await using var connection = new SqlConnection(configuration.GetConnectionString("SecureOpsDb"));
         Infrastructure.Resources.ResourceActor actor = await CreateActorAsync(connection);
         var users = new SqlAccessRepository(configuration);
+        string administrator = await SqlAccessTestActors.AdminAsync(configuration);
         ApplicationUser? first = null;
         for (int i = 0; i < 4; i++)
         {
@@ -25,7 +26,7 @@ public sealed partial class ResourceSqlTests
                 DisplayName: i < 2 ? "Deniz Örnek" : null);
             EnsureAccessUserResult pending = await users.EnsureUserAsync(principal, true, TimeSpan.Zero, _token);
             AccessMutationResult approved = await users.DecideRequestAsync(pending.PendingRequest!.Id, AccessRequestStatus.Approved,
-                pending.PendingRequest.Version, actor.UserId.ToString("D"), ["InUseReviewer"], "Synthetic display fixture", _token);
+                pending.PendingRequest.Version, administrator, ["InUseReviewer"], "Synthetic display fixture", _token);
             first ??= approved.User;
         }
         var repository = new SqlInUseRepository(configuration);

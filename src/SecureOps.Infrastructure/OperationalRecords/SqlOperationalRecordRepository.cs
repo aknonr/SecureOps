@@ -276,9 +276,9 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
 
             await UpdateStateAsync(connection, transaction, current.Id, OperationalRecordWorkflowState.CreateRequested, correlationId, null, cancellationToken);
             await connection.ExecuteAsync(Command("""
-                UPDATE ops.JiraTransfers SET SourceCloseRequested = @SourceCloseRequested
+                UPDATE ops.JiraTransfers SET SourceCloseRequested = @SourceCloseRequested, InputVersion=@InputVersion
                 WHERE OperationalRecordId = @Id AND MappingVersion = @MappingVersion;
-                """, new { current.Id, MappingVersion = mappingVersion, SourceCloseRequested = sourceCloseRequested }, cancellationToken, transaction));
+                """, new { current.Id, MappingVersion = mappingVersion, SourceCloseRequested = sourceCloseRequested, InputVersion = current.Version }, cancellationToken, transaction));
             await WriteHistoryAsync(connection, transaction, current.Id, OperationalRecordWorkflowState.CreateRequested, actor, correlationId, null, cancellationToken);
             await UpdateStateAsync(connection, transaction, current.Id, OperationalRecordWorkflowState.CreatingJira, correlationId, null, cancellationToken);
             await WriteHistoryAsync(connection, transaction, current.Id, OperationalRecordWorkflowState.CreatingJira, actor, correlationId, null, cancellationToken);
@@ -341,11 +341,9 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
                 return new WorkflowAcquireResult(WorkflowAcquireDisposition.AlreadyClaimed, current);
             }
 
-            if (current.WorkflowState == OperationalRecordWorkflowState.ClosingOperationalRecord)
+            if (current.ReconciliationRequired || current.WorkflowState == OperationalRecordWorkflowState.ClosingOperationalRecord)
             {
-                return ClaimOwnedBy(current, actor)
-                    ? new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, current)
-                    : new WorkflowAcquireResult(WorkflowAcquireDisposition.Conflict, current);
+                return new WorkflowAcquireResult(WorkflowAcquireDisposition.ReconciliationRequired, current);
             }
 
             if (current.WorkflowState is not (OperationalRecordWorkflowState.JiraCreated or OperationalRecordWorkflowState.OperationalRecordCloseFailed))
@@ -365,7 +363,8 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         });
 
     /// <inheritdoc />
-    public async Task<OperationalRecord> RecordCompletedAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken)
+    public async Task<OperationalRecord> RecordCompletedAsync(Guid id, string actor, string correlationId, CancellationToken cancellationToken,
+        SecureOps.Shared.Contracts.OperationalRecords.SourceClosureObservation observation)
     {
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
@@ -376,6 +375,10 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         {
             throw new InvalidOperationException("Workflow completion cannot be persisted from the current state.");
         }
+        if (!observation.Matches(current.SourceRecordId, current.OrCode, current.JiraIssueKey!, correlationId))
+        { throw new InvalidOperationException("Exact verified source closure evidence required."); }
+        await connection.ExecuteAsync(Command("UPDATE ops.JiraTransfers SET ClosureEvidenceJson=@json WHERE OperationalRecordId=@id",
+            new { id, json = System.Text.Json.JsonSerializer.Serialize(observation) }, cancellationToken, transaction));
 
         await UpdateStateAsync(connection, transaction, id, OperationalRecordWorkflowState.Completed, correlationId, null, cancellationToken);
         await WriteHistoryAsync(connection, transaction, id, OperationalRecordWorkflowState.Completed, actor, correlationId, null, cancellationToken);
@@ -395,7 +398,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         _ = await GetForUpdateAsync(connection, transaction, id, cancellationToken)
             ?? throw new KeyNotFoundException("Operational record was not found.");
         await UpdateStateAsync(connection, transaction, id, state, correlationId, errorCode, cancellationToken);
-        if (stage == WorkflowFailureStage.JiraCreate)
+        if (stage == WorkflowFailureStage.JiraCreate || reconciliationRequired)
         {
             const string transferUpdate = """
                 UPDATE ops.JiraTransfers SET ReconciliationRequired = @ReconciliationRequired,
@@ -443,6 +446,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await Access.SqlAccessRepository.LockAdministrationAsync(connection, transaction, cancellationToken);
         OperationalRecordRow? row = await GetForUpdateAsync(connection, transaction, id, cancellationToken);
         if (row is null)
         {
@@ -501,7 +505,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         return connection.ExecuteAsync(Command(sql, new { Id = id, State = state.ToString(), ErrorCode = errorCode, CorrelationId = correlationId }, cancellationToken, transaction));
     }
 
-    private static Task<int> WriteHistoryAsync(
+    private static async Task<int> WriteHistoryAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         Guid id,
@@ -518,7 +522,12 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
                 COALESCE((SELECT TOP (1) SourceCloseRequested FROM ops.JiraTransfers
                     WHERE OperationalRecordId = @Id ORDER BY CreatedAt DESC), 0));
             """;
-        return connection.ExecuteAsync(Command(sql, new { Id = id, State = state.ToString(), Actor = actor, CorrelationId = correlationId, ErrorCode = errorCode }, cancellationToken, transaction));
+        int count = await connection.ExecuteAsync(Command(sql, new { Id = id, State = state.ToString(), Actor = actor, CorrelationId = correlationId, ErrorCode = errorCode }, cancellationToken, transaction));
+        if (state is OperationalRecordWorkflowState.CreateRequested or OperationalRecordWorkflowState.CreatingJira or OperationalRecordWorkflowState.JiraCreated
+            or OperationalRecordWorkflowState.JiraCreateFailed or OperationalRecordWorkflowState.ClosingOperationalRecord
+            or OperationalRecordWorkflowState.OperationalRecordCloseFailed or OperationalRecordWorkflowState.Completed)
+        { await AppendWorkflowEventAsync(connection, transaction, id, state, actor, correlationId, cancellationToken); }
+        return count;
     }
 
     private static CommandDefinition Command(string sql, CancellationToken cancellationToken) =>
@@ -548,6 +557,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         CorrelationId = row.CorrelationId,
         MappingVersion = row.MappingVersion,
         SourceCloseRequested = row.SourceCloseRequested,
+        SourceClosureVerified = row.SourceClosureVerified,
         IdempotencyKey = row.IdempotencyKey,
         ReconciliationRequired = row.ReconciliationRequired,
         RetryCount = row.RetryCount,
@@ -580,6 +590,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
             r.LastSourceValidationAt, r.ClaimedBy, r.ClaimedAt, r.ClaimExpiresAt, CONVERT(bigint, r.RowVersion) AS Version,
             transfer.MappingVersion, transfer.IdempotencyKey, transfer.JiraIssueKey, transfer.ReconciliationRequired,
             COALESCE(transfer.SourceCloseRequested, 0) AS SourceCloseRequested,
+            CAST(CASE WHEN JSON_VALUE(transfer.ClosureEvidenceJson,'$.State')='VerifiedClosed' THEN 1 ELSE 0 END AS bit) AS SourceClosureVerified,
             r.SdmEvaluationJson
         FROM ops.OperationalRecords r
         LEFT JOIN ops.JiraTransfers transfer ON transfer.OperationalRecordId = r.OperationalRecordId
@@ -606,6 +617,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         public string? CorrelationId { get; init; }
         public string? MappingVersion { get; init; }
         public bool SourceCloseRequested { get; init; }
+        public bool SourceClosureVerified { get; init; }
         public string? IdempotencyKey { get; init; }
         public bool ReconciliationRequired { get; init; }
         public int RetryCount { get; init; }

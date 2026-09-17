@@ -1,6 +1,58 @@
 # Planned announcements: implemented API and UI
 
-## Mail And Access Continuation, 2026-09-15
+## Current Mail Contract, 2026-09-17
+
+ADR-0022 implements opt-in SMTP through the existing foreground Worker. This
+supersedes the absence statements in the historical checkpoint below, not its
+immutable preparation evidence. Corporate sending remains disabled and unverified.
+
+All commands require approved persisted access, `Announcements.Drafts` and ownership.
+Source submission/review/apply additionally requires `Announcements.Source`; new
+preparation requires `Announcements.Prepare`. Migration 020 preserves the formerly
+implicit source/preparation permissions. `Announcements.SelfTest` and `.Send` are
+new, unassigned capabilities, including for Admin; authorization does not enable SMTP.
+
+`POST /api/v1/announcements/mail/preview` accepts only `preparationId` and
+`kind` (`SelfTest` or `Send`). Response includes frozen sender, envelope sender,
+To/Cc, subject, draft/preparation/version, message ID/hash, command ID, expiry and
+protected preview token. Sender is the actor's saved valid Mail, never client From.
+SelfTest has only that Mail in To and empty Cc/Bcc; the actual draft is unchanged.
+`POST mail/confirm` accepts only `previewToken`, returns 200 with durable status,
+and is limited to six confirmations/minute per authenticated principal. Ten-minute
+preview expiry, changed draft/profile/access/relay policy reject new commands.
+An exact replay returns the prior command, even after preview expiry, but remains
+owner/capability protected. `GET /{draftId}/mail` returns at most 100 owned results.
+Responses are no-store. No client actor, transport credential or arbitrary MIME input.
+
+SQL commits immutable intent/bytes/profile and required audit before enqueue. Worker
+rechecks saved actor access/version/Mail, latest draft and relay-policy fingerprint
+inside its claim transaction. States: Queued, Dispatching, Accepted, Partial, Failed,
+Unknown, Denied. Only Queued may be re-enqueued; five-minute expired Dispatching
+becomes Unknown. Hangfire mail attempts have zero automatic retries. DATA ambiguity
+is never a known failure. Acknowledged DATA survives a later QUIT failure. Accepted
+means SMTP acceptance, not inbox delivery. Known rejected recipients remain separate.
+
+One distribution command per draft is enforced by a unique SQL index, including
+failed/denied commands. Pending, partial or unknown commands also block a new
+self-test for that draft. Existing immutable intent is never edited to retry.
+Reconciliation is read-only status/evidence plus accountable relay inspection;
+there is no operator SQL reset, automatic resend or invented remote absence proof.
+New distribution after a terminal failure requires an independently reviewed new
+draft, not copying an uncertain command to evade reconciliation.
+
+`AnnouncementMail` is disabled by default. Exact settings and private credential
+handling are in the current deployment runbook and disabled sample fragment.
+SMTP identity, envelope sender and visible From are distinct. TLS validation stays
+on; plaintext is accepted only for literal loopback in local test environments.
+No new service host, scheduler, SMTP grant or corporate network call is implied.
+
+Original six assets are retained byte-for-byte. Bounds are now 1 MiB per image,
+2 MiB aggregate, six roles, 2048x1024 decoded dimensions, single frame, complete
+PNG/JPEG decode. MIME type follows decoded bytes, including the PNG named .jpg.
+Historical preparations are neither rerendered nor relabelled as sent. Local
+browser/MIME evidence with original assets is not Outlook/inbox acceptance.
+
+## Historical Mail And Access Checkpoint, 2026-09-15
 
 The owner now authorizes real self-test/send and dynamic access management.
 Implementation is NOT complete. The bounded correction uses trusted persisted

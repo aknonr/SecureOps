@@ -23,6 +23,7 @@
   <ItemGroup>
     <!-- Data access -->
     <PackageReference Include="MimeKit" />
+    <PackageReference Include="MailKit" />
     <PackageReference Include="SkiaSharp" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />

@@ -39,12 +39,26 @@ public sealed record InUseAnswer(string ServerId, string Check, string Value, st
 
 /// <summary>Saved review bound to the source version, with server-authenticated provenance.</summary>
 public sealed record InUseDraft(long SourceVersion, IReadOnlyList<InUseAnswer> Answers, string Notes,
-    Guid ReviewedBy, DateTimeOffset ReviewedAt);
+    Guid ReviewedBy, DateTimeOffset ReviewedAt)
+{
+    /// <summary>Trusted profile-at-save display. Historical missing labels are not invented.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReviewedByLabel { get; init; }
+}
 
 /// <summary>Persisted independent In Use aggregate.</summary>
 public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash, long SourceVersion,
     long Version, Guid? AssigneeId, string? AssigneeLabel, InUseDraft? Draft, DateTimeOffset LastSeenAt)
 {
+    /// <summary>Authenticated actor who last changed the optional assignment, not the reviewer or source closer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? AssignedBy { get; init; }
+    /// <summary>Trusted profile-at-assignment display.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AssignedByLabel { get; init; }
+    /// <summary>Server UTC assignment/unassignment time, absent for historical unknown actions.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? AssignedAt { get; init; }
     /// <summary>Local review state, not authoritative source or BPM state.</summary>
     public string Status => Draft is null ? "Unreviewed" : Draft.SourceVersion == SourceVersion ? "Draft" : "Stale";
     /// <summary>Available historical archive versions; populated only by the detail service.</summary>

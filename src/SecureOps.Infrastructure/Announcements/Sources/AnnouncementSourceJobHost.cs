@@ -103,6 +103,10 @@ public sealed class HangfireJobServer(JobStorage storage, JobActivator activator
             options.Queue, job => job.RunAsync(CancellationToken.None), Cron.Minutely(), new RecurringJobOptions());
         new BackgroundJobClient(storage).Create<AnnouncementSourceRecovery>(job => job.RunAsync(CancellationToken.None),
             new Hangfire.States.EnqueuedState(options.Queue));
+        manager.AddOrUpdate<Mail.AnnouncementMailRecovery>("announcement-mail-recovery:" + options.Queue,
+            options.Queue, job => job.RunAsync(CancellationToken.None), Cron.Minutely(), new RecurringJobOptions());
+        new BackgroundJobClient(storage).Create<Mail.AnnouncementMailRecovery>(job => job.RunAsync(CancellationToken.None),
+            new Hangfire.States.EnqueuedState(options.Queue));
         _server = new BackgroundJobServer(new BackgroundJobServerOptions
         {
             Queues = [options.Queue.ToLowerInvariant()],

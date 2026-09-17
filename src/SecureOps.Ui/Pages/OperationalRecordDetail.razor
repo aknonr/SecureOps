@@ -135,11 +135,9 @@ OperationalRecordView.Ownership owner =
                     <MudIcon Icon="@Icons.Material.Filled.HelpOutline" />
                 </span>
                 <div class="so-result-body">
-                    <h2 class="so-panel-title">Jira sonucu doğrulanmalı</h2>
+                    <h2 class="so-panel-title">@(OperationalRecordView.HasJira(_record) ? "Kaynak sonucu doğrulanmalı" : "Jira sonucu doğrulanmalı")</h2>
 <p class="so-panel-text">
-                        Bu kayıt için bir Jira oluşturma denemesi başlatıldı, ancak sonucu
-                        doğrulanamadı. Doğrulama yapılmadan yeni bir oluşturma denemesi mükerrer
-                        Jira kaydı riski taşır.
+                        @OperationalRecordView.StateDetail(_record)
                     </p>
                     @* Whether an issue exists is the first thing to check by hand, so it is stated
                        here rather than only in the Jira panel further down. *@
@@ -211,6 +209,7 @@ OperationalRecordView.Ownership owner =
         { <p>İnceleme taslağı hazırlamak için Jira önizleme yetkisi gerekir. Kayıt ve engelleri aşağıda inceleyebilirsiniz.</p> }
 
         <SoSdmEvidence Record="_record" />
+        <OperationHistoryPanel RecordType="OperationalRecord" RecordId="_record.Id" />
 
         @if (_record.WorkflowState == OperationalRecordWorkflowState.JiraCreated && !_record.SourceCloseRequested)
         {
@@ -853,7 +852,7 @@ if (_access.Can(Capabilities.OperationalRecordsView))
                 OperationalRecordWorkflowState.JiraCreated when !transfer.SourceCloseRequested =>
                     "Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı.",
                 OperationalRecordWorkflowState.Completed =>
-                    $"Aktarım tamamlandı · {transfer.JiraIssueKey}",
+                    $"Jira kaydı korunuyor · {transfer.JiraIssueKey}. Kaynak doğrulamasını kayıt ayrıntısından kontrol edin.",
                 OperationalRecordWorkflowState.OperationalRecordCloseFailed =>
                     $"Jira kaydı oluşturuldu ({transfer.JiraIssueKey}), kaynak kapatma tamamlanmadı",
                 _ => $"İş akışı durumu: {OperationalRecordView.StateLabel(transfer.WorkflowState)}"

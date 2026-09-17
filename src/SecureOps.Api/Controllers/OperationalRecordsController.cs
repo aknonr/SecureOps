@@ -46,7 +46,8 @@ public sealed class OperationalRecordsController : ControllerBase
         _timeProvider = timeProvider;
         _readOnlyIntegrationMode = operationalOptions.Value.ReadOnlyIntegrationMode;
         _controlledTestWritesEnabled = operationalOptions.Value.ControlledTestWritesEnabled;
-        _sourceCloseEnabled = operationalOptions.Value.SourceCloseEnabled && !_readOnlyIntegrationMode;
+        _sourceCloseEnabled = operationalOptions.Value.SourceCloseEnabled && !_readOnlyIntegrationMode
+            && operationalOptions.Value.SourceProvider is "Fake" or "Simulation";
         _simulationMode = string.Equals(
                 operationalOptions.Value.SourceProvider,
                 "Simulation",
@@ -309,6 +310,7 @@ public sealed class OperationalRecordsController : ControllerBase
         RecommendedClassification = record.SdmEvaluation?.Result.RecommendedClassification,
         SourceCloseRequested = record.SourceCloseRequested,
         SourceCloseEnabled = _sourceCloseEnabled,
+        SourceClosureVerified = record.SourceClosureVerified,
         SdmCandidateRecommended = record.SdmEvaluation?.Result.SdmCandidateRecommended == true,
         RuleSetVersion = record.SdmEvaluation?.Result.RuleSetVersion,
         ReasonCodes = record.SdmEvaluation?.Result.ReasonCodes ?? [],
@@ -325,7 +327,6 @@ public sealed class OperationalRecordsController : ControllerBase
         && (record.WorkflowState == OperationalRecordWorkflowState.JiraCreateFailed
             || (record.SourceCloseRequested && _sourceCloseEnabled && !string.IsNullOrWhiteSpace(record.JiraIssueKey)
                 && record.WorkflowState is OperationalRecordWorkflowState.JiraCreated
-                    or OperationalRecordWorkflowState.ClosingOperationalRecord
                     or OperationalRecordWorkflowState.OperationalRecordCloseFailed));
 
     private bool IsValidIdempotencyKey(string? idempotencyKey) =>
@@ -356,7 +357,7 @@ public sealed class OperationalRecordsController : ControllerBase
 
     private static string PresentationState(OperationalRecord record) => record.WorkflowState switch
     {
-        OperationalRecordWorkflowState.Completed => OperationalRecordPresentationStates.Completed,
+        OperationalRecordWorkflowState.Completed when record.SourceClosureVerified => OperationalRecordPresentationStates.Completed,
         OperationalRecordWorkflowState.JiraCreated when !record.SourceCloseRequested
             && record.JiraIssueKey is not null && !record.ReconciliationRequired => OperationalRecordPresentationStates.SourceOpen,
         OperationalRecordWorkflowState.Eligible or OperationalRecordWorkflowState.Previewed when record.JiraEligible =>

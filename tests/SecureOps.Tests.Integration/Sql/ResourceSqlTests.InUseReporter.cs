@@ -34,7 +34,8 @@ public sealed partial class ResourceSqlTests
         (Guid Id, string RecordJson)[] existing = newFixtureOnly ? (await connection.QueryAsync<(Guid Id, string RecordJson)>("SELECT Id, RecordJson FROM ops.InUseRecords")).ToArray() : [];
         Infrastructure.Resources.ResourceActor actor = await CreateActorAsync(connection);
         var users = new SqlAccessRepository(configuration);
-        ApplicationUser user = (await users.GetUserAsync(actor.UserId, _token))!;
+        string administrator = await SqlAccessTestActors.AdminAsync(configuration);
+        ApplicationUser user = (await users.GetUserAsync(administrator, _token))!;
         var reviewers = new List<ApplicationUser>();
         CorporatePrincipal? trusted = null;
         foreach (string? name in new[] { "Önceki sentetik profil", "Örnek Gözlemci", "Örnek Gözlemci", null })
@@ -43,7 +44,7 @@ public sealed partial class ResourceSqlTests
             trusted ??= identity;
             EnsureAccessUserResult pending = await users.EnsureUserAsync(identity, true, TimeSpan.Zero, _token);
             AccessMutationResult approved = await users.DecideRequestAsync(pending.PendingRequest!.Id, AccessRequestStatus.Approved,
-                pending.PendingRequest.Version, actor.UserId.ToString("D"), ["InUseReviewer"], "Synthetic reviewer", _token);
+                pending.PendingRequest.Version, administrator, ["InUseReviewer"], "Synthetic reviewer", _token);
             reviewers.Add(approved.User!);
         }
         IApplicationAccessService access = Substitute.For<IApplicationAccessService>();
@@ -61,7 +62,8 @@ public sealed partial class ResourceSqlTests
             Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = true }),
             new EnterpriseIntegrationHealthState(), new EnterpriseIntegrationTelemetry(), NullLogger<TuruncuHatOperationalRecordClient>.Instance);
         IInUseRepository repository = newFixtureOnly ? new InMemoryInUseRepository(Substitute.For<IAuditWriter>()) : new SqlInUseRepository(configuration);
-        var service = new InUseService(repository, source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance);
+        var service = new InUseService(repository, source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance,
+            identities: new SqlInUseIdentities(configuration));
         var principal = new ClaimsPrincipal();
         var context = new AccessOperationContext("synthetic-reporter", "local", null);
         async Task<InUseRecord> Refresh()
@@ -77,6 +79,13 @@ public sealed partial class ResourceSqlTests
         InUseResult<InUseRecord> assigned = await service.AssignAsync(principal, context, record.Id, new(record.Version, reviewers[0].Id, "Synthetic manual assignment"), _token);
         assigned.Error.Should().BeNull();
         record = assigned.Value!;
+        record.AssignedBy.Should().Be(user.Id);
+        record.AssignedAt.Should().NotBeNull();
+        if (!newFixtureOnly)
+        {
+            string evidence = await connection.QuerySingleAsync<string>("SELECT EvidenceJson FROM ops.OperationEvents WHERE RecordId=@id AND Action='InUseAssigned'", new { id = record.Id.ToString("D") });
+            evidence.Should().Contain(user.Id.ToString()).And.Contain(reviewers[0].Id.ToString());
+        }
         EnsureAccessUserResult refreshed = await users.EnsureUserAsync(trusted! with { DisplayName = "Sentetik İnceleyici" }, true, TimeSpan.Zero, _token);
         refreshed.User.Id.Should().Be(reviewers[0].Id);
         refreshed.User.Roles.Should().BeEquivalentTo(reviewers[0].Roles);

@@ -25,8 +25,9 @@ const out = path.resolve(process.argv[6]);
     let page;
     async function role(roles) {
         const current = await json(admin, '/api/v1/access/users/' + me.userId);
+        const catalog = await json(admin, '/api/v1/access/roles');
         await json(admin, `/api/v1/access/users/${me.userId}/roles`, { method: 'PUT',
-            data: { roles, expectedVersion: current.version, reason: 'Synthetic isolated SDM review journey' } });
+            data: { roles, expectedVersion: current.version, roleVersions: Object.fromEntries(catalog.filter(r => roles.includes(r.code)).map(r => [r.code, r.version])) } });
         await actor.dispose();
         actor = await apiContext(request, api, 'team-lead');
         if (context) await context.close();
@@ -204,8 +205,10 @@ const out = path.resolve(process.argv[6]);
         console.log(JSON.stringify({ checks }, null, 2));
     } finally {
         const latest = await json(admin, '/api/v1/access/users/' + me.userId);
+        const catalog = await json(admin, '/api/v1/access/roles');
         await json(admin, `/api/v1/access/users/${me.userId}/roles`, { method: 'PUT', data: {
-            roles: original.roles, expectedVersion: latest.version, reason: 'Restore synthetic journey roles' } });
+            roles: original.roles, expectedVersion: latest.version,
+            roleVersions: Object.fromEntries(catalog.filter(r => original.roles.includes(r.code)).map(r => [r.code, r.version])) } });
         await browser.close();
         await actor.dispose();
         await admin.dispose();

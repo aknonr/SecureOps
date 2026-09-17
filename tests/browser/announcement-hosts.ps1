@@ -1,9 +1,15 @@
-param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly, [switch]$SourceReview, [switch]$OperationalRecordSimulation)
+param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly, [switch]$SourceReview, [switch]$OperationalRecordSimulation, [string]$OriginalAssetDirectory, [ValidateRange(1024,65535)][int]$LocalMailPort = 25251, [switch]$ResumeWorkerOnly)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $EvidenceRoot).Path
 $payload = (Resolve-Path -LiteralPath $PayloadRoot).Path
+if ($ResumeWorkerOnly) {
+    if ($ResumeApiOnly -or !$SourceReview) { throw 'Resume exactly one supported host.' }
+    $previous = Get-Content -LiteralPath "$root/hosts.json" -Raw | ConvertFrom-Json
+    if ($previous.Database -ne "SecureOps_ResourcesV1_$DatabaseSuffix" -or (Get-Process -Id $previous.Worker -ErrorAction SilentlyContinue)) { throw 'Stop only the previous task-owned Worker before resuming.' }
+    $ResumeApiOnly = $true
+}
 if (!(Test-Path "$payload/api/SecureOps.Api.dll") -or !(Test-Path "$payload/ui/SecureOps.Ui.dll")) { throw 'Publish both local payloads first.' }
-foreach ($candidate in $(if ($ResumeApiOnly) { @($Port) } else { @($Port,($Port+1),($Port+2)) })) { if (Get-NetTCPConnection -LocalPort $candidate -State Listen -ErrorAction SilentlyContinue) { throw "Port $candidate is occupied." } }
+foreach ($candidate in $(if ($ResumeWorkerOnly) { @() } elseif ($ResumeApiOnly) { @($Port) } else { @($Port,($Port+1),($Port+2)) })) { if (Get-NetTCPConnection -LocalPort $candidate -State Listen -ErrorAction SilentlyContinue) { throw "Port $candidate is occupied." } }
 if ($ResumeApiOnly -and (!(Test-Path "$root/hosts.json") -or !(Test-Path "$root/assets/banner.png"))) { throw 'Resume only an existing task-owned acceptance host.' }
 if (!$ResumeApiOnly) {
 if (Test-Path "$root/assets") { throw 'Use a fresh test-owned evidence directory.' }
@@ -57,6 +63,31 @@ if ($FinalPresentation) {
     [Environment]::SetEnvironmentVariable('Announcements__Bundles__bundle-v1__Label', 'Yerel test paketi', 'Process')
 }
 $env:DataProtection__Mode = 'FileSystemDpapi' # Test-owned persistent keys keep a transport restart distinct from session revocation.
+if ($OriginalAssetDirectory) {
+    if (!$FinalPresentation) { throw 'Original assets require the six-role presentation.' }
+    $manifest = Get-Content -LiteralPath (Join-Path $OriginalAssetDirectory 'manifest.json') -Raw | ConvertFrom-Json
+    $assetNames = @{header='planlimail_duyuru_header.jpg';main='planlimail_duyuru_main.jpg';logo='turkish_technology_logo.jpg';linkedin='planlimail_duyuru_linkedin.png';instagram='planlimail_duyuru_instagram.png';youtube='planlimail_duyuru_youtube.png'}
+    foreach ($role in $assetNames.Keys) {
+        $name = $assetNames[$role]
+        $source = Join-Path $OriginalAssetDirectory $name
+        $entry = @($manifest | Where-Object { $_.Name -eq $name })
+        if ($entry.Count -ne 1 -or (Get-FileHash -LiteralPath $source).Hash -ne $entry[0].Sha256 -or (Get-Item -LiteralPath $source).Length -ne $entry[0].Bytes) { throw 'Original asset evidence mismatch.' }
+        if (!$ResumeApiOnly) { Copy-Item -LiteralPath $source -Destination (Join-Path "$root/assets" $name) }
+        [Environment]::SetEnvironmentVariable("Announcements__Banners__$role", $name, 'Process')
+    }
+}
+$env:AnnouncementMail__Enabled = $SourceReview.ToString()
+$env:AnnouncementMail__SelfTestEnabled = $SourceReview.ToString()
+$env:AnnouncementMail__SendEnabled = $SourceReview.ToString()
+$env:AnnouncementMail__Host = '127.0.0.1'
+$env:AnnouncementMail__Port = $LocalMailPort.ToString()
+$env:AnnouncementMail__Security = 'PlaintextLoopback'
+$env:AnnouncementMail__PolicyRevision = 'synthetic-local-sink-v1'
+$env:AnnouncementMail__EnvelopeMode = 'Actor'
+$env:AnnouncementMail__AllowedRecipientDomains__0 = 'example.invalid'
+$env:AnnouncementMail__TimeoutSeconds = '10'
+$env:AnnouncementMail__UserName = $null
+$env:AnnouncementMail__Password = $null
 $env:DataProtection__ApplicationName = 'SecureOps.Api'
 $env:DataProtection__KeyRingPath = "$root/private-api-keys"
 $env:Oidc__Enabled = 'false'
@@ -72,16 +103,26 @@ if ($SourceReview) {
     $env:AnnouncementSource__CollectionProvider = 'Fixture'
     $env:AnnouncementSource__ServiceProvider = 'Fixture'
     $env:AnnouncementSource__FixtureDirectory = "$root/fixtures"
-    foreach ($area in @('collections','services','changes')) { New-Item -ItemType Directory "$root/fixtures/$area" -Force | Out-Null }
+    if (!$ResumeApiOnly) { foreach ($area in @('collections','services','changes')) { New-Item -ItemType Directory "$root/fixtures/$area" -Force | Out-Null } }
     foreach ($profile in @('NonProd','Prod01','Prod02')) {
         $values = @{ CollectionId=$profile;Scope="$profile scope";Impact='Local impact';Checks='Local checks';Description='Local description';'To__0'="$profile@example.invalid";'To__1'='remove@example.invalid';'Cc__0'='copy@example.invalid' }
         foreach ($key in $values.Keys) { [Environment]::SetEnvironmentVariable("AnnouncementSource__Profiles__${profile}__$key",$values[$key],'Process') }
+        if (!$ResumeApiOnly) {
         $devices = if ($profile -eq 'Prod02') { @('AMBIGUOUS','MISSING') } else { @(1..155 | ForEach-Object { 'DEVICE-'+$_ }) }
         @{ devices=$devices;complete=$true;delayMilliseconds=4000 } | ConvertTo-Json -Depth 4 | Set-Content "$root/fixtures/collections/$profile.json" -Encoding UTF8
+        }
     }
+    if (!$ResumeApiOnly) {
     foreach ($n in 1..155) { @{candidates=@("Service $n <b>")} | ConvertTo-Json | Set-Content "$root/fixtures/services/DEVICE-$n.json" -Encoding UTF8 }
     @{candidates=@('Candidate A','Candidate B')} | ConvertTo-Json | Set-Content "$root/fixtures/services/AMBIGUOUS.json" -Encoding UTF8
     @{rows=1;startText='2026-09-15T01:00:00.123+03:00';finishText='2026-09-15T02:00:00.456+03:00'} | ConvertTo-Json | Set-Content "$root/fixtures/changes/OCO-SYNTHETIC.json" -Encoding UTF8
+    }
+    if ($ResumeWorkerOnly) {
+        $log = 'worker-resumed-' + [guid]::NewGuid().ToString('N')
+        $worker = Start-Process dotnet -ArgumentList 'SecureOps.Worker.dll' -WorkingDirectory "$payload/worker" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/$log.log" -RedirectStandardError "$root/$log.err"
+        @{Worker=$worker.Id;Database=$previous.Database} | ConvertTo-Json | Set-Content "$root/$log.json"
+        return
+    }
     if (!$ResumeApiOnly) { $worker = Start-Process dotnet -ArgumentList 'SecureOps.Worker.dll' -WorkingDirectory "$payload/worker" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/worker-host.log" -RedirectStandardError "$root/worker-host.err" }
 }
 $log = if ($ResumeApiOnly) { 'api-resumed-' + [guid]::NewGuid().ToString('N') } else { 'api-host' }

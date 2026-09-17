@@ -11,6 +11,8 @@ public static class AccessRoleCatalog
             ["Admin"] =
             [
                 Capabilities.AnnouncementDrafts,
+                Capabilities.AnnouncementSource,
+                Capabilities.AnnouncementPrepare,
                 Capabilities.InUseView,
                 Capabilities.InUseReview,
                 Capabilities.InUseAssign,

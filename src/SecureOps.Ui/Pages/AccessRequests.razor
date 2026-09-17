@@ -4,6 +4,7 @@
 @inject ICurrentAccessProvider AccessProvider
 @inject IAccessAdminApiClient AccessAdmin
 @inject IDialogService Dialogs
+@inject NavigationManager Navigation
 
 <PageTitle>Erişim Talepleri · @WasasBrand.Name</PageTitle>
 
@@ -20,7 +21,7 @@
     values lead the row; opaque corporate identity remains available only under technical details.
 *@
 
-<div class="so-page">
+<div class="so-page so-access-requests">
     <SoPageHeader Title="Erişim Talepleri"
                   Lead="Karar bekleyen ve sonuçlanmış uygulama erişim talepleri.">
         <Actions>
@@ -56,6 +57,11 @@
     }
     else
     {
+        <form class="request-search" @onsubmit="SearchAsync" @onsubmit:preventDefault>
+            <label for="request-search">Kullanıcı ara</label>
+            <input id="request-search" @bind="_search" maxlength="128" placeholder="Ad, hesap veya e-posta" />
+            <MudButton ButtonType="ButtonType.Submit" StartIcon="@Icons.Material.Filled.Search" Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy">Ara</MudButton>
+        </form>
         <section class="so-panel so-panel--tabs">
             <div class="so-tabs" role="tablist" aria-label="Talep durumu">
                 @foreach ((string Value, string Label) tab in _tabs)
@@ -69,7 +75,7 @@
                         @tab.Label
                         @if (tab.Value == _status && _requests is not null)
                         {
-                            <span class="so-tab-count">@_requests.Count</span>
+                            <span class="so-tab-count">@_total</span>
                         }
                     </button>
                 }
@@ -213,7 +219,7 @@
                 }
             </section>
 
-            <section class="so-panel so-admin-detail">
+            <section class="so-panel so-admin-detail" tabindex="-1" @ref="_detailElement">
                 @if (_selected is null)
                 {
                     <SoEmptyState Title="Talep seçilmedi"
@@ -321,7 +327,7 @@
                         {
                             <MudButton Variant="Variant.Text" Color="Color.Default"
                                        StartIcon="@Icons.Material.Filled.PersonSearch"
-                                       Href="@($"access/users/{_selected.UserId}")">
+                                       Href="@($"access/users/{_selected.UserId}?returnTo={Uri.EscapeDataString("/access/requests" + new Uri(Navigation.Uri).Query)}")">
                                 Kullanıcı kaydını aç
                             </MudButton>
                         }
@@ -334,10 +340,23 @@
                 }
             </section>
         </div>
+        <nav class="request-pagination" aria-label="Talep sayfaları">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" title="Önceki sayfa" aria-label="Önceki sayfa" Disabled="@(_busy || _loading || Page <= 1)" OnClick="() => NavigatePage(Page - 1)" />
+            <span>@Page / @Math.Max(1, (int)Math.Ceiling(_total / 25d)) · @_total talep</span>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" title="Sonraki sayfa" aria-label="Sonraki sayfa" Disabled="@(_busy || _loading || Page * 25L >= _total)" OnClick="() => NavigatePage(Page + 1)" />
+        </nav>
     }
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "q")] public string? Search { get; set; }
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int Page { get; set; } = 1;
+    [SupplyParameterFromQuery(Name = "selected")] public Guid? SelectedId { get; set; }
+    private string? _search;
+    private long _total;
+    private int _generation;
+    private ElementReference _detailElement;
     private sealed record ActionResult(string Title, string Detail, CurrentAccessResponse? Access);
 
     private static readonly (string Value, string Label)[] _tabs =
@@ -362,6 +381,9 @@
     private string _status = "Pending";
     private bool _loading;
     private bool _busy;
+    private AccessActionDialog.Result? _attempted;
+    private Guid? _attemptedId;
+    private AccessActionDialog.AccessAction? _attemptedAction;
 
     private string CurrentTabLabel => _tabs.First(tab => tab.Value == _status).Label;
 
@@ -381,7 +403,14 @@
         AccessProvider.Changed += OnAccessChanged;
         _access = await AccessProvider.GetAsync(CancellationToken.None);
 
-        if (_access.Can(Capabilities.AccessApproveRequests))
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _status = _tabs.Any(tab => tab.Value == Status) ? Status! : "Pending";
+        _search = Search;
+        Page = Math.Max(1, Page);
+        if (_access?.Can(Capabilities.AccessApproveRequests) == true)
         {
             await ReloadAsync(announce: false);
         }
@@ -390,28 +419,35 @@
     private static bool IsPending(AccessRequestResponse request) =>
         string.Equals(request.Status, "Pending", StringComparison.OrdinalIgnoreCase);
 
-    private void Select(AccessRequestResponse request)
+    private async Task Select(AccessRequestResponse request)
     {
         _selected = request;
         _result = null;
         _actionProblem = null;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("selected", request.Id), replace: true);
+        await _detailElement.FocusAsync();
     }
 
-    private async Task SelectStatusAsync(string status)
+    private Task SelectStatusAsync(string status)
     {
         if (_status == status)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         _status = status;
         _selected = null;
         _result = null;
-        await ReloadAsync(announce: false);
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["status"] = status, ["page"] = 1, ["selected"] = null }));
+        return Task.CompletedTask;
     }
+
+    private void SearchAsync() => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["q"] = _search, ["page"] = 1, ["selected"] = null }));
+    private void NavigatePage(int page) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["page"] = page, ["selected"] = null }));
 
     private async Task ReloadAsync(bool announce)
     {
+        int generation = ++_generation;
         _loading = true;
 
         // Only the list's own problem is cleared here. _actionProblem belongs to the write that
@@ -428,22 +464,24 @@
 
         try
         {
-            _requests = await AccessAdmin.GetRequestsAsync(_status, CancellationToken.None);
+            AccessPage<AccessRequestResponse> page = await AccessAdmin.PageRequestsAsync(new(Search, _status, Page: Page), CancellationToken.None);
+            if (generation != _generation) { return; }
+            _requests = page.Items;
+            _total = page.Total;
 
             // Keep the selection pointing at authoritative state: after a write the row's status
             // has changed, and holding the pre-write copy would let a stale action be offered.
-            _selected = _selected is null
-                ? null
-                : _requests.FirstOrDefault(request => request.Id == _selected.Id);
+            _selected = _requests.FirstOrDefault(request => request.Id == SelectedId);
         }
         catch (SecureOpsApiException ex)
         {
+            if (generation != _generation) { return; }
             _listProblem = ex.Problem;
             _requests = null;
         }
         finally
         {
-            _loading = false;
+            if (generation == _generation) { _loading = false; }
             StateHasChanged();
         }
     }
@@ -463,7 +501,9 @@
             {
                 nameof(AccessActionDialog.SubjectLabel),
                 AccessIdentityDisplay.Name(target.Profile, target.CorporateIdentity)
-            }
+            },
+            { nameof(AccessActionDialog.ProposedRoles), _attemptedId == target.Id && _attemptedAction == action ? _attempted?.Roles : null },
+            { nameof(AccessActionDialog.InitialReason), _attemptedId == target.Id && _attemptedAction == action ? _attempted?.Reason : null }
         };
 
         IDialogReference dialog = await Dialogs.ShowAsync<AccessActionDialog>(
@@ -481,6 +521,7 @@
         // Set before the first await: every action button binds Disabled to this, so the second
         // click of a double-click finds them already disabled.
         _busy = true;
+        _attempted = confirmed; _attemptedId = target.Id; _attemptedAction = action;
         _actionProblem = null;
         _result = null;
         StateHasChanged();
@@ -493,11 +534,12 @@
                 ? Describe(
                     "Talep onaylandı",
                     await AccessAdmin.ApproveAsync(
-                        target.Id, confirmed.Reason, confirmed.Roles, target.Version, CancellationToken.None))
+                        target.Id, confirmed.Reason, confirmed.Roles, target.Version, CancellationToken.None, confirmed.RoleVersions))
                 : Describe(
                     "Talep reddedildi",
                     await AccessAdmin.RejectAsync(
                         target.Id, confirmed.Reason, target.Version, CancellationToken.None));
+            _attempted = null;
         }
         catch (SecureOpsApiException ex)
         {

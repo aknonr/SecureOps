@@ -211,15 +211,15 @@ public sealed class ApplicationAccessService : IApplicationAccessService
     }
 
     /// <inheritdoc />
-    public Task<AccessServiceResult<AccessMutationResult>> ApproveAsync(Guid requestId, IReadOnlyCollection<string> roles, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken) =>
-        DecideAsync(requestId, AccessRequestStatus.Approved, roles, reason, expectedVersion, context, cancellationToken);
+    public Task<AccessServiceResult<AccessMutationResult>> ApproveAsync(Guid requestId, IReadOnlyCollection<string> roles, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null) =>
+        DecideAsync(requestId, AccessRequestStatus.Approved, roles, reason, expectedVersion, context, cancellationToken, roleVersions);
 
     /// <inheritdoc />
     public Task<AccessServiceResult<AccessMutationResult>> RejectAsync(Guid requestId, string reason, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken) =>
         DecideAsync(requestId, AccessRequestStatus.Rejected, [], reason, expectedVersion, context, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken)
+    public async Task<AccessServiceResult<AccessMutationResult>> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, AccessOperationContext context, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null)
     {
         if (!ValidRoles(roles, requireAtLeastOne: true) || expectedVersion <= 0)
         {
@@ -227,7 +227,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         }
 
         const string description = "System-generated: ordinary role assignment.";
-        AccessMutationResult mutation = await _repository.ReplaceRolesAsync(userId, NormalizeRoles(roles), expectedVersion, context.Actor, cancellationToken);
+        AccessMutationResult mutation = await _repository.ReplaceRolesAsync(userId, NormalizeRoles(roles), expectedVersion, context.Actor, cancellationToken, roleVersions);
         return await MapMutationAsync(mutation, null, context, description, cancellationToken);
     }
 
@@ -250,7 +250,8 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         string reason,
         long expectedVersion,
         AccessOperationContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, long>? roleVersions = null)
     {
         if (!ValidReason(reason) || expectedVersion <= 0 || (decision == AccessRequestStatus.Approved && !ValidRoles(roles, requireAtLeastOne: true)))
         {
@@ -258,7 +259,7 @@ public sealed class ApplicationAccessService : IApplicationAccessService
         }
 
         IReadOnlyCollection<string> normalizedRoles = decision == AccessRequestStatus.Approved ? NormalizeRoles(roles) : [];
-        AccessMutationResult mutation = await _repository.DecideRequestAsync(requestId, decision, expectedVersion, context.Actor, normalizedRoles, reason.Trim(), cancellationToken);
+        AccessMutationResult mutation = await _repository.DecideRequestAsync(requestId, decision, expectedVersion, context.Actor, normalizedRoles, reason.Trim(), cancellationToken, roleVersions);
         return await MapMutationAsync(
             mutation,
             decision == AccessRequestStatus.Approved ? AuditActions.AccessApproved : AuditActions.AccessRejected,
@@ -282,6 +283,8 @@ public sealed class ApplicationAccessService : IApplicationAccessService
             AccessMutationDisposition.ConcurrencyConflict => OperationalErrorCodes.AccessConcurrencyConflict,
             AccessMutationDisposition.UserInvalidState => OperationalErrorCodes.AccessUserInvalidState,
             AccessMutationDisposition.SelfApprovalDenied => OperationalErrorCodes.AccessSelfApprovalDenied,
+            AccessMutationDisposition.InvalidRoles => OperationalErrorCodes.AccessValidationFailed,
+            AccessMutationDisposition.AdministrativeGuard => OperationalErrorCodes.AccessDenied,
             _ => throw new InvalidOperationException($"Unknown access mutation disposition: {mutation.Disposition}.")
         };
         if (error is not null)
@@ -422,9 +425,9 @@ public sealed class ApplicationAccessService : IApplicationAccessService
 
     private static bool ValidReason(string? reason) => !string.IsNullOrWhiteSpace(reason) && reason.Trim().Length <= 500;
     private static bool ValidRoles(IReadOnlyCollection<string> roles, bool requireAtLeastOne) =>
-        (!requireAtLeastOne || roles.Count > 0) && roles.Count <= 16 && roles.All(AccessRoleCatalog.IsKnownRole);
-    private static string[] NormalizeRoles(IEnumerable<string> roles) => AccessRoleCatalog.RoleCodes
-        .Where(roleCode => roles.Contains(roleCode, StringComparer.OrdinalIgnoreCase))
+        (!requireAtLeastOne || roles.Count > 0) && roles.Count <= 16 && roles.All(role =>
+            !string.IsNullOrWhiteSpace(role) && role.Length <= 64 && role.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-'));
+    private static string[] NormalizeRoles(IEnumerable<string> roles) => roles.Distinct(StringComparer.OrdinalIgnoreCase)
         .OrderBy(roleCode => roleCode, StringComparer.Ordinal)
         .ToArray();
 }

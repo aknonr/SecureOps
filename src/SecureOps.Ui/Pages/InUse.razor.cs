@@ -12,6 +12,17 @@ public partial class InUse
 {
     /// <summary>Optional persisted record identifier.</summary>
     [Parameter] public Guid? Id { get; set; }
+    /// <summary>List context retained while inspecting a record and across reloads.</summary>
+    [SupplyParameterFromQuery(Name = "q")] public string? QuerySearch { get; set; }
+    /// <summary>Presentation filter only, never an ownership restriction.</summary>
+    [SupplyParameterFromQuery(Name = "view")] public string? QueryView { get; set; }
+    /// <summary>Saved review state filter.</summary>
+    [SupplyParameterFromQuery(Name = "status")] public string? QueryStatus { get; set; }
+    /// <summary>Stored bounded page.</summary>
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    /// <summary>Stored bounded page size.</summary>
+    [SupplyParameterFromQuery(Name = "size")] public int? QuerySize { get; set; }
+    private string _assigneeSearch = "";
     private AccessSnapshot? _access;
     private InUsePage? _page;
     private InUseRecord? _record;
@@ -65,13 +76,36 @@ public partial class InUse
     protected override async Task OnInitializedAsync()
     { AccessProvider.Changed += AccessChanged; _access = await AccessProvider.GetAsync(_lifetime.Token); }
     /// <inheritdoc />
-    protected override async Task OnParametersSetAsync() { if (_access is not null) { await LoadAsync(); } }
+    protected override async Task OnParametersSetAsync()
+    {
+        _search = QuerySearch is { Length: <= 100 } ? QuerySearch : "";
+        _view = QueryView is "mine" or "unassigned" ? QueryView : "all";
+        _status = QueryStatus is "Unreviewed" or "Draft" or "Stale" ? QueryStatus : "";
+        _number = QueryPage is > 0 and <= 100000 ? QueryPage.Value : 1;
+        _size = QuerySize is 10 or 25 or 50 ? QuerySize.Value : 25;
+        if (_access is not null)
+        { await LoadAsync(); }
+    }
     private async Task InitializeAsync()
     { _access = await AccessProvider.RefreshAsync(_lifetime.Token); if (Can(Capabilities.InUseView)) { await LoadAsync(); } }
-    private Task FilterAsync() { _number = 1; return LoadAsync(); }
+    private Task FilterAsync() { _number = 1; return NavigateListAsync(); }
     private Task SearchAsync(string value) { _search = value; return FilterAsync(); }
-    private Task PreviousAsync() { _number = Math.Max(1, _number - 1); return LoadAsync(); }
-    private Task NextAsync() { _number++; return LoadAsync(); }
+    private Task PreviousAsync() { _number = Math.Max(1, _number - 1); return NavigateListAsync(); }
+    private Task NextAsync() { _number++; return NavigateListAsync(); }
+    private string ListQuery => $"?q={Uri.EscapeDataString(_search)}&view={_view}&status={_status}&page={_number}&size={_size}";
+    private string ListUrl => "/in-use" + ListQuery;
+    private string RecordUrl(Guid id) => $"/in-use/{id}" + ListQuery;
+    private Task NavigateListAsync() { Navigation.NavigateTo(ListUrl, replace: true); return Task.CompletedTask; }
+    private Task SearchAssigneesAsync(string value) => ExecuteAsync(async () =>
+    {
+        _assigneeSearch = value;
+        _assignees = await ReadAsync<InUseAssignee[]>("/assignees?search=" + Uri.EscapeDataString(value));
+    });
+    private static int SavedCompleted(InUseRecord record) => record.Source.Servers.Count(s => InUseChecks.OperatorCodes.All(c =>
+        record.Draft?.Answers.Any(a => a.ServerId == s.Id && a.Check == c && a.Value is "Yes" or "No") == true));
+    private static string RowNext(InUseRecord record) => record.Status == "Stale" ? "Kaynak değişti; yeniden incele"
+        : record.Source.Servers.Count == 0 ? "Sunucu ilişki kanıtı gerekli"
+        : SavedCompleted(record) < record.Source.Servers.Count ? "Eksik cevapları tamamla" : "Excel önizlemesini incele";
     private Task LoadAsync()
     {
         ++_generation;

@@ -1,0 +1,4 @@
+.preparation-summary { display:grid; grid-template-columns:8rem minmax(0,1fr); gap:6px 16px; margin:16px 0; }
+.preparation-summary dt { color:var(--mud-palette-text-secondary); }
+.preparation-summary dd { margin:0; overflow-wrap:anywhere; }
+@media(max-width:600px) { .preparation-summary { grid-template-columns:1fr; gap:3px; } .preparation-summary dd { margin-bottom:8px; } }

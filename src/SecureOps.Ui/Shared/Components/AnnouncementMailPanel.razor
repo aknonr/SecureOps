@@ -1,0 +1,129 @@
+@implements IDisposable
+@using SecureOps.Shared.Contracts.Announcements
+@inject AnnouncementApiClient Api
+@inject ICurrentAccessProvider Access
+@inject IJSRuntime Js
+
+<section class="mail-command" aria-labelledby="mail-heading" aria-busy="@_busy.ToString().ToLowerInvariant()">
+    <h3 id="mail-heading">Gönderim</h3>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    @if (_uncertain)
+    { <p role="alert">İstek sonucu alınamadı. Yeni gönderim başlatmayın. Önce kayıtlı sonucu kontrol edin.</p> }
+    <div class="so-inline-actions">
+        @if (_access?.Can(Capabilities.AnnouncementSelfTest) == true)
+        { <MudButton StartIcon="@Icons.Material.Filled.MarkEmailRead" Disabled="@(_busy || _preview is not null || _uncertain || Unresolved)" OnClick="@(() => PreviewAsync("SelfTest"))">Kendime deneme gönder</MudButton> }
+        @if (_access?.Can(Capabilities.AnnouncementSend) == true && !_history.Any(x => x.Kind == "Send"))
+        { <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Send" Disabled="@(_busy || _preview is not null || _uncertain || Unresolved)" OnClick="@(() => PreviewAsync("Send"))">Duyuruyu gönder</MudButton> }
+        <MudButton StartIcon="@Icons.Material.Filled.Refresh" Disabled="_busy" OnClick="LoadAsync">Kayıtlı sonucu kontrol et</MudButton>
+    </div>
+    @if (_preview is { } p)
+    {
+        <div class="mail-review" tabindex="-1" @ref="_review" role="region" aria-label="Gönderim onayı">
+            <h4>@(p.Kind == "SelfTest" ? "Yalnız kendime deneme" : "Duyuru gönderim onayı")</h4>
+            <dl><dt>Konu</dt><dd>@p.Subject</dd><dt>Gönderen</dt><dd>@p.Sender</dd>
+                <dt>Alıcı</dt><dd>@string.Join("; ", p.To)</dd><dt>Bilgi</dt><dd>@(p.Cc.Length == 0 ? "Yok" : string.Join("; ", p.Cc))</dd>
+                <dt>Hazırlık</dt><dd>v@(p.DraftVersion) · @p.ExpiresAt.ToLocalTime().ToString("HH:mm") saatine kadar geçerli</dd></dl>
+            @if (p.Kind == "SelfTest") { <p>Gerçek dağıtım listesi değişmez; bu denemenin tek alıcısı sizsiniz.</p> }
+            <p>SMTP kabulü, gelen kutusuna teslim edildiği anlamına gelmez.</p>
+            <details><summary>Teknik gönderim bilgisi</summary><p>Zarf göndereni: @p.EnvelopeSender</p><p>@p.MessageId</p><p>@p.MessageHash</p></details>
+            <div class="so-inline-actions">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Send" Disabled="_busy" OnClick="ConfirmAsync">@(p.Kind == "SelfTest" ? "Denemeyi onayla" : "Gönderimi onayla")</MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Close" Disabled="@(_busy || _uncertain)" OnClick="Cancel">Vazgeç</MudButton>
+            </div>
+        </div>
+    }
+    <div aria-live="polite">
+        @foreach (AnnouncementMailStatus entry in _history)
+        {
+            <article class="mail-result">
+                <strong>@(entry.Kind == "SelfTest" ? "Deneme" : "Duyuru") · @State(entry.State)</strong>
+                <p>@entry.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @entry.Sender</p>
+                @if (entry.State is "Queued" or "Dispatching") { <p>Sonucu bu kayıttan kontrol edin; yeniden gönderim başlatmayın.</p> }
+                @if (entry.State is "Unknown" or "Partial") { <p role="alert">Yeni gönderim kapalı. Mail yöneticisi bu işlem kimliği ve alıcılarla relay kaydını uzlaştırmalı; alınmadığını varsaymayın.</p> }
+                @if (entry.State == "Denied") { <p>Yetki, profil, taslak veya gönderim ayarı değişti. Gönderim yapılmadı.</p> }
+                @if (entry.State == "Failed") { <p>SMTP kabulü yok. Ayar ve relay hatası incelenmeden yeniden gönderim yapılmaz.</p> }
+                <details><summary>Alıcı ve işlem ayrıntıları</summary><p>@string.Join("; ", entry.To.Concat(entry.Cc))</p>
+                    <p>Kabul: @string.Join("; ", entry.Accepted)</p><p>Red: @string.Join("; ", entry.Rejected)</p><p>@entry.MessageId</p></details>
+            </article>
+        }
+        @if (!_busy && _history.Length == 0) { <p>Bu taslak için kayıtlı gönderim talebi yok.</p> }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Guid PreparationId { get; set; }
+    [Parameter, EditorRequired] public Guid DraftId { get; set; }
+    private AnnouncementMailPreview? _preview;
+    private AnnouncementMailStatus[] _history = [];
+    private AccessSnapshot? _access;
+    private UiProblem? _problem;
+    private CancellationTokenSource _pending = new();
+    private bool _busy, _uncertain, _disposed, _focus;
+    private ElementReference _review;
+    private Guid _loadedPreparation;
+    private bool Unresolved => _history.Any(entry => entry.State is "Queued" or "Dispatching" or "Unknown" or "Partial");
+    protected override void OnInitialized() => Access.Changed += AccessChanged;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedPreparation == PreparationId) { return; }
+        _loadedPreparation = PreparationId; _preview = null; _uncertain = false; _history = []; await LoadAsync();
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if (_focus) { _focus = false; await _review.FocusAsync(); } }
+    private async Task LoadAsync()
+    {
+        if (_disposed) { return; }
+        _pending.Cancel(); _pending.Dispose(); _pending = new();
+        CancellationToken token = _pending.Token;
+        _busy = true;
+        try
+        {
+            _access = await Access.GetAsync(token);
+            AnnouncementMailStatus[] history = await Api.MailHistoryAsync(DraftId, token);
+            if (token.IsCancellationRequested) { return; }
+            _history = history; _problem = null;
+            if (_preview is not null && history.Any(x => x.CommandId == _preview.CommandId)) { _preview = null; _uncertain = false; }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (SecureOpsApiException ex) { if (!token.IsCancellationRequested) { _problem = ex.Problem; } }
+        finally { if (!token.IsCancellationRequested) { _busy = false; } }
+    }
+    private async Task PreviewAsync(string kind)
+    {
+        _busy = true; _problem = null;
+        CancellationToken token = _pending.Token;
+        try { AnnouncementMailPreview preview = await Api.MailPreviewAsync(PreparationId, kind, token); if (!token.IsCancellationRequested) { _preview = preview; _focus = true; } }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (SecureOpsApiException ex) { if (!token.IsCancellationRequested) { _problem = ex.Problem; } }
+        finally { if (!token.IsCancellationRequested) { _busy = false; } }
+    }
+    private async Task ConfirmAsync()
+    {
+        if (_busy || _preview is null) { return; }
+        _busy = true;
+        CancellationToken token = _pending.Token;
+        try
+        {
+            AnnouncementMailStatus result = await Api.MailConfirmAsync(_preview.PreviewToken, token);
+            if (!token.IsCancellationRequested) { _history = [result, .. _history.Where(x => x.CommandId != result.CommandId)]; _preview = null; _uncertain = false; _problem = null; }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (SecureOpsApiException ex)
+        {
+            if (!token.IsCancellationRequested)
+            {
+                _problem = ex.Problem;
+                _uncertain = ex.Problem.StatusCode is null or >= 500;
+                if (!_uncertain) { _preview = null; }
+            }
+        }
+        finally { if (!token.IsCancellationRequested) { _busy = false; } }
+    }
+    private void Cancel() { if (!_uncertain) { _preview = null; } }
+    private static string State(string state) => state switch
+    {
+        "Queued" => "Kuyrukta", "Dispatching" => "Gönderim deneniyor", "Accepted" => "SMTP kabul etti; teslim doğrulanmadı",
+        "Partial" => "Bazı alıcılar kabul edildi", "Unknown" => "Sonuç belirsiz", "Denied" => "Gönderim engellendi", "Failed" => "Gönderim reddedildi", _ => "Durum bilinmiyor"
+    };
+    private void AccessChanged() { if (!_disposed) { _ = InvokeAsync(async () => { _preview = null; _history = []; await LoadAsync(); StateHasChanged(); }); } }
+    public void Dispose() { _disposed = true; Access.Changed -= AccessChanged; _pending.Cancel(); _pending.Dispose(); }
+}

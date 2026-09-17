@@ -63,11 +63,12 @@
     @if (_allowed && _form is not null)
     {
         <dl><dt>Profil e-postası / yeni hazırlığın göndereni</dt><dd>@(_page?.CurrentSender ?? "Kayıtlı e-posta eksik veya geçersiz; taslak kaydedilebilir.")</dd></dl>
-        <MudButton StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="@(() => _sourceOpen = !_sourceOpen)">Kaynak incelemesi</MudButton>
-        @if (_sourceOpen)
+        @if (_canSource)
+        { <MudButton StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="@(() => _sourceOpen = !_sourceOpen)">Kaynak incelemesi</MudButton> }
+        @if (_sourceOpen && _canSource)
         {
             <AnnouncementSourceReview @key="_id" DraftId="_id" Version="_version" OcoReference="@_form.Values["OcoReference"]"
-                Services="_form.Services" Locked="@(_busy || _dirty || _comparison is not null)" ApplyRequested="ApplySourceAsync" AccessLost="@(p => LoseAccess(p))" />
+                Services="_form.Services" Locked="@(_busy || _dirty || _comparison is not null || !_canSource)" ApplyRequested="ApplySourceAsync" AccessLost="@(p => LoseAccess(p))" />
         }
         @if (_comparison is { } current)
         {
@@ -138,7 +139,8 @@
                 <MudButton data-guide="announcement-save" ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" Disabled="@(_busy || _comparison is not null)">Kaydet</MudButton>
                 <MudButton data-guide="announcement-preview" OnClick="PreviewAsync" StartIcon="@Icons.Material.Filled.Visibility" Disabled="@(_busy || _dirty || _version == 0)">Önizle</MudButton>
                 <MudButton data-guide="announcement-download" OnClick="DownloadAsync" StartIcon="@Icons.Material.Filled.Download" Disabled="@(_busy || _dirty || _version == 0)">Maili indir</MudButton>
-                <MudButton OnClick="PrepareAsync" StartIcon="@Icons.Material.Filled.FactCheck" Disabled="@(_busy || _dirty || _version == 0)">İncelemeye hazırla</MudButton>
+                @if (_canPrepare)
+                { <MudButton OnClick="PrepareAsync" StartIcon="@Icons.Material.Filled.FactCheck" Disabled="@(_busy || _dirty || _version == 0)">İncelemeye hazırla</MudButton> }
                 <span role="status" data-save-state>@(_dirty ? "Kaydedilmemiş değişiklikler" : _version > 0 ? "Güncel içerik kaydedildi" : "Yeni taslak")</span>
             </div>
         </EditForm>

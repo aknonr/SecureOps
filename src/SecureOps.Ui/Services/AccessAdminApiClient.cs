@@ -6,7 +6,7 @@ namespace SecureOps.Ui.Services;
 /// <summary>
 /// HTTP implementation of the access administration API client.
 /// </summary>
-public sealed class AccessAdminApiClient : IAccessAdminApiClient
+public sealed partial class AccessAdminApiClient : IAccessAdminApiClient
 {
     private readonly HttpClient _httpClient;
 
@@ -49,8 +49,9 @@ public sealed class AccessAdminApiClient : IAccessAdminApiClient
         string reason,
         IReadOnlyList<string> roles,
         long expectedVersion,
-        CancellationToken cancellationToken) =>
-        DecideAsync(requestId, "approve", new AccessDecisionRequest(reason, roles, expectedVersion), cancellationToken);
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, long>? roleVersions = null) =>
+        DecideAsync(requestId, "approve", new AccessDecisionRequest(reason, roles, expectedVersion, roleVersions), cancellationToken);
 
     /// <inheritdoc />
     public Task<AccessRequestResponse> RejectAsync(
@@ -70,12 +71,13 @@ public sealed class AccessAdminApiClient : IAccessAdminApiClient
         Guid userId,
         IReadOnlyList<string> roles,
         long expectedVersion,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, long>? roleVersions = null)
     {
         HttpResponseMessage response = await SendAsync(
             () => _httpClient.PutAsJsonAsync(
                 $"api/v1/access/users/{userId}/roles",
-                new AssignRolesRequest(roles, expectedVersion),
+                new AssignRolesRequest(roles, expectedVersion, roleVersions),
                 cancellationToken),
             cancellationToken);
 

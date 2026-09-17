@@ -23,7 +23,7 @@ public partial class Announcements
     private (AnnouncementContent Content, long Version)? _comparison;
     private Guid _id;
     private long _version;
-    private bool _allowed, _busy, _dirty, _optional, _sourceOpen;
+    private bool _allowed, _canSource, _canPrepare, _busy, _dirty, _optional, _sourceOpen;
     private string? _html, _notice;
     private UiProblem? _problem;
     /// <inheritdoc />
@@ -33,6 +33,8 @@ public partial class Announcements
     {
         AccessSnapshot access = await Access.GetAsync(_lifetime.Token);
         _allowed = access.Can(Capabilities.AnnouncementDrafts);
+        _canSource = access.Can(Capabilities.AnnouncementSource);
+        _canPrepare = access.Can(Capabilities.AnnouncementPrepare);
         if (!_allowed)
         { _problem = access.Problem ?? UiProblemFactory.FromResponse(403, null); return; }
         _page = await Api.ListAsync(1, _lifetime.Token);
@@ -218,7 +220,15 @@ public partial class Announcements
         finally { _busy = false; if (_htmlGeneration != _previewRequests.Generation && _problem is null) { SchedulePreview(); } }
     }
     private void AccessChanged() => _ = InvokeAsync(async () =>
-    { _allowed = (await Access.GetAsync(_lifetime.Token)).Can(Capabilities.AnnouncementDrafts); if (!_allowed) { _form = null; _savedContent = null; CancelPreview(true); } StateHasChanged(); });
+    {
+        AccessSnapshot access = await Access.GetAsync(_lifetime.Token);
+        _allowed = access.Can(Capabilities.AnnouncementDrafts);
+        _canSource = access.Can(Capabilities.AnnouncementSource);
+        _canPrepare = access.Can(Capabilities.AnnouncementPrepare);
+        if (!_allowed)
+        { _form = null; _savedContent = null; CancelPreview(true); }
+        StateHasChanged();
+    });
     /// <inheritdoc />
     public void Dispose() { Access.Changed -= AccessChanged; CancelPreview(true); _lifetime.Cancel(); _lifetime.Dispose(); }
 }

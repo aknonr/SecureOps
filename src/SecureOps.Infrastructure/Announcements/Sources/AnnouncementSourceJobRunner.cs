@@ -148,7 +148,7 @@ public sealed class AnnouncementSourceAuthorizationRecheck(IAccessRepository acc
         }
         ApplicationUser? user = await access.GetUserAsync(ownerId, cancellationToken);
         bool authorized = user is { Status: AccessStatus.Approved }
-            && user.Capabilities.Contains(Capabilities.AnnouncementDrafts);
+            && user.Capabilities.Contains(Capabilities.AnnouncementDrafts) && user.Capabilities.Contains(Capabilities.AnnouncementSource);
         if (!authorized)
         { logger.LogWarning("Announcement source job stopped: owner access is no longer valid."); }
         return authorized;
