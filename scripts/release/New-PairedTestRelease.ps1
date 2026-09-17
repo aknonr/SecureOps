@@ -69,7 +69,7 @@ try {
     $extraPackages = @()
     if ($BrandingDirectory) {
         $branding = (Resolve-Path -LiteralPath $BrandingDirectory).Path
-        $approved = @(Get-Content -LiteralPath (Join-Path $branding 'manifest.json') -Raw | ConvertFrom-Json)
+        $approved = Get-Content -LiteralPath (Join-Path $branding 'manifest.json') -Raw | ConvertFrom-Json
         $names = @('planlimail_duyuru_header.jpg','planlimail_duyuru_main.jpg','turkish_technology_logo.jpg','planlimail_duyuru_linkedin.png','planlimail_duyuru_instagram.png','planlimail_duyuru_youtube.png')
         if ($approved.Count -ne 6) { throw 'Expected exactly six reviewed original branding assets.' }
         $assetRoot = "$destination/staging/branding"
