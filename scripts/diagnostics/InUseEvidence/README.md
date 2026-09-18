@@ -59,8 +59,9 @@ The independent Istem Sahibi selector remains unknown. Protected configuration,
 transport, limits and privacy rules below still apply. Preserve old 6e05b45.
 
 The following dated notes are historical discovery records, not current commands
-or requirements for a separate Reporter selector. Runtime refresh is still
-unwired pending operator evidence; this collector does not persist data.
+or requirements for a separate Reporter selector. RFC/Bildiren runtime refresh
+has since been wired; this collector itself does not persist data. Do not use
+the historical C: example paths for the current completion-mode procedure.
 
 ## Two Missing Fields: Targeted Inspection, 2026-09-11
 
@@ -122,7 +123,7 @@ Before using it, the source owner must provide these case-sensitive JSON members
 | RfcProperty | Exact direct LCSIMS_ServiceInstance property; must equal dictionary.json's `RFC Kaydı` selector |
 | ReferenceCellKind | `SET` or `KEY`, only as demonstrated by the response contract, not a name-based assumption |
 | ReferenceKind | `SourceId` for canonical positive numeric SMSS_oRFF identity, or `OrCode` for exact OR-digits code |
-| ReporterProperty | Optional; omit if unverified. When supplied, exact direct SMSS_oRFF Reporter selector, distinct from p_rel_requester |
+| ReporterProperty | Historical proposal, superseded: current code permits omission or exactly p_rel_requester only; never a separate Reporter selector |
 
 No real values for these keys are currently verified. Do not use synthetic test
 selectors as a corporate dictionary. Virtual PC User is optional and independent.

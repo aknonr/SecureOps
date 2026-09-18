@@ -27,7 +27,7 @@ public sealed class InUsePolicy(IOptions<InUsePolicyOptions> options)
             string? desired = environment switch
             {
                 "PROD" => "Evet",
-                "DEV" or "TEST" or "NONPROD" or "NON-PROD" or "POC" or "PREPROD" => "Hayır",
+                "DEV" or "TEST" or "UAT" or "NONPROD" or "NON-PROD" or "POC" or "PREPROD" => "Hayır",
                 _ => null
             };
             fields.AddRange(_alarmFields.Select(field => new InUsePolicyField(server.Id, field, desired,

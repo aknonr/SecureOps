@@ -34,6 +34,13 @@
 .so-inuse-server-table .mud-button-root { max-width: 100%; text-align: left; white-space: normal; scroll-margin-top: 5rem; }
 .so-inuse-server-table button:focus-visible { outline: 2px solid var(--so-text); outline-offset: 2px; }
 .so-inuse-mobile-label { display: none; }
+.so-inuse-assignment-dialog { font-size: 16px; line-height: 1.5; max-width: min(560px, calc(100vw - 32px)); }
+.so-inuse-assignment-dialog h2 { font-size: 20px; margin: 0; }
+.so-inuse-assignment-dialog p, .so-inuse-assignment-dialog .mud-input, .so-inuse-assignment-dialog .mud-input-label { font-size: 16px; }
+.so-inuse-assignment-dialog .mud-button-root { min-height: 44px; }
+.so-inuse-assignment-dialog .mud-button-label { font-size: 15px; text-transform: none; }
+.so-inuse-assignment-dialog .mud-dialog-content { overflow-wrap: anywhere; }
+.so-inuse-assignment-dialog .mud-dialog-actions { flex-wrap: wrap; }
 @media (max-width: 700px) {
     .so-inuse-server-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     .so-inuse-server-table table, .so-inuse-server-table tbody, .so-inuse-server-table tr, .so-inuse-server-table td { display: block; width: 100%; }

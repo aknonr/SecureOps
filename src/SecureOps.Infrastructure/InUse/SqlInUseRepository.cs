@@ -51,7 +51,9 @@ public sealed partial class SqlInUseRepository(IConfiguration configuration) : I
                   OR (server.ReporterState IN ('ExactMatch', 'Stale') AND (
                       (server.DisplayState = 'Returned' AND CHARINDEX(@Search, server.Reporter COLLATE Turkish_100_CI_AS) > 0)
                       OR (server.ReferenceState = 'Returned' AND CHARINDEX(@Search, server.Account COLLATE Latin1_General_100_CI_AS) > 0)))))
-             AND (@Status IS NULL OR ReviewStatus = @Status)
+             AND ((@Status='Discarded' AND JSON_VALUE(RecordJson,'$.Discarded')='true')
+              OR (COALESCE(@Status,'')<>'Discarded' AND COALESCE(JSON_VALUE(RecordJson,'$.Discarded'),'false')='false'
+                  AND (@Status IS NULL OR ReviewStatus = @Status)))
              AND (@View = 'all' OR (@View = 'mine' AND AssigneeId = @ActorId) OR (@View = 'unassigned' AND AssigneeId IS NULL))
             """;
         await using SqlConnection connection = new(_connectionString);
@@ -148,8 +150,11 @@ public sealed partial class SqlInUseRepository(IConfiguration configuration) : I
                     SELECT 1 FROM security.RoleAssignments a JOIN security.Roles r ON r.RoleId=a.RoleId CROSS APPLY OPENJSON(r.CapabilitiesJson) c
                     WHERE a.UserId=u.UserId AND a.RevokedAt IS NULL AND c.value=@capability);
                 """;
-            if (await connection.ExecuteScalarAsync<int>(Command(authority, new { userId = operation.Initiator.Id, capability }, cancellationToken, transaction)) != 1)
-            { return false; }
+            foreach (string required in new[] { "InUse.View", capability })
+            {
+                if (await connection.ExecuteScalarAsync<int>(Command(authority, new { userId = operation.Initiator.Id, capability = required }, cancellationToken, transaction)) != 1)
+                { return false; }
+            }
             if (operation.Action == "InUseAssigned" && next?.AssigneeId is { } assignee)
             {
                 foreach (string assigneeCapability in new[] { "InUse.View", "InUse.Review" })
@@ -160,6 +165,24 @@ public sealed partial class SqlInUseRepository(IConfiguration configuration) : I
             }
         }
         await ReadStateAsync(connection, transaction, cancellationToken);
+        // Execution creation/claim takes the same administration lock first. Never hide a running or uncertain remote effect.
+        if (audit.Operation?.Action == "InUseDraftLifecycle" && await connection.ExecuteScalarAsync<int>(Command(
+            "SELECT COUNT(*) FROM ops.InUseExecutions WITH(UPDLOCK,HOLDLOCK) WHERE RecordId=@id AND Active=1;",
+            new { id }, cancellationToken, transaction)) > 0)
+        { return false; }
+        if (audit.Operation?.Action == "InUseDraftSaved")
+        {
+            foreach (Guid reviewId in (next?.Draft?.Answers ?? []).Where(a => a.Origin?.ReviewId is not null).Select(a => a.Origin!.ReviewId!.Value).Distinct())
+            {
+                int valid = await connection.ExecuteScalarAsync<int>(Command("""
+                    SELECT COUNT(*) FROM ops.InUseServerReviews h JOIN ops.InUseRecords r WITH(HOLDLOCK) ON r.Id=h.RecordId
+                    WHERE h.ReviewId=@reviewId AND COALESCE(JSON_VALUE(r.RecordJson,'$.Discarded'),'false')='false'
+                        AND h.RecordVersion>COALESCE(TRY_CONVERT(bigint,JSON_VALUE(r.RecordJson,'$.InvalidatedReviewsThrough')),0);
+                    """, new { reviewId }, cancellationToken, transaction));
+                if (valid != 1)
+                { return false; }
+            }
+        }
         long? version = await connection.QuerySingleOrDefaultAsync<long?>(Command(
             "SELECT Version FROM ops.InUseRecords WITH (UPDLOCK, HOLDLOCK) WHERE Id = @Id;", new { Id = id }, cancellationToken, transaction));
         if (version != expectedVersion)

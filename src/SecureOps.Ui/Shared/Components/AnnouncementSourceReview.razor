@@ -7,12 +7,19 @@
     <h2>Kaynak incelemesi</h2>
     @if (_readiness is { } readiness)
     { <p role="status">@StateLabel(readiness.State)</p> }
+    @if (!_working && !_profiles.Any(p => p.State == "Configured"))
+    {
+        <p role="status">@(_readiness?.State == "Disabled"
+            ? "Kaynak toplama sunucu ayarlarında kapalı; servis sorgusu yapılmadı. Sistem yöneticisi API ve Worker kaynak tanılamasını karşılaştırmalı."
+            : _problem is not null ? "Bakım profilleri alınamadı; bu sonuç boş bir servis listesi değildir. Hata kaydıyla sistem yöneticisine başvurun."
+            : "Kullanılabilir bakım profili tanımlı değil. Sistem yöneticisi onaylı koleksiyon ve profil metinlerini yapılandırmalı.")</p>
+    }
     <p>Koleksiyondaki sunucuların servisleri ve OCO çalışma tarihleri ayrı kaynaklardan önerilir. Değişiklikler incelemenizden sonra uygulanır.</p>
     @if (_problem is not null)
     {
         <SoProblemPanel Problem="_problem" />
         @if (_problem.Code == "AnnouncementSourceDisabled")
-        { <p>Kaynak bağlantısı kapalı. Elle düzenleme kullanılabilir.</p> }
+        { <p>Kaynak bağlantısı kapalı. SMTP ayarları kaynak toplamayı etkinleştirmez.</p> }
         else
         { <p>Kaynak kullanılabilirliği doğrulanamadı. Elle düzenlemeleriniz korunur.</p> }
     }
@@ -26,7 +33,7 @@
             </select>
         </label>
         <p>OCO: <strong>@OcoReference</strong></p>
-        <MudButton StartIcon="@Icons.Material.Filled.CloudDownload" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_profile.Length == 0 || string.IsNullOrWhiteSpace(OcoReference) || _submission is not null)" OnClick="SubmitAsync">Kaydet ve kaynağı sorgula</MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.CloudDownload" Variant="Variant.Filled" Color="Color.Primary" Disabled="@(!_profiles.Any(p => p.Name == _profile && p.State == "Configured") || _readiness?.State != "Ready" || string.IsNullOrWhiteSpace(OcoReference) || _submission is not null)" OnClick="SubmitAsync">Kaydet ve kaynağı sorgula</MudButton>
         @if (_submission is not null)
         {
             <p>@_submission.Profile · @_submission.OcoReference</p>

@@ -10,6 +10,33 @@ namespace SecureOps.Tests.Unit.InUse;
 
 public sealed partial class InUseTests
 {
+    [Theory]
+    [InlineData("DEV", "Hayır")]
+    [InlineData("TEST", "Hayır")]
+    [InlineData("UAT", "Hayır")]
+    [InlineData("NonProd", "Hayır")]
+    [InlineData("NONPROD", "Hayır")]
+    [InlineData("PROD", "Evet")]
+    [InlineData("", null)]
+    [InlineData("new-environment", null)]
+    public async Task Policy_KnownEnvironmentsRemainRaw_UnknownDoesNotBecomeNonProduction(string raw, string? expected)
+    {
+        var fixture = new Fixture();
+        InUseRecord record = await fixture.ImportAsync();
+        record = record with
+        {
+            Source = record.Source with
+            {
+                Servers = [new("001", new Dictionary<string, InUseEvidence>
+        { ["SI_ENVIRONMENT"] = new(raw, "Synthetic source reference") })]
+            }
+        };
+        var policy = new InUsePolicy(Options.Create(new InUsePolicyOptions()));
+        InUsePolicyProposal result = policy.Propose(record);
+        result.Fields.Single(f => f.Field == "check:NmsRequested").Value.Should().Be(expected);
+        record.Source.Servers[0].Fields["SI_ENVIRONMENT"].Value.Should().Be(raw);
+    }
+
     [Fact]
     public async Task Policy_IsExplicitVersionBound_AndCannotReplaceSavedEvidenceSilently()
     {
@@ -35,7 +62,7 @@ public sealed partial class InUseTests
         record.PolicyProposal!.Fingerprint.Should().NotBe(proposal.Fingerprint);
         InUseReport report = (await fixture.Service.ExportAsync(_principal, _context, record.Id, new(record.Version), _token)).Value!;
         report.PreparedByLabel.Should().Contain(fixture.User.Id.ToString("N")[..8]);
-        report.Sheets.Single(s => s.Name == "ReviewEvidence").Rows.Should().Contain(r => r.Any(c => c.Contains(proposal.Fingerprint)));
+        report.EvidenceSheets.Single(s => s.Name == "ReviewEvidence").Rows.Should().Contain(r => r.Any(c => c.Contains(proposal.Fingerprint)));
     }
 
     [Fact]
@@ -72,7 +99,7 @@ public sealed partial class InUseTests
             nms.Rows[i + 1][0].Should().Be("Bilinmiyor / doğrulanmadı");
         }
         using ZipArchive zip = new(new MemoryStream(report.Content));
-        using Stream stream = zip.GetEntry("xl/worksheets/sheet4.xml")!.Open();
+        using Stream stream = zip.GetEntry("xl/worksheets/sheet1.xml")!.Open();
         var xml = XDocument.Load(stream);
         XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
         foreach (InUseServer server in servers)

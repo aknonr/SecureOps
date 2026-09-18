@@ -86,5 +86,17 @@ public sealed class InUseHostedTests
         (await admin.GetFromJsonAsync<InUseRecord>(root))!.Version.Should().Be(saved.Version);
         JsonElement records = await admin.GetFromJsonAsync<JsonElement>("/api/v1/operational-records/stored");
         records.GetProperty("total").GetInt32().Should().Be(0);
+        var discard = new ChangeInUseDraftRequest(saved.Version, "Discard", "Synthetic trial removed");
+        (await denied.PostAsJsonAsync(root + "/draft-lifecycle", discard)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        InUseRecord removed = (await (await admin.PostAsJsonAsync(root + "/draft-lifecycle", discard)).Content.ReadFromJsonAsync<InUseRecord>())!;
+        removed.Discarded.Should().BeTrue();
+        removed.Draft.Should().BeNull();
+        (await admin.PostAsJsonAsync(root + "/draft-lifecycle", discard)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await admin.GetFromJsonAsync<InUsePage>("/api/v1/in-use?status=Discarded"))!.Items.Should().ContainSingle(r => r.Id == removed.Id);
+        (await admin.GetFromJsonAsync<InUsePage>("/api/v1/in-use"))!.Items.Should().NotContain(r => r.Id == removed.Id);
+        InUseRecord restarted = (await (await admin.PostAsJsonAsync(root + "/draft-lifecycle", new ChangeInUseDraftRequest(removed.Version, "Restart", "Fresh review"))).Content.ReadFromJsonAsync<InUseRecord>())!;
+        restarted.Discarded.Should().BeFalse();
+        restarted.Draft.Should().BeNull();
+        restarted.AssigneeId.Should().Be(saved.AssigneeId);
     }
 }

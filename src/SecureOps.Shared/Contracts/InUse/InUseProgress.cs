@@ -26,14 +26,14 @@ public static class InUseProgress
         && (value.EndsWith('Z') || value.Length > 19 && (value[^6] is '+' or '-'))
         && DateTimeOffset.TryParseExact(value, ["O", "yyyy-MM-dd'T'HH:mm:ssK"], CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTimeOffset date) && date <= now ? date : null;
     /// <summary>Local workbook readiness, not global relationship completeness or corporate acceptance.</summary>
-    public static bool Ready(InUseRecord r) => r.Draft?.SourceVersion == r.SourceVersion
+    public static bool Ready(InUseRecord r) => !r.Discarded && r.Draft?.SourceVersion == r.SourceVersion
         && InUseChecks.RelationshipReady(r.Source) && InUseChecks.Missing(r.Source, r.Draft.Answers) is null;
     /// <summary>Aggregates stored records once; callers supply a consistent snapshot.</summary>
     public static InUseOverview Summarize(IReadOnlyList<InUseRecord> records, InUseRefreshState refresh, DateTimeOffset now) =>
-        new(records.Count, records.Count(r => r.Source.Lifecycle is { Value: "Open", Source.Length: > 0 }),
-            records.Count(r => r.Source.Lifecycle is not { Value: "Open" or "Closed", Source.Length: > 0 }),
-            records.Count(r => !Ready(r)), records.Count(Ready),
-            records.Where(r => r.Source.Lifecycle is { Value: "Open", Source.Length: > 0 } && Created(r.Source, now) is not null)
+        new(records.Count(r => !r.Discarded), records.Count(r => !r.Discarded && r.Source.Lifecycle is { Value: "Open", Source.Length: > 0 }),
+            records.Count(r => !r.Discarded && r.Source.Lifecycle is not { Value: "Open" or "Closed", Source.Length: > 0 }),
+            records.Count(r => !r.Discarded && !Ready(r)), records.Count(Ready),
+            records.Where(r => !r.Discarded && r.Source.Lifecycle is { Value: "Open", Source.Length: > 0 } && Created(r.Source, now) is not null)
                 .OrderBy(r => Created(r.Source, now)).ThenBy(r => r.Id).Take(5)
                 .Select(r => new InUseWaitingRecord(r.Id, r.Source.Code, Created(r.Source, now)!.Value)).ToArray(), refresh);
 }

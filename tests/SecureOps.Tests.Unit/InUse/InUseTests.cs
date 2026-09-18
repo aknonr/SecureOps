@@ -106,10 +106,10 @@ public sealed partial class InUseTests
         InUseAnswer[] answers = source.Servers.SelectMany(s => InUseChecks.OperatorCodes.Select(c => new InUseAnswer(s.Id, c, "No", ""))).ToArray();
         record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id, new(record.Version, record.SourceVersion, answers, ""), _token)).Value!;
         InUseReport report = (await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version), _token)).Value!;
-        report.Sheets[0].Rows.Single(r => r[0] == "HOSTNAME").Skip(1).Should().Equal(Enumerable.Range(0, 4).Select(i => "synthetic-server-" + i));
-        report.Sheets[0].Rows.Single(r => r[0] == "SI_ENVIRONMENT").Skip(1).Should().Equal(Enumerable.Range(0, 4).Select(i => $"display-{i}-p_SI_def_environment"));
-        report.Sheets[3].Rows.Skip(1).Select(r => r[3]).Should().Equal("2000", "2001", "2002", "2003");
-        report.Sheets[4].Rows.Should().Contain(r => r.Contains("Observed"));
+        report.Sheets[3].Rows.Single(r => r[0] == "HOSTNAME").Skip(1).Should().Equal(Enumerable.Range(0, 4).Select(i => "synthetic-server-" + i));
+        report.Sheets[3].Rows.Single(r => r[0] == "SI_ENVIRONMENT").Skip(1).Should().Equal(Enumerable.Range(0, 4).Select(i => $"display-{i}-p_SI_def_environment"));
+        report.Sheets[0].Rows.Skip(1).Select(r => r[3]).Should().Equal("2000", "2001", "2002", "2003");
+        report.EvidenceSheets[0].Rows.Should().Contain(r => r.Contains("Observed"));
         // A shrinking bounded result is not authoritative deletion, and prevents current archival.
         f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([source with { Servers = source.Servers.Take(3).ToArray() }], false));
         await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
@@ -229,7 +229,7 @@ public sealed partial class InUseTests
         record.Draft!.Answers.Select(a => a.Value).Should().Equal("Yes", "No");
         (await f.Service.ExportAsync(_principal, _context, record.Id, new(request.ExpectedVersion), _token)).Error.Should().Be("InUseConflict");
         InUseReport report = (await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version), _token)).Value!;
-        report.Sheets[0].Rows[14].Should().Equal("Sunucudan İnternete Erişim Var mı ?", "Evet", "Hayır");
+        report.Sheets[3].Rows[14].Should().Equal("Sunucudan İnternete Erişim Var mı ?", "Evet", "Hayır");
         InUseSource changed = record.Source with { Title = "Changed source evidence" };
         f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([changed], true));
         await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
@@ -280,14 +280,14 @@ public sealed partial class InUseTests
             Draft = new(record.SourceVersion, [], "@unsafe", f.User.Id, DateTimeOffset.UtcNow)
         };
         InUseReport report = InUseWorkbook.Create(record, f.User.Id, DateTimeOffset.UtcNow);
-        report.Sheets.Select(s => s.Name).Should().Equal("Sunucular", "CheckList_TEKNIK", "CheckList_THY", "NMS", "Provenance", "ReviewEvidence");
-        report.Sheets[0].Rows.Should().HaveCount(29);
-        report.Sheets[3].Rows[0].Should().HaveCount(22);
-        report.Sheets[0].Rows[2][1].Should().StartWith("'");
-        report.Sheets[3].Rows[1][0].Should().Be("Bilinmiyor / doğrulanmadı");
+        report.Sheets.Select(s => s.Name).Should().Equal("NMS", "CheckList_THY", "CheckList_TEKNIK", "Sunucular");
+        report.Sheets[3].Rows.Should().HaveCount(29);
+        report.Sheets[0].Rows[0].Should().HaveCount(22);
+        report.Sheets[3].Rows[2][1].Should().StartWith("'");
+        report.Sheets[0].Rows[1][0].Should().Be("Bilinmiyor / doğrulanmadı");
         report.Sheets[1].Rows.Should().BeEmpty();
-        report.Sheets[4].Rows.Should().Contain(r => r.Contains(record.SourceHash));
-        report.Sheets[4].Rows.Should().Contain(r => r[0] == "Relationships" && r[1] == record.Source.RelationshipEvidence);
+        report.EvidenceSheets[0].Rows.Should().Contain(r => r.Contains(record.SourceHash));
+        report.EvidenceSheets[0].Rows.Should().Contain(r => r[0] == "Relationships" && r[1] == record.Source.RelationshipEvidence);
         using ZipArchive zip = new(new MemoryStream(report.Content));
         foreach (ZipArchiveEntry entry in zip.Entries)
         {

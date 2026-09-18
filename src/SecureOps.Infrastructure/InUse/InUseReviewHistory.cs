@@ -34,7 +34,8 @@ public static class InUseReviewHistory
     public static InUseReuseProposal Proposal(InUseRecord current, InUseServer server, InUseServerReview old, DateTimeOffset now)
     {
         string[] changed = CriticalFields.Where(f => server.Fields.GetValueOrDefault(f)?.Value != old.Server.Fields.GetValueOrDefault(f)?.Value).ToArray();
-        string reason = Identity(current.Source, server) != old.IdentityKey ? "Sunucu kaynak kimliği eşleşmiyor."
+        string reason = old.Invalidated || current.Discarded ? "Taslak sıfırlanmış veya kaldırılmış; bu cevaplar yeniden kullanılamaz."
+            : Identity(current.Source, server) != old.IdentityKey ? "Sunucu kaynak kimliği eşleşmiyor."
             : current.LastSeenAt > now || current.LastSeenAt < now.AddHours(-24) || old.ReviewedAt > now || old.ReviewedAt < now.AddDays(-30)
                 || old.ObservedAt > old.ReviewedAt || old.ObservedAt < old.ReviewedAt.AddHours(-24)
                 ? "Kaynak gözlemi veya önceki inceleme güncel değil; yeniden kontrol edin."

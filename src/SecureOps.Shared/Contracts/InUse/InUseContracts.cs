@@ -66,6 +66,12 @@ public sealed record InUseDraft(long SourceVersion, IReadOnlyList<InUseAnswer> A
 public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash, long SourceVersion,
     long Version, Guid? AssigneeId, string? AssigneeLabel, InUseDraft? Draft, DateTimeOffset LastSeenAt)
 {
+    /// <summary>Local work disposition only; never source deletion or an external undo.</summary>
+    public bool Discarded { get; init; }
+    /// <summary>Prior review revisions remain historical but cannot be reused after an explicit reset.</summary>
+    public long InvalidatedReviewsThrough { get; init; }
+    /// <summary>Last explicit local reset/discard/restart, with trusted actor attribution.</summary>
+    public InUseDraftLifecycle? DraftLifecycle { get; init; }
     /// <summary>Authenticated actor who last changed the optional assignment, not the reviewer or source closer.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Guid? AssignedBy { get; init; }
@@ -109,6 +115,12 @@ public sealed record RefreshInUseRequest(Guid CommandId);
 /// <summary>Manual assignment to an approved application identity, or explicit unassignment.</summary>
 public sealed record AssignInUseRequest(long ExpectedVersion, Guid? AssigneeId, string Reason);
 
+/// <summary>Explicit record-wide local recovery, protected by the displayed aggregate version.</summary>
+public sealed record ChangeInUseDraftRequest(long ExpectedVersion, string Action, string Reason);
+
+/// <summary>Audit summary; old revisions, archives and remote outcomes are retained separately.</summary>
+public sealed record InUseDraftLifecycle(string Action, Guid ActorId, string ActorLabel, DateTimeOffset At, string Reason);
+
 /// <summary>Replace a review draft without altering source data.</summary>
 public sealed record SaveInUseDraftRequest(long ExpectedVersion, long SourceVersion, IReadOnlyList<InUseAnswer> Answers, string Notes)
 {
@@ -140,6 +152,10 @@ public sealed record InUseReport(Guid RecordId, long Version, long SourceVersion
     public DateTimeOffset PreparedAt { get; init; }
     /// <summary>Exact source identity bound to this artifact.</summary>
     public string SourceId { get; init; } = "";
+    /// <summary>Source display code frozen at preparation, not reconstructed from today's record.</summary>
+    public string? SourceCode { get; init; }
+    /// <summary>Internal audit evidence, separate from the corporate workbook worksheets.</summary>
+    public IReadOnlyList<InUseSheet> EvidenceSheets { get; init; } = [];
     /// <summary>True only after durable archive commit or verified archive read.</summary>
     public bool Archived { get; init; }
     /// <summary>Workbook byte count, independently checked when reading the archive.</summary>

@@ -30,18 +30,26 @@ public sealed partial class SqlWorkflowReportStore
                 ('InUse.Reviewed',CASE WHEN r.Answered=r.Servers AND r.Servers>0 THEN 1 ELSE 0 END),
                 ('InUse.Assigned',CASE WHEN r.AssigneeId IS NOT NULL THEN 1 ELSE 0 END),
                 ('InUse.Unassigned',CASE WHEN r.AssigneeId IS NULL THEN 1 ELSE 0 END)) metric(KeyName,IncludeRow)
-            WHERE metric.IncludeRow=1;
+            WHERE metric.IncludeRow=1 AND COALESCE(JSON_VALUE(r.RecordJson,'$.Discarded'),'false')='false';
+            INSERT #facts
+            SELECT 'InUse.Discarded',CONVERT(nvarchar(200),r.Id),'InUse',r.Id,r.Code,'InUse','Discarded',
+                JSON_VALUE(r.RecordJson,'$.DraftLifecycle.ActorLabel'),r.Assignee,
+                TRY_CONVERT(datetimeoffset,JSON_VALUE(r.RecordJson,'$.DraftLifecycle.At')),N'Yerel taslak kaldırıldı; kaynak kaydı ve arşivler korunur'
+            FROM #inuse r WHERE JSON_VALUE(r.RecordJson,'$.Discarded')='true';
             INSERT #facts
             SELECT 'InUse.Servers',CONVERT(nvarchar(36),r.Id)+':'+JSON_VALUE(s.value,'$.Id'),'InUse',r.Id,r.Code,'InUse','Reviewed',r.Reviewer,r.Assignee,r.ReviewedAt,
                 N'Güncel kaynak sürümünde üç açık cevap; izleme yapılandırması kanıtı değildir'
             FROM #inuse r CROSS APPLY OPENJSON(r.RecordJson,'$.Source.Servers') s
-            WHERE JSON_VALUE(r.RecordJson,'$.Draft.SourceVersion')=JSON_VALUE(r.RecordJson,'$.SourceVersion')
+            WHERE COALESCE(JSON_VALUE(r.RecordJson,'$.Discarded'),'false')='false'
+                AND JSON_VALUE(r.RecordJson,'$.Draft.SourceVersion')=JSON_VALUE(r.RecordJson,'$.SourceVersion')
                 AND (SELECT COUNT(DISTINCT JSON_VALUE(a.value,'$.Check')) FROM OPENJSON(r.RecordJson,'$.Draft.Answers') a
                     WHERE JSON_VALUE(a.value,'$.ServerId')=JSON_VALUE(s.value,'$.Id')
                     AND JSON_VALUE(a.value,'$.Check') IN ('InternetOut','InternetIn','Microsegmented')
                     AND JSON_VALUE(a.value,'$.Value') IN ('Yes','No'))=3;
             INSERT #facts
-            SELECT 'InUse.Archived',CONVERT(nvarchar(36),a.RecordId)+':'+CONVERT(nvarchar(20),a.ReportVersion),'InUse',a.RecordId,r.Code,'InUse','Archived',a.PreparedByLabel,r.Assignee,a.PreparedAt,
+            SELECT 'InUse.Archived',CONVERT(nvarchar(36),a.RecordId)+':'+CONVERT(nvarchar(20),a.ReportVersion),'InUse',a.RecordId,r.Code,'InUse',
+                CASE WHEN JSON_VALUE(r.RecordJson,'$.Discarded')='true' THEN 'Discarded'
+                     WHEN a.ReportVersion<r.Version THEN 'Superseded' ELSE 'Archived' END,a.PreparedByLabel,r.Assignee,a.PreparedAt,
                 N'SHA-256: '+a.Sha256
             FROM reporting.InUseArchiveReceipts a JOIN #inuse r ON r.Id=a.RecordId
             WHERE a.PreparedAt>=@From AND a.PreparedAt<@To AND (@IncludeSynthetic=1 OR a.Synthetic=0);

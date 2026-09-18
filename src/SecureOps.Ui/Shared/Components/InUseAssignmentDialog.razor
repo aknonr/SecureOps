@@ -1,0 +1,86 @@
+@using SecureOps.Shared.Contracts.InUse
+
+<MudDialog Class="so-dialog so-inuse-assignment-dialog" DefaultFocus="DefaultFocus.FirstChild">
+    <TitleContent><h2>İnceleyici ata / değiştir</h2></TitleContent>
+    <DialogContent>
+        <p><strong>@Record.Source.Code</strong> · Güncel inceleyici: @(Record.AssigneeLabel ?? "Atanmamış")</p>
+        <p>Atama isteğe bağlıdır. Kaydetmeden seçimleriniz uygulanmaz.</p>
+        @if (ReporterLabels.Length == 1)
+        {
+            <p>Bağlı sunucu talebini bildiren: <strong>@ReporterLabels[0]</strong>.</p>
+            <p>Kaynak kullanıcı kimliğinin uygun WASAS hesabıyla eşleşmesi doğrulanmadı. Ad benzerliğiyle otomatik atama yapılmaz; uygun inceleyiciyi arayabilir veya atanmamış bırakabilirsiniz.</p>
+        }
+        else
+        { <p>Tek ve güncel bir bağlı talep bildireni doğrulanamadı. İnceleyiciyi elle seçebilir veya atanmamış bırakabilirsiniz.</p> }
+        <MudTextField T="string" Label="Uygun WASAS inceleyicisi ara" aria-label="Uygun WASAS inceleyicisi ara" Value="_search" ValueChanged="SearchAsync"
+                      MaxLength="100" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Disabled="_busy" />
+        <MudSelect T="string" Label="İnceleyici" @bind-Value="_selected" Disabled="_busy" Variant="Variant.Outlined">
+            <MudSelectItem T="string" Value="@(string.Empty)">Atanmamış</MudSelectItem>
+            @if (Record.AssigneeId is { } current && !_people.Any(p => p.Id == current))
+            { <MudSelectItem T="string" Value="@(current.ToString("D"))">@Record.AssigneeLabel</MudSelectItem> }
+            @foreach (var person in _people)
+            { <MudSelectItem T="string" Value="@(person.Id.ToString("D"))">@person.Label</MudSelectItem> }
+        </MudSelect>
+        <MudTextField T="string" Label="Atama gerekçesi" aria-label="Atama gerekçesi" @bind-Value="_reason" MaxLength="500" Immediate="true"
+                      Required="true" Variant="Variant.Outlined" Disabled="_busy" />
+        @if (_error is not null) { <p role="alert">@_error</p> }
+        @if (_busy) { <p role="status">İşlem sürüyor...</p> }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_busy">Vazgeç</MudButton>
+        <MudButton OnClick="SaveAsync" Disabled="@(_busy || string.IsNullOrWhiteSpace(_reason))"
+                   Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save">Atamayı kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudDialogInstance Dialog { get; set; } = default!;
+    /// <summary>Version-bound selected record, not a source identity selector.</summary>
+    [Parameter, EditorRequired] public InUseRecord Record { get; set; } = default!;
+    /// <summary>Existing bounded API-authorized reviewer search.</summary>
+    [Parameter, EditorRequired] public Func<string, Task<InUseAssignee[]>> Search { get; set; } = default!;
+    /// <summary>Explicit version-bound assignment command.</summary>
+    [Parameter, EditorRequired] public Func<AssignInUseRequest, Task<InUseRecord>> Save { get; set; } = default!;
+    private InUseAssignee[] _people = [];
+    private string _selected = "", _search = "", _reason = "";
+    private string? _error;
+    private bool _busy;
+    private int _searchVersion;
+    private string[] ReporterLabels => Record.Source.Servers.Select(s => s.RelatedRequestReporter)
+        .Where(r => r is not null && r.EffectiveState(DateTimeOffset.UtcNow) == "ExactMatch" && r.DisplayState == "Returned"
+            && r.ReferenceState == "Returned" && !string.IsNullOrWhiteSpace(r.UserReference))
+        .Select(r => (r!.UserReference, Display: InUseDisplayText.Decode(r.Display))).Distinct().Select(r => r.Display).ToArray();
+    protected override async Task OnInitializedAsync()
+    {
+        _selected = Record.AssigneeId?.ToString("D") ?? "";
+        await SearchAsync("");
+    }
+    private async Task SearchAsync(string value)
+    {
+        _search = value;
+        int version = ++_searchVersion;
+        try
+        {
+            InUseAssignee[] people = await Search(value);
+            if (version == _searchVersion) { _people = people; _error = null; }
+        }
+        catch (SecureOpsApiException ex)
+        { if (version == _searchVersion) { _people = []; _error = ex.Problem.Explanation; } }
+        catch (OperationCanceledException) { Dialog.Cancel(); }
+    }
+    private async Task SaveAsync()
+    {
+        if (_busy || string.IsNullOrWhiteSpace(_reason)) { return; }
+        _busy = true;
+        _error = null;
+        try
+        {
+            InUseRecord updated = await Save(new(Record.Version, Guid.TryParse(_selected, out Guid person) ? person : null, _reason));
+            Dialog.Close(DialogResult.Ok(updated));
+        }
+        catch (SecureOpsApiException ex) { _error = ex.Problem.Explanation; }
+        catch (OperationCanceledException) { Dialog.Cancel(); }
+        finally { _busy = false; }
+    }
+    private void Cancel() => Dialog.Cancel();
+}

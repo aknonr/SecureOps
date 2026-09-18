@@ -80,10 +80,12 @@ public partial class AnnouncementSourceReview
         try
         {
             AnnouncementSourceReadiness readiness = await Api.SourceReadinessAsync(token);
-            MaintenanceProfileChoice[] choices = await Api.ProfilesAsync(token);
             if (token.IsCancellationRequested)
             { return; }
             _readiness = readiness;
+            MaintenanceProfileChoice[] choices = await Api.ProfilesAsync(token);
+            if (token.IsCancellationRequested)
+            { return; }
             _profiles = choices;
             if (Version == 0 && !submit)
             { return; }

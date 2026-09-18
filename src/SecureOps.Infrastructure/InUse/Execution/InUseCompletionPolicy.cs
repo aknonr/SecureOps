@@ -27,7 +27,11 @@ public sealed class InUseCompletionPolicy(IOptions<InUseCompletionOptions> optio
     public InUseExecutionReadiness Readiness(InUseSource source)
     {
         if (!options.Value.Enabled)
-        { return new(false, "Disabled", "Kaynağa ekleme ve tamamlama bu ortamda kapalı. Excel'i WASAS'a arşivleyip indirebilirsiniz."); }
+        {
+            return new(false, "Disabled", source.Synthetic
+                ? "Tamamlama özelliği yönetici tarafından kapalı. Excel'i WASAS'a arşivleyip indirebilirsiniz."
+                : "Tamamlama özelliği kapalı; ayrıca bu sürümün gerçek kaynak adaptörü ve ek/OR sonuç doğrulaması tamamlanmadı. Yalnız ayar açılması yeterli değildir. Arşivden indir kullanılabilir; entegrasyon sorumlusu eksik kaynak sözleşmelerini doğrulamalı.");
+        }
         if (options.Value.Provider == "Fixture" && environment is "Test" or "Development" or "Demo"
             && source.Synthetic && source.IdentityScope?.StartsWith("simulation:", StringComparison.Ordinal) == true
             && Path.IsPathFullyQualified(options.Value.FixtureDirectory))

@@ -1,5 +1,14 @@
 # SecureOps.Ui
 
+Post-rc6.26 In Use continuation: assignment uses the existing MudBlazor dialog
+service, explicit save/cancel and version-bound API, preserving unsaved answers.
+Unsaved undo is local; saved reset/discard/restart calls the authorized lifecycle
+endpoint and never deletes files. Removed drafts have an explicit list filter and
+restart action. Names use the original report preparer; evidence is outside the
+four corporate worksheet preview. OCO profile failure/disabled/unconfigured states
+are distinct; mail flags do not enable source collection. Final current-payload
+browser/touch/zoom acceptance remains pending, not inferred from compilation.
+
 ## rc6.22 Operator Completion
 
 The repaired OCO, In Use and access journeys are packaged at build source

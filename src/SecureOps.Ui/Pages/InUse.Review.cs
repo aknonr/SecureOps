@@ -22,7 +22,7 @@ public partial class InUse
         if (_record is null || _dirty || !MayStartExecution || _execution?.Readiness.Available != true || !Ready())
         { return; }
         if (await Dialogs.ShowMessageBox("Talebe ekle ve tamamla",
-            $"{_record.Source.Code}: kaydedilen {_record.Source.Servers.Count} sunuculuk rapor arşivlenecek; aynı baytlar talebe eklenecek, doğrulanan tek görev tamamlanacak ve OR son durumu ayrıca okunacak. Dış etkiler tek işlemle geri alınamaz.",
+            $"Başlatan: {_access?.Profile?.DisplayName ?? _access?.Profile?.Account ?? _access?.Access?.UserId.ToString("D")}. {_record.Source.Code}: kaydedilen {_record.Source.Servers.Count} sunuculuk rapor arşivlenecek; aynı baytlar talebe eklenecek, doğrulanan tek görev tamamlanacak ve OR son durumu ayrıca okunacak. İnceleyici ataması bu aktörün yerine geçmez. Dış etkiler tek işlemle geri alınamaz.",
             yesText: "Bu talep ve sürüm için onaylıyorum", cancelText: "Vazgeç") != true)
         { return; }
         _report = await SendAsync<InUseReport>(HttpMethod.Post, $"/{_record.Id}/report", new ExportInUseRequest(_record.Version, Archive: true));

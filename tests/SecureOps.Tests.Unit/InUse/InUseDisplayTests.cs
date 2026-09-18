@@ -38,9 +38,9 @@ public sealed class InUseDisplayTests
         string stored = JsonSerializer.Serialize(record);
         InUseRecord old = JsonSerializer.Deserialize<InUseRecord>(stored)!;
         InUseReport report = InUseWorkbook.Create(old, Guid.NewGuid(), DateTimeOffset.UtcNow);
-        report.Sheets[0].Rows.Single(r => r[0] == "SERVICE NAME (ÜRÜN/UYGULAMA)")[1].Should().Be("Görüntü & Kontrol");
-        report.Sheets[0].Rows.Single(r => r[0] == "CITY")[1].Should().Be("'=1+1");
-        report.Sheets[3].Rows[1][3].Should().Be("&amp;id");
+        report.Sheets[3].Rows.Single(r => r[0] == "SERVICE NAME (ÜRÜN/UYGULAMA)")[1].Should().Be("Görüntü & Kontrol");
+        report.Sheets[3].Rows.Single(r => r[0] == "CITY")[1].Should().Be("'=1+1");
+        report.Sheets[0].Rows[1][3].Should().Be("&amp;id");
         using var zip = new ZipArchive(new MemoryStream(report.Content));
         XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
         using Stream input = zip.GetEntry("xl/worksheets/sheet1.xml")!.Open();
@@ -87,16 +87,13 @@ public sealed class InUseDisplayTests
             new(2, [], "", Guid.NewGuid(), now), now);
         string original = JsonSerializer.Serialize(record);
         InUseReport report = InUseWorkbook.Create(record, Guid.NewGuid(), now);
-        IReadOnlyList<string>[] rows = report.Sheets[5].Rows.Where(r => r[1] == InUseRelatedRequestReporter.Label).ToArray();
+        IReadOnlyList<string>[] rows = report.EvidenceSheets[1].Rows.Where(r => r[1] == InUseRelatedRequestReporter.Label).ToArray();
         rows.Select(r => r[2]).Should().Equal(expected, expected, expected);
         rows.Select(r => r[3]).Should().Equal("RFC eşleşti", "Erişim reddedildi", "Güncel değil");
         using var zip = new ZipArchive(new MemoryStream(report.Content));
-        using Stream stream = zip.GetEntry("xl/worksheets/sheet6.xml")!.Open();
-        var xml = XDocument.Load(stream);
-        XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-        xml.Descendants(ns + "t").Select(t => t.Value).Should().Equal(report.Sheets[5].Rows.SelectMany(r => r));
-        xml.Descendants(ns + "f").Should().BeEmpty();
-        xml.Descendants("b").Should().BeEmpty();
+        zip.GetEntry("xl/worksheets/sheet6.xml").Should().BeNull();
+        JsonSerializer.Deserialize<InUseReport>(JsonSerializer.Serialize(report))!.EvidenceSheets
+            .Should().BeEquivalentTo(report.EvidenceSheets);
         JsonSerializer.Serialize(record).Should().Be(original);
     }
 }

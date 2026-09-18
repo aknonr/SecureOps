@@ -19,6 +19,28 @@ namespace SecureOps.Tests.Integration.Sql;
 public sealed partial class ResourceSqlTests
 {
     [LocalResourceSqlFact]
+    public async Task WorkflowReport_DiscardedDraftIsNotActiveWork_ArchiveRemainsHistorical()
+    {
+        ExecutionFixture f = await ExecutionAsync();
+        var store = new SqlWorkflowReportStore(Configuration());
+        await using var sql = new SqlConnection(Configuration().GetConnectionString("SecureOpsDb"));
+        long version = await sql.ExecuteScalarAsync<long>("SELECT AccessVersion FROM security.Users WHERE UserId=@id", new { id = f.Intent.InitiatorId });
+        var actor = new ApplicationUser(f.Intent.InitiatorId, "synthetic-report", "test", AccessStatus.Approved,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, version, [], []);
+        await store.ArchiveAsync(InUseWorkbook.Create(f.Record, actor.Id, DateTimeOffset.UtcNow) with { Archived = true }, true, _token);
+        var repository = new SqlInUseRepository(Configuration());
+        (await repository.SaveAsync(f.Record with { Version = f.Record.Version + 1, Draft = null, Discarded = true }, f.Record.Version, LifecycleAudit(f), _token)).Should().BeTrue();
+        Guid cut = await store.CaptureAsync(actor, "discard", new(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow, IncludeSynthetic: true), true, false, false, "synthetic-discard", _token);
+        WorkflowReport all = (await store.ReadAsync(cut, actor, "discard", new(), "synthetic-discard", true, _token))!;
+        WorkflowFact[] facts = all.Items.Where(i => i.RecordId == f.Record.Id).ToArray();
+        facts.Select(i => i.Metric).Should().BeEquivalentTo(new[] { "InUse.Discarded", "InUse.Archived" });
+        facts.Should().OnlyContain(i => i.Status == "Discarded");
+        WorkflowReport filtered = (await store.ReadAsync(cut, actor, "discard", new(Status: "Discarded"), "synthetic-discard", true, _token))!;
+        filtered.Total.Should().Be(filtered.Items.Count);
+        WorkflowReportWorkbook.Create(filtered).Should().NotBeEmpty();
+    }
+
+    [LocalResourceSqlFact]
     public async Task WorkflowReport_OcoOwnerBoundariesHalfOpenDatesAndLogicalSends()
     {
         await using var sql = new SqlConnection(Configuration().GetConnectionString("SecureOpsDb"));

@@ -2,6 +2,48 @@
 
 ## Owner exception and baseline
 
+### Post-rc6.26 continuation
+
+The owner explicitly extends the same task-specific exception to the reported
+export, history, draft lifecycle, assignment, source and mail gaps. Inspected
+continuation HEAD: `34c8837c2837b9a3ad61a432aa121cf41ac3e0c7`, clean, same branch.
+The cumulative baselines below remain unchanged; inherited changes and new files
+count. No intermediate release is requested. rc6.26 remains immutable.
+The operator reports matched installation, SQL 022/023 and resolved account
+lockout. These are not independently verified target observations; do not replay
+the migrations or repeat account remediation.
+
+An actual legacy XLSX is now supplied and its SHA-256 was independently verified:
+`B3979BBC3A5F58EC7A824F7199F92ACF744D0AAED72243E00B75ABB762AAF2EF`
+(12,718 bytes). Earlier statements below about no sample describe the prior
+checkpoint only. The original current JSON attachment is not on the inspected
+filesystem; the pasted copy has a malformed final `Archived` property. Its rows
+and screenshots are owner evidence, not an independently parsed archive file.
+
+The exporter repair preserves the corporate order NMS, CheckList_THY,
+CheckList_TEKNIK, Sunucular. The checklists remain empty. New workbook bytes use
+readable text-cell styles and widths without changing fields or data placement.
+Internal provenance stays in the immutable envelope as separate evidence, not
+extra corporate worksheet tabs. Existing envelopes and XLSX bytes are unchanged.
+Human-readable download names use the original trusted preparer snapshot plus a
+stable actor suffix and UTC preparation time; no current downloader substitution.
+This changes neither GUID archive paths nor the `<OR>_InUse.xlsx` remote contract.
+
+### Continuation accounting
+
+Owner exception remains cumulative, including inherited and new/untracked files.
+Counts below are the final continuation checkpoint; a commit does not reset them.
+
+| Baseline | Files | Additions | Deletions |
+|---|---:|---:|---:|
+| actual continuation 34c8837 | 43 | 1534 | 102 |
+| inherited rc6.24 8c1b58d | 104 | 4980 | 222 |
+| complete post-rc6.22 aa9e4d2 | 138 | 9336 | 1427 |
+
+Scope is workbook/metadata, local lifecycle/history invalidation, assignment,
+source-readiness presentation, reporting disposition, tests and matching guidance.
+No unrelated refactor, corporate migration, grant, activation or release ZIP.
+
 The owner extends the task-specific size exception to integrated OR/SDM, In Use,
 OCO and existing management reporting, necessary persistence, tests and delivery.
 Verified starting HEAD is `c4a835274cb1ce511a564137ad1c213a79b056f2`, clean, on
@@ -45,7 +87,9 @@ are excluded by default; synthetic demo inclusion must be explicit and labelled.
 | Result | Current baseline | Remaining work / next evidence | Target |
 |---|---|---|---|
 | OR to SDM | ServerRequest positive policy; explicit Jira-only intent and durable link | Verify exact types/mapping; selected OR/destination/actor; source closure contract | Not activated here |
-| In Use review/history/workbook | rc6.24 packaged synthetic acceptance; no supplied XLSX | Retain parity; receipt/reporting; actual archive setting and preserved re-download | Effective path unverified |
+| In Use review/history/workbook | rc6.26 retained; post-rc6.26 actual legacy XLSX hash/29 row labels/22 headers compared; four-sheet readable exporter implemented | New-source final browser/package acceptance and original current envelope; global authorized report catalogue still incomplete | D: archive operator-reported/screenshotted; effective identity/readback unverified |
+| Local draft recovery | Versioned reset/discard/restart, immutable archive preservation and history reuse invalidation implemented | API/unit/isolated SQL acceptance; final browser/package replay pending | Not installed by this agent |
+| Assignment and attribution | Visible modal, explicit save/cancel, optional reviewer, trusted initiator retained | Stable RFC-user to WASAS-user mapping still absent; final touch/zoom/focus acceptance pending | No automatic suggestion acceptance enabled |
 | In Use attachment/closure | Durable fixture executor, tested wire serializer | Actual readback/conditional contracts and real adapter registration | Not corporately verified |
 | OCO source/preparation/mail | Source jobs, six original CID assets, v3, optional SMTP; c4a8352 local sink/restart | Final package and target providers/relay/Outlook/selected recipients | No live send authorized by generic scope |
 | Management workflow reporting | New SQL 023 frozen metric/detail/export, module capability and OCO owner scope | Final UI/package acceptance and target schema/readiness | Not activated |
@@ -74,8 +118,9 @@ this work does not install or promise an unattended Windows Service.
 | Relay From/envelope/TLS and recipients | Real SMTP transport, immutable MIME and Worker; local rejection/unknown/revocation evidence retained | Messaging owner: approved relay policy/config revision. Operator: exact preparation, self-test actor Mail, separately reviewed distribution To/Cc; Outlook observation | Controlled mail activation |
 | Actual archive and runtime composition | Protected diagnostics report effective path/identity/provider source, not only JSON | TEST operator: effective API path, old/new hash manifests, installed 022, actual runtime identities, named foreground Worker window | Data-preserving activation |
 
-No actual sample XLSX was attached. Pasted rows and script layouts are test inputs,
-not workbook-to-workbook acceptance. The timestamped script SHA remains
+At the rc6.26 checkpoint no actual sample XLSX had been attached. That limitation
+is superseded by the verified legacy workbook above; the original current envelope
+is still requested, not reconstructed from its malformed pasted ending. The timestamped script SHA remains
 `BB07673BCC19FABFB07005E24897810FE9AD91FA6936049E7EB271CABAC0D704`.
 Current In Use workbook/reuse/execution trace and deliberate legacy bug corrections
 remain in `docs/inuse-v2-followup.md`.

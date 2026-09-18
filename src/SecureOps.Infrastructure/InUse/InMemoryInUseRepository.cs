@@ -44,7 +44,7 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
         {
             InUseRecord[] rows = [.. _records.Values.Where(r =>
                 Matches(r.Source, query.Search)
-                && (query.Status is null || r.Status == query.Status)
+                && (query.Status == "Discarded" ? r.Discarded : !r.Discarded && (query.Status is null || r.Status == query.Status))
                 && (query.View == "all" || query.View == "mine" && r.AssigneeId == actorId || query.View == "unassigned" && r.AssigneeId is null))
                 .OrderBy(r => r.Source.Code, StringComparer.Ordinal).ThenBy(r => r.Id)];
             return new(rows.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray(), rows.Length, query.Page, query.PageSize, _state);
@@ -121,6 +121,9 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
         {
             if (!_records.TryGetValue(id, out InUseRecord? current) || current.Version != expectedVersion)
             { return false; }
+            if (evidence.Operation?.Action == "InUseDraftSaved" && (next?.Draft?.Answers ?? []).Any(a =>
+                a.Origin?.ReviewId is Guid reviewId && (_reviews.SingleOrDefault(r => r.Id == reviewId) is not { } review || WithInvalidation(review).Invalidated)))
+            { return false; }
             await audit.WriteAsync(evidence, cancellationToken);
             if (next is not null)
             {
@@ -144,7 +147,7 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
                 || System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo.IndexOf(InUseReviewHistory.SearchText(r),
                     search.Trim(), System.Globalization.CompareOptions.IgnoreCase) >= 0))
                 .OrderByDescending(r => r.ReviewedAt).ThenBy(r => r.Id).ToArray();
-            return (rows.Skip((page - 1) * pageSize).Take(pageSize).ToArray(), rows.Length);
+            return (rows.Skip((page - 1) * pageSize).Take(pageSize).Select(WithInvalidation).ToArray(), rows.Length);
         }
         finally { _gate.Release(); }
     }
@@ -154,7 +157,10 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
     {
         await _gate.WaitAsync(token);
         try
-        { return _reviews.SingleOrDefault(r => r.Id == reviewId); }
+        { return _reviews.SingleOrDefault(r => r.Id == reviewId) is { } review ? WithInvalidation(review) : null; }
         finally { _gate.Release(); }
     }
+
+    private InUseServerReview WithInvalidation(InUseServerReview review) => review with
+    { Invalidated = !_records.TryGetValue(review.RecordId, out InUseRecord? record) || record.Discarded || review.RecordVersion <= record.InvalidatedReviewsThrough };
 }

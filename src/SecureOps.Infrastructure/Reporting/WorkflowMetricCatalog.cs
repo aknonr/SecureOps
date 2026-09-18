@@ -12,6 +12,7 @@ public static class WorkflowMetricCatalog
     {
         List<WorkflowMetric> metrics = [
             new("InUse.Backlog", "InUse", "Yerel inceleme bekleyen", "OR", "Current", 0),
+            new("InUse.Discarded", "InUse", "Kaldırılmış yerel taslak", "OR", "Current", 0),
             new("InUse.Open", "InUse", "Kaynakta açık gözlemlenmiş", "OR", "Current", 0),
             new("InUse.Assigned", "InUse", "İnceleyici atanmış", "OR", "Current", 0),
             new("InUse.Unassigned", "InUse", "İnceleyici atanmamış", "OR", "Current", 0),

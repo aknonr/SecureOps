@@ -22,6 +22,11 @@ namespace SecureOps.Api.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class InUseController(InUseService service) : ControllerBase
 {
+    /// <summary>Explicit local reset/discard/restart; never deletes a source record or archive.</summary>
+    [HttpPost("{id:guid}/draft-lifecycle")]
+    [Authorize(Policy = Policies.CanReviewInUse)]
+    public async Task<ActionResult<InUseRecord>> ChangeDraftAsync(Guid id, ChangeInUseDraftRequest request, CancellationToken token) =>
+        Reply(await service.ChangeDraftAsync(User, Context(), id, request, token));
     /// <summary>Structured completion readiness and exact durable step results.</summary>
     [HttpGet("{id:guid}/execution")]
     [Authorize(Policy = Policies.CanReviewInUse)]

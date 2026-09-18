@@ -23,7 +23,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         InUseQuery query, CancellationToken token) => RunAsync(principal, context, Capabilities.InUseView, async user =>
         {
             if (query.Page is < 1 or > 100000 || query.PageSize is < 1 or > 100 || query.Search?.Length > 100
-                || query.View is not ("all" or "mine" or "unassigned") || query.Status is not (null or "Unreviewed" or "Draft" or "Stale"))
+                || query.View is not ("all" or "mine" or "unassigned") || query.Status is not (null or "Unreviewed" or "Draft" or "Stale" or "Discarded"))
             { return InUseResult<InUsePage>.Fail("InUseInvalid"); }
             InUsePage page = await repository.QueryAsync(query, user.Id, token);
             IReadOnlyDictionary<Guid, string> labels = await LabelsAsync(page.Items, token);
@@ -136,7 +136,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             InUseRecord? old = await repository.GetAsync(id, token);
             if (old is null)
             { return InUseResult<InUseRecord>.Fail("InUseNotFound"); }
-            if (request.SourceVersion != old.SourceVersion || request.ExpectedVersion != old.Version)
+            if (old.Discarded || request.SourceVersion != old.SourceVersion || request.ExpectedVersion != old.Version)
             { return InUseResult<InUseRecord>.Fail("InUseConflict"); }
             if (!ValidDraft(request, old))
             { return InUseResult<InUseRecord>.Fail("InUseInvalid"); }
@@ -185,9 +185,9 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                         new { id, report.Version, report.Sha256 }, id, request.ExpectedVersion), token), token);
                 if (stored is not null)
                 { await ReceiptAsync(stored, token); }
-                return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(stored);
+                return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(DownloadPresentation(stored));
             }
-            if (record.Version != request.ExpectedVersion || record.Draft is null || record.Draft.SourceVersion != record.SourceVersion)
+            if (record.Discarded || record.Version != request.ExpectedVersion || record.Draft is null || record.Draft.SourceVersion != record.SourceVersion)
             { return InUseResult<InUseReport>.Fail("InUseConflict"); }
             if (request.Archive && InUseChecks.Missing(record.Source, record.Draft.Answers) is { } missing)
             {
@@ -198,6 +198,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             if (request.Archive && !InUseChecks.RelationshipReady(record.Source))
             { return InUseResult<InUseReport>.Fail("InUseIncomplete"); }
             InUseReport report = InUseWorkbook.Create(record, user.Id, DateTimeOffset.UtcNow) with { PreparedByLabel = ActorLabel(user) };
+            report = DownloadPresentation(report);
             if (request.Archive)
             {
                 InUseReport? stored = await (archive ?? throw new InvalidOperationException("Archive unavailable.")).AccessAsync(id, record.Version, report,
@@ -205,22 +206,24 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                         new { id, record.Version, record.SourceVersion, artifact.Sha256 }, id, request.ExpectedVersion), token), token);
                 if (stored is not null)
                 { await ReceiptAsync(stored, token); }
-                return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(stored);
+                return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(DownloadPresentation(stored));
             }
             bool saved = await repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ReportPrepared",
                 new { id, record.Version, record.SourceVersion, report.Sha256 }, id, request.ExpectedVersion), token);
             return saved ? new(report) : InUseResult<InUseReport>.Fail("InUseConflict");
         }, token);
 
+    private static InUseReport DownloadPresentation(InUseReport report) => report with { FileName = InUseReportNames.Download(report) };
+
     private Task ReceiptAsync(InUseReport report, CancellationToken token) => reports is not null && repository is SqlInUseRepository
-        ? reports.ArchiveAsync(report, !report.Sheets.Any(s => s.Name == "Provenance"
+        ? reports.ArchiveAsync(report, !report.Sheets.Concat(report.EvidenceSheets).Any(s => s.Name == "Provenance"
             && s.Rows.Any(r => r.Count == 2 && r[0] == "Synthetic" && r[1] == "False")), token) : Task.CompletedTask;
 
     private async Task<InUseResult<InUseRecord>> SaveAsync(InUseRecord next, long expected, AuditEvent audit, CancellationToken token)
     {
         IReadOnlyDictionary<Guid, string> labels = await LabelsAsync([next], token);
         return await repository.SaveAsync(next with { PolicyProposal = null }, expected, audit, token)
-            ? new(Label(next, labels) with { PolicyProposal = policy?.Propose(next) }) : InUseResult<InUseRecord>.Fail("InUseConflict");
+            ? new(Label(next, labels) with { PolicyProposal = policy?.Propose(next), ArchivedVersions = archive?.Versions(next.Id) ?? [] }) : InUseResult<InUseRecord>.Fail("InUseConflict");
     }
 
     /// <summary>Audited bounded diagnostic; no enrichment, assignment or source mutation.</summary>

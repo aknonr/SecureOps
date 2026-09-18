@@ -1,5 +1,14 @@
 # SecureOps.Infrastructure
 
+Post-rc6.26 In Use recovery uses the existing versioned JSON aggregate and
+administration/execution transaction boundary. Discard is not a source lifecycle:
+review-only SQL status remains compatible, while queries/reporting apply Discarded
+separately. InvalidatedReviewsThrough blocks proposal reuse without rewriting
+append-only reviews. API/Worker must stay matched; older writers cannot preserve
+new lifecycle metadata safely. No new migration or corporate grant is introduced.
+Corporate XLSX output retains four legacy sheets; provenance stays in archive
+EvidenceSheets. See `docs/post-rc626-repair-tr.md` and ADR-0020.
+
 External integrations and data access.
 
 Combined announcement persistence requires reviewed migrations 014-018 and separately

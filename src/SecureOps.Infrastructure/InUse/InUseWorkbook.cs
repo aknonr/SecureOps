@@ -8,7 +8,7 @@ using SecureOps.Shared.Contracts.InUse;
 namespace SecureOps.Infrastructure.InUse;
 
 /// <summary>Managed text-only XLSX writer: no formulas, macros, links, COM or remote calls.</summary>
-public static class InUseWorkbook
+public static partial class InUseWorkbook
 {
     private const string _spreadsheet = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     private const string _relationships = "http://schemas.openxmlformats.org/package/2006/relationships";
@@ -45,7 +45,7 @@ public static class InUseWorkbook
         List<IReadOnlyList<string>> provenance =
         [
             new[] { "Report", "LOCAL DRAFT - NOT UPLOADED - NOT SOURCE APPROVAL" },
-            new[] { "Template", "InUseV1-text-only; technical sheets intentionally blank in supplied script" },
+            new[] { "Template", "InUse-corporate-v2; four corporate sheets; audit evidence retained separately" },
             new[] { "RecordId", record.Id.ToString("D") }, new[] { "SourceId", record.Source.Id }, new[] { "Code", record.Source.Code },
             new[] { "Version", record.Version.ToString(CultureInfo.InvariantCulture) },
             new[] { "SourceVersion", record.SourceVersion.ToString(CultureInfo.InvariantCulture) }, new[] { "SourceHash", record.SourceHash },
@@ -87,13 +87,19 @@ public static class InUseWorkbook
                     .Select(f => new[] { f.ServerId, f.Field, f.Value ?? "Bilinmiyor", $"{f.Origin}; {policy.Revision}; {policy.Fingerprint}; öneri, kurulum veya doğrulama kanıtı değildir" }));
             }
         }
-        InUseSheet[] sheets = [new("Sunucular", serverRows), new("CheckList_TEKNIK", []), new("CheckList_THY", []),
-            new("NMS", nmsRows), new("Provenance", provenance), new("ReviewEvidence", evidenceRows)];
+        InUseSheet[] sheets = [new("NMS", nmsRows), new("CheckList_THY", []), new("CheckList_TEKNIK", []), new("Sunucular", serverRows)];
         sheets = sheets.Select(s => new InUseSheet(s.Name, s.Rows.Select(r => (IReadOnlyList<string>)r.Select(Safe).ToArray()).ToArray())).ToArray();
-        byte[] bytes = Write(sheets);
+        byte[] bytes = Write(sheets, corporateLayout: true);
         return new(record.Id, record.Version, record.SourceVersion, Convert.ToHexString(SHA256.HashData(bytes)),
             $"InUse-{record.Id:D}-v{record.Version}.xlsx", bytes, sheets)
-        { PreparedBy = actor, PreparedAt = now, SourceId = record.Source.Id, Size = bytes.LongLength };
+        {
+            PreparedBy = actor,
+            PreparedAt = now,
+            SourceId = record.Source.Id,
+            SourceCode = record.Source.Code,
+            Size = bytes.LongLength,
+            EvidenceSheets = [new("Provenance", provenance), new("ReviewEvidence", evidenceRows)]
+        };
     }
 
     private static string ServerField(int index) => index switch
@@ -131,7 +137,9 @@ public static class InUseWorkbook
             ? "'" + text : text;
     }
     /// <summary>Writes bounded caller-provided worksheet rows as safe text cells only.</summary>
-    public static byte[] Write(IReadOnlyList<InUseSheet> sheets)
+    public static byte[] Write(IReadOnlyList<InUseSheet> sheets) => Write(sheets, corporateLayout: false);
+
+    private static byte[] Write(IReadOnlyList<InUseSheet> sheets, bool corporateLayout)
     {
         using MemoryStream output = new();
         using (ZipArchive zip = new(output, ZipArchiveMode.Create, leaveOpen: true))
@@ -143,6 +151,8 @@ public static class InUseWorkbook
                 Element(writer, "Default", ns, ("Extension", "rels"), ("ContentType", "application/vnd.openxmlformats-package.relationships+xml"));
                 Element(writer, "Default", ns, ("Extension", "xml"), ("ContentType", "application/xml"));
                 Element(writer, "Override", ns, ("PartName", "/xl/workbook.xml"), ("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"));
+                if (corporateLayout)
+                { Element(writer, "Override", ns, ("PartName", "/xl/styles.xml"), ("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml")); }
                 for (int i = 1; i <= sheets.Count; i++)
                 { Element(writer, "Override", ns, ("PartName", $"/xl/worksheets/sheet{i}.xml"), ("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml")); }
                 writer.WriteEndElement();
@@ -156,6 +166,12 @@ public static class InUseWorkbook
             Entry(zip, "xl/workbook.xml", writer =>
             {
                 writer.WriteStartElement("workbook", _spreadsheet);
+                if (corporateLayout)
+                {
+                    writer.WriteStartElement("bookViews", _spreadsheet);
+                    Element(writer, "workbookView", _spreadsheet, ("activeTab", "0"));
+                    writer.WriteEndElement();
+                }
                 writer.WriteStartElement("sheets", _spreadsheet);
                 for (int i = 0; i < sheets.Count; i++)
                 {
@@ -173,22 +189,37 @@ public static class InUseWorkbook
                 writer.WriteStartElement("Relationships", _relationships);
                 for (int i = 1; i <= sheets.Count; i++)
                 { Element(writer, "Relationship", _relationships, ("Id", $"rId{i}"), ("Type", _officeRelationships + "/worksheet"), ("Target", $"worksheets/sheet{i}.xml")); }
+                if (corporateLayout)
+                { Element(writer, "Relationship", _relationships, ("Id", "styles"), ("Type", _officeRelationships + "/styles"), ("Target", "styles.xml")); }
                 writer.WriteEndElement();
             });
+            if (corporateLayout)
+            { Entry(zip, "xl/styles.xml", WriteStyles); }
             for (int i = 0; i < sheets.Count; i++)
             {
                 InUseSheet sheet = sheets[i];
                 Entry(zip, $"xl/worksheets/sheet{i + 1}.xml", writer =>
                 {
                     writer.WriteStartElement("worksheet", _spreadsheet);
+                    if (corporateLayout && sheet.Rows.Count > 0)
+                    { WriteLayout(writer, sheet); }
                     writer.WriteStartElement("sheetData", _spreadsheet);
-                    foreach (IReadOnlyList<string> row in sheet.Rows)
+                    for (int rowIndex = 0; rowIndex < sheet.Rows.Count; rowIndex++)
                     {
+                        IReadOnlyList<string> row = sheet.Rows[rowIndex];
                         writer.WriteStartElement("row", _spreadsheet);
-                        foreach (string value in row)
+                        if (corporateLayout)
                         {
+                            writer.WriteAttributeString("ht", RowHeight(sheet.Name, row).ToString(CultureInfo.InvariantCulture));
+                            writer.WriteAttributeString("customHeight", "1");
+                        }
+                        for (int column = 0; column < row.Count; column++)
+                        {
+                            string value = row[column];
                             writer.WriteStartElement("c", _spreadsheet);
                             writer.WriteAttributeString("t", "inlineStr");
+                            if (corporateLayout)
+                            { writer.WriteAttributeString("s", rowIndex == 0 || (sheet.Name == "Sunucular" && column == 0) ? "1" : "0"); }
                             writer.WriteStartElement("is", _spreadsheet);
                             writer.WriteStartElement("t", _spreadsheet);
                             writer.WriteAttributeString("xml", "space", null, "preserve");

@@ -1,5 +1,22 @@
 # ADR-0020: In Use Local Review Workspace
 
+## Post-rc6.26 Draft Recovery and Corporate Workbook
+
+The owner-approved continuation preserves four corporate worksheets in validated
+legacy order. Internal provenance stays in the immutable envelope and authorized
+application preview, not extra corporate worksheets. Historical bytes never change;
+download headers may use the frozen source code, original preparer and UTC time.
+
+Explicit Reset, Discard and Restart create audited aggregate revisions. Discard is
+a local disposition, not source deletion. A monotonic invalidated-review watermark
+prevents trial answers from becoming reuse proposals while retaining their history.
+Existing JSON storage is extended; the SQL ReviewStatus column retains its existing
+review-only meaning. Queries and reporting apply the separate disposition before
+counting active work. Older binaries must not write these extended aggregates.
+The access administration lock also serializes lifecycle commands with execution
+creation/claim. Any active execution blocks local lifecycle mutation; no remote
+effect is cancelled or replayed. Archives and completed remote facts are preserved.
+
 ## Post-rc6.22 Owner-Approved Continuation
 
 The 2026-09-18 owner instruction authorizes the bounded end-to-end In Use v2

@@ -60,6 +60,15 @@ The complete TEST deployment configuration, first-admin bootstrap, migration ord
 Operational Record endpoints live under `/api/v1/operational-records`. Controllers are thin and use capability policies; Jira preview performs no external write. External providers remain fake-only until approved contracts exist. See `docs/22-operational-record-jira-workflow.md`.
 # Integrated workflow reporting continuation
 
+Post-rc6.26 local recovery adds POST `/api/v1/in-use/{id}/draft-lifecycle`
+with ExpectedVersion, Action (Reset/Discard/Restart) and Reason. InUse.Review and
+the current approved actor are mandatory. This is not DELETE and never calls a
+provider. Active execution rows block lifecycle changes transactionally. GET
+`status=Discarded` explicitly lists removed local work; default queries exclude it.
+Archived report access remains separately authorized and byte-preserving.
+New report metadata separates EvidenceSheets from four corporate Sheets. See
+`docs/post-rc626-repair-tr.md`; OpenAPI is updated with the source contract.
+
 `/api/v1/reporting/management/workflows` captures bounded immutable SQL 023 cuts;
 GET `{id}` and `{id}/export` recheck current approval, report capability, owner,
 access version and module scope. OCO remains owner-only. POST is limited to three

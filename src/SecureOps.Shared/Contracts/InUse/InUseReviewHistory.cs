@@ -12,7 +12,11 @@ public sealed record InUseAnswerOrigin(string Kind, string? SourceServerId = nul
 public sealed record InUseServerReview(Guid Id, Guid RecordId, string OrCode, long RecordVersion, long SourceVersion,
     string IdentityKey, string ContextHash, InUseServer Server, IReadOnlyList<InUseAnswer> Answers,
     Guid ReviewerId, string? ReviewerLabel, DateTimeOffset ReviewedAt, DateTimeOffset ObservedAt,
-    InUsePolicyProposal? Policy);
+    InUsePolicyProposal? Policy)
+{
+    /// <summary>Current local invalidation; immutable answers remain available as historical evidence.</summary>
+    public bool Invalidated { get; init; }
+}
 
 /// <summary>Current observation and a permission-filtered, bounded history page.</summary>
 public sealed record InUseServerHistory(InUseServer Current, DateTimeOffset ObservedAt, string? IdentityKey,

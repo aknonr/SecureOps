@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
+using MudBlazor;
 using SecureOps.Shared.Auth;
 using SecureOps.Shared.Contracts.Api;
 using SecureOps.Shared.Contracts.InUse;
 using SecureOps.Ui.Services;
+using SecureOps.Ui.Shared.Components;
 
 namespace SecureOps.Ui.Pages;
 
@@ -39,7 +41,8 @@ public partial class InUse
     private readonly ElementReference[] _answerElements = new ElementReference[3];
     private int? _focusAnswer;
     private bool _busy, _dirty, _reloadRequested;
-    private bool _assignmentOpen, _acceptPolicy;
+    private bool _acceptPolicy;
+    private IDialogReference? _assignmentDialog;
     private int _number = 1, _size = 25, _sheet;
     private int _generation;
     private List<AnswerEdit> _answers = [];
@@ -56,7 +59,7 @@ public partial class InUse
         "Ambiguous" => "Eşleme belirsiz; önceki kanıt varsa korunur",
         _ => "Henüz sorgulanmadı / sözleşme bekleniyor"
     };
-    private bool CanEdit => Can(Capabilities.InUseReview) && _record is not null;
+    private bool CanEdit => Can(Capabilities.InUseReview) && _record is { Discarded: false };
     private bool AssignmentEdited => _record is not null && (!string.IsNullOrWhiteSpace(_reason)
         || _assignee != (_record.AssigneeId?.ToString("D") ?? ""));
     private bool HasUnsaved => _dirty || AssignmentEdited;
@@ -69,7 +72,8 @@ public partial class InUse
     }
     private int CompletedServers => _record?.Source.Servers.Count(s => InUseChecks.OperatorCodes.All(c =>
         _answers.Any(a => a.ServerId == s.Id && a.Check == c && a.Value is "Yes" or "No"))) ?? 0;
-    private string NextAction => !CanEdit ? "İnceleme yetkisi olan bir kullanıcı devam edebilir; atama zorunlu değil."
+    private string NextAction => _record?.Discarded == true ? "Yerel taslak kaldırılmış. Yetkili kullanıcı Yeniden başla ile boş inceleme açabilir; arşiv korunur."
+        : !CanEdit ? "İnceleme yetkisi olan bir kullanıcı devam edebilir; atama zorunlu değil."
         : _record!.Status == "Stale" ? "Değişen kaynak kanıtına göre cevapları yeniden doğrulayın."
         : _record.Draft is null || _dirty ? "Sunucu cevaplarını inceleyip yerel taslağı kaydedin."
         : CompletedServers < _record.Source.Servers.Count ? "Eksik cevapları tamamlayın; taslağınız korunuyor."
@@ -83,7 +87,7 @@ public partial class InUse
     {
         _search = QuerySearch is { Length: <= 100 } ? QuerySearch : "";
         _view = QueryView is "mine" or "unassigned" ? QueryView : "all";
-        _status = QueryStatus is "Unreviewed" or "Draft" or "Stale" ? QueryStatus : "";
+        _status = QueryStatus is "Unreviewed" or "Draft" or "Stale" or "Discarded" ? QueryStatus : "";
         _number = QueryPage is > 0 and <= 100000 ? QueryPage.Value : 1;
         _size = QuerySize is 10 or 25 or 50 ? QuerySize.Value : 25;
         if (_access is not null)
@@ -147,6 +151,40 @@ public partial class InUse
         _page = await ReadAsync<InUsePage>($"?page={_number}&pageSize={_size}&view={_view}&search={Uri.EscapeDataString(_search)}"
             + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status));
     });
+    private async Task OpenAssignmentAsync()
+    {
+        if (_record is null || _busy || !Can(Capabilities.InUseAssign))
+        { return; }
+        InUseRecord original = _record;
+        int generation = _generation;
+        DialogParameters parameters = new()
+        {
+            { nameof(InUseAssignmentDialog.Record), original },
+            { nameof(InUseAssignmentDialog.Search), (Func<string, Task<InUseAssignee[]>>)(search =>
+                ReadAsync<InUseAssignee[]>("/assignees?search=" + Uri.EscapeDataString(search))) },
+            { nameof(InUseAssignmentDialog.Save), (Func<AssignInUseRequest, Task<InUseRecord>>)(request =>
+                SendAsync<InUseRecord>(HttpMethod.Put, $"/{original.Id}/assignment", request)) }
+        };
+        IDialogReference dialog = await Dialogs.ShowAsync<InUseAssignmentDialog>("İnceleyici",
+            parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+        _assignmentDialog = dialog;
+        DialogResult result = await dialog.Result;
+        _assignmentDialog = null;
+        if (result.Canceled || result.Data is not InUseRecord updated || generation != _generation || _record?.Id != original.Id)
+        { return; }
+        if (_dirty)
+        {
+            // Assignment changes the version, not the local answers being reviewed.
+            _record = updated;
+            _assignee = updated.AssigneeId?.ToString("D") ?? "";
+            _report = null;
+        }
+        else
+        { SetRecord(updated); }
+        _reason = "";
+        _notice = "Yerel atama kaydedildi. Sunucu cevapları korunuyor.";
+    }
+
     private Task AssignAsync() => ExecuteAsync(async () =>
     {
         if (_record is null)
@@ -170,17 +208,52 @@ public partial class InUse
         { _assignee = assignee; }
         _notice = "Yerel inceleme taslağı kaydedildi.";
     });
+    private async Task UndoUnsavedAsync()
+    {
+        if (_record is null || _busy || !_dirty)
+        { return; }
+        Guid id = _record.Id;
+        long version = _record.Version;
+        if (await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikleri geri al",
+            $"{_record.Source.Code}: yalnızca kaydedilmemiş cevaplar son kayıtlı taslağa dönecek. Arşiv ve kaynak kaydı değişmez.",
+            yesText: "Geri al", cancelText: "Vazgeç") != true)
+        { return; }
+        if (_record?.Id != id || _record.Version != version || !CanEdit)
+        { return; }
+        SetRecord(_record);
+        _notice = "Son kayıtlı taslak geri yüklendi; dış sisteme işlem yapılmadı.";
+    }
     private Task CompareAsync() => ExecuteAsync(async () =>
     {
         if (_record is not null)
         { _comparison = await ReadAsync<InUseRecord>($"/{_record.Id}"); }
     });
+    private async Task ChangeDraftAsync(string action)
+    {
+        if (_record is null || _busy || !Can(Capabilities.InUseReview))
+        { return; }
+        Guid id = _record.Id;
+        long version = _record.Version;
+        string label = action switch { "Discard" => "Taslağı kaldır", "Restart" => "Yeniden başla", _ => "Kayıtlı cevapları sıfırla" };
+        if (await Dialogs.ShowMessageBox(label,
+            $"{_record.Source.Code}: {_record.Source.Servers.Count} sunucunun cevapları ve kabul edilmiş önerileri temizlenecek. Önceki sürümler ve Excel arşivleri korunur. Kaynak kaydı silinmez, dış işlemler geri alınmaz.",
+            yesText: label, cancelText: "Vazgeç") != true)
+        { return; }
+        await ExecuteAsync(async () =>
+        {
+            if (_record?.Id != id || _record.Version != version)
+            { return; }
+            SetRecord(await SendAsync<InUseRecord>(HttpMethod.Post, $"/{id}/draft-lifecycle", new ChangeInUseDraftRequest(version, action, label)));
+            _notice = action == "Discard" ? "Yerel taslak kaldırıldı. Kaldırılmış taslaklar filtresinden yeniden başlayabilirsiniz; arşivler korunur."
+                : "Yeni inceleme sürümü açıldı. Önceki deneme cevapları yeniden kullanılmayacak.";
+        });
+    }
     private void AcceptComparison()
     {
         if (_comparison is null || _record is null)
         { return; }
         AnswerEdit[] local = _answers.ToArray();
-        bool answersEdited = _dirty, assignmentEdited = AssignmentEdited;
+        bool answersEdited = _dirty && !_comparison.Discarded && _comparison.InvalidatedReviewsThrough < _record.Version, assignmentEdited = AssignmentEdited;
         string assignee = _assignee;
         SetRecord(_comparison);
         foreach (AnswerEdit answer in _answers.Where(_ => answersEdited))
@@ -383,6 +456,8 @@ public partial class InUse
     }
     private void ClearRecord()
     {
+        _assignmentDialog?.Close();
+        _assignmentDialog = null;
         _record = null;
         _page = null;
         _report = null;
