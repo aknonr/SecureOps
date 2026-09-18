@@ -47,7 +47,13 @@ public sealed class AnnouncementMailService(IApplicationAccessService access, Sq
                 request.PreparationId, request.Kind, expires, Hash(JsonSerializer.Serialize(intent)), context.CorrelationId)));
             return new(Preview: new(commandId, intent.PreparationId, intent.DraftId, intent.DraftVersion, intent.Kind,
                 intent.Sender, intent.EnvelopeSender, intent.To, intent.Cc, intent.Subject, intent.MessageId,
-                intent.MessageHash, expires, protectedToken));
+                intent.MessageHash, expires, protectedToken)
+            {
+                OcoReference = built.Prepared!.Draft.Content.OcoReference,
+                WorkStart = built.Prepared.Draft.Content.WorkStart,
+                WorkEnd = built.Prepared.Draft.Content.WorkEnd,
+                PreparedAt = built.Prepared.PreparedAt
+            });
         }
         catch (Exception exception) when (Unavailable(exception)) { return new(Error: "AnnouncementMailUnavailable"); }
     }
@@ -163,7 +169,7 @@ public sealed class AnnouncementMailService(IApplicationAccessService access, Sq
         var intent = new AnnouncementMailIntent(commandId, preparationId, prepared.Draft.Id, prepared.Draft.Version, prepared.Fingerprint,
             kind, new OperationActor(actor.Id, "Human", actor.DisplayName, actor.LoginName, actor.Mail), actor.Version, actor.Mail!, policy.Envelope(actor.Mail!),
             to, cc, message.Subject, message.MessageId, Convert.ToHexString(SHA256.HashData(bytes)), policy.Fingerprint(), correlation, "");
-        return new(intent, bytes);
+        return new(intent, bytes, Prepared: prepared);
     }
 
     private static AnnouncementMailStatus Status(AnnouncementMailCommand command) => new(command.Intent.CommandId, command.Intent.PreparationId,
@@ -172,7 +178,8 @@ public sealed class AnnouncementMailService(IApplicationAccessService access, Sq
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     private static bool Unavailable(Exception exception) => exception is DbException or IOException or InvalidOperationException or JsonException;
     private sealed record PreviewEnvelope(Guid CommandId, Guid PreparationId, string Kind, DateTimeOffset ExpiresAt, string InputHash, string CorrelationId);
-    private sealed record BuildResult(AnnouncementMailIntent? Intent = null, byte[]? Bytes = null, string? Error = null);
+    private sealed record BuildResult(AnnouncementMailIntent? Intent = null, byte[]? Bytes = null, string? Error = null,
+        PreparedAnnouncement? Prepared = null);
 }
 
 /// <summary>Host-owned purpose-isolated protection using the API's existing persistent key ring.</summary>

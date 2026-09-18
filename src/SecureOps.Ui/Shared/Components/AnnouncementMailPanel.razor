@@ -21,7 +21,12 @@
         <div class="mail-review" tabindex="-1" @ref="_review" role="region" aria-label="Gönderim onayı">
             <h4>@(p.Kind == "SelfTest" ? "Yalnız kendime deneme" : "Duyuru gönderim onayı")</h4>
             <dl><dt>Konu</dt><dd>@p.Subject</dd><dt>Gönderen</dt><dd>@p.Sender</dd>
+                <dt>OCO</dt><dd>@p.OcoReference</dd>
+                <dt>Çalışma başlangıcı</dt><dd>@PreparedDate(p.WorkStart)</dd>
+                <dt>Çalışma bitişi</dt><dd>@PreparedDate(p.WorkEnd)</dd>
                 <dt>Alıcı</dt><dd>@string.Join("; ", p.To)</dd><dt>Bilgi</dt><dd>@(p.Cc.Length == 0 ? "Yok" : string.Join("; ", p.Cc))</dd>
+                <dt>Toplam alıcı</dt><dd>@p.RecipientCount</dd>
+                <dt>Hazırlanma zamanı</dt><dd>@p.PreparedAt.ToOffset(TimeSpan.FromHours(3)).ToString("dd.MM.yyyy HH:mm:ss 'UTC'zzz")</dd>
                 <dt>Hazırlık</dt><dd>v@(p.DraftVersion) · @p.ExpiresAt.ToLocalTime().ToString("HH:mm") saatine kadar geçerli</dd></dl>
             @if (p.Kind == "SelfTest") { <p>Gerçek dağıtım listesi değişmez; bu denemenin tek alıcısı sizsiniz.</p> }
             <p>SMTP kabulü, gelen kutusuna teslim edildiği anlamına gelmez.</p>
@@ -119,6 +124,9 @@
         finally { if (!token.IsCancellationRequested) { _busy = false; } }
     }
     private void Cancel() { if (!_uncertain) { _preview = null; } }
+    private static string PreparedDate(string value) => DateTimeOffset.TryParse(value,
+        System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTimeOffset date)
+        ? date.ToString("dd.MM.yyyy HH:mm:ss 'UTC'zzz", System.Globalization.CultureInfo.InvariantCulture) : value;
     private static string State(string state) => state switch
     {
         "Queued" => "Kuyrukta", "Dispatching" => "Gönderim deneniyor", "Accepted" => "SMTP kabul etti; teslim doğrulanmadı",

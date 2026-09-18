@@ -26,9 +26,9 @@ async function until(probe, seconds = 30) {
     async function prepare(label) {
         const id = crypto.randomUUID(), reference = '/api/v1/announcements/' + id;
         const content = { ocoReference: 'OCO-SYNTHETIC', scope: 'Synthetic local scope', subject: label + ' ' + id.slice(0, 8),
-            announcementDate: '2026-09-17', workStart: '2026-09-18T10:00:00+03:00', workEnd: '2026-09-18T11:00:00+03:00',
+            announcementDate: '2026-09-17', workStart: '2026-09-18T10:00:17+03:00', workEnd: '2026-09-18T11:00:29+03:00',
             description: 'Türkçe & inceleme <b> düz metin', impact: 'Synthetic impact', checks: 'Synthetic checks', notes: '',
-            to: ['reader@example.invalid'], cc: ['copy@example.invalid'], bannerRevision: 'bundle-v1', templateRevision: 'oco-table-v2',
+            to: ['reader@example.invalid'], cc: ['copy@example.invalid'], bannerRevision: 'bundle-v1', templateRevision: 'oco-table-v3',
             dateTextRevision: 'tr-v1', restartStart: null, restartEnd: null,
             affectedServices: Array.from({ length: 155 }, (_, i) => `Sentetik servis ${i + 1} - Türkçe & inceleme`) };
         await json(client, reference + '?version=0', { method: 'PUT', data: content });
@@ -92,6 +92,10 @@ async function until(probe, seconds = 30) {
         await until(() => review.evaluate(e => document.activeElement === e));
         assert.ok((await review.innerText()).includes('actor@example.invalid'));
         assert.ok(!(await review.innerText()).includes('reader@example.invalid'));
+        assert.match(await review.innerText(), /18\.09\.2026 10:00:17 UTC\+03:00/);
+        assert.match(await review.innerText(), /18\.09\.2026 11:00:29 UTC\+03:00/);
+        assert.match(await review.innerText(), /Toplam alıcı\s+1/);
+        await review.screenshot({ path: path.join(out, 'self-test-review.png') });
         await click('Vazgeç'); assert.equal(files().length, initial);
         await click('Kendime deneme gönder'); await click('Denemeyi onayla');
         const self = await state(success.id, 'Accepted', 'SelfTest');
@@ -105,6 +109,13 @@ async function until(probe, seconds = 30) {
         await click('Duyuruyu gönder');
         assert.ok((await review.innerText()).includes('reader@example.invalid'));
         assert.ok((await review.innerText()).includes('copy@example.invalid'));
+        assert.match(await review.innerText(), /Toplam alıcı\s+2/);
+        assert.ok((await review.innerText()).includes('OCO-SYNTHETIC'));
+        await page.setViewportSize({ width: 390, height: 844 });
+        await review.scrollIntoViewIfNeeded();
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+        await page.screenshot({ path: path.join(out, 'distribution-review-mobile.png'), fullPage: true });
+        await page.setViewportSize({ width: 1440, height: 900 });
         await page.getByRole('button', { name: 'Gönderimi onayla', exact: true }).dblclick();
         await state(success.id, 'Accepted', 'Send');
         assert.equal(files().length, initial + 2, 'double click creates one distribution');

@@ -12,7 +12,8 @@ It requires migration 010 when Access persistence is SqlServer; see its README.
 `InUse/` provides independent bounded read-only discovery, persisted local review,
 audited assignment and managed text-only XLSX preparation. SQL persistence requires
 012. The existing Turuncu Hat transport supplies only evidenced root relationships;
-unknown server/owner contracts remain explicit. No source-write interface is used.
+unknown server/owner contracts remain explicit. Discovery never writes to source;
+the separate default-off completion executor is described below.
 See ADR-0020 and the canonical In Use handoff in `src/SecureOps.Ui/README.md`.
 
 ## Namespaces

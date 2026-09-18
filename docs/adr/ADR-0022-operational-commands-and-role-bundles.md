@@ -37,3 +37,11 @@ dimensions, image count and MIME type checks. Retain immutable historical MIME.
 Use consequential preview/confirmation, field-specific errors and recoverable edits,
 not repeated confirmation on routine draft saves. The existing design/framework and
 foreground hosting architecture remain unchanged. Corporate activation is separate.
+
+Post-rc6.24 owner continuation retains this architecture and explicitly includes
+both In Use completion and optional OCO mail. Mail confirmation presents frozen
+dates/count alongside sender/audience. Known In Use mutation request fields are
+not unknown contracts; attachment reconciliation, conditional target semantics
+and authoritative OR state still require source evidence. The bounded read-only
+completion probe uses script-backed projections only, and cannot approve writes.
+See `docs/rc624-workflow-continuation.md` for scope exception and cumulative baseline.

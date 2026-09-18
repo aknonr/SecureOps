@@ -33,6 +33,7 @@ public sealed class OperationsDiagnostics
         _announcements = configuration.GetSection("Announcements").Get<AnnouncementOptions>() ?? new();
         _source = configuration.GetSection("AnnouncementSource").Get<AnnouncementSourceOptions>() ?? new();
         _hangfire = configuration.GetSection("Hangfire").Get<HangfireOptions>() ?? new();
+        AnnouncementMailOptions mail = configuration.GetSection("AnnouncementMail").Get<AnnouncementMailOptions>() ?? new();
         _connection = configuration.GetConnectionString("SecureOpsDb");
         _reportDirectory = configuration["InUseReports:Directory"] ?? "";
         _missingSourceKeys = [.. new[] { "BaseUrl", "Authorization", "Username", "Password", "TenantId", "SessionLifetimeSeconds" }
@@ -46,11 +47,13 @@ public sealed class OperationsDiagnostics
             "AnnouncementSource:SiteCode", "AnnouncementSource:ProviderMachineName", "AnnouncementSource:ServiceInstanceBaseObject",
             "AnnouncementSource:ServiceNameSelect", "AnnouncementSource:ChangeBaseObject",
             "InUseCompletion:Enabled", "InUseCompletion:Provider", "InUseCompletion:TimeoutSeconds",
+            "AnnouncementMail:Enabled", "AnnouncementMail:SelfTestEnabled", "AnnouncementMail:SendEnabled",
             "TuruncuHat:InUseAspectLookupEnabled"];
         var bound = new Dictionary<string, JsonElement>
         {
             ["Announcements"] = JsonSerializer.SerializeToElement(_announcements),
             ["Hangfire"] = JsonSerializer.SerializeToElement(_hangfire),
+            ["AnnouncementMail"] = JsonSerializer.SerializeToElement(new { mail.Enabled, mail.SelfTestEnabled, mail.SendEnabled }),
             ["AnnouncementSource"] = JsonSerializer.SerializeToElement(_source),
             ["InUseCompletion"] = JsonSerializer.SerializeToElement(configuration.GetSection("InUseCompletion").Get<InUseCompletionOptions>() ?? new()),
             ["TuruncuHat"] = JsonSerializer.SerializeToElement(new { InUseAspectLookupEnabled = configuration.GetValue<bool>("TuruncuHat:InUseAspectLookupEnabled") })
@@ -60,6 +63,7 @@ public sealed class OperationsDiagnostics
             .. _source.Profiles.Where(p => MaintenanceProfiles.IsAllowed(p.Key)).OrderBy(p => p.Key, StringComparer.Ordinal).Take(5).SelectMany(p => new[] {
                 new EffectiveOperationSetting($"AnnouncementSource:Profiles:{p.Key}:CollectionId", p.Value.CollectionId, Provider(configuration, $"AnnouncementSource:Profiles:{p.Key}:CollectionId")),
                 new EffectiveOperationSetting($"AnnouncementSource:Profiles:{p.Key}:Fingerprint", MaintenanceProfileCatalog.Fingerprint(p.Value), "BoundProfile") }),
+            new EffectiveOperationSetting("AnnouncementMail:PolicyFingerprint", new Mail.AnnouncementMailPolicy(Options.Create(mail), "Diagnostics").Fingerprint(), "BoundPolicyNoCredentials"),
             new EffectiveOperationSetting("ConnectionStrings:SecureOpsDb:TargetFingerprint", DatabaseFingerprint(_connection), Provider(configuration, "ConnectionStrings:SecureOpsDb")),
             new EffectiveOperationSetting("TuruncuHat:TargetFingerprint", Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
                 new { BaseUrl = configuration["TuruncuHat:BaseUrl"], TenantId = configuration["TuruncuHat:TenantId"] }))), "BoundConfiguration")];

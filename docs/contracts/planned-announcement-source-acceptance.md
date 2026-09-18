@@ -1,5 +1,12 @@
 # Announcement source repair acceptance, 2026-09-14
 
+This is historical source-task evidence, not current mail availability. The
+current optional SMTP contract is in [planned announcements](planned-announcements-v1.md)
+and the rc6.24 continuation matrix is in [workflow continuation](../rc624-workflow-continuation.md).
+Current source operations require the separate `Announcements.Source` capability;
+old Drafts-only authorization and editor-pending statements below describe that
+dated checkpoint. Corporate source/relay acceptance is still separate.
+
 Combined editor/source/preparation integration has a separate
 [local handoff](planned-announcement-integration.md); this document retains source-task evidence.
 

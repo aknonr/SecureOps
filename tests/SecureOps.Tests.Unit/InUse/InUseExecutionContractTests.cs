@@ -98,6 +98,12 @@ public sealed class InUseExecutionContractTests
     [InlineData("{\"Success\":true}", "Acknowledged")]
     [InlineData("{}", "Unknown")]
     [InlineData("{\"Success\":false}", "Unknown")]
+    [InlineData("{\"Success\":true,\"ErrorNo\":12}", "Unknown")]
+    [InlineData("{\"Success\":true,\"ErrorNo\":\"12\"}", "Unknown")]
+    [InlineData("{\"Success\":true,\"ErrorNo\":{}}", "Unknown")]
+    [InlineData("{\"Success\":true,\"ErrorNo\":\"invalid\"}", "Unknown")]
+    [InlineData("{\"Success\":true,\"ErrorNo\":0}", "Acknowledged")]
+    [InlineData("{\"Success\":true,\"ErrorNo\":\"0\"}", "Acknowledged")]
     [InlineData("{\"Success\":true,\"ErrorDetails\":\"private source failure\"}", "Unknown")]
     public void AttachmentResponse_IsNotClosureOrReadback_AndDoesNotExposeSourceErrors(string body, string outcome)
     {

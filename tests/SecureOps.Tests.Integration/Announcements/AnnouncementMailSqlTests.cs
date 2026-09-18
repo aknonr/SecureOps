@@ -70,6 +70,11 @@ public sealed class AnnouncementMailSqlTests
         preview.Should().NotBeNull();
         preview.To.Should().Equal(actor.Mail!);
         preview.Cc.Should().BeEmpty();
+        preview.RecipientCount.Should().Be(1);
+        preview.OcoReference.Should().Be(prepared.Draft.Content.OcoReference);
+        preview.WorkStart.Should().Be(prepared.Draft.Content.WorkStart);
+        preview.WorkEnd.Should().Be(prepared.Draft.Content.WorkEnd);
+        preview.PreparedAt.Should().Be(prepared.PreparedAt);
         (await service.ConfirmAsync(principal, context, new(preview.PreviewToken + "tampered"), default)).Error.Should().Be("AnnouncementMailPreviewExpired");
         AnnouncementMailResult[] clicks = await Task.WhenAll(service.ConfirmAsync(principal, context, new(preview.PreviewToken), default), service.ConfirmAsync(principal, context, new(preview.PreviewToken), default));
         clicks.Should().OnlyContain(r => r.Error == null && r.Status!.CommandId == preview.CommandId);
@@ -87,6 +92,8 @@ public sealed class AnnouncementMailSqlTests
 
         sink.Mode = "Unknown";
         AnnouncementMailPreview distribution = (await service.PreviewAsync(principal, context, new(prepared.Id, "Send"), default)).Preview!;
+        distribution.RecipientCount.Should().Be(2);
+        distribution.WorkStart.Should().Be(preview.WorkStart);
         (await service.ConfirmAsync(principal, context, new(distribution.PreviewToken), default)).Error.Should().BeNull();
         await worker.RunAsync(distribution.CommandId, default);
         (await store.GetAsync(distribution.CommandId, actor.Id, default))!.State.Should().Be("Unknown");

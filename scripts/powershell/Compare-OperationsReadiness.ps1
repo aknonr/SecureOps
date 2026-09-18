@@ -15,13 +15,14 @@ function Read-Readiness([string]$Path) {
 }
 $api = Read-Readiness $ApiReport
 $worker = Read-Readiness $WorkerReport
-$allowed = '^(Announcements:Enabled|Hangfire:(Enabled|SchemaName|Queue|PrepareSchema)|AnnouncementSource:(Enabled|CollectionProvider|ServiceProvider|SiteCode|ProviderMachineName|ServiceInstanceBaseObject|ServiceNameSelect|ChangeBaseObject|Profiles:(NonProd|Prod01|Prod02|ProdSingle|ProdRPA):(CollectionId|Fingerprint))|ConnectionStrings:SecureOpsDb:TargetFingerprint|TuruncuHat:(TargetFingerprint|InUseAspectLookupEnabled)|InUseCompletion:(Enabled|Provider|TimeoutSeconds))$'
+$allowed = '^(Announcements:Enabled|AnnouncementMail:(Enabled|SelfTestEnabled|SendEnabled|PolicyFingerprint)|Hangfire:(Enabled|SchemaName|Queue|PrepareSchema)|AnnouncementSource:(Enabled|CollectionProvider|ServiceProvider|SiteCode|ProviderMachineName|ServiceInstanceBaseObject|ServiceNameSelect|ChangeBaseObject|Profiles:(NonProd|Prod01|Prod02|ProdSingle|ProdRPA):(CollectionId|Fingerprint))|ConnectionStrings:SecureOpsDb:TargetFingerprint|TuruncuHat:(TargetFingerprint|InUseAspectLookupEnabled)|InUseCompletion:(Enabled|Provider|TimeoutSeconds))$'
 $required = @('Announcements:Enabled','Hangfire:Enabled','Hangfire:SchemaName','Hangfire:Queue','Hangfire:PrepareSchema',
     'AnnouncementSource:Enabled','AnnouncementSource:CollectionProvider','AnnouncementSource:ServiceProvider',
     'AnnouncementSource:SiteCode','AnnouncementSource:ProviderMachineName','AnnouncementSource:ServiceInstanceBaseObject',
     'AnnouncementSource:ServiceNameSelect','AnnouncementSource:ChangeBaseObject',
     'ConnectionStrings:SecureOpsDb:TargetFingerprint','TuruncuHat:TargetFingerprint',
-    'InUseCompletion:Enabled','InUseCompletion:Provider','InUseCompletion:TimeoutSeconds','TuruncuHat:InUseAspectLookupEnabled')
+    'InUseCompletion:Enabled','InUseCompletion:Provider','InUseCompletion:TimeoutSeconds','TuruncuHat:InUseAspectLookupEnabled',
+    'AnnouncementMail:Enabled','AnnouncementMail:SelfTestEnabled','AnnouncementMail:SendEnabled','AnnouncementMail:PolicyFingerprint')
 $keys = @($required + @($api.Settings.Key) + @($worker.Settings.Key) | Where-Object { $_ -cmatch $allowed } | Sort-Object -Unique)
 $different = 0
 foreach ($key in $keys) {

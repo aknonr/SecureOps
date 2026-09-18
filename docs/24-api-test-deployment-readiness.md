@@ -1,5 +1,22 @@
 # API TEST Deployment Readiness
 
+## Post-rc6.24 Continuation, 2026-09-18
+
+Current requirement/evidence matrix and scoped owner exception:
+[rc624-workflow-continuation.md](rc624-workflow-continuation.md). rc6.24 build source
+is `8c1b58d0bfdbb363c451139cd212b08a83be7c86`; it remains immutable, not assumed
+deployed. It includes additive SQL 022; installed 001-021 and Hangfire 9 must not
+be replayed. The rc6.22 section below is historical, not the current upgrade plan.
+
+The continuation adds immutable OCO dates/recipient count to mail confirmation,
+safe API/Worker mail-setting comparison and bounded read-only completion evidence.
+These changes are not in rc6.24 and have not been packaged as a successor. Local
+SQL, browser, SMTP sink and actual restart evidence is linked in the matrix.
+Real In Use attachment/readback/conditional-update/final-OR semantics and adapter
+wiring remain incomplete. Do not treat this record as installation approval.
+Use [inuse-v2-upgrade-tr.md](inuse-v2-upgrade-tr.md) for the rc6.24 upgrade context;
+no new corporate configuration, migration, grant or deployment was performed.
+
 ## rc6.22 Defect Completion, 2026-09-18
 
 Local implementation and matched package acceptance are complete for the approved

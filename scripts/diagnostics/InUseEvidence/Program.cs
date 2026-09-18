@@ -7,10 +7,10 @@ using Microsoft.Extensions.Logging;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.OperationalRecords;
 
-if (args.Length is not (5 or 7) || args[4] is not ("--collect" or "--inspect-candidates")
+if (args.Length is not (5 or 7) || args[4] is not ("--collect" or "--inspect-candidates" or "--completion-evidence")
     || (args.Length == 7 && (args[4] != "--collect" || args[5] != "--rfc-contract")) || !OperatingSystem.IsWindows())
 {
-    Console.WriteLine("Usage (approved TEST Windows host only): InUseEvidence <server-config.json> <source-id> <dictionary.json> <new-private-output.json> --inspect-candidates OR --collect [--rfc-contract <verified-rfc-contract.json>]");
+    Console.WriteLine("Usage (approved TEST Windows host only): InUseEvidence <server-config.json> <source-id> <dictionary.json> <new-private-output.json> --completion-evidence OR --inspect-candidates OR --collect [--rfc-contract <verified-rfc-contract.json>]");
     return 2;
 }
 try
@@ -20,6 +20,8 @@ try
     { return 2; }
     byte[] dictionaryBytes = await File.ReadAllBytesAsync(args[2]);
     Dictionary<string, string> dictionary = InUseDiagnosticJson.Read<Dictionary<string, string>>(dictionaryBytes);
+    if (args[4] == "--completion-evidence" && dictionary.Count != 0)
+    { return 2; }
     if (args[4] == "--inspect-candidates" && (dictionary.Count != 2
         || dictionary.GetValueOrDefault("RFC Kaydı") != "c_rfc_record"
         || dictionary.GetValueOrDefault("Virtual PC User") != "c_virtual_pc_user"))
@@ -53,7 +55,9 @@ try
     await output.WriteAsync(attempt, timeout.Token);
     output.Flush(true);
     var comparison = new List<JsonElement>();
-    JsonElement evidence = await client.DiagnoseAsync(args[1], dictionary, timeout.Token, referenced, comparison.Add);
+    JsonElement evidence = args[4] == "--completion-evidence"
+        ? await client.DiagnoseCompletionAsync(args[1], timeout.Token)
+        : await client.DiagnoseAsync(args[1], dictionary, timeout.Token, referenced, comparison.Add);
     byte[] result = JsonSerializer.SerializeToUtf8Bytes(new
     {
         Status = "CollectedNotMapped",

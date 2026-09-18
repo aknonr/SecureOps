@@ -1,5 +1,37 @@
 # InUseEvidence Standalone Operator Delivery
 
+## Completion evidence continuation (not present in rc6.24)
+
+The new `--completion-evidence` mode accepts the same five arguments and an empty
+dictionary `{}`. It requires all corporate write fences to remain closed. It
+requests only the selected active 4241/68 OR's `id`, `p_code`,
+`p_emb_dynamic_case_orff`, then the script's eligible BPM activity filter with
+id/model/status/group/main-object projections. Both requests use the existing
+login/session/query transport, 45-second overall and 64 KiB per-response limits.
+No update/upload, service enumeration, attachment endpoint guess or OR-state
+selector is attempted. Zero/one/multiple candidates remain different results;
+one candidate is not approval to mutate it. Partial paging is rejected.
+
+Turkce operator adimi: Yalniz bu modu iceren dogrulanmis arac derlemesiyle,
+onayli TEST yonetim oturumunda tek bir kaynak OR kimligi icin calistirin:
+
+```powershell
+& '<dogrulanmis-arac>\InUseEvidence.exe' '<ozel-yapilandirma>\server-config.json' '<sayisal-kaynak-OR-ID>' '<arac>\dictionary.json' '<ozel-kanit>\completion-one-or.json' --completion-evidence
+```
+
+Bu komut rc6.24 aracina yeni parametre ekleme talimati degildir; yeni arac
+dogrulamasi gerekir. Yapilandirma onceligi asagidaki mevcut JSON-only kuralla
+aynidir; IIS ayarlari kendiliginden okunmaz. Cikti `CollectedNotMapped` olmali.
+Yalniz `Evidence` bolumunu paylasin. Degerler yerine eslesebilir gecici takma
+kimlikler bulunur; gercek OR/hesap/token yazilmaz. Kaynak sahibi
+`p_emb_dynamic_case_orff` icin hangi SET/KEY temsilinin dinamik vaka kimligi
+oldugunu ve guncellemede surum kosulu destegini ayrica dogrular.
+
+Ek listesi/icerik ozeti okuma nesnesi ve nihai OR durum alani bu scriptten
+cikarilamaz. Kaynak sahibi sadece bunlarin selector/islem adini ve maskelenmis
+yanit seklini saglamalidir. Tam config, HAR, parola veya ham Authorization
+istenmez. Bu tanilama kurumsal ortamda bu gelistirme goreviyle calistirilmadi.
+
 ## Current Reporter Delivery, 2026-09-11
 
 Use **operator-reporter-tr.md** for current A/B commands. Packaging now includes

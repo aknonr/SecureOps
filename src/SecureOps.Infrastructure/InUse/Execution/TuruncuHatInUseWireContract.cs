@@ -65,8 +65,16 @@ public static class TuruncuHatInUseWireContract
     public static InUseRemoteResult Acknowledgement(JsonElement response, bool attachment)
     {
         string root = attachment ? "UploadAttachmentStringResult" : "UpdateResult";
-        if (!response.TryGetProperty(root, out JsonElement result) || result.ValueKind != JsonValueKind.Object)
+        if (response.ValueKind != JsonValueKind.Object || !response.TryGetProperty(root, out JsonElement result) || result.ValueKind != JsonValueKind.Object)
         { return new("Unknown", "UnsupportedAcknowledgement"); }
+        if (result.TryGetProperty("ErrorNo", out JsonElement number) && number.ValueKind != JsonValueKind.Null)
+        {
+            string? text = number.ValueKind == JsonValueKind.String ? number.GetString()
+                : number.ValueKind == JsonValueKind.Number ? number.GetRawText() : null;
+            if (!int.TryParse(text, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out int errorNo) || errorNo != 0)
+            { return new("Unknown", "SourceReportedFailureReconcileBeforeRetry"); }
+        }
         foreach (string field in new[] { "ErrorDescription", "ErrorDetails" })
         {
             if (result.TryGetProperty(field, out JsonElement error) && error.ValueKind != JsonValueKind.Null

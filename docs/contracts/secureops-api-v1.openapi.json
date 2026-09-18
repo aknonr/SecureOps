@@ -10970,6 +10970,27 @@
           "previewToken": {
             "type": "string",
             "nullable": true
+          },
+          "ocoReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "workStart": {
+            "type": "string",
+            "nullable": true
+          },
+          "workEnd": {
+            "type": "string",
+            "nullable": true
+          },
+          "preparedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recipientCount": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
           }
         },
         "additionalProperties": false

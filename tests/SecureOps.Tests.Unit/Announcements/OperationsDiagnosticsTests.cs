@@ -18,11 +18,19 @@ public sealed class OperationsDiagnosticsTests
         (await defaults.InspectAsync(default)).ConfigurationFingerprint.Should().Be((await explicitDefaults.InspectAsync(default)).ConfigurationFingerprint);
         values["ConnectionStrings:SecureOpsDb"] = "Server=synthetic;Database=synthetic;User ID=secret-user;Password=secret-password";
         values["TuruncuHat:Password"] = "another-secret";
+        values["AnnouncementMail:Password"] = "mail-password";
+        values["AnnouncementMail:UserName"] = "mail-private-identity";
+        values["AnnouncementMail:Host"] = "relay-private.example.invalid";
+        values["AnnouncementMail:SelfTestEnabled"] = "true";
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(values)
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Hangfire:Queue"] = "overridden-queue" }).Build();
         var diagnostic = new OperationsDiagnostics(configuration);
         string json = JsonSerializer.Serialize(diagnostic.Composition());
         json.Should().Contain("overridden-queue").And.NotContain("secret-user").And.NotContain("secret-password").And.NotContain("another-secret");
+        json.Should().NotContain("mail-password").And.NotContain("mail-private-identity").And.NotContain("relay-private.example.invalid");
+        using var report = JsonDocument.Parse(json);
+        report.RootElement.GetProperty("Settings").EnumerateArray().Single(x => x.GetProperty("Key").GetString() == "AnnouncementMail:SelfTestEnabled")
+            .GetProperty("Value").GetString().Should().Be("True");
         (await diagnostic.SourceAsync(default)).State.Should().Be("Disabled");
     }
 

@@ -1,5 +1,15 @@
 # Planned announcements: implemented API and UI
 
+## Post-rc6.24 confirmation continuation
+
+Mail preview adds immutable-preparation `ocoReference`, `workStart`, `workEnd`,
+`preparedAt` and distinct `recipientCount` output. The confirmation displays
+seconds and the saved offsets, not browser-local reinterpretation. Self-test
+count is one with no Cc. No request accepts these fields; existing protected
+preview-token comparison binds the same preparation fingerprint. No migration,
+relay activation or change to historical MIME. Evidence/status is tracked in
+`docs/rc624-workflow-continuation.md`; rc6.24 does not contain this correction.
+
 ## Current Mail Contract, 2026-09-17
 
 ADR-0022 implements opt-in SMTP through the existing foreground Worker. This

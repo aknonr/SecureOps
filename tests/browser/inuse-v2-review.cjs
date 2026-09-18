@@ -40,6 +40,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         assert.equal(first.draft.answers.find(a => a.serverId === '1200002' && a.check === 'InternetIn').origin.kind, 'Individual');
         await navigate(page, ui, 'in-use/' + first.id);
         await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('changed');
+        await page.waitForFunction(() => document.querySelectorAll('[data-answer-check=InternetOut]').length === 0);
         assert.equal(await page.locator('[data-answer-check=InternetOut]').count(), 0);
         await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('all');
         assert.equal(await answer('1200002', 'InternetIn').inputValue(), 'Yes');
