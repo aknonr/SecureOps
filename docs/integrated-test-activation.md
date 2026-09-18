@@ -132,3 +132,13 @@ resolved these; failed evidence is retained, not reported as a pass. Initial
 OpenAPI/schema packaging expectations were updated for the actual added contracts
 and 023, then normal equality/regression passed. No corporate secrets, sending,
 upload, closure, permission change, target SQL or deployment occurred.
+
+## Package acceptance correction
+
+The first candidate rc6.25 (d6b285c) failed the standalone collector payload gate:
+its native SkiaSharp dependency published a PDB despite DebugSymbols=false.
+No final release metadata was produced. Retain that failed directory; do not install.
+The collector now removes only verified files in its fresh tool staging before
+the unchanged payload/integrity scan, matching component package handling.
+The successor is required for this concrete acceptance failure, not another
+intermediate product iteration. Product behavior is unchanged from d6b285c.

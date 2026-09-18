@@ -20,6 +20,12 @@ New-Item -ItemType Directory -Path $tool | Out-Null
     '-p:DebugType=None' '-p:DebugSymbols=false' '-p:GenerateDocumentationFile=false' `
     '-p:ContinuousIntegrationBuild=true' "-p:PathMap=$repo=/_/" "-p:SourceRevisionId=$source"
 if ($LASTEXITCODE -ne 0) { throw 'Collector publish failed; incomplete delivery is not usable.' }
+# Native dependency packages can carry symbols independently of project DebugType.
+foreach ($symbol in Get-ChildItem -LiteralPath $tool -Recurse -File -Filter '*.pdb') {
+    if (!$symbol.FullName.StartsWith($tool + '\', [StringComparison]::OrdinalIgnoreCase) -or
+        $symbol.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Symbol outside fresh collector staging.' }
+    Remove-Item -LiteralPath $symbol.FullName
+}
 & (Join-Path $PSScriptRoot 'Test-ApiReleasePayload.ps1') -PublishDirectory $tool -ForbiddenText @($repo, $env:USERPROFILE)
 foreach ($required in @('InUseEvidence.exe', 'InUseEvidence.dll', 'InUseEvidence.deps.json', 'InUseEvidence.runtimeconfig.json',
         'SecureOps.Infrastructure.dll', 'SecureOps.Shared.dll', 'SecureOps.Domain.dll')) {
