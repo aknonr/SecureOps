@@ -54,3 +54,11 @@ Phase 1A audit and identity lookup infrastructure is implemented. The Operationa
 See `Identity/README.md`, `Audit/README.md`, and `OperationalRecords/README.md` for provider selection, local-test boundaries, configuration, and controlled-runtime blockers.
 
 SQL-backed Access, Audit, Operational Record, command idempotency, reporting, and application-session providers share `ConnectionStrings:SecureOpsDb`. They require the applicable migrations through 007 and the object-level runtime grants documented in `docs/24-api-test-deployment-readiness.md`; the application never executes those migrations.
+
+Post-rc6.22 In Use history/execution adds SQL 022 to the current installed 001-021
+chain. `InUse/Execution` keeps immutable reviewed bytes separate from execution
+versions, uses the existing Hangfire host and revalidates current authority before
+each new step. The enabled synthetic transport is local-only. Known corporate
+mutation HTTP shapes are tested without network but are not registered for
+dispatch while verified target/readback contracts are missing. Server history
+uses stable source identity, not hostname/IP. See `docs/inuse-v2-followup.md`.

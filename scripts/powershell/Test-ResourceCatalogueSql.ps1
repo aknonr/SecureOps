@@ -5,11 +5,13 @@ param(
     [switch]$RunTests,
     [switch]$IncludeAnnouncementDrafts,
     [switch]$IncludeAnnouncementSources,
-    [switch]$IncludeAnnouncementPreparations
+    [switch]$IncludeAnnouncementPreparations,
+    [switch]$DeferInUseFollowup
 )
 
 $ErrorActionPreference = 'Stop'
-# Current workflow persistence requires 021 and its full predecessor inventory.
+if ($DeferInUseFollowup -and $RunTests) { throw 'Current regression requires 022. Deferred mode is for the isolated upgrade checkpoint only.' }
+# Fresh isolated acceptance includes the additive 022 delta; never targets an installed corporate database.
 $IncludeAnnouncementPreparations = $true
 if ($IncludeAnnouncementPreparations) { $IncludeAnnouncementSources = $true }
 if ($IncludeAnnouncementSources) { $IncludeAnnouncementDrafts = $true }
@@ -87,6 +89,7 @@ try {
     Invoke-ResourceTestSql -File '019-access-role-bundles.sql'
     Invoke-ResourceTestSql -File '020-operational-mail-commands.sql'
     Invoke-ResourceTestSql -File '021-workflow-actor-and-closure-evidence.sql'
+    if (!$DeferInUseFollowup) { Invoke-ResourceTestSql -File '022-in-use-review-and-execution.sql' }
 }
 finally { Pop-Location }
 
@@ -107,4 +110,4 @@ if ($RunTests) {
         } finally { Pop-Location }
     } finally { $env:SECUREOPS_SQL_TEST_CONNECTION = $previous }
 }
-[PSCustomObject]@{ Database = $database; Migrations = '001-021'; UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }
+[PSCustomObject]@{ Database = $database; Migrations = $(if ($DeferInUseFollowup) { '001-021' } else { '001-022' }); UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }

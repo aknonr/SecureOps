@@ -1,5 +1,15 @@
 # ADR-0020: In Use Local Review Workspace
 
+## Post-rc6.22 Owner-Approved Continuation
+
+The 2026-09-18 owner instruction authorizes the bounded end-to-end In Use v2
+follow-up, including Razor, server review history/reuse, controlled executor,
+necessary additive persistence and local release preparation. Its task-specific
+size exception starts at aa9e4d2 and does not change permanent rules. See
+../inuse-v2-followup.md. Existing local-only and blocked-intent implementations
+remain historical evidence, not proof of remote completion. Corporate execution
+and deployment remain outside this authorization.
+
 ## rc6.21 Completion, 2026-09-17
 
 The owner authorizes the bounded completion exception from 778dca3, including the

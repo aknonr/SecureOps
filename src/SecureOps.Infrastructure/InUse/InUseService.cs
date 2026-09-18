@@ -15,7 +15,8 @@ namespace SecureOps.Infrastructure.InUse;
 /// <summary>Authorized local In Use workflow. There is deliberately no external-write dependency.</summary>
 public sealed partial class InUseService(IInUseRepository repository, IInUseSourceClient source,
     IApplicationAccessService access, IAccessRepository users, ICommandIdempotencyStore commands,
-    ILogger<InUseService> logger, InUseReportArchive? archive = null, SqlInUseIdentities? identities = null, InUsePolicy? policy = null)
+    ILogger<InUseService> logger, InUseReportArchive? archive = null, SqlInUseIdentities? identities = null, InUsePolicy? policy = null,
+    Execution.InUseCompletionCoordinator? completion = null)
 {
     /// <summary>Queries only persisted records.</summary>
     public Task<InUseResult<InUsePage>> QueryAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -139,6 +140,9 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             { return InUseResult<InUseRecord>.Fail("InUseConflict"); }
             if (!ValidDraft(request, old))
             { return InUseResult<InUseRecord>.Fail("InUseInvalid"); }
+            IReadOnlyList<InUseAnswer>? answers = await NormalizeAnswersAsync(old, request, user, token);
+            if (answers is null)
+            { return new(null, "InUseConflict", "Kopyalanan veya önceki cevapların kaynak bağlamı değişti. Seçiminiz korunuyor; sunucuları yeniden inceleyin."); }
             InUsePolicyProposal? accepted = old.Draft?.SourceVersion == old.SourceVersion ? old.Draft.Policy : null;
             if (request.ReviewedPolicyFingerprint is not null)
             {
@@ -153,7 +157,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                 Version = old.Version + 1,
                 Draft = new(old.SourceVersion,
                 (old.Draft?.Answers ?? []).Where(a => !request.Answers.Any(n => n.ServerId == a.ServerId && n.Check == a.Check))
-                    .Concat(request.Answers.Select(a => string.IsNullOrWhiteSpace(a.Evidence)
+                    .Concat(answers.Select(a => string.IsNullOrWhiteSpace(a.Evidence)
                         ? a with { Evidence = old.Draft?.Answers.FirstOrDefault(o => o.ServerId == a.ServerId && o.Check == a.Check)?.Evidence ?? "" } : a))
                     .OrderBy(a => a.ServerId, StringComparer.Ordinal).ThenBy(a => a.Check, StringComparer.Ordinal).ToArray(),
                 string.IsNullOrWhiteSpace(request.Notes) ? old.Draft?.Notes ?? "" : request.Notes.Trim(), user.Id, DateTimeOffset.UtcNow)

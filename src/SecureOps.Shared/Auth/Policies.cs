@@ -15,6 +15,8 @@ public static class Policies
     public const string CanAssignInUse = "CanAssignInUse";
     /// <summary>Explicit read-only In Use discovery.</summary>
     public const string CanRefreshInUse = "CanRefreshInUse";
+    /// <summary>Narrow explicit source-completion permission, separate from local review.</summary>
+    public const string CanCompleteInUse = "CanCompleteInUse";
     /// <summary>Approved catalogue reader and personal preference owner.</summary>
     public const string CanViewResources = "CanViewResources";
     /// <summary>Explicit shared catalogue management.</summary>

@@ -16,6 +16,7 @@ public sealed class LocalInUseSourceClient : IInUseSourceClient
             [Server("demo-server-01", "Production", "Sample service A"), Server("demo-server-02", "Test", "Sample service B")],
             "Synthetic fixture: two explicit service items with different services and environments.", true)
         {
+            IdentityScope = "simulation:local:v1",
             ServiceItemsState = "Complete",
             AffectedAssetsState = "Complete",
             AffectedAssetCount = 0,

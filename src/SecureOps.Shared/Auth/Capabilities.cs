@@ -21,6 +21,8 @@ public static class Capabilities
     public const string InUseAssign = "InUse.Assign";
     /// <summary>Explicit read-only source discovery.</summary>
     public const string InUseRefresh = "InUse.Refresh";
+    /// <summary>Explicit In Use source completion, additionally protected by deployment and provider fences.</summary>
+    public const string InUseComplete = "InUse.Complete";
     /// <summary>Read permitted catalogue entries and manage personal resource preferences.</summary>
     public const string ResourcesView = "Resources.View";
     /// <summary>Manage shared categories and links; does not grant destination-system access.</summary>

@@ -44,12 +44,16 @@ public sealed class OperationsDiagnostics
         string[] keys = ["Announcements:Enabled", "Hangfire:Enabled", "Hangfire:SchemaName", "Hangfire:Queue", "Hangfire:PrepareSchema",
             "AnnouncementSource:Enabled", "AnnouncementSource:CollectionProvider", "AnnouncementSource:ServiceProvider",
             "AnnouncementSource:SiteCode", "AnnouncementSource:ProviderMachineName", "AnnouncementSource:ServiceInstanceBaseObject",
-            "AnnouncementSource:ServiceNameSelect", "AnnouncementSource:ChangeBaseObject"];
+            "AnnouncementSource:ServiceNameSelect", "AnnouncementSource:ChangeBaseObject",
+            "InUseCompletion:Enabled", "InUseCompletion:Provider", "InUseCompletion:TimeoutSeconds",
+            "TuruncuHat:InUseAspectLookupEnabled"];
         var bound = new Dictionary<string, JsonElement>
         {
             ["Announcements"] = JsonSerializer.SerializeToElement(_announcements),
             ["Hangfire"] = JsonSerializer.SerializeToElement(_hangfire),
-            ["AnnouncementSource"] = JsonSerializer.SerializeToElement(_source)
+            ["AnnouncementSource"] = JsonSerializer.SerializeToElement(_source),
+            ["InUseCompletion"] = JsonSerializer.SerializeToElement(configuration.GetSection("InUseCompletion").Get<InUseCompletionOptions>() ?? new()),
+            ["TuruncuHat"] = JsonSerializer.SerializeToElement(new { InUseAspectLookupEnabled = configuration.GetValue<bool>("TuruncuHat:InUseAspectLookupEnabled") })
         };
         _settings = [.. keys.Select(key => new EffectiveOperationSetting(key,
                 bound[key.Split(':')[0]].GetProperty(key.Split(':')[1]).ToString(), Provider(configuration, key))),

@@ -48,4 +48,6 @@ public sealed class TuruncuHatOptions
     public int MaxDescriptionLength { get; set; } = 8000;
     /// <summary>Enables bounded, secret-free wire-contract metadata logging in TEST only.</summary>
     public bool DiagnosticContractLogging { get; set; }
+    /// <summary>Explicit opt-in to the In Use per-service semantic aspect projection, after read-only contract validation.</summary>
+    public bool InUseAspectLookupEnabled { get; set; }
 }

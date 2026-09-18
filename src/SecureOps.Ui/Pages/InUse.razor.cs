@@ -62,6 +62,7 @@ public partial class InUse
     private bool HasUnsaved => _dirty || AssignmentEdited;
     private void ReviewServer(string id)
     {
+        _answerView = "all";
         _editingServer = id;
         _changes = null;
         _focusAnswer = CanEdit ? 0 : null;
@@ -72,7 +73,7 @@ public partial class InUse
         : _record!.Status == "Stale" ? "Değişen kaynak kanıtına göre cevapları yeniden doğrulayın."
         : _record.Draft is null || _dirty ? "Sunucu cevaplarını inceleyip yerel taslağı kaydedin."
         : CompletedServers < _record.Source.Servers.Count ? "Eksik cevapları tamamlayın; taslağınız korunuyor."
-        : "Kaydedilen taslağın Excel önizlemesini kontrol edin. Kaynak tamamlama kapalı.";
+        : "Kaydedilen taslağın Excel önizlemesini ve talebe ekleme koşullarını kontrol edin.";
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
@@ -128,6 +129,8 @@ public partial class InUse
                 if (Can(Capabilities.InUseAssign))
                 { _assignees = await ReadAsync<InUseAssignee[]>("/assignees"); }
                 SetRecord(record);
+                if (CanEdit)
+                { await ReadExecutionAsync(); }
             }
             else
             {
@@ -161,7 +164,7 @@ public partial class InUse
         bool assignmentEdited = AssignmentEdited;
         SetRecord(await SendAsync<InUseRecord>(HttpMethod.Put, $"/{_record.Id}/draft",
             new SaveInUseDraftRequest(_record.Version, _record.SourceVersion,
-                _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence)).ToArray(), _notes)
+                _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence) { Origin = a.Origin }).ToArray(), _notes)
             { ReviewedPolicyFingerprint = _acceptPolicy ? _record.PolicyProposal?.Fingerprint : null }));
         if (assignmentEdited)
         { _assignee = assignee; }
@@ -184,7 +187,7 @@ public partial class InUse
         {
             AnswerEdit? retained = local.SingleOrDefault(a => a.ServerId == answer.ServerId && a.Check == answer.Check);
             if (retained is not null)
-            { answer.Value = retained.Value; answer.Evidence = retained.Evidence; }
+            { answer.Value = retained.Value; answer.Evidence = retained.Evidence; answer.Origin = retained.Origin; }
         }
         if (assignmentEdited)
         { _assignee = assignee; }
@@ -249,6 +252,7 @@ public partial class InUse
     });
     private bool Ready()
     {
+        _answerView = "all";
         InUseAnswer? missing = InUseChecks.Missing(_record!.Source, _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, "")).ToArray());
         if (missing is not null)
         {
@@ -266,7 +270,11 @@ public partial class InUse
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_focusAnswer is int index)
-        { _focusAnswer = null; await _answerElements[index].FocusAsync(); }
+        {
+            _focusAnswer = null;
+            if (_rowElements.TryGetValue((_editingServer, InUseChecks.OperatorCodes[index]), out ElementReference element))
+            { await element.FocusAsync(); }
+        }
         if (Id is null && _page is not null && !_busy)
         {
             try
@@ -299,10 +307,13 @@ public partial class InUse
         _changes = null;
         _validation = null;
         _editingServer = record.Source.Servers.FirstOrDefault()?.Id ?? "";
+        _history = null;
+        _reuseSelection.Clear();
+        _rowElements.Clear();
         _answers = record.Source.Servers.SelectMany(server => InUseChecks.OperatorCodes.Select(check =>
         {
             InUseAnswer? saved = record.Draft?.Answers.FirstOrDefault(a => a.ServerId == server.Id && a.Check == check);
-            return new AnswerEdit(server.Id, check) { Value = saved?.Value ?? "Unknown", Evidence = saved?.Evidence ?? "" };
+            return new AnswerEdit(server.Id, check) { Value = saved?.Value ?? "Unknown", Evidence = saved?.Evidence ?? "", Origin = saved?.Origin };
         })).ToList();
     }
     private void SelectServer(string id, ChangeEventArgs args)
@@ -310,12 +321,20 @@ public partial class InUse
     private void PreviewBulk() => _changes = _answers.Where(a => _selected.Contains(a.ServerId))
         .Select(a => (Target: a, Before: a.Value, After: _answers.Single(s => s.ServerId == _editingServer && s.Check == a.Check).Value))
         .Where(c => c.Before != c.After).ToArray();
-    private void ApplyBulk()
+    private async Task ApplyBulk()
     {
         if (!CanEdit || _changes is null)
         { return; }
-        foreach ((AnswerEdit Target, string Before, string After) change in _changes)
-        { change.Target.Value = change.After; }
+        (AnswerEdit Target, string Before, string After)[] changes = _changes;
+        if (await Dialogs.ShowMessageBox("Seçili sunucuların cevaplarını değiştir",
+            $"{changes.Select(c => c.Target.ServerId).Distinct().Count()} sunucuda {changes.Length} gösterilen cevap değişecek. Diğer cevaplar korunacak.",
+            yesText: "Gösterilen değişiklikleri uygula", cancelText: "Vazgeç") != true)
+        { return; }
+        foreach ((AnswerEdit Target, string Before, string After) change in changes)
+        {
+            change.Target.Value = change.After;
+            change.Target.Origin = new("Bulk", _editingServer) { CopiedValue = change.After };
+        }
         Dirty();
         _notice = "Toplu cevaplar taslakta. Kaydetmeden önce sunucu bazında inceleyin.";
     }
@@ -368,6 +387,10 @@ public partial class InUse
         _page = null;
         _report = null;
         _comparison = null;
+        _history = null;
+        _execution = null;
+        _reuseSelection.Clear();
+        _rowElements.Clear();
         _assignees = [];
         _answers.Clear();
         _selected.Clear();
@@ -470,5 +493,6 @@ public partial class InUse
         public string Check { get; } = check;
         public string Value { get; set; } = "Unknown";
         public string Evidence { get; set; } = "";
+        public InUseAnswerOrigin? Origin { get; set; }
     }
 }

@@ -1,0 +1,23 @@
+namespace SecureOps.Shared.Contracts.InUse;
+
+/// <summary>Explicit input origin. Actor/time are always assigned by the server, never trusted from requests.</summary>
+public sealed record InUseAnswerOrigin(string Kind, string? SourceServerId = null, Guid? ReviewId = null,
+    Guid? AcceptedBy = null, string? AcceptedByLabel = null, DateTimeOffset? AcceptedAt = null)
+{
+    /// <summary>Explicit copy-time value; later source-answer edits do not alter accepted copies.</summary>
+    public string? CopiedValue { get; init; }
+}
+
+/// <summary>Immutable server-linked review; absent identity cannot be used for cross-record reuse.</summary>
+public sealed record InUseServerReview(Guid Id, Guid RecordId, string OrCode, long RecordVersion, long SourceVersion,
+    string IdentityKey, string ContextHash, InUseServer Server, IReadOnlyList<InUseAnswer> Answers,
+    Guid ReviewerId, string? ReviewerLabel, DateTimeOffset ReviewedAt, DateTimeOffset ObservedAt,
+    InUsePolicyProposal? Policy);
+
+/// <summary>Current observation and a permission-filtered, bounded history page.</summary>
+public sealed record InUseServerHistory(InUseServer Current, DateTimeOffset ObservedAt, string? IdentityKey,
+    IReadOnlyList<InUseServerReview> Items, int Total, int Page, int PageSize,
+    IReadOnlyList<InUseReuseProposal> Proposals);
+
+/// <summary>Prior answers are proposals only; changed/missing context is explicitly blocked.</summary>
+public sealed record InUseReuseProposal(Guid ReviewId, bool CanReuse, string Reason, IReadOnlyList<string> ChangedFields);

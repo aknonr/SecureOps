@@ -18,6 +18,7 @@ public static class AccessActionCatalog
         new(Capabilities.InUseReview, "In Use", "İncele ve raporla", "Atamadan bağımsız yerel cevapları kaydeder ve rapor hazırlar."),
         new(Capabilities.InUseAssign, "In Use", "İnceleyici ata", "Doğrulanmış uygulama kullanıcısını isteğe bağlı atar."),
         new(Capabilities.InUseRefresh, "In Use", "Kaynağı yenile", "Kurumsal kaynaktan açık okuma başlatır; kaynak yazmaz."),
+        new(Capabilities.InUseComplete, "In Use", "Talebe ekle ve tamamla", "Ayrı kaynak yazma izni ve doğrulanmış sözleşmeyle arşivlenmiş raporu ekler, görevi tamamlar ve OR son durumunu okur. Yerel inceleme izni bunu vermez."),
         new(Capabilities.ResourcesView, "Bağlantılar", "Bağlantıları kullan", "İzinli bağlantıları ve kişisel grupları kullanır."),
         new(Capabilities.ResourcesManage, "Bağlantılar", "Katalog yönet", "Paylaşılan kategori ve bağlantıları düzenler."),
         new(Capabilities.IdentityLookup, "Kimlik", "Hesap sorgula", "Sınırlı tam hesap sorgusu yapar."),

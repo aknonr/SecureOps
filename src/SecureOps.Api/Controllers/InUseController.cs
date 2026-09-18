@@ -22,6 +22,23 @@ namespace SecureOps.Api.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class InUseController(InUseService service) : ControllerBase
 {
+    /// <summary>Structured completion readiness and exact durable step results.</summary>
+    [HttpGet("{id:guid}/execution")]
+    [Authorize(Policy = Policies.CanReviewInUse)]
+    public async Task<ActionResult<InUseExecutionStatus>> ExecutionAsync(Guid id, CancellationToken token) =>
+        Reply(await service.ExecutionStatusAsync(User, Context(), id, token));
+    /// <summary>Fresh narrow-authorized durable completion; never a browser-reported outcome.</summary>
+    [HttpPost("{id:guid}/execution")]
+    [Authorize(Policy = Policies.CanReviewInUse)]
+    [Authorize(Policy = Policies.CanCompleteInUse)]
+    public async Task<ActionResult<InUseExecution>> ExecuteAsync(Guid id, StartInUseExecutionRequest request, CancellationToken token) =>
+        Reply(await service.StartExecutionAsync(User, Context(), id, request, token));
+    /// <summary>Immutable server review history and explicit reuse proposals, resolved from trusted source identity.</summary>
+    [HttpGet("{id:guid}/servers/{serverId}/history")]
+    [Authorize(Policy = Policies.CanReviewInUse)]
+    public async Task<ActionResult<InUseServerHistory>> HistoryAsync(Guid id, string serverId, CancellationToken token,
+        string? search = null, int page = 1, int pageSize = 10) =>
+        Reply(await service.HistoryAsync(User, Context(), id, serverId, search, page, pageSize, token));
     /// <summary>Management-authorized OR-based summary of stored records.</summary>
     [HttpGet("overview")]
     [Authorize(Policy = Policies.CanViewManagementReports)]

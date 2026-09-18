@@ -172,6 +172,16 @@ public static class DependencyInjection
         AddAnnouncementSource(services, configuration);
         services.Configure<InUsePolicyOptions>(configuration.GetSection("InUsePolicy"));
         services.AddSingleton<InUsePolicy>();
+        services.Configure<InUseCompletionOptions>(configuration.GetSection("InUseCompletion"));
+        services.AddSingleton(p => new InUse.Execution.InUseCompletionPolicy(p.GetRequiredService<IOptions<InUseCompletionOptions>>(),
+            p.GetRequiredService<IOptions<OperationalRecordsOptions>>(), environmentName));
+        services.AddScoped<InUse.Execution.SqlInUseExecutionStore>();
+        services.AddScoped<InUse.Execution.IInUseExecutionStore>(p => p.GetRequiredService<InUse.Execution.SqlInUseExecutionStore>());
+        services.AddScoped<InUse.Execution.InUseExecutionDispatcher>();
+        services.AddScoped<InUse.Execution.InUseCompletionCoordinator>();
+        services.AddScoped<InUse.Execution.IInUseCompletionTransport, InUse.Execution.FixtureInUseCompletionTransport>();
+        services.AddScoped<InUse.Execution.InUseExecutionWorker>();
+        services.AddScoped<InUse.Execution.InUseExecutionRecovery>();
         services.AddScoped<InUseService>();
         services.AddSingleton<InUseReportArchive>();
         if (string.Equals(configuration[$"{SessionSecurityOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase))

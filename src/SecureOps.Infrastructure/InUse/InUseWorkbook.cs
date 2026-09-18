@@ -24,7 +24,7 @@ public static class InUseWorkbook
         "Department", "Sub_Department", "Contact_email", "UY_Owner Mail Address", "ITMC_Event_Owner_Group", "ITMC_MEMORY_Alarm",
         "ITMC_CPU_Alarm", "ITMC_UP_DOWN_Alarm", "ITMC_Disk_Alarm"];
     private static readonly string[] _nmsFields = ["check:Verified", "IP ADDRESS", "ENVANTER_ID", "ITMC_Service_ID",
-        "SERVICE NAME (ÜRÜN/UYGULAMA)", "ITMC_Servis_Unsuru_ID", "ITMC_Servis_Unsuru", "SERVER TYPE", "Device_Type", "SI_ENVIRONMENT",
+        "SERVICE NAME (ÜRÜN/UYGULAMA)", "ITMC_Servis_Unsuru_ID", "SERVICE ASPECT (Servis Unsuru)", "SERVER TYPE", "Device_Type", "SI_ENVIRONMENT",
         "COUNTRY", "CITY", "BUILDING", "Department", "Sub_Department", "Contact_email", "UY_Owner Mail Address", "ITMC_Event_Owner_Group",
         "check:MemoryAlarm", "check:CpuAlarm", "check:UpDownAlarm", "check:DiskAlarm"];
 
@@ -78,6 +78,9 @@ public static class InUseWorkbook
                 .Select(f => new[] { server.Id, f.Key, InUseDisplayText.Field(f.Key, f.Value.Value), f.Value.Source }));
             evidenceRows.AddRange(record.Draft.Answers.Where(a => a.ServerId == server.Id)
                 .Select(a => new[] { a.ServerId, a.Check, a.Value, a.Evidence }));
+            evidenceRows.AddRange(record.Draft.Answers.Where(a => a.ServerId == server.Id && a.Origin is not null)
+                .Select(a => new[] { a.ServerId, a.Check + ":Origin", a.Origin!.Kind,
+                    $"{a.Origin.AcceptedBy:D}; {a.Origin.AcceptedByLabel}; {a.Origin.AcceptedAt:O}; source-server={a.Origin.SourceServerId}; review={a.Origin.ReviewId:D}; copied-value={a.Origin.CopiedValue}" }));
             if (record.Draft.Policy is { } policy)
             {
                 evidenceRows.AddRange(policy.Fields.Where(f => f.ServerId == server.Id)
@@ -112,6 +115,8 @@ public static class InUseWorkbook
         if (!field.StartsWith("check:", StringComparison.Ordinal))
         {
             string? observed = server.Fields.GetValueOrDefault(field)?.Value;
+            if (field == "SERVICE ASPECT (Servis Unsuru)" && string.IsNullOrWhiteSpace(observed))
+            { observed = server.Fields.GetValueOrDefault("ITMC_Servis_Unsuru")?.Value; }
             return !string.IsNullOrWhiteSpace(observed) ? InUseDisplayText.Field(field, observed) : proposal?.Value ?? "Bilinmiyor";
         }
         if (!InUseChecks.OperatorCodes.Contains(field[6..]))

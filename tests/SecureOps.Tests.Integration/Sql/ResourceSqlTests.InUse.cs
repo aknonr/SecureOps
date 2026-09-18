@@ -20,9 +20,9 @@ public sealed partial class ResourceSqlTests
         ResourceActor actor = await CreateActorAsync(connection);
         var repository = new SqlInUseRepository(Configuration());
         var audit = new AuditEvent { Actor = actor.UserId.ToString("D"), Action = "InUseLocalProgress", CorrelationId = "synthetic-progress" };
-        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(_token)).Records[0] with { Id = Guid.NewGuid().ToString(), Code = "OR-PROGRESS" };
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(_token)).Records[0] with { Id = Guid.NewGuid().ToString(), Code = "OR-PROGRESS-" + Guid.NewGuid().ToString("N") };
         await repository.RefreshAsync((await repository.StateAsync(_token)).Version, new([source], false), null, audit, _token);
-        InUseRecord r = (await repository.QueryAsync(new(Search: "OR-PROGRESS"), actor.UserId, _token)).Items.Single();
+        InUseRecord r = (await repository.QueryAsync(new(Search: source.Code), actor.UserId, _token)).Items.Single();
         var intent = new InUseCompletion(Guid.NewGuid(), actor.UserId, r.Version, r.SourceVersion, new string('A', 64), DateTimeOffset.UtcNow);
         (await repository.SaveAsync(r with { Version = r.Version + 1, Completion = intent }, r.Version, audit, _token)).Should().BeTrue();
         InUseRecord stored = (await new SqlInUseRepository(Configuration()).GetAsync(r.Id, _token))!;

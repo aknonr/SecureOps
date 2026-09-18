@@ -109,6 +109,7 @@ public static class AccessLabels
         [Capabilities.ResourcesManage] = new(Capabilities.ResourcesManage, "Uygulama bağlantıları", "Bağlantı kataloğunu yönetme", "Paylaşılan bağlantıları ve kategorileri düzenler."),
         [Capabilities.InUseView] = new(Capabilities.InUseView, "In Use", "Kayıtları görüntüleme", "Kayıtlı In Use verisini okur."),
         [Capabilities.InUseReview] = new(Capabilities.InUseReview, "In Use", "Yerel inceleme", "Yerel inceleme taslağı ve Excel hazırlığı."),
+        [Capabilities.InUseComplete] = new(Capabilities.InUseComplete, "In Use", "Talebe ekleme ve tamamlama", "Ayrıca etkinleştirilmiş ve doğrulanmış kaynak sözleşmesi kapsamında incelenen raporu talebe ekler ve tekil görevi tamamlar; OR kapanışı ayrıca doğrulanır."),
         [Capabilities.InUseAssign] = new(Capabilities.InUseAssign, "In Use", "İnceleyici atama", "Onaylı uygulama kimliğine yerel atama."),
         [Capabilities.InUseRefresh] = new(Capabilities.InUseRefresh, "In Use", "Salt okunur keşif", "Kategori 4241 / grup 68 kaynak okuması."),
         [Capabilities.IdentityLookup] = new(

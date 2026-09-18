@@ -1,9 +1,9 @@
-param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly, [switch]$SourceReview, [switch]$OperationalRecordSimulation, [string]$OriginalAssetDirectory, [ValidateRange(1024,65535)][int]$LocalMailPort = 25251, [switch]$ResumeWorkerOnly)
+param([Parameter(Mandatory)][string]$EvidenceRoot, [Parameter(Mandatory)][ValidatePattern('^Oco[A-Za-z0-9_]{1,36}$')][string]$DatabaseSuffix, [string]$PayloadRoot = $EvidenceRoot, [ValidateRange(1024,65533)][int]$Port = 5431, [switch]$FinalPresentation, [switch]$ResumeApiOnly, [switch]$SourceReview, [switch]$OperationalRecordSimulation, [string]$OriginalAssetDirectory, [ValidateRange(1024,65535)][int]$LocalMailPort = 25251, [switch]$ResumeWorkerOnly, [switch]$InUseExecutionFixture, [ValidateRange(1024,65535)][int]$UiApiProxyPort = 5431)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $EvidenceRoot).Path
 $payload = (Resolve-Path -LiteralPath $PayloadRoot).Path
 if ($ResumeWorkerOnly) {
-    if ($ResumeApiOnly -or !$SourceReview) { throw 'Resume exactly one supported host.' }
+    if ($ResumeApiOnly -or !($SourceReview -xor $InUseExecutionFixture)) { throw 'Resume exactly one supported host.' }
     $previous = Get-Content -LiteralPath "$root/hosts.json" -Raw | ConvertFrom-Json
     if ($previous.Database -ne "SecureOps_ResourcesV1_$DatabaseSuffix" -or (Get-Process -Id $previous.Worker -ErrorAction SilentlyContinue)) { throw 'Stop only the previous task-owned Worker before resuming.' }
     $ResumeApiOnly = $true
@@ -40,6 +40,17 @@ if ($OperationalRecordSimulation) {
 $env:OperationalRecords__ReadOnlyIntegrationMode = 'false' # Supported Demo + disabled providers, not corporate read mode.
 $env:OperationalRecords__ControlledTestWritesEnabled = 'false'
 $env:OperationalRecords__SourceCloseEnabled = 'false'
+$env:InUseCompletion__Enabled = 'false'
+if ($InUseExecutionFixture) {
+    if (!$OperationalRecordSimulation -or $SourceReview) { throw 'In Use execution requires isolated simulation without mail/source review.' }
+    $env:InUseCompletion__Enabled = 'true'
+    $env:InUseCompletion__Provider = 'Fixture'
+    $env:InUseCompletion__FixtureDirectory = "$root/private-remote-fixture"
+    $env:InUsePolicy__Revision = 'synthetic-inuse-v2'
+    foreach ($entry in @{COUNTRY='Turkey';Department='Enterprise Systems';Sub_Department='WASAS';Contact_email='operator@example.invalid';ITMC_Event_Owner_Group='operator@example.invalid';Device_Type='Server'}.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable("InUsePolicy__Proposals__$($entry.Key)", $entry.Value, 'Process')
+    }
+}
 $env:Announcements__Enabled = 'true'
 $env:Announcements__DefaultDisplayOffset = '+03:00'
 $env:Announcements__Sender = 'announcements@example.invalid'
@@ -93,6 +104,22 @@ $env:DataProtection__KeyRingPath = "$root/private-api-keys"
 $env:Oidc__Enabled = 'false'
 $env:Hangfire__Enabled = $SourceReview.ToString()
 $env:AnnouncementSource__Enabled = $SourceReview.ToString()
+if ($InUseExecutionFixture) {
+    if (!(Test-Path "$payload/worker/SecureOps.Worker.dll")) { throw 'Publish the isolated Worker first.' }
+    $env:Hangfire__Enabled = 'true'
+    $env:Hangfire__Queue = 'inuse-' + $DatabaseSuffix.Substring($DatabaseSuffix.Length-8).ToLowerInvariant()
+    $env:Hangfire__SchemaName = 'HangFire'
+    $env:Hangfire__PrepareSchema = 'false'
+    $env:Hangfire__WorkerCount = '1'
+    $env:Hangfire__QueuePollIntervalSeconds = '1'
+    if ($ResumeWorkerOnly) {
+        $log = 'worker-resumed-' + [guid]::NewGuid().ToString('N')
+        $worker = Start-Process dotnet -ArgumentList 'SecureOps.Worker.dll' -WorkingDirectory "$payload/worker" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/$log.log" -RedirectStandardError "$root/$log.err"
+        @{Worker=$worker.Id;Database=$previous.Database} | ConvertTo-Json | Set-Content "$root/$log.json"
+        return
+    }
+    if (!$ResumeApiOnly) { $worker = Start-Process dotnet -ArgumentList 'SecureOps.Worker.dll' -WorkingDirectory "$payload/worker" -WindowStyle Hidden -PassThru -RedirectStandardOutput "$root/worker-host.log" -RedirectStandardError "$root/worker-host.err" }
+}
 if ($SourceReview) {
     if (!(Test-Path "$payload/worker/SecureOps.Worker.dll")) { throw 'Publish the isolated Worker first.' }
     $env:Hangfire__Queue = 'oco-' + $DatabaseSuffix.Substring($DatabaseSuffix.Length-8).ToLowerInvariant()
@@ -131,6 +158,7 @@ if ($ResumeApiOnly) { @{Api=$api.Id;Port=$Port} | ConvertTo-Json | Set-Content "
 $env:DataProtection__ApplicationName = 'SecureOps.Ui'
 $env:DataProtection__KeyRingPath = "$root/private-ui-keys"
 $env:IdentityLookupApi__BaseAddress = "http://127.0.0.1:$Port/"
+if ($PSBoundParameters.ContainsKey('UiApiProxyPort')) { $env:IdentityLookupApi__BaseAddress = "http://127.0.0.1:$UiApiProxyPort/" }
 $env:DemoMode__Enabled = 'true'
 $env:DemoMode__AllowMockAuthentication = 'true'
 $env:DemoMode__ApiDemoActor = 'platform-admin'

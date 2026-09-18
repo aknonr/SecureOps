@@ -9,6 +9,7 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly Dictionary<Guid, InUseRecord> _records = [];
+    private readonly List<InUseServerReview> _reviews = [];
     private InUseRefreshState _state = InUseRefreshState.Empty;
 
     /// <inheritdoc />
@@ -122,9 +123,38 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
             { return false; }
             await audit.WriteAsync(evidence, cancellationToken);
             if (next is not null)
-            { _records[id] = next; }
+            {
+                _records[id] = next;
+                if (evidence.Operation?.Action == "InUseDraftSaved")
+                { _reviews.AddRange(InUseReviewHistory.Snapshots(next)); }
+            }
             return true;
         }
+        finally { _gate.Release(); }
+    }
+
+    /// <inheritdoc />
+    public async Task<(IReadOnlyList<InUseServerReview> Items, int Total)> HistoryAsync(string identityKey, string? search,
+        int page, int pageSize, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+        try
+        {
+            InUseServerReview[] rows = _reviews.Where(r => r.IdentityKey == identityKey && (string.IsNullOrWhiteSpace(search)
+                || System.Globalization.CultureInfo.GetCultureInfo("tr-TR").CompareInfo.IndexOf(InUseReviewHistory.SearchText(r),
+                    search.Trim(), System.Globalization.CompareOptions.IgnoreCase) >= 0))
+                .OrderByDescending(r => r.ReviewedAt).ThenBy(r => r.Id).ToArray();
+            return (rows.Skip((page - 1) * pageSize).Take(pageSize).ToArray(), rows.Length);
+        }
+        finally { _gate.Release(); }
+    }
+
+    /// <inheritdoc />
+    public async Task<InUseServerReview?> ReviewAsync(Guid reviewId, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+        try
+        { return _reviews.SingleOrDefault(r => r.Id == reviewId); }
         finally { _gate.Release(); }
     }
 }

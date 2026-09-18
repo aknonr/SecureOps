@@ -35,6 +35,18 @@ sql/
 | 019 | Versioned persisted role bundles and bounded access paging indexes; preserves existing role IDs/permissions. Requires 018; refuses replay. |
 | 020 | Immutable mail intent/bytes, one-distribution index, recovery states and append-only typed operation events. Existing OCO Source/Prepare rights become explicit; no SelfTest/Send grant. Requires 019; refuses replay. |
 | 021 | Nullable original initiator, input version and authoritative closure evidence on JiraTransfers; legacy rows remain NULL. Requires 020; refuses replay. |
+| 022 | Immutable server review history, durable In Use execution/artifact and append-only step evidence. Requires installed 001-021; no role assignment or legacy-data rewrite. |
+
+### Post-rc6.22 Delta
+
+An installation already on 001-021/Hangfire 9 applies only the reviewed **022**
+successor, never the earlier scripts. See `docs/inuse-v2-upgrade-tr.md` for the
+operator sequence, narrow object permissions and non-destructive rollback limits.
+No new source writes are enabled. History/events need SELECT/INSERT; executions
+need SELECT/INSERT/UPDATE; existing record/access reads and audit INSERT remain.
+No runtime DDL, DELETE or db_owner is needed. Review/event updates and deletes,
+and execution intent/artifact rewrites, are rejected by triggers. Preserve new
+tables on binary rollback and suspend In Use writes from older serializers.
 
 ### Upgrade From Verified 018
 

@@ -19,6 +19,10 @@ public sealed record InUseBatch(IReadOnlyList<InUseSource> Records, bool Complet
 /// <summary>Local workflow persistence with atomic audit and concurrency.</summary>
 public interface IInUseRepository
 {
+    /// <summary>Stored reviews of one verified source identity, with filtering before count and paging.</summary>
+    public Task<(IReadOnlyList<InUseServerReview> Items, int Total)> HistoryAsync(string identityKey, string? search, int page, int pageSize, CancellationToken token);
+    /// <summary>Reads one immutable review for server-side reuse validation.</summary>
+    public Task<InUseServerReview?> ReviewAsync(Guid reviewId, CancellationToken token);
     /// <summary>Aggregates a consistent stored snapshot; never calls the source.</summary>
     public Task<InUseOverview> OverviewAsync(AuditEvent audit, CancellationToken cancellationToken);
     /// <summary>Exclusively owns the discovery scope until disposal; null means another refresh is running.</summary>

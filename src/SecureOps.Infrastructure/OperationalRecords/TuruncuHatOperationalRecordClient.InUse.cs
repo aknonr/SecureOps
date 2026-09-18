@@ -30,6 +30,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IInUseSourceClie
         }
         List<InUseSource> records = [];
         var reporters = new Dictionary<string, InUseRelatedRequestReporter>(StringComparer.Ordinal);
+        var aspects = new Dictionary<string, IReadOnlyDictionary<string, InUseEvidence>>(StringComparer.Ordinal);
         foreach (OperationalRecordSourceItem item in parsed.Items)
         {
             if (!long.TryParse(item.SourceRecordId, System.Globalization.NumberStyles.None,
@@ -38,15 +39,20 @@ public sealed partial class TuruncuHatOperationalRecordClient : IInUseSourceClie
             InUseSource source = new(item.SourceRecordId, item.OrCode, item.Title,
             new(item.Requester, "TuruncuHat: KEY.p_rel_requester (display only; not an application identity)"),
             new(null, "Unresolved: service-owner response contract"),
-            new(null, "Unresolved: provisioning identity contract"), [], "", false);
+            new(null, "Unresolved: provisioning identity contract"), [], "", false)
+            {
+                IdentityScope = Uri.TryCreate(_options.BaseUrl, UriKind.Absolute, out Uri? sourceUri)
+                    ? "turuncuhat:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(sourceUri.AbsoluteUri.TrimEnd('/') + "|" + _options.TenantId))) : null
+            };
             try
             {
                 using JsonDocument related = await QueryAsync("rel", [$"#%m_tid%#=100049 and #%m_lid%#={id}"],
                     InUseServiceItemParser.ReporterSelects, "in-use-service-items", cancellationToken, 65536);
                 source = source with
                 {
-                    Servers = await EnrichReportersAsync(item.SourceRecordId,
-                        InUseServiceItemParser.Parse(related.RootElement, includeRfc: true), reporters, cancellationToken),
+                    Servers = await EnrichAspectsAsync(await EnrichReportersAsync(item.SourceRecordId,
+                        InUseServiceItemParser.Parse(related.RootElement, includeRfc: true), reporters, cancellationToken), aspects, cancellationToken),
                     ServiceItemsState = "Observed",
                     RelationshipEvidence = "TuruncuHat rel m_tid=100049 / m_lid=source OR; exact KEY/SET projection. Observed rows only; completeness unverified."
                 };

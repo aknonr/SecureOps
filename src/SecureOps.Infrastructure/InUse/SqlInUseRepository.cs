@@ -9,7 +9,7 @@ using SecureOps.Shared.Contracts.InUse;
 namespace SecureOps.Infrastructure.InUse;
 
 /// <summary>Local SQL state with exact-version writes and same-transaction audit.</summary>
-public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRepository
+public sealed partial class SqlInUseRepository(IConfiguration configuration) : IInUseRepository
 {
     private readonly string _connectionString = configuration.GetConnectionString("SecureOpsDb")
         ?? throw new InvalidOperationException("In Use persistence requires SecureOpsDb.");
@@ -165,7 +165,28 @@ public sealed class SqlInUseRepository(IConfiguration configuration) : IInUseRep
         if (version != expectedVersion)
         { return false; }
         if (next is not null)
-        { await PersistAsync(connection, transaction, next, false, cancellationToken); }
+        {
+            await PersistAsync(connection, transaction, next, false, cancellationToken);
+            if (audit.Operation?.Action == "InUseDraftSaved")
+            {
+                foreach (InUseServerReview review in InUseReviewHistory.Snapshots(next))
+                {
+                    await connection.ExecuteAsync(Command("""
+                        INSERT INTO ops.InUseServerReviews(ReviewId, RecordId, RecordVersion, IdentityKey, ReviewedAt, SearchText, SnapshotJson)
+                        VALUES(@Id,@RecordId,@RecordVersion,@IdentityKey,@ReviewedAt,@SearchText,@Json);
+                        """, new
+                    {
+                        review.Id,
+                        review.RecordId,
+                        review.RecordVersion,
+                        review.IdentityKey,
+                        review.ReviewedAt,
+                        SearchText = InUseReviewHistory.SearchText(review),
+                        Json = JsonSerializer.Serialize(review)
+                    }, cancellationToken, transaction));
+                }
+            }
+        }
         await AuditAsync(connection, transaction, audit, cancellationToken);
         if (audit.Operation is not null)
         { await Commands.SqlOperationEvidence.AppendAsync(connection, transaction, audit.Operation, cancellationToken, writeAudit: false); }

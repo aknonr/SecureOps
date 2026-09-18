@@ -24,6 +24,8 @@ public sealed record InUseSource(string Id, string Code, string Title, InUseEvid
     InUseEvidence ServiceOwner, InUseEvidence ProvisioningTeam, IReadOnlyList<InUseServer> Servers,
     string RelationshipEvidence, bool Synthetic)
 {
+    /// <summary>Trusted provider/tenant namespace; legacy unknown namespaces are never inferred from hostnames.</summary>
+    public string? IdentityScope { get; init; }
     /// <summary>Complete, Observed (completeness unverified), Partial, NotQueried, Forbidden, Failed or Ambiguous.</summary>
     public string ServiceItemsState { get; init; } = "NotQueried";
     /// <summary>A separate relationship, never populated from service items.</summary>
@@ -41,7 +43,11 @@ public sealed record InUseSource(string Id, string Code, string Title, InUseEvid
 }
 
 /// <summary>One explicitly reviewed technical answer. Unknown is a first-class value.</summary>
-public sealed record InUseAnswer(string ServerId, string Check, string Value, string Evidence);
+public sealed record InUseAnswer(string ServerId, string Check, string Value, string Evidence)
+{
+    /// <summary>Individual, Bulk or PreviousReview, with trusted acceptance provenance after save.</summary>
+    public InUseAnswerOrigin? Origin { get; init; }
+}
 
 /// <summary>Saved review bound to the source version, with server-authenticated provenance.</summary>
 public sealed record InUseDraft(long SourceVersion, IReadOnlyList<InUseAnswer> Answers, string Notes,

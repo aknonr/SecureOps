@@ -69,7 +69,7 @@ const proxy = http.createServer(async (req, res) => {
         await page.getByLabel('In Use kayıt ara', { exact: true }).fill(record.source.code);
         await page.waitForFunction(() => document.querySelectorAll('.so-inuse-records > li').length === 1); await ready();
         await page.getByRole('link', { name: record.source.code, exact: true }).click(); await ready();
-        await page.locator('.so-inuse-assignment summary').click();
+        await button('İnceleyici ata/değiştir').click();
         await page.getByLabel('In Use inceleyicisi', { exact: true }).selectOption(me.userId);
         await page.getByLabel('Atama gerekçesi', { exact: true }).fill('Synthetic retained assignment reason');
         for (const mode of ['503', 'transport']) {
@@ -88,37 +88,39 @@ const proxy = http.createServer(async (req, res) => {
         await button('Atamayı kaydet').click(); await page.getByText('Yerel atama kaydedildi.', { exact: true }).waitFor(); await ready();
         assert.equal((await read()).assigneeId, me.userId);
         checks.push('refresh -> SQL records -> stable assignment; 503/transport and real assignment conflict preserve intent');
-        const answer = check => page.getByLabel(`demo-server-01 ${check}`, { exact: true });
+        const answer = check => page.locator(`[data-answer-server="demo-server-01"][data-answer-check="${check}"]`);
         await answer('InternetOut').selectOption('Yes');
         await page.getByRole('link', { name: 'Listeye dön', exact: true }).click();
         const dialog = page.getByRole('dialog'); await dialog.waitFor();
         await dialog.getByRole('button', { name: 'Sayfada kal', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
         await page.waitForFunction(() => !document.querySelector('.so-route-progress.is-active'));
-        assert.equal(await answer('InternetOut').inputValue(), 'Yes'); assert.ok(page.url().endsWith(record.id));
+        assert.equal(await answer('InternetOut').inputValue(), 'Yes'); assert.ok(new URL(page.url()).pathname.endsWith(record.id));
         for (const mode of ['503', 'transport']) {
             arm('PUT', '/draft', mode); await button('Taslağı kaydet').click(); await page.locator('.so-problem').waitFor(); await ready(); fault = null;
             assert.equal(await answer('InternetOut').inputValue(), 'Yes');
         }
         await answer('InternetIn').selectOption('No'); await answer('Microsegmented').selectOption('Yes');
-        await page.locator('.so-inuse-bulk summary').click(); await page.locator('.so-inuse-bulk input[type=checkbox]').check();
+        await page.locator('.so-inuse-bulk input[type=checkbox]').check();
         const prior = await read(); await button('Değişiklikleri göster').click();
         await page.waitForFunction(() => document.querySelectorAll('.so-inuse-bulk li').length === 3);
         assert.equal(await page.locator('.so-inuse-bulk li').count(), 3); assert.deepEqual(await read(), prior);
         await button('Gösterilen değişiklikleri onayla').click();
+        await button('Gösterilen değişiklikleri uygula').click();
+        await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('all');
         const slow = arm('PUT', '/draft', 'hold'); await button('Taslağı kaydet').click(); await slow.hit;
-        await page.waitForFunction(() => document.querySelector('select[aria-label="demo-server-01 InternetOut"]')?.disabled && document.querySelector('input[aria-label="Atama gerekçesi"]')?.disabled);
+        await page.waitForFunction(() => document.querySelector('[data-answer-server="demo-server-01"][data-answer-check="InternetOut"]')?.disabled && document.querySelector('input[aria-label="Atama gerekçesi"]')?.disabled);
         assert.equal(await answer('InternetOut').isDisabled(), true);
         assert.equal(await page.getByLabel('Atama gerekçesi', { exact: true }).isDisabled(), true);
         await page.getByRole('link', { name: 'Listeye dön', exact: true }).click();
         await page.getByText('İşlem sürüyor. Sonucu gördükten sonra sayfadan ayrılabilirsiniz.', { exact: true }).waitFor();
-        assert.ok(page.url().endsWith(record.id)); slow.release();
+        assert.ok(new URL(page.url()).pathname.endsWith(record.id)); slow.release();
         await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor(); await ready();
         assert.equal((await read()).draft.answers.filter(a => a.value !== 'Unknown').length, 6);
         checks.push('canceled navigation; unsaved answers survive 503/transport; explicit bulk confirmation; pending command cannot lose newer edits');
         await navigate(page, ui, `in-use/${record.id}`); await ready();
+        await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('all');
         assert.equal(await answer('InternetOut').inputValue(), 'Yes');
-        await page.getByLabel('Yanıtlanacak sunucu', { exact: true }).selectOption('demo-server-02');
-        await page.getByLabel('demo-server-02 InternetOut', { exact: true }).selectOption('No'); await saved();
+        await page.locator('[data-answer-server="demo-server-02"][data-answer-check="InternetOut"]').selectOption('No'); await saved();
         const reviewed = await read(); assert.deepEqual(reviewed.source, record.source); assert.equal(reviewed.sourceHash, record.sourceHash);
         await button('Excel önizleme').click(); await page.getByLabel('Excel sayfası', { exact: true }).waitFor();
         const downloadEvent = page.waitForEvent('download'); await button("WASAS'a arşivle ve indir").click();
@@ -154,6 +156,7 @@ const proxy = http.createServer(async (req, res) => {
         await navigate(page, ui, 'account'); await page.waitForFunction(() => !document.querySelector('.so-loading'));
         assert.ok(currentSession, 'Actual UI/API application session observed');
         await navigate(page, ui, `in-use/${record.id}`); await ready();
+        await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('all');
         await answer('InternetOut').selectOption('No');
         await json(client, '/api/v1/sessions/revoke', { method: 'POST', data: { sessionId: currentSession, reason: 'Synthetic browser expiry-path verification' } });
         await button('Taslağı kaydet').click(); await page.waitForURL(url => url.pathname === '/session-expired');

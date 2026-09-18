@@ -67,3 +67,13 @@ No service or scheduler is installed by these commands. API source submissions
 persist, but collection cannot complete without this host and its matching queue.
 Controlled TEST must therefore name the foreground operator/session and recovery
 procedure. See the current Turkish runbook in `docs/24-api-test-deployment-readiness.md`.
+
+## In Use Follow-up
+
+The same Hangfire host performs bounded In Use execution and durable outbox
+recovery when explicitly enabled. Normal deployments keep `InUseCompletion`
+disabled; no extra service/host is installed. Step leases, original initiator,
+immutable artifact and append-only evidence are in additive SQL 022. A lost
+mutation response is Unknown, not permission for a queue retry. Corporate target,
+attachment reconciliation and final OR-state contracts remain blocking. See
+`docs/inuse-v2-followup.md` and `docs/inuse-v2-upgrade-tr.md`.
