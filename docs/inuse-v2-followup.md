@@ -25,6 +25,11 @@ The three questions already render; do not duplicate them. Make the desktop
 answer table primary, preserve focused mobile editing, expose selected bulk
 changes and per-answer origins. All copies are snapshots, not live links.
 Only an explicit save records answers; closing a dialog never supplies No.
+Explicit saves also retain the exact per-server observation in the draft.
+The changed-source filter compares each server's values and provenance against
+that observation; an unrelated record version change does not mark every server.
+Legacy drafts without that snapshot show an unavailable comparison, not an
+invented unchanged result. Source review is not automatic answer approval.
 
 Store immutable server review snapshots transactionally with draft/audit writes.
 Identity consists of provider/tenant scope, source object and exact server ID.
@@ -252,3 +257,27 @@ was not re-measured against an identical fixture, so no percentage/time reductio
 is claimed. An additional archived-baseline host launch was blocked by execution
 policy and was not retried through another route. Existing hosts/packages remain
 untouched. A final closeout must retain this measurement limitation.
+
+## Packaged Candidate and Final Correction
+
+The immutable local rc6.23 candidate identifies implementation source
+`2418a8e8035770356a2291394e3c12a7d70a0f85`. Its extracted API/UI/Worker
+passed the two-OR review, explicit history reuse, archive/download failure retry,
+enabled synthetic completion and process-restart checks. Original six-image OCO
+preparation/MIME and published source Worker interruption/recovery also passed.
+It was not deployed and is superseded by the next matched candidate: final
+inspection added the per-server saved-observation comparison and clarified API
+read grants needed even while completion is disabled.
+
+Retained failed browser attempts were test defects: replacing a JS function did
+not replace Blazor's cached reference, and native-zoom screenshots captured an
+inactive tab/incorrect clip. Corrected tests use a switch inside one fault wrapper
+and the active Chrome surface, with nonblank pixel checks. Metric-only passes and
+blank screenshots are not visual acceptance. A restart report request initially
+used the wrong JSON property (`reviewedVersion` instead of `reportVersion`);
+the corrected request returned identical archived bytes. No server failure is
+inferred from these test defects. Final-source regression is 1,330 unit plus
+278 integration passes; 45 explicit opt-ins have separately indexed evidence.
+
+Corrected build-source cumulative accounting: 63 files, +3,241/-90 lines against
+the original `aa9e4d2` baseline, not the intermediate implementation commit.

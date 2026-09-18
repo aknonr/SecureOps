@@ -15,7 +15,8 @@ const ui = loopback(process.argv[3]), out = path.resolve(process.argv[4]), id = 
             headless: true, ignoreHTTPSErrors: true, viewport: null, args: ['--window-size=1366,768'] });
         try {
             await context.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
-            const page = await context.newPage();
+            const page = context.pages()[0] || await context.newPage();
+            await page.bringToFront();
             await signIn(page, ui); await navigate(page, ui, 'in-use/' + id);
             await page.locator('.inuse-answer-table').waitFor();
             for (const theme of ['light', 'dark']) {
@@ -41,9 +42,23 @@ const ui = loopback(process.argv[3]), out = path.resolve(process.argv[4]), id = 
                 await page.locator('[data-answer-check=InternetOut]').first().focus(); await page.keyboard.press('Tab');
                 const focus = await page.evaluate(() => { const r = document.activeElement.getBoundingClientRect(); return { tag: document.activeElement.tagName, top: r.top, bottom: r.bottom, height: innerHeight }; });
                 assert.equal(focus.tag, 'SELECT'); assert.ok(focus.top >= 0 && focus.bottom <= focus.height);
-                await page.screenshot({ path: path.join(out, `${theme}-native-${zoom * 100}-viewport.png`) });
+                await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+                // Native zoom changes CDP layout coordinates; capture the actual surface, not a CSS-sized clip.
+                const cdp = await context.newCDPSession(page);
+                const shot = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+                fs.writeFileSync(path.join(out, `${theme}-native-${zoom * 100}-viewport.png`), Buffer.from(shot.data, 'base64'));
+                await cdp.detach();
+                const pixels = await page.evaluate(async data => {
+                    const image = new Image(); image.src = 'data:image/png;base64,' + data; await image.decode();
+                    const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+                    const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
+                    const bytes = context.getImageData(0, 0, canvas.width, canvas.height).data, colors = new Set();
+                    for (let i = 0; i < bytes.length; i += 64) colors.add(bytes[i] + ',' + bytes[i + 1] + ',' + bytes[i + 2]);
+                    return { width: image.width, height: image.height, sampledColors: colors.size };
+                }, shot.data);
+                assert.ok(pixels.sampledColors > 100, 'Blank browser capture is not presentation evidence');
                 await page.screenshot({ path: path.join(out, `${theme}-native-${zoom * 100}-full.png`), fullPage: true });
-                results.push({ theme, nativeZoom: zoom, metrics, focus });
+                results.push({ theme, nativeZoom: zoom, metrics, focus, pixels });
             }
         } finally { await context.close(); }
     }

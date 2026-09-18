@@ -78,7 +78,7 @@ public partial class InUse
         _ => "Belirsiz; mutabakat gerekli"
     };
     private IEnumerable<InUseServer> AnswerServers => (_record?.Source.Servers ?? []).Where(s => _answerView == "all"
-        || _answerView == "missing" && Remaining(s.Id) > 0 || _answerView == "changed" && _record?.Status == "Stale");
+        || _answerView == "missing" && Remaining(s.Id) > 0 || _answerView == "changed" && InUseSourceChanges.Fields(s, _record?.Draft)?.Count > 0);
     private int Remaining(string id) => _answers.Count(a => a.ServerId == id && a.Value is not ("Yes" or "No"));
     private AnswerEdit? Edit(string id, string check) => _answers.SingleOrDefault(a => a.ServerId == id && a.Check == check);
     private string ServerName(string? id) => _record?.Source.Servers.FirstOrDefault(s => s.Id == id) is { } server ? Field(server, "HOSTNAME") : "Önceki sunucu";

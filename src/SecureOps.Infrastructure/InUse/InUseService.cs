@@ -161,7 +161,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                         ? a with { Evidence = old.Draft?.Answers.FirstOrDefault(o => o.ServerId == a.ServerId && o.Check == a.Check)?.Evidence ?? "" } : a))
                     .OrderBy(a => a.ServerId, StringComparer.Ordinal).ThenBy(a => a.Check, StringComparer.Ordinal).ToArray(),
                 string.IsNullOrWhiteSpace(request.Notes) ? old.Draft?.Notes ?? "" : request.Notes.Trim(), user.Id, DateTimeOffset.UtcNow)
-                { ReviewedByLabel = ActorLabel(user), Policy = accepted }
+                { ReviewedByLabel = ActorLabel(user), Policy = accepted, ReviewedServers = old.Source.Servers }
             };
             return await SaveAsync(next, request.ExpectedVersion, Audit(user, context, "DraftSaved",
                 new { id, next.Version, next.SourceVersion, AnswerCount = request.Answers.Count, PolicyFingerprint = accepted?.Fingerprint }, id, request.ExpectedVersion, assigneeId: old.AssigneeId), token);

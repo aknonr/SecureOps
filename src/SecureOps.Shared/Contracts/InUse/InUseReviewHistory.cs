@@ -21,3 +21,20 @@ public sealed record InUseServerHistory(InUseServer Current, DateTimeOffset Obse
 
 /// <summary>Prior answers are proposals only; changed/missing context is explicitly blocked.</summary>
 public sealed record InUseReuseProposal(Guid ReviewId, bool CanReuse, string Reason, IReadOnlyList<string> ChangedFields);
+
+/// <summary>Per-server source comparison; null means a legacy draft lacks comparison evidence.</summary>
+public static class InUseSourceChanges
+{
+    /// <summary>Compare exact source values/provenance, not record-wide version increments or answer edits.</summary>
+    public static IReadOnlyList<string>? Fields(InUseServer current, InUseDraft? draft)
+    {
+        if (draft?.ReviewedServers is null)
+        { return null; }
+        InUseServer? previous = draft.ReviewedServers.FirstOrDefault(s => s.Id == current.Id);
+        if (previous is null)
+        { return ["ServerAdded"]; }
+        return current.Fields.Keys.Union(previous.Fields.Keys, StringComparer.Ordinal)
+            .Where(key => current.Fields.GetValueOrDefault(key) != previous.Fields.GetValueOrDefault(key))
+            .Order(StringComparer.Ordinal).ToArray();
+    }
+}

@@ -58,6 +58,8 @@ public sealed record InUseDraft(long SourceVersion, IReadOnlyList<InUseAnswer> A
     public string? ReviewedByLabel { get; init; }
     /// <summary>Server-generated proposal snapshot accepted by the saving actor.</summary>
     public InUsePolicyProposal? Policy { get; init; }
+    /// <summary>Server-authored observation at explicit save; absent on legacy drafts, never inferred.</summary>
+    public IReadOnlyList<InUseServer>? ReviewedServers { get; init; }
 }
 
 /// <summary>Persisted independent In Use aggregate.</summary>

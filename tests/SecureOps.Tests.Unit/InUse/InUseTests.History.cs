@@ -8,6 +8,26 @@ namespace SecureOps.Tests.Unit.InUse;
 public sealed partial class InUseTests
 {
     [Fact]
+    public async Task SourceComparison_PersistsExactPerServerObservation_WithoutInventingLegacyEvidence()
+    {
+        var f = new Fixture();
+        InUseRecord record = await f.ImportAsync();
+        InUseRecord saved = (await f.Service.SaveDraftAsync(_principal, _context, record.Id,
+            new(record.Version, record.SourceVersion, [], ""), _token)).Value!;
+        InUseDraft draft = System.Text.Json.JsonSerializer.Deserialize<InUseDraft>(
+            System.Text.Json.JsonSerializer.Serialize(saved.Draft))!;
+        InUseServer first = record.Source.Servers[0], second = record.Source.Servers[1];
+        InUseServer changed = first with { Fields = first.Fields.ToDictionary(p => p.Key, p => p.Value) };
+        ((Dictionary<string, InUseEvidence>)changed.Fields)["IP ADDRESS"] = new("192.0.2.99", "verified changed field");
+        InUseSourceChanges.Fields(changed, draft).Should().Equal("IP ADDRESS");
+        InUseSourceChanges.Fields(second, draft).Should().BeEmpty();
+        InUseSourceChanges.Fields(first with { Id = "new-server" }, draft).Should().Equal("ServerAdded");
+        InUseSourceChanges.Fields(first, draft with { ReviewedServers = null }).Should().BeNull();
+        InUseSourceChanges.Fields(first, null).Should().BeNull();
+        saved.Draft!.ReviewedServers.Should().BeEquivalentTo(record.Source.Servers);
+    }
+
+    [Fact]
     public async Task ReviewHistory_CopySnapshotSurvivesSourceAnswerEdit_AndReuseRequiresExplicitContextMatch()
     {
         var f = new Fixture();

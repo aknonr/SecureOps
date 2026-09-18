@@ -35,20 +35,28 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         await page.locator('.inuse-policy input[type=checkbox]').check();
         await saved();
         first = await read(first.id);
+        assert.deepEqual(first.draft.reviewedServers, first.source.servers);
         assert.equal(first.draft.answers.filter(a => a.origin?.kind === 'Bulk').length, 2);
         assert.equal(first.draft.answers.find(a => a.serverId === '1200002' && a.check === 'InternetIn').origin.kind, 'Individual');
         await navigate(page, ui, 'in-use/' + first.id);
+        await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('changed');
+        assert.equal(await page.locator('[data-answer-check=InternetOut]').count(), 0);
         await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('all');
         assert.equal(await answer('1200002', 'InternetIn').inputValue(), 'Yes');
         assert.equal(await answer('1200002', 'InternetOut').inputValue(), 'No');
         await page.getByRole('button', { name: 'Excel önizleme', exact: true }).click();
         await page.getByRole('button', { name: "WASAS'a arşivle ve indir", exact: true }).waitFor();
-        await page.evaluate(() => { window.savedInUseDownload = window.secureOpsDownload; window.secureOpsDownload = () => { throw new Error('Synthetic download failure after archive'); }; });
+        await page.evaluate(() => {
+            const download = window.secureOpsDownload;
+            window.failInUseDownload = true;
+            // Blazor caches the function reference; switch the fault inside the same wrapper.
+            window.secureOpsDownload = (...args) => { if (window.failInUseDownload) throw new Error('Synthetic download failure after archive'); return download(...args); };
+        });
         await page.getByRole('button', { name: "WASAS'a arşivle ve indir", exact: true }).click();
         await page.locator('.so-problem').waitFor();
         const afterFailedDownload = await read(first.id);
         assert.deepEqual(afterFailedDownload.archivedVersions, [first.version]);
-        await page.evaluate(() => { window.secureOpsDownload = window.savedInUseDownload; delete window.savedInUseDownload; });
+        await page.evaluate(() => { window.failInUseDownload = false; });
         const downloadPromise = page.waitForEvent('download');
         await page.getByRole('button', { name: 'Arşivi indir', exact: true }).click();
         const download = await downloadPromise;

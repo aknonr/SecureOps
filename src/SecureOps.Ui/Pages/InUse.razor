@@ -173,6 +173,8 @@
                     <p role="status">Kaydedilen: @SavedCompleted(record) / @record.Source.Servers.Count sunucu. Ekrandaki cevaplar: @CompletedServers / @record.Source.Servers.Count sunucu; @_answers.Count(a => a.Value is not ("Yes" or "No")) cevap eksik.</p>
                     <p>Mikrosegmentasyon, sunucular arasındaki ağ erişiminin ayrı güvenlik kurallarıyla sınırlandırılmasıdır. Kanıtınız yoksa Bilinmiyor bırakın.</p>
                     <label>Cevap görünümü<select aria-label="Cevap görünümü" @bind="_answerView"><option value="all">Tümü</option><option value="missing">Eksik cevaplar</option><option value="changed">Kaynak bilgisi değişenler</option></select></label>
+                    @if (_answerView == "changed" && record.Draft?.ReviewedServers is null)
+                    { <p>Önceki alan karşılaştırması kaydedilmemiş. Tümü görünümünden kaynak bilgilerini inceleyin; değişmediği varsayılmaz.</p> }
                     @if (CanEdit && CompletedServers < record.Source.Servers.Count) { <MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">İlk eksik cevaba git</MudButton> }
                     <div class="inuse-answer-table"><table><thead><tr><th>Sunucu / ortam</th><th>Sunucudan internete</th><th>İnternetten sunucuya</th><th>Mikrosegmentasyon</th><th>İlerleme / geçmiş</th></tr></thead><tbody>
                         @foreach (InUseServer server in AnswerServers)

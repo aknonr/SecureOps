@@ -37,8 +37,10 @@ SMTP/OCO ayarları değiştirilmez. Branding için fark yoktur; onaylı altı do
 022, `ops.InUseServerReviews`, `ops.InUseExecutions`, `ops.InUseExecutionEvents`
 tablolarını ve koruyucu tetikleyicileri ekler. Eski veriyi silmez, kullanıcıya rol
 vermez. Normal geçmiş kaydı için mevcut onaylı API çalışma hesabına yalnız
-InUseServerReviews SELECT/INSERT; yürütme altyapısı kullanılacaksa InUseExecutions
-SELECT/INSERT/UPDATE ve InUseExecutionEvents SELECT/INSERT gerekir. Mevcut
+InUseServerReviews SELECT/INSERT gerekir. Tamamlama kapalı olsa da mevcut sonuçları
+göstermek için API hesabına InUseExecutions ve InUseExecutionEvents SELECT gerekir.
+Yürütme ayrıca yetkilendirildiğinde API/Worker için InUseExecutions INSERT/UPDATE
+ve InUseExecutionEvents INSERT gerekir. Mevcut
 `audit.AuditLog` INSERT ve uygulama erişim/rol okuma izinleri korunur. DBA ayrı
 onaylı süreçle yalnız eksik nesne izinlerini tamamlar; db_owner, DDL veya genel
 DELETE verilmez. Yeni `InUse.Complete` uygulama yetkisi hiçbir mevcut role
