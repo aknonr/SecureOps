@@ -21,12 +21,12 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         await navigate(page, ui, 'announcements');
         if (await page.getByRole('button', { name: 'Şimdi değil', exact: true }).count()) await click('Şimdi değil');
         await click('Düzenle: ' + content.subject);
-        await click('Kaynak incelemesi');
+        await panel().waitFor();
         await page.locator('#source-profile option[value=NonProd]').waitFor({ state: 'attached' });
     }
     async function retrieve(profile, state = 'Succeeded') {
         await page.locator('#source-profile').selectOption(profile);
-        await click('Kaynağı sorgula');
+        await click('Kaydet ve kaynağı sorgula');
         await page.locator('[data-source-state=' + state + ']').waitFor();
         await panel().getByText('Dağıtım talebi alıcıları; nihai duyuru için onaylanmış gönderim listesi değildir.', { exact: true }).waitFor();
         return json(client, route + '/source/jobs');
@@ -45,8 +45,8 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         await signIn(page, ui); await open();
         assert.equal(await page.locator('#source-profile option[value=ProdSingle]').evaluate(e => e.disabled), true);
         await page.locator('#announcement-Scope').fill('Unsaved local value');
-        assert.equal(await page.getByRole('button', { name: 'Kaynağı sorgula', exact: true }).isEnabled(), false);
-        await click('Kaydet');
+        await page.locator('#source-profile').selectOption('NonProd');
+        assert.equal(await page.getByRole('button', { name: 'Kaydet ve kaynağı sorgula', exact: true }).isEnabled(), true);
         const first = await retrieve('NonProd');
         assert.equal((await json(client, route)).scope, 'Unsaved local value', 'completion must not apply');
         const duplicateInput = { profile: 'NonProd', ocoReference: 'OCO-SYNTHETIC', submissionKey: 'combined-duplicate-key' };
@@ -90,7 +90,10 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
             assert.equal(await frame.contentFrame().locator('img').evaluateAll(a => a.length === 6 && a.every(i => i.complete && i.naturalWidth > 0)), true);
             await page.screenshot({ path: path.join(out, 'reviewed-preview-' + width + '.png') });
         }
-        await click('Düzenle');
+        const editTab = page.getByRole('group', { name: 'Duyuru görünümü', exact: true }).getByRole('button', { name: 'Düzenle', exact: true });
+        await editTab.focus();
+        await page.keyboard.press('Enter');
+        await page.waitForFunction(() => document.querySelector('[aria-label="Duyuru görünümü"] button')?.getAttribute('aria-pressed') === 'true');
         await page.locator('#announcement-Scope').waitFor();
         await apply(true);
         const after = await json(client, route);
@@ -103,7 +106,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         assert.equal(await panel().getByRole('checkbox', { name: 'Servis değişikliklerini uygula', exact: true }).isDisabled(), true);
         assert.ok((await panel().innerText()).includes('Candidate A')); assert.ok((await panel().innerText()).includes('MISSING'));
         await page.locator('#source-profile').selectOption('NonProd');
-        await page.getByRole('button', { name: 'Kaynağı sorgula', exact: true }).click();
+        await page.getByRole('button', { name: 'Kaydet ve kaynağı sorgula', exact: true }).click();
         await page.locator('[data-source-state=Queued], [data-source-state=Running]').waitFor();
         const running = await json(client, route + '/source/jobs');
         await click('Taslaklar'); await open();
@@ -118,7 +121,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), deniedUi 
         await page.getByRole('link', { name: 'Geçmiş', exact: true }).click();
         await page.getByRole('row').filter({ hasText: content.subject }).waitFor();
         assert.equal((await denied.get(route + '/source/jobs')).status(), 403);
-        await open(); await page.locator('#source-profile').selectOption('NonProd'); await click('Kaynağı sorgula');
+        await open(); await page.locator('#source-profile').selectOption('NonProd'); await click('Kaydet ve kaynağı sorgula');
         await page.locator('[data-source-state=Queued], [data-source-state=Running]').waitFor();
         const sessions = await json(client, '/api/v1/sessions/active');
         for (const session of sessions.items.filter(s => !s.isCurrent))
