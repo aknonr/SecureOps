@@ -32,7 +32,7 @@ $runtime = Get-Content -LiteralPath (Join-Path $tool 'InUseEvidence.runtimeconfi
 if ($runtime.runtimeOptions.tfm -ne 'net8.0' -or @($runtime.runtimeOptions.frameworks).Count -ne 2) { throw 'Unexpected runtime requirements.' }
 $deps = Get-Content -LiteralPath (Join-Path $tool 'InUseEvidence.deps.json') -Raw | ConvertFrom-Json
 if ($deps.runtimeTarget.name -notlike '*/win-x64') { throw 'Expected Windows x64 dependency graph.' }
-foreach ($name in @('README.md', 'operator-reporter-tr.md', 'dictionary.json', 'candidate-dictionary.json', 'rfc-contract.template.json', 'server-config.example.json')) {
+foreach ($name in @('README.md', 'operator-completion-tr.md', 'operator-reporter-tr.md', 'dictionary.json', 'candidate-dictionary.json', 'rfc-contract.template.json', 'server-config.example.json')) {
     Copy-Item -LiteralPath (Join-Path $project $name) -Destination (Join-Path $output $name)
 }
 if ((Get-Content -LiteralPath (Join-Path $output 'dictionary.json') -Raw).Trim() -ne '{}') { throw 'Initial dictionary must be empty.' }
@@ -42,8 +42,8 @@ if ($LASTEXITCODE -ne 2) { throw 'Published collector usage smoke check failed.'
 $metadata = [ordered]@{
     BuildSource = $source; RuntimeIdentifier = 'win-x64'; SelfContained = $false
     Frameworks = $runtime.runtimeOptions.frameworks
-    Scope = 'A: One In Use OR and direct service items, two DOM-backed candidates. B: One exact RFC hop after representation verification.'
-    Mapping = 'Candidates are not approved API contracts; production RFC refresh remains unwired'
+    Scope = 'Completion: one selected OR dynamic-case shape and bounded eligible activities, read-only. Historical A/B reporter modes retained.'
+    Mapping = 'CollectedNotMapped is not runtime mapping or closure evidence; attachment readback and final OR-state semantics require source-owner contracts.'
     Validation = 'Release payload scan and published no-network usage smoke passed; inspect task test evidence separately'
 }
 $metadata | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $output 'delivery-metadata.json') -Encoding UTF8

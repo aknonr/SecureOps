@@ -12,6 +12,15 @@ namespace SecureOps.Ui.Pages;
 /// <summary>Explicit, owner-authorized draft and source review journey; no mail sending.</summary>
 public partial class Announcements
 {
+    /// <summary>Owner-authorized drilldown from a management report; no source refresh or automatic save.</summary>
+    [SupplyParameterFromQuery(Name = "draft")] public Guid? ReportDraft { get; set; }
+    private Guid? _openedReportDraft;
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_allowed && !_busy && !_dirty && ReportDraft is { } id && id != Guid.Empty && _openedReportDraft != id)
+        { _openedReportDraft = id; await OpenAsync(id); }
+    }
     /// <summary>Resets shell feedback when unsaved-edit protection cancels navigation.</summary>
     [Microsoft.AspNetCore.Components.CascadingParameter] public Shared.MainLayout? Shell { get; set; }
     private readonly CancellationTokenSource _lifetime = new();

@@ -12,7 +12,7 @@ public sealed class ApiReleasePackagingContractTests
         script.Should().Contain("$metadata.readyForInstallation = $false")
             .And.Contain("$metadata.payloadValidated = $true")
             .And.Contain("evidence/validation.json")
-            .And.Contain(".Replace('{{RELEASE_NAME}}', $ReleaseName).Replace('{{BUILD_SHA}}', $sha)")
+            .And.Contain("docs/integrated-activation-tr.md").And.Contain("Kaynak: $sha")
             .And.Contain("$runtime.runtimeOptions.frameworks")
             .And.Contain("manifestSha256=")
             .And.Contain("-p:ContinuousIntegrationBuild=true")
@@ -27,10 +27,12 @@ public sealed class ApiReleasePackagingContractTests
         string paired = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-PairedTestRelease.ps1"));
         string managed = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-UiDeploymentPackage.ps1"));
         string worker = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Worker", "Program.cs"));
-        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-022'")
-            .And.Contain("Expected the exact complete 001-022 SQL chain.")
-            .And.Contain("upgradeFromVerified018='019-022'").And.Contain("database-delta")
+        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-023'")
+            .And.Contain("Expected the exact complete 001-023 SQL chain.")
+            .And.Contain("upgradeFromVerified018='019-023'").And.Contain("database-delta")
             .And.Contain("[switch]$UpgradeFromRc622").And.Contain("apply only reviewed additive 022")
+            .And.Contain("[switch]$UpgradeFromRc624").And.Contain("apply only reviewed additive 023")
+            .And.Contain("New-InUseEvidencePackage.ps1").And.Contain("diagnostics/payload.sha256")
             .And.Contain("InUseCompletionEnabled=$false").And.Contain("InUseAspectLookupEnabled=$false")
             .And.Contain("runtimePrepareSchema=$false").And.Contain("-Component Worker")
             .And.Contain("Foreground console only").And.Contain("Symbol outside fresh staging.").And.NotContain("sc.exe");

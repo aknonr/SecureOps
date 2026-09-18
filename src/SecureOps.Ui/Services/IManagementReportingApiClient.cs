@@ -14,6 +14,12 @@ namespace SecureOps.Ui.Services;
 /// </remarks>
 public interface IManagementReportingApiClient
 {
+    /// <summary>Captures the current authorized workflow cut without external refresh.</summary>
+    public Task<WorkflowReport> CaptureWorkflowsAsync(WorkflowReportRequest request, CancellationToken token);
+    /// <summary>Pages and filters a retained cut.</summary>
+    public Task<WorkflowReport> ReadWorkflowsAsync(Guid id, WorkflowReportFilter filter, CancellationToken token);
+    /// <summary>Downloads the exact same filtered cut as safe XLSX.</summary>
+    public Task<byte[]> ExportWorkflowsAsync(Guid id, WorkflowReportFilter filter, CancellationToken token);
     /// <summary>
     /// Reads the aggregate management summary for one window.
     /// </summary>

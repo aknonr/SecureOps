@@ -6,6 +6,8 @@ namespace SecureOps.Api.Security;
 /// <summary>Named actor-and-operation API rate-limit policies.</summary>
 public static class ApiRateLimits
 {
+    /// <summary>Bounded materialization of durable workflow report snapshots.</summary>
+    public const string WorkflowReport = "WorkflowReport";
     /// <summary>Bounded transient announcement rendering.</summary>
     public const string AnnouncementPreview = "AnnouncementPreview";
     /// <summary>Single exact identity lookup.</summary>

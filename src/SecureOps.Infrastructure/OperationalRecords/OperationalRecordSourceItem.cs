@@ -13,4 +13,8 @@ public sealed record OperationalRecordSourceItem(
     string? ApplicationReference,
     bool IsOpen = true,
     string? VersionToken = null,
-    DateTimeOffset? LastModifiedAt = null);
+    DateTimeOffset? LastModifiedAt = null)
+{
+    /// <summary>Provider-authored provenance; absent historical evidence is not inferred from a name.</summary>
+    public bool? Synthetic { get; init; }
+}

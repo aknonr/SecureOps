@@ -130,7 +130,8 @@ public static class InUseWorkbook
         return text.TrimStart().StartsWith('=') || text.TrimStart().StartsWith('+') || text.TrimStart().StartsWith('-') || text.TrimStart().StartsWith('@')
             ? "'" + text : text;
     }
-    private static byte[] Write(IReadOnlyList<InUseSheet> sheets)
+    /// <summary>Writes bounded caller-provided worksheet rows as safe text cells only.</summary>
+    public static byte[] Write(IReadOnlyList<InUseSheet> sheets)
     {
         using MemoryStream output = new();
         using (ZipArchive zip = new(output, ZipArchiveMode.Create, leaveOpen: true))
@@ -191,7 +192,7 @@ public static class InUseWorkbook
                             writer.WriteStartElement("is", _spreadsheet);
                             writer.WriteStartElement("t", _spreadsheet);
                             writer.WriteAttributeString("xml", "space", null, "preserve");
-                            writer.WriteString(value);
+                            writer.WriteString(Safe(value));
                             writer.WriteEndElement();
                             writer.WriteEndElement();
                             writer.WriteEndElement();

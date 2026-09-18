@@ -49,18 +49,18 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
                 INSERT INTO ops.OperationalRecords
                     (OperationalRecordId, SourceRecordId, OrCode, Title, Description, Requester, SourceCreatedAt,
                      EnvironmentName, ServerReference, ApplicationReference, SourceConcurrencyToken, LastSourceValidationAt,
-                     Classification, JiraEligible, EligibilityReason, WorkflowState, CorrelationId, UpdatedAt)
+                     Classification, JiraEligible, EligibilityReason, WorkflowState, CorrelationId, UpdatedAt, SourceSynthetic)
                 VALUES
                     (@Id, @SourceRecordId, @OrCode, @Title, @Description, @Requester, @CreatedAt,
                      @Environment, @ServerReference, @ApplicationReference, @SourceConcurrencyToken, SYSUTCDATETIME(),
-                     'NeedsManualReview', 0, 'Classification pending.', 'Imported', @CorrelationId, SYSUTCDATETIME());
+                     'NeedsManualReview', 0, 'Classification pending.', 'Imported', @CorrelationId, SYSUTCDATETIME(), @Synthetic);
             END
             ELSE
                 UPDATE ops.OperationalRecords SET OrCode = @OrCode, Title = @Title, Description = @Description,
                     Requester = @Requester, SourceCreatedAt = @CreatedAt, EnvironmentName = @Environment,
                     ServerReference = @ServerReference, ApplicationReference = @ApplicationReference,
                     SourceConcurrencyToken = @SourceConcurrencyToken, LastSourceValidationAt = SYSUTCDATETIME(),
-                    CorrelationId = @CorrelationId, UpdatedAt = SYSUTCDATETIME()
+                    CorrelationId = @CorrelationId, UpdatedAt = SYSUTCDATETIME(), SourceSynthetic = @Synthetic
                 WHERE OperationalRecordId = @Id
                   AND WorkflowState NOT IN ('CreatingJira', 'JiraCreated', 'ClosingOperationalRecord', 'OperationalRecordCloseFailed', 'Completed');
             SELECT @Id AS Id, @Action AS MergeAction;
@@ -80,6 +80,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
             sourceItem.Environment,
             sourceItem.ServerReference,
             sourceItem.ApplicationReference,
+            sourceItem.Synthetic,
             SourceConcurrencyToken = OperationalRecordSourceConcurrency.Create(sourceItem),
             CorrelationId = correlationId
         }, cancellationToken, transaction));

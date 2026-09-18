@@ -2077,3 +2077,12 @@ the `InternalsVisibleTo` entry in the csproj.
 
 Responsive and visual behaviour is validated in a real browser at 1440×900, 1366×768, and 390px in
 both themes. See `docs/25-ui-enterprise-shell.md` §8.
+# Integrated management reporting continuation
+
+The owner explicitly includes the existing dashboard in the bounded Codex scope.
+`/dashboard` now includes `WorkflowReportsPanel`, SQL-backed same-cut metrics,
+bounded detail pages, module/status/type filters and safe Excel export. OCO links
+open the exact owned draft; access/synthetic/historical limitations stay visible.
+An unavailable response retains the previous cut and restores its applied filters.
+This is not target activation or an employee productivity ranking. See
+`docs/integrated-test-activation.md` and `docs/integrated-activation-tr.md`.

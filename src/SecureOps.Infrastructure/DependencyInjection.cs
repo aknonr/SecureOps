@@ -290,6 +290,8 @@ public static class DependencyInjection
         services.AddSingleton<ReportingWindowResolver>();
         services.AddSingleton<ManagementReportProjector>();
         services.AddScoped<IManagementReportingService, ManagementReportingService>();
+        services.AddScoped<SqlWorkflowReportStore>();
+        services.AddScoped<WorkflowReportService>();
         bool authoritativeReporting = string.Equals(auditProvider, "SqlServer", StringComparison.OrdinalIgnoreCase)
             && string.Equals(configuration[$"{AccessOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase)
             && string.Equals(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase);

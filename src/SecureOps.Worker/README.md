@@ -77,3 +77,12 @@ immutable artifact and append-only evidence are in additive SQL 022. A lost
 mutation response is Unknown, not permission for a queue retry. Corporate target,
 attachment reconciliation and final OR-state contracts remain blocking. See
 `docs/inuse-v2-followup.md` and `docs/inuse-v2-upgrade-tr.md`.
+# Integrated activation continuation
+
+Workflow reporting reads persisted Worker evidence, never dispatches work. In Use
+execution continues to consume frozen SQL workbook bytes, not a new loose-file
+archive. API archive migration does not require UI/Worker access to that directory.
+Heartbeat/queue readiness is separate from source, upload, closure and SMTP results.
+Foreground hosting still needs a named session/operator, operating window, restart
+and monitoring responsibility; no Windows Service or unattended availability was
+introduced. See `docs/integrated-activation-tr.md` for current activation limits.

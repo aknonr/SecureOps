@@ -63,3 +63,12 @@ each new step. The enabled synthetic transport is local-only. Known corporate
 mutation HTTP shapes are tested without network but are not registered for
 dispatch while verified target/readback contracts are missing. Server history
 uses stable source identity, not hostname/IP. See `docs/inuse-v2-followup.md`.
+# Workflow snapshot extension
+
+SQL 023 adds bounded reporting cuts and verified In Use archive receipts.
+`SqlWorkflowReportStore` materializes permitted facts under serializable isolation;
+aggregates, pages and Excel share the cut and filters. Archive receipts are written
+only after envelope integrity/commit, including repair on re-download. Frozen
+execution bytes remain in SQL; no Worker filesystem archive permission is added.
+Historical receipt/provenance gaps remain labelled. See ADR-0023 and the integrated
+activation runbook; current source adapter contract gaps are not solved by fixtures.

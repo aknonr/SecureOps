@@ -119,6 +119,18 @@ public sealed class OperationsDiagnostics
         { missing.Add("AnnouncementSource:Profiles"); }
         if (missing.Count > 0)
         { return new("ConfigurationMissing", "configuration", [.. missing], "NotChecked", 0, null, now); }
+        return await QueueAsync(token);
+    }
+
+    /// <summary>Reads configured Worker/queue health independently of any module being enabled.</summary>
+    public async Task<AnnouncementSourceReadiness> QueueAsync(CancellationToken token)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (!_hangfire.Enabled)
+        { return new("Disabled", "queue", [], "NotChecked", 0, null, now); }
+        if (_hangfire.PrepareSchema || !SafeName(_hangfire.SchemaName, 64, false) || !SafeName(_hangfire.Queue, 20, true)
+            || string.IsNullOrWhiteSpace(_connection))
+        { return new("ConfigurationMissing", "queue", [], "NotChecked", 0, null, now); }
         try
         {
             var sql = new SqlConnectionStringBuilder(_connection) { ConnectTimeout = 3 };

@@ -16,7 +16,7 @@ namespace SecureOps.Infrastructure.InUse;
 public sealed partial class InUseService(IInUseRepository repository, IInUseSourceClient source,
     IApplicationAccessService access, IAccessRepository users, ICommandIdempotencyStore commands,
     ILogger<InUseService> logger, InUseReportArchive? archive = null, SqlInUseIdentities? identities = null, InUsePolicy? policy = null,
-    Execution.InUseCompletionCoordinator? completion = null)
+    Execution.InUseCompletionCoordinator? completion = null, Reporting.SqlWorkflowReportStore? reports = null)
 {
     /// <summary>Queries only persisted records.</summary>
     public Task<InUseResult<InUsePage>> QueryAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -183,6 +183,8 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                 InUseReport? stored = await (archive ?? throw new InvalidOperationException("Archive unavailable.")).AccessAsync(id, historical, null,
                     report => repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ArchivedReportDownloadAuthorized",
                         new { id, report.Version, report.Sha256 }, id, request.ExpectedVersion), token), token);
+                if (stored is not null)
+                { await ReceiptAsync(stored, token); }
                 return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(stored);
             }
             if (record.Version != request.ExpectedVersion || record.Draft is null || record.Draft.SourceVersion != record.SourceVersion)
@@ -201,12 +203,18 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                 InUseReport? stored = await (archive ?? throw new InvalidOperationException("Archive unavailable.")).AccessAsync(id, record.Version, report,
                     artifact => repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ReportArchiveAuthorized",
                         new { id, record.Version, record.SourceVersion, artifact.Sha256 }, id, request.ExpectedVersion), token), token);
+                if (stored is not null)
+                { await ReceiptAsync(stored, token); }
                 return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(stored);
             }
             bool saved = await repository.ExportAsync(id, request.ExpectedVersion, Audit(user, context, "ReportPrepared",
                 new { id, record.Version, record.SourceVersion, report.Sha256 }, id, request.ExpectedVersion), token);
             return saved ? new(report) : InUseResult<InUseReport>.Fail("InUseConflict");
         }, token);
+
+    private Task ReceiptAsync(InUseReport report, CancellationToken token) => reports is not null && repository is SqlInUseRepository
+        ? reports.ArchiveAsync(report, !report.Sheets.Any(s => s.Name == "Provenance"
+            && s.Rows.Any(r => r.Count == 2 && r[0] == "Synthetic" && r[1] == "False")), token) : Task.CompletedTask;
 
     private async Task<InUseResult<InUseRecord>> SaveAsync(InUseRecord next, long expected, AuditEvent audit, CancellationToken token)
     {

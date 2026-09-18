@@ -89,6 +89,7 @@
     }
     else if (_managementView)
     {
+        <WorkflowReportsPanel />
         @if (_snapshot.Can(Capabilities.InUseView)) { <InUseOverviewPanel /> }
         <SoWindowPicker @bind-Preset="_preset"
                         Applied="_report?.Window"

@@ -68,7 +68,8 @@ internal static class TuruncuHatQueryParser
                 ApplicationReference: null,
                 IsOpen: true,
                 VersionToken: null,
-                LastModifiedAt: null));
+                LastModifiedAt: null)
+            { Synthetic = false });
         }
 
         HashSet<string> duplicateIds = Duplicates(parsed.Select(item => item.SourceRecordId));

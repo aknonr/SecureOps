@@ -28,6 +28,7 @@ internal sealed class LocalSmtpSink : IAsyncDisposable
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
         catch (SocketException) when (_stop.IsCancellationRequested) { }
+        catch (ObjectDisposedException) when (_stop.IsCancellationRequested) { }
     }
     private async Task SessionAsync(TcpClient client)
     {

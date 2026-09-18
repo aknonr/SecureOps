@@ -58,3 +58,13 @@ The API release gate verifies Active Directory runtime assemblies, dependency-ma
 The complete TEST deployment configuration, first-admin bootstrap, migration order, runtime permissions, web.config delta, and rollback constraints are documented in `docs/24-api-test-deployment-readiness.md`. The generated OpenAPI snapshot and `docs/contracts/secureops-api-v1-ui-integration.md` are the frontend contract; UI agents must not infer routes or response models.
 
 Operational Record endpoints live under `/api/v1/operational-records`. Controllers are thin and use capability policies; Jira preview performs no external write. External providers remain fake-only until approved contracts exist. See `docs/22-operational-record-jira-workflow.md`.
+# Integrated workflow reporting continuation
+
+`/api/v1/reporting/management/workflows` captures bounded immutable SQL 023 cuts;
+GET `{id}` and `{id}/export` recheck current approval, report capability, owner,
+access version and module scope. OCO remains owner-only. POST is limited to three
+captures per authenticated actor/minute. No discovery, SMTP or source mutation.
+See `docs/adr/ADR-0023-workflow-report-snapshots.md`,
+`docs/integrated-test-activation.md` and `docs/integrated-activation-tr.md`.
+023 must precede this API; 001-022 are not replayed. Corporate completion readback
+contracts remain separate blockers; a dashboard event is not remote acceptance.

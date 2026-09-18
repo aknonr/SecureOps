@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.Security.Claims;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SecureOps.Domain.Access;
@@ -18,7 +19,8 @@ public sealed record AnnouncementOutcome(AnnouncementDraft? Draft = null, string
 
 /// <summary>Owner-scoped local draft orchestration; no source or mail transport dependency.</summary>
 public sealed partial class AnnouncementService(SqlAnnouncementStore store, AnnouncementRenderer renderer,
-    IApplicationAccessService access, IOptions<AnnouncementOptions> options, ILogger<AnnouncementService> logger)
+    IApplicationAccessService access, IOptions<AnnouncementOptions> options, ILogger<AnnouncementService> logger,
+    IConfiguration? configuration = null)
 {
     /// <summary>Revalidates persisted capabilities for every save/read/preview/download.</summary>
     public Task<AnnouncementOutcome> ExecuteAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -79,8 +81,14 @@ public sealed partial class AnnouncementService(SqlAnnouncementStore store, Anno
                 string[] to = [.. input.To.Distinct(StringComparer.OrdinalIgnoreCase)];
                 input = input with { To = to, Cc = [.. input.Cc.Except(to, StringComparer.OrdinalIgnoreCase).Distinct(StringComparer.OrdinalIgnoreCase)] };
                 string sender = AnnouncementValidation.Address(current.Value.User.Mail) ? current.Value.User.Mail! : "";
+                AnnouncementDraft? previous = version > 0 ? await store.GetAsync(id, owner, token) : null;
+                bool synthetic = current.Value.User.AuthenticationSource.StartsWith("demo", StringComparison.OrdinalIgnoreCase)
+                    || configuration?.GetValue<bool>("DemoAuth:Enabled") == true
+                    || configuration?["AnnouncementSource:CollectionProvider"] == "Fixture"
+                    || configuration?["AnnouncementSource:ServiceProvider"] == "Fixture";
                 var next = new AnnouncementDraft(id, owner, version + 1, DateTimeOffset.UtcNow, input, sender,
-                    presentation?.Hash ?? "", TemplateRevision: input.TemplateRevision);
+                    presentation?.Hash ?? "", TemplateRevision: input.TemplateRevision)
+                { Synthetic = synthetic ? true : version == 0 ? false : previous?.Synthetic };
                 string? error = reviewedSave is null ? await store.SaveAsync(next, context.CorrelationId, token)
                     : await reviewedSave(next, token);
                 return error is null ? new(next) : new(Error: error);

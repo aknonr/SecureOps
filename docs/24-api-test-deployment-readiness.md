@@ -1707,3 +1707,12 @@ No corporate migration, push, deployment or release packaging occurred here.
 - Next UI milestone: implement the resource catalogue, manager forms, private
   favourites/set editor and explicit browser opening/fallback against the committed
   additive contract. No cookie/token forwarding or inferred target authentication.
+# Integrated activation continuation, 2026-09-18
+
+Current integrated operator procedure: `integrated-activation-tr.md`; requirements
+and evidence: `integrated-test-activation.md`. New reporting needs additive 023
+after verified 022; do not replay installed migrations or Hangfire schema 9.
+Earlier release-specific instructions below remain historical. The matched release
+script exports the current integrated runbook, preserves private settings/rings,
+and includes the same-source standalone completion-evidence collector. No target
+deployment, archive move, permission expansion or corporate effect is implied.

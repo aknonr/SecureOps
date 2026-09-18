@@ -165,3 +165,15 @@ SQL integration tests must use an explicitly supplied `SECUREOPS_SQL_TEST_CONNEC
 
 - `docs/04-domain-model.md` — full schema specification with DDL.
 - `docs/08-audit-model.md` — audit table specifics and triggers.
+# Integrated reporting delta 023
+
+Current follow-up requires `023-workflow-report-snapshots.sql` after verified 022.
+It adds `OperationalRecords.SourceSynthetic` (NULL means unknown, never backfilled
+as real), three immutable reporting tables and bounded-query indexes. Runtime uses
+SELECT/INSERT on those tables with existing operational reads/audit INSERT; no
+DDL, DELETE, grants or history rewrite is performed by application startup.
+Archive receipts attest verified envelope bytes, not an earlier authorization audit.
+Preserve additive data on binary rollback. Expired cuts are inaccessible after one
+hour/access-version change; immutable retention is not an automatic purge policy.
+See ADR-0023 and `docs/integrated-activation-tr.md`. Review installed definitions;
+never replay 001-022 or Hangfire schema 9 on an existing target.

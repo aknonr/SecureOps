@@ -1,5 +1,14 @@
 # API Release Packaging
 
+Current integrated continuation requires schema 001-023. Use `-UpgradeFromRc624`
+only with verified installed 022 for a 023-only delta; `-UpgradeFromRc622` includes
+022-023 for verified installed 001-021. The canonical current operator export is
+`docs/integrated-activation-tr.md`. Matching InUseEvidence (including completion
+mode) is built, scanned and hashed in `diagnostics/` by the same source commit.
+Earlier 001-022/022-only descriptions below document old rc6.24 packaging, not
+instructions to replay installed migrations. The tool does not deploy or enable
+corporate effects. Prepare one successor only after applicable gates.
+
 `New-PairedTestRelease.ps1 -ReleaseName <reviewed-next-name>` requires a clean
 committed feature branch (pre-existing `.vscode/` is excluded), publishes matching
 API/UI/Worker on the combined delivery branch, reuses the payload scanners/validators,

@@ -1,5 +1,11 @@
 # InUseEvidence Standalone Operator Delivery
 
+Current completion-mode commands and D: private paths: **operator-completion-tr.md**.
+The dated reporter investigation below is historical. Current runtime RFC/Bildiren
+mapping is implemented separately; those old "unwired" notes are not its status.
+ReporterProperty is deprecated: omit it or use only p_rel_requester, never a new
+selector. The completion mode accepts only the empty dictionary and no RFC option.
+
 ## Completion evidence continuation (not present in rc6.24)
 
 The new `--completion-evidence` mode accepts the same five arguments and an empty

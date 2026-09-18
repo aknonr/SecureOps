@@ -8,6 +8,27 @@ namespace SecureOps.Ui.Services;
 /// </summary>
 public sealed class ManagementReportingApiClient : IManagementReportingApiClient
 {
+    /// <inheritdoc />
+    public async Task<WorkflowReport> CaptureWorkflowsAsync(WorkflowReportRequest request, CancellationToken token)
+    {
+        using HttpResponseMessage response = await _httpClient.PostAsJsonAsync("api/v1/reporting/management/workflows", request, token);
+        return await ApiResponseReader.ReadOrThrowAsync<WorkflowReport>(response, token);
+    }
+    /// <inheritdoc />
+    public Task<WorkflowReport> ReadWorkflowsAsync(Guid id, WorkflowReportFilter filter, CancellationToken token) =>
+        GetAsync<WorkflowReport>($"api/v1/reporting/management/workflows/{id:D}{WorkflowQuery(filter)}", token);
+    /// <inheritdoc />
+    public async Task<byte[]> ExportWorkflowsAsync(Guid id, WorkflowReportFilter filter, CancellationToken token)
+    {
+        using HttpResponseMessage response = await _httpClient.GetAsync($"api/v1/reporting/management/workflows/{id:D}/export{WorkflowQuery(filter)}", token);
+        if (!response.IsSuccessStatusCode)
+        { _ = await ApiResponseReader.ReadOrThrowAsync<WorkflowReport>(response, token); }
+        return await response.Content.ReadAsByteArrayAsync(token);
+    }
+    private static string WorkflowQuery(WorkflowReportFilter filter) => "?page=" + filter.Page.ToString(CultureInfo.InvariantCulture)
+        + "&pageSize=" + filter.PageSize.ToString(CultureInfo.InvariantCulture)
+        + "&module=" + Uri.EscapeDataString(filter.Module ?? "") + "&status=" + Uri.EscapeDataString(filter.Status ?? "")
+        + "&recordType=" + Uri.EscapeDataString(filter.RecordType ?? "") + "&metric=" + Uri.EscapeDataString(filter.Metric ?? "");
     private readonly HttpClient _httpClient;
 
     /// <summary>
