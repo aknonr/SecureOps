@@ -59,10 +59,10 @@ They include OpenAPI, new files and inherited work; a commit does not reset them
 
 | Baseline | Files | Additions | Deletions |
 |---|---:|---:|---:|
-| immediate remaining-work checkpoint 03b0c04 | 48 | 1857 | 60 |
-| actual continuation 34c8837 | 74 | 3368 | 139 |
-| inherited rc6.24 8c1b58d | 125 | 7687 | 1132 |
-| complete post-rc6.22 aa9e4d2 | 159 | 11002 | 1296 |
+| immediate remaining-work checkpoint 03b0c04 | 49 | 1891 | 60 |
+| actual continuation 34c8837 | 75 | 3402 | 139 |
+| inherited rc6.24 8c1b58d | 126 | 7721 | 1132 |
+| complete post-rc6.22 aa9e4d2 | 160 | 11036 | 1296 |
 
 Scope includes workbook/metadata, local lifecycle/history invalidation, assignment,
 source readiness, catalogue/024, reviewed reporter crosswalk, tests and guidance.
