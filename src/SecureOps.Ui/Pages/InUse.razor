@@ -15,6 +15,7 @@
 <div class="so-page so-page--wide so-inuse">
     <SoPageHeader Title="Sunucu Kullanıma Alma Kontrolleri">
         <Actions>
+            @if (Can(Capabilities.InUseReview)) { <MudButton Href="/in-use/reports" StartIcon="@Icons.Material.Filled.History">Rapor geçmişi</MudButton> }
             @if (Id.HasValue) { <MudButton Href="@ListUrl" StartIcon="@Icons.Material.Filled.ArrowBack">Listeye dön</MudButton> }
             @if (Can(Capabilities.InUseView)) { <ResourceHelp Surface="@(Id.HasValue ? "inuse-review" : "inuse-list")" Disabled="_busy" /> }
         </Actions>
@@ -305,7 +306,7 @@
                     }
                 }
                 @if (Can(Capabilities.InUseReview) && record.ArchivedVersions.Count > 0)
-                { <details><summary>Önceki WASAS raporları</summary>@foreach (long version in record.ArchivedVersions) { <p>Sürüm @version · @(version <= record.InvalidatedReviewsThrough ? "Sıfırlanmış / kaldırılmış inceleme" : version < record.Version ? "Önceki sürüm" : "Güncel sürüm")<MudButton OnClick="() => DownloadAsync(version)" aria-label="@($"Sürüm {version} (arşiv)")" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Arşivden indir</MudButton></p> }</details> }
+                { <details><summary>Önceki WASAS raporları</summary>@foreach (long version in record.ArchivedVersions) { <p>Sürüm @version · @(version <= record.InvalidatedReviewsThrough ? "Sıfırlanmış / kaldırılmış inceleme" : version < record.Version ? "Önceki sürüm" : "Güncel sürüm")<MudButton OnClick="() => DownloadAsync(version)" aria-label="@($"Sürüm {version} (arşiv)")" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Arşivden indir</MudButton><MudButton OnClick="() => IndexReportAsync(version)" Disabled="_busy" StartIcon="@Icons.Material.Filled.ManageSearch">Rapor kataloğuna indeksle</MudButton></p> }</details> }
                 @if (record.Completion is { } intent)
                 {
                     <p role="status">@CompletionStatus(intent)</p>

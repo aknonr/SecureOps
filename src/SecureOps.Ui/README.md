@@ -1,5 +1,16 @@
 # SecureOps.Ui
 
+The current continuation adds `/in-use/reports`, linked from In Use, with bounded
+server search by OR/hostname/original preparer/account, UTC dates, version and
+lifecycle. It displays exact historical download names and separate attachment
+verification; no source action is triggered. The assignment dialog loads an
+authorized RFC suggestion with explicit matched/missing/ambiguous/ineligible
+states. Selecting is local; saving records an explicit reviewed decision.
+The revised `inuse-rc626-repair.cjs` includes catalogue download integrity,
+mouse/touch/keyboard/focus return, themes and optional native Chrome 200% zoom.
+Its syntax is checked, but the final host/browser run remains pending after the
+previous tool-policy rejection. No replacement launcher was used to evade it.
+
 Post-rc6.26 In Use continuation: assignment uses the existing MudBlazor dialog
 service, explicit save/cancel and version-bound API, preserving unsaved answers.
 Unsaved undo is local; saved reset/discard/restart calls the authorized lifecycle

@@ -2,6 +2,11 @@
 
 Current backend TEST deployment readiness, migrations, bootstrap access, exact runtime configuration, release validation, and rollback are documented in `docs/24-api-test-deployment-readiness.md`. Frontend integrations must consume `docs/contracts/secureops-api-v1.openapi.json` and `docs/contracts/secureops-api-v1-ui-integration.md`.
 
+Current post-rc6.26 work and separate source/payload/target acceptance are tracked
+in `docs/integrated-test-activation.md`; executable Turkish handoff:
+`docs/post-rc626-continuation-tr.md`. The archive catalogue adds SQL 024; it is not
+installed by this source change. No successor release or full activation is claimed.
+
 An enterprise Windows operations platform that receives monitoring alarms, runs read-only diagnostics, captures structured audit data, and surfaces actionable findings to shift engineers.
 
 > **Status:** The real Turuncu Hat read-only import is deployed and verified in TEST at source `0ec0376`; external writes remain disabled, and deterministic SDM classification plus the broader controlled pilot remain pending.

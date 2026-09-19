@@ -4,6 +4,7 @@ using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using SecureOps.Domain.Access;
+using SecureOps.Infrastructure.InUse;
 using SecureOps.Shared.Contracts.InUse;
 using SecureOps.Shared.Contracts.Reporting;
 
@@ -23,15 +24,23 @@ public sealed partial class SqlWorkflowReportStore(IConfiguration configuration)
     {
         if (!report.Archived || report.PreparedBy == Guid.Empty || report.Sha256.Length != 64)
         { throw new InvalidDataException("A verified immutable archive is required."); }
+        var metadata = InUseReportMetadata.From(report);
         await using var sql = new SqlConnection(Connection);
         await sql.ExecuteAsync(new CommandDefinition("""
             SET XACT_ABORT ON;
             BEGIN TRANSACTION;
             IF EXISTS(SELECT 1 FROM reporting.InUseArchiveReceipts WITH(UPDLOCK,HOLDLOCK)
-                WHERE RecordId=@RecordId AND ReportVersion=@Version AND (Sha256<>@Sha256 OR SourceVersion<>@SourceVersion))
+                WHERE RecordId=@RecordId AND ReportVersion=@Version AND (Sha256<>@Sha256 OR SourceVersion<>@SourceVersion
+                    OR PreparedBy<>@PreparedBy OR PreparedAt<>@PreparedAt
+                    OR ISNULL(PreparedByLabel,N'')<>ISNULL(@PreparedByLabel,N'')))
                 THROW 51232,'Archive receipt identity conflict.',1;
             IF NOT EXISTS(SELECT 1 FROM reporting.InUseArchiveReceipts WITH(UPDLOCK,HOLDLOCK) WHERE RecordId=@RecordId AND ReportVersion=@Version)
                 INSERT reporting.InUseArchiveReceipts VALUES(@RecordId,@Version,@SourceVersion,@Sha256,@PreparedBy,@PreparedByLabel,@PreparedAt,SYSDATETIMEOFFSET(),@synthetic);
+            IF EXISTS(SELECT 1 FROM reporting.InUseReportCatalogue WITH(UPDLOCK,HOLDLOCK)
+                WHERE RecordId=@RecordId AND ReportVersion=@Version AND MetadataHash<>@MetadataHash)
+                THROW 51242,'Archive catalogue identity conflict.',1;
+            IF NOT EXISTS(SELECT 1 FROM reporting.InUseReportCatalogue WITH(UPDLOCK,HOLDLOCK) WHERE RecordId=@RecordId AND ReportVersion=@Version)
+                INSERT reporting.InUseReportCatalogue VALUES(@RecordId,@Version,@SourceCode,@HostsJson,@PreparedByAccount,@DownloadName,@MetadataHash,SYSDATETIMEOFFSET());
             COMMIT;
             """, new
         {
@@ -42,6 +51,11 @@ public sealed partial class SqlWorkflowReportStore(IConfiguration configuration)
             report.PreparedBy,
             report.PreparedByLabel,
             report.PreparedAt,
+            metadata.SourceCode,
+            metadata.HostsJson,
+            metadata.PreparedByAccount,
+            metadata.DownloadName,
+            metadata.MetadataHash,
             synthetic
         }, commandTimeout: 15, cancellationToken: token));
     }

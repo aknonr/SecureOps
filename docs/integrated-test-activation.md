@@ -2,6 +2,28 @@
 
 ## Owner exception and baseline
 
+### Remaining-work continuation from 03b0c04
+
+Verified incoming HEAD was `03b0c048d50cf926b5640116533df39c8685a37d`, clean on the
+existing delivery branch. The same cumulative owner exception applies; all older
+baselines below remain in force. No target D: deployment is accessible here.
+
+The owner identifies the original current envelope as 27,044 bytes, SHA-256
+`2FDB1ABB5837BF292F8912D8ED707AAF9342A96A4804EF8A05D88BB0E5CD828A`;
+its embedded XLSX is 6,788 bytes, SHA-256
+`11ECD7B916A9A6086D934C107936664CFBC999CB956EB7C3564A9145688C40DC`.
+The malformed chat paste is a different representation, not evidence that the
+original attachment is corrupt. Exact-name Desktop/Downloads search and available
+resource inventory did not expose the original attachment in this session.
+
+Catalogue decision: additive 024 will index only integrity-verified archive
+metadata, never current names/OR values inferred for a historical report. SQL
+search/count/paging requires current InUse.View and InUse.Review before counting.
+Original account is frozen for new reports; absent historical accounts stay NULL.
+Indexing old versions is an explicit bounded, version-protected operation;
+repeating it is idempotent, conflicting metadata fails closed. Search never scans
+the archive. Earlier 022/023 and all historical bytes remain untouched.
+
 ### Post-rc6.26 continuation
 
 The owner explicitly extends the same task-specific exception to the reported
@@ -32,16 +54,18 @@ This changes neither GUID archive paths nor the `<OR>_InUse.xlsx` remote contrac
 ### Continuation accounting
 
 Owner exception remains cumulative, including inherited and new/untracked files.
-Counts below are the final continuation checkpoint; a commit does not reset them.
+Counts below are the current cumulative Git diff, not sums of overlapping commits.
+They include OpenAPI, new files and inherited work; a commit does not reset them.
 
 | Baseline | Files | Additions | Deletions |
 |---|---:|---:|---:|
-| actual continuation 34c8837 | 43 | 1534 | 102 |
-| inherited rc6.24 8c1b58d | 104 | 4980 | 222 |
-| complete post-rc6.22 aa9e4d2 | 138 | 9336 | 1427 |
+| immediate remaining-work checkpoint 03b0c04 | 48 | 1857 | 60 |
+| actual continuation 34c8837 | 74 | 3368 | 139 |
+| inherited rc6.24 8c1b58d | 125 | 7687 | 1132 |
+| complete post-rc6.22 aa9e4d2 | 159 | 11002 | 1296 |
 
-Scope is workbook/metadata, local lifecycle/history invalidation, assignment,
-source-readiness presentation, reporting disposition, tests and matching guidance.
+Scope includes workbook/metadata, local lifecycle/history invalidation, assignment,
+source readiness, catalogue/024, reviewed reporter crosswalk, tests and guidance.
 No unrelated refactor, corporate migration, grant, activation or release ZIP.
 
 The owner extends the task-specific size exception to integrated OR/SDM, In Use,
@@ -84,17 +108,25 @@ are excluded by default; synthetic demo inclusion must be explicit and labelled.
 
 ## Requirement/evidence tracking
 
-| Result | Current baseline | Remaining work / next evidence | Target |
-|---|---|---|---|
-| OR to SDM | ServerRequest positive policy; explicit Jira-only intent and durable link | Verify exact types/mapping; selected OR/destination/actor; source closure contract | Not activated here |
-| In Use review/history/workbook | rc6.26 retained; post-rc6.26 actual legacy XLSX hash/29 row labels/22 headers compared; four-sheet readable exporter implemented | New-source final browser/package acceptance and original current envelope; global authorized report catalogue still incomplete | D: archive operator-reported/screenshotted; effective identity/readback unverified |
-| Local draft recovery | Versioned reset/discard/restart, immutable archive preservation and history reuse invalidation implemented | API/unit/isolated SQL acceptance; final browser/package replay pending | Not installed by this agent |
-| Assignment and attribution | Visible modal, explicit save/cancel, optional reviewer, trusted initiator retained | Stable RFC-user to WASAS-user mapping still absent; final touch/zoom/focus acceptance pending | No automatic suggestion acceptance enabled |
-| In Use attachment/closure | Durable fixture executor, tested wire serializer | Actual readback/conditional contracts and real adapter registration | Not corporately verified |
-| OCO source/preparation/mail | Source jobs, six original CID assets, v3, optional SMTP; c4a8352 local sink/restart | Final package and target providers/relay/Outlook/selected recipients | No live send authorized by generic scope |
-| Management workflow reporting | New SQL 023 frozen metric/detail/export, module capability and OCO owner scope | Final UI/package acceptance and target schema/readiness | Not activated |
-| Collector | c4a8352 completion-evidence source, absent rc6.24 binary | Matched standalone delivery and D: private runbook | Read-only operator execution pending |
-| Archive move | Immutable envelopes; proposed D:\SecureOpsData\InUseReports | Inventory, pause, backup, hash-preserving copy, exact IIS key, API-identity verification | No corporate filesystem access established |
+This is the single current remaining-work register. Detailed commands and minimal
+masked requests are in [the continuation handoff](post-rc626-continuation-tr.md).
+Implemented, local tested, exact-payload tested, installed, configured and remote
+verified are separate states; no row below implies full team activation.
+
+| Requirement / class | Implementation and evidence/build | Owner | Concrete input / next action | Target status |
+|---|---|---|---|---|
+| Report catalogue / local implementation | SQL bounded authorized metadata search, explicit integrity-checked indexing, readable original metadata; `InUseCatalogue` SQL tests and new UI route `/in-use/reports`; requires 024 | Developer / authorized test operator | Current browser/payload gate; apply only reviewed 024 with matched successor after gates | Not in rc6.26; not installed |
+| RFC suggestion / missing source contract | Exact scoped crosswalk resolver and explicit UI decision; matched/no-match/ambiguous/ineligible tests; no display-name matching | Source identity owner / access owner | One approved source scope + reporter reference -> existing eligible application GUID, review reference and expiry; then target case | Resolver complete locally; corporate mapping absent |
+| Assignment, lifecycle, catalogue, OCO UI / test-runner restriction | Incoming 03b0c04 repairs retained; current browser script includes pointer, focus, themes, reflow and native zoom assertions | Authorized test runner | Run existing host/test procedure; prior tool-policy rejection not bypassed; OCO source journey separate | Current UI screenshot/200% acceptance pending |
+| Four-sheet Excel and history / corporate acceptance | Prior real legacy hash/29 labels/22 headings and synthetic Excel acceptance retained; immutable download tests | Evidence owner / TEST operator | Original 27044-byte current attachment unavailable locally (requested once); old/new authorized target download hashes | rc6.26 six-sheet output remains installed; repaired exporter needs successor |
+| Draft recovery / corporate acceptance | Versioned reset/discard/restart, retained archive and invalidated suggestions; API/unit/SQL tests | TEST operator | Current UI journey then exact installed successor trial/restart case | New-source behavior not yet installed |
+| In Use upload and workflow / missing source contract + unfinished integration | Durable stages and known wire mutation client registered only for real source transport; no guessed readback dispatcher | Source API/workflow owner, then developer | Attachment parent/ID/content readback; keyed dynamic-case + true conditional concurrency; authoritative OR states. Implement full real completion transport against those facts | No confirmed real upload or OR closure; not feature-complete |
+| OCO source / target configuration + corporate acceptance | Existing real SCCM/Turuncu Hat adapters, proposals and profiles retained; diagnostic distinctions improved | Integration operator | Sanitized API/normal-start Worker reports; approved profile, provider/queue and exact selected OCO -> terminal job/count/date evidence | Installed rc6.26 owner-reported; source configuration/job unverified |
+| Self-test/distribution / target configuration + corporate acceptance | Real SMTP and durable outcomes retained; prior local sink/restart evidence | Messaging owner / operator | Actual relay/TLS/envelope policy, remove false startup overrides only under staged guide; exact self-test preparation then separately reviewed audience | No target send, inbox or Outlook evidence |
+| OR to SDM / corporate acceptance + type-specific contract | ServerRequest positive policy; immutable Jira-only/close intent and durable link retained | Jira/source owner / operator | Exact selected OR/destination/actor; verify Jira result; other enum types need reviewed mappings, close needs final-state contract | No new target acceptance; not all types enabled |
+| Management reporting / corporate acceptance | rc6.26 SQL 023 snapshot/drilldown/export preserved; discarded-state repair retained | TEST operator | Reconcile exact selected authoritative outcomes with same dashboard snapshot/export | Installation/023 owner-reported; new-result reconciliation pending |
+| Collector / corporate acceptance | rc6.26 matched completion-evidence binary present; six package hashes rechecked | Source operator | Existing bounded read-only command; share only masked Evidence, not secrets; cannot discover undocumented attachment API | Not run here corporately |
+| Archive and operating window / target configuration | Immutable envelopes; owner-configured D:\SecureOpsData\InUseReports; no move requested | TEST operator / operations owner | Effective API access and original-byte readback; named foreground Worker session/window/restart owner | Screenshots and owner report retained; effective access not independently verified |
 
 ## Activation boundaries
 

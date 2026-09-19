@@ -159,6 +159,8 @@ public static class DependencyInjection
         services.Configure<AnnouncementOptions>(configuration.GetSection("Announcements"));
         services.AddScoped<Announcements.SqlAnnouncementStore>();
         services.AddScoped<SqlInUseIdentities>();
+        services.Configure<InUseReporterMappingOptions>(configuration.GetSection(InUseReporterMappingOptions.SectionName));
+        services.AddScoped<InUseReporterResolver>();
         services.AddSingleton<Announcements.AnnouncementRenderer>();
         services.AddScoped<Announcements.AnnouncementService>();
         services.Configure<AnnouncementMailOptions>(configuration.GetSection(AnnouncementMailOptions.SectionName));
@@ -214,6 +216,8 @@ public static class DependencyInjection
         }
         else if (string.Equals(sourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
         {
+            // Known request transport only; completion dispatch still requires verified readback/concurrency contracts.
+            services.AddScoped<InUse.Execution.TuruncuHatInUseMutationClient>();
             services.AddSingleton<ITuruncuHatSessionManager>(serviceProvider => new TuruncuHatSessionManager(
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),
                 serviceProvider.GetRequiredService<IOptions<TuruncuHatOptions>>(),

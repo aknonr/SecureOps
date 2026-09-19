@@ -1,5 +1,35 @@
 # SecureOps API v1 UI Integration Contract
 
+## Post-rc6.26 Catalogue And Reporter Suggestion
+
+This source is not in installed rc6.26. `GET in-use/reports` requires current
+InUse.View and InUse.Review, before SQL counts/pages. Search is literal metadata
+substring over archived OR/host/original preparer label/account; From inclusive,
+To exclusive preparation instants, Version, Status Current/Superseded/Discarded,
+Page 1..10000 and PageSize 1..100. Count/page share one AsOf transaction, not a
+retained cross-page management snapshot. Coverage explicitly excludes unindexed
+history. Missing metadata stays null; no current-person or current-OR substitution.
+AttachmentStatus is separately Verified/Unknown/NotVerified, never inferred from
+archive existence or local lifecycle. Download the selected version using the
+existing report endpoint and returned CurrentRecordVersion; a conflict requires
+refresh, never regenerating historical bytes. `POST in-use/{id}/reports/index`
+takes expectedVersion and 1..25 unique positive archived versions. Completed
+indexes survive an interrupted batch; repeating exact metadata is idempotent,
+conflicting immutable metadata fails. SQL 024 is required. Missing persistence is
+503, not an empty successful result.
+
+`GET in-use/{id}/reporter-suggestion` requires InUse.View and InUse.Assign and is
+audited; it never saves assignment. States: Matched, ReporterUnverified,
+MappingNotConfigured, MappingUnverified, NoMatch, Ambiguous, Ineligible. Only
+Matched returns an eligible candidate and source/version/mapping-bound
+fingerprint. Explicit assignment may add reporterDecision Accept/Reject/Override
+and reporterFingerprint. The API resolves current eligibility again; stale
+fingerprints fail with 409. Existing manual/unassigned saves remain supported.
+An API-owned reviewed identity crosswalk is empty by default; display-name
+similarity cannot create a mapping. The saved decision freezes relation/scope,
+source versions, mapping revision/review/expiry and trusted acting identity;
+refresh preserves it. This does not establish a corporate mapping or source closer.
+
 ## OCO Sender And Role Assignment, 2026-09-15
 
 PUT access/users/{id}/roles takes roles and expectedVersion, no Reason. Unknown

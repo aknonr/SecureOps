@@ -16,7 +16,7 @@ namespace SecureOps.Infrastructure.InUse;
 public sealed partial class InUseService(IInUseRepository repository, IInUseSourceClient source,
     IApplicationAccessService access, IAccessRepository users, ICommandIdempotencyStore commands,
     ILogger<InUseService> logger, InUseReportArchive? archive = null, SqlInUseIdentities? identities = null, InUsePolicy? policy = null,
-    Execution.InUseCompletionCoordinator? completion = null, Reporting.SqlWorkflowReportStore? reports = null)
+    Execution.InUseCompletionCoordinator? completion = null, Reporting.SqlWorkflowReportStore? reports = null, InUseReporterResolver? reporterResolver = null)
 {
     /// <summary>Queries only persisted records.</summary>
     public Task<InUseResult<InUsePage>> QueryAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -115,10 +115,22 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             ApplicationUser? assignee = request.AssigneeId is Guid target ? await users.GetUserAsync(target, token) : null;
             if (request.AssigneeId.HasValue && (assignee is null || !Reviewer(assignee)))
             { return InUseResult<InUseRecord>.Fail("InUseAssigneeUnavailable"); }
+            InUseReporterDecision? decision = old.ReporterDecision;
+            if (request.ReporterDecision is not null || request.ReporterFingerprint is not null)
+            {
+                if (request.ReporterDecision is not ("Accept" or "Reject" or "Override") || reporterResolver is null)
+                { return InUseResult<InUseRecord>.Fail("InUseInvalid"); }
+                InUseReporterSuggestion proposal = await reporterResolver.ResolveAsync(old, DateTimeOffset.UtcNow, token);
+                if (proposal.State != "Matched" || proposal.Fingerprint != request.ReporterFingerprint
+                    || (request.ReporterDecision == "Accept") != (proposal.Candidate!.Id == request.AssigneeId))
+                { return InUseResult<InUseRecord>.Fail("InUseConflict"); }
+                decision = new(request.ReporterDecision, proposal, user.Id, ActorLabel(user), DateTimeOffset.UtcNow);
+            }
             IReadOnlyDictionary<Guid, string> labels = await LabelsAsync([old with { AssigneeId = assignee?.Id }], token);
             InUseRecord next = old with
             {
                 Version = old.Version + 1,
+                ReporterDecision = decision,
                 AssigneeId = assignee?.Id,
                 AssigneeLabel = assignee is null ? null : labels.GetValueOrDefault(assignee.Id) ?? InUseAssigneeLabels.Create([assignee])[assignee.Id],
                 AssignedBy = user.Id,
@@ -126,7 +138,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                 AssignedAt = DateTimeOffset.UtcNow
             };
             return await SaveAsync(next, request.ExpectedVersion, Audit(user, context, "Assigned",
-                new { id, PreviousAssignee = old.AssigneeId, next.AssigneeId, request.Reason, next.Version }, id, request.ExpectedVersion, assigneeId: next.AssigneeId), token);
+                new { id, PreviousAssignee = old.AssigneeId, next.AssigneeId, request.Reason, next.Version, next.ReporterDecision }, id, request.ExpectedVersion, assigneeId: next.AssigneeId), token);
         }, token);
 
     /// <summary>An approved review-capable actor can save a version-protected draft; assignment is optional.</summary>
@@ -197,7 +209,8 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             }
             if (request.Archive && !InUseChecks.RelationshipReady(record.Source))
             { return InUseResult<InUseReport>.Fail("InUseIncomplete"); }
-            InUseReport report = InUseWorkbook.Create(record, user.Id, DateTimeOffset.UtcNow) with { PreparedByLabel = ActorLabel(user) };
+            InUseReport report = InUseWorkbook.Create(record, user.Id, DateTimeOffset.UtcNow) with
+            { PreparedByLabel = ActorLabel(user), PreparedByAccount = user.LoginName };
             report = DownloadPresentation(report);
             if (request.Archive)
             {

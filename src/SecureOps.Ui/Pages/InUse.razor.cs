@@ -160,6 +160,8 @@ public partial class InUse
         DialogParameters parameters = new()
         {
             { nameof(InUseAssignmentDialog.Record), original },
+            { nameof(InUseAssignmentDialog.Suggest), (Func<Task<InUseReporterSuggestion>>)(() =>
+                ReadAsync<InUseReporterSuggestion>($"/{original.Id}/reporter-suggestion")) },
             { nameof(InUseAssignmentDialog.Search), (Func<string, Task<InUseAssignee[]>>)(search =>
                 ReadAsync<InUseAssignee[]>("/assignees?search=" + Uri.EscapeDataString(search))) },
             { nameof(InUseAssignmentDialog.Save), (Func<AssignInUseRequest, Task<InUseRecord>>)(request =>
@@ -305,6 +307,12 @@ public partial class InUse
     private static string Waiting(InUseRecord record) => InUseProgress.Created(record.Source, DateTimeOffset.UtcNow) is { } created
         ? $"Kaynak açılışından beri {(DateTimeOffset.UtcNow - created).Days} gün"
         : "Kaynak açılış tarihi bilinmiyor" + (record.FirstSeenAt is { } seen ? $" · WASAS ilk görülme: {seen.ToLocalTime():g} (kaynak yaşı değil)" : " · Yerel ilk görülme bilinmiyor");
+    private Task IndexReportAsync(long version) => ExecuteAsync(async () =>
+    {
+        await SendAsync<IndexInUseReportsResult>(HttpMethod.Post, $"/{_record!.Id}/reports/index",
+            new IndexInUseReportsRequest(_record.Version, [version]));
+        _notice = $"Sürüm {version} rapor kataloğunda. Arşiv baytları değiştirilmedi.";
+    });
     private Task DownloadAsync(long? archivedVersion = null) => ExecuteAsync(async () =>
     {
         if (archivedVersion is null && !Ready())

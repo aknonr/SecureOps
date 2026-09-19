@@ -144,7 +144,7 @@ public sealed partial class SqlInUseRepository(IConfiguration configuration) : I
         if (audit.Operation is { } operation)
         {
             await Access.SqlAccessRepository.LockAdministrationAsync(connection, transaction, cancellationToken);
-            string capability = operation.Action == "InUseAssigned" ? "InUse.Assign" : "InUse.Review";
+            string capability = operation.Action is "InUseAssigned" or "InUseReporterSuggestionRead" ? "InUse.Assign" : "InUse.Review";
             const string authority = """
                 SELECT COUNT(*) FROM security.Users u WHERE u.UserId=@userId AND u.AccessStatus='Approved' AND EXISTS(
                     SELECT 1 FROM security.RoleAssignments a JOIN security.Roles r ON r.RoleId=a.RoleId CROSS APPLY OPENJSON(r.CapabilitiesJson) c

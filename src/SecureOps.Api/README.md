@@ -1,5 +1,14 @@
 # SecureOps.Api
 
+Current successor source requires reviewed **024** after installed 023 for archive
+catalogue writes/reads. GET `/api/v1/in-use/reports` provides authorized SQL paging;
+POST `/{id}/reports/index` indexes at most 25 existing immutable versions under
+current review/view and record-version guards. It does not create new reports.
+GET `/{id}/reporter-suggestion` requires assignment/view capability and an audited
+read. Assignment can explicitly Accept/Reject/Override its exact fingerprint;
+API derives the actor and re-resolves eligibility. No mapping or grant is accepted
+from the browser. See ADR-0020 and `docs/post-rc626-continuation-tr.md`.
+
 ASP.NET Core Web API. Hosted on IIS in-process.
 
 Planned-announcement source/editor/preparation integration and local evidence:

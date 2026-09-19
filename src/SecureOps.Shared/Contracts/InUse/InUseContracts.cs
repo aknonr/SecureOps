@@ -72,6 +72,8 @@ public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash,
     public long InvalidatedReviewsThrough { get; init; }
     /// <summary>Last explicit local reset/discard/restart, with trusted actor attribution.</summary>
     public InUseDraftLifecycle? DraftLifecycle { get; init; }
+    /// <summary>Last explicit reporter-suggestion decision, retained across source refresh.</summary>
+    public InUseReporterDecision? ReporterDecision { get; init; }
     /// <summary>Authenticated actor who last changed the optional assignment, not the reviewer or source closer.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Guid? AssignedBy { get; init; }
@@ -113,7 +115,13 @@ public sealed record InUsePage(IReadOnlyList<InUseRecord> Items, int Total, int 
 public sealed record RefreshInUseRequest(Guid CommandId);
 
 /// <summary>Manual assignment to an approved application identity, or explicit unassignment.</summary>
-public sealed record AssignInUseRequest(long ExpectedVersion, Guid? AssigneeId, string Reason);
+public sealed record AssignInUseRequest(long ExpectedVersion, Guid? AssigneeId, string Reason)
+{
+    /// <summary>Accept, Reject or Override only after an explicit suggestion review; absent means manual assignment.</summary>
+    public string? ReporterDecision { get; init; }
+    /// <summary>Exact server-generated suggestion fingerprint; never a source/user mapping supplied by the browser.</summary>
+    public string? ReporterFingerprint { get; init; }
+}
 
 /// <summary>Explicit record-wide local recovery, protected by the displayed aggregate version.</summary>
 public sealed record ChangeInUseDraftRequest(long ExpectedVersion, string Action, string Reason);
@@ -148,6 +156,8 @@ public sealed record InUseReport(Guid RecordId, long Version, long SourceVersion
     public Guid PreparedBy { get; init; }
     /// <summary>Trusted profile snapshot; absent on historical archives.</summary>
     public string? PreparedByLabel { get; init; }
+    /// <summary>Original trusted preparer account snapshot; unavailable in older envelopes.</summary>
+    public string? PreparedByAccount { get; init; }
     /// <summary>Preparation timestamp retained on repeated archive requests.</summary>
     public DateTimeOffset PreparedAt { get; init; }
     /// <summary>Exact source identity bound to this artifact.</summary>

@@ -15,6 +15,26 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class SqlPersistenceDependencyInjectionTests
 {
     [Fact]
+    public void InUseKnownWireClient_IsComposedOnlyForRealSource_WithoutDispatchOrNetwork()
+    {
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["OperationalRecords:SourceProvider"] = "TuruncuHat",
+            ["TuruncuHat:BaseUrl"] = "https://source.example.invalid/DataRest.svc/json",
+            ["OperationalRecords:ReadOnlyIntegrationMode"] = "true",
+            ["InUseCompletion:Enabled"] = "false",
+            ["Jira:Provider"] = "Disabled"
+        }).Build();
+        ServiceCollection registrations = new();
+        registrations.AddSingleton(configuration);
+        registrations.AddLogging();
+        registrations.AddSecureOpsInfrastructure(configuration);
+        using ServiceProvider services = registrations.BuildServiceProvider();
+        using IServiceScope scope = services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<SecureOps.Infrastructure.InUse.Execution.TuruncuHatInUseMutationClient>().Should().NotBeNull();
+    }
+
+    [Fact]
     public void FullSqlProviderSelection_RegistersEveryAuthoritativeRepositoryWithoutConnecting()
     {
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

@@ -3,6 +3,7 @@ const { chromium, request } = require(process.argv[2]);
 const { expect } = require(path.join(process.argv[2], 'test'));
 const { loopback, navigate, signIn, apiContext, json } = require('./journey-support.cjs');
 const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = path.resolve(process.argv[5]);
+const nativeZoom = process.env.WASAS_NATIVE_ZOOM === '1';
 (async () => {
     fs.mkdirSync(out, { recursive: true });
     const client = await apiContext(request, api);
@@ -22,12 +23,20 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
     const bytes = Buffer.from(report.content, 'base64');
     assert.equal(crypto.createHash('sha256').update(bytes).digest('hex').toUpperCase(), report.sha256);
     fs.writeFileSync(path.join(out, 'synthetic-corporate.xlsx'), bytes);
-    const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
-    const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1366, height: 768 }, hasTouch: true });
+    const browser = nativeZoom ? null : await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+    const context = nativeZoom ? await chromium.launchPersistentContext(path.join(out, 'private-profile'), {
+        executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,
+        ignoreHTTPSErrors: true, viewport: null, hasTouch: true, args: ['--window-size=1366,768'] })
+        : await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1366, height: 768 }, hasTouch: true });
     const results = [];
     try {
-        await context.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
         const page = await context.newPage();
+        if (nativeZoom) {
+            await page.goto('chrome://settings/appearance');
+            assert.equal(await page.evaluate(() => new Promise(resolve => chrome.settingsPrivate.setDefaultZoom(2,
+                () => resolve(chrome.runtime.lastError?.message ?? null)))), null);
+        }
+        await context.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
         await signIn(page, ui);
         await navigate(page, ui, 'in-use/' + record.id);
         await expect(async () => {
@@ -38,23 +47,34 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         fs.writeFileSync(path.join(out, 'loaded.html'), await page.content());
         const answer = page.locator('[data-answer-check=InternetOut]').first();
         await answer.selectOption('Yes');
-        for (const width of [1366, 390]) {
-            await page.setViewportSize({ width, height: 844 });
+        for (const theme of ['light', 'dark']) {
+            await page.getByRole('button', { name: 'Hesap menüsü', exact: true }).click();
+            await page.locator('.so-user-menu-popover .mud-list-item').filter({ hasText: theme === 'dark' ? /^Koyu/ : /^Aydınlık/ }).click();
+        for (const width of nativeZoom ? [0] : [1366, 390]) {
+            if (!nativeZoom) await page.setViewportSize({ width, height: 844 });
             const trigger = page.getByRole('button', { name: 'İnceleyici ata/değiştir', exact: true });
             if (width === 390) await trigger.tap(); else await trigger.click();
             const dialog = page.getByRole('dialog');
             await dialog.waitFor();
-            await page.screenshot({ path: path.join(out, `assignment-open-${width}.png`) });
+            await page.screenshot({ path: path.join(out, `assignment-open-${theme}-${width}.png`) });
             await page.getByRole('textbox', { name: /Atama gerekçesi/ }).fill('Synthetic dialog cancel');
             assert.equal(await dialog.evaluate(e => e.contains(document.activeElement)), true);
             const box = await dialog.boundingBox();
-            assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= width + 1 && box.y + box.height <= 845);
-            await page.screenshot({ path: path.join(out, `assignment-${width}.png`) });
+            const screen = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio, scale: visualViewport.scale }));
+            if (nativeZoom) { assert.equal(screen.dpr, 2); assert.equal(screen.scale, 1); assert.ok(screen.width < 700); }
+            assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= screen.width + 1 && box.y + box.height <= screen.height + 1);
+            await page.screenshot({ path: path.join(out, `assignment-${theme}-${width}.png`) });
             await page.getByRole('button', { name: 'Vazgeç', exact: true }).click();
+            await dialog.waitFor({ state: 'hidden' });
+            assert.equal(await trigger.evaluate(e => e === document.activeElement), true, 'Focus returns to assignment trigger');
+            await trigger.press('Enter');
+            await dialog.waitFor();
+            await page.keyboard.press('Escape');
             await dialog.waitFor({ state: 'hidden' });
             assert.equal(await answer.inputValue(), 'Yes');
             assert.equal((await json(client, `/api/v1/in-use/${record.id}`)).version, record.version);
-            results.push({ width, input: width === 390 ? 'touch' : 'mouse', dialogVisible: true, cancelPreservedAnswers: true });
+            results.push({ theme, width, nativeZoom, screen, input: width === 390 ? 'touch' : 'mouse', keyboard: true, focusReturn: true, dialogVisible: true, cancelPreservedAnswers: true });
+        }
         }
         await page.getByRole('button', { name: 'Kaydedilmemiş değişiklikleri geri al', exact: true }).click();
         await page.getByRole('button', { name: 'Geri al', exact: true }).click();
@@ -88,6 +108,17 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         const retained = await json(client, `/api/v1/in-use/${record.id}/report`, { method: 'POST', data: { expectedVersion: fresh.version, archivedVersion: report.version } });
         assert.equal(retained.content, report.content);
         await page.screenshot({ path: path.join(out, 'restarted-draft.png'), fullPage: true });
+        await navigate(page, ui, 'in-use/reports');
+        await page.getByRole('textbox', { name: 'Rapor ara', exact: true }).fill(record.source.code);
+        await page.getByRole('button', { name: 'Ara', exact: true }).click();
+        await page.getByText(report.fileName, { exact: true }).waitFor();
+        const row = page.getByRole('row').filter({ hasText: report.fileName });
+        const downloadPromise = page.waitForEvent('download');
+        await row.getByRole('button', { name: 'İndir', exact: true }).click();
+        const download = await downloadPromise;
+        assert.equal(download.suggestedFilename(), report.fileName);
+        assert.equal(crypto.createHash('sha256').update(fs.readFileSync(await download.path())).digest('hex').toUpperCase(), report.sha256);
+        await page.screenshot({ path: path.join(out, 'catalogue.png'), fullPage: true });
         fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify({ recordId: record.id, reportName: report.fileName, sha256: report.sha256, results, undoUnsaved: true, lifecycleRestart: true, unchangedRedownload: true, corporateEffects: false }, null, 2));
-    } finally { await context.close(); await browser.close(); await client.dispose(); }
+    } finally { await context.close(); if (browser) await browser.close(); await client.dispose(); }
 })().catch(error => { console.error(error); process.exit(1); });

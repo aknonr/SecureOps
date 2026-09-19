@@ -1,5 +1,19 @@
 # API TEST Deployment Readiness
 
+## Post-rc6.26 Remaining Work, 2026-09-20
+
+The current register is [integrated-test-activation.md](integrated-test-activation.md);
+the executable target handoff is [post-rc626-continuation-tr.md](post-rc626-continuation-tr.md).
+Incoming source was 03b0c04; installed rc6.26/022/023 remains an operator report,
+not independently verified target composition. The new archive catalogue needs
+additive 024, after final successor acceptance. No new numbered release, target
+SQL, IIS changes, source writes or live SMTP were performed. Do not replay older
+SQL or use the historical plans below as the current installation sequence.
+Final current UI/payload acceptance is pending the authorized runner; the previous
+tool-policy rejection was not bypassed. Known mutation wire DI is not a complete
+In Use source completion adapter. Exact missing source contracts remain in the
+register; local success is not corporate activation.
+
 ## Post-rc6.24 Continuation, 2026-09-18
 
 Current requirement/evidence matrix and scoped owner exception:

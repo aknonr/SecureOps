@@ -1,5 +1,12 @@
 # SecureOps.Shared
 
+Archive catalogue contracts retain original metadata and label current lifecycle
+and attachment state separately. Report PreparedByAccount is frozen for new
+archives and remains absent for unknown history. Reporter suggestion decisions
+carry source scope/relation/version, reviewed mapping revision/expiry, candidate
+identity and the trusted accepting/rejecting/overriding actor. Neither contract
+grants authority or represents remote closure.
+
 In Use report contract now separates corporate Sheets from internal EvidenceSheets
 and freezes SourceCode for readable UTC download names. Historical reports recover
 the code only from their own Provenance sheet. Draft lifecycle adds Discarded,

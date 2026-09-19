@@ -22,6 +22,21 @@ namespace SecureOps.Api.Controllers;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class InUseController(InUseService service) : ControllerBase
 {
+    /// <summary>Verified RFC reporter suggestion; opening it never assigns anyone.</summary>
+    [HttpGet("{id:guid}/reporter-suggestion")]
+    [Authorize(Policy = Policies.CanAssignInUse)]
+    public async Task<ActionResult<InUseReporterSuggestion>> ReporterAsync(Guid id, CancellationToken token) =>
+        Reply(await service.ReporterAsync(User, Context(), id, token));
+    /// <summary>Authorized bounded search over verified immutable archive metadata.</summary>
+    [HttpGet("reports")]
+    [Authorize(Policy = Policies.CanReviewInUse)]
+    public async Task<ActionResult<InUseReportPage>> ReportsAsync([FromQuery] InUseReportQuery query, CancellationToken token) =>
+        Reply(await service.ReportsAsync(User, Context(), query, token));
+    /// <summary>Explicit bounded historical indexing; preserves original bytes and metadata.</summary>
+    [HttpPost("{id:guid}/reports/index")]
+    [Authorize(Policy = Policies.CanReviewInUse)]
+    public async Task<ActionResult<IndexInUseReportsResult>> IndexReportsAsync(Guid id, IndexInUseReportsRequest request, CancellationToken token) =>
+        Reply(await service.IndexReportsAsync(User, Context(), id, request, token));
     /// <summary>Explicit local reset/discard/restart; never deletes a source record or archive.</summary>
     [HttpPost("{id:guid}/draft-lifecycle")]
     [Authorize(Policy = Policies.CanReviewInUse)]

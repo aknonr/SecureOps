@@ -1,5 +1,11 @@
 # Entegre TEST teslimatı ve kontrollü aktivasyon
 
+Güncel devamın katalog/RFC önerisi, gerekli yeni 024 farkı, eksik kaynak
+sözleşmeleri ve test-runner sınırı: `post-rc626-continuation-tr.md`.
+SMTP/kaynak ayar adları: `rc626-mail-source-activation-tr.md`. Bunlar boşlukları
+doldurulacak şablonlardır; hedef tanılama olmadan uygulanabilir değer sayılmaz.
+rc6.26 korunur; yeni kaynak kodu o kurulu pakette yoktur. 022/023 tekrar edilmez.
+
 Bu belge kurumsal aktivasyon yapıldığını bildirmez. Paket metadata'sındaki kaynak
 SHA ve bileşen hash'leri esas alınır. Yerel fixture/SMTP kanıtı kurumsal kabul
 değildir. Sonuç matrisi: `integrated-test-activation.md`; kaynak sözleşmesi

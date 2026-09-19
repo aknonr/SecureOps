@@ -2,6 +2,20 @@
 
 Two test projects mirroring `src/`.
 
+## Post-rc6.26 Remaining Gates
+
+Current catalogue SQL, reporter crosswalk, route authorization, immutable metadata
+and release delta contracts are covered by the continuation tests. The isolated
+resource harness includes 024 only in fresh task-owned databases; it never upgrades
+corporate installations. Source SQL tests additionally require the published
+Hangfire schema 9 installed explicitly into that fresh test database, never runtime
+schema preparation. Existing API draft tests require fresh fixtures on every run.
+See `docs/post-rc626-continuation-tr.md` for exact opt-in accounting and the current
+operator browser procedure. `browser/inuse-rc626-repair.cjs` now tests catalogue,
+focus return, themes and `WASAS_NATIVE_ZOOM=1` separately from mobile reflow. Its
+current assertions are not claimed passed until that permitted runner completes.
+Do not retry a rejected UI-host launch using another command/port/executor.
+
 Announcement commands, isolated SQL setup and actual results are recorded in
 `docs/contracts/planned-announcements-v1.md`, including the isolated published
 `browser/announcements.cjs` UI journey. No corporate/VDI/SMTP acceptance is implied.

@@ -1,11 +1,24 @@
 # SecureOps.Infrastructure
 
+The 03b0c04 continuation adds a SQL 024 archive catalogue. Verified envelope
+metadata is indexed atomically with its existing receipt; exact duplicates are
+no-ops and metadata conflicts fail. Search/count/page run under current access
+checks and the administration lock, not filesystem scans. Explicit historical
+indexing is bounded to 25 selected versions and safely repeatable.
+`InUseReporterResolver` uses a server-reviewed exact IdentityScope/UserReference
+crosswalk to an existing UserId, then rechecks current eligibility. No mapping
+ships, and no name matching/account provisioning occurs. The known mutation
+client is composed only with the real source provider; it is NOT registered as
+the completion transport. Missing conditional/readback contracts still prevent
+real execution. See `docs/post-rc626-continuation-tr.md` and ADR-0020.
+
 Post-rc6.26 In Use recovery uses the existing versioned JSON aggregate and
 administration/execution transaction boundary. Discard is not a source lifecycle:
 review-only SQL status remains compatible, while queries/reporting apply Discarded
 separately. InvalidatedReviewsThrough blocks proposal reuse without rewriting
 append-only reviews. API/Worker must stay matched; older writers cannot preserve
-new lifecycle metadata safely. No new migration or corporate grant is introduced.
+new lifecycle metadata safely. Those lifecycle repairs alone introduced no migration;
+the later report catalogue requires additive 024. No corporate grant was applied.
 Corporate XLSX output retains four legacy sheets; provenance stays in archive
 EvidenceSheets. See `docs/post-rc626-repair-tr.md` and ADR-0020.
 

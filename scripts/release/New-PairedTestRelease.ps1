@@ -3,10 +3,11 @@ param([Parameter(Mandatory)][ValidatePattern('^\d{4}-\d{2}-\d{2}-pilot-rc6\.\d+$
     [string]$BrandingDirectory,
     [switch]$UpgradeFromRc621,
     [switch]$UpgradeFromRc622,
-    [switch]$UpgradeFromRc624)
+    [switch]$UpgradeFromRc624,
+    [switch]$UpgradeFromRc626)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-if ($UpgradeFromRc621 -or ($UpgradeFromRc622 -and $UpgradeFromRc624)) { throw 'Choose one reviewed upgrade baseline: rc6.22 (022-023) or verified rc6.24/022 (023 only).' }
+if ($UpgradeFromRc621 -or (@($UpgradeFromRc622,$UpgradeFromRc624,$UpgradeFromRc626 | Where-Object { $_ }).Count -gt 1)) { throw 'Choose one reviewed upgrade baseline: rc6.22 (022-024), rc6.24/022 (023-024), or rc6.26/023 (024 only).' }
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $destination = Join-Path 'C:\SecureOpsBuild\release' $ReleaseName
 Push-Location $repo
@@ -47,10 +48,10 @@ try {
     foreach ($folder in @('migrations','schema')) {
         $files = @(Get-ChildItem "sql/$folder" -File -Filter '*.sql' | Sort-Object Name)
         $numbers = @($files | ForEach-Object { $_.Name.Substring(0,3) }) -join ','
-        if ($numbers -cne ((1..23 | ForEach-Object { '{0:D3}' -f $_ }) -join ',')) { throw 'Expected the exact complete 001-023 SQL chain.' }
+        if ($numbers -cne ((1..24 | ForEach-Object { '{0:D3}' -f $_ }) -join ',')) { throw 'Expected the exact complete 001-024 SQL chain.' }
         foreach ($file in $files) {
             Copy-Item -LiteralPath $file.FullName -Destination "$destination/staging/database/sql/$folder/$($file.Name)"
-            $firstDelta = if ($UpgradeFromRc624) { 23 } elseif ($UpgradeFromRc622) { 22 } else { 19 }
+            $firstDelta = if ($UpgradeFromRc626) { 24 } elseif ($UpgradeFromRc624) { 23 } elseif ($UpgradeFromRc622) { 22 } else { 19 }
             if ([int]$file.Name.Substring(0,3) -ge $firstDelta) { Copy-Item -LiteralPath $file.FullName -Destination "$destination/staging/database-delta/sql/$folder/$($file.Name)" }
         }
     }
@@ -64,8 +65,8 @@ try {
     $apiZip = "$destination/API/secureops-api-TEST-$short.zip"
     $uiZip = "$destination/UI/secureops-ui-TEST-$short.zip"
     $workerZip = "$destination/Worker/secureops-worker-TEST-$short.zip"
-    $dbZip = "$destination/DBA/secureops-database-001-023-TEST-$($ReleaseName.Split('-')[-1]).zip"
-    $deltaRange = if ($UpgradeFromRc624) { '023' } elseif ($UpgradeFromRc622) { '022-023' } else { '019-023' }
+    $dbZip = "$destination/DBA/secureops-database-001-024-TEST-$($ReleaseName.Split('-')[-1]).zip"
+    $deltaRange = if ($UpgradeFromRc626) { '024' } elseif ($UpgradeFromRc624) { '023-024' } elseif ($UpgradeFromRc622) { '022-024' } else { '019-024' }
     $deltaZip = "$destination/DBA/secureops-database-delta-$deltaRange-TEST-$($ReleaseName.Split('-')[-1]).zip"
     $extraPackages = @()
     if ($BrandingDirectory) {
@@ -88,13 +89,16 @@ try {
     New-Item -ItemType Directory -Path "$destination/configuration" | Out-Null
     Copy-Item -LiteralPath "$PSScriptRoot/announcement-mail.disabled.example.json" -Destination "$destination/configuration/announcement-mail.disabled.example.json"
     Copy-Item -LiteralPath 'scripts/powershell/Compare-OperationsReadiness.ps1' -Destination "$destination/configuration/Compare-OperationsReadiness.ps1"
+    foreach ($guide in @('rc626-mail-source-activation-tr.md','post-rc626-continuation-tr.md')) {
+        Copy-Item -LiteralPath "docs/$guide" -Destination "$destination/configuration/$guide"
+    }
     & "$PSScriptRoot/New-ApiDeploymentPackage.ps1" -PublishDirectory "$destination\staging\api" -ZipPath $apiZip -ManifestPath "$destination/manifests/api-payload.sha256" -ForbiddenText @($env:USERPROFILE)
     & "$PSScriptRoot/Validate-ApiAdRuntimeDependencies.ps1" -PublishDirectory "$destination\staging\api" -ZipPath $apiZip -ManifestPath "$destination/manifests/api-payload.sha256"
     & "$PSScriptRoot/New-UiDeploymentPackage.ps1" -PublishDirectory "$destination\staging\ui" -ZipPath $uiZip -ManifestPath "$destination/manifests/ui-payload.sha256" -ForbiddenText @($env:USERPROFILE)
     & "$PSScriptRoot/New-UiDeploymentPackage.ps1" -Component Worker -PublishDirectory "$destination\staging\worker" -ZipPath $workerZip -ManifestPath "$destination/manifests/worker-payload.sha256" -ForbiddenText @($env:USERPROFILE)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $dataPackages = @(@('database',$dbZip),@('database-delta',$deltaZip))
-    if ($UpgradeFromRc622 -or $UpgradeFromRc624) { $dataPackages = @(,@('database-delta',$deltaZip)) }
+    if ($UpgradeFromRc622 -or $UpgradeFromRc624 -or $UpgradeFromRc626) { $dataPackages = @(,@('database-delta',$deltaZip)) }
     foreach ($extra in $extraPackages) { $dataPackages += ,@($extra[1],$extra[2]) }
     foreach ($databasePackage in $dataPackages) {
     $databaseRoot = "$destination\staging\$($databasePackage[0])"
@@ -108,7 +112,7 @@ try {
     }
     $packages = @()
     $payloads = @(@('API','api',$apiZip), @('UI','ui',$uiZip), @('Worker','worker',$workerZip))
-    if ($UpgradeFromRc622 -or $UpgradeFromRc624) { $payloads += ,@('DBA-DELTA','database-delta',$deltaZip) }
+    if ($UpgradeFromRc622 -or $UpgradeFromRc624 -or $UpgradeFromRc626) { $payloads += ,@('DBA-DELTA','database-delta',$deltaZip) }
     else { $payloads += @(@('DBA','database',$dbZip), @('DBA-DELTA','database-delta',$deltaZip)) }
     foreach ($item in ($payloads + $extraPackages)) {
         $root = "$destination\staging\$($item[1])"
@@ -134,15 +138,19 @@ try {
     $collector = @(Get-ChildItem -LiteralPath "$destination/diagnostics" -File -Filter '*.zip')
     if ($collector.Count -ne 1) { throw 'Expected one matching collector archive.' }
     $packages += [ordered]@{ component='InUseEvidence'; path="diagnostics/$($collector[0].Name)"; bytes=$collector[0].Length; sha256=(Get-FileHash -LiteralPath $collector[0].FullName).Hash; manifest='diagnostics/payload.sha256'; manifestSha256=(Get-FileHash -LiteralPath "$destination/diagnostics/payload.sha256").Hash }
-    $metadata = [ordered]@{ release=$ReleaseName; branch=$branch; buildSource=$sha; requiredSchema='001-023'; upgradeFromVerified018='019-023'; productVersion="0.1.0+$sha"; fileVersion='0.1.0.0'; targetFramework='net8.0'; selfContained=$false; packages=$packages; corporateCallsPerformed=$false; deploymentPerformed=$false; requiredFences=@{ ReadOnlyIntegrationMode=$true; ControlledTestWritesEnabled=$false; SourceCloseEnabled=$false; AnnouncementMailEnabled=$false; InUseCompletionEnabled=$false; InUseAspectLookupEnabled=$false } }
+    $metadata = [ordered]@{ release=$ReleaseName; branch=$branch; buildSource=$sha; requiredSchema='001-024'; upgradeFromVerified018='019-024'; productVersion="0.1.0+$sha"; fileVersion='0.1.0.0'; targetFramework='net8.0'; selfContained=$false; packages=$packages; corporateCallsPerformed=$false; deploymentPerformed=$false; requiredFences=@{ ReadOnlyIntegrationMode=$true; ControlledTestWritesEnabled=$false; SourceCloseEnabled=$false; AnnouncementMailEnabled=$false; InUseCompletionEnabled=$false; InUseAspectLookupEnabled=$false } }
     $metadata.workerHosting = 'Foreground console only; Windows Service/unattended hosting deferred'
     if ($UpgradeFromRc622) {
         $metadata.Remove('upgradeFromVerified018')
-        $metadata.upgradeFrom = 'Verified 001-021 and Hangfire schema 9; apply only reviewed additive 022-023'
+        $metadata.upgradeFrom = 'Verified 001-021 and Hangfire schema 9; apply only reviewed additive 022-024'
     }
     if ($UpgradeFromRc624) {
         $metadata.Remove('upgradeFromVerified018')
-        $metadata.upgradeFrom = 'Verified 001-022 and Hangfire schema 9; apply only reviewed additive 023'
+        $metadata.upgradeFrom = 'Verified 001-022 and Hangfire schema 9; apply only reviewed additive 023-024'
+    }
+    if ($UpgradeFromRc626) {
+        $metadata.Remove('upgradeFromVerified018')
+        $metadata.upgradeFrom = 'Verified 001-023 and Hangfire schema 9; apply only reviewed additive 024'
     }
     $metadata.operatorFiles = @(Get-Item "$destination/operator-runbook-tr.md"; Get-ChildItem "$destination/configuration" -File) | ForEach-Object {
         [ordered]@{ path=$_.FullName.Substring($destination.Length+1); sha256=(Get-FileHash -LiteralPath $_.FullName).Hash }

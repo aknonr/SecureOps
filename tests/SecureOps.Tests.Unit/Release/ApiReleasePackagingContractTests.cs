@@ -30,11 +30,12 @@ public sealed class ApiReleasePackagingContractTests
         string collector = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-InUseEvidencePackage.ps1"));
         collector.Should().Contain("Symbol outside fresh collector staging.").And.Contain("Remove-Item -LiteralPath $symbol.FullName")
             .And.Contain("Test-ApiReleasePayload.ps1");
-        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-023'")
-            .And.Contain("Expected the exact complete 001-023 SQL chain.")
-            .And.Contain("upgradeFromVerified018='019-023'").And.Contain("database-delta")
+        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-024'")
+            .And.Contain("Expected the exact complete 001-024 SQL chain.")
+            .And.Contain("upgradeFromVerified018='019-024'").And.Contain("database-delta")
             .And.Contain("[switch]$UpgradeFromRc622").And.Contain("apply only reviewed additive 022")
             .And.Contain("[switch]$UpgradeFromRc624").And.Contain("apply only reviewed additive 023")
+            .And.Contain("[switch]$UpgradeFromRc626").And.Contain("apply only reviewed additive 024")
             .And.Contain("New-InUseEvidencePackage.ps1").And.Contain("diagnostics/payload.sha256")
             .And.Contain("InUseCompletionEnabled=$false").And.Contain("InUseAspectLookupEnabled=$false")
             .And.Contain("runtimePrepareSchema=$false").And.Contain("-Component Worker")

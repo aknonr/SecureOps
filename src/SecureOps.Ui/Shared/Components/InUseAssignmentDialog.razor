@@ -8,10 +8,19 @@
         @if (ReporterLabels.Length == 1)
         {
             <p>Bağlı sunucu talebini bildiren: <strong>@ReporterLabels[0]</strong>.</p>
-            <p>Kaynak kullanıcı kimliğinin uygun WASAS hesabıyla eşleşmesi doğrulanmadı. Ad benzerliğiyle otomatik atama yapılmaz; uygun inceleyiciyi arayabilir veya atanmamış bırakabilirsiniz.</p>
         }
         else
         { <p>Tek ve güncel bir bağlı talep bildireni doğrulanamadı. İnceleyiciyi elle seçebilir veya atanmamış bırakabilirsiniz.</p> }
+        @if (_suggestion?.State == "Matched" && _suggestion.Candidate is { } candidate)
+        {
+            <p>İnceleyici önerisi: <strong>@candidate.Label</strong></p>
+            <MudButton OnClick="SelectSuggestion" Disabled="_busy" StartIcon="@Icons.Material.Filled.PersonAdd">Önerilen kişiyi seç</MudButton>
+            <MudButton OnClick='() => _decision = "Reject"' Disabled="_busy" StartIcon="@Icons.Material.Filled.PersonOff">Öneriyi reddet</MudButton>
+            @if (_decision == "Reject") { <p role="status">Öneri reddedildi; karar Atamayı kaydet ile uygulanacak.</p> }
+        }
+        else { <p role="status">@SuggestionState</p> }
+        @if (Record.ReporterDecision is { } previous)
+        { <p>Önceki öneri kararı: @DecisionText(previous.Decision) · @previous.ActorLabel · @previous.At.ToString("u")</p> }
         <MudTextField T="string" Label="Uygun WASAS inceleyicisi ara" aria-label="Uygun WASAS inceleyicisi ara" Value="_search" ValueChanged="SearchAsync"
                       MaxLength="100" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Disabled="_busy" />
         <MudSelect T="string" Label="İnceleyici" @bind-Value="_selected" Disabled="_busy" Variant="Variant.Outlined">
@@ -41,6 +50,26 @@
     [Parameter, EditorRequired] public Func<string, Task<InUseAssignee[]>> Search { get; set; } = default!;
     /// <summary>Explicit version-bound assignment command.</summary>
     [Parameter, EditorRequired] public Func<AssignInUseRequest, Task<InUseRecord>> Save { get; set; } = default!;
+    /// <summary>Authorized source-bound proposal; no side effects on opening.</summary>
+    [Parameter] public Func<Task<InUseReporterSuggestion>>? Suggest { get; set; }
+    private InUseReporterSuggestion? _suggestion;
+    private string? _decision;
+    private string SuggestionState => _suggestion?.State switch
+    {
+        "NoMatch" => "Kaynak referansı için doğrulanmış WASAS hesabı bulunamadı.",
+        "Ambiguous" => "Birden fazla kaynak kişi veya hesap eşlemesi var; öneri seçilemez.",
+        "Ineligible" => "Eşleşen hesap aktif inceleyici yetkisine sahip değil.",
+        "MappingUnverified" => "Hesap eşlemesinin geçerli kaynak sahibi onayı eksik.",
+        "ReporterUnverified" => "Güncel, tekil RFC bildiren ilişkisi doğrulanamadı.",
+        _ => "Kaynak kullanıcı referansı ile WASAS hesabı eşlemesi yapılandırılmamış. Elle seçim veya atanmamış devam kullanılabilir."
+    };
+    private static string DecisionText(string decision) => decision switch { "Accept" => "Kabul", "Reject" => "Ret", _ => "Alternatif seçim" };
+    private void SelectSuggestion()
+    {
+        if (_suggestion?.Candidate is not { } candidate) { return; }
+        _people = _people.Where(p => p.Id != candidate.Id).Append(candidate).ToArray();
+        _selected = candidate.Id.ToString("D"); _decision = "Accept";
+    }
     private InUseAssignee[] _people = [];
     private string _selected = "", _search = "", _reason = "";
     private string? _error;
@@ -54,6 +83,12 @@
     {
         _selected = Record.AssigneeId?.ToString("D") ?? "";
         await SearchAsync("");
+        if (Suggest is not null)
+        {
+            try { _suggestion = await Suggest(); }
+            catch (SecureOpsApiException ex) { _error = ex.Problem.Explanation; }
+            catch (OperationCanceledException) { Dialog.Cancel(); }
+        }
     }
     private async Task SearchAsync(string value)
     {
@@ -75,7 +110,13 @@
         _error = null;
         try
         {
-            InUseRecord updated = await Save(new(Record.Version, Guid.TryParse(_selected, out Guid person) ? person : null, _reason));
+            Guid? selected = Guid.TryParse(_selected, out Guid person) ? person : null;
+            if (_decision == "Reject" && selected == _suggestion?.Candidate?.Id)
+            { _error = "Reddedilen öneri seçili. Başka bir inceleyici veya Atanmamış seçin."; return; }
+            string? decision = _suggestion?.State == "Matched"
+                ? selected == _suggestion.Candidate!.Id ? "Accept" : _decision == "Reject" ? "Reject" : "Override" : null;
+            InUseRecord updated = await Save(new(Record.Version, selected, _reason)
+            { ReporterDecision = decision, ReporterFingerprint = decision is null ? null : _suggestion!.Fingerprint });
             Dialog.Close(DialogResult.Ok(updated));
         }
         catch (SecureOpsApiException ex) { _error = ex.Problem.Explanation; }

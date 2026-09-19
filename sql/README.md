@@ -1,5 +1,23 @@
 # sql/
 
+## Post-03b0c04 Catalogue Delta
+
+Current successor source additionally requires **024-in-use-report-catalogue**
+after verified 023. 024 creates one immutable metadata projection and its code
+index; it neither backfills from current records nor rewrites existing receipts,
+envelopes or XLSX bytes. Runtime delta is SELECT/INSERT on
+`reporting.InUseReportCatalogue` for the existing approved API principal only;
+no user/role assignment, UPDATE, DELETE, DDL or Worker archive ACL is added.
+DBA reviews this new object through the existing deployment procedure. Do not
+replay operator-reported installed 022/023, 001-021, or Hangfire schema 9.
+There is no migration ledger in this repository: verify object/column/index/
+trigger definitions and the target's retained DBA execution evidence read-only.
+The isolated harness now creates a fresh 001-024 test database. Existing 023
+installations use only the separately reviewed 024 delta in a matched successor.
+Older writers are not proven compatible with lifecycle/EvidenceSheets and reporter
+decision metadata: stop writes and coordinate all components before rollback;
+retain the new table and audit, do not use destructive down scripts.
+
 SQL Server schema and migration scripts. Files under `schema/` are reviewed contracts, never applied by application startup. Explicit isolated SQL tests may execute them; corporate execution requires the approved DBA process.
 
 ## Structure

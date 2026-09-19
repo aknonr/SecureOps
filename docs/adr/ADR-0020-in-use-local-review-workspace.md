@@ -1,5 +1,28 @@
 # ADR-0020: In Use Local Review Workspace
 
+## Archive Catalogue
+
+Reporter suggestion uses the already persisted provider/tenant IdentityScope and
+exact RFC SET.p_rel_requester reference. A server-owned, source-owner-reviewed
+crosswalk may bind that pair to an existing application UserId, with review
+reference, revision and expiry. No default links ship. This is not name matching,
+an account provisioning route, or authorization. Current approval and review/view
+capabilities are mandatory. Missing, ambiguous, expired and ineligible mappings
+stay explicit. Acceptance/rejection/override is version/fingerprint-bound and
+persists the source relation, mapping review and authenticated decision actor;
+opening/selecting a suggestion alone performs no assignment.
+
+024 adds an immutable archive-metadata projection with bounded SQL search and
+paging. It does not change 023 receipts or archive bytes. Metadata is extracted
+from each verified envelope only; legacy provenance may supply its own code and
+server names. Current profiles never supply historical preparers. Current record
+disposition and separately verified attachment evidence are labelled projections.
+Explicit indexing of at most 25 selected versions can resume after interruption:
+identical entries are no-ops, conflicts stop, and already indexed entries remain.
+Current review/view access is checked under the administration transaction lock
+before counts/pages. Missing metadata and incomplete historical coverage remain
+visible. New reports freeze the trusted preparer's account in addition to label.
+
 ## Post-rc6.26 Draft Recovery and Corporate Workbook
 
 The owner-approved continuation preserves four corporate worksheets in validated

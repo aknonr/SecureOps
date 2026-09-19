@@ -404,7 +404,8 @@ public sealed partial class InUseTests
         public InUseService Service { get; }
         public ApplicationUser User { get; }
         public IAccessRepository Users { get; } = Substitute.For<IAccessRepository>();
-        public Fixture(string role = "Admin", InUseReportArchive? archive = null, InUsePolicy? policy = null)
+        public Fixture(string role = "Admin", InUseReportArchive? archive = null, InUsePolicy? policy = null,
+            SecureOps.Shared.Configuration.InUseReporterMappingOptions? mapping = null)
         {
             Repository = new(Audit);
             User = new(Guid.NewGuid(), "synthetic:reviewer", "test", AccessStatus.Approved, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, 1, [role], AccessRoleCatalog.GetCapabilities([role]));
@@ -414,7 +415,8 @@ public sealed partial class InUseTests
             IAccessRepository users = Users;
             users.GetUserAsync(User.Id, Arg.Any<CancellationToken>()).Returns(User);
             users.ListUsersAsync(Arg.Any<CancellationToken>()).Returns(new[] { User });
-            Service = new(Repository, Source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance, archive, policy: policy);
+            Service = new(Repository, Source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance, archive, policy: policy,
+                reporterResolver: new InUseReporterResolver(Microsoft.Extensions.Options.Options.Create(mapping ?? new()), users));
         }
         public async Task<InUseRecord> ImportAsync()
         {

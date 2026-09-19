@@ -44,6 +44,17 @@ public sealed class InUseHostedTests
         page.Items.Should().ContainSingle();
         InUseRecord record = page.Items[0];
         string root = $"/api/v1/in-use/{record.Id}";
+        (await denied.GetAsync("/api/v1/in-use/reports")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await denied.GetAsync(root + "/reporter-suggestion")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await denied.PostAsJsonAsync(root + "/reports/index", new IndexInUseReportsRequest(record.Version, [1]))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        foreach (string invalid in new[] { "page=0", "pageSize=101", "status=Attached", "version=0", "from=2026-09-20&to=2026-09-19" })
+        { (await admin.GetAsync("/api/v1/in-use/reports?" + invalid)).StatusCode.Should().Be(HttpStatusCode.BadRequest); }
+        // In-memory mode must not manufacture a successful empty SQL catalogue.
+        (await admin.GetAsync("/api/v1/in-use/reports")).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await admin.PostAsJsonAsync(root + "/reports/index", new IndexInUseReportsRequest(record.Version, []))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        InUseReporterSuggestion suggestion = (await admin.GetFromJsonAsync<InUseReporterSuggestion>(root + "/reporter-suggestion"))!;
+        suggestion.Candidate.Should().BeNull();
+        (await admin.GetFromJsonAsync<InUseRecord>(root))!.Version.Should().Be(record.Version);
         record.AssigneeId.Should().BeNull();
         (await denied.GetAsync("/api/v1/in-use/overview")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await admin.GetFromJsonAsync<InUseOverview>("/api/v1/in-use/overview"))!.Unknown.Should().Be(2);
