@@ -4,7 +4,10 @@
 
 The current register is [integrated-test-activation.md](integrated-test-activation.md);
 the executable target handoff is [post-rc626-continuation-tr.md](post-rc626-continuation-tr.md).
-Incoming source was 03b0c04; installed rc6.26/022/023 remains an operator report,
+Historical starting source was 03b0c04; recovered product is b596058 and its
+documentation-only closeout is 69a9b839. The 2026-09-20 continuation corrects
+guidance export and pending browser checks without changing product DLLs.
+Installed rc6.26/022/023 remains an operator report,
 not independently verified target composition. The new archive catalogue needs
 additive 024, after final successor acceptance. No new numbered release, target
 SQL, IIS changes, source writes or live SMTP were performed. Do not replay older

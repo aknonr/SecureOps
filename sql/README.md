@@ -54,6 +54,8 @@ sql/
 | 020 | Immutable mail intent/bytes, one-distribution index, recovery states and append-only typed operation events. Existing OCO Source/Prepare rights become explicit; no SelfTest/Send grant. Requires 019; refuses replay. |
 | 021 | Nullable original initiator, input version and authoritative closure evidence on JiraTransfers; legacy rows remain NULL. Requires 020; refuses replay. |
 | 022 | Immutable server review history, durable In Use execution/artifact and append-only step evidence. Requires installed 001-021; no role assignment or legacy-data rewrite. |
+| 023 | Immutable workflow snapshots/facts/archive receipts and nullable synthetic-origin evidence; requires 022. Runtime SELECT/INSERT on the reporting objects; no inferred historical origin. |
+| 024 | Immutable In Use report catalogue metadata linked to verified archive receipts; requires 023. Runtime SELECT/INSERT on reporting.InUseReportCatalogue for the API only; no backfill, user assignment or archive rewrite. |
 
 ### Post-rc6.22 Delta
 

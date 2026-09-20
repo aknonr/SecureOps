@@ -1,5 +1,10 @@
 # rc6.26 sonrasi duzeltme ve kabul durumu
 
+TARIHSEL ONARIM NOTU: 03b0c04 urun kaynagi / schema 001-023.
+Guncel operator girisi [post-rc626-continuation-tr.md](post-rc626-continuation-tr.md).
+Bu not aktif upgrade proseduru degildir. Buradaki yeni migration gerekmiyor
+karari lifecycle/export onarimina aittir; sonraki katalog degisikligi 024 ister.
+
 Bu bir TEST aktivasyonu veya yeni paket kabul raporu degildir. Baslangic
 `34c8837c2837b9a3ad61a432aa121cf41ac3e0c7`; rc6.26 build kaynagi
 `028cbd2e4ec7068d71a33088d7c651e4df21644a`. Yeni ZIP uretilmedi.

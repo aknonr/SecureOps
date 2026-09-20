@@ -1,5 +1,10 @@
 # rc6.26 Kaynak ve SMTP Kontrolu
 
+Destek proseduru: rc6.26 / kaynak 028cbd2 / schema 001-023 ayar sozlesmesi;
+b596058 devaminda ayni kaynak/mail anahtarlari korunur, katalog ayrica 024 ister.
+Tek guncel [operator girisi](post-rc626-continuation-tr.md) ve onun ana matrisi
+surum/kabul durumunu belirler. Buradaki ayar ornekleri kurulum kaniti degildir.
+
 Bu belge koddan dogrulanan ayar adlarini verir; kurumsal aktivasyon kaniti degildir.
 Relay ve alici degerlerini mesajlasma sorumlusu onaylamadan uygulamayin.
 SQL 022/023 kurulumu ve hesap sorununun cozulmesi operator bildirimidir. Bu

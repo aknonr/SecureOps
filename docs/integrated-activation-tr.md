@@ -1,5 +1,11 @@
 # Entegre TEST teslimatı ve kontrollü aktivasyon
 
+> TARIHSEL PROSEDUR: rc6.26 / kaynak 028cbd2 / schema 001-023 icindir.
+> Guncel operator girisi [post-rc626-continuation-tr.md](post-rc626-continuation-tr.md).
+> Asagidaki arsiv tasima ve 023 uygulama sirasi bu devamda aktif talimat degildir.
+> Owner'in mevcut arsiv yolu korunur; kuruldu bildirilen 022/023 tekrarlanmaz.
+> Sonraki katalog degisikligi 024 gerektirir; bu eski adaya eklenmis sayilmaz.
+
 Güncel devamın katalog/RFC önerisi, gerekli yeni 024 farkı, eksik kaynak
 sözleşmeleri ve test-runner sınırı: `post-rc626-continuation-tr.md`.
 SMTP/kaynak ayar adları: `rc626-mail-source-activation-tr.md`. Bunlar boşlukları

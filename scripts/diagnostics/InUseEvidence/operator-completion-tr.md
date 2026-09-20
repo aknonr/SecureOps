@@ -1,5 +1,10 @@
 # In Use tamamlanma sözleşmesi: salt okunur kanıt
 
+Guncel [operator girisi](../../../docs/post-rc626-continuation-tr.md) kaynak
+sozlesmesi ve kabul durumunu tutar. Bu prosedur rc6.26 / 028cbd2 ile paketlenen
+completion modunu ve ayni sozlesmedeki successor aracini kapsar. SQL kullanmaz;
+API katalog 024 gereksinimi bu salt okunur aracin onkosulu degildir.
+
 Yalnız teslimat metadata/hash listesi bu derlemeyi doğruladığında kullanın.
 rc6.24 arşivindeki eski araca `--completion-evidence` eklemek yeterli değildir.
 `tool/` bağımlılık ağacını bütünüyle koruyun. Windows x64 üzerinde .NET 8

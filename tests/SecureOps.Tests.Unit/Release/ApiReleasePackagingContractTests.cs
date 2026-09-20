@@ -12,12 +12,21 @@ public sealed class ApiReleasePackagingContractTests
         script.Should().Contain("$metadata.readyForInstallation = $false")
             .And.Contain("$metadata.payloadValidated = $true")
             .And.Contain("evidence/validation.json")
-            .And.Contain("docs/integrated-activation-tr.md").And.Contain("Kaynak: $sha")
+            .And.Contain("Export-CompletionGuidance.ps1").And.Contain("operator/docs/post-rc626-continuation-tr.md")
+            .And.Contain("operator/docs/integrated-test-activation.md").And.Contain("Paket derleme kaynagi: $sha")
+            .And.NotContain("docs/integrated-activation-tr.md")
             .And.Contain("$runtime.runtimeOptions.frameworks")
             .And.Contain("manifestSha256=")
             .And.Contain("-p:ContinuousIntegrationBuild=true")
             .And.Contain("-p:PathMap=$repo=/_/")
             .And.NotContain("@{ Ready=$true;");
+        string exporter = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "scripts", "powershell", "Export-CompletionGuidance.ps1"));
+        exporter.Should().Contain("docs/post-rc626-continuation-tr.md")
+            .And.Contain("docs/integrated-test-activation.md").And.Contain("docs/continuation-b596058-evidence.md")
+            .And.Contain("docs/rc626-mail-source-activation-tr.md")
+            .And.Contain("scripts/diagnostics/InUseEvidence/operator-completion-tr.md")
+            .And.Contain("Refusing to overwrite existing guidance.").And.Contain("Guidance copy hash mismatch")
+            .And.NotContain("docs/integrated-activation-tr.md");
     }
 
     [Fact]

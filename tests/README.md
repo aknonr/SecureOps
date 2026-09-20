@@ -15,6 +15,17 @@ operator browser procedure. `browser/inuse-rc626-repair.cjs` now tests catalogue
 focus return, themes and `WASAS_NATIVE_ZOOM=1` separately from mobile reflow. Its
 current assertions are not claimed passed until that permitted runner completes.
 Do not retry a rejected UI-host launch using another command/port/executor.
+The same permitted journey now includes the system-status card before/after each
+explicit check, both themes, mobile touch, keyboard focus, native zoom and unchanged
+repeat JSON download/timestamps. Page refresh must leave the first-check state
+untouched. These browser assertions remain unexecuted. Local synthetic
+`OperationsReadinessPresentationTests` covers disabled/unchecked/partial mapping,
+single-flight requests, stale failure retention, denial clearing and download.
+The current script requires a fresh evidence directory, records Chrome's actual
+zoom setting plus a 100% baseline, and covers explicit save/unassignment as well
+as cancellation. Escape retains the dialog by its existing explicit-cancel policy;
+keyboard cancellation uses the Cancel button. The launcher binds the API to HTTP
+loopback and UI to HTTPS; use those exact schemes in the operator procedure.
 
 Announcement commands, isolated SQL setup and actual results are recorded in
 `docs/contracts/planned-announcements-v1.md`, including the isolated published

@@ -3,8 +3,14 @@
 Current integrated continuation requires schema 001-024. Use `-UpgradeFromRc626`
 only with verified installed 023 for a 024-only delta. `-UpgradeFromRc624`
 requires verified 022 for a 023-024 delta; `-UpgradeFromRc622` includes
-022-024 for verified installed 001-021. The canonical current operator export is
-`docs/integrated-activation-tr.md`. Matching InUseEvidence (including completion
+022-024 for verified installed 001-021. The canonical current operator entry is
+`docs/post-rc626-continuation-tr.md`. `scripts/powershell/Export-CompletionGuidance.ps1` exports that
+entry, the single register, retained product evidence and supporting procedures
+with their relative paths into a fresh operator directory. The top-level runbook
+links to that tree; the same tree accompanies the DBA delta. Operator files are
+hashed in release metadata. No corporate samples or server values are included.
+`integrated-activation-tr.md` is historical rc6.26/023 guidance, no longer exported.
+Matching InUseEvidence (including completion
 mode) is built, scanned and hashed in `diagnostics/` by the same source commit.
 Earlier 001-022/022-only descriptions below document old rc6.24 packaging, not
 instructions to replay installed migrations. The tool does not deploy or enable
@@ -13,7 +19,7 @@ corporate effects. Prepare one successor only after applicable gates.
 `New-PairedTestRelease.ps1 -ReleaseName <reviewed-next-name>` requires a clean
 committed feature branch (pre-existing `.vscode/` is excluded), publishes matching
 API/UI/Worker on the combined delivery branch, reuses the payload scanners/validators,
-exports the canonical Turkish runbook and packages the exact DBA 001-022 inventory
+exports the current Turkish entry and packages the exact DBA 001-024 inventory
 with per-file sizes/hashes and source metadata. Hangfire.SqlServer 1.8.6's original
 schema-9 installation script is included separately for reviewed DBA provisioning;
 runtime DDL stays disabled. Worker is a foreground console host, not a Windows Service.
@@ -22,11 +28,11 @@ release metadata first. It does not deploy, activate writes or certify TEST acce
 Payload success is not release approval: `readyForInstallation` stays false;
 the release owner records required gates in `evidence/validation.json`. DoD still
 requires repository-wide format success; historical scoped passes are not a waiver.
-Canonical runbook tokens bind the actual release name/build SHA. DBA 001-022
+The top-level runbook binds the actual release name/build SHA. DBA 001-024
 inclusion is a reference artifact, never an instruction to replay unchanged SQL.
 
-For this already deployed rc6.22 with 001-021/Hangfire 9, `-UpgradeFromRc622`
-exports `docs/inuse-v2-upgrade-tr.md` and emits only the additive 022 DBA delta.
+For a verified rc6.22 with 001-021/Hangfire 9, `-UpgradeFromRc622`
+exports the same current entry and emits only the additive 022-024 DBA delta.
 The previous `-UpgradeFromRc621` no-delta switch is rejected by this source.
 Original installed Branding can be retained; omit `-BrandingDirectory` when no
 artwork changed. The effective-configuration comparator is included and hashed

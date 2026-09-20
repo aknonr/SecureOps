@@ -1,5 +1,16 @@
 # SecureOps.Ui
 
+## System Status Presentation Continuation, 2026-09-20
+
+`/admin/system-status` keeps the authorized read-only diagnostic and JSON download
+contracts. The workflow-check card separates disabled, unchecked and partial
+evidence; capture/source-check times remain distinct UTC values from the response.
+Page refresh is integration-only, mutually disabled with an active workflow check.
+No automatic check, polling, configuration update, source/SMTP request or archive
+write probe was added. Transient failure retains a labelled previous snapshot;
+access/session denial clears it. Synthetic presentation tests are not visual or
+installed acceptance. See the single `docs/integrated-test-activation.md` register.
+
 The current continuation adds `/in-use/reports`, linked from In Use, with bounded
 server search by OR/hostname/original preparer/account, UTC dates, version and
 lifecycle. It displays exact historical download names and separate attachment

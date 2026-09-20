@@ -39,12 +39,20 @@ try {
         $frameworks = if ($runtime.runtimeOptions.PSObject.Properties['frameworks']) { @($runtime.runtimeOptions.frameworks) } else { @($runtime.runtimeOptions.framework) }
         $assemblies += [ordered]@{ component=$component; productVersion=$version.ProductVersion; fileVersion=$version.FileVersion; frameworks=$frameworks; sha256=(Get-FileHash -LiteralPath "$destination/staging/$($component.ToLowerInvariant())/SecureOps.$component.dll").Hash }
     }
-    $runbook = "# $ReleaseName`r`n`r`nKaynak: $sha`r`n`r`n" + (Get-Content -LiteralPath 'docs/integrated-activation-tr.md' -Raw -Encoding UTF8)
+    & "$PSScriptRoot/../powershell/Export-CompletionGuidance.ps1" -OutputDirectory "$destination/operator"
+    $runbook = "# $ReleaseName`r`n`r`nPaket derleme kaynagi: $sha`r`nGereken schema: 001-024.`r`n`r`n" +
+        "[Guncel operator girisi](operator/docs/post-rc626-continuation-tr.md).`r`n`r`n" +
+        "[Tek gereksinim ve kabul matrisi](operator/docs/integrated-test-activation.md).`r`n`r`n" +
+        "Belgelerdeki onceki urun/test/kurulum kimlikleri tarihsel kanittir. Bu paketin kabul sonucu release-metadata.json ve evidence/validation.json ile ayrica dogrulanir.`r`n" +
+        "Kurulum veya 024 uygulama onayi degildir; hedef DBA kaydi ve kabul kapilari gerekir.`r`n"
     [IO.File]::WriteAllText("$destination/operator-runbook-tr.md", $runbook, [Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath "$destination/operator-runbook-tr.md" -Destination "$destination/staging/database/operator-runbook-tr.md"
     Copy-Item -LiteralPath 'sql/README.md' -Destination "$destination/staging/database/DBA-README.md"
     Copy-Item -LiteralPath "$destination/operator-runbook-tr.md" -Destination "$destination/staging/database-delta/operator-runbook-tr.md"
     Copy-Item -LiteralPath 'sql/README.md' -Destination "$destination/staging/database-delta/DBA-README.md"
+    foreach ($database in @('database','database-delta')) {
+        Copy-Item -LiteralPath "$destination/operator" -Destination "$destination/staging/$database/operator" -Recurse
+    }
     foreach ($folder in @('migrations','schema')) {
         $files = @(Get-ChildItem "sql/$folder" -File -Filter '*.sql' | Sort-Object Name)
         $numbers = @($files | ForEach-Object { $_.Name.Substring(0,3) }) -join ','
@@ -89,9 +97,6 @@ try {
     New-Item -ItemType Directory -Path "$destination/configuration" | Out-Null
     Copy-Item -LiteralPath "$PSScriptRoot/announcement-mail.disabled.example.json" -Destination "$destination/configuration/announcement-mail.disabled.example.json"
     Copy-Item -LiteralPath 'scripts/powershell/Compare-OperationsReadiness.ps1' -Destination "$destination/configuration/Compare-OperationsReadiness.ps1"
-    foreach ($guide in @('rc626-mail-source-activation-tr.md','post-rc626-continuation-tr.md')) {
-        Copy-Item -LiteralPath "docs/$guide" -Destination "$destination/configuration/$guide"
-    }
     & "$PSScriptRoot/New-ApiDeploymentPackage.ps1" -PublishDirectory "$destination\staging\api" -ZipPath $apiZip -ManifestPath "$destination/manifests/api-payload.sha256" -ForbiddenText @($env:USERPROFILE)
     & "$PSScriptRoot/Validate-ApiAdRuntimeDependencies.ps1" -PublishDirectory "$destination\staging\api" -ZipPath $apiZip -ManifestPath "$destination/manifests/api-payload.sha256"
     & "$PSScriptRoot/New-UiDeploymentPackage.ps1" -PublishDirectory "$destination\staging\ui" -ZipPath $uiZip -ManifestPath "$destination/manifests/ui-payload.sha256" -ForbiddenText @($env:USERPROFILE)
@@ -152,7 +157,7 @@ try {
         $metadata.Remove('upgradeFromVerified018')
         $metadata.upgradeFrom = 'Verified 001-023 and Hangfire schema 9; apply only reviewed additive 024'
     }
-    $metadata.operatorFiles = @(Get-Item "$destination/operator-runbook-tr.md"; Get-ChildItem "$destination/configuration" -File) | ForEach-Object {
+    $metadata.operatorFiles = @(Get-Item "$destination/operator-runbook-tr.md"; Get-ChildItem "$destination/configuration" -File; Get-ChildItem "$destination/operator" -File -Recurse) | ForEach-Object {
         [ordered]@{ path=$_.FullName.Substring($destination.Length+1); sha256=(Get-FileHash -LiteralPath $_.FullName).Hash }
     }
     $metadata.hangfire = @{ packageVersion=$hangfireVersion; schemaVersion=9; runtimePrepareSchema=$false; installationScriptSha256=(Get-FileHash -LiteralPath $install[0]).Hash }

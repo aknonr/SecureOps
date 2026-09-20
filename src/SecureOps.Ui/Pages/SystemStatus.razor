@@ -23,11 +23,12 @@
 
 <div class="so-page">
     <SoPageHeader Title="Sistem Durumu"
-                  Lead="WASAS'in bağlandığı kurumsal sistemlerin yapılandırma ve erişilebilirlik durumu.">
+                  Lead="Kurumsal sağlayıcı ayarları ve ayrı iş akışı kontrolleri.">
         <Actions>
             <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Refresh"
-                       Disabled="@_loading"
+                       Disabled="@(_loading || _diagnosticsBusy)"
+                       aria-label="Kurumsal entegrasyonları yenile"
                        OnClick="ReloadAsync">
                 Yenile
             </MudButton>
@@ -89,23 +90,21 @@
                 </div>
 
                 <p class="so-panel-text so-panel-text--sm">
-                    <strong>Yapılandırıldı</strong>, sağlayıcının tanımlı olduğunu ve son çağrının
-                    başarısız olmadığını gösterir. <strong>Devre dışı</strong>, sağlayıcının bilinçli
-                    olarak kapatıldığı anlamına gelir. <strong>Erişilemiyor</strong>, son çağrının
-                    başarısız olduğunu gösterir; bu durum sağlayıcı yeniden yanıt verdiğinde kendiliğinden
-                    düzelir.
+                    <strong>Yapılandırıldı</strong>, bağlantı veya iş akışı kabulü değildir.
+                    Turuncu Hat sağlayıcısı tanımlı olsa da OCO kaynak toplama ayrı olarak kapalı olabilir.
+                    Yenile yalnız bu entegrasyon bilgilerini yeniler.
                 </p>
 
-                <p class="so-panel-text so-panel-text--sm">
-                    Bu ekran yalnızca sağlayıcı adı, seçilen yapılandırma ve durum bilgisini gösterir.
-                    Adres, kimlik bilgisi, kullanıcı adı veya uzak sistem hata içerikleri hiçbir
-                    şekilde döndürülmez.
-                </p>
+                <details><summary>Sağlayıcı durumları</summary>
+                    <p class="so-panel-text so-panel-text--sm">Devre dışı: sağlayıcı etkin değil.
+                        Erişilemiyor: son çağrı başarısız. Bu kartlar yalnız sağlayıcı, yapılandırma
+                        ve durum bilgisini gösterir; uzak sistem hata içeriklerini göstermez.</p>
+                </details>
             }
         </section>
 
         @if (_access.Can(Capabilities.SystemDiagnostics))
-        { <OperationsReadinessPanel /> }
+        { <OperationsReadinessPanel RefreshBusy="_loading" BusyChanged="@(busy => _diagnosticsBusy = busy)" /> }
     }
 </div>
 
@@ -116,6 +115,7 @@
     private IntegrationProviderHealthResponse? _directoryProvider;
     private UiProblem? _problem;
     private bool _loading;
+    private bool _diagnosticsBusy;
 
     protected override async Task OnInitializedAsync()
     {
@@ -140,6 +140,7 @@
 
     private async Task ReloadAsync()
     {
+        if (_loading || _diagnosticsBusy) { return; }
         _loading = true;
         _problem = null;
         StateHasChanged();
@@ -147,6 +148,7 @@
         try
         {
             _health = await Sessions.GetIntegrationHealthAsync(CancellationToken.None);
+            await LoadDirectoryAsync();
         }
         catch (SecureOpsApiException ex)
         {
@@ -159,7 +161,6 @@
             _loading = false;
         }
 
-        await LoadDirectoryAsync();
     }
 
     // The directory provider is reported by a different endpoint in a different shape. It is mapped
