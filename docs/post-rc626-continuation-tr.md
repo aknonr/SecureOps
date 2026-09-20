@@ -6,6 +6,8 @@ Bu belge tek guncel Turkce operator girisidir. 20 Eylul 2026 kontrolu:
 
 | Kimlik | Deger ve kanit siniri |
 |---|---|
+| Guncel yerel testli urun/derleme | `c12abf29a60d2087728cd1e34879c0360a57c1c9`; sistem-durumu duzeltmesi dahil. Numarali paket, kurulum veya browser kabul kaniti degil |
+| Sonraki belge kapanisi | Yalniz bu giris ve ana matrisin sonraki Git commit'i; derlenmis urun kaynagi degil |
 | Tarihsel baslangic | `03b0c048d50cf926b5640116533df39c8685a37d` |
 | Gelen testli urun kaynagi | `b596058fa0e1f82b278511f9a9e1c032c1130045`; kurtarma sirasinda uc Release DLL ProductVersion/hash ve TRX eslesti. Sonraki sistem-durumu UI duzeltmesi bu staging'de yok |
 | Gelen belge kapanisi | `69a9b839614d97aaed5ea9f600cc4841cf01d24d`; b596058 sonrasinda sadece iki Markdown dosyasi degismis |
@@ -192,26 +194,29 @@ kurulu Chrome, mevcut Playwright modulu (journey-support.cjs ve test export'u).
 Birbirinden ayrilmis taze kanit/publish dizinleri; fixture disinda endpoint yok.
 Mevcut `Test-ResourceCatalogueSql.ps1 -DatabaseSuffix OcoCompletion20Ui`
 taze 001-024 DB olusturur; burada calistirilmadi. Bu devamda
-`C:\SecureOpsBuild\validation\completion-20260920\payload` altina mevcut testli
-b596058 DLL'leri `--no-build --no-restore` ile yayimlandi. Uc giris DLL hash'i
-ayni; `staged-payload-manifest.json` tum dosyalari kaydeder. Bu numarasiz runner
-girdisidir; host/paket kabulunu kanitlamaz. Source degisirse yeni SHA icin taze
+`C:\SecureOpsBuild\validation\system-status-20260920\payload-mapped` altina c12abf2
+DLL'leri release PathMap ile derlenip `--no-build --no-restore` ile yayimlandi.
+12 proje DLL hash/surumu testli derlemeyle ayni; ust dizindeki
+`staged-payload-manifest.json` 767 dosyayi kaydeder. Uc payload taramasi gecti.
+Eski completion-20260920 b596058 staging'i yeni paneli icermez. Yeni kokun
+`payload` altindaki ilk deneme kisisel yol taramasinda reddedildi; kullanilmaz.
+`payload-mapped` numarasiz runner girdisidir; host/paket kabulunu kanitlamaz. Source degisirse yeni SHA icin taze
 staging gerekir. Son teslimatta kabul edilen baytlar ile paket yeniden eslestirilir.
 
 Mevcut host proseduru (serbest port oldugu dogrulanmadan calistirmayin):
 
 ```powershell
 powershell -NoProfile -File tests/browser/announcement-hosts.ps1 `
-  -EvidenceRoot C:\SecureOpsBuild\validation\completion-20260920\hosts `
-  -PayloadRoot C:\SecureOpsBuild\validation\completion-20260920\payload `
+  -EvidenceRoot C:\SecureOpsBuild\validation\system-status-20260920\hosts `
+  -PayloadRoot C:\SecureOpsBuild\validation\system-status-20260920\payload-mapped `
   -DatabaseSuffix OcoCompletion20Ui -Port 64731 -OperationalRecordSimulation
 node tests/browser/inuse-rc626-repair.cjs $playwrightModule `
   https://localhost:64732 http://127.0.0.1:64731 `
-  C:\SecureOpsBuild\validation\completion-20260920\browser
+  C:\SecureOpsBuild\validation\system-status-20260920\browser
 $env:WASAS_NATIVE_ZOOM = '1'
 node tests/browser/inuse-rc626-repair.cjs $playwrightModule `
   https://localhost:64732 http://127.0.0.1:64731 `
-  C:\SecureOpsBuild\validation\completion-20260920\zoom
+  C:\SecureOpsBuild\validation\system-status-20260920\zoom
 Remove-Item Env:\WASAS_NATIVE_ZOOM
 ```
 
@@ -284,9 +289,10 @@ foreground model icin sorumluluk/pencere karari zorunludur; unattended denemez.
 
 Sistem-durumu duzeltmesi icin yeni yerel kanit:
 `C:\SecureOpsBuild\validation\system-status-20260920`.
-`tests/system-status-unit-accepted.trx`: 1399 gecti (17 yeni panel testi dahil);
-`tests/system-status-integration.trx`: 279 gecti, 56 opt-in atlandi.
-Release build sifir uyari/hata. Onceki sayilara ekleyerek toplam uretilmez.
+Son c12abf2 PathMap'li derlemenin `tests/mapped-committed-unit.trx` dosyasinda
+1399 gecti (17 yeni panel testi dahil); `tests/mapped-committed-integration.trx`:
+279 gecti, 56 opt-in atlandi. Release build sifir uyari/hata; scoped format ve
+node syntax gecti. Onceki/ortusen kosulara ekleyerek toplam uretilmez.
 Iki eski birim TRX basarisizligi, artik arsivlenen rehber/runbook adini bekleyen
 paket testiyle ilgiliydi; guncel ihrac beklentisiyle duzeltildi ve kanit korundu.
 Bu kaynak duzeltmesi kurulmadi; tarayici once/sonra goruntusu yoktur.

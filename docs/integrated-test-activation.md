@@ -4,6 +4,11 @@
 
 ### Recovered checkpoint, 2026-09-20
 
+Current locally tested product/build: `c12abf29a60d2087728cd1e34879c0360a57c1c9`.
+The subsequent closeout changes only this register and the current Turkish entry;
+its Git identity is documentation-only, not the built product. No successor ZIP
+or installation claim. The b596058/69a9b839 recovery identities below are retained.
+
 Recovered the existing clean worktree at
 `C:\SecureOpsBuild\secure-ops-combined-test-delivery-20260915`, branch
 `feature/combined-test-delivery-20260915`, HEAD
@@ -127,11 +132,11 @@ They include OpenAPI, new files and inherited work; a commit does not reset them
 
 | Baseline | Files | Additions | Deletions |
 |---|---:|---:|---:|
-| this continuation 69a9b839 | 20 | 886 | 127 |
-| immediate remaining-work checkpoint 03b0c04 | 58 | 2711 | 121 |
-| actual continuation 34c8837 | 82 | 4215 | 193 |
-| inherited rc6.24 8c1b58d | 132 | 8531 | 1183 |
-| complete post-rc6.22 aa9e4d2 | 166 | 11842 | 1343 |
+| this continuation 69a9b839 | 20 | 913 | 127 |
+| immediate remaining-work checkpoint 03b0c04 | 58 | 2738 | 121 |
+| actual continuation 34c8837 | 82 | 4242 | 193 |
+| inherited rc6.24 8c1b58d | 132 | 8558 | 1183 |
+| complete post-rc6.22 aa9e4d2 | 166 | 11869 | 1343 |
 
 Scope includes workbook/metadata, local lifecycle/history invalidation, assignment,
 source readiness, catalogue/024, reviewed reporter crosswalk, tests and guidance.
@@ -202,8 +207,8 @@ verified are separate states; no row below implies full team activation.
 ### Current module evidence states
 
 This table is a view of the same requirements above, not a second work register.
-"Reported" means owner-reported rc6.26, not observed target state. Local product
-evidence is b596058; the original 1,382/279 results are retained, not rerun here.
+"Reported" means owner-reported rc6.26, not observed target state. Current local
+product evidence is c12abf2 below; b596058's 1,382/279 results remain historical.
 
 | Requirement | Implemented | Exact successor payload tested | Installed | Configured | Corporately verified | Available to team |
 |---|---|---|---|---|---|---|
@@ -341,6 +346,22 @@ retained b596058 stage predates this UI change and must not be used for UI-01
 acceptance. Before/after screenshots and actual zoom/theme/touch evidence still
 require the already documented authorized runner. No host-policy workaround,
 new release ZIP, target mutation, mail or team announcement was performed.
+
+Committed source c12abf2 was rebuilt using the existing release flags
+`ContinuousIntegrationBuild=true`, `PathMap=<repo>=/_/`, `DebugType=None` and
+`DebugSymbols=false`: zero warnings/errors. Final matching-build results are
+`tests/mapped-committed-unit.trx` (1,399 passed) and
+`tests/mapped-committed-integration.trx` (279 passed, 56 NotExecuted).
+Scoped `dotnet format --verify-no-changes` and `node --check` passed.
+The first ordinary-build staging failed the personal-path scanner; it remains
+private at `payload/` and is not runner input. Corrected `payload-mapped/` has
+three no-build publishes, all 12 own DLLs byte-matching the tested build and
+version `0.1.0+c12abf29a60d2087728cd1e34879c0360a57c1c9`. Three payload scans
+passed. Nine debug symbols were removed only from that fresh mapped tree.
+`staged-payload-manifest.json` covers 767 files (including four nonsecret config
+defaults excluded by release packaging), SHA-256
+`2FDAE4BF45797A00A6E47E80A54D1B0BC85E80525FBBB6962263B3DD7542DF09`.
+This is current unnumbered runner input, not browser/source/SMTP acceptance.
 
 ### Retained earlier integrated checks
 
