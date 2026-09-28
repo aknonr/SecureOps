@@ -11,6 +11,11 @@ namespace SecureOps.Infrastructure.ServiceAccounts;
 public sealed partial class ServiceAccountService
 {
     private const int _maxDecisionsPerRequest = 5000;
+    private const int _maxCoverageOrganizations = 20;
+
+    /// <summary>Profiles that can carry coordination-list observations, the only source from which absence is inferred.</summary>
+    private static readonly string[] _coverageProfiles =
+        [ServiceAccountImportProfiles.CoordinationList, ServiceAccountImportProfiles.LegacyPackage, ServiceAccountImportProfiles.LegacyWorkbook];
 
     /// <summary>Stored stage parameters (re-parse input); the file bytes stay server-side.</summary>
     private sealed record StoredMapping(StageImportRequest Request, IReadOnlyList<ImportColumnMapping> Applied, IReadOnlyList<string> Warnings);
@@ -31,7 +36,12 @@ public sealed partial class ServiceAccountService
             }
 
             string sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-            StageImportRequest normalized = request with { SourceDateProvenance = request.SourceDateProvenance.Trim() };
+            StageImportRequest normalized = request with
+            {
+                SourceDateProvenance = request.SourceDateProvenance.Trim(),
+                Coverage = CoverageOf(request),
+                CoverageOrganizationIds = [.. (request.CoverageOrganizationIds ?? []).Distinct().Order()]
+            };
             string replayKey = ReplayKey(normalized, sha);
             if (await repository!.FindCommittedReplayAsync(replayKey, cancellationToken) is { } committed)
             {
@@ -48,8 +58,13 @@ public sealed partial class ServiceAccountService
                 return SaResult<ImportBatchView>.Fail(SaErrors.ImportFile, rejected.Code);
             }
 
-            ImportPlanResult plan = ImportPlanner.Plan(PlanInput(normalized, fileName), staged, await repository.LoadImportContextAsync(caller.Scope, cancellationToken),
-                new Dictionary<int, ImportRowDecision>());
+            ImportContext importContext = await repository.LoadImportContextAsync(caller.Scope, cancellationToken);
+            if (!CoverageInScope(normalized, importContext))
+            {
+                return SaResult<ImportBatchView>.Fail(SaErrors.Invalid, "coverageOrganizationIds");
+            }
+
+            ImportPlanResult plan = ImportPlanner.Plan(PlanInput(normalized, fileName), staged, importContext, new Dictionary<int, ImportRowDecision>());
             DateTimeOffset now = clock.GetUtcNow();
             ImportBatchRecord batch = new(Guid.NewGuid(), request.Profile, SafeName(fileName), ContentTypeOf(bytes), sha, bytes, request.SourceReportDate,
                 normalized.SourceDateProvenance, Clean(request.DeclaredScope, 200), Clean(request.DeclaredDomain, 128),
@@ -247,8 +262,40 @@ public sealed partial class ServiceAccountService
 
         return !ValidText(request.DeclaredScope, 200) ? "declaredScope" : !ValidText(request.DeclaredDomain, 128) ? "declaredDomain"
             : !ValidText(request.Sheet, 64) ? "sheet" : !ValidText(request.TargetTeam, 200) ? "targetTeam"
-            : request.Mapping is { Count: > 60 } ? "mapping" : null;
+            : request.Mapping is { Count: > 60 } ? "mapping" : ValidateCoverage(request);
     }
+
+    /// <summary>
+    /// A complete-list declaration names its population explicitly (1..20 organizations, optional domain), needs a
+    /// dated source that carries coordination-list observations, and is the only way absence can be inferred. Partial/unknown lists carry no population.
+    /// </summary>
+    private static string? ValidateCoverage(StageImportRequest request)
+    {
+        string coverage = CoverageOf(request);
+        int organizations = request.CoverageOrganizationIds?.Count ?? 0;
+        if (!ServiceAccountImportCoverage.All.Contains(coverage, StringComparer.Ordinal))
+        {
+            return "coverage";
+        }
+
+        if (coverage != ServiceAccountImportCoverage.Complete)
+        {
+            return organizations == 0 ? null : "coverageOrganizationIds";
+        }
+
+        return !_coverageProfiles.Contains(request.Profile, StringComparer.Ordinal) ? "coverage"
+            : request.SourceReportDate is null ? "sourceReportDate"
+            : organizations is < 1 or > _maxCoverageOrganizations || request.CoverageOrganizationIds!.Contains(Guid.Empty) ? "coverageOrganizationIds"
+            : null;
+    }
+
+    private static string CoverageOf(StageImportRequest request) =>
+        string.IsNullOrWhiteSpace(request.Coverage) ? ServiceAccountImportCoverage.Unknown : request.Coverage.Trim();
+
+    /// <summary>Every declared organization must exist and lie inside the importer's organization-level scope.</summary>
+    private static bool CoverageInScope(StageImportRequest request, ImportContext context) =>
+        (request.CoverageOrganizationIds ?? []).All(id => context.Organizations.Any(o => o.Id == id)
+            && (context.Scope.All || context.Scope.Organizations.Contains(id)));
 
     private static string ReplayKey(StageImportRequest request, string sha) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
@@ -260,7 +307,9 @@ public sealed partial class ServiceAccountService
             Domain = Domain.ServiceAccounts.ServiceAccountText.DomainKey(request.DeclaredDomain),
             Sheet = request.Sheet,
             Target = Domain.ServiceAccounts.ServiceAccountText.LabelKey(request.TargetTeam),
-            Mapping = request.Mapping?.Select(m => new { Header = Domain.ServiceAccounts.ServiceAccountText.LabelKey(m.SourceHeader), m.TargetField })
+            Mapping = request.Mapping?.Select(m => new { Header = Domain.ServiceAccounts.ServiceAccountText.LabelKey(m.SourceHeader), m.TargetField }),
+            Coverage = CoverageOf(request),
+            CoverageOrganizations = request.CoverageOrganizationIds?.Distinct().Order()
         })))).ToLowerInvariant();
 
     private (StagedFile Staged, StoredMapping Stored) Reparse(ImportBatchRecord batch)
@@ -276,7 +325,8 @@ public sealed partial class ServiceAccountService
     }
 
     private static ImportPlanInput PlanInput(StageImportRequest request, string fileName) =>
-        new(request.Profile, request.SourceReportDate, request.DeclaredScope, request.DeclaredDomain, request.TargetTeam, SafeName(fileName));
+        new(request.Profile, request.SourceReportDate, request.DeclaredScope, request.DeclaredDomain, request.TargetTeam, SafeName(fileName),
+            CoverageOf(request), request.CoverageOrganizationIds ?? []);
 
     private static ImportSummary Summary(ImportPlanResult plan, StagedFile staged) => plan.Summary with
     {
@@ -316,7 +366,8 @@ public sealed partial class ServiceAccountService
             batch.DeclaredScope, batch.DeclaredDomain, batch.Status, batch.PreviewVersion, batch.DecisionVersion,
             batch.SummaryJson is null ? null : JsonSerializer.Deserialize<ImportSummary>(batch.SummaryJson),
             stored?.Applied ?? [], stored?.Warnings ?? [], replay, batch.UploadedAt, batch.CommittedAt,
-            batch.ResultJson is null ? null : JsonSerializer.Deserialize<ImportResultView>(batch.ResultJson));
+            batch.ResultJson is null ? null : JsonSerializer.Deserialize<ImportResultView>(batch.ResultJson),
+            stored is null ? ServiceAccountImportCoverage.Unknown : CoverageOf(stored.Request), stored?.Request.CoverageOrganizationIds ?? []);
     }
 
     private static string ContentTypeOf(byte[] bytes) => Import.SpreadsheetReader.IsZip(bytes)

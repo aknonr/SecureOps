@@ -8,8 +8,16 @@ using SecureOps.Shared.Contracts.ServiceAccounts;
 namespace SecureOps.Infrastructure.ServiceAccounts.Import;
 
 /// <summary>Batch-level planning parameters (declared by the operator; never taken from upload time).</summary>
+/// <param name="Profile">Import profile.</param>
+/// <param name="SourceReportDate">Declared source report date.</param>
+/// <param name="DeclaredScope">Free-text scope label (provenance only).</param>
+/// <param name="DeclaredDomain">Default domain; also narrows a complete-list population.</param>
+/// <param name="TargetTeam">DBA handover target team label.</param>
+/// <param name="SourceLabel">Safe source file label.</param>
+/// <param name="Coverage">Declared completeness (<see cref="ServiceAccountImportCoverage"/>); only Complete infers absence.</param>
+/// <param name="CoverageOrganizations">Declared population for a complete list (child organizations included).</param>
 public sealed record ImportPlanInput(string Profile, DateOnly? SourceReportDate, string? DeclaredScope, string? DeclaredDomain, string? TargetTeam,
-    string SourceLabel);
+    string SourceLabel, string Coverage = ServiceAccountImportCoverage.Unknown, IReadOnlyList<Guid>? CoverageOrganizations = null);
 
 /// <summary>
 /// Deterministic preview/commit planner. Preview and the in-transaction commit re-plan run the same code;
@@ -36,6 +44,8 @@ public sealed partial class ImportPlanner
     private readonly HashSet<string> _plannedKeys = new(StringComparer.Ordinal);
     private readonly HashSet<(Guid, string)> _observed = [];
     private readonly HashSet<Guid> _gmsaPlanned = [];
+    private int _coveragePopulation;
+    private int _coverageOutsideRows;
 
     private sealed record NewAccount(Guid Id, string Name, string NameKey, string? Domain, string? DomainKey, string IdentityKey, int RowKey)
     {

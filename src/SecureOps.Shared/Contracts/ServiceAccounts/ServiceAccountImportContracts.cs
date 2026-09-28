@@ -39,6 +39,23 @@ public static class ServiceAccountImportClasses
     public const string OutOfScope = "OutOfScope";
 }
 
+/// <summary>
+/// Declared completeness of a source list. Only a complete list over a declared, validated population may produce
+/// "not seen in this list" observations; a partial or unknown list never implies that an account is absent.
+/// </summary>
+public static class ServiceAccountImportCoverage
+{
+    /// <summary>Completeness not declared (default): no absence is inferred.</summary>
+    public const string Unknown = "Unknown";
+    /// <summary>Known to be a subset: no absence is inferred.</summary>
+    public const string Partial = "Partial";
+    /// <summary>Complete list for the declared organizations (and domain, when declared).</summary>
+    public const string Complete = "Complete";
+
+    /// <summary>All coverage codes.</summary>
+    public static IReadOnlyList<string> All { get; } = [Unknown, Partial, Complete];
+}
+
 /// <summary>Bounded generic mapping target fields.</summary>
 public static class ServiceAccountImportFields
 {
@@ -75,7 +92,9 @@ public sealed record StageImportRequest(
     string? DeclaredDomain = null,
     string? Sheet = null,
     string? TargetTeam = null,
-    IReadOnlyList<ImportColumnMapping>? Mapping = null);
+    IReadOnlyList<ImportColumnMapping>? Mapping = null,
+    string? Coverage = null,
+    IReadOnlyList<Guid>? CoverageOrganizationIds = null);
 
 /// <summary>Preview counts by classification and entity.</summary>
 public sealed record ImportSummary(
@@ -95,7 +114,10 @@ public sealed record ImportSummary(
     IReadOnlyList<string> NewOrganizationLabels,
     int IgnoredHelperColumns,
     int FormulaCells,
-    int CohortFlagged);
+    int CohortFlagged,
+    string Coverage = ServiceAccountImportCoverage.Unknown,
+    int CoveragePopulation = 0,
+    int CoverageOutsideRows = 0);
 
 /// <summary>Import batch state.</summary>
 public sealed record ImportBatchView(
@@ -116,7 +138,9 @@ public sealed record ImportBatchView(
     bool Replay,
     DateTimeOffset UploadedAt,
     DateTimeOffset? CommittedAt,
-    ImportResultView? Result);
+    ImportResultView? Result,
+    string Coverage = ServiceAccountImportCoverage.Unknown,
+    IReadOnlyList<Guid>? CoverageOrganizationIds = null);
 
 /// <summary>Old/new value pair.</summary>
 public sealed record ImportFieldDiff(string Field, string? Current, string? Proposed, string Effect);

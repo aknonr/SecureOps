@@ -24,7 +24,8 @@ public sealed class ServiceAccountImportSqlTests
         await fx.GrantAsync(coordinator, ScopeKind.Organization, org);
         SyntheticLegacy legacy = new(fx.Suffix, orgName);
 
-        ImportBatchView package = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.LegacyPackage, "paket.json", legacy.Package, new DateOnly(2026, 9, 14));
+        ImportBatchView package = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.LegacyPackage, "paket.json", legacy.Package, new DateOnly(2026, 9, 14),
+            Complete(org));
         package.Status.Should().Be("Previewed");
         package.Summary!.ByEntity[StagedKinds.Account].Should().Be(5);
         package.Summary.NotSeen.Should().Be(1, "the fifth account is not in the coordination list: an observation, never a closure");
@@ -53,7 +54,8 @@ public sealed class ServiceAccountImportSqlTests
         ImportBatchView again = Ok(await fx.Service.CommitImportAsync(coordinator.Principal, fx.Context, package.Id,
             new ImportCommitRequest(package.PreviewVersion, package.DecisionVersion), "another-key-" + fx.Suffix, _token));
         again.Result.Should().BeEquivalentTo(result);
-        ImportBatchView restaged = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.LegacyPackage, "paket.json", legacy.Package, new DateOnly(2026, 9, 14));
+        ImportBatchView restaged = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.LegacyPackage, "paket.json", legacy.Package, new DateOnly(2026, 9, 14),
+            Complete(org));
         restaged.Replay.Should().BeTrue();
         restaged.Id.Should().Be(package.Id);
 
@@ -100,7 +102,7 @@ public sealed class ServiceAccountImportSqlTests
         await CommitAsync(fx, coordinator, List(orgName, (a, 45000), (b, 45001), (c, 45002)), new DateOnly(2026, 9, 7));
         ImportBatchView second = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "liste.csv",
             Csv(["Yorum", "Organizasyon", "Kullanıcı Adı", "Son Parola Değişiklik Zamanı"], [["yeni dönem", orgName, a, "46000"], ["", orgName, b, "46001"]]),
-            new DateOnly(2026, 9, 14));
+            new DateOnly(2026, 9, 14), Complete(org));
         second.Summary!.ObservationUpdates.Should().Be(2);
         second.Summary.NotSeen.Should().Be(1);
         second.Summary.New.Should().Be(0);
@@ -177,6 +179,60 @@ public sealed class ServiceAccountImportSqlTests
     }
 
     [ServiceAccountSqlFact]
+    public async Task Absence_IsInferredOnlyFromAValidatedCompleteList()
+    {
+        ServiceAccountSqlFixture fx = new();
+        string xName = "SYN COV X " + fx.Suffix, yName = "SYN COV Y " + fx.Suffix, otherName = "SYN COV O " + fx.Suffix;
+        Guid x = await fx.OrganizationAsync(xName), y = await fx.OrganizationAsync(yName), other = await fx.OrganizationAsync(otherName);
+        SynUser coordinator = await fx.UserAsync(_importer);
+        await fx.GrantAsync(coordinator, ScopeKind.Organization, x);
+        await fx.GrantAsync(coordinator, ScopeKind.Organization, y);
+        string a = $"SYN{fx.Suffix}_CA", b = $"SYN{fx.Suffix}_CB", c = $"SYN{fx.Suffix}_CC";
+        await CommitAsync(fx, coordinator, List(xName, (a, 45000), (b, 45001), (c, 45002)), new DateOnly(2026, 9, 7));
+        byte[] onlyA = List(xName, (a, 46000));
+        DateOnly date = new(2026, 9, 14);
+
+        foreach (string coverage in new[] { ServiceAccountImportCoverage.Unknown, ServiceAccountImportCoverage.Partial })
+        {
+            ImportBatchView partial = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "kismi.xlsx", onlyA, date, Declared(coverage));
+            partial.Coverage.Should().Be(coverage);
+            partial.Summary!.NotSeen.Should().Be(0, "a partial or unknown list never implies that an account is absent");
+            partial.Warnings.Should().Contain("CoverageNotComplete:" + coverage);
+        }
+
+        (await TryStageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "t.xlsx", onlyA, date, Complete())).Field
+            .Should().Be("coverageOrganizationIds", "a complete list must name its population");
+        (await TryStageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "t.xlsx", onlyA, null, Complete(x))).Field
+            .Should().Be("sourceReportDate", "absence needs a dated source");
+        (await TryStageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "t.xlsx", onlyA, date, Complete(other))).Field
+            .Should().Be("coverageOrganizationIds", "the population must be inside the importer's scope");
+        (await TryStageAsync(fx, coordinator, ServiceAccountImportProfiles.DbaHandover, "t.xlsx", onlyA, date, Complete(x))).Field
+            .Should().Be("coverage");
+        (await TryStageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "t.xlsx", onlyA, date, new StageImportRequest(string.Empty, null,
+            string.Empty, Coverage: ServiceAccountImportCoverage.Partial, CoverageOrganizationIds: [x]))).Field.Should().Be("coverageOrganizationIds");
+
+        ImportBatchView complete = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "tam.xlsx", onlyA, date, Complete(x));
+        complete.Coverage.Should().Be(ServiceAccountImportCoverage.Complete);
+        complete.CoverageOrganizationIds.Should().Equal(x);
+        complete.Summary!.CoveragePopulation.Should().Be(3);
+        complete.Summary.NotSeen.Should().Be(2);
+
+        byte[] mixed = SyntheticWorkbook.Create([("Sheet2", [
+            (1, new SynCell?[] { "Kullanıcı Adı", "Son Parola Değişiklik Zamanı", "AD veya LDAP Son Oturum Açma Zamanı", "AD Son Oturum Açma Zamanı", "Organizasyon", "Grup Direktorlugu", "Yorum" }),
+            (2, new SynCell?[] { a, 46000d, 46000d, 46000d, xName, "SYN GRUP", null }),
+            (3, new SynCell?[] { $"SYN{fx.Suffix}_CY", 46000d, 46000d, 46000d, yName, "SYN GRUP", null })])]);
+        ImportBatchView contradicted = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "karma.xlsx", mixed, date, Complete(x));
+        contradicted.Summary!.CoverageOutsideRows.Should().Be(1);
+        contradicted.Summary.NotSeen.Should().Be(0, "a row outside the declared population contradicts the complete-list declaration");
+        contradicted.Warnings.Should().Contain("CoverageContradicted:1");
+
+        ImportBatchView committed = await CommitStagedAsync(fx, coordinator, complete);
+        committed.Result!.NotSeenObservations.Should().Be(2);
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.Accounts WHERE ReportOrganizationId = @x AND LastObservationPresence = 'NotPresent' AND LifecycleState = 'Active'",
+            new { x })).Should().Be(2, "absence is an observation, never a closure");
+    }
+
+    [ServiceAccountSqlFact]
     public async Task ScopeIsEnforced_TeamScopeCannotImport_AndOtherOrganizationAccountsAreOutOfScope()
     {
         ServiceAccountSqlFixture fx = new();
@@ -227,9 +283,20 @@ public sealed class ServiceAccountImportSqlTests
             .ErrorCode.Should().Be(SaErrors.Forbidden);
     }
 
-    private static async Task<ImportBatchView> StageAsync(ServiceAccountSqlFixture fx, SynUser user, string profile, string file, byte[] bytes, DateOnly? date) =>
-        Ok(await fx.Service.StageImportAsync(user.Principal, fx.Context, new StageImportRequest(profile, date, "Sentetik beyan: kaynak rapor tarihi test verisidir"),
-            file, "application/octet-stream", bytes, _token));
+    private static async Task<ImportBatchView> StageAsync(ServiceAccountSqlFixture fx, SynUser user, string profile, string file, byte[] bytes, DateOnly? date,
+        StageImportRequest? coverage = null) =>
+        Ok(await TryStageAsync(fx, user, profile, file, bytes, date, coverage));
+
+    private static Task<SaResult<ImportBatchView>> TryStageAsync(ServiceAccountSqlFixture fx, SynUser user, string profile, string file, byte[] bytes, DateOnly? date,
+        StageImportRequest? coverage = null) =>
+        fx.Service.StageImportAsync(user.Principal, fx.Context, new StageImportRequest(profile, date, "Sentetik beyan: kaynak rapor tarihi test verisidir",
+            Coverage: coverage?.Coverage, CoverageOrganizationIds: coverage?.CoverageOrganizationIds), file, "application/octet-stream", bytes, _token);
+
+    /// <summary>Coverage declaration carrier (only Coverage and CoverageOrganizationIds are used).</summary>
+    private static StageImportRequest Complete(params Guid[] organizations) =>
+        new(string.Empty, null, string.Empty, Coverage: ServiceAccountImportCoverage.Complete, CoverageOrganizationIds: organizations);
+
+    private static StageImportRequest Declared(string coverage) => new(string.Empty, null, string.Empty, Coverage: coverage);
 
     private static async Task<ImportRowPage> Rows(ServiceAccountSqlFixture fx, SynUser user, Guid id, bool decisionsOnly = false, string? kind = null) =>
         Ok(await fx.Service.ImportRowsAsync(user.Principal, fx.Context, id, null, kind, decisionsOnly, 1, 200, _token));

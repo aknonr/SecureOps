@@ -245,21 +245,51 @@ public sealed partial class ImportPlanner
             JsonSerializer.Serialize(row.Original));
     }
 
+    /// <summary>
+    /// "Not seen in this list" observations are inferred only from a declared complete list. The population is the
+    /// declared organizations (children included) inside the importer's scope, narrowed to the declared domain when one
+    /// is given. An observed row outside that population contradicts the declaration, so nothing is inferred; a partial
+    /// or unknown list never implies absence. Absence stays an observation, never a closure.
+    /// </summary>
     private IEnumerable<PlannedRow> PlanAbsences(int lastKey)
     {
-        if (!_file.Rows.Any(r => r.Kind == StagedKinds.Observation && (r[StagedFields.ObservationProfile] ?? _input.Profile) == ServiceAccountImportProfiles.CoordinationList))
+        const string profile = ServiceAccountImportProfiles.CoordinationList;
+        if (!_file.Rows.Any(r => r.Kind == StagedKinds.Observation && (r[StagedFields.ObservationProfile] ?? _input.Profile) == profile))
         {
             yield break;
         }
 
-        const string profile = ServiceAccountImportProfiles.CoordinationList;
+        if (_input.Coverage != ServiceAccountImportCoverage.Complete)
+        {
+            _warnings.Add("CoverageNotComplete:" + _input.Coverage);
+            yield break;
+        }
+
+        HashSet<Guid> population = CoverageOrganizations();
+        string? domain = ServiceAccountText.DomainKey(_input.DeclaredDomain);
+        var created = _work.AccountCreates.ToDictionary(c => c.Id, c => (c.OrganizationId, c.DomainKey));
+        bool Inside(Guid? organization, string? accountDomain) =>
+            organization is { } id && population.Contains(id) && (domain is null || accountDomain == domain);
+        bool InsideAccount(Guid id) => created.TryGetValue(id, out (Guid? Organization, string? Domain) c)
+            ? Inside(c.Organization, c.Domain)
+            : _byId.TryGetValue(id, out ContextAccount? account) && Inside(EffectiveOrganization(account), account.DomainKey);
+
+        ContextAccount[] members = [.. _context.Accounts.Where(a => _context.Scope.Covers(a.Anchor) && Inside(EffectiveOrganization(a), a.DomainKey))];
+        _coveragePopulation = members.Length + created.Count(c => Inside(c.Value.OrganizationId, c.Value.DomainKey));
+        _coverageOutsideRows = _observed.Count(o => o.Item2 == profile && !InsideAccount(o.Item1));
+        if (_coverageOutsideRows > 0)
+        {
+            _warnings.Add("CoverageContradicted:" + _coverageOutsideRows.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            yield break;
+        }
+
         int key = lastKey;
-        IEnumerable<(Guid Id, string Label, string Fingerprint)> candidates = _context.Accounts
-            .Where(a => _context.Scope.Covers(a.Anchor))
+        IEnumerable<(Guid Id, string Label, string Fingerprint)> candidates = members
             .Where(a => _context.LatestObservations.FirstOrDefault(o => o.AccountId == a.Id && o.Profile == profile) is not { SourceReportDate: { } d }
                 || _input.SourceReportDate is not { } current || current >= d)
             .Select(a => (a.Id, Label(a), a.Id.ToString("N") + ":" + a.RowVersion))
-            .Concat(_newAccounts.Values.Where(n => n.Created).Select(n => (n.Id, n.Name, "new:" + n.IdentityKey)))
+            .Concat(_newAccounts.Values.Where(n => n.Created && created.TryGetValue(n.Id, out (Guid? Organization, string? Domain) c) && Inside(c.Organization, c.Domain))
+                .Select(n => (n.Id, n.Name, "new:" + n.IdentityKey)))
             .OrderBy(a => a.Item2, StringComparer.Ordinal);
         foreach ((Guid id, string label, string fingerprint) in candidates)
         {
@@ -281,7 +311,34 @@ public sealed partial class ImportPlanner
 
             AccountTarget target = new(id, label, null, null, fingerprint, null, [], false);
             yield return Row(key, row, ServiceAccountImportClasses.NotSeen, target,
-                [new ImportFieldDiff("Kaynak listesinde görünüm", null, "Bu partide yok", "Gözlem (kapanış değil)")], [], _applyOrSkip, ImportDecisions.Apply, false, "absence");
+                [new ImportFieldDiff("Kaynak listesinde görünüm", null, "Bu partide yok", "Gözlem (kapanış değil)")], [], _applyOrSkip, ImportDecisions.Apply, false,
+                new { absence = true, _input.Coverage, population = _coveragePopulation });
         }
     }
+
+    /// <summary>Declared organizations plus their descendants (cycles ignored).</summary>
+    private HashSet<Guid> CoverageOrganizations()
+    {
+        HashSet<Guid> result = [];
+        Queue<Guid> pending = new(_input.CoverageOrganizations ?? []);
+        while (pending.Count > 0)
+        {
+            Guid next = pending.Dequeue();
+            if (!result.Add(next))
+            {
+                continue;
+            }
+
+            foreach (ContextNamed child in _context.Organizations.Where(o => o.ParentId == next))
+            {
+                pending.Enqueue(child.Id);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>The account's report organization after this batch's additive fill (an empty organization may be filled).</summary>
+    private Guid? EffectiveOrganization(ContextAccount account) =>
+        account.OrganizationId ?? _work.AccountFills.FirstOrDefault(f => f.AccountId == account.Id)?.OrganizationId;
 }

@@ -30,8 +30,21 @@ public sealed class ServiceAccountImportsController(ServiceAccountService servic
     [ProducesResponseType(typeof(ImportBatchView), StatusCodes.Status200OK)]
     public async Task<ActionResult<ImportBatchView>> StageAsync([FromForm] IFormFile file, [FromForm] string profile, [FromForm] DateOnly? sourceReportDate,
         [FromForm] string sourceDateProvenance, [FromForm] string? declaredScope, [FromForm] string? declaredDomain, [FromForm] string? sheet,
-        [FromForm] string? targetTeam, [FromForm] string? mappingJson, CancellationToken cancellationToken)
+        [FromForm] string? targetTeam, [FromForm] string? mappingJson, [FromForm] string? coverage, [FromForm] string? coverageOrganizationIds,
+        CancellationToken cancellationToken)
     {
+        // Declared completeness population: comma-separated organization IDs (validated against scope by the service).
+        List<Guid> coverageOrganizations = [];
+        foreach (string part in (coverageOrganizationIds ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!Guid.TryParse(part, out Guid organizationId))
+            {
+                return ServiceAccountReplies.Reply(this, SaResult<ImportBatchView>.Fail(SaErrors.Invalid, "coverageOrganizationIds"));
+            }
+
+            coverageOrganizations.Add(organizationId);
+        }
+
         IReadOnlyList<ImportColumnMapping>? mapping = null;
         if (!string.IsNullOrWhiteSpace(mappingJson))
         {
@@ -52,7 +65,8 @@ public sealed class ServiceAccountImportsController(ServiceAccountService servic
 
         using MemoryStream buffer = new();
         await file.CopyToAsync(buffer, cancellationToken);
-        StageImportRequest request = new(profile, sourceReportDate, sourceDateProvenance, declaredScope, declaredDomain, sheet, targetTeam, mapping);
+        StageImportRequest request = new(profile, sourceReportDate, sourceDateProvenance, declaredScope, declaredDomain, sheet, targetTeam, mapping,
+            coverage, coverageOrganizations);
         return ServiceAccountReplies.Reply(this, await service.StageImportAsync(User, ServiceAccountReplies.Context(this), request, file.FileName,
             file.ContentType, buffer.ToArray(), cancellationToken));
     }

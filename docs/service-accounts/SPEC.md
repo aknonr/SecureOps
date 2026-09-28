@@ -18,7 +18,10 @@ Account owner team, executing team, consuming team, follow-up person, contact pe
 coordinator are different roles and must never be collapsed into one "responsible" field.
 Periodic coordination lists are risk/observation lists, not full AD inventories: an account
 absent from a newer list is **not** deleted, fixed or out of scope. History is kept and only a
-"not seen in this source batch" observation is added.
+"not seen in this source batch" observation is added — and only when the importer declares the
+list **complete** for named organizations (children included, optionally one domain) inside
+their scope, with a dated source. Unknown (default) or partial coverage never implies absence.
+A complete-list declaration that is contradicted by rows outside its population infers nothing.
 
 ## Business rules (implemented unchanged)
 
@@ -82,7 +85,8 @@ Preview classes: new / existing-observation update / same / conflict / invalid /
 this batch. Old and proposed values are shown side by side. Source observation fields become
 new observations; an owner team from the source fills an empty confirmed assignment only with
 authorized approval and conflicts go to a decision; manual person/OR/OCO/plan/action/evidence
-fields are never overwritten; absence is only a not-present observation.
+fields are never overwritten; absence is only a not-present observation, inferred solely from a
+validated complete-list declaration (preview shows the declared population and any rows outside it).
 
 The commit revalidates preview version, file hash, row decisions and row versions, and writes
 batch state, observations, approved changes, audit and outbox in one short transaction. A

@@ -27,7 +27,15 @@ public partial class ServiceAccountImports
         "Dosya adındaki tarih", "Dosyayı ileten e-postanın tarihi", "Dosya sahibinin yazılı beyanı", "Dosya içindeki rapor tarihi", "Tarih bilinmiyor"
     ];
 
+    private static readonly (string Value, string Label)[] _coverages =
+    [
+        (ServiceAccountImportCoverage.Unknown, "Bilinmiyor (listede olmayan hesaplar için çıkarım yapılmaz)"),
+        (ServiceAccountImportCoverage.Partial, "Kısmi liste (listede olmayan hesaplar için çıkarım yapılmaz)"),
+        (ServiceAccountImportCoverage.Complete, "Seçilen kurumların tam listesi")
+    ];
+
     private ImportBatchView? _batch;
+    private IReadOnlyList<OrganizationView> _organizations = [];
     private ImportRowPage? _rows;
     private IReadOnlyList<ImportHistoryItem> _history = [];
     private (string Name, byte[] Content)? _file;
@@ -42,7 +50,17 @@ public partial class ServiceAccountImports
     private int Step => _batch is null ? 1 : _batch.Status == "Committed" ? 3 : 2;
 
     /// <inheritdoc />
-    protected override Task LoadAsync() => RunSerializedAsync(async token => _history = await Api.GetAsync<IReadOnlyList<ImportHistoryItem>>("/imports", token));
+    protected override Task LoadAsync() => RunSerializedAsync(async token =>
+    {
+        _history = await Api.GetAsync<IReadOnlyList<ImportHistoryItem>>("/imports", token);
+        _organizations = await Api.GetAsync<IReadOnlyList<OrganizationView>>("/organizations", token);
+    });
+
+    private bool CoverageSupported => _form.Profile is ServiceAccountImportProfiles.CoordinationList or ServiceAccountImportProfiles.LegacyPackage
+        or ServiceAccountImportProfiles.LegacyWorkbook;
+
+    private bool CoverageReady => !CoverageSupported || _form.Coverage != ServiceAccountImportCoverage.Complete
+        || _form.CoverageOrganizations.Any() && _form.ReportDate is not null;
 
     private async Task ChooseAsync(InputFileChangeEventArgs args)
     {
@@ -76,7 +94,10 @@ public partial class ServiceAccountImports
             ["declaredDomain"] = Blank(_form.DeclaredDomain),
             ["sheet"] = Blank(_form.Sheet),
             ["targetTeam"] = _form.Profile == ServiceAccountImportProfiles.DbaHandover ? Blank(_form.TargetTeam) : null,
-            ["mappingJson"] = mapping is null ? null : JsonSerializer.Serialize(mapping, ApiResponseReader.JsonOptions)
+            ["mappingJson"] = mapping is null ? null : JsonSerializer.Serialize(mapping, ApiResponseReader.JsonOptions),
+            ["coverage"] = CoverageSupported ? _form.Coverage : ServiceAccountImportCoverage.Unknown,
+            ["coverageOrganizationIds"] = CoverageSupported && _form.Coverage == ServiceAccountImportCoverage.Complete
+                ? string.Join(',', _form.CoverageOrganizations) : null
         }, token);
         _commitKey = null;
         _rowQuery = (null, null, false, 1);
@@ -170,12 +191,23 @@ public partial class ServiceAccountImports
 
     private static string ProfileHelp(string profile) => profile switch
     {
-        ServiceAccountImportProfiles.CoordinationList => "Hesap adı, domain, kurum, parola ve son oturum sütunları okunur. Önceki listede olup bu listede olmayan hesaplar \"bu listede yok\" gözlemi alır; hiçbir hesap silinmez.",
+        ServiceAccountImportProfiles.CoordinationList => "Hesap adı, domain, kurum, parola ve son oturum sütunları okunur. Yalnız \"tam liste\" beyan edilirse, seçilen kurumlarda olup bu listede olmayan hesaplar \"bu listede yok\" gözlemi alır; hiçbir hesap silinmez veya kapanmaz.",
         ServiceAccountImportProfiles.DbaHandover => "Kaynak ekip, kullanan ekip ve devir işareti okunur. Devir kabulü sayılmaz; hedef ekip belirtilirse devir bildirimi oluşur.",
         ServiceAccountImportProfiles.LegacyPackage => "Eski çalışma kitabının hazırlanmış veri paketi. Aynı çalışma kitabı .xlsx olarak da aktarılırsa satırlar tekrar oluşturulmaz.",
         ServiceAccountImportProfiles.LegacyWorkbook => "Yalnız giriş sayfaları aktarılır; arşiv sayfaları uyarı olarak listelenir. Formüller hesaplanmaz, kayıtlı değerleri okunur.",
         _ => "Sütunlar önizlemede alanlara eşlenir; eşlemeyi değiştirip yeniden önizleyebilirsiniz."
     };
+
+    private static string CoverageLabel(string coverage) => coverage switch
+    {
+        ServiceAccountImportCoverage.Complete => "Tam liste",
+        ServiceAccountImportCoverage.Partial => "Kısmi liste",
+        _ => "Kapsam bilinmiyor"
+    };
+
+    private string CoverageOrganizationNames(IReadOnlyList<Guid>? ids) =>
+        ids is null || ids.Count == 0 ? "kurum seçilmedi"
+            : string.Join(", ", ids.Select(id => _organizations.FirstOrDefault(o => o.Id == id)?.Name ?? "erişim dışı kurum"));
 
     private static string BatchStatus(string status) => status switch
     {
@@ -195,5 +227,7 @@ public partial class ServiceAccountImports
         public string? DeclaredDomain { get; set; }
         public string? Sheet { get; set; }
         public string? TargetTeam { get; set; }
+        public string Coverage { get; set; } = ServiceAccountImportCoverage.Unknown;
+        public IEnumerable<Guid> CoverageOrganizations { get; set; } = [];
     }
 }

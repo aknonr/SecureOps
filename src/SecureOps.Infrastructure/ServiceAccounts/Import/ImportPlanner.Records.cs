@@ -357,6 +357,7 @@ public sealed partial class ImportPlanner
             _file.IgnoredHelperColumns, _file.FormulaCells,
             // The cohort is accounts, not rows: the flagged source row and the handover row of one account count once.
             rows.Where(r => r.Row.Kind == StagedKinds.Handover || ServiceAccountText.Same(r.Row[StagedFields.HandoverFlag], "OK"))
-                .Select(r => ServiceAccountText.AccountKey(r.Row[StagedFields.Account])).OfType<string>().Distinct(StringComparer.Ordinal).Count());
+                .Select(r => ServiceAccountText.AccountKey(r.Row[StagedFields.Account])).OfType<string>().Distinct(StringComparer.Ordinal).Count(),
+            _input.Coverage, _coveragePopulation, _coverageOutsideRows);
     }
 }
