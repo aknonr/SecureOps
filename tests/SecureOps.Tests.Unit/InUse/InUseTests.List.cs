@@ -21,7 +21,8 @@ public sealed partial class InUseTests
         record = record with
         {
             Source = record.Source with { WasasActivity = new(value, provenance), Lifecycle = null },
-            HasActiveExecution = active, SourceObservationMissing = missing,
+            HasActiveExecution = active,
+            SourceObservationMissing = missing,
             Completion = new(Guid.NewGuid(), f.User.Id, 1, 1, "fixture", DateTimeOffset.UtcNow, "ManuallyConfirmed")
         };
         record.ActivityStatus.Should().Be(expected);

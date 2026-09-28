@@ -174,8 +174,12 @@ public sealed partial class ResourceSqlTests
             else
             {
                 var repository = new SqlInUseRepository(Configuration());
-                await repository.SaveAsync(f.Record with { Version = f.Record.Version + 1,
-                    SourceVersion = f.Record.SourceVersion + (reason == "source" ? 1 : 0), SourceObservationMissing = reason == "notObserved" },
+                await repository.SaveAsync(f.Record with
+                {
+                    Version = f.Record.Version + 1,
+                    SourceVersion = f.Record.SourceVersion + (reason == "source" ? 1 : 0),
+                    SourceObservationMissing = reason == "notObserved"
+                },
                     f.Record.Version, new AuditEvent { Actor = "synthetic", Action = "SyntheticSourceDrift" }, _token);
             }
             (await f.Store.ClaimAsync(f.Intent.OperationId, f.Policy.Fingerprint, "restarted-worker", _token)).Should().BeNull();

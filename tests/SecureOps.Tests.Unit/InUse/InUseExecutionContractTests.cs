@@ -95,7 +95,9 @@ public sealed class InUseExecutionContractTests
         InUseSource seed = (await new LocalInUseSourceClient().DiscoverAsync(CancellationToken.None)).Records[0];
         InUseSource source = seed with
         {
-            Id = "000123", Code = "OR-000123", Synthetic = false,
+            Id = "000123",
+            Code = "OR-000123",
+            Synthetic = false,
             Servers = [new("first", new Dictionary<string, InUseEvidence>
                 { ["SI_ENVIRONMENT"] = new(first, "synthetic source") }),
                 new("second", new Dictionary<string, InUseEvidence>
@@ -113,10 +115,18 @@ public sealed class InUseExecutionContractTests
         IHttpClientFactory clients = Substitute.For<IHttpClientFactory>();
         clients.CreateClient("TuruncuHat").Returns(_ => new HttpClient(handler, false));
         var client = new TuruncuHatInUseMutationClient(clients, sessions,
-            Options.Create(new TuruncuHatOptions { BaseUrl = "https://source.example.invalid/ws/DataRest.svc/json",
-                Authorization = "synthetic", TenantId = 1 }),
-            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = false,
-                ControlledTestWritesEnabled = true, SourceCloseEnabled = true }),
+            Options.Create(new TuruncuHatOptions
+            {
+                BaseUrl = "https://source.example.invalid/ws/DataRest.svc/json",
+                Authorization = "synthetic",
+                TenantId = 1
+            }),
+            Options.Create(new OperationalRecordsOptions
+            {
+                ReadOnlyIntegrationMode = false,
+                ControlledTestWritesEnabled = true,
+                SourceCloseEnabled = true
+            }),
             Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat" }));
 
         InUseRemoteResult result = await client.SendAsync("Property4464", lease, "500", null, proposed, default);

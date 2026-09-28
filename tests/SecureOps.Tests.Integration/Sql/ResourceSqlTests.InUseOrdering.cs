@@ -28,9 +28,11 @@ public sealed partial class ResourceSqlTests
         InUseSource seed = (await new LocalInUseSourceClient().DiscoverAsync(_token)).Records[0];
         InUseSource[] sources = Enumerable.Range(0, 30).Select(i => seed with
         {
-            Id = prefix + i, Code = prefix + (29 - i).ToString("D2"),
+            Id = prefix + i,
+            Code = prefix + (29 - i).ToString("D2"),
             Creation = new(new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(i).ToString("O"), "Synthetic parent creation"),
-            WasasActivity = new("Pending", "Synthetic eligible WASAS activity"), Lifecycle = new("Open", "Synthetic parent")
+            WasasActivity = new("Pending", "Synthetic eligible WASAS activity"),
+            Lifecycle = new("Open", "Synthetic parent")
         }).ToArray();
         sources[28] = sources[28] with { Code = sources[27].Code, Creation = new("2000-01-28T03:00:00+03:00", "Synthetic parent creation") };
         sources[29] = sources[29] with { Code = sources[27].Code, Creation = new("2000-01-28T00:00:00Z", "Synthetic parent creation") };
