@@ -38,16 +38,16 @@
                 </MudTd>
                 <MudTd DataLabel="Yazışma">İlk gönderim: @ServiceAccountUiText.Date(context.FirstSentOn, "yok")<div class="so-panel-text--sm">Son yanıt: @ServiceAccountUiText.Date(context.LastReplyOn, "yok")</div></MudTd>
                 <MudTd DataLabel="İşlem">
-                    @if (context.Status == "Open" && Detail.Permissions.Work)
+                    @if (context.Status == "Open" && Detail.Permissions.CanWorkRequest(context.Id))
                     {
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Select(context))" aria-expanded="@((_selected?.Id == context.Id).ToString().ToLowerInvariant())">Güncelle / kapat</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Select(context))" aria-expanded="@((_selected?.Id == context.Id).ToString().ToLowerInvariant())">@(Detail.Permissions.Work ? "Güncelle / kapat" : "Güncelle")</MudButton>
                     }
                 </MudTd>
             </RowTemplate>
         </MudTable>
     }
 
-    @if (_selected is { } selected && Detail.Permissions.Work)
+    @if (_selected is { } selected && Detail.Permissions.CanWorkRequest(selected.Id))
     {
         <section class="so-panel mt-2" aria-label="@($"{selected.ActionLabel} talebini güncelle")">
             <h3 class="so-panel-title">@selected.ActionLabel talebi</h3>
@@ -68,6 +68,8 @@
             </MudGrid>
             <MudButton OnClick="UpdateAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Talebi güncelle</MudButton>
 
+            @if (Detail.Permissions.Work)
+            {
             <h3 class="so-panel-title mt-4">Talebi kapat</h3>
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
@@ -81,6 +83,11 @@
             </MudGrid>
             <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">Kapatma, talebi açık işler ve hatırlatmalar listesinden çıkarır. Hesap kaydı silinmez.</MudAlert>
             <MudButton OnClick="CloseAsync" Disabled="Busy" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">Talebi kapat</MudButton>
+            }
+            else
+            {
+                <p class="so-panel-text--sm mt-2">Talebin kapatılması hesaptan sorumlu ekipte; işlem bildiriminiz kapanış için değerlendirilir.</p>
+            }
         </section>
     }
 

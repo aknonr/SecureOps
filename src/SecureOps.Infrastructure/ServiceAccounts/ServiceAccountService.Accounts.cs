@@ -30,20 +30,31 @@ public sealed partial class ServiceAccountService
         }
 
         AccountDetail? detail = await repository.AccountDetailAsync(id, Today, cancellationToken);
-        return detail is null ? SaResult<AccountDetail>.Fail(SaErrors.NotFound) : detail with { Permissions = Permissions(caller, anchor.Anchor) };
+        return detail is null ? SaResult<AccountDetail>.Fail(SaErrors.NotFound) : detail with { Permissions = Permissions(caller, anchor.Anchor, detail.Requests) };
     }
 
-    private static AccountPermissions Permissions(SaCaller caller, AccountScopeAnchor anchor)
+    /// <summary>
+    /// Visibility is not authority. Organization-level scope or the confirmed owner team is responsible for the whole
+    /// account; a team that sees the account only through a request targeted at it (or an incoming handover) is a
+    /// participant limited to those open requests.
+    /// </summary>
+    private static AccountPermissions Permissions(SaCaller caller, AccountScopeAnchor anchor, IReadOnlyList<RequestView> requests)
     {
-        bool covered = caller.Scope.Covers(anchor);
         bool orgLevel = caller.Scope.CoversAtOrganizationLevel(anchor);
+        bool responsible = orgLevel || caller.Scope.CoversTeam(anchor.OwnerTeamId);
+        Guid[] participant = responsible ? [] : [.. requests.Where(r => r.Status == "Open" && caller.Scope.CoversTeam(r.TargetTeam?.Id)).Select(r => r.Id)];
+        bool incomingHandover = anchor.IncomingHandoverTeamIds.Any(t => caller.Scope.CoversTeam(t));
+        bool work = caller.Can(ServiceAccountCapabilities.Work);
         return new AccountPermissions(
-            caller.Can(ServiceAccountCapabilities.Work) && covered,
-            caller.Can(ServiceAccountCapabilities.Assign) && (orgLevel || caller.Scope.CoversTeam(anchor.OwnerTeamId)),
+            work && responsible,
+            caller.Can(ServiceAccountCapabilities.Assign) && responsible,
             caller.Can(ServiceAccountCapabilities.Assign) && orgLevel,
-            caller.Can(ServiceAccountCapabilities.Verify) && covered,
-            caller.Can(ServiceAccountCapabilities.Assign) && (orgLevel || anchor.IncomingHandoverTeamIds.Any(t => caller.Scope.CoversTeam(t))),
-            caller.Can(ServiceAccountCapabilities.Work) && covered);
+            caller.Can(ServiceAccountCapabilities.Verify) && responsible,
+            caller.Can(ServiceAccountCapabilities.Assign) && (orgLevel || incomingHandover),
+            work && (responsible || participant.Length > 0),
+            responsible ? ServiceAccountAccessBasis.Responsible
+                : participant.Length > 0 || incomingHandover ? ServiceAccountAccessBasis.Participant : ServiceAccountAccessBasis.Viewer,
+            work ? participant : []);
     }
 
     /// <summary>Runs an account-scoped mutation after capability and permission checks; conflicts return the caller's current view.</summary>
@@ -171,9 +182,15 @@ public sealed partial class ServiceAccountService
     /// <summary>Partial request update at the expected version.</summary>
     public Task<SaResult<AccountDetail>> UpdateRequestAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid requestId, UpdateWorkRequest request,
         CancellationToken cancellationToken) =>
-        EntityAsync(principal, context, "Request", requestId, ServiceAccountCapabilities.Work, p => p.Work, (caller, detail, accountId) =>
+        EntityAsync(principal, context, "Request", requestId, ServiceAccountCapabilities.Work, p => p.CanWorkRequest(requestId), (caller, detail, accountId) =>
         {
             IReadOnlyList<string> clear = request.ClearFields ?? [];
+            // A participant team works on its own request but cannot move it to another team or change what is expected.
+            if (!detail.Permissions.Work && (request.TargetTeamId is not null || request.ActionType is not null || clear.Contains("targetTeam")))
+            {
+                return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Forbidden, request.ActionType is not null ? "actionType" : "targetTeamId"));
+            }
+
             ServiceAccountActionType? type = request.ActionType is null ? null : Enum.TryParse(request.ActionType, false, out ServiceAccountActionType parsed) ? parsed : (ServiceAccountActionType?)null;
             RequestView? current = detail.Requests.FirstOrDefault(r => r.Id == requestId);
             string? invalid = current is null ? "id"

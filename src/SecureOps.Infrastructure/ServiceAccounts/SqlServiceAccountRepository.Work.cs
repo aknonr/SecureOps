@@ -36,7 +36,10 @@ public sealed partial class SqlServiceAccountRepository
         return await connection.QuerySingleOrDefaultAsync<Guid?>(Cmd($"SELECT AccountId FROM {table} WHERE Id = @id;", new { id }, null, cancellationToken));
     }
 
-    /// <summary>Creates an account manually (explicit, audited; no automatic provisioning from names).</summary>
+    /// <summary>
+    /// Creates an account manually (explicit, audited; no automatic provisioning from names). A typed name and domain are
+    /// not a verified directory identity, so the identity always starts provisional, exactly like an imported account.
+    /// </summary>
     public Task<SaResult<Guid>> CreateAccountAsync(string name, string? domain, Guid? organizationId, string reason, SaActor actor, CancellationToken cancellationToken)
     {
         var id = Guid.NewGuid();
@@ -55,9 +58,9 @@ public sealed partial class SqlServiceAccountRepository
                 return await connection.ExecuteAsync(Cmd("""
                     INSERT INTO svcacct.Accounts(Id, AccountName, NormalizedName, Domain, NormalizedDomain, IdentityKey, IdentityState, ReportOrganizationId,
                         LifecycleState, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
-                    VALUES(@id, @name, @nameKey, @domain, @domainKey, @identity, @state, @organizationId, 'Active', @now, @UserId, @now, @UserId);
+                    VALUES(@id, @name, @nameKey, @domain, @domainKey, @identity, 'Provisional', @organizationId, 'Active', @now, @UserId, @now, @UserId);
                     """, new { id, name = ServiceAccountText.Clean(name), nameKey, domain = ServiceAccountText.Clean(domain), domainKey, identity,
-                    state = domainKey is null ? "Provisional" : "Confirmed", organizationId, now, actor.UserId }, transaction, cancellationToken));
+                    organizationId, now, actor.UserId }, transaction, cancellationToken));
             }, cancellationToken, duplicateField: "accountName");
     }
 
@@ -75,7 +78,6 @@ public sealed partial class SqlServiceAccountRepository
                     Domain = CASE WHEN Domain IS NULL AND @Domain IS NOT NULL THEN @Domain ELSE Domain END,
                     NormalizedDomain = CASE WHEN NormalizedDomain IS NULL AND @domainKey IS NOT NULL THEN @domainKey ELSE NormalizedDomain END,
                     IdentityKey = CASE WHEN NormalizedDomain IS NULL AND @domainKey IS NOT NULL THEN 'D:' + @domainKey + '|' + NormalizedName ELSE IdentityKey END,
-                    IdentityState = CASE WHEN NormalizedDomain IS NULL AND @domainKey IS NOT NULL THEN 'Confirmed' ELSE IdentityState END,
                     UpdatedAt = @now, UpdatedBy = @UserId
                 WHERE Id = @id AND RowVer = @RowVer;
                 """, new { change.ClearNotes, change.Notes, change.ClearConsumerTeam, change.ConsumerTeamId, change.ReportOrganizationId,

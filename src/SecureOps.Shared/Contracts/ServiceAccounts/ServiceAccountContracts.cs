@@ -168,8 +168,32 @@ public sealed record EvidenceView(Guid Id, string OwnerEntityType, Guid OwnerEnt
 public sealed record SourceRowView(Guid BatchId, string Profile, string FileName, DateOnly? SourceReportDate, string Sheet, int RowNumber,
     string EntityKind, string Classification, string OriginalJson);
 
-/// <summary>Which actions the current caller may take on this account (server-computed).</summary>
-public sealed record AccountPermissions(bool Work, bool AssignPerson, bool AssignTeam, bool Verify, bool DecideHandover, bool UploadEvidence);
+/// <summary>Why the caller sees an account, which bounds what they may change.</summary>
+public static class ServiceAccountAccessBasis
+{
+    /// <summary>Organization-level scope or the confirmed owner team: account-wide work.</summary>
+    public const string Responsible = "Responsible";
+    /// <summary>Visible only through an open request targeted at the caller's team or an incoming handover.</summary>
+    public const string Participant = "Participant";
+    /// <summary>Read only.</summary>
+    public const string Viewer = "Viewer";
+}
+
+/// <summary>
+/// Which actions the current caller may take on this account (server-computed). <see cref="Work"/>, <see cref="Verify"/> and
+/// ownership apply to the whole account and need the responsible basis. A participant team works only on the open
+/// requests listed in <see cref="ParticipantRequestIds"/>: it may update them (not retarget them), report actions linked
+/// to them and attach evidence to them, but may not change the account, its ownership, other requests or verification.
+/// </summary>
+public sealed record AccountPermissions(bool Work, bool AssignPerson, bool AssignTeam, bool Verify, bool DecideHandover, bool UploadEvidence,
+    string Basis = ServiceAccountAccessBasis.Viewer, IReadOnlyList<Guid>? ParticipantRequestIds = null)
+{
+    /// <summary>Whether the caller may work on this request (account-wide work or a participant request).</summary>
+    public bool CanWorkRequest(Guid requestId) => Work || (ParticipantRequestIds?.Contains(requestId) ?? false);
+
+    /// <summary>Whether the caller has any request it may work on.</summary>
+    public bool CanWorkAnyRequest => Work || ParticipantRequestIds is { Count: > 0 };
+}
 
 /// <summary>Complete scoped account detail.</summary>
 public sealed record AccountDetail(

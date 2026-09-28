@@ -70,7 +70,17 @@ A complete-list declaration that is contradicted by rows outside its population 
 | System administrator | Settings | Scope grants and dictionaries; cannot silently change business results |
 
 Authorization applies to API, exports, attachments, import commit and background jobs, not only
-buttons. Knowing an account name must not reveal an out-of-scope record. No new user/password
+buttons. Knowing an account name must not reveal an out-of-scope record.
+
+Visibility is not authority. Organization-level scope or the confirmed owner team is
+**responsible** for an account (account attributes, ownership, new/other requests, closing,
+findings, verification). A team that sees an account only because an open request targets it (or
+a handover is proposed to it) is a **participant**: it may update its own open request (dates,
+notes, follow-up; not retarget it or change its action), report actions linked to it, attach
+evidence to it and record mails, and nothing else. Participation ends when the request closes.
+
+Manually created accounts start with a provisional identity like imported ones; a typed or later
+filled domain does not confirm it. No new user/password
 store is created; team membership is established through an authorized administration screen.
 
 ## Import semantics

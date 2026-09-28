@@ -234,6 +234,94 @@ public sealed class ServiceAccountWorkflowSqlTests
             new { prefix })).Should().Be(0);
     }
 
+    [ServiceAccountSqlFact]
+    public async Task ParticipantTeam_WorksOnlyOnItsOwnRequest_AndLosesAccessWhenItCloses()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        Guid ownerTeam = await fx.TeamAsync("SYN SAHIP " + fx.Suffix, org), helperTeam = await fx.TeamAsync("SYN YARDIM " + fx.Suffix, null);
+        AccountDetail account = await CreateAccountAsync(fx, coordinator, org, "PART");
+        account = Ok(await fx.Service.ChangeOwnershipAsync(coordinator.Principal, fx.Context, account.Summary.Id,
+            new OwnershipChangeRequest(account.Summary.Version, ownerTeam, null, "Confirm", "Sentetik sahiplik kararı"), _token));
+        account = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, account.Summary.Id,
+            new CreateWorkRequest("PasswordChange", TargetTeamId: helperTeam), _token));
+        account = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, account.Summary.Id,
+            new CreateWorkRequest("Review", TargetTeamId: ownerTeam), _token));
+        Guid accountId = account.Summary.Id;
+        Guid mine = account.Requests.Single(r => r.ActionType == "PasswordChange").Id, theirs = account.Requests.Single(r => r.ActionType == "Review").Id;
+
+        SynUser member = await fx.UserAsync(_all);
+        await fx.GrantAsync(member, ScopeKind.Team, team: helperTeam);
+        AccountDetail seen = Ok(await fx.Service.AccountAsync(member.Principal, fx.Context, accountId, _token));
+        seen.Permissions.Basis.Should().Be(ServiceAccountAccessBasis.Participant);
+        seen.Permissions.ParticipantRequestIds.Should().Equal(mine);
+        seen.Permissions.Work.Should().BeFalse("visibility through an assigned request is not account-wide authority");
+        seen.Permissions.Verify.Should().BeFalse();
+        seen.Permissions.AssignPerson.Should().BeFalse();
+        seen.Permissions.UploadEvidence.Should().BeTrue();
+
+        RequestView own = seen.Requests.Single(r => r.Id == mine);
+        seen = Ok(await fx.Service.UpdateRequestAsync(member.Principal, fx.Context, mine,
+            new UpdateWorkRequest(own.Version, Notes: "ekip notu", PlanStart: new(2026, 10, 1), PlanEnd: new(2026, 10, 2)), _token));
+        own = seen.Requests.Single(r => r.Id == mine);
+        own.Notes.Should().Be("ekip notu");
+        (await fx.Service.UpdateRequestAsync(member.Principal, fx.Context, mine, new UpdateWorkRequest(own.Version, TargetTeamId: ownerTeam), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden, "a participant cannot move its request to another team");
+        (await fx.Service.UpdateRequestAsync(member.Principal, fx.Context, theirs,
+            new UpdateWorkRequest(seen.Requests.Single(r => r.Id == theirs).Version, Notes: "izinsiz"), _token)).ErrorCode.Should().Be(SaErrors.Forbidden);
+        (await fx.Service.CloseRequestAsync(member.Principal, fx.Context, mine, new CloseWorkRequest(own.Version, "Cancelled", "izinsiz"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden);
+        (await fx.Service.CreateRequestAsync(member.Principal, fx.Context, accountId, new CreateWorkRequest("Deletion"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden, $"safe SQL diagnostics: {string.Join("; ", fx.SqlDiagnostics)}");
+        (await fx.Service.UpdateAccountAsync(member.Principal, fx.Context, accountId, new UpdateAccountRequest(seen.Summary.Version, Notes: "izinsiz"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden);
+        (await fx.Service.ChangeOwnershipAsync(member.Principal, fx.Context, accountId,
+            new OwnershipChangeRequest(seen.Summary.Version, helperTeam, null, "Propose", "izinsiz"), _token)).ErrorCode.Should().Be(SaErrors.Forbidden);
+        (await fx.Service.CreateFindingAsync(member.Principal, fx.Context, new CreateFindingRequest(accountId, "Success", "Match"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden);
+        (await fx.Service.ReportActionAsync(member.Principal, fx.Context, accountId,
+            new ReportActionRequest("Review", "Performed", "Intermediate", theirs, ActualOn: new(2026, 9, 20), EvidenceNote: "izinsiz"), _token))
+            .Field.Should().Be("requestId");
+        (await fx.Service.ReportActionAsync(member.Principal, fx.Context, accountId,
+            new ReportActionRequest("PasswordChange", "Performed", "Intermediate", ActualOn: new(2026, 9, 20), EvidenceNote: "talepsiz"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden, "a participant reports only against its own request");
+
+        seen = Ok(await fx.Service.ReportActionAsync(member.Principal, fx.Context, accountId,
+            new ReportActionRequest("PasswordChange", "Performed", "Intermediate", mine, ActualOn: new(2026, 9, 20), EvidenceNote: "ekip bildirimi"), _token));
+        ActionView performed = seen.Actions.Single();
+        (await fx.Service.VerifyActionAsync(member.Principal, fx.Context, performed.Id,
+            new VerifyActionRequest(performed.Version, new(2026, 9, 21), VerificationNote: "kendi doğrulaması"), _token)).ErrorCode.Should().Be(SaErrors.Forbidden);
+        (await fx.Service.VoidActionAsync(member.Principal, fx.Context, performed.Id, new VoidActionRequest(performed.Version, "izinsiz"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden);
+        seen = Ok(await fx.Service.AddEvidenceAsync(member.Principal, fx.Context, accountId, "Request", mine, "kanit.txt", "text/plain",
+            "sentetik ekip kanıtı"u8.ToArray(), "Sentetik", _token));
+        seen.Evidence.Should().ContainSingle();
+        (await fx.Service.AddEvidenceAsync(member.Principal, fx.Context, accountId, "Account", accountId, "kanit.txt", "text/plain",
+            "sentetik"u8.ToArray(), null, _token)).ErrorCode.Should().Be(SaErrors.Forbidden);
+
+        account = Ok(await fx.Service.VerifyActionAsync(coordinator.Principal, fx.Context, performed.Id,
+            new VerifyActionRequest(performed.Version, new(2026, 9, 21), VerificationNote: "sorumlu doğrulaması"), _token));
+        account = Ok(await fx.Service.CloseRequestAsync(coordinator.Principal, fx.Context, mine,
+            new CloseWorkRequest(account.Requests.Single(r => r.Id == mine).Version, "Completed"), _token));
+        (await fx.Service.AccountAsync(member.Principal, fx.Context, accountId, _token)).ErrorCode
+            .Should().Be(SaErrors.NotFound, "participation ends with the request");
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.History WHERE AccountId = @accountId AND ActorUserId = @user",
+            new { accountId, user = member.User.Id })).Should().Be(3, "the participant's request update, action report and evidence are attributed to it");
+    }
+
+    [ServiceAccountSqlFact]
+    public async Task ManualAccounts_StayProvisional_EvenWithATypedDomain()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        AccountDetail typed = Ok(await fx.Service.CreateAccountAsync(coordinator.Principal, fx.Context,
+            new CreateAccountRequest($"SYN{fx.Suffix}_DOM", "syn.example", org, "Sentetik test hesabı"), _token));
+        typed.Summary.IdentityState.Should().Be("Provisional", "a typed name and domain are not a verified directory identity");
+        AccountDetail bare = await CreateAccountAsync(fx, coordinator, org, "NODOM");
+        bare = Ok(await fx.Service.UpdateAccountAsync(coordinator.Principal, fx.Context, bare.Summary.Id,
+            new UpdateAccountRequest(bare.Summary.Version, Domain: "syn.example"), _token));
+        bare.Summary.Domain.Should().Be("syn.example");
+        bare.Summary.IdentityState.Should().Be("Provisional", "filling a missing domain does not verify the identity");
+    }
+
     /// <summary>
     /// Deterministic reproduction of the recorded VerifyAction deadlock (error 1205 reported as persistence unavailable):
     /// an import commit holds its exclusive commit lock and serializable locks on an account row, a closure verification

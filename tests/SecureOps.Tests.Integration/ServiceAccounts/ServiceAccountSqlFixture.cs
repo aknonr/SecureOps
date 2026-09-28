@@ -125,6 +125,10 @@ internal sealed class ServiceAccountSqlFixture
         return await connection.ExecuteScalarAsync<int>(sql, parameters);
     }
 
+    /// <summary>Optional file (from SECUREOPS_SA_SQL_DIAGNOSTICS) receiving every captured safe diagnostic, whatever the assertion path.</summary>
+    private static readonly string? _diagnosticsFile = Environment.GetEnvironmentVariable("SECUREOPS_SA_SQL_DIAGNOSTICS");
+    private static readonly object _diagnosticsLock = new();
+
     private sealed class SafeSqlLogger(ConcurrentQueue<string> entries) : ILogger<ServiceAccountService>
     {
         public IDisposable BeginScope<TState>(TState state) where TState : notnull => EmptyScope.Instance;
@@ -135,16 +139,27 @@ internal sealed class ServiceAccountSqlFixture
             if (state is not IEnumerable<KeyValuePair<string, object?>> values)
             { return; }
             var fields = values.ToDictionary(x => x.Key, x => x.Value);
+            string entry;
             if (fields.TryGetValue("FailureType", out object? failureType))
             {
-                // Non-SQL failures that are also reported as "persistence unavailable" are captured by type only.
-                entries.Enqueue($"FailureType={failureType}");
-                return;
+                // Non-SQL failures that are also reported as "persistence unavailable" are captured by type and origin only.
+                entry = $"FailureType={failureType} Origin={fields.GetValueOrDefault("Origin")} CorrelationId={fields.GetValueOrDefault("CorrelationId")}";
             }
-
-            if (!fields.ContainsKey("SqlNumber"))
+            else if (fields.ContainsKey("SqlNumber"))
+            {
+                entry = $"Number={fields["SqlNumber"]} State={fields["SqlState"]} Class={fields["SqlClass"]} CorrelationId={fields["CorrelationId"]} Origin={fields.GetValueOrDefault("Origin")}";
+            }
+            else
             { return; }
-            entries.Enqueue($"Number={fields["SqlNumber"]} State={fields["SqlState"]} Class={fields["SqlClass"]} CorrelationId={fields["CorrelationId"]}");
+
+            entries.Enqueue(entry);
+            if (_diagnosticsFile is not null)
+            {
+                lock (_diagnosticsLock)
+                {
+                    File.AppendAllText(_diagnosticsFile, $"{DateTimeOffset.UtcNow:O} {entry}{Environment.NewLine}");
+                }
+            }
         }
 
         private sealed class EmptyScope : IDisposable

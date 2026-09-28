@@ -73,7 +73,7 @@
         </section>
     }
 
-    @if (Detail.Permissions.Work)
+    @if (Detail.Permissions.CanWorkAnyRequest)
     {
         <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="İşlem bildir">
             <MudGrid Spacing="2">
@@ -95,8 +95,8 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="4">
-                    <MudSelect T="Guid?" @bind-Value="_report.RequestId" Label="İlgili talep" Clearable="true" Variant="Variant.Outlined">
-                        @foreach (RequestView request in Detail.Requests.Where(r => r.Status == "Open")) { <MudSelectItem T="Guid?" Value="@((Guid?)request.Id)">@request.ActionLabel</MudSelectItem> }
+                    <MudSelect T="Guid?" @bind-Value="_report.RequestId" Label="@(Detail.Permissions.Work ? "İlgili talep" : "İlgili talep (zorunlu)")" Clearable="@Detail.Permissions.Work" Variant="Variant.Outlined">
+                        @foreach (RequestView request in Detail.Requests.Where(r => r.Status == "Open" && Detail.Permissions.CanWorkRequest(r.Id))) { <MudSelectItem T="Guid?" Value="@((Guid?)request.Id)">@request.ActionLabel</MudSelectItem> }
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="4"><MudDatePicker Editable="true" @bind-Date="_report.ActualOn" Label="@(_report.Result == "Performed" ? "Gerçekleşme tarihi (biliniyorsa)" : "Planlanan tarih")" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" /></MudItem>
@@ -109,7 +109,7 @@
                 <MudItem xs="12" md="4"><MudTextField @bind-Value="_report.OrNumber" Label="@(_report.ActionType == "Deletion" ? "OR numarası (silme kapanışı için gerekli)" : "OR numarası")" MaxLength="64" Variant="Variant.Outlined" /></MudItem>
                 <MudItem xs="12" md="4"><MudTextField @bind-Value="_report.EvidenceNote" Label="Kanıt notu" MaxLength="2000" Variant="Variant.Outlined" /></MudItem>
             </MudGrid>
-            <MudButton OnClick="ReportAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Bildirimi kaydet</MudButton>
+            <MudButton OnClick="ReportAsync" Disabled="@(Busy || !Detail.Permissions.Work && _report.RequestId is null)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Bildirimi kaydet</MudButton>
         </MudExpansionPanel></MudExpansionPanels>
     }
 </section>

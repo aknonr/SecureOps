@@ -26,7 +26,7 @@
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
                     <MudSelect T="string" @bind-Value="_owner" Label="Bağlanacak kayıt" Variant="Variant.Outlined">
-                        @foreach ((string key, string label) in Owners()) { <MudSelectItem T="string" Value="@key">@label</MudSelectItem> }
+                        @foreach ((string key, string label) in UploadOwners()) { <MudSelectItem T="string" Value="@key">@label</MudSelectItem> }
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="4"><MudTextField @bind-Value="_label" Label="Açıklama" MaxLength="200" Variant="Variant.Outlined" /></MudItem>
@@ -72,8 +72,16 @@
 
     protected override void OnParametersSet()
     {
-        if (_seenRevision != Revision) { (_seenRevision, _file, _label, _fileError, _owner) = (Revision, null, null, null, "Account"); }
+        if (_seenRevision != Revision) { (_seenRevision, _file, _label, _fileError, _owner) = (Revision, null, null, null, UploadOwners().FirstOrDefault().Key ?? "Account"); }
     }
+
+    /// <summary>Attachable records: everything for the responsible team; a participant only its own requests and their unverified actions.</summary>
+    private IEnumerable<(string Key, string Label)> UploadOwners() => Detail.Permissions.Work
+        ? Owners()
+        : Owners().Where(o => o.Key.Split(':') is [var type, var id] && Guid.TryParse(id, out Guid ownerId)
+            && (type == "Request" && Detail.Permissions.CanWorkRequest(ownerId)
+                || type == "Action" && Detail.Actions.Any(a => a.Id == ownerId && !a.Voided && a.Result != "Verified"
+                    && a.RequestId is { } request && Detail.Permissions.CanWorkRequest(request))));
 
     private IEnumerable<(string Key, string Label)> Owners()
     {

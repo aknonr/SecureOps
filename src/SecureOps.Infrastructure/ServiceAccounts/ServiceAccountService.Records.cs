@@ -18,8 +18,14 @@ public sealed partial class ServiceAccountService
     /// <summary>Reports a planned or performed action. Adding an action never closes a request (rule 9).</summary>
     public Task<SaResult<AccountDetail>> ReportActionAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid accountId, ReportActionRequest request,
         CancellationToken cancellationToken) =>
-        MutateAccountAsync(principal, context, accountId, ServiceAccountCapabilities.Work, p => p.Work, (caller, detail) =>
+        MutateAccountAsync(principal, context, accountId, ServiceAccountCapabilities.Work, p => p.CanWorkAnyRequest, (caller, detail) =>
         {
+            // A participant reports only against its own open request.
+            if (!detail.Permissions.Work && (request.RequestId is not { } own || !detail.Permissions.CanWorkRequest(own)))
+            {
+                return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Forbidden, "requestId"));
+            }
+
             if (!Enum.TryParse(request.ActionType, false, out ServiceAccountActionType type) || !Enum.TryParse(request.RecordKind, false, out ServiceAccountRecordKind kind))
             {
                 return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "actionType"));
@@ -46,8 +52,14 @@ public sealed partial class ServiceAccountService
     /// <summary>Moves a planned action to performed (same identity) or completes missing details.</summary>
     public Task<SaResult<AccountDetail>> UpdateActionAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid actionId, UpdateActionRequest request,
         CancellationToken cancellationToken) =>
-        EntityAsync(principal, context, "Action", actionId, ServiceAccountCapabilities.Work, p => p.Work, (caller, _, accountId) =>
+        EntityAsync(principal, context, "Action", actionId, ServiceAccountCapabilities.Work, p => p.CanWorkAnyRequest, (caller, detail, accountId) =>
         {
+            // A participant completes only unverified actions linked to its own request.
+            if (!detail.Permissions.Work && !ParticipantAction(detail, actionId))
+            {
+                return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Forbidden, "requestId"));
+            }
+
             ServiceAccountActionResult? result = request.Result is null ? null : Enum.TryParse(request.Result, false, out ServiceAccountActionResult r) ? r : null;
             ServiceAccountRecordKind? kind = request.RecordKind is null ? null : Enum.TryParse(request.RecordKind, false, out ServiceAccountRecordKind k) ? k : null;
             DateOnly? actual = request.ActualAt is { } at ? ReportCalendar.LocalDate(at) : request.ActualOn;
@@ -98,6 +110,11 @@ public sealed partial class ServiceAccountService
             ValidText(request.Reason, 1000, true)
                 ? repository!.VoidActionAsync(accountId, actionId, request with { Reason = request.Reason.Trim() }, caller.Actor, cancellationToken)
                 : Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "reason")), cancellationToken);
+
+    /// <summary>An unverified, non-void action linked to one of the participant's open requests.</summary>
+    private static bool ParticipantAction(AccountDetail detail, Guid actionId) =>
+        detail.Actions.FirstOrDefault(a => a.Id == actionId) is { RequestId: { } linked, Voided: false } action
+        && action.Result != "Verified" && detail.Permissions.CanWorkRequest(linked);
 
     private static ActionFacts Facts(ActionView action) => new(Enum.Parse<ServiceAccountActionType>(action.ActionType), Enum.Parse<ServiceAccountActionResult>(action.Result),
         Enum.Parse<ServiceAccountRecordKind>(action.RecordKind), action.ActualOn, action.VerifiedOn, action.VerifiedByPerson is not null,
@@ -198,6 +215,13 @@ public sealed partial class ServiceAccountService
         string fileName, string contentType, byte[] content, string? label, CancellationToken cancellationToken) =>
         MutateAccountAsync(principal, context, accountId, ServiceAccountCapabilities.Work, p => p.UploadEvidence, (caller, detail) =>
         {
+            // A participant attaches evidence only to its own requests and the actions linked to them.
+            if (!detail.Permissions.Work && !(ownerType == "Request" && detail.Permissions.CanWorkRequest(ownerId)
+                || ownerType == "Action" && ParticipantAction(detail, ownerId)))
+            {
+                return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Forbidden, "ownerId"));
+            }
+
             bool owned = ownerType switch
             {
                 "Account" => ownerId == accountId,

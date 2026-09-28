@@ -132,6 +132,27 @@ kept no deadlock graph, so they are **consistent with** this cause but not prove
 fixture now also records the failure type of non-SQL exceptions that are reported as persistence
 unavailable.
 
+### Other single failures after a fresh build (unexplained, not reproduced)
+
+Two further single failures occurred, each on the first module SQL run right after a build, before
+the diagnostic capture below existed:
+
+1. `SentSnapshotNeverChanges_LiveReportPlacesLateActionInItsWeek_ExportsReconcile` (after the
+   coverage change). The assertion message was dropped by my own console filter; no TRX was kept.
+2. `ParticipantTeam_WorksOnlyOnItsOwnRequest_AndLosesAccessWhenItCloses`: a participant's
+   `CreateRequest` returned `ServiceAccountPersistenceUnavailable` instead of `AccessDenied` on a
+   path that only reads before denying.
+
+No deadlock was recorded by `system_health` at either time, so neither is the 1205 cause above;
+the second must have been a SQL error or one of `DbException`/`IOException`/
+`InvalidOperationException`/`TimeoutException`, which the service reports as "persistence
+unavailable". Since then the module log records the SQL number/state/class or failure type plus a
+safe throwing `Origin` (type and method name only, no message or values), and the SQL test fixture
+appends every such entry to the file named by `SECUREOPS_SA_SQL_DIAGNOSTICS`. Afterwards 8 warm
+runs and 10 rebuild-then-run cycles passed (24/24 each) with no unexpected diagnostic (only the
+injected 51091 of the audit-rollback test). These passes are **non-reproduction, not a fix**; the
+next failing run will name its exception type and origin.
+
 ## Acceptance mapping (SPEC scenarios)
 
 | # | Requirement | Evidence | Result |

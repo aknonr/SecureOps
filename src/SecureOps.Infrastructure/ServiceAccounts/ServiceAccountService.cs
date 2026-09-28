@@ -67,17 +67,22 @@ public sealed partial class ServiceAccountService(SqlServiceAccountRepository? r
         }
         catch (SqlException exception)
         {
-            logger.LogError("Service Accounts SQL persistence failed. Number={SqlNumber} State={SqlState} Class={SqlClass} CorrelationId={CorrelationId}",
-                exception.Number, exception.State, exception.Class, context.CorrelationId);
+            logger.LogError("Service Accounts SQL persistence failed. Number={SqlNumber} State={SqlState} Class={SqlClass} CorrelationId={CorrelationId} Origin={Origin}",
+                exception.Number, exception.State, exception.Class, context.CorrelationId, Origin(exception));
             return SaResult<T>.Fail(SaErrors.Unavailable);
         }
         catch (Exception exception) when (exception is DbException or IOException or InvalidOperationException or TimeoutException)
         {
-            // Exception messages may contain parameters or file content; only the type is logged.
-            logger.LogError("Service Accounts persistence failed. FailureType: {FailureType}", exception.GetType().Name);
+            // Exception messages may contain parameters or file content; only the type and throwing method are logged.
+            logger.LogError("Service Accounts persistence failed. FailureType: {FailureType} Origin={Origin} CorrelationId={CorrelationId}",
+                exception.GetType().Name, Origin(exception), context.CorrelationId);
             return SaResult<T>.Fail(SaErrors.Unavailable);
         }
     }
+
+    /// <summary>Throwing type and method only (no message, no values) so a failure can be located safely.</summary>
+    private static string Origin(Exception exception) =>
+        exception.TargetSite is { } site ? $"{site.DeclaringType?.Name}.{site.Name}" : "unknown";
 
     private static bool ValidText(string? value, int max, bool required = false) =>
         value is null ? !required : value.Trim().Length > 0 && value.Length <= max || !required && value.Length == 0;
