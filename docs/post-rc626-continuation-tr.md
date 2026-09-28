@@ -696,9 +696,14 @@ gerektirir; basarili issue icin Jira sahibinin ayri iptal sureci kullanilir.
    tekil cozulmus requester ve oturumdaki dogrulanmis reporter ile varsa
    onayli assignee'yi alan alan karsilastirin. Kaynak surumu veya mapping
    degisirse eski onizlemeyle gondermeyin.
-3. Ayri yetkili onaydan sonra UI onay penceresinden yalniz bir
-   `POST /api/v1/operational-records/{internal-guid}/jira` istegi gonderin; komut
-   kimligini koruyun. Beklenen: Jira'da ayni alanlara sahip tek issue, WASAS
+3. Ayri yetkili onaydan sonra UI onay penceresinden yalniz bir kullanici
+   gonderimi yapin (`POST /api/v1/operational-records/{internal-guid}/jira`).
+   UI hostunun HTTP katmani kopan cevabi otomatik yeniden iletebilir; bu nedenle
+   agdaki POST sayisinin kesinlikle bir oldugu iddia edilmez. Beklenen, kalici
+   komut/transfer korumasi sayesinde Jira'da tek issue ve tek kayitli key'dir.
+   Komut kimligi mevcut DTO'da gosterilmez; destek referansi ve UTC zamaniyla
+   yetkili destek ekibi kalici komut/audit kanitini eslestirir. Beklenen:
+   Jira'da ayni alanlara sahip tek issue, WASAS
    transferinde kalici tek issue key ve OR-Jira iliskisi, `JiraCreated` durumu,
    `SourceCloseRequested=false`. WASAS ayrintisindaki key'i Jira'nin kendi
    onayli arayuzunde acilan issue ile karsilastirin; bu UI key gosterir, yeni
@@ -712,12 +717,16 @@ gerektirir; basarili issue icin Jira sahibinin ayri iptal sureci kullanilir.
    onizleme, redakte mapping surumu, secilen OR/actor ve Jira issue ekran
    kanitini ayni kabul kaydina baglayin; sifre veya Authorization saklamayin.
 5. Zaman asimi, kopan cevap veya `CreatingJira`/`ReconciliationRequired` varsa
-   yeni anahtarla gondermeyin. Jira sahibi secilen OR ve komut iliskisini
+   yeni anahtarla gondermeyin. F5 devreye ait yerel belirsizlik mesajini silebilir;
+   kayitli key olmamasi veya onizleme dugmesinin yeniden acilmasi tekrar gonderim
+   izni degildir. Kalici belirsizlik sunucuda korunur. Jira sahibi secilen OR ve komut iliskisini
    onayli Jira arayuzunde inceleyip var olan issue kimligini veya belirsizligi
    kaydeder; bos arama tek basina yokluk kaniti degildir. Hatali issue icin
    silme/iptal yalniz Jira sahibinin ayri onayli sureciyle yapilir; WASAS SQL
    linki veya audit silinmez. Acik Jira reddi duzeltilmis onizleme ve ayri
-   onay gerektirir. Kaynak OR kapanisi ve In Use kabulunden bagimsizdir.
+   onay gerektirir. Ilk tek-OR kabulunde retry yapilmaz: mevcut retry penceresi
+   sabitlenmis alanlari yeniden gosteremez; sonraki deneme icin ayri alan inceleme
+   kaniti ve onay gerekir. Kaynak OR kapanisi ve In Use kabulunden bagimsizdir.
 
 Tarihsel not: Onceki 6. maddedeki "otoritatif OR durumu" kosulu eski tum-OR
 kapanisi kabulune aitti; guncel WASAS aktivitesi kabulunde yururlukten kalkti.

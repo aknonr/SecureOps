@@ -4,6 +4,45 @@
 
 ### SDM-01 combined integration, 2026-09-28 (current)
 
+#### Pinned UI handoff reconciliation
+
+Audited UI snapshot `a3037175bb0bb9ecc7ab5c36c7c28607726469ce` is present
+locally and compared by Git blob identity, not by branch name alone. Of its
+19 changed paths, 16 code/test files are identical to the integrated source.
+`OperationalRecordDetail.razor` differs only by the tested initial access-listener
+ordering correction; the README retains that correction, the distinction between
+UI-to-API and API-to-Jira transport, and prior In Use work. The remaining new file,
+`ui-or-sdm-jira-only-cloud-handoff.md`, is retained verbatim as historical UI-owner
+handoff. Its uncommitted-backend and branch-only test descriptions are historical;
+the final integrated evidence below remains authoritative. No duplicate patch,
+cherry-pick, backend reset or product rebuild was needed.
+
+New focused verification: 49 unit cases passed, zero failed/skipped, using the
+unchanged final Release assemblies (`JiraSubmissionTests`, access-provider and
+matching transfer tests). Evidence:
+`C:\SecureOpsBuild\validation\sdm-ui-pinned-a303717-20260928\ui-pinned-equivalence.trx`.
+This is a focused unit run, not another run of the 49-case SQL suite. Product
+source, matched ZIP hashes and prior final-source SQL/browser results are unchanged.
+
+Handoff limitations remain explicit:
+
+- One approved operator submission is not a guarantee of one UI-to-API HTTP
+  POST. An empty-body transport resend uses the deterministic actor/command/target
+  create key and durable command/transfer protection. Retry fallback additionally
+  includes record version; this is not a remote Jira idempotency contract. The
+  API-to-Jira JSON socket tests are separate evidence, not corporate TLS proof.
+- F5 loses circuit-local uncertainty if the API has no persisted execution state.
+  Persisted `CreatingJira`/reconciliation still blocks writes. Absence of a key,
+  or a new preview button after reload, is not permission to resubmit an unknown
+  attempt. Keep the operator stop/reconciliation rule across reloads. F5 during
+  an in-flight browser command remains unexecuted, not covered by restart evidence.
+- Retry confirmation cannot redisplay the persisted reviewed field preview with
+  the current DTOs. No preview, issue URL, command identity or replay field was
+  invented. The first corporate acceptance excludes retry: explicit rejection or
+  uncertainty stops the window; any subsequent retry needs separate reviewed
+  evidence and approval. Existing command/audit evidence requires authorized
+  support collection, not an assumed UI field.
+
 #### Final local outcome
 
 Tested product source: `deda8486b57c04a23aba203c0e79f96b746102e9`;
