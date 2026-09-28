@@ -44,6 +44,11 @@ public sealed partial class ServiceAccountService(SqlServiceAccountRepository? r
                 orgs, teams, !caller.Scope.IsEmpty));
         }, cancellationToken);
 
+    /// <summary>What needs the caller's attention on entry (own teams' requests; coordinator scope counts).</summary>
+    public Task<SaResult<ServiceAccountWorkSummary>> WorkSummaryAsync(ClaimsPrincipal principal, AccessOperationContext context, CancellationToken cancellationToken) =>
+        RunAsync(principal, context, ServiceAccountCapabilities.View, async caller =>
+            new SaResult<ServiceAccountWorkSummary>(await repository!.WorkSummaryAsync(caller.Scope, Today, cancellationToken)), cancellationToken);
+
     private async Task<SaResult<T>> RunAsync<T>(ClaimsPrincipal principal, AccessOperationContext context, string capability,
         Func<SaCaller, Task<SaResult<T>>> operation, CancellationToken cancellationToken)
     {

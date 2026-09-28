@@ -337,3 +337,26 @@ public sealed record CreateHandoverRequest(Guid TargetTeamId, Guid? SourceTeamId
 /// <summary>Update gMSA suitability/plan; a decision needs a note.</summary>
 public sealed record TransitionUpdateRequest(string ExpectedVersion, string Suitability, string? DecisionNote = null,
     DateOnly? PlannedOn = null, Guid? CompletedActionId = null);
+
+/// <summary>One open request in the caller's entry summary (nearest due first).</summary>
+public sealed record WorkSummaryItem(Guid RequestId, Guid AccountId, string AccountName, string ActionType, string ActionLabel, DateOnly? Due,
+    bool Overdue, bool FollowupDue, SaRef? TargetTeam);
+
+/// <summary>
+/// What needs the caller's attention when entering the module. Team counts cover open work targeted at the caller's
+/// directly granted teams; coordinator counts cover the caller's organization-level scope. All counts are scope-filtered.
+/// </summary>
+public sealed record ServiceAccountWorkSummary(
+    DateOnly Today,
+    bool HasTeams,
+    int TeamOpenRequests,
+    int TeamOverdue,
+    int TeamFollowupDue,
+    int TeamAwaitingDate,
+    int IncomingHandovers,
+    bool Coordinator,
+    int ScopeOverdue,
+    int ScopeFollowupDue,
+    int ProposedOwnership,
+    int AwaitingVerification,
+    IReadOnlyList<WorkSummaryItem> Items);

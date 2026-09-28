@@ -1,0 +1,90 @@
+@* Entry summary: before changing anything, the caller sees the open work targeted at their own teams and, when they
+   coordinate an organization scope, what waits for their decision. Counts come from the scope-filtered API. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-work-summary">
+    <div class="so-panel-head">
+        <h2 id="sa-work-summary" class="so-panel-title">Takibinizdeki işler</h2>
+        <span class="so-panel-text--sm">Bugün @Summary.Today.ToString("dd.MM.yyyy")</span>
+    </div>
+    @if (!Summary.HasTeams && !Summary.Coordinator)
+    {
+        <p class="so-panel-text">Size doğrudan bir ekip veya kurum kapsamı atanmadığı için takip listesi oluşmadı.</p>
+    }
+    else
+    {
+        @if (Attention > 0)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2" role="status">
+                Değişiklik yapmadan önce: @AttentionText
+            </MudAlert>
+        }
+        <div class="d-flex flex-wrap gap-2" role="list" aria-label="Takip özeti">
+            @if (Summary.HasTeams)
+            {
+                <SoMetric Label="Ekibinize atanmış açık iş" Value="@Summary.TeamOpenRequests.ToString()" />
+                <SoMetric Label="Plan bitişi geçen (ekibiniz)" Value="@Summary.TeamOverdue.ToString()" />
+                <SoMetric Label="Takip günü gelen (ekibiniz)" Value="@Summary.TeamFollowupDue.ToString()" />
+                <SoMetric Label="Tarih bekleyen (ekibiniz)" Value="@Summary.TeamAwaitingDate.ToString()" />
+                <SoMetric Label="Ekibinize devir önerisi" Value="@Summary.IncomingHandovers.ToString()" />
+            }
+            @if (Summary.Coordinator)
+            {
+                <SoMetric Label="Kapsamda plan bitişi geçen" Value="@Summary.ScopeOverdue.ToString()" />
+                <SoMetric Label="Kapsamda takip günü gelen" Value="@Summary.ScopeFollowupDue.ToString()" />
+                <SoMetric Label="Sahiplik kararı bekleyen hesap" Value="@Summary.ProposedOwnership.ToString()" />
+                <SoMetric Label="Doğrulama bekleyen işlem bildirimi" Value="@Summary.AwaitingVerification.ToString()" />
+            }
+        </div>
+        <div class="d-flex flex-wrap gap-1 mt-2">
+            @if (Summary.HasTeams)
+            {
+                <MudButton Href="service-accounts?myTeam=true&status=open" Size="Size.Small" Variant="Variant.Outlined">Ekibimin açık işleri</MudButton>
+                <MudButton Href="service-accounts?myTeam=true&status=overdue" Size="Size.Small" Variant="Variant.Outlined">Ekibimin geciken işleri</MudButton>
+            }
+            @if (Summary.Coordinator)
+            {
+                <MudButton Href="service-accounts?status=overdue" Size="Size.Small" Variant="Variant.Outlined">Kapsamdaki geciken işler</MudButton>
+                <MudButton Href="service-accounts?status=proposed" Size="Size.Small" Variant="Variant.Outlined">Sahiplik kararı bekleyenler</MudButton>
+            }
+        </div>
+        @if (Summary.Items.Count > 0)
+        {
+            <MudSimpleTable Dense="true" Class="mt-2">
+                <thead><tr><th scope="col">Hesap</th><th scope="col">İş</th><th scope="col">Hedef ekip</th><th scope="col">Vade</th></tr></thead>
+                <tbody>
+                    @foreach (WorkSummaryItem item in Summary.Items)
+                    {
+                        <tr>
+                            <td><MudLink Href="@($"service-accounts/{item.AccountId}")">@item.AccountName</MudLink></td>
+                            <td>@item.ActionLabel</td>
+                            <td>@(item.TargetTeam?.Label ?? "Hedef ekip yok")</td>
+                            <td>
+                                @ServiceAccountUiText.Date(item.Due, "tarih yok")
+                                @if (item.Overdue) { <SoStatusBadge Label="Plan bitişi geçti" Tone="SoStatusBadge.BadgeTone.Critical" Icon="@Icons.Material.Filled.Warning" /> }
+                                else if (item.FollowupDue) { <SoStatusBadge Label="Takip günü" Tone="SoStatusBadge.BadgeTone.Caution" Icon="@Icons.Material.Filled.Alarm" /> }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    }
+</section>
+
+@code {
+    /// <summary>Summary from the API.</summary>
+    [Parameter] public ServiceAccountWorkSummary Summary { get; set; } = default!;
+
+    private int Attention => Summary.TeamOverdue + Summary.TeamFollowupDue + Summary.IncomingHandovers + Summary.ScopeOverdue + Summary.ProposedOwnership;
+
+    private string AttentionText => string.Join(", ", new[]
+    {
+        Summary.TeamOverdue > 0 ? $"ekibinizde {Summary.TeamOverdue} işin plan bitişi geçti" : null,
+        Summary.TeamFollowupDue > 0 ? $"ekibinizde {Summary.TeamFollowupDue} işin takip günü geldi" : null,
+        Summary.IncomingHandovers > 0 ? $"ekibinize {Summary.IncomingHandovers} devir önerisi var" : null,
+        Summary.ScopeOverdue > 0 ? $"kapsamınızda {Summary.ScopeOverdue} işin plan bitişi geçti" : null,
+        Summary.ProposedOwnership > 0 ? $"{Summary.ProposedOwnership} hesap sahiplik kararı bekliyor" : null
+    }.OfType<string>()) + ".";
+}

@@ -309,6 +309,49 @@ public sealed class ServiceAccountWorkflowSqlTests
     }
 
     [ServiceAccountSqlFact]
+    public async Task WorkSummary_ShowsTeamFollowupsAndCoordinatorDecisions_WithinScopeOnly()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        Guid team = await fx.TeamAsync("SYN OZET " + fx.Suffix, null);
+        AccountDetail account = await CreateAccountAsync(fx, coordinator, org, "OZET");
+        account = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, account.Summary.Id,
+            new CreateWorkRequest("PasswordChange", TargetTeamId: team, PlanStart: new(2026, 9, 1), PlanEnd: new(2026, 9, 2)), _token));
+        account = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, account.Summary.Id,
+            new CreateWorkRequest("Review", TargetTeamId: team, NextFollowupOn: new(2026, 9, 3)), _token));
+        account = Ok(await fx.Service.ChangeOwnershipAsync(coordinator.Principal, fx.Context, account.Summary.Id,
+            new OwnershipChangeRequest(account.Summary.Version, team, null, "Propose", "Sentetik öneri"), _token));
+        AccountDetail other = await CreateAccountAsync(fx, coordinator, org, "OZET2");
+        Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, other.Summary.Id, new CreateWorkRequest("Deletion"), _token));
+
+        SynUser member = await fx.UserAsync(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Work);
+        await fx.GrantAsync(member, ScopeKind.Team, team: team);
+        ServiceAccountWorkSummary mine = Ok(await fx.Service.WorkSummaryAsync(member.Principal, fx.Context, _token));
+        mine.HasTeams.Should().BeTrue();
+        mine.Coordinator.Should().BeFalse();
+        mine.TeamOpenRequests.Should().Be(2);
+        mine.TeamOverdue.Should().Be(1);
+        mine.TeamFollowupDue.Should().Be(1);
+        mine.TeamAwaitingDate.Should().Be(1);
+        mine.ProposedOwnership.Should().Be(0, "coordinator counts are not shown to a team member");
+        mine.Items.Should().HaveCount(2).And.OnlyContain(i => i.TargetTeam!.Id == team, "the list holds only work targeted at the member's team");
+        mine.Items[0].Overdue.Should().BeTrue("overdue and due follow-ups come first");
+
+        ServiceAccountWorkSummary scope = Ok(await fx.Service.WorkSummaryAsync(coordinator.Principal, fx.Context, _token));
+        scope.Coordinator.Should().BeTrue();
+        scope.HasTeams.Should().BeFalse();
+        scope.ScopeOverdue.Should().Be(1);
+        scope.ScopeFollowupDue.Should().Be(1);
+        scope.ProposedOwnership.Should().Be(1);
+        scope.Items.Should().HaveCount(3, "a coordinator sees the open work in the organization scope");
+
+        SynUser outsider = await fx.UserAsync(ServiceAccountCapabilities.View);
+        await fx.GrantAsync(outsider, ScopeKind.Team, team: await fx.TeamAsync("SYN DIS " + fx.Suffix, null));
+        ServiceAccountWorkSummary none = Ok(await fx.Service.WorkSummaryAsync(outsider.Principal, fx.Context, _token));
+        none.TeamOpenRequests.Should().Be(0);
+        none.Items.Should().BeEmpty("another team's work never appears in the summary");
+    }
+
+    [ServiceAccountSqlFact]
     public async Task ManualAccounts_StayProvisional_EvenWithATypedDomain()
     {
         (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();

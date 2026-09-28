@@ -23,6 +23,12 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
 {
     private const long _maxEvidenceRequestBytes = 11L * 1024 * 1024;
 
+    /// <summary>Entry summary: open work targeted at the caller's teams and coordinator attention counts (scope-filtered).</summary>
+    [HttpGet("work-summary")]
+    [ProducesResponseType(typeof(ServiceAccountWorkSummary), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ServiceAccountWorkSummary>> WorkSummaryAsync(CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.WorkSummaryAsync(User, Context(), cancellationToken));
+
     /// <summary>Server-paged, scope-filtered account list with stable ordering.</summary>
     [HttpGet("accounts")]
     [ProducesResponseType(typeof(AccountPage), StatusCodes.Status200OK)]
