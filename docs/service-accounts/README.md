@@ -76,6 +76,19 @@ or team grant matching the owner team, an open request's target team, or an inco
 target team. Owner-team changes require `Assign` plus organization/All scope; owner-person
 changes within a team require `Assign` plus that team or wider scope.
 
+Visibility is not authority (`AccountPermissions.Basis`): organization scope or the owner team is
+*responsible*; a team seeing the account only through its targeted open request or an incoming
+handover is a *participant* limited to `ParticipantRequestIds` (update without retargeting, linked
+action reports, evidence on those, mails). See SPEC "Visibility is not authority".
+
+Entry summary: `GET work-summary` returns open work targeted at the caller's directly granted
+teams and, for organization-scope coordinators, scope-wide overdue/follow-up counts, ownership
+decisions and performed actions awaiting verification. The account list and "Ekibimin işleri"
+show it first, so the caller sees their follow-ups before changing anything.
+
+Concurrency: every module write transaction takes the application lock `svcacct:import-commit`
+in Shared mode first; the import commit holds it exclusively (see PROGRESS, VerifyAction deadlock).
+
 ## Data model (SQL candidate `svcacct` schema)
 
 Mutable roots carry `CreatedAt/By`, `UpdatedAt/By` and `rowversion`; stale writes return 409

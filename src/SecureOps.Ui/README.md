@@ -265,9 +265,9 @@ have to be invented.
 | `/resources` | Uygulama Bağlantıları: search, favourites, add to a personal group | `Resources.View` |
 | `/resources/sets` | Bağlantı Gruplarım: personal ordered groups, preferred group, opening | `Resources.View` |
 | `/admin/resources` | Bağlantı Yönetimi: shared categories and links | `Resources.View` and `Resources.Manage` |
-| `/service-accounts` | Servis Hesapları: scoped list and filters | `ServiceAccounts.View` and scope grant |
+| `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters | `ServiceAccounts.View` and scope grant |
 | `/service-accounts/{id}` | Account detail, work, evidence and history | `ServiceAccounts.View`; commands require their own capability |
-| `/service-accounts/work` | In-app reminders and unsent coordinator drafts | `ServiceAccounts.View` |
+| `/service-accounts/work` | Entry work summary, in-app reminders and unsent coordinator drafts | `ServiceAccounts.View` |
 | `/service-accounts/imports` | Import preview, decisions and idempotent commit | `ServiceAccounts.Import` and organization scope |
 | `/service-accounts/reports` | Live report, immutable snapshots, XLSX/PDF | `ServiceAccounts.Report` |
 | `/service-accounts/admin` | Scope grants and dictionaries | `ServiceAccounts.Administer` |
