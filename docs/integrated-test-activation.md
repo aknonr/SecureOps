@@ -4,6 +4,93 @@
 
 ### SDM-01 combined integration, 2026-09-28 (current)
 
+#### Final local outcome
+
+Tested product source: `deda8486b57c04a23aba203c0e79f96b746102e9`;
+all three ProductVersion values are `0.1.0+deda8486b57c04a23aba203c0e79f96b746102e9`.
+The product worktree was clean at publish. A later documentation-only closeout
+must not replace this build identity. Cumulative product diff from the shared
+base is 117 files, 6,318 insertions and 447 deletions under the retained scoped
+completion exception; it includes all inherited work, not just this turn's fixes.
+
+Current matched review candidate:
+`C:\SecureOpsBuild\delivery-review\2026-09-28-sdm-integrated-test\final`.
+`candidate.json` records ZIP identities/hashes and the SQL inventory;
+`payload-manifest.json` records all staged file hashes and component versions;
+`manifests/Api.sha256`, `Ui.sha256`, `Worker.sha256` describe the exact ZIP members.
+`evidence/verification.json` and its copied TRX/browser results identify the
+final local checks. `operator/` contains hash-preserved exported guidance from
+the documentation-only closeout recorded separately in `candidate.json`.
+Packages are `packages/SecureOps.{Api,Ui,Worker}-deda848-TEST-review.zip`.
+Only this `final` directory is current. Earlier 0644141/3a8b637 outputs in the
+parent are visibly superseded for concrete browser defects; no new rc number
+was assigned. E-05/E-06/E-07/E-08 and the security-held SCCM package are unchanged.
+
+| Component | Entry DLL SHA256 |
+|---|---|
+| API | `6CA3B302AA3E5B777027B29061928FE1ACE666BAE329C25AF2C551D401E5DE1C` |
+| UI | `FA3763E8DD6776671A5E68EC4014A9F6FAD344257E2D03FD9E5825182DB48F60` |
+| Worker | `812CF134E3B568A65F13ADCC2D6BC969F347EEA79343328B3D0405A195D6C472` |
+
+Newly executed final-source evidence under
+`C:\SecureOpsBuild\validation\sdm-integrated-20260928`:
+
+- Release build: zero warnings/errors. Full format verification passed after
+  mechanical corrections; earlier failed reports remain available.
+- `tests/delivery-unit.trx`: 1,512 passed, zero failed/skipped.
+- `tests/delivery-integration.trx`: 283 passed, 61 opt-ins skipped, zero failed.
+  The two actual CorporateJiraClient socket checks are included in 283, not extra.
+- `tests/delivery-sql49.trx`: 49 passed, zero failed/skipped, fresh guarded
+  `SecureOps_ResourcesV1_OcoSdmDelivery0928F`, test-only 001-024. Those names
+  overlap normal-run opt-ins; totals must not be added as disjoint suites.
+- `browser-delivery/jira-only-results.json`: real Chrome against the final
+  published API/UI and isolated SQL/Simulation. Capability denial, three review
+  declarations without type coercion, source-version conflict, keyboard focus,
+  confirmation/cancel/double-click, one persisted synthetic key, no source-close
+  stage, replay and unknown-result stop passed. Desktop 1440 and mobile 390
+  screenshots are retained; this does not claim native 200% zoom or all In Use
+  visual gates passed.
+- `browser-delivery-restart/restart-results.json`: actual task-owned API stop
+  and restart, same persisted key and source-open intent; unknown stays blocked,
+  no second create. This is not corporate restart or Worker service acceptance.
+- `browser-delivery-fault/negative-results.json`: five scenarios passed on
+  fresh `SecureOps_ResourcesV1_OcoSdmFaultDelivery0928G`: another actor publishes
+  first, lost response after create, request never delivered, stale source with
+  explicit retry confirmation, and unsupported types remaining review-only.
+- `tests/access-race-before.trx` failed as expected (two notifications instead
+  of one); `access-race-after.trx` passed. Final full suites include the regression.
+  Earlier `browser-negative`, `browser-negative-corrected` and `browser-accepted`
+  failures are retained, not relabelled as passes. Final runs passed without
+  rewriting assertions or suppressing authorization/source-version checks.
+
+The existing normal loopback runner executed without a policy denial in this
+turn; no fallback launcher or security override was used. All task-owned hosts
+and fault proxies were stopped. Corporate SCCM/Falcon restrictions are unchanged.
+Package checks cover forbidden files/secrets/personal paths, API AD dependency
+closure, Worker runtime closure and per-entry ZIP hashes. Config/web.config,
+credentials, key rings and test databases are not deployment ZIP members.
+
+| ID | Final state / owner | Next action and evidence to close |
+|---|---|---|
+| SDM-01-COMBINED | Implemented and locally verified / delivery owner | Final source and exact payload evidence above; not installed |
+| SDM-01-TARGET | Unexecuted corporate acceptance / business + Jira + platform owners | Supply one approved open ServerRequest OR code/source ID/current fingerprint, Jira project/issue-type/mapping, actor and explicit Jira-only approval; review live preview before the single create |
+| SDM-01-RELEASE | Matched review ZIPs prepared; promotion not approved / release owner | Resolve exact-branch guard in the existing release procedure through reviewed promotion, without resetting dirty inputs or weakening the rule; obtain target SQL/payload/security review |
+| SDM-01-ROLLBACK | Conditional procedure prepared / operator + DBA + Jira owner | Use current Turkish entry; stop writes and reconcile unknown outcomes, coordinate component versions, retain audit/intents/keys and additive schema |
+
+No selected corporate OR or real preview was fabricated. The existing API
+write gates remain the explicit read-only/controlled-write pair with
+`SourceCloseEnabled=false`; the exact single-record policy is an additional
+restriction, not an inferred role grant. Corporate issue URL must be retained
+from the approved Jira interface because no URL field exists in the DTO.
+UI/API deploy together; Worker is matched but Jira-only creation executes in
+the API and does not require SCCM or service installation. 024 is the catalogue
+delta only after target 022/023 verification; nothing here applies SQL.
+In Use's three source contracts and Falcon approval remain separate. Security
+receipt/approval of either diagnostic or final binaries is not established.
+
+The historical integration steps below are retained for provenance; this final
+outcome supersedes their intermediate source/test states.
+
 The active delivery source is now the isolated worktree
 `C:\SecureOpsBuild\secure-ops-sdm-integrated-test-20260928`, branch
 `feature/sdm-integrated-test-20260928`. Both input worktrees remain untouched.

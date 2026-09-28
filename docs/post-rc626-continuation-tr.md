@@ -611,6 +611,16 @@ OCO'dan gelir. Dogrudan OCO-servis baglantisi oldugu varsayilmaz.
 ### SDM-01: secili TEST ServerRequest icin Jira-only kabul (hazir, calistirilmadi)
 
 Guncel birlesik kaynak: `feature/sdm-integrated-test-20260928`.
+Test edilen urun: `deda8486b57c04a23aba203c0e79f96b746102e9`.
+Guncel eslesmis API/UI/Worker inceleme adayi:
+`C:\SecureOpsBuild\delivery-review\2026-09-28-sdm-integrated-test\final`.
+Surum `0.1.0+deda8486b57c04a23aba203c0e79f96b746102e9`; paket hash'leri
+`candidate.json`, dosya hash'leri `manifests` altindadir. Bu bir rc numarali
+kurulum onayi degildir. Ust dizindeki onceki yayinlar tarayici kusuru nedeniyle
+yerini bu adaya birakmistir; kullanilmaz. Yerel 1512 unit, 283 normal integration,
+49 izole SQL ve son payload tarayici/restart/yanit-kaybi yolculuklari gecti.
+61 opt-in normal kosuda atlandi; 49 SQL bunlarin icindedir, sayilar ust uste
+eklenmez. In Use/SMTP/SCCM ve kurumsal Jira kabulu bu sonuctan turetilmez.
 Iki kaynak worktree ve muhurlu E-05/E-06/E-07/E-08 degistirilmedi.
 Birlesik aday ve test kimligi tek kayitta: `integrated-test-activation.md`.
 Asagidaki hedef sirasi **kosullu inceleme taslagidir**, simdi uygulanacak
@@ -714,6 +724,10 @@ kapanisi kabulune aitti; guncel WASAS aktivitesi kabulunde yururlukten kalkti.
 E-07/E-08 tarihsel kanitlari ve gercek kapanis kayitlari aynen korunur.
 
 ## Son UI kapisi: izinli test ortami
+
+Kapsam notu: Asagidaki onceki host kisiti ve In Use kabul proseduru tarihsel
+baglamiyla korunur. Yukaridaki SDM-01 bolumundeki yeni Jira-only tarayici
+kanitlari ayri, normal yerel runner kosusudur; In Use UI kabulunu kapatmaz.
 
 Onceki ozel UI host baslatmasi tool policy tarafindan reddedildi. Daha ayrintili
 bir neden kanit kaydinda yok; port/komut/launcher/izin degistirerek tekrar denenmedi.
