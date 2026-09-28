@@ -68,6 +68,12 @@
                     }
                 </span>
             </p>
+            @if (JiraSubmissionView.IsUncertain(Attempt?.Problem))
+            {
+                <p class="so-jira-submit-note" data-resolved-uncertain>
+                    Gönderimin yanıtı alınamadı; bu anahtar kayıtlı durum yeniden okunarak doğrulandı. Yeni gönderim yapmayın.
+                </p>
+            }
             @if (Record.SimulationMode)
             {
                 <p class="so-jira-submit-note">Simülasyon: bu anahtar sentetiktir ve gerçek bir Jira kaydı değildir.</p>

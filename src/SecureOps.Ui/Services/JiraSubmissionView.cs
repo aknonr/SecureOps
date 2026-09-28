@@ -122,8 +122,14 @@ public static class JiraSubmissionView
     /// <summary>Whether a command failure is the unresolved-outcome presentation.</summary>
     /// <param name="problem">Translated failure.</param>
     /// <returns><c>true</c> for the reconciliation stage.</returns>
+    /// <remarks>
+    /// <c>WorkflowAlreadyInProgress</c> counts too: the same command scope is still executing, so this
+    /// page's request was not refused on its merits and its outcome belongs to that execution. The
+    /// HTTP transport can resend a create whose response was lost, and that resend meets exactly this.
+    /// </remarks>
     public static bool IsUncertain(UiProblem? problem) =>
-        string.Equals(problem?.Stage, UiProblemFactory.ReconciliationStage, StringComparison.Ordinal);
+        string.Equals(problem?.Stage, UiProblemFactory.ReconciliationStage, StringComparison.Ordinal)
+        || string.Equals(problem?.Code, SecureOps.Shared.Contracts.Api.OperationalErrorCodes.WorkflowAlreadyInProgress, StringComparison.Ordinal);
 
     /// <summary>What happens to the source OR, as fixed by the server preview.</summary>
     /// <param name="sourceCloseRequested">The preview's close intent.</param>

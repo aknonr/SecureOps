@@ -35,6 +35,22 @@ The current Turkish operator entry below contains the conditional Jira-only
 configuration/deployment review. It is not an executable target authorization:
 corporate selection, mapping, payload approval and SQL baseline are still open.
 
+Integration follow-up: the UI owner continued editing during this run. The
+separately hash-recorded `ui-followup-manifest.json` captures that follow-up
+without modifying its worktree. It corrects `WorkflowAlreadyInProgress` to
+uncertain, explains saved-key readback after a lost response and improves the
+loopback fault proxy. The first negative browser run failed at the lost-response
+notice because a one-shot drop let a transparent UI HTTP resend through; that
+failed evidence remains in `browser-negative`. The successful initial journey
+and restart remain scoped to source `06441416b983f1ce97ea308bcdb68548ff8df074`,
+not automatically evidence for the corrected source. No ZIP was issued from it.
+`CorporateJiraSocketTests` now tests the actual JSON create client with a consumed
+body and aborted response, on fresh and reused loopback connections: 2/2 passed,
+one create per attempt, unknown/non-retryable outcome. UI-to-API empty-body
+resend and API-to-Jira JSON create are different transports; neither grants
+corporate acceptance. The new test initially hit IDE0008 and was corrected
+before its successful run.
+
 ### In Use SQL regression correction, 2026-09-28
 
 The audit-rollback assertion in

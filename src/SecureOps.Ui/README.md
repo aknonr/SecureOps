@@ -386,6 +386,26 @@ Refresh is a deliberate operator action, plus an automatic re-read after every w
   contradicts the contract by also sending `retryEligible=true`.
 - After a command settles, focus moves to the panel heading.
 - No Jira link is rendered: the contract carries no issue URL, and none is composed from the key.
+- **Yeniden Dene is a write and is confirmed.** For a safe `JiraCreateFailed` the server reports
+  `retryEligible=true` and `POST /retry` rebuilds the draft and calls Jira create again.
+  `JiraRetryDialog` states that effect and the source outcome and uses the same statement gate.
+  The reviewed fields cannot be re-shown there: no preview exists in a failed stage.
+- A lost response that the re-read resolves to a persisted key is shown as Created with a
+  resolution note; the stale "may or may not exist" notice is not kept beside the saved key.
+- `WorkflowAlreadyInProgress` on create/retry is Uncertain, not Rejected: the same command scope
+  is still executing and this page's request was not refused on its merits.
+- **UI transport resend (measured 2026-09-28).** .NET `SocketsHttpHandler` can transparently resend
+  this body's-empty UI-to-API POST when the connection closes before any response byte,
+  and `PooledConnectionLifetime`/`Connection: close` do not stop it. A lost create response can
+  therefore reach the API twice. The API's deterministic actor/command/target command key turns
+  the second into a replay (one `JiraCreated` observed). A UI-only suppression needs a custom
+  connection stream that is not reliable under TLS, so none is shipped; the backend key semantics
+  are a hard dependency of this screen.
+  This observation is not a claim about the API-to-Jira JSON POST. The separate
+  `CorporateJiraSocketTests` exercises that actual client against a loopback server
+  which consumes the reviewed body then aborts the response: both fresh and reused
+  connections produce one create and a non-retryable unknown outcome. No corporate
+  destination is contacted, and proxy/TLS behavior still needs target acceptance.
 
 Backend contract needs (for Codex; nothing here is assumed by the UI):
 
@@ -395,9 +415,24 @@ Backend contract needs (for Codex; nothing here is assumed by the UI):
    `OperationalRecordResponse`, so duplicate protection stays visible after a page reload.
 3. A replay indicator on `JiraTransferResponse` (for example `replayed: true` when an existing key
    was returned without a new Jira call), so "created now" and "already existed" can be told apart.
+4. A read-only view of the persisted reviewed draft (fields and mapping version) for a
+   `JiraCreateFailed` record, so the retry confirmation can show what Jira will receive.
+5. Keep the deterministic actor/command/target fallback command key for create/retry; the UI sends
+   no `Idempotency-Key` and relies on it to absorb transport resends (see above).
 
-Replay: `node tests/browser/sdm-jira-submission.cjs <playwright-core path> <UI URL> <API URL> <evidence dir>`
-against paired `Simulation` providers with `InMemory` persistence (every key is synthetic `SIM-*`).
+None of these fields exist in the current DTOs or in the backend worktree's uncommitted changes;
+the UI does not read or assume them.
+
+Replay (all Simulation-only, synthetic `SIM-*` keys, loopback, test-owned LocalDB):
+
+- `tests/browser/sdm-jira-submission.cjs <playwright-core> <UI URL> <API URL> <evidence dir>` —
+  ready/confirm/created/rejected/uncertain/review-only.
+- `tests/browser/sdm-jira-negative.cjs <playwright-core> <admin UI URL> <API URL> <proxy URL> <db> <evidence dir>`
+  with `announcement-hosts.ps1 -OperationalRecordSimulation -UiApiProxyPort <proxy>` and
+  `tests/browser/sdm-fault-proxy.cjs <proxy port> <API port>` — stale preview after another
+  operator, lost response, request never delivered, stale source plus retry gate, unsupported types.
+- `tests/browser/sdm-jira-only.cjs` (existing) after the five `ResourceSqlTests` SDM cases seed a
+  fresh `Test-ResourceCatalogueSql.ps1` database; `--verify-presentation` after a real host restart.
 
 ## Resource catalogue and shift-start sets
 

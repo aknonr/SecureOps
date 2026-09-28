@@ -112,9 +112,14 @@
             </section>
         }
 
+        @* An unacknowledged create that the re-read has resolved to a persisted key is no longer
+           unknown; the submission panel states how it was resolved instead of a stale "may or may
+           not exist" notice beside the saved key. *@
         @if (_actionProblem is not null && (!OperationalRecordView.OutcomeUnknown(_record)
             || _actionProblem.Stage != UiProblemFactory.ReconciliationStage
-            || _actionProblem.CorrelationId != _record.CorrelationId))
+            || _actionProblem.CorrelationId != _record.CorrelationId)
+            && !(JiraSubmissionView.IsUncertain(_actionProblem) && phase == JiraSubmissionView.Phase.Created
+                 && !OperationalRecordView.OutcomeUnknown(_record)))
         {
             @* Held apart from the load problem: every write is followed by a re-read, and one
                shared field would let that re-read erase the message explaining what happened. *@

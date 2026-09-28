@@ -118,6 +118,17 @@ public sealed class JiraSubmissionTests
     }
 
     [Fact]
+    public void SameCommandAlreadyRunning_IsUncertain_NotRejected()
+    {
+        // A transport resend of a create whose response was lost can meet the first execution.
+        UiProblem running = UiProblemFactory.NetworkFailure() with { Code = OperationalErrorCodes.WorkflowAlreadyInProgress, Stage = "command" };
+        OperationalRecordResponse requested = Record() with { WorkflowState = OperationalRecordWorkflowState.CreateRequested };
+
+        JiraSubmissionView.PhaseOf(requested, null, OperationalRecordView.ActionsFor(requested), true, false, new(null, running))
+            .Should().Be(JiraSubmissionView.Phase.Uncertain);
+    }
+
+    [Fact]
     public void UnsupportedTypeGuidance_ComesOnlyFromServerBlockers()
     {
         OperationalRecordResponse record = Record() with { BlockingConditions = ["ApplicationMappingPending", "RequesterMissing"] };
@@ -167,6 +178,17 @@ public sealed class JiraSubmissionTests
             .And.Contain("Mükerrer koruma").And.Contain("mevcut kayıt korundu")
             .And.Contain("sentetiktir ve gerçek bir Jira kaydı değildir");
         html.Should().NotContain("href=").And.NotContain("<a ");
+    }
+
+    [Fact]
+    public async Task CreatedPanel_AfterLostResponse_SaysTheKeyCameFromTheReRead()
+    {
+        var attempt = new JiraSubmissionView.Attempt(null, UiProblemFactory.UncertainPublication(UiProblemFactory.NetworkFailure()));
+        string html = await RenderPanelAsync(Saved("SIM-3"), null, JiraSubmissionView.Phase.Created, attempt);
+
+        html.Should().Contain("data-resolved-uncertain").And.Contain("kayıtlı durum yeniden okunarak doğrulandı")
+            .And.Contain("Yeni gönderim yapmayın");
+        (await RenderPanelAsync(Saved("SIM-3"), null, JiraSubmissionView.Phase.Created)).Should().NotContain("data-resolved-uncertain");
     }
 
     [Fact]
