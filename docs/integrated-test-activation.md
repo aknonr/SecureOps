@@ -2,6 +2,69 @@
 
 ## Owner exception and baseline
 
+### SDM-01 source handoff and target preflight, 2026-09-28
+
+The integration worktree was clean at `9f4f57d00cdb759ac0be888b9727e0baa34e1246`.
+`deda8486b57c04a23aba203c0e79f96b746102e9` is its ancestor; the two
+intervening commits change only `docs/integrated-test-activation.md`,
+`docs/post-rc626-continuation-tr.md` and the pinned UI handoff document.
+ProductVersion and the three review ZIP hashes remain those of `deda848`.
+
+**Source publication gate:** an unauthenticated GitHub API query returned
+`private=false`, `visibility=public` for `aknonr/SecureOps`; its signed-out web
+page also displayed Public. Git advertised the pinned UI branch at `a303717` but
+no `feature/sdm-integrated-test-20260928` remote ref. The requested push was
+therefore withheld. The owner must make the intended repository private and
+verify that state, or supply an approved private destination; inspect any prior
+public exposure separately. Do not publish this corporate continuation to the
+currently public remote. The new-commit review found 118 changed paths, no
+binary/archive/runtime-config/credential paths; three secret-like assignment
+matches were synthetic test literals, not credentials. This scan is not a
+substitute for private visibility.
+
+**Release guard:** `scripts/release/New-PairedTestRelease.ps1:17` requires the
+exact branch `feature/combined-test-delivery-20260915` and line 19 requires a
+clean tree. That branch is attached to the original 96-file dirty worktree.
+For a later approved numbered release, use an independent local clone and
+check out that branch name there at shared base `5c986a9`; fast-forward it to
+the *tested product* `deda848` (ancestor check passed) and verify clean status.
+The existing release script can then run from the clone without changing either
+original worktree or its guard. Running it from documentation tip `9f4f57d`
+would stamp a different ProductVersion and require new testing/payload identity.
+The exact branch-only preparation, for an unused private local directory, is:
+
+```powershell
+git clone --no-local --no-checkout C:\SecureOpsBuild\secure-ops-sdm-integrated-test-20260928 C:\SecureOpsBuild\sdm-release-promotion-review
+git -C C:\SecureOpsBuild\sdm-release-promotion-review switch -c feature/combined-test-delivery-20260915 5c986a96f1f6639e47bf1432a87c3ac55e98054d
+git -C C:\SecureOpsBuild\sdm-release-promotion-review merge --ff-only deda8486b57c04a23aba203c0e79f96b746102e9
+git -C C:\SecureOpsBuild\sdm-release-promotion-review status --porcelain
+git -C C:\SecureOpsBuild\sdm-release-promotion-review rev-parse HEAD
+```
+
+The clone and script have not been run. The release script exports the docs at
+its build HEAD, so its `deda848` operator copy predates the later closeout.
+Release owner must bind the separately hash-identified current operator guide
+to that exact tested product; a script run at a later docs tip is a new build
+requiring its own verification. The review ZIPs are not silently renumbered.
+No release script was run in this handoff. Select a release name only after
+rechecking inventory (currently through rc6.26), target 022/023/024 state,
+payload/security approval and the accepted release scope; `-UpgradeFromRc626`
+is conditional on verified 023 and emits only 024 as the delta. Keep the later
+operator documentation as a separately identified closeout, not build source.
+
+**Target preflight:** the current Turkish operator entry below contains the
+small read-only version/object/configuration checks. Owner-reported rc6.26
+entry versions, repaired API/Worker OCO parity and 022/023 installation are
+historical reports, not fresh checks. The protected API operations diagnostics
+reports effective OCO/mail composition but does not expose OperationalRecords
+or Jira pilot/mapping keys. File/web.config inspection is source-layer evidence,
+not an effective-runtime readback when other providers/overrides exist. The
+normal API owner must reconcile these layers without exposing Authorization,
+connection strings or credentials. A NULL SQL metadata result can reflect
+insufficient metadata visibility; DBA uses the authorized inspection identity.
+No current Jira destination or selected
+ServerRequest OR has been inferred.
+
 ### SDM-01 combined integration, 2026-09-28 (current)
 
 #### Pinned UI handoff reconciliation

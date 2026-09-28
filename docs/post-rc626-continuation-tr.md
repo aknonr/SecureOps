@@ -610,6 +610,76 @@ OCO'dan gelir. Dogrudan OCO-servis baglantisi oldugu varsayilmaz.
 
 ### SDM-01: secili TEST ServerRequest icin Jira-only kabul (hazir, calistirilmadi)
 
+#### Salt okunur hedef on kontrolu
+
+Kaynak teslimi beklemede: `aknonr/SecureOps` 28.09.2026 anonim GitHub
+API/web denetiminde Public gorundu. Ozel gorunurluk dogrulanmadan bu dal
+gonderilmez. Yerel inceleme ZIP'leri ve hash'leri degismedi; onceki belge
+kapanisi `9f4f57d`, derlenen urun `deda848` olarak ayridir.
+
+1. Normal yetkili TEST makinesinde mevcut IIS fiziksel yollarini dogrulayin.
+   API ve UI giris DLL'lerini asagidaki salt okunur PowerShell ile okuyun;
+   bildirilen rc6.26 veya halihazirda kurulu farkli ProductVersion ve SHA256
+   sonucunu kaydedin. Dosya yoksa gercek IIS fiziksel yolunu bulun, tahmin
+   edilmis baska kopyayi kurulu surum saymayin.
+
+   ```powershell
+   $entries = [ordered]@{
+       Api = 'D:\Applications\api\wasasyonetimapi.thy.com\SecureOps.Api.dll'
+       Ui  = 'D:\Applications\ui\wasasyonetim.thy.com\SecureOps.Ui.dll'
+   }
+   foreach ($name in $entries.Keys) {
+       $path = $entries[$name]
+       $file = Get-Item -LiteralPath $path -ErrorAction Stop
+       [pscustomobject]@{
+           Component = $name
+           ProductVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($file.FullName).ProductVersion
+           SHA256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+       }
+   }
+   ```
+
+2. DBA mevcut onayli TEST baglantisinda yalniz asagidaki SELECT'i calistirir.
+   Bu repoda migration ledger yoktur. Nesne gorunurlugu kurulum makbuzu yerine
+   gecmez; NULL sonuc sinirli metadata yetkisinden de kaynaklanabilir.
+   DBA 022/023/024 nesne, kolon, index, trigger ve grant tanimlarini
+   imzali kurulum kaydi ile karsilastirir; fark varsa durur. 022/023 tekrar
+   calistirilmaz; 024 bu on kontrolde uygulanmaz.
+
+   ```sql
+   SELECT DB_NAME() AS DatabaseName,
+          OBJECT_ID(N'ops.InUseServerReviews', N'U') AS M022Review,
+          OBJECT_ID(N'ops.InUseExecutions', N'U') AS M022Execution,
+          OBJECT_ID(N'ops.InUseExecutionEvents', N'U') AS M022Events,
+          OBJECT_ID(N'reporting.WorkflowSnapshots', N'U') AS M023Snapshots,
+          OBJECT_ID(N'reporting.WorkflowFacts', N'U') AS M023Facts,
+          OBJECT_ID(N'reporting.InUseArchiveReceipts', N'U') AS M023Receipts,
+          COL_LENGTH(N'ops.OperationalRecords', N'SourceSynthetic') AS M023SourceColumnBytes,
+          OBJECT_ID(N'reporting.InUseReportCatalogue', N'U') AS M024Catalogue;
+   ```
+
+3. Mevcut yetkili API `GET /api/v1/diagnostics/operations` raporunun yalniz
+   allowlist `Settings` ve kaynak durumu kisimlarini, gizli alan eklemeden
+   saklayin. Bu endpoint OperationalRecords/Jira mapping degerlerini vermez.
+   API sahibinin normal IIS kimligi ve ortaminda mevcut `appsettings.Test.json`
+   ve `web.config` environmentVariables katmanlarindan yalniz su anahtarlarin
+   kaynak/degerini redakte ederek eslestirmesi gerekir:
+   `OperationalRecords:{SourceProvider,RepositoryProvider,ReadOnlyIntegrationMode,ControlledTestWritesEnabled,SourceCloseEnabled}`,
+   `OperationalRecords:Pilot:{RuleSetVersion,SourceRecordId,SourceFingerprint,SourceScope,RequestType,MappingVersion,ApprovalReference,ExpiresAt}` ve
+   `Jira:{Provider,ProjectKey,IssueType,IssueTypeId,MappingVersion,TeamCustomField,TeamValue,Labels,RequesterWatcherCustomField,ReporterMode,AssignmentMode,UnresolvedRequesterPolicy}`.
+   `TrackingReason` ve kisi eslemeleri gerekiyorsa kayitli onay referansiyla
+   ayrica incelenir. `Jira:Authorization`, URL'nin gizli kisimlari ve baglanti
+   dizeleri paylasilmaz. Dosya ve IIS katmanlari baska saglayici/override varsa
+   etkin degerin kaniti sayilmaz; ayni prosesin etkin degeri dogrulanmadan
+   yazma kapisi acilmaz. Bu turde ek bilgi icin Falcon engelli SCCM paketi
+   calistirilmaz.
+
+4. Is/Jira sahibi bir acik TEST ServerRequest OR kodu/kaynak ID'si ve guncel
+   kaynak parmak izini, onayli Jira proje/issue type/mapping, yetkili actor ve
+   yalniz Jira niyetini tek kabul kaydina baglar. Canli preview ayni alanlari
+   gosterene kadar ikinci asamadaki yazma anahtarlari kapali kalir. Kurulum,
+   SQL degisikligi ve Jira create bu on kontrolun parcasi degildir.
+
 Guncel birlesik kaynak: `feature/sdm-integrated-test-20260928`.
 Test edilen urun: `deda8486b57c04a23aba203c0e79f96b746102e9`.
 Guncel eslesmis API/UI/Worker inceleme adayi:
