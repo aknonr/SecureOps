@@ -1,0 +1,30 @@
+@* Module-internal navigation. Each link appears only when the access snapshot reports its capability; the API
+   still decides every call. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+
+<nav class="d-flex flex-wrap gap-1" aria-label="Servis hesapları bölümleri">
+    @foreach ((string key, string href, string label, string capability, string icon) in _links)
+    {
+        @if (Access?.Can(capability) == true && key != Current)
+        {
+            <MudButton Href="@href" Variant="Variant.Text" StartIcon="@icon">@label</MudButton>
+        }
+    }
+</nav>
+
+@code {
+    private static readonly (string Key, string Href, string Label, string Capability, string Icon)[] _links =
+    [
+        ("list", "service-accounts", "Hesaplar", ServiceAccountCapabilities.View, Icons.Material.Filled.ManageAccounts),
+        ("work", "service-accounts/work", "Ekibimin işleri", ServiceAccountCapabilities.View, Icons.Material.Filled.NotificationsActive),
+        ("imports", "service-accounts/imports", "İçe aktarım", ServiceAccountCapabilities.Import, Icons.Material.Filled.UploadFile),
+        ("reports", "service-accounts/reports", "Raporlar", ServiceAccountCapabilities.Report, Icons.Material.Filled.Summarize),
+        ("admin", "service-accounts/admin", "Modül yönetimi", ServiceAccountCapabilities.Administer, Icons.Material.Filled.Tune)
+    ];
+
+    /// <summary>Access snapshot.</summary>
+    [Parameter] public AccessSnapshot? Access { get; set; }
+
+    /// <summary>Key of the current page (not linked).</summary>
+    [Parameter] public string Current { get; set; } = string.Empty;
+}

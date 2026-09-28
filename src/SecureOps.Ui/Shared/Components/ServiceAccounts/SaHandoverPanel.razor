@@ -1,0 +1,132 @@
+@* Handover cohort and gMSA transition tracking. Being listed in a handover is not acceptance; acceptance is an
+   explicit decision with a real date and note. The application never converts an account to gMSA. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-handover">
+    <div class="so-panel-head"><h2 id="sa-handover" class="so-panel-title">Devir</h2></div>
+    @if (Detail.Handovers.Count == 0) { <SoEmptyState Title="Devir kaydı yok" /> }
+    @foreach (HandoverView h in Detail.Handovers)
+    {
+        <div class="so-panel mb-2">
+            <SoFieldGrid>
+                <SoField Label="Hedef ekip" Value="@h.TargetTeam.Label" />
+                <SoField Label="Kaynak ekip" Value="@(h.SourceTeam?.Label ?? "Bilinmiyor")" />
+                <SoField Label="Durum" Value="@ServiceAccountUiText.Handover(h.Status)" />
+                <SoField Label="Bildirim / karar" Value="@($"{ServiceAccountUiText.Date(h.ProposedOn)} / {ServiceAccountUiText.Date(h.DecidedOn, "karar yok")}")" />
+                @if (h.CohortLabel is not null) { <SoField Label="Devir grubu" Value="@h.CohortLabel" /> }
+            </SoFieldGrid>
+            @if (h.DecisionNote is not null) { <p class="so-panel-text--sm">@h.DecisionNote</p> }
+            @if (h.Status == "Proposed" && Detail.Permissions.DecideHandover)
+            {
+                <MudGrid Spacing="2" Class="mt-1">
+                    <MudItem xs="12" md="3"><MudDatePicker Editable="true" @bind-Date="_decidedOn" Label="Karar tarihi" DateFormat="dd.MM.yyyy" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="9"><MudTextField @bind-Value="_note" Label="Karar notu / kanıt" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+                </MudGrid>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <MudButton Disabled="@(!CanDecide)" OnClick="@(() => DecideAsync(h, "Accept"))" Variant="Variant.Filled" Color="Color.Primary">Devri kabul et</MudButton>
+                    <MudButton Disabled="@(!CanDecide)" OnClick="@(() => DecideAsync(h, "Reject"))" Variant="Variant.Outlined">Reddet</MudButton>
+                </div>
+            }
+        </div>
+    }
+
+    @if (Detail.Permissions.AssignTeam)
+    {
+        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Devir bildir">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4">
+                    <MudSelect T="Guid?" @bind-Value="_target" Label="Hedef ekip" Variant="Variant.Outlined">
+                        @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_cohort" Label="Devir grubu etiketi" MaxLength="200" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4" Class="d-flex align-center"><MudCheckBox T="bool" @bind-Value="_trackGmsa" Label="gMSA geçişi olarak izle" /></MudItem>
+            </MudGrid>
+            <MudButton OnClick="CreateAsync" Disabled="@(Busy || _target is null)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Devri bildir</MudButton>
+        </MudExpansionPanel></MudExpansionPanels>
+    }
+</section>
+
+<section class="so-panel" aria-labelledby="sa-gmsa">
+    <div class="so-panel-head"><h2 id="sa-gmsa" class="so-panel-title">gMSA geçiş izlemesi</h2></div>
+    @if (Detail.Transitions.Count == 0) { <SoEmptyState Title="gMSA izlemesi yok" /> }
+    @foreach (TransitionView t in Detail.Transitions)
+    {
+        <div class="so-panel mb-2">
+            <SoFieldGrid>
+                <SoField Label="Uygunluk" Value="@ServiceAccountUiText.Suitability(t.Suitability)" />
+                <SoField Label="Plan" Value="@ServiceAccountUiText.Date(t.PlannedOn, "planlanmadı")" />
+                <SoField Label="Tamamlanma" Value="@(t.CompletedActionId is null ? "Tamamlanma kanıtı yok" : "Gerçekleşen gMSA geçişi bildirimine bağlı")" />
+            </SoFieldGrid>
+            @if (t.DecisionNote is not null) { <p class="so-panel-text--sm">@t.DecisionNote</p> }
+            @if (Detail.Permissions.AssignTeam || Detail.Permissions.AssignPerson)
+            {
+                <MudGrid Spacing="2" Class="mt-1">
+                    <MudItem xs="6" md="3">
+                        <MudSelect T="string" @bind-Value="_suitability" Label="Uygunluk" Variant="Variant.Outlined">
+                            @foreach (string value in _suitabilities) { <MudSelectItem T="string" Value="@value">@ServiceAccountUiText.Suitability(value)</MudSelectItem> }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6" md="3"><MudDatePicker Editable="true" @bind-Date="_plannedOn" Label="Planlanan gün" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudSelect T="Guid?" @bind-Value="_completedAction" Label="Tamamlayan gMSA geçişi" Clearable="true" Variant="Variant.Outlined">
+                            @foreach (ActionView a in Detail.Actions.Where(a => a.ActionType == "GmsaConversion" && !a.Voided && a.Result != "Planned"))
+                            { <MudSelectItem T="Guid?" Value="@((Guid?)a.Id)">@($"{a.ActionLabel} · {ServiceAccountUiText.Date(a.ActualOn)}")</MudSelectItem> }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="3"><MudTextField @bind-Value="_decisionNote" Label="Karar notu (uygun/uygun değil için zorunlu)" MaxLength="2000" Variant="Variant.Outlined" /></MudItem>
+                </MudGrid>
+                <MudButton OnClick="@(() => UpdateTransitionAsync(t))" Disabled="Busy" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">İzlemeyi güncelle</MudButton>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private static readonly string[] _suitabilities = ["Unknown", "Review", "Eligible", "Ineligible"];
+    private DateTime? _decidedOn, _plannedOn;
+    private string? _note, _cohort, _decisionNote;
+    private string _suitability = "Review";
+    private Guid? _target, _completedAction;
+    private bool _trackGmsa;
+    private int _seenRevision = -1;
+
+    /// <summary>Account detail.</summary>
+    [Parameter] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Team choices.</summary>
+    [Parameter] public IReadOnlyList<TeamView> Teams { get; set; } = [];
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last command was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Command sink.</summary>
+    [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    private bool CanDecide => !Busy && _decidedOn is not null && !string.IsNullOrWhiteSpace(_note);
+
+    protected override void OnParametersSet()
+    {
+        if (_seenRevision != Revision)
+        {
+            _seenRevision = Revision;
+            (_decidedOn, _plannedOn, _note, _cohort, _decisionNote, _suitability, _target, _completedAction, _trackGmsa) =
+                (null, null, null, null, null, Detail.Transitions.FirstOrDefault()?.Suitability ?? "Review", null, null, false);
+        }
+    }
+
+    private Task DecideAsync(HandoverView handover, string decision) => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/handovers/{handover.Id}/decision",
+        new HandoverDecisionRequest(handover.Version, decision, ServiceAccountUiText.ToDate(_decidedOn)!.Value, _note!.Trim())));
+
+    private Task CreateAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/accounts/{Detail.Summary.Id}/handovers",
+        new CreateHandoverRequest(_target!.Value, Detail.Summary.OwnerTeam?.Id, Detail.Summary.ConsumerTeam?.Id, string.IsNullOrWhiteSpace(_cohort) ? null : _cohort.Trim(),
+            null, null, _trackGmsa)));
+
+    private Task UpdateTransitionAsync(TransitionView transition) => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Patch, $"/transitions/{transition.Id}",
+        new TransitionUpdateRequest(transition.Version, _suitability, string.IsNullOrWhiteSpace(_decisionNote) ? null : _decisionNote.Trim(),
+            ServiceAccountUiText.ToDate(_plannedOn), _completedAction)));
+}

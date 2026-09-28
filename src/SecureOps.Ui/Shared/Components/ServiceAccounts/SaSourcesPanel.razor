@@ -1,0 +1,74 @@
+@* Read-only provenance: source-list observations, original imported rows and the business timeline. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-observations">
+    <div class="so-panel-head"><h2 id="sa-observations" class="so-panel-title">Kaynak liste gözlemleri</h2></div>
+    @if (Detail.Observations.Count == 0) { <SoEmptyState Title="Gözlem yok" /> }
+    else
+    {
+        <MudTable Items="Detail.Observations" Dense="true" Breakpoint="Breakpoint.Sm" T="ObservationView">
+            <HeaderContent><MudTh>Rapor tarihi</MudTh><MudTh>Kaynak</MudTh><MudTh>Listede</MudTh><MudTh>Parola / son oturum</MudTh><MudTh>Kurum / ekip</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Rapor tarihi">@ServiceAccountUiText.Date(context.SourceReportDate)</MudTd>
+                <MudTd DataLabel="Kaynak">@Profile(context.SourceProfile)</MudTd>
+                <MudTd DataLabel="Listede">@(context.Presence == "Present" ? "Var" : "Yok")</MudTd>
+                <MudTd DataLabel="Parola / son oturum">@(context.PasswordLastSet?.ToString("dd.MM.yyyy") ?? "?") / @((context.LastLogonAdOrLdap ?? context.LastLogonAd)?.ToString("dd.MM.yyyy") ?? "?")</MudTd>
+                <MudTd DataLabel="Kurum / ekip">@(context.Organization ?? "-")<div class="so-panel-text--sm">@(context.SourceTeam ?? "") @(context.Comment ?? "")</div></MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</section>
+
+<section class="so-panel" aria-labelledby="sa-source-rows">
+    <div class="so-panel-head"><h2 id="sa-source-rows" class="so-panel-title">Aktarılan kaynak satırları</h2></div>
+    @if (Detail.Sources.Count == 0) { <SoEmptyState Title="Aktarım satırı yok" Description="Hesap uygulamada elle kaydedildi." /> }
+    else
+    {
+        <MudTable Items="Detail.Sources" Dense="true" Breakpoint="Breakpoint.Sm" T="SourceRowView">
+            <HeaderContent><MudTh>Dosya / sayfa</MudTh><MudTh>Satır</MudTh><MudTh>Tür</MudTh><MudTh>Sınıf</MudTh><MudTh>Özgün değerler</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Dosya / sayfa">@context.FileName<div class="so-panel-text--sm">@context.Sheet · @ServiceAccountUiText.Date(context.SourceReportDate)</div></MudTd>
+                <MudTd DataLabel="Satır">@context.RowNumber</MudTd>
+                <MudTd DataLabel="Tür">@context.EntityKind</MudTd>
+                <MudTd DataLabel="Sınıf">@context.Classification</MudTd>
+                <MudTd DataLabel="Özgün değerler"><code class="so-panel-text--sm">@Truncate(context.OriginalJson)</code></MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</section>
+
+<section class="so-panel" aria-labelledby="sa-history">
+    <div class="so-panel-head"><h2 id="sa-history" class="so-panel-title">Geçmiş</h2></div>
+    @if (Detail.History.Count == 0) { <SoEmptyState Title="Geçmiş kaydı yok" /> }
+    else
+    {
+        <MudTable Items="Detail.History" Dense="true" Breakpoint="Breakpoint.Sm" T="HistoryView">
+            <HeaderContent><MudTh>Zaman</MudTh><MudTh>Kayıt</MudTh><MudTh>Olay</MudTh><MudTh>Yapan</MudTh><MudTh>Gerekçe / değişiklik</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Zaman">@ServiceAccountUiText.Instant(context.OccurredAt)</MudTd>
+                <MudTd DataLabel="Kayıt">@context.EntityType</MudTd>
+                <MudTd DataLabel="Olay">@context.Action</MudTd>
+                <MudTd DataLabel="Yapan">@context.Actor</MudTd>
+                <MudTd DataLabel="Gerekçe / değişiklik">@(context.Reason ?? "")<div class="so-panel-text--sm"><code>@Truncate(context.ChangesJson)</code></div></MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</section>
+
+@code {
+    private const int MaxShown = 400;
+
+    /// <summary>Account detail.</summary>
+    [Parameter] public AccountDetail Detail { get; set; } = default!;
+
+    private static string Truncate(string? value) => value is null ? string.Empty : value.Length <= MaxShown ? value : value[..MaxShown] + " …";
+
+    private static string Profile(string profile) => profile switch
+    {
+        "coordination-list" => "Koordinasyon listesi",
+        "dba-handover" => "DBA devir listesi",
+        "legacy-package" or "legacy-workbook" => "Eski çalışma kitabı",
+        _ => "Genel aktarım"
+    };
+}

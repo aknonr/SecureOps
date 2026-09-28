@@ -1,0 +1,99 @@
+@* Account attribute edit. Blank never erases: clearing is an explicit choice with a reason (rule 11). *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<MudExpansionPanels Class="mt-2">
+    <MudExpansionPanel Text="Hesap bilgilerini düzenle">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?" @bind-Value="_organization" Label="Rapor kurumu (kurum kapsamı gerekir)" Clearable="true" Variant="Variant.Outlined">
+                    @foreach (OrganizationView org in Organizations) { <MudSelectItem T="Guid?" Value="@((Guid?)org.Id)">@org.Name</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?" @bind-Value="_consumer" Label="Kullanan ekip" Clearable="true" Variant="Variant.Outlined">
+                    @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_domain" Label="Domain" MaxLength="128" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_notes" Label="Notlar" MaxLength="2000" Lines="3" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudSelect T="string" @bind-Value="_refType" Label="Referans türü" Variant="Variant.Outlined">
+                    @foreach (string type in _refTypes) { <MudSelectItem T="string" Value="@type">@type</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" md="4">
+                <MudTextField @bind-Value="_refNumber" Label="Referans numarası (isteğe bağlı)" MaxLength="64" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6" Class="d-flex flex-wrap align-center gap-3">
+                <MudCheckBox T="bool" @bind-Value="_clearNotes" Label="Notları temizle" />
+                <MudCheckBox T="bool" @bind-Value="_clearConsumer" Label="Kullanan ekibi temizle" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_reason" Label="Gerekçe (temizleme için zorunlu)" MaxLength="1000" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+        <MudButton OnClick="SubmitAsync" Disabled="@(Busy || !HasChange)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Değişiklikleri kaydet</MudButton>
+    </MudExpansionPanel>
+</MudExpansionPanels>
+
+@code {
+    private static readonly string[] _refTypes = ["OR", "OCO", "JIRA", "OTHER"];
+    private Guid? _organization, _consumer;
+    private string? _domain, _notes, _reason, _refNumber;
+    private string _refType = "OR";
+    private bool _clearNotes, _clearConsumer;
+    private int _seenRevision = -1;
+
+    /// <summary>Current account summary.</summary>
+    [Parameter] public AccountSummaryView Summary { get; set; } = default!;
+
+    /// <summary>Organization choices.</summary>
+    [Parameter] public IReadOnlyList<OrganizationView> Organizations { get; set; } = [];
+
+    /// <summary>Team choices.</summary>
+    [Parameter] public IReadOnlyList<TeamView> Teams { get; set; } = [];
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last command was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Command sink.</summary>
+    [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    private bool HasChange => _organization != Summary.ReportOrganization?.Id || _consumer != Summary.ConsumerTeam?.Id && _consumer is not null
+        || (_domain ?? "") != (Summary.Domain ?? "") && !string.IsNullOrWhiteSpace(_domain) || (_notes ?? "") != (Summary.Notes ?? "") && !string.IsNullOrWhiteSpace(_notes)
+        || _clearNotes || _clearConsumer || !string.IsNullOrWhiteSpace(_refNumber);
+
+    protected override void OnParametersSet()
+    {
+        if (_seenRevision != Revision)
+        {
+            _seenRevision = Revision;
+            (_organization, _consumer, _domain, _notes) = (Summary.ReportOrganization?.Id, Summary.ConsumerTeam?.Id, Summary.Domain, Summary.Notes);
+            (_reason, _refNumber, _clearNotes, _clearConsumer) = (null, null, false, false);
+        }
+    }
+
+    private Task SubmitAsync()
+    {
+        List<string> clear = [];
+        if (_clearNotes) { clear.Add("notes"); }
+        if (_clearConsumer) { clear.Add("consumerTeam"); }
+        UpdateAccountRequest request = new(Summary.Version,
+            Notes: !_clearNotes && !string.IsNullOrWhiteSpace(_notes) && _notes != Summary.Notes ? _notes.Trim() : null,
+            ConsumerTeamId: !_clearConsumer && _consumer != Summary.ConsumerTeam?.Id ? _consumer : null,
+            ReportOrganizationId: _organization is { } org && org != Summary.ReportOrganization?.Id ? org : null,
+            Domain: !string.IsNullOrWhiteSpace(_domain) && _domain != Summary.Domain ? _domain.Trim() : null,
+            ClearFields: clear.Count > 0 ? clear : null,
+            Reason: string.IsNullOrWhiteSpace(_reason) ? null : _reason.Trim(),
+            AddReferences: string.IsNullOrWhiteSpace(_refNumber) ? null : [new SaExternalRef(_refType, _refNumber.Trim())]);
+        return OnCommand.InvokeAsync(new SaCommand(HttpMethod.Patch, $"/accounts/{Summary.Id}", request));
+    }
+}

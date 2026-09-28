@@ -36,6 +36,7 @@ public static class AccessActionCatalog
         new(Capabilities.AccessApproveRequests, "Erişim", "Talepleri kararlaştır", "Başkasının erişim talebini onaylar veya reddeder."),
         new(Capabilities.AccessAssignRoles, "Erişim", "Rol ata", "Sürüm kontrollü rol atar; rol tanımı için kullanıcı yönetimi de gerekir."),
         new(Capabilities.ManagementReportingView, "Raporlar", "Yönetim raporlarını gör", "Yetkili toplu operasyon raporlarını okur."),
+        .. SecureOps.Infrastructure.ServiceAccounts.ServiceAccountAccessActions.Actions,
         new(Capabilities.TeamView, "Tarihsel", "Takım", "Tarihsel hak; bağımsız uygulanmış yeni eylem değil.", false),
         new(Capabilities.AuditView, "Tarihsel", "Denetim", "Tarihsel hak; bağımsız uygulanmış yeni eylem değil.", false),
         new(Capabilities.AccessAdministration, "Tarihsel", "Erişim yönetimi", "Tarihsel hak; dar eylemler kullanılır.", false),

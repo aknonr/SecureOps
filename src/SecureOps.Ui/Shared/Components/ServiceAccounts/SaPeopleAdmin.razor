@@ -1,0 +1,108 @@
+@* Person references. Verification records a directory identity supplied with evidence; nothing is looked up
+   automatically and exact identity lookup is not broadened. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+@inject ServiceAccountApiClient Api
+
+<section class="so-panel" aria-labelledby="sa-people">
+    <h2 id="sa-people" class="so-panel-title">Kişi kayıtları</h2>
+    <div class="d-flex flex-wrap gap-2 align-center">
+        <MudTextField @bind-Value="_search" Label="Ad ile ara (en az 2 harf)" MaxLength="100" Variant="Variant.Outlined" />
+        <MudButton OnClick="SearchAsync" Disabled="@(Busy || (_search?.Trim().Length ?? 0) < 2)" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Search">Ara</MudButton>
+    </div>
+    @if (_error is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_error</MudAlert> }
+    @if (_people is not null)
+    {
+        @if (_people.Count == 0) { <SoEmptyState Title="Eşleşen kişi yok" /> }
+        else
+        {
+            <MudTable Items="_people" Dense="true" Breakpoint="Breakpoint.Sm" T="PersonView" Class="mt-2">
+                <HeaderContent><MudTh>Ad</MudTh><MudTh>Durum</MudTh><MudTh>Diğer yazımlar</MudTh><MudTh>İşlem</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Ad">@context.DisplayName</MudTd>
+                    <MudTd DataLabel="Durum">@(context.VerificationState == "Verified" ? "Doğrulanmış" : "Doğrulanmamış")</MudTd>
+                    <MudTd DataLabel="Diğer yazımlar">@(context.Aliases.Count == 0 ? "—" : string.Join(", ", context.Aliases))</MudTd>
+                    <MudTd DataLabel="İşlem"><MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => _selected = context)">Seç</MudButton></MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
+
+    @if (_selected is { } person)
+    {
+        <div class="so-panel mt-2" role="group" aria-label="@($"{person.DisplayName} kaydı")">
+            <h3 class="so-panel-title">@person.DisplayName</h3>
+            @if (person.VerificationState != "Verified")
+            {
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4"><MudTextField @bind-Value="_upn" Label="UPN" MaxLength="256" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="4"><MudTextField @bind-Value="_objectId" Label="Dizin nesne kimliği" MaxLength="64" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="4"><MudTextField @bind-Value="_evidence" Label="Doğrulama kanıtı" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+                </MudGrid>
+                <MudButton OnClick="VerifyAsync" Disabled="@(Busy || string.IsNullOrWhiteSpace(_evidence) || string.IsNullOrWhiteSpace(_upn) && string.IsNullOrWhiteSpace(_objectId))"
+                           Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">Kimliği doğrulanmış olarak kaydet</MudButton>
+            }
+            <MudGrid Spacing="2" Class="mt-2">
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_alias" Label="Diğer yazım (ör. eski kayıttaki ad)" MaxLength="200" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_aliasEvidence" Label="Aynı kişi olduğunun kanıtı" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <MudButton OnClick="AliasAsync" Disabled="@(Busy || string.IsNullOrWhiteSpace(_alias) || string.IsNullOrWhiteSpace(_aliasEvidence))" Variant="Variant.Outlined" Class="mt-2">Diğer yazımı ekle</MudButton>
+        </div>
+    }
+
+    <h3 class="so-panel-title mt-4">Kişi kaydı ekle</h3>
+    <div class="d-flex flex-wrap gap-2 align-center">
+        <MudTextField @bind-Value="_newName" Label="Görünen ad" MaxLength="200" Variant="Variant.Outlined" />
+        <MudButton OnClick="CreateAsync" Disabled="@(Busy || string.IsNullOrWhiteSpace(_newName))" Variant="Variant.Filled" Color="Color.Primary">Ekle</MudButton>
+    </div>
+</section>
+
+@code {
+    private IReadOnlyList<PersonView>? _people;
+    private PersonView? _selected;
+    private string? _search, _upn, _objectId, _evidence, _alias, _aliasEvidence, _newName, _error;
+    private int _seenRevision;
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last command was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Command sink.</summary>
+    [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_seenRevision != Revision)
+        {
+            _seenRevision = Revision;
+            (_selected, _upn, _objectId, _evidence, _alias, _aliasEvidence, _newName) = (null, null, null, null, null, null, null);
+            if (!string.IsNullOrWhiteSpace(_search)) { await SearchAsync(); }
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        _error = null;
+        try
+        {
+            _people = await Api.GetAsync<IReadOnlyList<PersonView>>("/people?search=" + Uri.EscapeDataString(_search!.Trim()), CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _error = ex.Problem.Title;
+            _people = null;
+        }
+    }
+
+    private Task VerifyAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/people/{_selected!.Id}/verify",
+        new VerifyPersonRequest(_selected.Version, Blank(_upn), Blank(_objectId), _evidence!.Trim())));
+
+    private Task AliasAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/people/{_selected!.Id}/aliases",
+        new AddPersonAliasRequest(_alias!.Trim(), _aliasEvidence!.Trim())));
+
+    private Task CreateAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, "/people", new CreatePersonRequest(_newName!.Trim())));
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

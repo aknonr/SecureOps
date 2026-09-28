@@ -679,6 +679,7 @@ public static class UiProblemFactory
             ["Farklı bir dönem seçip tekrar deneyin."],
             retryable: false, requiresRefresh: false),
 
+        _ when ServiceAccounts.ServiceAccountProblems.FromCode(code) is { } serviceAccount => serviceAccount,
         _ => FromStatus(statusCode) with { Code = code }
     };
 

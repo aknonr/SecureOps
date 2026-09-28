@@ -115,6 +115,7 @@ AddSecureOpsApiClient<InUseApiClient, InUseApiClient>(builder.Services);
 AddSecureOpsApiClient<OperationsDiagnosticsApiClient, OperationsDiagnosticsApiClient>(builder.Services);
 AddSecureOpsApiClient<AnnouncementApiClient, AnnouncementApiClient>(builder.Services);
 AddSecureOpsApiClient<OperationHistoryApiClient, OperationHistoryApiClient>(builder.Services);
+AddSecureOpsApiClient<SecureOps.Ui.Services.ServiceAccounts.ServiceAccountApiClient, SecureOps.Ui.Services.ServiceAccounts.ServiceAccountApiClient>(builder.Services);
 
 WebApplication app = builder.Build();
 

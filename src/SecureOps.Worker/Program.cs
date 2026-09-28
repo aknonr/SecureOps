@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Announcements;
 using SecureOps.Infrastructure.Announcements.Sources;
+using SecureOps.Worker.ServiceAccounts;
 using SecureOps.Worker;
 
 // The Worker hosts the Hangfire job server per ADR-0003. It serves no HTTP traffic and never calls
@@ -48,6 +49,7 @@ try
         { builder.Services.AddHostedService<JobServerHostedService>(); }
         else if (service)
         { throw new InvalidOperationException("WorkerHosting.JobServerConfigurationRequired"); }
+        builder.Services.AddServiceAccountsWorker(builder.Configuration, jobsConfigured);
 
         using IHost host = builder.Build();
         IHostApplicationLifetime lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();

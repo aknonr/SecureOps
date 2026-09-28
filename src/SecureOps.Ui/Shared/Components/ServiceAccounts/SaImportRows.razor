@@ -1,0 +1,197 @@
+@* Preview rows with current/proposed values and the decisions the server allows for each row. Decisions are kept
+   locally until "Kararları kaydet"; the server re-plans and returns new versions. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-import-rows">
+    <h2 id="sa-import-rows" class="so-panel-title">Satırlar</h2>
+    <MudGrid Spacing="2">
+        <MudItem xs="6" md="3">
+            <MudSelect T="string" @bind-Value="_classification" Label="Sınıf" Clearable="true" Variant="Variant.Outlined">
+                @foreach ((string value, string label) in Classes) { <MudSelectItem T="string" Value="@value">@label</MudSelectItem> }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <MudSelect T="string" @bind-Value="_kind" Label="Kayıt türü" Clearable="true" Variant="Variant.Outlined">
+                @foreach ((string value, string label) in Kinds) { <MudSelectItem T="string" Value="@value">@label</MudSelectItem> }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-center"><MudSwitch T="bool" @bind-Value="_decisionsOnly" Label="Yalnız karar gerekenler" Color="Color.Primary" /></MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-center">
+            <MudButton OnClick="@(() => QueryAsync(1))" Disabled="Busy" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.FilterList">Uygula</MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (Page is null) { <SoLoading Message="Satırlar okunuyor" /> }
+    else if (Page.Items.Count == 0) { <SoEmptyState Title="Bu filtreyle satır yok" /> }
+    else
+    {
+        <p role="status" class="so-panel-text">@Page.Total satır · sayfa @Page.Page</p>
+        <MudTable Items="Page.Items" Dense="true" Breakpoint="Breakpoint.Sm" T="ImportRowView">
+            <HeaderContent><MudTh>Kaynak</MudTh><MudTh>Hesap / tür</MudTh><MudTh>Sınıf</MudTh><MudTh>Değişiklik</MudTh><MudTh>Karar</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Kaynak">@context.Sheet<div class="so-panel-text--sm">satır @context.RowNumber</div></MudTd>
+                <MudTd DataLabel="Hesap / tür">@(context.AccountLabel ?? "Hesap adı yok")<div class="so-panel-text--sm">@KindLabel(context.EntityKind)</div></MudTd>
+                <MudTd DataLabel="Sınıf">
+                    <SoStatusBadge Label="@ClassLabel(context.Classification)" Tone="@Tone(context.Classification)" />
+                    @if (context.RequiresDecision) { <div class="so-panel-text--sm">Karar gerekli</div> }
+                </MudTd>
+                <MudTd DataLabel="Değişiklik">
+                    @foreach (ImportFieldDiff diff in context.Diff.Take(8))
+                    {
+                        <div class="so-panel-text--sm"><strong>@diff.Field</strong>: @(diff.Current ?? "—") → @(diff.Proposed ?? "—") <span>(@diff.Effect)</span></div>
+                    }
+                    @foreach (string error in context.Errors) { <div class="so-panel-text--sm" role="note">Hata: @error</div> }
+                    @foreach (string warning in context.Warnings) { <div class="so-panel-text--sm">Uyarı: @warning</div> }
+                    @if (context.Candidates.Count > 0)
+                    {
+                        <div class="so-panel-text--sm">Olası eşleşmeler: @string.Join("; ", context.Candidates.Select(c => $"{c.Label} ({c.Reason})"))</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Karar">
+                    @if (context.AllowedDecisions.Count > 0)
+                    {
+                        <MudSelect T="string" Value="@DecisionOf(context)" ValueChanged="@(v => SetDecision(context, v))" Label="Karar" Dense="true" Clearable="true" Variant="Variant.Outlined"
+                                   aria-label="@($"Satır {context.RowNumber} kararı")">
+                            @foreach (string d in context.AllowedDecisions.Where(d => d != "Confirm" || CanConfirmOwnership))
+                            { <MudSelectItem T="string" Value="@d">@DecisionLabel(d)</MudSelectItem> }
+                        </MudSelect>
+                        @if (DecisionOf(context) == "Link" && context.Candidates.Count > 0)
+                        {
+                            <MudSelect T="Guid?" Value="@TargetOf(context)" ValueChanged="@(v => SetTarget(context, v))" Label="Bağlanacak kayıt" Dense="true" Variant="Variant.Outlined">
+                                @foreach (ImportCandidate c in context.Candidates) { <MudSelectItem T="Guid?" Value="@((Guid?)c.Id)">@c.Label</MudSelectItem> }
+                            </MudSelect>
+                        }
+                    }
+                    else { <span class="so-panel-text--sm">Karar gerekmez</span> }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+        <nav class="d-flex align-center gap-2 mt-2" aria-label="Satır sayfalama">
+            <MudButton StartIcon="@Icons.Material.Filled.ChevronLeft" Disabled="@(Busy || Page.Page == 1)" OnClick="@(() => QueryAsync(Page.Page - 1))">Önceki</MudButton>
+            <span>Sayfa @Page.Page</span>
+            <MudButton EndIcon="@Icons.Material.Filled.ChevronRight" Disabled="@(Busy || Page.Page * Page.PageSize >= Page.Total)" OnClick="@(() => QueryAsync(Page.Page + 1))">Sonraki</MudButton>
+        </nav>
+    }
+
+    <div class="d-flex flex-wrap gap-2 mt-3 align-center">
+        <MudButton OnClick="SaveAsync" Disabled="@(Busy || _pending.Count == 0)" Variant="Variant.Filled" Color="Color.Primary">Kararları kaydet (@_pending.Count)</MudButton>
+        @if (_pending.Count > 0) { <MudButton OnClick="@(() => _pending.Clear())" Variant="Variant.Text">Kaydedilmemiş kararları sil</MudButton> }
+    </div>
+
+    <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Toplu karar">
+        <p class="so-panel-text--sm">Seçilen sınıf ve kayıt türündeki, bu kararın izinli olduğu tüm satırlara uygulanır. Birden çok olası eşleşmesi olan satırlara toplu bağlama yapılmaz.</p>
+        <MudGrid Spacing="2">
+            <MudItem xs="6" md="4">
+                <MudSelect T="string" @bind-Value="_bulkClass" Label="Sınıf" Clearable="true" Variant="Variant.Outlined">
+                    @foreach ((string value, string label) in Classes) { <MudSelectItem T="string" Value="@value">@label</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" md="4">
+                <MudSelect T="string" @bind-Value="_bulkKind" Label="Kayıt türü" Clearable="true" Variant="Variant.Outlined">
+                    @foreach ((string value, string label) in Kinds) { <MudSelectItem T="string" Value="@value">@label</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="string" @bind-Value="_bulkDecision" Label="Karar" Variant="Variant.Outlined">
+                    @foreach (string d in _decisions.Where(d => d != "Confirm" || CanConfirmOwnership)) { <MudSelectItem T="string" Value="@d">@DecisionLabel(d)</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+        <MudButton OnClick="BulkAsync" Disabled="@(Busy || _bulkDecision is null)" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">Toplu kararı uygula</MudButton>
+    </MudExpansionPanel></MudExpansionPanels>
+</section>
+
+@code {
+    private static readonly string[] _decisions = ["Create", "Skip", "Link", "Propose", "Confirm", "Keep", "Apply"];
+    private static readonly (string Value, string Label)[] Classes =
+    [
+        ("New", "Yeni"), ("ObservationUpdate", "Gözlem güncellemesi"), ("Update", "Güncelleme"), ("Same", "Aynı"), ("Conflict", "Çakışma"),
+        ("Invalid", "Geçersiz"), ("NotSeen", "Bu listede yok"), ("OutOfScope", "Kapsam dışı")
+    ];
+    private static readonly (string Value, string Label)[] Kinds =
+    [
+        ("Account", "Hesap"), ("Ownership", "Sahiplik"), ("Observation", "Gözlem"), ("Absence", "Listede yok"), ("Request", "Talep"),
+        ("Action", "İşlem"), ("Communication", "Yazışma"), ("Finding", "Bulgu"), ("Handover", "Devir")
+    ];
+
+    private readonly Dictionary<int, (string Decision, Guid? Target)> _pending = [];
+    private string? _classification, _kind, _bulkClass, _bulkKind, _bulkDecision;
+    private bool _decisionsOnly;
+    private Guid _batchId;
+    private int _decisionVersion;
+
+    /// <summary>Batch under review.</summary>
+    [Parameter] public ImportBatchView Batch { get; set; } = default!;
+
+    /// <summary>Current row page.</summary>
+    [Parameter] public ImportRowPage? Page { get; set; }
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Whether the caller may confirm ownership (Assign).</summary>
+    [Parameter] public bool CanConfirmOwnership { get; set; }
+
+    /// <summary>Row query sink.</summary>
+    [Parameter] public EventCallback<(string? Classification, string? Kind, bool DecisionsOnly, int Page)> OnQuery { get; set; }
+
+    /// <summary>Decision sink (the page sets the expected version).</summary>
+    [Parameter] public EventCallback<ImportDecisionsRequest> OnDecide { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (_batchId != Batch.Id) { (_batchId, _classification, _kind, _decisionsOnly) = (Batch.Id, null, null, false); _pending.Clear(); }
+
+        // Pending choices are dropped only once the server has accepted them (new decision version).
+        if (_decisionVersion != Batch.DecisionVersion) { _decisionVersion = Batch.DecisionVersion; _pending.Clear(); }
+    }
+
+    private Task QueryAsync(int page) => OnQuery.InvokeAsync((_classification, _kind, _decisionsOnly, page));
+
+    private string? DecisionOf(ImportRowView row) => _pending.TryGetValue(row.RowKey, out var p) ? p.Decision : row.Decision;
+
+    private Guid? TargetOf(ImportRowView row) => _pending.TryGetValue(row.RowKey, out var p) ? p.Target : null;
+
+    private void SetDecision(ImportRowView row, string? decision)
+    {
+        if (decision is null) { _pending.Remove(row.RowKey); return; }
+        _pending[row.RowKey] = (decision, decision == "Link" && row.Candidates.Count == 1 ? row.Candidates[0].Id : null);
+    }
+
+    private void SetTarget(ImportRowView row, Guid? target)
+    {
+        if (_pending.TryGetValue(row.RowKey, out var p)) { _pending[row.RowKey] = (p.Decision, target); }
+    }
+
+    private async Task SaveAsync()
+    {
+        List<ImportRowDecision> decisions = [.. _pending.Select(p => new ImportRowDecision(p.Key, p.Value.Decision, p.Value.Target))];
+        await OnDecide.InvokeAsync(new ImportDecisionsRequest(0, decisions));
+    }
+
+    private Task BulkAsync() => OnDecide.InvokeAsync(new ImportDecisionsRequest(0, [], _bulkClass, _bulkKind, _bulkDecision));
+
+    private static string ClassLabel(string value) => Classes.FirstOrDefault(c => c.Value == value).Label ?? value;
+
+    private static string KindLabel(string value) => Kinds.FirstOrDefault(k => k.Value == value).Label ?? value;
+
+    private static string DecisionLabel(string value) => value switch
+    {
+        "Create" => "Yeni kayıt oluştur",
+        "Skip" => "Atla",
+        "Link" => "Mevcut kayda bağla",
+        "Propose" => "Sahiplik önerisi olarak kaydet",
+        "Confirm" => "Teyitli sahiplik olarak kaydet",
+        "Keep" => "Mevcut değeri koru",
+        "Apply" => "Yeni değeri uygula",
+        _ => value
+    };
+
+    private static SoStatusBadge.BadgeTone Tone(string value) => value switch
+    {
+        "Conflict" or "Invalid" => SoStatusBadge.BadgeTone.Critical,
+        "New" or "Update" => SoStatusBadge.BadgeTone.Info,
+        "NotSeen" or "OutOfScope" => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+}

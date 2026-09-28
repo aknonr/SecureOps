@@ -1,0 +1,47 @@
+@* Manual account registration. The server normalizes the identity and refuses duplicates; the reason is audited. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+
+<EditForm Model="_model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="_model.AccountName" For="@(() => _model.AccountName)" Label="Hesap adı" MaxLength="256" Required="true" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="_model.Domain" Label="Domain (bilinmiyorsa boş)" MaxLength="100" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudSelect T="Guid?" @bind-Value="_model.OrganizationId" Label="Rapor kurumu" Clearable="true" Variant="Variant.Outlined">
+                @foreach (OrganizationView org in Organizations) { <MudSelectItem T="Guid?" Value="@((Guid?)org.Id)">@org.Name</MudSelectItem> }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12">
+            <MudTextField @bind-Value="_model.Reason" For="@(() => _model.Reason)" Label="Kayıt gerekçesi / kaynak" MaxLength="1000" Required="true" Lines="2" Variant="Variant.Outlined" />
+        </MudItem>
+    </MudGrid>
+    <MudButton ButtonType="ButtonType.Submit" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Hesabı kaydet</MudButton>
+</EditForm>
+
+@code {
+    private readonly Model _model = new();
+
+    /// <summary>Organizations for the report organization picker.</summary>
+    [Parameter] public IReadOnlyList<OrganizationView> Organizations { get; set; } = [];
+
+    /// <summary>Disables submit while a call is in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Submit handler.</summary>
+    [Parameter] public EventCallback<CreateAccountRequest> OnSubmit { get; set; }
+
+    private Task SubmitAsync() => OnSubmit.InvokeAsync(new CreateAccountRequest(_model.AccountName.Trim(),
+        string.IsNullOrWhiteSpace(_model.Domain) ? null : _model.Domain.Trim(), _model.OrganizationId, _model.Reason.Trim()));
+
+    private sealed class Model
+    {
+        [Required(ErrorMessage = "Hesap adı gerekli.")] public string AccountName { get; set; } = string.Empty;
+        public string? Domain { get; set; }
+        public Guid? OrganizationId { get; set; }
+        [Required(ErrorMessage = "Gerekçe gerekli.")] public string Reason { get; set; } = string.Empty;
+    }
+}

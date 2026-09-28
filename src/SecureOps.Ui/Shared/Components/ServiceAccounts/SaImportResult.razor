@@ -1,0 +1,27 @@
+@* Persisted commit result. A repeated commit or replayed file shows this same stored result. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-import-result" role="status">
+    <h2 id="sa-import-result" class="so-panel-title">Aktarım sonucu · @ServiceAccountUiText.Instant(Result.CommittedAt)</h2>
+    <div class="d-flex flex-wrap gap-2">
+        <SoMetric Label="Oluşturulan hesap" Value="@Result.AccountsCreated.ToString()" />
+        <SoMetric Label="Kaynak gözlemi" Value="@Result.ObservationsRecorded.ToString()" />
+        <SoMetric Label="Listede yok gözlemi" Value="@Result.NotSeenObservations.ToString()" />
+        <SoMetric Label="Sahiplik önerisi" Value="@Result.OwnershipProposed.ToString()" />
+        <SoMetric Label="Teyitli sahiplik" Value="@Result.OwnershipConfirmed.ToString()" />
+        <SoMetric Label="Talep" Value="@Result.RequestsCreated.ToString()" />
+        <SoMetric Label="İşlem" Value="@Result.ActionsCreated.ToString()" />
+        <SoMetric Label="Yazışma / bağlantı" Value="@($"{Result.CommunicationsCreated} / {Result.CommunicationLinksAdded}")" />
+        <SoMetric Label="Bulgu" Value="@Result.FindingsCreated.ToString()" />
+        <SoMetric Label="Devir / gMSA izleme" Value="@($"{Result.HandoversCreated} / {Result.TransitionsCreated}")" />
+        <SoMetric Label="Yeni ekip / kurum / kişi" Value="@($"{Result.TeamsCreated} / {Result.OrganizationsCreated} / {Result.PeopleCreated}")" />
+        <SoMetric Label="Değişmeyen / atlanan / geçersiz" Value="@($"{Result.Unchanged} / {Result.Skipped} / {Result.Invalid}")" />
+    </div>
+    <MudButton Href="service-accounts" Variant="Variant.Outlined" Class="mt-2">Hesaplara git</MudButton>
+</section>
+
+@code {
+    /// <summary>Stored result.</summary>
+    [Parameter] public ImportResultView Result { get; set; } = default!;
+}

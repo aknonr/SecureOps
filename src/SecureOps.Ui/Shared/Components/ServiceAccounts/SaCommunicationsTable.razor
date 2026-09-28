@@ -1,0 +1,30 @@
+@* One mail may be linked to many accounts; it is stored once. Drafts and undated mails are labelled, not hidden. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+@if (Items.Count == 0)
+{
+    <SoEmptyState Title="Yazışma kaydı yok" />
+}
+else
+{
+    <MudTable Items="Items" Dense="true" Breakpoint="Breakpoint.Sm" T="CommunicationView">
+        <HeaderContent><MudTh>Tarih</MudTh><MudTh>Yön / tür</MudTh><MudTh>Muhatap</MudTh><MudTh>Konu</MudTh><MudTh>Bağlı hesaplar</MudTh></HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Tarih">@(context.Precision == "Instant" ? ServiceAccountUiText.Instant(context.OccurredAt) : ServiceAccountUiText.Date(context.OccurredOn))</MudTd>
+            <MudTd DataLabel="Yön / tür">
+                @ServiceAccountUiText.Direction(context.Direction) · @ServiceAccountUiText.CommunicationKind(context.Kind)
+                @if (context.Kind == "Draft") { <div class="so-panel-text--sm">Taslak — gönderilmiş sayılmaz</div> }
+                @if (context.MeaningfulReply == true) { <div class="so-panel-text--sm">Anlamlı yanıt</div> }
+            </MudTd>
+            <MudTd DataLabel="Muhatap">@(context.ContactTeam?.Label ?? "Ekip yok")<div class="so-panel-text--sm">@(context.ContactPerson?.Label ?? "")</div></MudTd>
+            <MudTd DataLabel="Konu">@(context.Subject ?? "Konu yok")@if (context.Summary is not null) { <div class="so-panel-text--sm">@context.Summary</div> }</MudTd>
+            <MudTd DataLabel="Bağlı hesaplar">@context.Accounts.Count<div class="so-panel-text--sm">@string.Join(", ", context.Accounts.Take(5).Select(a => a.Label))@(context.Accounts.Count > 5 ? " …" : "")</div></MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    /// <summary>Communications.</summary>
+    [Parameter] public IReadOnlyList<CommunicationView> Items { get; set; } = [];
+}

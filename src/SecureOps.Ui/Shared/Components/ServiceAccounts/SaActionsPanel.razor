@@ -1,0 +1,181 @@
+@* Actions report what was planned, performed or verified. A performed action needs a real date; verification is a
+   separate, evidenced record by a verifier. Nothing here changes a password, deletes an account or converts to gMSA. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-actions">
+    <div class="so-panel-head"><h2 id="sa-actions" class="so-panel-title">İşlem bildirimleri</h2></div>
+    @if (Detail.Actions.Count == 0)
+    {
+        <SoEmptyState Title="İşlem bildirimi yok" Description="Planlanan, gerçekleşen veya doğrulanan işlem kaydedilmedi." />
+    }
+    else
+    {
+        <MudTable Items="Detail.Actions" Dense="true" Breakpoint="Breakpoint.Sm" T="ActionView">
+            <HeaderContent><MudTh>İşlem</MudTh><MudTh>Sonuç</MudTh><MudTh>Tarih</MudTh><MudTh>Yapan</MudTh><MudTh>Doğrulama</MudTh><MudTh>Komut</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="İşlem">
+                    @context.ActionLabel
+                    <div class="so-panel-text--sm">@(context.RecordKind == "Closure" ? "Hesap kapanışı" : "Ara adım") · @ServiceAccountUiText.References(context.References)</div>
+                </MudTd>
+                <MudTd DataLabel="Sonuç">
+                    @if (context.Voided) { <SoStatusBadge Label="İptal edildi" Tone="SoStatusBadge.BadgeTone.Neutral" Icon="@Icons.Material.Filled.Block" /> <div class="so-panel-text--sm">@context.VoidReason</div> }
+                    else if (context.VerifiedClosure) { <SoStatusBadge Label="Doğrulanmış kapanış" Tone="SoStatusBadge.BadgeTone.Positive" Icon="@Icons.Material.Filled.Verified" /> }
+                    else { @context.ResultLabel }
+                </MudTd>
+                <MudTd DataLabel="Tarih">@(context.Precision == "Instant" ? ServiceAccountUiText.Instant(context.ActualAt) : ServiceAccountUiText.Date(context.ActualOn))</MudTd>
+                <MudTd DataLabel="Yapan">@(context.PerformerTeam?.Label ?? "Ekip bilinmiyor")<div class="so-panel-text--sm">@(context.PerformerPerson?.Label ?? "Kişi bilinmiyor")</div></MudTd>
+                <MudTd DataLabel="Doğrulama">
+                    @if (context.VerifiedOn is { } verified) { @($"{verified:dd.MM.yyyy} · {context.VerifiedByPerson?.Label ?? "doğrulayan bilinmiyor"}") }
+                    else { <span>Doğrulanmadı</span> }
+                    @if (context.EvidenceNote is not null) { <div class="so-panel-text--sm">Kanıt: @context.EvidenceNote</div> }
+                </MudTd>
+                <MudTd DataLabel="Komut">
+                    @if (!context.Voided && context.Result == "Performed" && Detail.Permissions.Verify)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Open(context, "verify"))">Doğrula</MudButton>
+                    }
+                    @if (!context.Voided && Detail.Permissions.Verify)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => Open(context, "void"))">İptal et</MudButton>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+    @if (_target is { } target && _mode == "verify")
+    {
+        <section class="so-panel mt-2" aria-label="İşlemi doğrula">
+            <h3 class="so-panel-title">@target.ActionLabel doğrulaması</h3>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4"><MudDatePicker Editable="true" @bind-Date="_verifiedOn" Label="Doğrulama tarihi" DateFormat="dd.MM.yyyy" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4"><SaPersonPicker Label="Doğrulayan kişi" @bind-Value="_verifier" /></MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect T="Guid?" @bind-Value="_evidenceId" Label="Kanıt dosyası" Clearable="true" Variant="Variant.Outlined">
+                        @foreach (EvidenceView file in Detail.Evidence) { <MudSelectItem T="Guid?" Value="@((Guid?)file.Id)">@file.FileName</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12"><MudTextField @bind-Value="_note" Label="Doğrulama notu / kanıt açıklaması" MaxLength="2000" Lines="2" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <MudButton OnClick="VerifyAsync" Disabled="@(Busy || _verifiedOn is null)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Doğrulamayı kaydet</MudButton>
+            <MudButton OnClick="Close" Variant="Variant.Text" Class="mt-2">Vazgeç</MudButton>
+        </section>
+    }
+    else if (_target is { } voidTarget && _mode == "void")
+    {
+        <section class="so-panel mt-2" aria-label="İşlem kaydını iptal et">
+            <h3 class="so-panel-title">@voidTarget.ActionLabel kaydını iptal et</h3>
+            <p class="so-panel-text">Kayıt silinmez; iptal gerekçesiyle geçmişte kalır ve raporlarda sayılmaz.</p>
+            <MudTextField @bind-Value="_note" Label="İptal gerekçesi" MaxLength="1000" Variant="Variant.Outlined" />
+            <MudButton OnClick="VoidAsync" Disabled="@(Busy || string.IsNullOrWhiteSpace(_note))" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">Kaydı iptal et</MudButton>
+            <MudButton OnClick="Close" Variant="Variant.Text" Class="mt-2">Vazgeç</MudButton>
+        </section>
+    }
+
+    @if (Detail.Permissions.Work)
+    {
+        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="İşlem bildir">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string" @bind-Value="_report.ActionType" Label="İşlem" Variant="Variant.Outlined">
+                        @foreach ((string value, string label) in ServiceAccountUiText.Actions) { <MudSelectItem T="string" Value="@value">@label</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6" md="4">
+                    <MudSelect T="string" @bind-Value="_report.Result" Label="Sonuç" Variant="Variant.Outlined">
+                        <MudSelectItem T="string" Value="@("Planned")">Planlandı</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Performed")">Gerçekleşti</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6" md="4">
+                    <MudSelect T="string" @bind-Value="_report.RecordKind" Label="Kayıt türü" Variant="Variant.Outlined">
+                        <MudSelectItem T="string" Value="@("Intermediate")">Ara adım</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Closure")">Hesap kapanışı</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect T="Guid?" @bind-Value="_report.RequestId" Label="İlgili talep" Clearable="true" Variant="Variant.Outlined">
+                        @foreach (RequestView request in Detail.Requests.Where(r => r.Status == "Open")) { <MudSelectItem T="Guid?" Value="@((Guid?)request.Id)">@request.ActionLabel</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4"><MudDatePicker Editable="true" @bind-Date="_report.ActualOn" Label="@(_report.Result == "Performed" ? "Gerçekleşme tarihi (biliniyorsa)" : "Planlanan tarih")" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect T="Guid?" @bind-Value="_report.PerformerTeamId" Label="Yapan ekip" Clearable="true" Variant="Variant.Outlined">
+                        @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4"><SaPersonPicker Label="Yapan kişi" @bind-Value="_report.PerformerPersonId" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_report.OrNumber" Label="@(_report.ActionType == "Deletion" ? "OR numarası (silme kapanışı için gerekli)" : "OR numarası")" MaxLength="64" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_report.EvidenceNote" Label="Kanıt notu" MaxLength="2000" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <MudButton OnClick="ReportAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Bildirimi kaydet</MudButton>
+        </MudExpansionPanel></MudExpansionPanels>
+    }
+</section>
+
+@code {
+    private ActionView? _target;
+    private string _mode = string.Empty;
+    private DateTime? _verifiedOn;
+    private Guid? _verifier, _evidenceId;
+    private string? _note;
+    private ReportModel _report = new();
+    private int _seenRevision = -1;
+
+    /// <summary>Account detail.</summary>
+    [Parameter] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Team choices.</summary>
+    [Parameter] public IReadOnlyList<TeamView> Teams { get; set; } = [];
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last command was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Command sink.</summary>
+    [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (_seenRevision != Revision)
+        {
+            _seenRevision = Revision;
+            _report = new ReportModel();
+            Close();
+        }
+        else if (_target is not null)
+        {
+            _target = Detail.Actions.FirstOrDefault(a => a.Id == _target.Id);
+        }
+    }
+
+    private void Open(ActionView action, string mode) => (_target, _mode, _verifiedOn, _verifier, _evidenceId, _note) = (action, mode, null, null, null, null);
+
+    private void Close() => (_target, _mode) = (null, string.Empty);
+
+    private Task VerifyAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/actions/{_target!.Id}/verify",
+        new VerifyActionRequest(_target.Version, ServiceAccountUiText.ToDate(_verifiedOn)!.Value, _verifier, string.IsNullOrWhiteSpace(_note) ? null : _note.Trim(), _evidenceId)));
+
+    private Task VoidAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/actions/{_target!.Id}/void", new VoidActionRequest(_target.Version, _note!.Trim())));
+
+    private Task ReportAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/accounts/{Detail.Summary.Id}/actions",
+        new ReportActionRequest(_report.ActionType, _report.Result, _report.RecordKind, _report.RequestId, ServiceAccountUiText.ToDate(_report.ActualOn), null,
+            _report.PerformerTeamId, _report.PerformerPersonId, string.IsNullOrWhiteSpace(_report.EvidenceNote) ? null : _report.EvidenceNote.Trim(),
+            string.IsNullOrWhiteSpace(_report.OrNumber) ? null : [new SaExternalRef("OR", _report.OrNumber.Trim())])));
+
+    private sealed class ReportModel
+    {
+        public string ActionType { get; set; } = "PasswordChange";
+        public string Result { get; set; } = "Performed";
+        public string RecordKind { get; set; } = "Intermediate";
+        public Guid? RequestId { get; set; }
+        public DateTime? ActualOn { get; set; }
+        public Guid? PerformerTeamId { get; set; }
+        public Guid? PerformerPersonId { get; set; }
+        public string? OrNumber { get; set; }
+        public string? EvidenceNote { get; set; }
+    }
+}

@@ -1,0 +1,119 @@
+@* Renders one report payload (live or stored snapshot) exactly as computed by the single server metric
+   implementation. Team rows describe workload, not people; there is no ranking. *@
+@using SecureOps.Domain.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-report-summary">
+    <div class="so-panel-head">
+        <h2 id="sa-report-summary" class="so-panel-title">@Title</h2>
+        <span class="so-panel-text--sm">Hafta: @Report.WeekStart.ToString("dd.MM.yyyy") – @Report.WeekEndExclusive.AddDays(-1).ToString("dd.MM.yyyy") · Kesim: @ServiceAccountUiText.Instant(Report.AsOf) · @Report.ScopeLabel · @Report.MetricDefinitionVersion</span>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <SoMetric Label="Tekil hesap" Value="@S.UniqueAccounts.ToString()" />
+        <SoMetric Label="Sahip ekibi olan" Value="@S.AccountsWithOwnerTeam.ToString()" />
+        <SoMetric Label="Sorumlu kişisi olan" Value="@S.AccountsWithAssignedPerson.ToString()" />
+        <SoMetric Label="Tekil sorumlu kişi" Value="@S.UniqueResponsiblePersons.ToString()" />
+        <SoMetric Label="Açık talep" Value="@S.OpenRequests.ToString()" />
+        <SoMetric Label="Tarihli açık plan (talep / hesap)" Value="@($"{S.DatedOpenPlanRequests} / {S.DatedOpenPlanAccounts}")" />
+        <SoMetric Label="Tarih bekleyen" Value="@S.AwaitingDateRequests.ToString()" />
+        <SoMetric Label="Plan bitişi geçen" Value="@S.OverdueRequests.ToString()" />
+        <SoMetric Label="Gerçekleşen işlem bildirimi" Value="@S.PerformedActionReports.ToString()" />
+        <SoMetric Label="Doğrulanmış kapanış (hesap)" Value="@S.VerifiedClosureAccounts.ToString()" />
+        <SoMetric Label="Geçerli e-posta / tarihsiz / taslak" Value="@($"{S.ValidMails} / {S.UndatedMails} / {S.DraftMailsExcluded}")" />
+        <SoMetric Label="Açık bulgu" Value="@S.OpenFindings.ToString()" />
+    </div>
+</section>
+
+<section class="so-panel" aria-labelledby="sa-report-week">
+    <h2 id="sa-report-week" class="so-panel-title">Haftalık hareket</h2>
+    <MudSimpleTable Dense="true" Bordered="true">
+        <thead><tr><th scope="col">Kayıt</th><th scope="col">Bu hafta</th><th scope="col">Daha önce</th><th scope="col">Sonra (kesimden önce)</th><th scope="col">Kesimden sonra</th><th scope="col">Tarihsiz</th><th scope="col">Toplam</th><th scope="col">Mutabakat</th></tr></thead>
+        <tbody>
+            @foreach ((string label, PlacementCounts c) in Placements)
+            {
+                <tr>
+                    <th scope="row">@label</th><td>@c.InPeriod</td><td>@c.Earlier</td><td>@c.LaterBeforeCutoff</td><td>@c.AfterCutoff</td><td>@c.UnknownDate</td><td>@c.Total</td>
+                    <td>@(c.Reconciles ? "Tutarlı" : "Tutarsız")</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+    <p class="so-panel-text--sm mt-1">Bu hafta giden / gelen e-posta: @Report.Weekly.OutgoingMailsInPeriod / @Report.Weekly.IncomingMailsInPeriod</p>
+    @if (Report.Weekly.ActionsInPeriod.Count > 0)
+    {
+        <MudTable Items="Report.Weekly.ActionsInPeriod" Dense="true" Breakpoint="Breakpoint.Sm" T="ReportActionLine" Class="mt-2">
+            <HeaderContent><MudTh>Hesap</MudTh><MudTh>İşlem</MudTh><MudTh>Sonuç</MudTh><MudTh>Tarih</MudTh><MudTh>Yapan ekip</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Hesap">@context.Account</MudTd><MudTd DataLabel="İşlem">@context.Action</MudTd><MudTd DataLabel="Sonuç">@context.Result</MudTd>
+                <MudTd DataLabel="Tarih">@ServiceAccountUiText.Date(context.Date)</MudTd><MudTd DataLabel="Yapan ekip">@(context.PerformerTeam ?? "Bilinmiyor")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</section>
+
+<section class="so-panel" aria-labelledby="sa-report-plans">
+    <h2 id="sa-report-plans" class="so-panel-title">Tarihli açık planlar</h2>
+    @if (Report.DatedPlans.Count == 0) { <SoEmptyState Title="Tarihli açık plan yok" /> }
+    else
+    {
+        <MudTable Items="Report.DatedPlans" Dense="true" Breakpoint="Breakpoint.Sm" T="PlanLine">
+            <HeaderContent><MudTh>Hesap</MudTh><MudTh>İş</MudTh><MudTh>Başlangıç</MudTh><MudTh>Bitiş</MudTh><MudTh>Hedef ekip</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Hesap">@context.Account</MudTd><MudTd DataLabel="İş">@context.Action</MudTd>
+                <MudTd DataLabel="Başlangıç">@context.Start.ToString("dd.MM.yyyy")</MudTd>
+                <MudTd DataLabel="Bitiş">@context.End.ToString("dd.MM.yyyy")@(context.Overdue ? " · geçti" : "")</MudTd>
+                <MudTd DataLabel="Hedef ekip">@(context.TargetTeam ?? "Yok")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</section>
+
+<section class="so-panel" aria-labelledby="sa-report-teams">
+    <h2 id="sa-report-teams" class="so-panel-title">Ekip iş yükü</h2>
+    @if (Report.TeamWorkload.Count == 0) { <SoEmptyState Title="Ekip verisi yok" /> }
+    else
+    {
+        <MudTable Items="Report.TeamWorkload" Dense="true" Breakpoint="Breakpoint.Sm" T="TeamWorkloadRow">
+            <HeaderContent><MudTh>Ekip</MudTh><MudTh>Sahip olunan hesap</MudTh><MudTh>Hedef olunan açık talep</MudTh><MudTh>Plan bitişi geçen</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Ekip">@context.Team</MudTd><MudTd DataLabel="Sahip olunan hesap">@context.OwnedAccounts</MudTd>
+                <MudTd DataLabel="Hedef olunan açık talep">@context.OpenRequestsAsTarget</MudTd><MudTd DataLabel="Plan bitişi geçen">@context.OverdueAsTarget</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</section>
+
+<section class="so-panel" aria-labelledby="sa-report-handover">
+    <h2 id="sa-report-handover" class="so-panel-title">Devir ve gMSA</h2>
+    <div class="d-flex flex-wrap gap-2">
+        <SoMetric Label="Devir bildirimi" Value="@Report.Handover.Reported.ToString()" />
+        <SoMetric Label="Kabul / ret" Value="@($"{Report.Handover.Accepted} / {Report.Handover.Rejected}")" />
+        <SoMetric Label="gMSA hedefi / tamamlanan / bekleyen" Value="@($"{Report.Handover.GmsaTargeted} / {Report.Handover.GmsaCompleted} / {Report.Handover.GmsaPending}")" />
+    </div>
+    @if (Report.Handover.PendingBySuitability.Count > 0)
+    {
+        <p class="so-panel-text--sm mt-1">Bekleyen gMSA uygunluğu: @string.Join(", ", Report.Handover.PendingBySuitability.Select(n => $"{n.Label}: {n.Count}"))</p>
+    }
+    <p class="so-panel-text--sm mt-2">@Report.Legacy.Label: adı geçen sorumlu @Report.Legacy.NamedAccounts, takipçi yedeği @Report.Legacy.FollowupFallbackAccounts, birleşik @Report.Legacy.CombinedAccounts hesap / @Report.Legacy.CombinedPeople kişi.</p>
+    @if (Report.Notes.Count > 0)
+    {
+        <ul class="mt-1">@foreach (string note in Report.Notes) { <li class="so-panel-text--sm">@note</li> }</ul>
+    }
+</section>
+
+@code {
+    /// <summary>Report payload.</summary>
+    [Parameter] public ServiceAccountReport Report { get; set; } = default!;
+
+    /// <summary>Heading.</summary>
+    [Parameter] public string Title { get; set; } = "Özet";
+
+    private ReportSummary S => Report.Summary;
+
+    private IEnumerable<(string, PlacementCounts)> Placements =>
+    [
+        ("Gerçekleşen işlem bildirimi", Report.Weekly.Actions),
+        ("Doğrulanmış kapanış", Report.Weekly.VerifiedClosures),
+        ("Geçerli e-posta", Report.Weekly.Mails)
+    ];
+}
