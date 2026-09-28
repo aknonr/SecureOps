@@ -121,7 +121,7 @@ Fix: `BeginWriteAsync` takes the same lock in **Shared** mode as the first state
 module write transaction on tables the commit reads or writes (account/work mutations, communications,
 administration, import staging and re-plan). Consistent lock order means a write waits for a running
 commit before locking any row, and a commit waits for running writes. No retry, sleep or weakened
-assertion. A gate wait above 25 s throws 51311 and is reported as persistence unavailable with nothing
+assertion. A gate wait above 25 s throws 51312 (distinct from the install-time 51311) and is reported as persistence unavailable with nothing
 written. Reminder outbox, report snapshots and audit-only reads touch disjoint tables and are unchanged.
 `sp_getapplock` needs only `public`; the role scripts are unchanged.
 

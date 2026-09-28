@@ -39,6 +39,9 @@ internal sealed class ServiceAccountSqlFixture
     private readonly Guid _grantor = Guid.NewGuid();
     public ConcurrentQueue<string> SqlDiagnostics { get; } = new();
 
+    /// <summary>Optional runtime connection for the repository under test (least-privilege runs).</summary>
+    public const string RuntimeVariable = "SECUREOPS_SA_SQL_RUNTIME_CONNECTION";
+
     public ServiceAccountSqlFixture()
     {
         Configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -46,7 +49,15 @@ internal sealed class ServiceAccountSqlFixture
             ["ConnectionStrings:SecureOpsDb"] = Environment.GetEnvironmentVariable(ServiceAccountSqlFactAttribute.Variable),
             ["ServiceAccounts:Provider"] = "SqlServer"
         }).Build();
-        Repository = new SqlServiceAccountRepository(Configuration);
+        // Optional least-privilege run: synthetic setup keeps the privileged connection, while the module under test
+        // connects as a principal that is only a member of the reviewed runtime role (SECUREOPS_SA_SQL_RUNTIME_CONNECTION).
+        string? runtime = Environment.GetEnvironmentVariable(RuntimeVariable);
+        Repository = new SqlServiceAccountRepository(string.IsNullOrWhiteSpace(runtime) ? Configuration
+            : new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:SecureOpsDb"] = runtime,
+                ["ServiceAccounts:Provider"] = "SqlServer"
+            }).Build());
         IApplicationAccessService access = Substitute.For<IApplicationAccessService>();
         access.GetCurrentAsync(Arg.Any<ClaimsPrincipal>(), Arg.Any<AccessOperationContext>(), Arg.Any<CancellationToken>())
             .Returns(call =>

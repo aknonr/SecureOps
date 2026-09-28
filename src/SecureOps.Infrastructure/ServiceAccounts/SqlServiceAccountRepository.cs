@@ -25,7 +25,7 @@ public sealed partial class SqlServiceAccountRepository
     /// </summary>
     private const string _importCommitLock = "svcacct:import-commit";
 
-    /// <summary>Shared gate wait; below the 30 s command timeout so a long commit surfaces as error 51311, not a timeout.</summary>
+    /// <summary>Shared gate wait; below the 30 s command timeout so a long commit surfaces as error 51312, not a timeout.</summary>
     private const int _writeGateTimeoutMilliseconds = 25000;
     private readonly string _connectionString;
 
@@ -147,7 +147,7 @@ public sealed partial class SqlServiceAccountRepository
 
     /// <summary>
     /// Begins a module write transaction and waits (shared) behind any running import commit before any row is locked.
-    /// A gate timeout throws SQL error 51311 and is reported as persistence unavailable with nothing written.
+    /// A gate timeout throws SQL error 51312 and is reported as persistence unavailable with nothing written.
     /// </summary>
     private static async Task<SqlTransaction> BeginWriteAsync(SqlConnection connection, CancellationToken cancellationToken,
         IsolationLevel isolation = IsolationLevel.ReadCommitted)
@@ -156,7 +156,7 @@ public sealed partial class SqlServiceAccountRepository
         await connection.ExecuteAsync(Cmd("""
             DECLARE @result int;
             EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Shared', @LockOwner = 'Transaction', @LockTimeout = @timeout;
-            IF @result < 0 THROW 51311, 'Service Accounts import commit in progress.', 1;
+            IF @result < 0 THROW 51312, 'Service Accounts import commit in progress.', 1;
             """, new { resource = _importCommitLock, timeout = _writeGateTimeoutMilliseconds }, transaction, cancellationToken));
         return transaction;
     }
