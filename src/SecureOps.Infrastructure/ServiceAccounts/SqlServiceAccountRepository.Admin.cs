@@ -95,7 +95,7 @@ public sealed partial class SqlServiceAccountRepository
         Guid key = id ?? Guid.NewGuid();
         parameters.AddDynamicParams(new { Id = key, Name = clean, Key = ServiceAccountText.LabelKey(clean), now, actor.UserId, RowVer = Version(expectedVersion) });
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         if (await connection.ExecuteScalarAsync<int>(Cmd($"SELECT COUNT(*) FROM svcacct.{table} WHERE NormalizedName = @Key AND Id <> @Id;", parameters, transaction, cancellationToken)) > 0)
         {
             return SaResult<Guid>.Fail(SaErrors.Invalid, "name");
@@ -128,7 +128,7 @@ public sealed partial class SqlServiceAccountRepository
         DateTimeOffset now = DateTimeOffset.UtcNow;
         string clean = ServiceAccountText.Clean(displayName)!;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken);
         await connection.ExecuteAsync(Cmd("""
             INSERT INTO svcacct.People(Id, DisplayName, NormalizedName, VerificationState, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
             VALUES(@id, @clean, @key, 'Provisional', @now, @UserId, @now, @UserId);
@@ -144,7 +144,7 @@ public sealed partial class SqlServiceAccountRepository
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         string? upn = ServiceAccountText.Clean(request.Upn)?.ToLowerInvariant();
         string? objectId = ServiceAccountText.Clean(request.DirectoryObjectId);
         if (await connection.ExecuteScalarAsync<int>(Cmd("""
@@ -176,7 +176,7 @@ public sealed partial class SqlServiceAccountRepository
         DateTimeOffset now = DateTimeOffset.UtcNow;
         string alias = ServiceAccountText.Clean(request.Alias)!;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         int inserted = await connection.ExecuteAsync(Cmd("""
             IF EXISTS (SELECT 1 FROM svcacct.People WHERE Id = @id)
                AND NOT EXISTS (SELECT 1 FROM svcacct.PersonAliases WHERE PersonId = @id AND AliasNormalized = @key)
@@ -219,7 +219,7 @@ public sealed partial class SqlServiceAccountRepository
         var id = Guid.NewGuid();
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         if (await connection.ExecuteScalarAsync<int>(Cmd("""
             SELECT COUNT(*) FROM svcacct.ScopeGrants WHERE UserId = @userId AND RevokedAt IS NULL AND ScopeKind = @Kind
               AND ISNULL(OrganizationId, '00000000-0000-0000-0000-000000000000') = ISNULL(@organizationId, '00000000-0000-0000-0000-000000000000')
@@ -244,7 +244,7 @@ public sealed partial class SqlServiceAccountRepository
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken);
         int changed = await connection.ExecuteAsync(Cmd("""
             UPDATE svcacct.ScopeGrants SET RevokedAt = @now, RevokedBy = @UserId, RevokeReason = @Reason
             WHERE Id = @id AND RevokedAt IS NULL AND RowVer = @RowVer;

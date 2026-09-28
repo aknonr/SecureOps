@@ -135,6 +135,13 @@ internal sealed class ServiceAccountSqlFixture
             if (state is not IEnumerable<KeyValuePair<string, object?>> values)
             { return; }
             var fields = values.ToDictionary(x => x.Key, x => x.Value);
+            if (fields.TryGetValue("FailureType", out object? failureType))
+            {
+                // Non-SQL failures that are also reported as "persistence unavailable" are captured by type only.
+                entries.Enqueue($"FailureType={failureType}");
+                return;
+            }
+
             if (!fields.ContainsKey("SqlNumber"))
             { return; }
             entries.Enqueue($"Number={fields["SqlNumber"]} State={fields["SqlState"]} Class={fields["SqlClass"]} CorrelationId={fields["CorrelationId"]}");

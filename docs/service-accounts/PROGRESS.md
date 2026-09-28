@@ -62,7 +62,7 @@ by Codex). SQL: disposable SQL Server 2022 container, databases created by
 | Unit tests (all) | 1477/1478; the 1 failure (`AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`) also fails on the baseline |
 | Module unit tests | 49/49 (domain, parser, metrics, reminders, export, UI transport/wording) |
 | Integration tests (all) | 286 passed, 56 skipped, 12 failed; the failing set (DPAPI key ring, image codec) is identical to the baseline run on this host |
-| Module SQL tests (`SECUREOPS_SA_SQL_TEST_CONNECTION`) | 19/19 in the recorded runs. **Unresolved:** one run had 3 failures (see below); later passes are not a root cause |
+| Module SQL tests (`SECUREOPS_SA_SQL_TEST_CONNECTION`) | 19/19 in the recorded runs; one earlier run had 3 failures. Cause established on 2026-09-29 as an import-commit/VerifyAction deadlock and fixed (see below) |
 | OpenAPI snapshot | regenerated with `SECUREOPS_UPDATE_OPENAPI=1`; purely additive (`git diff --histogram`: +10 558 / −0) |
 | Browser journey `tests/browser/service-accounts.cjs` — **temporary harness, not the production API composition** | 13/13 steps against the harness below, Chromium, 1440 px / 390 px, dark scheme, 200 % zoom (720×450 @2x), no page errors, no unnamed module fields. Not yet run against the real Demo/Test API |
 | Private reconciliation (supplied package + workbook, private DB, results outside the repository) | see scenarios 1–5 below |
@@ -96,19 +96,41 @@ session cookies against a persisted session store, Integrated Security SQL, IIS 
 normal Demo/Test API with `Access:RepositoryProvider=SqlServer`, a reviewed role containing the
 module actions, and the bootstrap fixture — not done.
 
-### Unresolved SQL test failure
+### SQL test failure: VerifyAction deadlock (cause established 2026-09-29)
 
-One run of the 19 module SQL tests (`dotnet test tests/SecureOps.Tests.Integration --filter
-FullyQualifiedName~ServiceAccounts`) reported 3 failures and took 37 s instead of ~10 s. It ran
-immediately after `dotnet build` of the solution, against the shared disposable database
-`SecureOps_SaTest2`, while the harness API (another database on the same SQL container) was
-running. Which three tests failed and their messages were **not captured**. Four later full runs
-and 14 earlier reminder-suite runs passed; that does not explain or resolve the failure.
-Reproduction attempt (synthetic data only): start the harness host, rebuild the solution, then run
-the filter above in a loop with `--logger "trx"` and `--blame` into an evidence folder, keeping every
-TRX, until a failure is captured; also run once against a freshly created database. Candidate areas
-to inspect, not conclusions: shared-database interference between parallel test classes, lock
-waits (the 37 s duration), and the pooled-isolation issue already fixed for reminder claims.
+History: one early run of the module SQL tests had 3 failures without captured messages
+(`SecureOps_SaTest2`), and Codex later saw 18/19 on a fresh LocalDB with
+`MultipleRequests_ActionVerification_AndClosureRules` returning `ServiceAccountPersistenceUnavailable`
+at VerifyAction. Passing reruns were never treated as a fix.
+
+Evidence: the SQL Server `system_health` session of the disposable container retained one
+`xml_deadlock_report` (synthetic database `SecureOps_SaTest2`, 2026-09-28 19:50:31 UTC). Victim:
+VerifyAction's closure statement `UPDATE svcacct.Accounts SET LifecycleState = 'ClosureVerified' …`
+(READ COMMITTED, holding U/X on the account key). Other side: the import commit (SERIALIZABLE)
+`UPDATE a SET LastObservedOn … FROM svcacct.Accounts a JOIN svcacct.AccountObservations o …`,
+holding RangeS-S from its in-transaction re-plan and requesting RangeS-U on the same key. Error
+1205 was mapped to `ServiceAccountPersistenceUnavailable`. xUnit runs the import and workflow test
+classes in parallel on one database, and on a small fresh table the commit's re-plan reads ranges
+that cover other tests' synthetic accounts — so the failure is timing-dependent, and it is also a
+production defect (any account write overlapping an import commit could deadlock).
+
+Cause: the import commit takes the exclusive application lock `svcacct:import-commit`, but no other
+module write took that lock, so they could hold row locks inside the commit's serializable range.
+
+Fix: `BeginWriteAsync` takes the same lock in **Shared** mode as the first statement of every other
+module write transaction on tables the commit reads or writes (account/work mutations, communications,
+administration, import staging and re-plan). Consistent lock order means a write waits for a running
+commit before locking any row, and a commit waits for running writes. No retry, sleep or weakened
+assertion. A gate wait above 25 s throws 51311 and is reported as persistence unavailable with nothing
+written. Reminder outbox, report snapshots and audit-only reads touch disjoint tables and are unchanged.
+`sp_getapplock` needs only `public`; the role scripts are unchanged.
+
+Proof: `ClosureVerification_DuringImportCommit_WaitsInsteadOfDeadlocking` reproduces the recorded lock
+order deterministically (synthetic data). Without the fix: 3/3 runs fail with error 1205. With the fix:
+3/3 pass, and the full module SQL filter passes (21/21). The early 3-failure run and Codex's 18/19 run
+kept no deadlock graph, so they are **consistent with** this cause but not proven identical. The test
+fixture now also records the failure type of non-SQL exceptions that are reported as persistence
+unavailable.
 
 ## Acceptance mapping (SPEC scenarios)
 

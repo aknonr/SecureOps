@@ -91,7 +91,7 @@ public sealed partial class SqlServiceAccountRepository
     public async Task StageAsync(ImportBatchRecord batch, IReadOnlyList<ImportRowRecord> rows, SaActor actor, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken);
         await connection.ExecuteAsync(Cmd("""
             INSERT INTO svcacct.ImportBatches(Id, Profile, FileName, ContentType, Sha256, Content, SourceReportDate, SourceDateProvenance, DeclaredScope,
                 DeclaredDomain, MappingJson, MappingVersion, PreviewVersion, DecisionVersion, Status, ReplayKey, SummaryJson, UploadedBy, UploadedAt)
@@ -169,7 +169,7 @@ public sealed partial class SqlServiceAccountRepository
         string summaryJson, string action, SaActor actor, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         int updated = await connection.ExecuteAsync(Cmd("""
             UPDATE svcacct.ImportBatches SET PreviewVersion = PreviewVersion + 1, DecisionVersion = DecisionVersion + 1, SummaryJson = @summaryJson,
                 Status = 'Previewed'
@@ -238,9 +238,9 @@ public sealed partial class SqlServiceAccountRepository
         await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
         await connection.ExecuteAsync(Cmd("""
             DECLARE @result int;
-            EXEC @result = sp_getapplock @Resource = 'svcacct:import-commit', @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 30000;
+            EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 30000;
             IF @result < 0 THROW 51310, 'Import commit lock unavailable.', 1;
-            """, null, transaction, cancellationToken, _commitTimeoutSeconds));
+            """, new { resource = _importCommitLock }, transaction, cancellationToken, _commitTimeoutSeconds));
         ImportBatchRecord? batch = await connection.QuerySingleOrDefaultAsync<ImportBatchRecord>(Cmd(
             BatchSelect(true) + " WITH (UPDLOCK, HOLDLOCK) WHERE Id = @batchId;", new { batchId }, transaction, cancellationToken));
         if (batch is null)

@@ -234,6 +234,66 @@ public sealed class ServiceAccountWorkflowSqlTests
             new { prefix })).Should().Be(0);
     }
 
+    /// <summary>
+    /// Deterministic reproduction of the recorded VerifyAction deadlock (error 1205 reported as persistence unavailable):
+    /// an import commit holds its exclusive commit lock and serializable locks on an account row, a closure verification
+    /// then updates the same account, and the commit afterwards updates that account too. Every module write must wait
+    /// for the commit before taking row locks, so both sides complete.
+    /// </summary>
+    [ServiceAccountSqlFact]
+    public async Task ClosureVerification_DuringImportCommit_WaitsInsteadOfDeadlocking()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        AccountDetail account = await CreateAccountAsync(fx, coordinator, org, "GATE");
+        account = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, account.Summary.Id, new CreateWorkRequest("Deletion"), _token));
+        Guid deletion = account.Requests.Single().Id;
+        account = Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, account.Summary.Id,
+            new ReportActionRequest("Deletion", "Performed", "Closure", deletion, ActualOn: new(2026, 9, 12), EvidenceNote: "silme bildirimi"), _token));
+        ActionView delete = account.Actions.Single();
+        account = Ok(await fx.Service.UpdateActionAsync(coordinator.Principal, fx.Context, delete.Id,
+            new UpdateActionRequest(delete.Version, AddReferences: [new SaExternalRef("OR", "OR-GATE-" + fx.Suffix)]), _token));
+        delete = account.Actions.Single();
+        Guid accountId = account.Summary.Id;
+
+        await using SqlConnection import = fx.Connection();
+        await import.OpenAsync(_token);
+        await using var transaction = (SqlTransaction)await import.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, _token);
+        await import.ExecuteAsync("""
+            DECLARE @result int;
+            EXEC @result = sp_getapplock @Resource = 'svcacct:import-commit', @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 30000;
+            IF @result < 0 THROW 51399, 'Synthetic commit lock unavailable.', 1;
+            """, transaction: transaction);
+        await import.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM svcacct.Accounts WHERE Id = @accountId;", new { accountId }, transaction);
+        short importSession = await import.ExecuteScalarAsync<short>("SELECT CONVERT(smallint, @@SPID);", transaction: transaction);
+
+        Task<SaResult<AccountDetail>> verify = fx.Service.VerifyActionAsync(coordinator.Principal, fx.Context, delete.Id,
+            new VerifyActionRequest(delete.Version, new(2026, 9, 13), VerificationNote: "AD'de yok, OR kapalı"), _token);
+        (await WaitUntilBlockedByAsync(fx, importSession)).Should().BeTrue("the verification must be waiting behind the synthetic commit");
+
+        Func<Task> commitUpdate = () => import.ExecuteAsync("UPDATE svcacct.Accounts SET UpdatedAt = UpdatedAt WHERE Id = @accountId;", new { accountId }, transaction);
+        await commitUpdate.Should().NotThrowAsync("the commit must not be chosen as a deadlock victim");
+        await transaction.CommitAsync(_token);
+
+        SaResult<AccountDetail> verified = await verify;
+        verified.ErrorCode.Should().BeNull($"safe SQL diagnostics: {string.Join("; ", fx.SqlDiagnostics)}");
+        verified.Value!.Summary.LifecycleState.Should().Be("ClosureVerified");
+    }
+
+    private static async Task<bool> WaitUntilBlockedByAsync(ServiceAccountSqlFixture fx, short session)
+    {
+        for (int attempt = 0; attempt < 150; attempt++)
+        {
+            if (await fx.CountAsync("SELECT COUNT(*) FROM sys.dm_os_waiting_tasks WHERE blocking_session_id = @session;", new { session }) > 0)
+            {
+                return true;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+        }
+
+        return false;
+    }
+
     private static async Task<(ServiceAccountSqlFixture Fx, SynUser Coordinator, Guid Org)> SetupAsync()
     {
         ServiceAccountSqlFixture fx = new();

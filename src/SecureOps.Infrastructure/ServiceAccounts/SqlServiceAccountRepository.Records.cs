@@ -21,7 +21,7 @@ public sealed partial class SqlServiceAccountRepository
         DateTimeOffset now = DateTimeOffset.UtcNow;
         string? provider = ServiceAccountText.Clean(request.ProviderMessageId);
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         Guid? existing = provider is null ? null : await connection.QuerySingleOrDefaultAsync<Guid?>(Cmd(
             "SELECT Id FROM svcacct.Communications WITH (UPDLOCK, HOLDLOCK) WHERE ProviderMessageId = @provider;", new { provider }, transaction, cancellationToken));
         Guid id = existing ?? Guid.NewGuid();

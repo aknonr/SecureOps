@@ -334,7 +334,7 @@ public sealed partial class SqlServiceAccountRepository
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.ReadCommitted);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.ReadCommitted);
         int affected;
         try
         {

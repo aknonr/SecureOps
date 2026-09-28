@@ -17,6 +17,16 @@ public sealed partial class SqlServiceAccountRepository
 {
     private const int _timeoutSeconds = 30;
     private const int _commitTimeoutSeconds = 180;
+
+    /// <summary>
+    /// Application lock the import commit holds exclusively for its whole serializable transaction. Every other module
+    /// write that touches tables the commit reads or writes takes it shared as its first statement, so a write never holds
+    /// row locks inside the commit's range while the commit waits for them (the recorded 1205 deadlock).
+    /// </summary>
+    private const string _importCommitLock = "svcacct:import-commit";
+
+    /// <summary>Shared gate wait; below the 30 s command timeout so a long commit surfaces as error 51311, not a timeout.</summary>
+    private const int _writeGateTimeoutMilliseconds = 25000;
     private readonly string _connectionString;
 
     /// <summary>Scope predicate over alias <c>a</c> (svcacct.Accounts); mirrors <see cref="ServiceAccountScope.Covers"/>.</summary>
@@ -134,6 +144,22 @@ public sealed partial class SqlServiceAccountRepository
     private static async Task<SqlTransaction> BeginAsync(SqlConnection connection, CancellationToken cancellationToken,
         IsolationLevel isolation = IsolationLevel.ReadCommitted) =>
         (SqlTransaction)await connection.BeginTransactionAsync(isolation, cancellationToken);
+
+    /// <summary>
+    /// Begins a module write transaction and waits (shared) behind any running import commit before any row is locked.
+    /// A gate timeout throws SQL error 51311 and is reported as persistence unavailable with nothing written.
+    /// </summary>
+    private static async Task<SqlTransaction> BeginWriteAsync(SqlConnection connection, CancellationToken cancellationToken,
+        IsolationLevel isolation = IsolationLevel.ReadCommitted)
+    {
+        SqlTransaction transaction = await BeginAsync(connection, cancellationToken, isolation);
+        await connection.ExecuteAsync(Cmd("""
+            DECLARE @result int;
+            EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Shared', @LockOwner = 'Transaction', @LockTimeout = @timeout;
+            IF @result < 0 THROW 51311, 'Service Accounts import commit in progress.', 1;
+            """, new { resource = _importCommitLock, timeout = _writeGateTimeoutMilliseconds }, transaction, cancellationToken));
+        return transaction;
+    }
 
     private static string? Truncate(string? value, int length) => value is null || value.Length <= length ? value : value[..length];
 
