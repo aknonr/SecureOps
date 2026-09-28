@@ -15,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\SecureOps.Worker\SecureOps.Worker.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Domain\SecureOps.Domain.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Shared\SecureOps.Shared.csproj" />
     <ProjectReference Include="..\..\src\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />

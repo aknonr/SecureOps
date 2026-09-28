@@ -2,7 +2,33 @@
 
 Two test projects mirroring `src/`.
 
+Post-E-08 archive follow-up: six synthetic corruption cases in `InUseTests` verify
+the exact `InUseArchiveIntegrityFailed` category for byte/hash, size, identity,
+preparer, retention and malformed JSON errors, no content/callback and no rewrite.
+Focused In Use and in-process API runs are recorded separately in the canonical
+register. Supplied corporate archives/workbooks remain private review evidence,
+not public fixtures. No full-suite, browser or SCM rerun is claimed for this fix.
+
+Manual In Use verification (IU-06/E-07) adds component rendering and real-client
+fake HTTP coverage, plus isolated SQL acknowledgement/timeout/rejection, concurrent
+manual confirmation, audit rollback/revocation and no verified report count tests.
+The 10 current SQL regression cases run against the matched E-07 build; normal
+integration still skips opt-ins without explicit LocalDB configuration. Exact TRX
+paths and counts are in integrated-test-activation.md. No browser or corporate
+closure is implied. The sealed E-06 and E-05 diagnostic remain unchanged.
+
 ## Post-rc6.26 Remaining Gates
+
+AnnouncementSourceProposalTests covers literal/whitespace description fallback,
+separate manual restart time and dynamic service proposals without SQL/providers.
+E-06 matched review artifacts and new test identities are in the canonical register.
+
+WorkerHostingTests exercises explicit binary content root/Test-only JSON, CLI
+precedence, diagnostics composition without writes/host start, service config
+guards, local exclusive-lock release, durable structured lifecycle logs and the
+same job-server start/stop delegation. It does not install an SCM service or test
+logoff/crash recovery. Native acceptance uses worker-service-operations-tr.md and
+the single OPS-02 register entry. No existing UI host restriction is bypassed.
 
 Current catalogue SQL, reporter crosswalk, route authorization, immutable metadata
 and release delta contracts are covered by the continuation tests. The isolated
@@ -217,4 +243,32 @@ All identity, Swagger, authorization, forwarded-header, and SQL schema tests are
 
 Release validation additionally checks the published Active Directory dependency closure, manifest hashes, and ZIP paths without contacting a domain controller.
 
+`SccmFailureEvidenceTests` uses a temporary FileSystem drive in a real Restricted
+in-process PowerShell runspace. It verifies built-in Management/Utility availability,
+private-drive continuity across staged commands and sanitized ErrorRecord metadata;
+it never imports ConfigurationManager or contacts SCCM. Worker hosting tests also
+cover explicit absolute content-root diagnostics and rejected disabled/incomplete
+profiles before dispatch. Published runtime/profile checks and their exact TRX
+identities are recorded under E-05 in the single integrated activation register.
+
 Operational Record/Jira workflow tests use deterministic fakes. They cover manual-review fallback, exact requester resolution, preview, audit, repeated/concurrent create requests, unknown Jira outcomes, persisted Jira plus source-close failure, retry, cancellation, ProblemDetails, authorization, and offline SQL uniqueness. The opt-in Resource SQL suite also validates SDM persistence in isolated LocalDB. No tests contact live Jira, the Operational Record source, corporate SQL Server, AD, IIS, or PowerShell remoting.
+## E-08 In Use activity checks
+
+Focused tests cover unchanged answers across workflow progression, real server
+changes remaining stale, four-server corporate workbook dimensions/answers, trusted
+and unresolved attribution, and activity/OR/manual evidence separation. Isolated
+SQL tests additionally cover exact count/page tracking, verified-activity reporting,
+transactional confirmation, unknown/no-retry and retained duplicate fencing.
+Browser runner selectors follow the new activity/save wording; they are prepared,
+not executed under the recorded host restriction. No synthetic rendering is
+reported as browser acceptance. Evidence is linked from the canonical delivery
+register, not a second checklist here.
+
+In Use list tests compare memory/SQL creation-date ordering before pagination,
+unknown dates last, equal-date/code stable ties, and minimal activity reconciliation
+using labelled synthetic source observations. Missing rows preserve answers and
+block current eligibility, never imply completion. Active or manually confirmed
+executions remain verification-pending; a missing parent blocks the next mutation.
+UI component logic verifies sort URL/load/refresh persistence and status labels;
+these checks are not browser acceptance. See the current canonical register for
+the final source identity, exact TRX files and unrepeated historical evidence.

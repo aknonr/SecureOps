@@ -1,5 +1,10 @@
 # SecureOps.Shared
 
+InUseExecutionIntent freezes verification mode with historical SourceReadback
+default; new submissions select Manual. Execution exposes immutable SourceCode.
+ManualVerification evidence carries trusted confirmer identity/label and event UTC
+time; it is distinct from Closure/Verified and never changes the original initiator.
+
 Archive catalogue contracts retain original metadata and label current lifecycle
 and attachment state separately. Report PreparedByAccount is frozen for new
 archives and remains absent for unknown history. Reporter suggestion decisions
@@ -33,3 +38,20 @@ response envelopes. Resources.View and Resources.Manage are distinct capabilitie
 ## Current state
 
 Populated with identity lookup contracts, application-session contracts, audit-store health contracts, Operational Record/Jira response contracts, safe API error codes, authorization policy constants, and strongly typed session/Data Protection configuration options. Continue to keep this project free of infrastructure and UI dependencies.
+## E-08 In Use contract clarification
+
+`ReviewSourceVersion` separates answer freshness from the full execution source
+version. Null on historical records fails conservatively to the full version.
+`WasasActivity`/`CurrentStage` are optional authoritative observations; the current
+corporate adapter does not supply them. `ActivityVerifiedAt` is a server-side SQL
+event projection, never caller attestation. New intent `WasasActivityManual` and
+activity-specific manual evidence do not reinterpret historical OR closure events.
+`InUsePersonLabel` keeps stable application GUIDs/SIDs out of human-facing labels;
+new draft/report snapshots retain name/account with stable technical identity.
+
+`InUseQuery.Sort` accepts code/oldest/newest (default code). Date ordering is
+retained for later verified mapping, not a delivery prerequisite. `ActivityStatus` is a
+minimal list classification: Pending, Completed, OrClosed or VerificationPending.
+`HasActiveExecution` is a repository read-side fence; `SourceObservationMissing`
+marks a parent not observed in the latest refresh. Neither manual confirmation nor
+missing rows proves completion. These fields do not authorize command execution.

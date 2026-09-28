@@ -29,6 +29,8 @@ public sealed record InUseReuseProposal(Guid ReviewId, bool CanReuse, string Rea
 /// <summary>Per-server source comparison; null means a legacy draft lacks comparison evidence.</summary>
 public static class InUseSourceChanges
 {
+    /// <summary>Inventory lifecycle fences execution, but is not one of the reviewed server-answer inputs.</summary>
+    public static bool AffectsReview(string field) => field != "STATUS";
     /// <summary>Compare exact source values/provenance, not record-wide version increments or answer edits.</summary>
     public static IReadOnlyList<string>? Fields(InUseServer current, InUseDraft? draft)
     {

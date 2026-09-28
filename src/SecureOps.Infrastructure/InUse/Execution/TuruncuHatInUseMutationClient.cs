@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Configuration;
+using SecureOps.Shared.Contracts.InUse;
 
 namespace SecureOps.Infrastructure.InUse.Execution;
 
@@ -37,8 +38,8 @@ public sealed class TuruncuHatInUseMutationClient(IHttpClientFactory clients, IT
                 "Upload" => TuruncuHatInUseWireContract.Attachment(standard,
                     new Uri(standard, "../../DataRestSecure.svc/json/uploadattachment"), lease, session, source.Value.TenantId, source.Value.Authorization),
                 "Property4463" => TuruncuHatInUseWireContract.Property(dynamicCaseId ?? "", 4463, "Application Server", session, source.Value.TenantId, source.Value.Authorization),
-                "Property4464" when lease.Intent.Source.Servers.Count > 0 && lease.Intent.Source.Servers.All(s =>
-                    string.Equals(s.Fields.GetValueOrDefault("SI_ENVIRONMENT")?.Value?.Trim(), environment, StringComparison.OrdinalIgnoreCase))
+                "Property4464" when environment is not null && string.Equals(
+                    InUseRequiredFields.Environment(lease.Intent.Source), environment, StringComparison.OrdinalIgnoreCase)
                     => TuruncuHatInUseWireContract.Property(dynamicCaseId ?? "", 4464, environment?.ToUpperInvariant() ?? "", session, source.Value.TenantId, source.Value.Authorization),
                 "Bpm" => TuruncuHatInUseWireContract.Activity(activityId ?? "", lease.Intent.Source.Id, session, source.Value.TenantId, source.Value.Authorization),
                 _ => throw new InvalidDataException("Unsupported or unverified mutation target.")

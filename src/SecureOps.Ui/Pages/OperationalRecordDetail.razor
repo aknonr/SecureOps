@@ -76,7 +76,9 @@
     else
     {
         OperationalRecordView.Actions actions = OperationalRecordView.ActionsFor(_record);
-OperationalRecordView.Ownership owner =
+        JiraSubmissionView.Phase phase = JiraSubmissionView.PhaseOf(_record, _preview, actions,
+            _access.Can(Capabilities.OperationalRecordsCreateJira), _submitting, _attempt);
+        OperationalRecordView.Ownership owner =
             OperationalRecordView.OwnershipOf(_record, DateTimeOffset.UtcNow, _actor);
 
         @* Above everything else. Whether a real Jira issue will be created changes the meaning of
@@ -157,9 +159,8 @@ OperationalRecordView.Ownership owner =
                         </p>
                     }
                     <p class="so-panel-text so-panel-text--sm">
-                        @(_record.RetryEligible
-                            ? "Sunucu bu kayıt için aktarımın sürdürülmesine izin veriyor."
-                            : "Sunucu bu kayıt için yeniden denemeye izin vermiyor.")
+                        Sonuç doğrulanana kadar bu ekranda yeni gönderim veya yeniden deneme sunulmaz.
+                        Mutabakat için destek referansıyla platform yöneticisine başvurun.
                     </p>
                     @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
                     {
@@ -210,11 +211,6 @@ OperationalRecordView.Ownership owner =
 
         <SoSdmEvidence Record="_record" />
         <OperationHistoryPanel RecordType="OperationalRecord" RecordId="_record.Id" />
-
-        @if (_record.WorkflowState == OperationalRecordWorkflowState.JiraCreated && !_record.SourceCloseRequested)
-        {
-            <MudAlert Severity="Severity.Success" role="status">Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı.</MudAlert>
-        }
 
         <details class="so-review-technical">
             <summary>Kaynak ayrıntıları ve WASAS iş akışı</summary>
@@ -402,25 +398,10 @@ OperationalRecordView.Ownership owner =
             <section class="so-review-preview" data-guide="review-preview">
                 <h2 class="so-panel-title">Önizleme ve işlem</h2>
 
-                @if (OperationalRecordView.HasJira(_record))
-                {
-                    <SoFieldGrid MinColumnWidth="220px">
-                        <SoField Label="Jira kaydı">
-                            <code class="so-code so-code--strong">@_record.JiraIssueKey</code>
-                        </SoField>
-                    </SoFieldGrid>
-                    @* Stated explicitly wherever an issue exists, because this is the fact that
-                       decides whether creating again is safe. *@
-                    <p class="so-panel-text">
-                        Bu kayıt için Jira kaydı oluşturulmuş. Yeni bir Jira kaydı oluşturulmamalıdır.
-                    </p>
-                }
-                else
-                {
-                    <p class="so-field-empty">@(OperationalRecordView.OutcomeUnknown(_record)
-                        ? "Doğrulanmış bir Jira anahtarı henüz yok."
-                        : "Henüz Jira kaydı oluşturulmadı.")</p>
-                }
+                @* Ready, sending, created, refused and unknown are resolved from the re-read record
+                   first; a command response alone is never shown as a created issue. *@
+                <JiraSubmissionPanel Record="_record" Preview="_preview" Phase="phase" Attempt="_attempt"
+                                     UnavailableReason="@UnavailableReason(actions)" FocusRequest="_focusRequest" />
 
                 @* Error codes, mapping versions, and record identifiers are support material. They
                    are kept — they are what a support call needs — and folded away, because an
@@ -456,80 +437,6 @@ OperationalRecordView.Ownership owner =
                     </SoFieldGrid>
                 </details>
 
-                @if (_preview is not null)
-                {
-                    <h3 class="so-subhead">Aktarılacak içerik</h3>
-                    @* The backend's mapping, rendered verbatim. No mapping rule is reproduced here. *@
-                    <SoFieldGrid MinColumnWidth="200px">
-                        <SoField Label="Proje">@_preview.ProjectKey</SoField>
-                        <SoField Label="Talep türü">@SdmEvidenceView.RequestTypeLabel(_preview.RequestType)</SoField>
-                        <SoField Label="Türün dayanağı">@(_preview.ReviewOnly ? "Operatör beyanı; kaynak doğrulaması değil" : _record.SimulationMode ? "Yalıtılmış sentetik test" : "Kayıt değerlendirmesi")</SoField>
-                        <SoField Label="Kaynak kapatma">@(_preview.SourceCloseRequested ? "Jira sonrasında kapatma denenecek" : "Turuncu Hat kaydı açık bırakılacak")</SoField>
-                        <SoField Label="Kayıt tipi">@_preview.IssueType</SoField>
-                        @if (!string.IsNullOrWhiteSpace(_preview.IssueTypeId))
-                        {
-                            <SoField Label="Kayıt tipi kimliği">@_preview.IssueTypeId</SoField>
-                        }
-                        <SoField Label="Raporlayıcı">@(_preview.ReporterUsername ?? "Proje varsayılanı")</SoField>
-                        @if (!string.IsNullOrWhiteSpace(_preview.TeamValue))
-                        {
-                            <SoField Label="İlgili grup">@_preview.TeamValue (@_preview.TeamCustomField)</SoField>
-                        }
-                        @if (_preview.Labels is { Count: > 0 })
-                        {
-                            <SoField Label="Etiketler">@string.Join(", ", _preview.Labels)</SoField>
-                        }
-                        <SoField Label="Takip eden kişi (kaynak talep sahibi)">
-                            @if (string.IsNullOrWhiteSpace(_preview.RequesterAccountId))
-                            {
-                                <span class="so-field-empty">Çözümlenemedi</span>
-                            }
-                            else
-                            {
-                                @_preview.RequesterAccountId
-                            }
-                        </SoField>
-                        @if (!string.IsNullOrWhiteSpace(_preview.RequesterWatcherCustomField))
-                        {
-                            <SoField Label="Takip eden kişi alanı">@_preview.RequesterWatcherCustomField</SoField>
-                        }
-                        <SoField Label="Atanacak kişi">@(_preview.AssigneeUsername ?? "Proje varsayılanı")</SoField>
-                    </SoFieldGrid>
-
-                    <h4 class="so-subhead">Özet</h4>
-                    <p class="so-panel-text">@_preview.Summary</p>
-
-                    <h4 class="so-subhead">Açıklama</h4>
-                    <pre class="so-preview-body">@_preview.Description</pre>
-
-                    @if (_preview.Warnings.Count > 0)
-                    {
-                        <div class="so-panel-note so-panel-note--caution">
-                            <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" />
-                            <span>
-                                <strong>Sunucu uyarıları</strong>
-                                <ul class="so-warning-list">
-                                    @foreach (string warning in _preview.Warnings)
-                                    {
-                                        <li>@warning</li>
-                                    }
-                                </ul>
-                            </span>
-                        </div>
-                    }
-                }
-
-                @if (_preview?.ReviewOnly == true)
-                {
-                    <MudAlert Severity="Severity.Warning">Bu inceleme taslağı yayımlanamaz.</MudAlert>
-                    <ul>
-                        @foreach (string blocker in _preview.BlockingConditions.Except(_record.BlockingConditions, StringComparer.Ordinal))
-                        {
-                            <li>@SdmEvidenceView.Guidance(blocker)</li>
-                        }
-                    </ul>
-                }
-
                 <div class="so-panel-actions so-panel-actions--wrap">
                     @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
                     {
@@ -548,7 +455,7 @@ OperationalRecordView.Ownership owner =
 <MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                                        StartIcon="@Icons.Material.Filled.AddTask"
-                                       Disabled="@(_busy || !actions.Create || _preview is null || _preview.ReviewOnly || _declaredType is not null)"
+                                       Disabled="@(_busy || phase != JiraSubmissionView.Phase.Ready || _declaredType is not null)"
                                        OnClick="CreateAsync">
                                 Jira Kaydı Oluştur
                             </MudButton>
@@ -560,7 +467,7 @@ OperationalRecordView.Ownership owner =
 <MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
                             <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                                        StartIcon="@Icons.Material.Filled.RestartAlt"
-                                       Disabled="@(_busy || !actions.Retry)"
+                                       Disabled="@(_busy || !actions.Retry || phase is JiraSubmissionView.Phase.Uncertain or JiraSubmissionView.Phase.Acknowledged)"
                                        OnClick="RetryAsync">
                                 Yeniden Dene
                             </MudButton>
@@ -568,30 +475,8 @@ OperationalRecordView.Ownership owner =
                     }
                 </div>
 
-                @* Stated next to the buttons it disables. The actions stay visible rather than
-                   disappearing, so the operator can see where the workflow stops and why, instead
-                   of wondering whether they lack a permission. *@
-                @if (actions.WriteFenceReason is { Length: > 0 } fenced)
-                {
-                    <p class="so-panel-text so-panel-text--sm">@fenced</p>
-                }
-
-                @if (!_access.Can(Capabilities.OperationalRecordsCreateJira))
-                {
-                    <p class="so-panel-text so-panel-text--sm">Jira yayımlama yetkiniz yok. Gerekiyorsa yetkili yöneticinizden erişim talep edin.</p>
-                }
-
-                @if (actions.BlockedReason is { Length: > 0 } blocked)
-                {
-                    <p class="so-panel-text so-panel-text--sm">@blocked</p>
-                }
-                else if (actions.Create && _preview is null
-                         && _access.Can(Capabilities.OperationalRecordsCreateJira))
-                {
-                    <p class="so-panel-text so-panel-text--sm">
-                        Jira kaydı oluşturmadan önce önizleme alın.
-                    </p>
-                }
+                @* The actions stay visible rather than disappearing; why they are disabled is stated
+                   by the submission panel directly above them. *@
 
                 @if (_busy)
                 {
@@ -617,6 +502,13 @@ OperationalRecordView.Ownership owner =
     private string? _actor;
     private bool _loading;
     private bool _busy;
+    // Narrower than _busy: only while a create/retry command is actually in flight, so the panel
+    // does not say "sending" while the confirmation dialog is still open.
+    private bool _submitting;
+    // Outcome of the last create/retry, held until an explicit refresh so an unacknowledged
+    // command stays "uncertain" even if the automatic re-read races the server.
+    private JiraSubmissionView.Attempt? _attempt;
+    private int _focusRequest;
     private int _generation;
     private Guid? _loadedId;
     private bool _disposed;
@@ -637,6 +529,19 @@ OperationalRecordView.Ownership owner =
 
     private string? SimulationNotice =>
         _preview?.SimulationNotice ?? _record?.SimulationNotice;
+
+    // Every reason that applies, in the order an operator can act on them. Only shown while the
+    // panel is in its unavailable phase; the created/uncertain/rejected phases explain themselves.
+    private string UnavailableReason(OperationalRecordView.Actions actions)
+    {
+        List<string> reasons = [];
+        if (actions.BlockedReason is { Length: > 0 } blocked) reasons.Add(blocked);
+        if (actions.WriteFenceReason is { Length: > 0 } fenced) reasons.Add(fenced);
+        if (reasons.Count == 0 && _access?.Can(Capabilities.OperationalRecordsCreateJira) != true)
+            reasons.Add("Jira yayımlama yetkiniz yok. Gerekiyorsa yetkili yöneticinizden erişim talep edin.");
+        if (reasons.Count == 0 && _preview is null) reasons.Add("Jira kaydı oluşturmadan önce önizleme alın.");
+        return string.Join(" ", reasons);
+    }
 
     private string HeaderTitle => _record is null ? "Operasyonel kayıt" : _record.OrCode;
 
@@ -670,7 +575,8 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         _record = null;
         _loadProblem = null;
         _declaredType = null;
-        _loading = _busy = false;
+        _loading = _busy = _submitting = false;
+        _attempt = null;
         ClearReviewDraft();
     }
 
@@ -706,6 +612,7 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         {
             _actionProblem = null;
             _result = null;
+            _attempt = null;
         }
 
         StateHasChanged();
@@ -835,9 +742,11 @@ if (_access.Can(Capabilities.OperationalRecordsView))
         // Set before the first await: every action button binds Disabled to this, so a second
         // click finds them already disabled and no second command can be issued.
         _busy = true;
+        _submitting = true;
         _busyMessage = "Jira kaydı oluşturuluyor. Sonuç doğrulanana kadar sayfadan ayrılmayın…";
         _actionProblem = null;
         _result = null;
+        _attempt = null;
         StateHasChanged();
 
         try
@@ -845,33 +754,37 @@ if (_access.Can(Capabilities.OperationalRecordsView))
             JiraTransferResponse transfer = await Records.CreateJiraAsync(RecordId, CancellationToken.None);
             if (!Current(generation)) return;
 
-            // Rendered from what the server returned, never from what was requested. A create can
-            // succeed as far as Jira and still stop at the source-close stage.
-            _result = transfer.WorkflowState switch
-            {
-                OperationalRecordWorkflowState.JiraCreated when !transfer.SourceCloseRequested =>
-                    "Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı.",
-                OperationalRecordWorkflowState.Completed =>
-                    $"Jira kaydı korunuyor · {transfer.JiraIssueKey}. Kaynak doğrulamasını kayıt ayrıntısından kontrol edin.",
-                OperationalRecordWorkflowState.OperationalRecordCloseFailed =>
-                    $"Jira kaydı oluşturuldu ({transfer.JiraIssueKey}), kaynak kapatma tamamlanmadı",
-                _ => $"İş akışı durumu: {OperationalRecordView.StateLabel(transfer.WorkflowState)}"
-            };
+            // Held as an acknowledgement only. Whether an issue exists is decided by the re-read
+            // record below; a response is never presented as a saved Jira issue on its own.
+            _attempt = new(transfer, null);
         }
         catch (SecureOpsApiException ex)
         {
             if (!Current(generation)) return;
             _actionProblem = ex.Problem;
+            _attempt = new(null, ex.Problem);
         }
         finally
         {
-            if (Current(generation)) _busy = false;
+            if (Current(generation)) _busy = _submitting = false;
             // The draft is consumed by the attempt; keeping it would let a stale preview justify a
             // second create against a record whose state has moved on.
             if (Current(generation)) _preview = null;
         }
 
-        if (Current(generation)) await LoadAsync(clearAction: false);
+        if (Current(generation)) await SettleAsync();
+    }
+
+    // Re-reads authoritative state, then moves focus to the submission outcome so keyboard and
+    // screen-reader users are not left on a button that has just been disabled.
+    private async Task SettleAsync()
+    {
+        await LoadAsync(clearAction: false);
+        if (!_disposed && _record is not null)
+        {
+            _focusRequest++;
+            StateHasChanged();
+        }
     }
 
     private async Task RetryAsync()
@@ -883,28 +796,47 @@ if (_access.Can(Capabilities.OperationalRecordsView))
 
         int generation = _generation;
         _busy = true;
+        _busyMessage = "Yeniden deneme kararı bekleniyor…";
+
+        // A retry without a persisted key asks Jira to create the issue again, so it is confirmed
+        // exactly like the first create rather than dispatched on a single click.
+        IDialogReference dialog = await Dialogs.ShowAsync<JiraRetryDialog>(
+            title: string.Empty,
+            new DialogParameters { { nameof(JiraRetryDialog.Record), _record } },
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+        DialogResult? outcome = await dialog.Result;
+        if (!Current(generation)) return;
+        if (outcome is null || outcome.Canceled)
+        {
+            _busy = false;
+            return;
+        }
+
+        _submitting = true;
         _busyMessage = "Aktarım sürdürülüyor…";
         _actionProblem = null;
         _result = null;
+        _attempt = null;
         StateHasChanged();
 
         try
         {
             JiraTransferResponse transfer = await Records.RetryAsync(RecordId, CancellationToken.None);
             if (!Current(generation)) return;
-            _result = $"İş akışı durumu: {OperationalRecordView.StateLabel(transfer.WorkflowState)}";
+            _attempt = new(transfer, null);
         }
         catch (SecureOpsApiException ex)
         {
             if (!Current(generation)) return;
             _actionProblem = ex.Problem;
+            _attempt = new(null, ex.Problem);
         }
         finally
         {
-            if (Current(generation)) _busy = false;
+            if (Current(generation)) _busy = _submitting = false;
         }
 
-        if (Current(generation)) await LoadAsync(clearAction: false);
+        if (Current(generation)) await SettleAsync();
     }
 
     private async Task RefreshAccessAsync()

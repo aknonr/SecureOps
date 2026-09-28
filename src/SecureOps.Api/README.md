@@ -1,5 +1,10 @@
 # SecureOps.Api
 
+POST in-use/{id}/execution/manual-verification is a local human attestation, not
+a source-outcome endpoint. It requires View/Review/Complete and a stopped eligible
+execution, exact OR/operation/revision, with transactional current authorization
+and append-only audit. It cannot dispatch or assert system-verified closure.
+
 Current successor source requires reviewed **024** after installed 023 for archive
 catalogue writes/reads. GET `/api/v1/in-use/reports` provides authorized SQL paging;
 POST `/{id}/reports/index` indexes at most 25 existing immutable versions under

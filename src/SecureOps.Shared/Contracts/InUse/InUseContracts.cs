@@ -40,6 +40,10 @@ public sealed record InUseSource(string Id, string Code, string Title, InUseEvid
     /// <summary>Verified parent lifecycle Open/Closed plus provenance; absent is unknown.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public InUseEvidence? Lifecycle { get; init; }
+    /// <summary>Authoritative WASAS activity observation only. Current corporate read adapter does not supply it.</summary>
+    public InUseEvidence? WasasActivity { get; init; }
+    /// <summary>Observed current team/stage, never inferred from approval acknowledgement.</summary>
+    public InUseEvidence? CurrentStage { get; init; }
 }
 
 /// <summary>One explicitly reviewed technical answer. Unknown is a first-class value.</summary>
@@ -56,6 +60,8 @@ public sealed record InUseDraft(long SourceVersion, IReadOnlyList<InUseAnswer> A
     /// <summary>Trusted profile-at-save display. Historical missing labels are not invented.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ReviewedByLabel { get; init; }
+    /// <summary>Trusted account frozen on save; not a source-system requester reference.</summary>
+    public string? ReviewedByAccount { get; init; }
     /// <summary>Server-generated proposal snapshot accepted by the saving actor.</summary>
     public InUsePolicyProposal? Policy { get; init; }
     /// <summary>Server-authored observation at explicit save; absent on legacy drafts, never inferred.</summary>
@@ -84,7 +90,24 @@ public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash,
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTimeOffset? AssignedAt { get; init; }
     /// <summary>Local review state, not authoritative source or BPM state.</summary>
-    public string Status => Draft is null ? "Unreviewed" : Draft.SourceVersion == SourceVersion ? "Draft" : "Stale";
+    public string Status => Draft is null ? "Unreviewed" : ReviewCurrent ? "Draft" : "Stale";
+    /// <summary>Last review-context change. Legacy records conservatively use the full source version.</summary>
+    public long? ReviewSourceVersion { get; init; }
+    /// <summary>Review currency never relaxes the separate execution source-version fence.</summary>
+    public bool ReviewCurrent => Draft is not null && Draft.SourceVersion >= (ReviewSourceVersion ?? SourceVersion)
+        && Draft.SourceVersion <= SourceVersion;
+    /// <summary>Tracking includes only observed completion, never a local click or manual attestation.</summary>
+    public bool TrackingOnly => ActivityVerifiedAt.HasValue || InUseActivity.Has(Source.WasasActivity, "Completed") || InUseActivity.Has(Source.Lifecycle, "Closed");
+    /// <summary>Read-side projection of authoritative activity evidence, never manual attestation.</summary>
+    public DateTimeOffset? ActivityVerifiedAt { get; init; }
+    /// <summary>Read-side durable execution fence, including uncertain or partial effects; not completion.</summary>
+    public bool HasActiveExecution { get; init; }
+    /// <summary>The latest refresh did not observe this parent; saved answers and last observation remain intact.</summary>
+    public bool SourceObservationMissing { get; init; }
+    /// <summary>List classification only; never replaces command eligibility or authorization checks.</summary>
+    public string ActivityStatus => InUseActivity.Status(this);
+    /// <summary>Last observed parent changes; not evidence of successful workflow execution.</summary>
+    public IReadOnlyList<InUseFieldChange> SourceChanges { get; init; } = [];
     /// <summary>Available historical archive versions; populated only by the detail service.</summary>
     public IReadOnlyList<long> ArchivedVersions { get; init; } = [];
     /// <summary>Local first observation only; old aggregates without this evidence remain null.</summary>
@@ -96,7 +119,7 @@ public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash,
 }
 
 /// <summary>Bounded persisted query; mine is resolved from the authenticated user.</summary>
-public sealed record InUseQuery(string? Search = null, string View = "all", string? Status = null, int Page = 1, int PageSize = 25);
+public sealed record InUseQuery(string? Search = null, string View = "all", string? Status = null, int Page = 1, int PageSize = 25, string Sort = "code");
 
 /// <summary>Refresh health independent of retained records.</summary>
 public sealed record InUseRefreshState(long Version, DateTimeOffset? LastAttemptAt, DateTimeOffset? LastSuccessfulAt,

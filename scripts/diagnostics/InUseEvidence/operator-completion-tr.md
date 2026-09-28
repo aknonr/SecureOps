@@ -54,6 +54,14 @@ okur. Sıfır/tek/çok aday ayrılır; tek aday yazma onayı değildir. Üst sı
 
 Kaynak sahibi ayrıca şu **sözleşmeleri** sağlamalıdır: dinamik vaka kimliğinin
 SET/KEY anlamı ve sürüm-koşullu güncelleme; OR ekinin kimliğini ve içerik hash'ini
-okuma işlemi; yetkili OR son durum alanı ve hangi değerin gerçekten kapanış
-olduğu. Araç bilinmeyen bir ek API'sini veya kapanış anlamını keşfetmez.
+okuma işlemi; yalnız uygun WASAS aktivitesinin koşullu güncelleme ve yanıt anlamı.
+Güncel iş hedefi WASAS adımını ilerletmektir; nihai OR kapanış okuması önkoşul
+değildir. Bu aracın status 1 / grup 68 filtresi tamamlanmış aktiviteyi veya sonraki
+ekibi sorgulamaz. Sıfır aday dönmesi tamamlanma kanıtı değildir. IU-05-STATUS için
+yalnız aynı OR/WASAS aktivitesinin bekleyen/tamamlanmış durumuna ait sınırlı
+query/select/yanıt sözleşmesi gerekir; kanıt yoksa doğrulama bekleyen kalır.
+Sonraki ekip ayrıntıları ve kapsamlı zaman çizelgesi ertelendi (IU-07-NEXT);
+bu teslimatın kaynak isteği veya kabul kapısı değildir. Endpoint tahmin edilmez.
+İletilebilir soru metni güncel operatör girişinin IU-05 bölümündedir.
+Araç bilinmeyen bir ek API'sini veya kapanış anlamını keşfetmez.
 `CollectedNotMapped`, gerçek executor uyarlamasının tamamlandığı anlamına gelmez.

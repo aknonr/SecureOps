@@ -27,11 +27,11 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         await signIn(page, ui);
         for (const [name, { record, operation }] of found) {
             await navigate(page, ui, 'in-use/' + record.id);
-            const stage = page.getByRole('region', { name: 'Talebe ekle ve tamamla', exact: true });
-            await stage.getByRole('alert').waitFor();
+            const stage = page.getByRole('region', { name: 'WASAS adımını onayla', exact: true });
+            await stage.getByRole('status').first().waitFor();
             await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'İşlem durumunu yenile' && !b.disabled));
             await stage.evaluate(element => element.scrollIntoView({ block: 'center' }));
-            assert.equal(await stage.getByRole('button', { name: 'Talebe ekle ve tamamla', exact: true }).isDisabled(), true);
+            assert.equal(await stage.getByRole('button', { name: 'Raporu ekle ve WASAS adımını onayla', exact: true }).isDisabled(), true);
             assert.equal(await stage.getByText('Ek doğrulandı ve OR kapalı durumu kaynaktan doğrulandı', { exact: true }).count(), 0);
             if (name === 'attachment-confirmed-bpm-failed') {
                 assert.ok(operation.evidence.some(e => e.step === 'Attachment' && e.outcome === 'Verified'));

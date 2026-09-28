@@ -40,7 +40,7 @@ public sealed class InUsePolicy(IOptions<InUsePolicyOptions> options)
                     string.IsNullOrWhiteSpace(observed) ? policy.Proposals.ContainsKey(field) ? "ConfiguredProposal" : "ConfigurationRequired" : "Source"));
             }
         }
-        string hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new { policy.Revision, record.SourceVersion, record.SourceHash, Fields = fields })));
+        string hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new { policy.Revision, record.Source.Id, record.Source.IdentityScope, Fields = fields })));
         return new(policy.Revision, hash, fields);
     }
 }

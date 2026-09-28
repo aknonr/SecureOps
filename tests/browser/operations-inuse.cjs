@@ -61,7 +61,7 @@ const code = process.argv[6], resumed = process.argv[7] === 'resumed';
             await assign(other);
             await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('all');
             await page.locator(`[data-answer-server="${record.source.servers[0].id}"][data-answer-check="InternetOut"]`).selectOption('Yes');
-            await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+            await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
             await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
             record = await json(client, '/api/v1/in-use/' + record.id);
             assert.equal(record.draft.reviewedBy, me.userId);

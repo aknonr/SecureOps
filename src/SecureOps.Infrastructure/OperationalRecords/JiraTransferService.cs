@@ -339,6 +339,12 @@ public sealed class JiraTransferService : IJiraTransferService
             return OperationalRecordResult<OperationalRecord>.Success(existing);
         }
 
+        if (existing is { ReconciliationRequired: true } or { WorkflowState: OperationalRecordWorkflowState.CreatingJira })
+        {
+            return OperationalRecordResult<OperationalRecord>.Fail(
+                OperationalErrorCodes.WorkflowAlreadyInProgress, "jira-reconciliation", false);
+        }
+
         OperationalRecord? record = await _repository.RecordRetryRequestedAsync(id, context.Actor, context.CorrelationId, cancellationToken);
         if (record is null)
         {

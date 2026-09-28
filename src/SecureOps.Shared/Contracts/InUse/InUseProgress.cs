@@ -23,10 +23,11 @@ public static class InUseProgress
     /// <summary>Accepts only explicit, offset-bearing parent creation evidence. Future/invalid dates stay unknown.</summary>
     public static DateTimeOffset? Created(InUseSource source, DateTimeOffset now) =>
         source.Creation is { Value: { } value, Source.Length: > 0 }
+        && !string.IsNullOrWhiteSpace(source.Creation.Source)
         && (value.EndsWith('Z') || value.Length > 19 && (value[^6] is '+' or '-'))
         && DateTimeOffset.TryParseExact(value, ["O", "yyyy-MM-dd'T'HH:mm:ssK"], CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTimeOffset date) && date <= now ? date : null;
     /// <summary>Local workbook readiness, not global relationship completeness or corporate acceptance.</summary>
-    public static bool Ready(InUseRecord r) => !r.Discarded && r.Draft?.SourceVersion == r.SourceVersion
+    public static bool Ready(InUseRecord r) => !r.Discarded && r.ReviewCurrent && r.Draft is not null
         && InUseChecks.RelationshipReady(r.Source) && InUseChecks.Missing(r.Source, r.Draft.Answers) is null;
     /// <summary>Aggregates stored records once; callers supply a consistent snapshot.</summary>
     public static InUseOverview Summarize(IReadOnlyList<InUseRecord> records, InUseRefreshState refresh, DateTimeOffset now) =>

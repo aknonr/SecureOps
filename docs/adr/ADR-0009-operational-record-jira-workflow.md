@@ -20,6 +20,7 @@ SecureOps will replace the workflow with typed backend boundaries, a preview-bef
 - The Jira issue key is persisted before source close/update.
 - Retry resumes source close only when a Jira key exists, persisted close intent is true, and the independent gate and existing write fences permit it.
 - Unknown Jira outcomes and interrupted create ownership require reconciliation; automatic recreation is blocked.
+- A blocked reconciliation request is not counted or audited as an executed retry; the corporate create adapter rejects unmapped SoftwareInstallation and ServerRetirement drafts before HTTP.
 - Real external write adapters require a later approval and contract review.
 - Reporter policy is explicit: `ProjectDefault` preserves legacy behavior; `AuthenticatedOperator` resolves the server-authenticated actor through the bounded exact Jira user-search boundary, exposes the verified Jira username in preview, and fails closed before create when resolution is absent or ambiguous.
 - The Jira integration credential authenticates REST calls only. It is never used as an operator-reporter fallback, and Jira rejection of the explicit reporter is returned as a stable actionable failure.

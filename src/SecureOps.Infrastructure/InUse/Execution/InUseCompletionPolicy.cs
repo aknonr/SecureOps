@@ -13,6 +13,7 @@ public sealed class InUseCompletionPolicy(IOptions<InUseCompletionOptions> optio
     /// <summary>Secret-free binding prevents a queued intent surviving an unnoticed provider/fence change.</summary>
     public string Fingerprint => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
     {
+        ExecutionContract = "WasasActivityManual-v2",
         options.Value.Enabled,
         options.Value.Provider,
         options.Value.FixtureDirectory,
@@ -26,20 +27,22 @@ public sealed class InUseCompletionPolicy(IOptions<InUseCompletionOptions> optio
     /// <summary>Normal deployments remain disabled; corporate missing contracts cannot be bypassed by a boolean.</summary>
     public InUseExecutionReadiness Readiness(InUseSource source)
     {
+        if (source.WasasActivity?.Value == "Completed" || source.Lifecycle?.Value == "Closed")
+        { return new(false, "TrackingOnly", "Kaynakta tamamlanmış iş yalnız izlenir. Başka ekibin aktivitesi onaylanmaz."); }
         if (!options.Value.Enabled)
         {
             return new(false, "Disabled", source.Synthetic
                 ? "Tamamlama özelliği yönetici tarafından kapalı. Excel'i WASAS'a arşivleyip indirebilirsiniz."
-                : "Tamamlama özelliği kapalı; ayrıca bu sürümün gerçek kaynak adaptörü ve ek/OR sonuç doğrulaması tamamlanmadı. Yalnız ayar açılması yeterli değildir. Arşivden indir kullanılabilir; entegrasyon sorumlusu eksik kaynak sözleşmelerini doğrulamalı.");
+                : "WASAS adımı gönderimi kapalı. Ek içeriği doğrulama, gerekli alan eşlemesi ve koşullu görev güncelleme sözleşmeleri tamamlanmalı. Şimdilik raporu arşivleyip indirin; kaynak sistemde yalnız WASAS görevini onaylayın. OR'nin açık kalması sonraki ekibin işiyle uyumludur.");
         }
         if (options.Value.Provider == "Fixture" && environment is "Test" or "Development" or "Demo"
             && source.Synthetic && source.IdentityScope?.StartsWith("simulation:", StringComparison.Ordinal) == true
             && Path.IsPathFullyQualified(options.Value.FixtureDirectory))
-        { return new(true, "SyntheticOnly", "Yalnız sentetik yerel kaynak: rapor ekleme, görev ve OR durumu ayrı doğrulanır."); }
+        { return new(true, "SyntheticOnly", "Yalnız sentetik yerel kaynak: ek doğrulandıktan sonra WASAS onayı iletilir; OR kapanışı ve sonraki ekip ayrı izlenir."); }
         if (operations.Value.ReadOnlyIntegrationMode || !operations.Value.ControlledTestWritesEnabled || !operations.Value.SourceCloseEnabled)
         { return new(false, "WriteFence", "Kaynak yazma kontrolleri kapalı. Arşivleme ve indirme kullanılabilir."); }
         return options.Value.Provider == "TuruncuHat"
-            ? new(false, "SourceContractsMissing", "Dinamik vaka kimliği, ek kimliği/özet doğrulaması ve yetkili OR son-durum okuması için kaynak sözleşmesi eksik. Arşivleme kullanılabilir.")
+            ? new(false, "SourceContractsMissing", "Dinamik vaka hedefi ve koşullu güncelleme, tekil görev eşzamanlılığı ve ek kimliği/içerik doğrulaması için kaynak sözleşmesi eksik. Son OR durumu manuel kontrol edilebilir; arşivleme kullanılabilir.")
             : new(false, "ProviderUnavailable", "Onaylı tamamlama sağlayıcısı yok. Arşivleme kullanılabilir.");
     }
 }

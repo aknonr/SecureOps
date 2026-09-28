@@ -83,6 +83,18 @@ public sealed partial class SqlWorkflowReportStore
                 CASE e.Step WHEN 'Bpm' THEN N'İş akışı yanıtı; OR kapanışı değildir' WHEN 'Attachment' THEN N'Kaynak eki doğrulandı' ELSE N'Otoritatif OR durumu doğrulandı' END
             FROM evidence e JOIN #inuse r ON r.Id=e.RecordId
             WHERE e.n=1;
+            ;WITH activity AS(
+                SELECT e.RecordId,JSON_VALUE(e.IntentJson,'$.InitiatorLabel') AS Actor,v.OccurredAt,
+                    ROW_NUMBER() OVER(PARTITION BY e.RecordId ORDER BY v.OccurredAt DESC,v.EventId DESC) AS n
+                FROM ops.InUseExecutions e JOIN ops.InUseExecutionEvents v ON v.OperationId=e.OperationId
+                WHERE JSON_VALUE(e.IntentJson,'$.VerificationMode')='WasasActivityManual'
+                    AND JSON_VALUE(v.EvidenceJson,'$.Step')='Bpm' AND JSON_VALUE(v.EvidenceJson,'$.Outcome')='Verified'
+                    AND v.OccurredAt>=@From AND v.OccurredAt<@To
+            )
+            INSERT #facts
+            SELECT 'InUse.ActivityVerified',CONVERT(nvarchar(200),r.Id),'InUse',r.Id,r.Code,'InUse','Verified',
+                a.Actor,r.Assignee,a.OccurredAt,N'WASAS aktivitesi doğrulandı; sonraki ekip ve genel OR kapanışı ayrı kanıt gerektirir'
+            FROM activity a JOIN #inuse r ON r.Id=a.RecordId WHERE a.n=1;
         END;
 
         IF @sdm=1

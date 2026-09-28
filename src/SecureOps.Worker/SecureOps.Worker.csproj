@@ -16,6 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SecureOps.Tests.Unit" />
     <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
     <ProjectReference Include="..\SecureOps.Shared\SecureOps.Shared.csproj" />
     <ProjectReference Include="..\SecureOps.Infrastructure\SecureOps.Infrastructure.csproj" />

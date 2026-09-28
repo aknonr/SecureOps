@@ -918,6 +918,21 @@ public sealed class EnterpriseAdapterContractTests
     }
 
     [Fact]
+    public async Task JiraCreate_Retirement_RejectsBeforeHttpEvenWithServerLabels()
+    {
+        ScriptedHandler handler = new();
+        JiraIssueDraft draft = new(Guid.NewGuid(), "OR-100", "SDM", "Task", "Synthetic", "Synthetic",
+            "synthetic", "v1", new string('a', 64), [], JiraMapping())
+        { RequestType = SecureOps.Domain.OperationalRecords.OperationalRecordClassification.ServerRetirement };
+
+        Func<Task> create = () => JiraClient(handler).CreateIssueAsync(draft, CancellationToken.None);
+
+        await create.Should().ThrowAsync<ExternalIntegrationException>()
+            .Where(exception => exception.ErrorCode == OperationalErrorCodes.JiraValidationFailed && !exception.Retryable);
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task JiraCreate_UsesTheReviewedDraftMappingInsteadOfReadingASecondRuntimeSnapshot()
     {
         ScriptedHandler handler = new(Response(HttpStatusCode.Created, "{\"key\":\"SAFE-124\"}"));

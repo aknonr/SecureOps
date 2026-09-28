@@ -49,7 +49,7 @@ const proxy = http.createServer(async (req, res) => {
     const button = name => page.getByRole('button', { name, exact: true });
     const ready = async () => page.waitForFunction(() => document.querySelector('.so-inuse') && !document.querySelector('.so-inuse [aria-busy=true]')
         && !document.querySelector('[id^=resource-guide-replay-inuse]')?.disabled);
-    const saved = async () => { await button('Taslağı kaydet').click(); await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor(); await ready(); };
+    const saved = async () => { await button('Cevapları kaydet').click(); await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor(); await ready(); };
     try {
         const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
         await context.route('**/*', r => ['localhost', '127.0.0.1'].includes(new URL(r.request().url()).hostname) ? r.continue() : r.abort());
@@ -96,7 +96,7 @@ const proxy = http.createServer(async (req, res) => {
         await page.waitForFunction(() => !document.querySelector('.so-route-progress.is-active'));
         assert.equal(await answer('InternetOut').inputValue(), 'Yes'); assert.ok(new URL(page.url()).pathname.endsWith(record.id));
         for (const mode of ['503', 'transport']) {
-            arm('PUT', '/draft', mode); await button('Taslağı kaydet').click(); await page.locator('.so-problem').waitFor(); await ready(); fault = null;
+            arm('PUT', '/draft', mode); await button('Cevapları kaydet').click(); await page.locator('.so-problem').waitFor(); await ready(); fault = null;
             assert.equal(await answer('InternetOut').inputValue(), 'Yes');
         }
         await answer('InternetIn').selectOption('No'); await answer('Microsegmented').selectOption('Yes');
@@ -107,7 +107,7 @@ const proxy = http.createServer(async (req, res) => {
         await button('Gösterilen değişiklikleri onayla').click();
         await button('Gösterilen değişiklikleri uygula').click();
         await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('all');
-        const slow = arm('PUT', '/draft', 'hold'); await button('Taslağı kaydet').click(); await slow.hit;
+        const slow = arm('PUT', '/draft', 'hold'); await button('Cevapları kaydet').click(); await slow.hit;
         await page.waitForFunction(() => document.querySelector('[data-answer-server="demo-server-01"][data-answer-check="InternetOut"]')?.disabled && document.querySelector('input[aria-label="Atama gerekçesi"]')?.disabled);
         assert.equal(await answer('InternetOut').isDisabled(), true);
         assert.equal(await page.getByLabel('Atama gerekçesi', { exact: true }).isDisabled(), true);
@@ -159,7 +159,7 @@ const proxy = http.createServer(async (req, res) => {
         await page.getByLabel('Cevap görünümü', { exact: true }).selectOption('all');
         await answer('InternetOut').selectOption('No');
         await json(client, '/api/v1/sessions/revoke', { method: 'POST', data: { sessionId: currentSession, reason: 'Synthetic browser expiry-path verification' } });
-        await button('Taslağı kaydet').click(); await page.waitForURL(url => url.pathname === '/session-expired');
+        await button('Cevapları kaydet').click(); await page.waitForURL(url => url.pathname === '/session-expired');
         assert.equal(await page.locator('.so-inuse').count(), 0);
         checks.push('repeated persisted 403; actual server session revocation redirects to reauthentication without implicit replacement');
         assert.deepEqual(errors, []);

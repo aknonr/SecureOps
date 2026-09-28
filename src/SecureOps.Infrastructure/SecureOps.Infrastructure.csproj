@@ -36,7 +36,8 @@
     <PackageReference Include="Hangfire.SqlServer" />
 
     <!-- PowerShell / JEA -->
-    <PackageReference Include="System.Management.Automation" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
 
     <!-- AD lookup -->
     <PackageReference Include="System.DirectoryServices" />

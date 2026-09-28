@@ -36,6 +36,15 @@ deployment runbook; no request type is promoted to bypass them.
 
 ### Local Acceptance Continuation, 2026-09-15
 
+2026-09-28 narrow SDM-01 hardening: the Corporate Jira adapter rejects both
+SoftwareInstallation and ServerRetirement drafts before HTTP, even when a
+caller supplies ServerRequest labels. Review-only drafts remain non-publishable.
+For an unknown Jira create response, the persisted reconciliation flag or
+`CreatingJira` state blocks another create; a blocked Retry does not increment
+the attempted-retry counter or add a `WorkflowRetried` audit event. This is
+local safety behavior, not confirmation of a corporate Jira issue. The first
+controlled ServerRequest acceptance remains Jira-only and source-open.
+
 The current exact-record positive ServerRequest policy is implemented under
 ADR-0018; older negative-only descriptions below are historical foundation scope.
 SoftwareInstallation and ServerRetirement remain mapping-blocked. Detail recovery

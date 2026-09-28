@@ -10,7 +10,7 @@ using SecureOps.Shared.Contracts.InUse;
 namespace SecureOps.Infrastructure.InUse.Execution;
 
 /// <summary>Atomic durable intent/outbox and fenced step journal on the existing application SQL store.</summary>
-public sealed class SqlInUseExecutionStore(IConfiguration configuration) : IInUseExecutionStore
+public sealed partial class SqlInUseExecutionStore(IConfiguration configuration) : IInUseExecutionStore
 {
     /// <summary>False for memory-only test compositions; execution requires SQL.</summary>
     public bool Configured => !string.IsNullOrWhiteSpace(configuration.GetConnectionString("SecureOpsDb"));
@@ -61,7 +61,8 @@ public sealed class SqlInUseExecutionStore(IConfiguration configuration) : IInUs
         await EventAsync(sql, tx, intent, 1, new("Intent", "Queued", null, "ReviewedArtifactPersisted", DateTimeOffset.UtcNow, "SecureOps.Api"), token);
         await tx.CommitAsync(token);
         return new(new(intent.OperationId, intent.RecordId, intent.ReportVersion, intent.ReportSha256, "Queued", 0, 1,
-            intent.InitiatorId, intent.InitiatorLabel, intent.RequestedAt, []));
+            intent.InitiatorId, intent.InitiatorLabel, intent.RequestedAt, [])
+        { SourceCode = intent.Source.Code, VerificationMode = intent.VerificationMode });
     }
 
     /// <summary>Reads the latest operation for a record; the application service authorizes access first.</summary>
@@ -124,6 +125,8 @@ public sealed class SqlInUseExecutionStore(IConfiguration configuration) : IInUs
         bool verifiedStep = row.Step is 0 or 4 or 6;
         string state = result.Outcome == "Unknown" ? "Unknown" : result.Outcome == "Rejected" ? "Failed"
             : result.Outcome == "Unconfirmed" || verifiedStep && result.Outcome != "Verified" ? "Unconfirmed"
+            : row.Step == 5 && lease.Intent.VerificationMode == "WasasActivityManual" && result.Outcome == "Verified" ? "Completed"
+            : row.Step == 5 && lease.Intent.VerificationMode is "Manual" or "WasasActivityManual" ? "Unconfirmed"
             : row.Step == 6 ? "Completed" : "Queued";
         await UpdateAsync(sql, tx, row, lease.Intent, state, state is "Queued" or "Completed" ? row.Step + 1 : row.Step,
             new(InUseExecutionWorker.Steps[row.Step], result.Outcome, result.RemoteId, result.Code, DateTimeOffset.UtcNow, executor), token);
@@ -151,6 +154,7 @@ public sealed class SqlInUseExecutionStore(IConfiguration configuration) : IInUs
     }
 
     private static bool Current(InUseRecord record, InUseExecutionIntent intent) => record.SourceVersion == intent.SourceVersion
+        && !record.SourceObservationMissing && !record.TrackingOnly
         && record.SourceHash == intent.SourceHash && ReviewHash(record.Draft) == intent.ReviewHash && InUseProgress.Ready(record);
 
     private static Task<int> UpdateAsync(SqlConnection sql, SqlTransaction tx, Row row, InUseExecutionIntent intent,
@@ -162,7 +166,15 @@ public sealed class SqlInUseExecutionStore(IConfiguration configuration) : IInUs
         int count = await sql.ExecuteAsync(Command("""
             UPDATE ops.InUseExecutions SET State=@state,Step=@step,Revision=@revision,Active=@active,
                 LeaseToken=NULL,LeaseUntil=NULL,UpdatedAt=SYSDATETIMEOFFSET() WHERE OperationId=@id;
-            """, new { state, step, revision = row.Revision + 1, active = state != "Completed" && (row.Step > 0 || state is "Queued" or "Unknown"), id = row.OperationId }, tx, token));
+            """, new
+        {
+            state,
+            step,
+            revision = row.Revision + 1,
+            active = intent.VerificationMode == "WasasActivityManual" && row.Step == 5 && state == "Completed"
+                || state != "Completed" && (row.Step > 0 || state is "Queued" or "Unknown"),
+            id = row.OperationId
+        }, tx, token));
         await EventAsync(sql, tx, intent, row.Revision + 1, evidence, token);
         return count;
     }
@@ -190,9 +202,19 @@ public sealed class SqlInUseExecutionStore(IConfiguration configuration) : IInUs
             revision,
             at = evidence.At,
             json = JsonSerializer.Serialize(evidence),
-            actor = intent.InitiatorId.ToString("D"),
+            actor = (evidence.ConfirmedBy ?? intent.InitiatorId).ToString("D"),
             correlation = intent.OperationId.ToString("D"),
-            audit = JsonSerializer.Serialize(new { intent.OperationId, intent.RecordId, intent.ReportVersion, intent.ReportSha256, evidence })
+            audit = JsonSerializer.Serialize(new
+            {
+                intent.OperationId,
+                intent.RecordId,
+                intent.Source.Code,
+                intent.ReportVersion,
+                intent.ReportSha256,
+                intent.InitiatorId,
+                intent.VerificationMode,
+                evidence
+            })
         }, tx, token));
     }
     private static async Task<IReadOnlyList<InUseStepEvidence>> EvidenceAsync(SqlConnection sql, SqlTransaction? tx, Guid id, CancellationToken token) =>
@@ -201,7 +223,8 @@ public sealed class SqlInUseExecutionStore(IConfiguration configuration) : IInUs
     {
         InUseExecutionIntent i = Read<InUseExecutionIntent>(row.IntentJson);
         return new(i.OperationId, i.RecordId, i.ReportVersion, i.ReportSha256, row.State, row.Step, row.Revision,
-            i.InitiatorId, i.InitiatorLabel, i.RequestedAt, await EvidenceAsync(sql, tx, i.OperationId, token));
+            i.InitiatorId, i.InitiatorLabel, i.RequestedAt, await EvidenceAsync(sql, tx, i.OperationId, token))
+        { SourceCode = i.Source.Code, VerificationMode = i.VerificationMode };
     }
     private static T Read<T>(string json) => JsonSerializer.Deserialize<T>(json) ?? throw new InvalidDataException("Invalid In Use execution state.");
     private static CommandDefinition Command(string sql, object? values, SqlTransaction? tx, CancellationToken token) => new(sql, values, tx, commandTimeout: 15, cancellationToken: token);

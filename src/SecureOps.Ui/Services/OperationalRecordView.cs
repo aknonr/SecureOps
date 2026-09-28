@@ -399,15 +399,12 @@ public static class OperationalRecordView
         bool hasJira = HasJira(record);
 
         // Reconciliation outranks the state machine. While the outcome of a create is unresolved,
-        // neither creating nor resuming is safe, whatever stage the record reports.
+        // neither creating nor resuming is safe, whatever stage the record reports. The contract
+        // states retryEligible is always false here; a payload claiming otherwise is contradictory
+        // and fails closed rather than offering a resume that could reach Jira a second time.
         if (record.ReconciliationRequired)
         {
-            return new Actions(
-                false,
-                false,
-                // Only if the server explicitly says so — never inferred.
-                record.RetryEligible,
-                record.RetryEligible ? null : "Önceki denemenin sonucu doğrulanmalı.");
+            return new Actions(false, false, false, "Önceki denemenin sonucu doğrulanmalı.");
         }
 
         return record.WorkflowState switch

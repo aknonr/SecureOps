@@ -67,6 +67,8 @@ public static class TuruncuHatInUseWireContract
         string root = attachment ? "UploadAttachmentStringResult" : "UpdateResult";
         if (response.ValueKind != JsonValueKind.Object || !response.TryGetProperty(root, out JsonElement result) || result.ValueKind != JsonValueKind.Object)
         { return new("Unknown", "UnsupportedAcknowledgement"); }
+        if (result.TryGetProperty("Success", out JsonElement rejected) && rejected.ValueKind == JsonValueKind.False)
+        { return new("Rejected", "SourceExplicitRejection"); }
         if (result.TryGetProperty("ErrorNo", out JsonElement number) && number.ValueKind != JsonValueKind.Null)
         {
             string? text = number.ValueKind == JsonValueKind.String ? number.GetString()

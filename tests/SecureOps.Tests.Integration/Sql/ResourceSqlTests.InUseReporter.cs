@@ -93,7 +93,7 @@ public sealed partial class ResourceSqlTests
         string trustedLabel = labels.Single(p => p.Id == reviewers[0].Id).Label;
         trustedLabel.Should().StartWith("Sentetik İnceleyici");
         labels.Where(p => reviewers.Skip(1).Take(2).Any(u => u.Id == p.Id)).Select(p => p.Label).Distinct().Should().HaveCount(2);
-        labels.Single(p => p.Id == reviewers[3].Id).Label.Should().StartWith("Profil adı bekleniyor");
+        labels.Single(p => p.Id == reviewers[3].Id).Label.Should().StartWith("Kullanıcı adı çözümlenemedi");
         (await service.GetAsync(principal, context, record.Id, _token)).Value!.AssigneeLabel.Should().Be(trustedLabel);
         (await repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record);
         string hash = record.SourceHash;

@@ -1,0 +1,96 @@
+/* Each phase pairs a tone with an icon and a heading, so colour is never the only signal. */
+.so-jira-submit {
+    margin: var(--so-space-4) 0;
+    padding: var(--so-space-4);
+    border: 1px solid var(--so-border);
+    border-left-width: 4px;
+    border-radius: 4px;
+    background: var(--so-surface);
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+.so-jira-submit--ready { border-left-color: var(--so-info); }
+.so-jira-submit--submitting { border-left-color: var(--so-info); }
+.so-jira-submit--created { border-left-color: var(--so-success); }
+.so-jira-submit--acknowledged,
+.so-jira-submit--uncertain {
+    border-left-color: var(--so-warning);
+    background: color-mix(in srgb, var(--so-warning) 6%, var(--so-surface));
+}
+.so-jira-submit--rejected { border-left-color: var(--so-danger); }
+.so-jira-submit--reviewonly,
+.so-jira-submit--unavailable { border-left-color: var(--so-text-muted); }
+
+.so-jira-submit-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+}
+
+.so-jira-submit-icon {
+    display: inline-flex;
+    flex: none;
+    padding: var(--so-space-1);
+    border-radius: 50%;
+}
+
+.so-jira-submit--created .so-jira-submit-icon { color: var(--so-success); }
+.so-jira-submit--acknowledged .so-jira-submit-icon,
+.so-jira-submit--uncertain .so-jira-submit-icon { color: var(--so-warning); }
+.so-jira-submit--rejected .so-jira-submit-icon { color: var(--so-danger); }
+.so-jira-submit--ready .so-jira-submit-icon,
+.so-jira-submit--submitting .so-jira-submit-icon { color: var(--so-info); }
+
+.so-jira-submit-text { flex: 1; min-width: 0; }
+
+.so-jira-submit-title {
+    margin: 0 0 var(--so-space-1);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+/* Focus is moved here programmatically after a command settles; keep it visible. */
+.so-jira-submit-title:focus-visible,
+.so-jira-submit-title:focus {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 3px;
+}
+
+.so-jira-submit-lead {
+    margin: 0;
+    line-height: 1.5;
+    max-width: 850px;
+}
+
+.so-jira-submit-source,
+.so-jira-submit-guard {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-2);
+    margin: var(--so-space-3) 0;
+    padding: var(--so-space-2) var(--so-space-3);
+    border-left: 3px solid var(--so-info);
+    background: color-mix(in srgb, var(--so-info) 6%, var(--so-surface));
+    line-height: 1.5;
+}
+
+.so-jira-submit-guard { border-left-color: var(--so-success); background: color-mix(in srgb, var(--so-success) 6%, var(--so-surface)); }
+
+.so-jira-submit-steps {
+    margin: var(--so-space-3) 0;
+    padding-left: var(--so-space-5);
+    line-height: 1.5;
+}
+
+.so-jira-submit-steps li { margin-bottom: var(--so-space-2); }
+
+.so-jira-submit-blocked { font-weight: 600; margin: var(--so-space-3) 0 var(--so-space-1); }
+
+.so-jira-submit-note,
+.so-jira-submit-muted { color: var(--so-text-muted); font-size: 0.9rem; }
+
+@media (max-width: 480px) {
+    .so-jira-submit { padding: var(--so-space-3); }
+}

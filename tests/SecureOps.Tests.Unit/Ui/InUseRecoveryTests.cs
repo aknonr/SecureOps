@@ -14,6 +14,58 @@ namespace SecureOps.Tests.Unit.Ui;
 
 public sealed class InUseRecoveryTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("oldest")]
+    [InlineData("newest")]
+    public async Task UnavailableDateOrdering_OldLinksUseAccurateCodeOrder(string? requested)
+    {
+        using var f = new Fixture(request =>
+        {
+            request.RequestUri!.Query.Should().Contain("sort=code");
+            return Task.FromResult(Response(new InUsePage([], 0, 1, 25, InUseRefreshState.Empty)));
+        });
+        f.SetProperty("Id", null);
+        f.SetProperty("QuerySort", requested);
+        await f.Call("OnParametersSetAsync");
+        f.Get<string>("_sort").Should().Be("code");
+    }
+
+    [Theory]
+    [InlineData("oldest")]
+    [InlineData("newest")]
+    public async Task ListOrdering_SurvivesLoadRefreshAndDetailNavigation(string sort)
+    {
+        var requests = new List<string>();
+        using var f = new Fixture(request =>
+        {
+            requests.Add(request.RequestUri!.PathAndQuery);
+            return Task.FromResult(request.Method == HttpMethod.Post ? Response(InUseRefreshState.Empty)
+                : Response(new InUsePage([], 0, 1, 25, InUseRefreshState.Empty)));
+        });
+        f.SetProperty("Id", null);
+        f.Set("_sort", sort);
+        f.Set("_view", "verification");
+        await f.Call("LoadAsync");
+        await f.Call("RefreshAsync");
+        requests.Should().HaveCount(3, "refresh performs one source command and one persisted list read");
+        requests.Where(r => r.Contains('?')).Should().OnlyContain(r => r.Contains("sort=" + sort) && r.Contains("view=verification"));
+        ((string)f.Invoke("RecordUrl", Guid.NewGuid())!).Should().Contain("sort=" + sort).And.Contain("view=verification");
+    }
+
+    [Theory]
+    [InlineData("Pending", false, "Kaynakta bekliyor")]
+    [InlineData("Completed", false, "Tamamlandığı kaynakta doğrulandı")]
+    [InlineData("Pending", true, "Doğrulama bekliyor")]
+    [InlineData(null, false, "Doğrulama bekliyor")]
+    public void MinimalListLabels_AreNotOverallClosure(string? value, bool active, string expected)
+    {
+        InUseRecord record = Record();
+        record = record with { Source = record.Source with { WasasActivity = new(value, "Synthetic source"), Lifecycle = null }, HasActiveExecution = active };
+        MethodInfo method = typeof(Workspace).GetMethod("SourceActivity", BindingFlags.Static | BindingFlags.NonPublic)!;
+        ((string)method.Invoke(null, [record])!).Should().Contain(expected).And.NotContain("OR kapandı");
+    }
+
     [Fact]
     public async Task ArchivedDownload_JavascriptFailureRetainsArchiveAndRetryDoesNotCreateAnother()
     {

@@ -8,9 +8,12 @@
 
     Like AccessActionDialog, this captures intent only. The page owns the call and disables its
     actions before the first await, which is what makes a double submission unexpressible.
+
+    Confirmation is explicit: the create button stays disabled until the operator ticks a statement
+    naming the OR and what happens to the source record. Escape and Vazgeç always cancel.
 *@
 
-<MudDialog Class="so-dialog" DefaultFocus="DefaultFocus.FirstChild">
+<MudDialog Class="so-dialog" DefaultFocus="DefaultFocus.None">
     <TitleContent>
         <div class="so-dialog-title">
             <span class="so-dialog-icon so-dialog--grant" aria-hidden="true">
@@ -50,12 +53,16 @@
         <fieldset class="so-role-picker">
             <legend>Aktarılacak içerik</legend>
 
-            <p>@(Preview.SourceCloseRequested ? "Jira oluşturulduktan sonra Turuncu Hat kaydının kapatılması denenecek." : "Turuncu Hat kaydı açık bırakılacak.")</p>
+            <p class="so-dialog-source"><strong>@(Preview.SourceCloseRequested ? "Jira oluşturulduktan sonra Turuncu Hat kaydının kapatılması denenecek." : "Turuncu Hat kaydı açık bırakılacak.")</strong></p>
 
             <SoFieldGrid MinColumnWidth="180px">
                 <SoField Label="Proje">@Preview.ProjectKey</SoField>
                 <SoField Label="Talep türü">@SdmEvidenceView.RequestTypeLabel(Preview.RequestType)</SoField>
                 <SoField Label="Kayıt tipi">@Preview.IssueType</SoField>
+                @if (!string.IsNullOrWhiteSpace(Preview.IssueTypeId))
+                {
+                    <SoField Label="Kayıt tipi kimliği">@Preview.IssueTypeId</SoField>
+                }
                 <SoField Label="Raporlayıcı">@(Preview.ReporterUsername ?? "Proje varsayılanı")</SoField>
                 <SoField Label="Atanacak kişi">@(Preview.AssigneeUsername ?? "Proje varsayılanı")</SoField>
                 <SoField Label="Takip eden kişi">@(Preview.RequesterAccountId ?? "Eşleme yok")</SoField>
@@ -96,6 +103,15 @@
                 </ul>
             }
         </fieldset>
+
+        @* Initial focus lands here rather than on a dialog button: ticking it is harmless on its
+           own, and with Oluştur disabled the focus trap would otherwise leave forward Tab unable
+           to reach it. *@
+        <SoConfirmStatement Text="@AcknowledgementText" @bind-Checked="_acknowledged"
+                            DescribedBy="@_ackHintId" AutoFocus="true" />
+        <p id="@_ackHintId" class="so-dialog-ack-hint">
+            @(_acknowledged ? "Onay verildi. Oluştur düğmesi etkin." : "Oluştur düğmesi, yukarıdaki beyan işaretlenene kadar kapalıdır.")
+        </p>
     </DialogContent>
 
     <DialogActions>
@@ -103,6 +119,8 @@
         <MudButton OnClick="Confirm"
                    Variant="Variant.Filled"
                    Color="Color.Primary"
+                   Disabled="@(!_acknowledged)"
+                   aria-describedby="@_ackHintId"
                    StartIcon="@Icons.Material.Filled.AddTask">
             Oluştur
         </MudButton>
@@ -111,6 +129,14 @@
 
 @code {
     private readonly string _titleId = "jira-confirm-" + Guid.NewGuid().ToString("N");
+    private readonly string _ackHintId = "jira-confirm-ack-" + Guid.NewGuid().ToString("N");
+    private bool _acknowledged;
+
+    // Names the OR and the source outcome the server preview fixed, so ticking it is a statement
+    // about this record rather than a generic "I agree".
+    private string AcknowledgementText => Preview.SourceCloseRequested
+        ? $"{Record.OrCode} için tek bir Jira kaydı isteneceğini ve ardından Turuncu Hat kaydının kapatılmasının deneneceğini onaylıyorum."
+        : $"{Record.OrCode} için tek bir Jira kaydı isteneceğini ve Turuncu Hat kaydının açık kalacağını onaylıyorum.";
 
     [CascadingParameter]
     private MudDialogInstance Dialog { get; set; } = null!;
@@ -123,7 +149,12 @@
     [Parameter, EditorRequired]
     public JiraPreviewResponse Preview { get; set; } = default!;
 
-    private void Confirm() => Dialog.Close(DialogResult.Ok(true));
+    private void Confirm()
+    {
+        // The disabled button is the visible gate; this guards a stale or scripted click.
+        if (!_acknowledged) return;
+        Dialog.Close(DialogResult.Ok(true));
+    }
 
     private void Cancel() => Dialog.Cancel();
 }

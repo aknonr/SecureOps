@@ -23,11 +23,14 @@ public sealed partial class ResourceSqlTests
         for (int i = 0; i < 4; i++)
         {
             var principal = new CorporatePrincipal("oidc:synthetic-display-" + Guid.NewGuid().ToString("N"), "oidc",
-                DisplayName: i < 2 ? "Deniz Örnek" : null);
+                LoginName: i == 0 ? "CONTOSO\\reviewer" : null, DisplayName: i < 2 ? "Deniz Örnek" : null);
             EnsureAccessUserResult pending = await users.EnsureUserAsync(principal, true, TimeSpan.Zero, _token);
             AccessMutationResult approved = await users.DecideRequestAsync(pending.PendingRequest!.Id, AccessRequestStatus.Approved,
                 pending.PendingRequest.Version, administrator, ["InUseReviewer"], "Synthetic display fixture", _token);
             first ??= approved.User;
+            InUseAssignee label = (await new SqlInUseIdentities(configuration).ReadAsync([approved.User!.Id], null, _token)).Single();
+            label.Label.Should().StartWith(i == 0 ? "Deniz Örnek (CONTOSO\\reviewer)" : i == 1 ? "Deniz Örnek" : "Kullanıcı adı çözümlenemedi");
+            label.Label.Should().NotContain(principal.Identifier);
         }
         var repository = new SqlInUseRepository(configuration);
         InUseSource seed = (await new LocalInUseSourceClient().DiscoverAsync(_token)).Records[0];

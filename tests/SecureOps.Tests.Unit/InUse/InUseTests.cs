@@ -20,6 +20,52 @@ namespace SecureOps.Tests.Unit.InUse;
 public sealed partial class InUseTests
 {
     [Theory]
+    [InlineData("bytes")]
+    [InlineData("size")]
+    [InlineData("identity")]
+    [InlineData("preparer")]
+    [InlineData("retention")]
+    [InlineData("json")]
+    public async Task Archive_CorruptionReturnsStableFailureWithoutServingOrRewriting(string corruption)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "inuse-integrity-" + Guid.NewGuid());
+        var archive = new InUseReportArchive(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["InUseReports:Directory"] = directory }).Build());
+        try
+        {
+            var f = new Fixture(archive: archive);
+            InUseRecord record = await f.ImportAsync();
+            InUseAnswer[] answers = record.Source.Servers.SelectMany(s => InUseChecks.OperatorCodes.Select(c => new InUseAnswer(s.Id, c, "No", ""))).ToArray();
+            record = (await f.Service.SaveDraftAsync(_principal, _context, record.Id,
+                new(record.Version, record.SourceVersion, answers, ""), _token)).Value!;
+            InUseReport report = (await f.Service.ExportAsync(_principal, _context, record.Id, new(record.Version, true), _token)).Value!;
+            string path = Path.Combine(directory, record.Id.ToString("D"), report.Version + ".json");
+            InUseReport damaged = corruption switch
+            {
+                "bytes" => report with { Content = report.Content.Select((value, index) => index == 0 ? (byte)(value ^ 1) : value).ToArray() },
+                "size" => report with { Size = report.Size + 1 },
+                "identity" => report with { RecordId = Guid.NewGuid() },
+                "preparer" => report with { PreparedBy = Guid.Empty },
+                "retention" => report with { Archived = false },
+                _ => report
+            };
+            byte[] stored = corruption == "json" ? "{"u8.ToArray() : JsonSerializer.SerializeToUtf8Bytes(damaged);
+            await File.WriteAllBytesAsync(path, stored, _token);
+            bool authorized = false;
+            Func<Task> read = async () => await archive.AccessAsync(record.Id, report.Version, null,
+                _ => { authorized = true; return Task.FromResult(true); }, _token);
+            (await read.Should().ThrowAsync<InUseArchiveException>()).Which.Code.Should().Be("InUseArchiveIntegrityFailed");
+            authorized.Should().BeFalse();
+            InUseResult<InUseReport> response = await f.Service.ExportAsync(_principal, _context, record.Id,
+                new(record.Version, ArchivedVersion: report.Version), _token);
+            response.Value.Should().BeNull();
+            response.Error.Should().Be("InUseArchiveIntegrityFailed");
+            (await File.ReadAllBytesAsync(path, _token)).Should().Equal(stored);
+        }
+        finally { if (Directory.Exists(directory)) { Directory.Delete(directory, recursive: true); } }
+    }
+
+    [Theory]
     [InlineData("Complete")]
     [InlineData("Observed")]
     public async Task Archive_RequiresCompleteAnswers_PreservesEvidenceAndActor_AndReplaysOriginalBytes(string relationship)
@@ -196,7 +242,8 @@ public sealed partial class InUseTests
         fixture.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns<InUseBatch>(_ => throw new InvalidDataException("synthetic"));
         (await fixture.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token)).Value!.Issue.Should().Be("SourceUnavailableOrMalformed");
         (await fixture.Repository.StateAsync(_token)).LastSuccessfulAt.Should().Be(state.LastSuccessfulAt);
-        (await fixture.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record);
+        (await fixture.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record with
+        { Version = record.Version + 1, SourceObservationMissing = true });
         fixture.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([], false, "Partial"));
         await fixture.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
         (await fixture.Repository.QueryAsync(new(), fixture.User.Id, _token)).Total.Should().Be(2);
@@ -234,9 +281,10 @@ public sealed partial class InUseTests
         f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([changed], true));
         await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token);
         InUseRecord stale = (await f.Repository.GetAsync(record.Id, _token))!;
-        stale.Status.Should().Be("Stale");
+        stale.Status.Should().Be("Draft");
         stale.Draft.Should().BeEquivalentTo(record.Draft);
-        (await f.Service.ExportAsync(_principal, _context, stale.Id, new(stale.Version), _token)).Error.Should().Be("InUseConflict");
+        stale.SourceHash.Should().NotBe(record.SourceHash);
+        (await f.Service.ExportAsync(_principal, _context, stale.Id, new(stale.Version), _token)).Error.Should().BeNull();
     }
 
     [Fact]
@@ -315,7 +363,8 @@ public sealed partial class InUseTests
         InUseRecord record = await f.ImportAsync();
         f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([record.Source, record.Source], false));
         (await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token)).Value!.Issue.Should().Be("SourceUnavailableOrMalformed");
-        (await f.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record);
+        (await f.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record with
+        { Version = record.Version + 1, SourceObservationMissing = true });
     }
 
     [Theory]
@@ -367,7 +416,8 @@ public sealed partial class InUseTests
         (await first).Value!.Issue.Should().Be("SourceUnavailableOrMalformed");
         f.Source.DiscoverAsync(Arg.Any<CancellationToken>()).Returns(new InUseBatch([], false));
         (await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token)).Error.Should().BeNull();
-        (await f.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record);
+        (await f.Repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(record with
+        { Version = record.Version + 1, SourceObservationMissing = true });
     }
 
     [Fact]

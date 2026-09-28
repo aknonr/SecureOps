@@ -21,6 +21,8 @@ public partial class InUse
     [SupplyParameterFromQuery(Name = "view")] public string? QueryView { get; set; }
     /// <summary>Saved review state filter.</summary>
     [SupplyParameterFromQuery(Name = "status")] public string? QueryStatus { get; set; }
+    /// <summary>Source request creation ordering, retained across detail navigation.</summary>
+    [SupplyParameterFromQuery(Name = "sort")] public string? QuerySort { get; set; }
     /// <summary>Stored bounded page.</summary>
     [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
     /// <summary>Stored bounded page size.</summary>
@@ -34,7 +36,7 @@ public partial class InUse
     private IReadOnlyList<InUseAssignee> _assignees = [];
     private UiProblem? _problem;
     private string? _notice;
-    private string _search = "", _view = "all", _status = "", _assignee = "", _reason = "", _notes = "";
+    private string _search = "", _view = "all", _status = "", _sort = "code", _assignee = "", _reason = "", _notes = "";
     private string _editingServer = "";
     private string? _validation;
     private (AnswerEdit Target, string Before, string After)[]? _changes;
@@ -86,7 +88,9 @@ public partial class InUse
     protected override async Task OnParametersSetAsync()
     {
         _search = QuerySearch is { Length: <= 100 } ? QuerySearch : "";
-        _view = QueryView is "mine" or "unassigned" ? QueryView : "all";
+        _view = QueryView is "mine" or "unassigned" or "tracking" or "review" or "pending" or "verification" ? QueryView : "all";
+        // Date ordering remains available in the API, but the real parent creation mapping is unverified.
+        _sort = "code";
         _status = QueryStatus is "Unreviewed" or "Draft" or "Stale" or "Discarded" ? QueryStatus : "";
         _number = QueryPage is > 0 and <= 100000 ? QueryPage.Value : 1;
         _size = QuerySize is 10 or 25 or 50 ? QuerySize.Value : 25;
@@ -99,7 +103,7 @@ public partial class InUse
     private Task SearchAsync(string value) { _search = value; return FilterAsync(); }
     private Task PreviousAsync() { _number = Math.Max(1, _number - 1); return NavigateListAsync(); }
     private Task NextAsync() { _number++; return NavigateListAsync(); }
-    private string ListQuery => $"?q={Uri.EscapeDataString(_search)}&view={_view}&status={_status}&page={_number}&size={_size}";
+    private string ListQuery => $"?q={Uri.EscapeDataString(_search)}&view={_view}&status={_status}&sort={_sort}&page={_number}&size={_size}";
     private string ListUrl => "/in-use" + ListQuery;
     private string RecordUrl(Guid id) => $"/in-use/{id}" + ListQuery;
     private Task NavigateListAsync() { Navigation.NavigateTo(ListUrl, replace: true); return Task.CompletedTask; }
@@ -110,7 +114,10 @@ public partial class InUse
     });
     private static int SavedCompleted(InUseRecord record) => record.Source.Servers.Count(s => InUseChecks.OperatorCodes.All(c =>
         record.Draft?.Answers.Any(a => a.ServerId == s.Id && a.Check == c && a.Value is "Yes" or "No") == true));
-    private static string RowNext(InUseRecord record) => record.Status == "Stale" ? "Kaynak değişti; yeniden incele"
+    private static string RowNext(InUseRecord record) => record.TrackingOnly ? "Kaynakta doğrulanan sonucu inceleyin; yeni WASAS onayı göndermeyin"
+        : record.HasActiveExecution ? "Önceki işlemin sonucunu doğrulayın; yeni onay göndermeyin"
+        : record.SourceObservationMissing ? "Son yenilemede görülmedi; kaynak durumunu doğrulayın, cevaplar korunuyor"
+        : record.Status == "Stale" ? "Sunucu incelemesini etkileyen farkları inceleyin; cevaplar korunuyor"
         : record.Source.Servers.Count == 0 ? "Sunucu ilişki kanıtı gerekli"
         : SavedCompleted(record) < record.Source.Servers.Count ? "Eksik cevapları tamamla" : "Excel önizlemesini incele";
     private Task LoadAsync()
@@ -139,7 +146,7 @@ public partial class InUse
             else
             {
                 _page = null;
-                _page = await ReadAsync<InUsePage>($"?search={Uri.EscapeDataString(_search)}&view={_view}&page={_number}&pageSize={_size}"
+                _page = await ReadAsync<InUsePage>($"?search={Uri.EscapeDataString(_search)}&view={_view}&sort={_sort}&page={_number}&pageSize={_size}"
                     + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status));
             }
         });
@@ -148,7 +155,7 @@ public partial class InUse
     {
         InUseRefreshState state = await SendAsync<InUseRefreshState>(HttpMethod.Post, "/refresh", new RefreshInUseRequest(Guid.NewGuid()));
         _notice = state.Issue is null ? "Sınırlı kaynak okuması tamamlandı." : RefreshIssue(state.Issue);
-        _page = await ReadAsync<InUsePage>($"?page={_number}&pageSize={_size}&view={_view}&search={Uri.EscapeDataString(_search)}"
+        _page = await ReadAsync<InUsePage>($"?page={_number}&pageSize={_size}&view={_view}&sort={_sort}&search={Uri.EscapeDataString(_search)}"
             + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status));
     });
     private async Task OpenAssignmentAsync()
@@ -199,6 +206,10 @@ public partial class InUse
     private Task SaveAsync() => ExecuteAsync(async () =>
     {
         if (_record is null)
+        { return; }
+        if (_record.Status == "Stale" && await Dialogs.ShowMessageBox("Değişen sunucu bilgilerini yeniden incele",
+            "Kaynak değişiklikleri bölümündeki eski/yeni değerleri kontrol ettiniz mi? Kaydetmek mevcut cevapları yeni kaynak sürümü için onaylar; cevaplar kendiliğinden değiştirilmez.",
+            yesText: "Farkları inceledim, cevapları kaydet", cancelText: "İncelemeye dön") != true)
         { return; }
         string assignee = _assignee;
         bool assignmentEdited = AssignmentEdited;

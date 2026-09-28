@@ -324,17 +324,19 @@ public sealed class OperationalRecordViewTests
         }
     }
 
-    [Fact]
-    public void ReconciliationRequired_OffersRetryOnlyWhenServerAllowsIt()
+    [Theory]
+    [InlineData(OperationalRecordWorkflowState.CreatingJira)]
+    [InlineData(OperationalRecordWorkflowState.JiraCreateFailed)]
+    public void ReconciliationRequired_NeverOffersRetry_EvenWhenPayloadContradictsContract(OperationalRecordWorkflowState state)
     {
-        OperationalRecordResponse allowed = Record(
-            OperationalRecordWorkflowState.CreatingJira, reconciliationRequired: true, retryEligible: true);
-        OperationalRecordResponse blocked = Record(
-            OperationalRecordWorkflowState.CreatingJira, reconciliationRequired: true, retryEligible: false);
+        // The contract says retryEligible is always false while reconciliation is required. A
+        // payload claiming both is contradictory; resuming could reach Jira a second time.
+        OperationalRecordResponse contradictory = Record(state, reconciliationRequired: true, retryEligible: true);
+        OperationalRecordResponse blocked = Record(state, reconciliationRequired: true, retryEligible: false);
 
-        Assert.True(OperationalRecordView.ActionsFor(allowed).Retry);
+        Assert.False(OperationalRecordView.ActionsFor(contradictory).Retry);
         Assert.False(OperationalRecordView.ActionsFor(blocked).Retry);
-        Assert.NotNull(OperationalRecordView.ActionsFor(blocked).BlockedReason);
+        Assert.NotNull(OperationalRecordView.ActionsFor(contradictory).BlockedReason);
     }
 
     [Fact]

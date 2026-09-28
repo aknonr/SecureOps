@@ -165,6 +165,27 @@ public sealed class JiraTransferServiceTests
         first.Failure.Retryable.Should().BeFalse();
         retry.Failure!.Code.Should().Be(OperationalErrorCodes.WorkflowAlreadyInProgress);
         jira.Calls.Should().Be(1);
+        (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!.RetryCount.Should().Be(0);
+        fixture.Audit.Events.Should().NotContain(item => item.Action == AuditActions.WorkflowRetried);
+    }
+
+    [Fact]
+    public async Task CallerCancellation_DuringJiraCreate_DoesNotPermitOrCountAnotherAttempt()
+    {
+        CountingJiraClient jira = new(new OperationCanceledException("Synthetic browser disconnect"));
+        TestFixture fixture = await TestFixture.CreateAsync(jira, sourceCloseEnabled: false);
+
+        Func<Task> create = () => fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+        await create.Should().ThrowAsync<OperationCanceledException>();
+        OperationalRecord afterCancellation = (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!;
+        afterCancellation.WorkflowState.Should().Be(OperationalRecordWorkflowState.CreatingJira);
+
+        OperationalRecordResult<OperationalRecord> retry = await fixture.Service.RetryAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        retry.Failure!.Code.Should().Be(OperationalErrorCodes.WorkflowAlreadyInProgress);
+        jira.Calls.Should().Be(1);
+        (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!.RetryCount.Should().Be(0);
+        fixture.Source.CloseCalls.Should().Be(0);
     }
 
     [Fact]

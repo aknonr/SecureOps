@@ -17,7 +17,28 @@ public sealed class ConfigurationManagerCollectionClient(IOptions<AnnouncementSo
     TimeProvider time, ILogger<ConfigurationManagerCollectionClient> logger) : ICollectionMembershipClient
 {
     /// <inheritdoc />
-    public async Task<CollectionMembershipResult> GetDevicesAsync(string collectionId, CancellationToken cancellationToken)
+    public Task<CollectionMembershipResult> GetDevicesAsync(string collectionId, CancellationToken cancellationToken) =>
+        ReadAsync(collectionId, null, cancellationToken);
+
+    /// <summary>Runs the same bounded read once, without job dispatch, service queries or source payload output.</summary>
+    public async Task<SccmCollectionDiagnostic> DiagnoseAsync(string collectionId, CancellationToken cancellationToken)
+    {
+        SccmFailureEvidence? failure = null;
+        CollectionMembershipResult? result = null;
+        try
+        { result = await ReadAsync(collectionId, evidence => failure = evidence, cancellationToken); }
+        catch (AnnouncementSourceException) { }
+        string? ui = Environment.GetEnvironmentVariable("SMS_ADMIN_UI_PATH");
+        return new(PSVersionInfo.PSVersion.ToString(), Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            await File.ReadAllBytesAsync(typeof(PowerShell).Assembly.Location, cancellationToken))),
+            System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+            System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(), !string.IsNullOrWhiteSpace(ui),
+            !string.IsNullOrWhiteSpace(ui) && File.Exists(Path.Combine(ui, "..", "ConfigurationManager.psd1")),
+            result is null ? "Failed" : result.Complete ? "Complete" : "Partial", result?.Devices.Count, result?.Complete, failure);
+    }
+
+    private async Task<CollectionMembershipResult> ReadAsync(string collectionId,
+        Action<SccmFailureEvidence>? observe, CancellationToken cancellationToken)
     {
         AnnouncementSourceOptions settings = options.Value;
         if (!IsSiteCode(settings.SiteCode) || !IsProviderHost(settings.ProviderMachineName)
@@ -27,35 +48,55 @@ public sealed class ConfigurationManagerCollectionClient(IOptions<AnnouncementSo
         var state = InitialSessionState.CreateDefault2();
         state.ExecutionPolicy = Microsoft.PowerShell.ExecutionPolicy.Restricted;
         using Runspace runspace = RunspaceFactory.CreateRunspace(state);
-        runspace.Open();
         using var shell = PowerShell.Create();
         shell.Runspace = runspace;
-        shell.AddCommand("Import-Module").AddParameter("Name", "ConfigurationManager").AddParameter("ErrorAction", "Stop");
-        shell.AddStatement().AddCommand("New-PSDrive").AddParameter("Name", settings.SiteCode)
-            .AddParameter("PSProvider", "CMSite").AddParameter("Root", settings.ProviderMachineName)
-            .AddParameter("Scope", "Private").AddParameter("ErrorAction", "Stop")
-            .AddCommand("Out-Null");
-        shell.AddStatement().AddCommand("Set-Location").AddParameter("LiteralPath", settings.SiteCode + ":\\")
-            .AddParameter("ErrorAction", "Stop");
-        shell.AddStatement().AddCommand("Get-CMDevice")
-            .AddParameter("CollectionId", collectionId).AddParameter("ErrorAction", "Stop")
-            .AddCommand("Select-Object").AddParameter("Property", "Name")
-            .AddCommand("Select-Object").AddParameter("First", settings.MaxDevices + 1);
-
+        string stage = "OpenRunspace";
         PSDataCollection<PSObject> output;
         try
-        { output = await shell.InvokeAsync().WaitAsync(cancellationToken); }
+        {
+            runspace.Open();
+            stage = "ImportModule";
+            shell.AddCommand("Import-Module").AddParameter("Name", "ConfigurationManager").AddParameter("ErrorAction", "Stop");
+            await shell.InvokeAsync().WaitAsync(cancellationToken);
+            shell.Commands.Clear();
+            stage = "CreateSiteDrive";
+            shell.AddCommand("New-PSDrive").AddParameter("Name", settings.SiteCode)
+                .AddParameter("PSProvider", "CMSite").AddParameter("Root", settings.ProviderMachineName)
+                .AddParameter("Scope", "Private").AddParameter("ErrorAction", "Stop")
+                .AddCommand("Out-Null");
+            await shell.InvokeAsync().WaitAsync(cancellationToken);
+            shell.Commands.Clear();
+            stage = "SelectSiteDrive";
+            shell.AddCommand("Set-Location").AddParameter("LiteralPath", settings.SiteCode + ":\\")
+                .AddParameter("ErrorAction", "Stop");
+            await shell.InvokeAsync().WaitAsync(cancellationToken);
+            shell.Commands.Clear();
+            stage = "ReadCollection";
+            shell.AddCommand("Get-CMDevice")
+                .AddParameter("CollectionId", collectionId).AddParameter("ErrorAction", "Stop")
+                .AddCommand("Select-Object").AddParameter("Property", "Name")
+                .AddCommand("Select-Object").AddParameter("First", settings.MaxDevices + 1);
+
+            output = await shell.InvokeAsync().WaitAsync(cancellationToken);
+        }
         catch (OperationCanceledException)
         { throw; }
         catch (Exception exception) when (exception is RuntimeException or CommandNotFoundException
             or PSInvalidOperationException or InvalidOperationException or IOException)
         {
-            // Module, drive and provider failures are indistinguishable from absence; never guess membership.
-            logger.LogWarning("SCCM collection membership read failed. FailureType: {FailureType}", exception.GetType().Name);
+            ErrorRecord? record = (exception as RuntimeException)?.ErrorRecord ?? shell.Streams.Error.LastOrDefault();
+            var evidence = SccmFailureEvidence.Capture(stage, exception, record);
+            observe?.Invoke(evidence);
+            logger.LogWarning("SCCM collection membership read failed. FailureType: {FailureType}. Evidence: {Evidence}",
+                exception.GetType().Name, System.Text.Json.JsonSerializer.Serialize(evidence));
             throw new AnnouncementSourceException("AnnouncementSourceCollectionUnavailable", true);
         }
         if (shell.HadErrors && output.Count == 0)
         {
+            ErrorRecord? record = shell.Streams.Error.LastOrDefault();
+            var evidence = SccmFailureEvidence.Capture(stage,
+                record?.Exception ?? new InvalidOperationException(), record);
+            observe?.Invoke(evidence);
             logger.LogWarning("SCCM collection membership read reported errors. ErrorCount: {ErrorCount}", shell.Streams.Error.Count);
             throw new AnnouncementSourceException("AnnouncementSourceCollectionUnavailable", true);
         }

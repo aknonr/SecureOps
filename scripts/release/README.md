@@ -22,7 +22,12 @@ API/UI/Worker on the combined delivery branch, reuses the payload scanners/valid
 exports the current Turkish entry and packages the exact DBA 001-024 inventory
 with per-file sizes/hashes and source metadata. Hangfire.SqlServer 1.8.6's original
 schema-9 installation script is included separately for reviewed DBA provisioning;
-runtime DDL stays disabled. Worker is a foreground console host, not a Windows Service.
+runtime DDL stays disabled. New source supports native Windows Service and console
+hosting. The exported worker-service-operations-tr.md procedure and service/runtime
+dependency validation accompany the candidate; packaging never installs a service.
+SCM/logoff/recovery acceptance remains required. The external In Use contract gate
+does not indefinitely block a scoped Worker/fixes release, but unsupported In Use
+completion stays disabled and UI/process/MIME release gates are not waived.
 It refuses an existing release directory. Determine the next name from actual
 release metadata first. It does not deploy, activate writes or certify TEST acceptance.
 Payload success is not release approval: `readyForInstallation` stays false;
@@ -66,8 +71,10 @@ release must name the same exact build source SHA and required schema level in
 the existing release-directory readiness manifest.
 
 `New-UiDeploymentPackage.ps1 -Component Worker` reuses the same path-preserving
-ZIP/hash/configuration exclusion logic for the existing console Worker. It checks
+ZIP/hash/configuration exclusion logic for the console/service-capable Worker. It checks
 the Worker identity/runtime manifest, Hangfire/SQL dependencies and every declared
 runtime/native/resource asset before packaging. The default remains Ui. Shared
 scanning additionally rejects private key/certificate/database and fixture files.
-No service installation or new hosting implementation is included.
+It also requires the matching PowerShell SDK Management/Utility dependencies and
+Windows module manifests; engine-only presence is insufficient for SCCM hosting.
+The packaging script never installs a service or changes target configuration.

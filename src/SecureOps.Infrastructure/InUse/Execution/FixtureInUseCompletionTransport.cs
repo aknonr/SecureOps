@@ -24,11 +24,15 @@ public sealed class FixtureInUseCompletionTransport(IOptions<InUseCompletionOpti
         if (state.SourceId != source.Id)
         { return new("Rejected", "TargetMismatch"); }
         string[] environments = source.Servers.Select(s => s.Fields.GetValueOrDefault("SI_ENVIRONMENT")?.Value?.ToUpperInvariant() ?? "").Distinct().ToArray();
+        bool activity = execution.Intent.VerificationMode == "WasasActivityManual";
+        string? targetEnvironment = activity ? InUseRequiredFields.Environment(source) : environments.Length == 1 ? environments[0] : null;
         InUseRemoteResult result;
         if (step == "Validate")
         {
-            if (environments.Length != 1 || environments[0] is not ("PROD" or "DEV" or "TEST" or "NONPROD"))
+            if (targetEnvironment is not ("PROD" or "DEV" or "TEST" or "NONPROD"))
             { return new("Rejected", "MixedOrUnknownEnvironment"); }
+            if (state.ActivityCompleted)
+            { return new("Rejected", "AlreadyActivityCompleted"); }
             if (state.Closed)
             { return new("Rejected", "AlreadyClosed"); }
             if (source.Servers.Any(s => string.IsNullOrWhiteSpace(s.Fields.GetValueOrDefault("ITMC_Service_ID")?.Value)
@@ -40,9 +44,9 @@ public sealed class FixtureInUseCompletionTransport(IOptions<InUseCompletionOpti
         { state = state with { Category = "Application Server" }; result = new("Acknowledged", "SyntheticProperty4463"); }
         else if (step == "Property4464")
         {
-            if (environments.Length != 1)
+            if (targetEnvironment is null)
             { return new("Rejected", "MixedEnvironment"); }
-            state = state with { Environment = environments[0] };
+            state = state with { Environment = targetEnvironment };
             result = new("Acknowledged", "SyntheticProperty4464");
         }
         else if (step == "Upload")
@@ -62,7 +66,8 @@ public sealed class FixtureInUseCompletionTransport(IOptions<InUseCompletionOpti
         {
             if (!execution.Evidence.Any(e => e.Step == "Attachment" && e.Outcome == "Verified") || state.AttachmentId is null)
             { return new("Rejected", "AttachmentRequired"); }
-            state = state with { Closed = true };
+            state = execution.Intent.VerificationMode == "WasasActivityManual"
+                ? state with { ActivityCompleted = true } : state with { Closed = true };
             result = new("Acknowledged", "SyntheticActivityAcknowledged", "fixture-task-" + key[..12]);
         }
         else if (step == "Closure")
@@ -81,5 +86,6 @@ public sealed class FixtureInUseCompletionTransport(IOptions<InUseCompletionOpti
         string? AttachmentId = null, string? Hash = null, bool Closed = false)
     {
         public byte[] Content { get; init; } = [];
+        public bool ActivityCompleted { get; init; }
     }
 }

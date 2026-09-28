@@ -58,7 +58,7 @@ async function tour(page, surface) {
             await page.getByRole('button', { name: 'Değişiklikleri göster', exact: true }).click();
             await page.waitForFunction(() => document.querySelectorAll('.so-inuse-bulk li').length === 9);
             await page.getByRole('button', { name: 'Gösterilen değişiklikleri onayla', exact: true }).click();
-            await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+            await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
             await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
             const saved = await json(client, `/api/v1/in-use/${record.id}`);
             assert.equal(saved.assigneeId, null, 'Review does not require or silently create assignment');
@@ -178,7 +178,7 @@ async function tour(page, surface) {
             assert.equal(await page.locator('select[aria-label*="Internet"],select[aria-label*="Microsegmented"]').count(), 3);
             assert.equal(await page.getByLabel('İnceleme notu', { exact: true }).count(), 0);
             await page.getByLabel('demo-server-01 InternetOut', { exact: true }).selectOption('Yes');
-            await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+            await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
             await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
             await page.getByRole('button', { name: 'Excel önizleme', exact: true }).click();
             await page.getByLabel('Excel sayfası').waitFor();
@@ -200,7 +200,7 @@ async function tour(page, surface) {
             await page.setViewportSize({ width: 390, height: 844 });
             await page.getByLabel('Yanıtlanacak sunucu', { exact: true }).selectOption('demo-server-02');
             await page.getByLabel('demo-server-02 InternetOut', { exact: true }).selectOption('No');
-            await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+            await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
             await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
             let saved = await json(client, `/api/v1/in-use/${record.id}`);
             assert.deepEqual(saved.draft.answers.filter(a => a.check === 'InternetOut').map(a => a.value), ['Yes', 'No']);
@@ -231,7 +231,7 @@ async function tour(page, surface) {
             saved = await json(client, `/api/v1/in-use/${record.id}`);
             await page.getByLabel('demo-server-01 InternetIn', { exact: true }).selectOption('Yes');
             await json(client, `/api/v1/in-use/${record.id}/assignment`, { method: 'PUT', data: { expectedVersion: saved.version, assigneeId: me.userId, reason: 'Synthetic concurrent save' } });
-            await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+            await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
             await page.getByText('In Use veri sürümü değişti', { exact: true }).waitFor();
             assert.equal(await page.getByLabel('demo-server-01 InternetIn', { exact: true }).inputValue(), 'Yes');
             await page.getByRole('button', { name: 'Cevapları koru ve güncel kayıtla karşılaştır', exact: true }).click();
@@ -239,7 +239,7 @@ async function tour(page, surface) {
             assert.equal(await page.getByLabel('demo-server-01 InternetIn', { exact: true }).inputValue(), 'Yes');
             await capture(page, out, 'after-conflict-comparison');
             await page.getByRole('button', { name: 'Farkları inceledim; yerel cevaplarla devam et', exact: true }).click();
-            await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+            await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
             await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
             assert.equal((await json(client, `/api/v1/in-use/${record.id}`)).draft.answers.find(a => a.serverId === 'demo-server-01' && a.check === 'InternetIn').value, 'Yes');
             await page.evaluate(() => localStorage.setItem('wasas.appearance', 'light'));

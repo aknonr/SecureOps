@@ -48,7 +48,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         await page.waitForFunction(id => document.activeElement?.getAttribute('aria-label') === `${id} InternetIn`, missingServer);
         await capture(page, out, 'progress-validation');
         await page.getByLabel(`${missingServer} InternetIn`, { exact: true }).selectOption('No');
-        await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click();
+        await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
         await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
         r = await json(client, `/api/v1/in-use/${r.id}`);
         await page.getByRole('button', { name: 'Excel önizleme', exact: true }).click();

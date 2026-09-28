@@ -30,7 +30,7 @@ public sealed class ApiReleasePackagingContractTests
     }
 
     [Fact]
-    public void CombinedDelivery_IncludesConsoleWorkerAndExactSchemaWithoutServiceInstallation()
+    public void CombinedDelivery_IncludesNativeWorkerAndExactSchemaWithoutInstallingService()
     {
         string root = FindRepositoryRoot();
         string paired = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-PairedTestRelease.ps1"));
@@ -48,11 +48,14 @@ public sealed class ApiReleasePackagingContractTests
             .And.Contain("New-InUseEvidencePackage.ps1").And.Contain("diagnostics/payload.sha256")
             .And.Contain("InUseCompletionEnabled=$false").And.Contain("InUseAspectLookupEnabled=$false")
             .And.Contain("runtimePrepareSchema=$false").And.Contain("-Component Worker")
-            .And.Contain("Foreground console only").And.Contain("Symbol outside fresh staging.").And.NotContain("sc.exe");
+            .And.Contain("Native Windows Service or console").And.Contain("Symbol outside fresh staging.").And.NotContain("sc.exe");
         managed.Should().Contain("runtimeTargets").And.Contain("Missing Worker runtime asset")
-            .And.Contain("Hangfire.SqlServer").And.Contain("Test-ApiReleasePayload.ps1");
+            .And.Contain("Hangfire.SqlServer").And.Contain("Test-ApiReleasePayload.ps1")
+            .And.Contain("Microsoft.PowerShell.SDK").And.Contain("Microsoft.PowerShell.Commands.Management")
+            .And.Contain("Microsoft.PowerShell.Commands.Utility").And.Contain("Missing Worker PowerShell module manifest");
         worker.Should().Contain("TryAddSecureOpsJobServer").And.Contain("await host.RunAsync()")
-            .And.NotContain("AddWindowsService").And.NotContain("UseWindowsService");
+            .And.Contain("AddWindowsService").And.Contain("WorkerHosting.CreateBuilder")
+            .And.Contain("WorkerHosting.Acquire").And.Contain("args.Contains(\"--diagnostics\"");
     }
 
     [Fact]

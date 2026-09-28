@@ -11,7 +11,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
     const page = await context.newPage(), observations = [], checks = ['InternetOut', 'InternetIn', 'Microsegmented'];
     const answer = (server, check) => page.locator(`[data-answer-server="${server}"][data-answer-check="${check}"]`);
     const read = id => json(client, '/api/v1/in-use/' + id);
-    const saved = async () => { await page.getByRole('button', { name: 'Taslağı kaydet', exact: true }).click(); await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor(); };
+    const saved = async () => { await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click(); await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor(); };
     try {
         const records = (await json(client, '/api/v1/in-use?search=OR-90000')).items;
         let first = records.find(r => r.source.code === 'OR-900001'), second = records.find(r => r.source.code === 'OR-900002');
@@ -67,19 +67,29 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         assert.deepEqual(report.sheets.find(s => s.name === 'NMS').rows[1].slice(18), ['Hayır', 'Hayır', 'Evet', 'Hayır']);
         assert.equal(report.sheets.find(s => s.name === 'NMS').rows[1][6], '[Genel]');
         assert.equal(report.sheets.find(s => s.name === 'NMS').rows[1][2], '000123456789012345678901');
-        await page.getByRole('button', { name: 'Talebe ekle ve tamamla', exact: true }).click();
+        await page.getByRole('button', { name: 'Raporu ekle ve WASAS adımını onayla', exact: true }).click();
         await page.getByRole('button', { name: 'Bu talep ve sürüm için onaylıyorum', exact: true }).click();
         let execution;
         for (let i = 0; i < 30; i++) {
             execution = await json(client, `/api/v1/in-use/${first.id}/execution`);
-            if (execution.operation?.state === 'Completed') break;
+            if (execution.operation?.state === 'Unconfirmed') break;
             await new Promise(resolve => setTimeout(resolve, 500));
         }
-        assert.equal(execution.operation?.state, 'Completed', JSON.stringify(execution));
+        assert.equal(execution.operation?.state, 'Unconfirmed', JSON.stringify(execution));
+        assert.equal(execution.operation.verificationMode, 'WasasActivityManual');
+        assert.equal(execution.operation.evidence.some(e => e.step === 'Closure'), false);
         assert.equal(execution.operation.reportSha256, report.sha256);
         await page.getByRole('button', { name: 'İşlem durumunu yenile', exact: true }).click();
-        await page.getByText('Ek doğrulandı ve OR kapalı durumu kaynaktan doğrulandı', { exact: true }).waitFor();
-        await page.screenshot({ path: path.join(out, 'synthetic-completion.png'), fullPage: true });
+        await page.getByText(/WASAS onay isteği iletildi/).waitFor();
+        assert.equal(await page.getByText(/OR kapandı/).count(), 0);
+        await page.screenshot({ path: path.join(out, 'synthetic-activity-acknowledged.png'), fullPage: true });
+        await page.getByRole('button', { name: 'Kaynakta kontrol ettim', exact: true }).click();
+        await page.getByRole('button', { name: 'Kontrol ettim, manuel onayı kaydet', exact: true }).click();
+        await page.getByText(/Manuel doğrulama: operatör WASAS adımının tamamlandığını bildirdi/).waitFor();
+        execution = await json(client, `/api/v1/in-use/${first.id}/execution`);
+        assert.equal(execution.operation.state, 'Unconfirmed');
+        assert.equal(execution.operation.evidence.at(-1).code, 'OperatorAttestedWasasActivityCompleted');
+        assert.equal((await read(first.id)).trackingOnly, false, 'Manual attestation is not verified activity completion');
         const sameReport = await json(client, `/api/v1/in-use/${first.id}/report`, { method: 'POST', data: { expectedVersion: first.version, archivedVersion: first.version } });
         assert.equal(sameReport.content, report.content);
         await navigate(page, ui, 'in-use/' + second.id);

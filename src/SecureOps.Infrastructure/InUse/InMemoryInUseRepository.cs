@@ -42,11 +42,19 @@ public sealed class InMemoryInUseRepository(IAuditWriter audit) : IInUseReposito
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            InUseRecord[] rows = [.. _records.Values.Where(r =>
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var matches = _records.Values.Where(r =>
                 Matches(r.Source, query.Search)
                 && (query.Status == "Discarded" ? r.Discarded : !r.Discarded && (query.Status is null || r.Status == query.Status))
-                && (query.View == "all" || query.View == "mine" && r.AssigneeId == actorId || query.View == "unassigned" && r.AssigneeId is null))
-                .OrderBy(r => r.Source.Code, StringComparer.Ordinal).ThenBy(r => r.Id)];
+                && (query.View == "all" || query.View == "mine" && r.AssigneeId == actorId || query.View == "unassigned" && r.AssigneeId is null
+                    || query.View == "tracking" && r.TrackingOnly || query.View == "review" && !r.TrackingOnly
+                    || query.View == "pending" && r.ActivityStatus == "Pending"
+                    || query.View == "verification" && r.ActivityStatus == "VerificationPending"))
+                .Select(r => new { Record = r, Created = query.Sort == "code" ? null : InUseProgress.Created(r.Source, now) });
+            var knownFirst = matches.OrderBy(r => r.Created is null);
+            var ordered = query.Sort == "newest" ? knownFirst.ThenByDescending(r => r.Created) : knownFirst.ThenBy(r => r.Created);
+            InUseRecord[] rows = ordered.ThenBy(r => r.Record.Source.Code, StringComparer.Ordinal)
+                .ThenBy(r => r.Record.Id.ToString("D"), StringComparer.Ordinal).Select(r => r.Record).ToArray();
             return new(rows.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray(), rows.Length, query.Page, query.PageSize, _state);
         }
         finally { _gate.Release(); }

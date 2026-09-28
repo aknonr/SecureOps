@@ -189,7 +189,7 @@ public sealed class AnnouncementSourceService(SqlAnnouncementStore drafts, SqlAn
         if (start is not null && finish is not null && DateTimeOffset.Parse(finish, System.Globalization.CultureInfo.InvariantCulture)
             <= DateTimeOffset.Parse(start, System.Globalization.CultureInfo.InvariantCulture))
         { start = null; finish = null; }
-        string? description = profile.DescriptionTemplate.Length == 0 ? profile.Description : start is null || finish is null ? null
+        string? description = string.IsNullOrWhiteSpace(profile.DescriptionTemplate) ? profile.Description : start is null || finish is null ? null
             : profile.DescriptionTemplate.Replace("{WorkStart}", DisplayTime(start), StringComparison.Ordinal)
                 .Replace("{WorkEnd}", DisplayTime(finish), StringComparison.Ordinal);
         ProposedField[] fields =

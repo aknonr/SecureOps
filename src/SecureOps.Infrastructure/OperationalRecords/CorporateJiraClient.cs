@@ -47,7 +47,8 @@ public sealed class CorporateJiraClient : IJiraClient
 
         JiraIssueFieldMapping mapping = draft.FieldMapping;
         if (draft.ReviewOnly || draft.BlockingConditions.Count > 0
-            || draft.RequestType == SecureOps.Domain.OperationalRecords.OperationalRecordClassification.SoftwareInstallation
+            || draft.RequestType is SecureOps.Domain.OperationalRecords.OperationalRecordClassification.SoftwareInstallation
+                or SecureOps.Domain.OperationalRecords.OperationalRecordClassification.ServerRetirement
             || string.IsNullOrWhiteSpace(mapping.IssueTypeId)
             || string.IsNullOrWhiteSpace(mapping.TeamCustomField)
             || string.IsNullOrWhiteSpace(mapping.TeamValue)

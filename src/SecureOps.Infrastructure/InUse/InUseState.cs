@@ -52,11 +52,7 @@ internal static class InUseState
         if (old is not null && source.AffectedAssetsState != "Complete")
         { source = source with { AffectedAssetCount = old.Source.AffectedAssetCount }; }
         // Verification time is freshness metadata; unchanged source content must not invalidate a draft.
-        InUseSource fingerprint = source with
-        {
-            Servers = source.Servers.Select(s => s.RelatedRequestReporter is null ? s
-            : s with { RelatedRequestReporter = s.RelatedRequestReporter with { LastVerifiedAt = null } }).ToArray()
-        };
+        InUseSource fingerprint = Canonical(source);
         string hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(fingerprint)));
         if (old is null)
         {
@@ -68,10 +64,48 @@ internal static class InUseState
             Source = source,
             SourceHash = hash,
             SourceVersion = old.SourceVersion + (changed ? 1 : 0),
+            ReviewSourceVersion = ReviewHash(old.Source) == ReviewHash(source)
+                ? old.ReviewSourceVersion ?? old.SourceVersion : old.SourceVersion + (changed ? 1 : 0),
+            SourceChanges = changed ? ParentChanges(old.Source, source) : old.SourceChanges,
             Version = old.Version + 1,
+            SourceObservationMissing = false,
             LastSeenAt = now
         };
     }
+
+    private static InUseSource Canonical(InUseSource source) => source with
+    {
+        Servers = source.Servers.OrderBy(s => s.Id, StringComparer.Ordinal).Select(s => s with
+        {
+            Fields = new SortedDictionary<string, InUseEvidence>(s.Fields.ToDictionary(f => f.Key, f => f.Value), StringComparer.Ordinal),
+            RelatedRequestReporter = s.RelatedRequestReporter is null ? null : s.RelatedRequestReporter with { LastVerifiedAt = null }
+        }).ToArray()
+    };
+
+    // Parent stage/title and reporter freshness still fence execution, but do not invalidate server answers.
+    private static string ReviewHash(InUseSource source) => JsonSerializer.Serialize(new
+    {
+        source.Id,
+        source.IdentityScope,
+        source.Synthetic,
+        source.ServiceItemsState,
+        source.ServiceOwner,
+        source.ProvisioningTeam,
+        Servers = Canonical(source).Servers.Select(s => new
+        { s.Id, Fields = s.Fields.Where(f => InUseSourceChanges.AffectsReview(f.Key)).ToDictionary(f => f.Key, f => f.Value, StringComparer.Ordinal) })
+    });
+
+    private static InUseFieldChange[] ParentChanges(InUseSource before, InUseSource after) => new[]
+    {
+        new InUseFieldChange("Execution", "OR başlığı", before.Title, after.Title),
+        new InUseFieldChange("Execution", "OR talep eden", before.Requester.Value, after.Requester.Value),
+        new InUseFieldChange("Workflow", "Genel OR durumu", before.Lifecycle?.Value, after.Lifecycle?.Value),
+        new InUseFieldChange("Workflow", "WASAS aktivitesi", before.WasasActivity?.Value, after.WasasActivity?.Value),
+        new InUseFieldChange("Workflow", "Güncel ekip / aşama", before.CurrentStage?.Value, after.CurrentStage?.Value),
+        new InUseFieldChange("Review", "Sunucu ilişkisi", before.ServiceItemsState, after.ServiceItemsState),
+        new InUseFieldChange("Review", "Servis sahibi", before.ServiceOwner.Value, after.ServiceOwner.Value),
+        new InUseFieldChange("Review", "Kurulum ekibi", before.ProvisioningTeam.Value, after.ProvisioningTeam.Value)
+    }.Where(c => c.Before != c.After).ToArray();
 
     internal static InUseRefreshState Refresh(InUseRefreshState old, InUseBatch? batch, string? error, DateTimeOffset now) =>
         new(old.Version + 1, now, batch is null ? old.LastSuccessfulAt : now,
@@ -79,14 +113,15 @@ internal static class InUseState
 
     internal static InUseRecord RetainUnobserved(InUseRecord old)
     {
-        if (!old.Source.Servers.Any(s => s.RelatedRequestReporter is { State: not "Stale" }))
+        if (old.SourceObservationMissing && !old.Source.Servers.Any(s => s.RelatedRequestReporter is { State: not "Stale" }))
         { return old; }
         InUseSource source = old.Source with
         {
             Servers = old.Source.Servers.Select(s => s with
             { RelatedRequestReporter = Stale(s.RelatedRequestReporter) }).ToArray()
         };
-        return Merge(old, source, old.LastSeenAt) with { LastSeenAt = old.LastSeenAt };
+        return Merge(old, source, old.LastSeenAt) with
+        { LastSeenAt = old.LastSeenAt, ReviewSourceVersion = old.ReviewSourceVersion, SourceObservationMissing = true };
     }
 
     internal static bool Valid(InUseBatch batch) => batch.Records.Count <= 100

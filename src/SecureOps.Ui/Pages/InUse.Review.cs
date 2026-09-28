@@ -19,28 +19,64 @@ public partial class InUse
     private Task RefreshExecutionAsync() => ExecuteAsync(ReadExecutionAsync);
     private Task StartExecutionAsync() => ExecuteAsync(async () =>
     {
-        if (_record is null || _dirty || !MayStartExecution || _execution?.Readiness.Available != true || !Ready())
+        if (_record is null || _dirty || !Can(SecureOps.Shared.Auth.Capabilities.InUseComplete)
+            || !MayStartExecution || _execution?.Readiness.Available != true || !Ready())
         { return; }
-        if (await Dialogs.ShowMessageBox("Talebe ekle ve tamamla",
-            $"Başlatan: {_access?.Profile?.DisplayName ?? _access?.Profile?.Account ?? _access?.Access?.UserId.ToString("D")}. {_record.Source.Code}: kaydedilen {_record.Source.Servers.Count} sunuculuk rapor arşivlenecek; aynı baytlar talebe eklenecek, doğrulanan tek görev tamamlanacak ve OR son durumu ayrıca okunacak. İnceleyici ataması bu aktörün yerine geçmez. Dış etkiler tek işlemle geri alınamaz.",
+        InUseRecord selected = _record;
+        int generation = _generation;
+        _report = await SendAsync<InUseReport>(HttpMethod.Post, $"/{selected.Id}/report", new ExportInUseRequest(selected.Version, Archive: true));
+        InUseReport reviewed = _report;
+        if (await Dialogs.ShowMessageBox($"{selected.Source.Code}: WASAS adımını onayla",
+            $"OR: {selected.Source.Code}. Başlatan: {_access?.Profile?.DisplayName ?? _access?.Profile?.Account ?? _access?.Access?.UserId.ToString("D")}. "
+            + $"{selected.Source.Servers.Count} sunucu; rapor sürümü {reviewed.Version}; arşiv SHA-256 (16 karakterlik bloklar): {string.Join(" ", reviewed.Sha256.Chunk(16).Select(c => new string(c)))}. "
+            + $"Kaynağa eklenecek dosya: {selected.Source.Code}_InUse.xlsx. Sunucu tipi: Application Server. Ortam: {RequiredEnvironment(selected)}. "
+            + "Aynı baytlar eklenip ek içeriği doğrulandıktan sonra yalnız tek uygun WASAS aktivitesi onaylanacak. Başka ekibin görevi onaylanmaz; genel OR açık kalabilir. "
+            + "WASAS adımını kaynak sistemde kontrol edin. İptal etmek yerel arşivi silmez. Dış etkiler geri alınamaz.",
             yesText: "Bu talep ve sürüm için onaylıyorum", cancelText: "Vazgeç") != true)
         { return; }
-        _report = await SendAsync<InUseReport>(HttpMethod.Post, $"/{_record.Id}/report", new ExportInUseRequest(_record.Version, Archive: true));
-        InUseExecution operation = await SendAsync<InUseExecution>(HttpMethod.Post, $"/{_record.Id}/execution",
-            new StartInUseExecutionRequest(Guid.NewGuid(), _record.Version, _report.Sha256));
+        if (generation != _generation || _record?.Id != selected.Id || _record.Version != selected.Version
+            || _dirty || !Can(SecureOps.Shared.Auth.Capabilities.InUseComplete))
+        { return; }
+        InUseExecution operation = await SendAsync<InUseExecution>(HttpMethod.Post, $"/{selected.Id}/execution",
+            new StartInUseExecutionRequest(Guid.NewGuid(), selected.Version, reviewed.Sha256));
         _execution = _execution with { Operation = operation };
-        _notice = "İşlem kalıcı olarak kaydedildi. Ek ve kapanış sonuçlarını ayrı ayrı izleyin.";
+        _notice = "İşlem kalıcı olarak kaydedildi. Ek, WASAS onayı ve genel OR durumunu ayrı ayrı izleyin.";
     });
-    private static string ExecutionState(string state) => state switch
+    private Task ConfirmClosureAsync() => ExecuteAsync(async () =>
     {
-        "Queued" => "İş kuyruğunda; Worker bekleniyor",
-        "Running" => "Kaynak adımı çalışıyor; yeniden başlatmayın",
-        "Completed" => "Ek doğrulandı ve OR kapalı durumu kaynaktan doğrulandı",
-        "Unknown" => "Sonuç belirsiz. Kaynak mutabakatı gerekli; yazmayı tekrarlamayın",
-        "Unconfirmed" => "Kaynak son durumu doğrulanamadı; OR kapatıldı sayılmaz",
-        "Blocked" => "Yetki, yapılandırma veya kaynak sürümü değişti; kalan adımlar durduruldu",
-        _ => "Adım başarısız; önceki başarılı etkiler korunuyor. Yeniden yazmadan sonucu inceleyin"
+        if (_record is null || !Can(SecureOps.Shared.Auth.Capabilities.InUseComplete)
+            || _execution?.Operation is not { } operation || !InUseClosureVerification.CanConfirm(operation))
+        { return; }
+        int generation = _generation;
+        bool activity = operation.VerificationMode == "WasasActivityManual";
+        if (await Dialogs.ShowMessageBox(activity ? "WASAS adımı için manuel doğrulama" : "Geçmiş OR kapanışı için manuel doğrulama",
+            $"{operation.SourceCode}: kaynak sistemde {(activity ? "WASAS aktivitesinin tamamlandığını" : "bu OR'nin kapalı olduğunu")} kontrol ettiniz mi? Onayınız kimliğiniz ve UTC zamanıyla manuel doğrulama olarak kaydedilir; sistem doğrulaması değildir ve yeni kaynak isteği göndermez.",
+            yesText: "Kontrol ettim, manuel onayı kaydet", cancelText: "Vazgeç") != true)
+        { return; }
+        if (generation != _generation || _record?.Id != operation.RecordId || _execution?.Operation?.Revision != operation.Revision
+            || !Can(SecureOps.Shared.Auth.Capabilities.InUseComplete))
+        { return; }
+        InUseExecution confirmed = await SendAsync<InUseExecution>(HttpMethod.Post, $"/{operation.RecordId}/execution/manual-verification",
+            new ConfirmInUseClosureRequest(operation.OperationId, operation.Revision, operation.SourceCode));
+        _execution = _execution with { Operation = confirmed };
+        _notice = "Manuel doğrulama kaydedildi. Kaynak sisteme yeni istek gönderilmedi.";
+    });
+    private static string RequiredEnvironment(InUseRecord record)
+    {
+        string? environment = InUseRequiredFields.Environment(record.Source);
+        return environment is null
+            ? "Kaynak ortamını doğrulayın; bilinmeyen ortam TEST sayılmaz"
+            : environment + " (iş kuralı; kaynak alan değeri eşlemesi ayrıca doğrulanmalı)";
+    }
+    private static string SourceActivity(InUseRecord record) => record.ActivityStatus switch
+    {
+        "Completed" => "Tamamlandığı kaynakta doğrulandı",
+        "Pending" => "Kaynakta bekliyor",
+        "OrClosed" => "Genel OR kapalı; WASAS aktivitesine ait doğrulama alınmadı",
+        _ => "Doğrulama bekliyor; güncel WASAS durumu doğrulanmadı"
     };
+    private static string SourceLifecycle(InUseRecord record) => string.IsNullOrWhiteSpace(record.Source.Lifecycle?.Source) ? "Kaynak durumu alınmadı" : record.Source.Lifecycle?.Value switch
+    { "Open" => "Açık", "Closed" => "Kapalı (kaynak kanıtı)", _ => "Kaynak durumu alınmadı" };
     private static string ExecutionStep(string step) => step switch
     {
         "Intent" => "İncelenen rapor ve işlem kaydı",
@@ -49,8 +85,9 @@ public partial class InUse
         "Property4464" => "Ortam özelliği",
         "Upload" => "Rapor ekleme yanıtı",
         "Attachment" => "Ek kimliği ve bayt doğrulaması",
-        "Bpm" => "Görev tamamlama yanıtı",
+        "Bpm" => "WASAS aktivitesi onay yanıtı",
         "Closure" => "OR son durum okuması",
+        "ManualVerification" => "Operatörün manuel doğrulaması",
         _ => "İşlem"
     };
     private static string ExecutionReason(string code) => code switch
@@ -63,12 +100,14 @@ public partial class InUse
         "AttachmentNotVerified" or "AttachmentRequired" => "Raporun doğru talebe eklendiği doğrulanamadı. Görev tamamlanmadı; eki tekrar yüklemeyin.",
         "OrStillOpen" => "Görev yanıtına rağmen OR kapalı durumu doğrulanmadı. Kaynak durumunu yetkili operatörle inceleyin.",
         "AlreadyClosed" => "Kaynak kayıt zaten kapalı. Yeni ek veya görev işlemi yapılmadı.",
+        "AlreadyActivityCompleted" => "WASAS aktivitesi zaten tamamlanmış. Yeni ek veya başka ekibin görevi için onay gönderilmedi.",
         _ => "Kaydedilen adım sonuçlarını destek referansıyla yöneticinize iletin. Belirsiz yazma işlemini tekrar etmeyin; taslak ve arşiv korunur."
     };
     private static string ExecutionOutcome(string outcome) => outcome switch
     {
         "Verified" => "Kaynak okumasıyla doğrulandı",
-        "Acknowledged" => "İşlem yanıtı alındı; son durum ayrıca okunacak",
+        "Acknowledged" => "İstek kabul edildi; son durum doğrulanmadı",
+        "ManuallyConfirmed" => "Manuel onay kaydedildi; sistem doğrulaması değil",
         "Started" => "Başladı",
         "Queued" => "Kaydedildi",
         "Rejected" => "Reddedildi",

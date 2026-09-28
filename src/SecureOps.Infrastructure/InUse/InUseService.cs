@@ -23,7 +23,8 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         InUseQuery query, CancellationToken token) => RunAsync(principal, context, Capabilities.InUseView, async user =>
         {
             if (query.Page is < 1 or > 100000 || query.PageSize is < 1 or > 100 || query.Search?.Length > 100
-                || query.View is not ("all" or "mine" or "unassigned") || query.Status is not (null or "Unreviewed" or "Draft" or "Stale" or "Discarded"))
+                || query.Sort is not ("code" or "oldest" or "newest")
+                || query.View is not ("all" or "mine" or "unassigned" or "tracking" or "review" or "pending" or "verification") || query.Status is not (null or "Unreviewed" or "Draft" or "Stale" or "Discarded"))
             { return InUseResult<InUsePage>.Fail("InUseInvalid"); }
             InUsePage page = await repository.QueryAsync(query, user.Id, token);
             IReadOnlyDictionary<Guid, string> labels = await LabelsAsync(page.Items, token);
@@ -58,7 +59,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         }, token);
 
     private static InUseRecord Label(InUseRecord record, IReadOnlyDictionary<Guid, string> labels) => record.AssigneeId is Guid id
-        ? record with { AssigneeLabel = labels.GetValueOrDefault(id) ?? $"Kayıtlı inceleyici · {id:D}" } : record;
+        ? record with { AssigneeLabel = labels.GetValueOrDefault(id) ?? InUsePersonLabel.Format(null, null) } : record;
 
     /// <summary>Refreshes a bounded independent scope, with durable command tracking and no deletion.</summary>
     public Task<InUseResult<InUseRefreshState>> RefreshAsync(ClaimsPrincipal principal, AccessOperationContext context,
@@ -155,7 +156,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             IReadOnlyList<InUseAnswer>? answers = await NormalizeAnswersAsync(old, request, user, token);
             if (answers is null)
             { return new(null, "InUseConflict", "Kopyalanan veya önceki cevapların kaynak bağlamı değişti. Seçiminiz korunuyor; sunucuları yeniden inceleyin."); }
-            InUsePolicyProposal? accepted = old.Draft?.SourceVersion == old.SourceVersion ? old.Draft.Policy : null;
+            InUsePolicyProposal? accepted = old.ReviewCurrent ? old.Draft?.Policy : null;
             if (request.ReviewedPolicyFingerprint is not null)
             {
                 InUsePolicyProposal? current = policy?.Propose(old);
@@ -173,7 +174,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                         ? a with { Evidence = old.Draft?.Answers.FirstOrDefault(o => o.ServerId == a.ServerId && o.Check == a.Check)?.Evidence ?? "" } : a))
                     .OrderBy(a => a.ServerId, StringComparer.Ordinal).ThenBy(a => a.Check, StringComparer.Ordinal).ToArray(),
                 string.IsNullOrWhiteSpace(request.Notes) ? old.Draft?.Notes ?? "" : request.Notes.Trim(), user.Id, DateTimeOffset.UtcNow)
-                { ReviewedByLabel = ActorLabel(user), Policy = accepted, ReviewedServers = old.Source.Servers }
+                { ReviewedByLabel = user.DisplayName, ReviewedByAccount = user.LoginName, Policy = accepted, ReviewedServers = old.Source.Servers }
             };
             return await SaveAsync(next, request.ExpectedVersion, Audit(user, context, "DraftSaved",
                 new { id, next.Version, next.SourceVersion, AnswerCount = request.Answers.Count, PolicyFingerprint = accepted?.Fingerprint }, id, request.ExpectedVersion, assigneeId: old.AssigneeId), token);
@@ -199,7 +200,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                 { await ReceiptAsync(stored, token); }
                 return stored is null ? InUseResult<InUseReport>.Fail("InUseConflict") : new(DownloadPresentation(stored));
             }
-            if (record.Discarded || record.Version != request.ExpectedVersion || record.Draft is null || record.Draft.SourceVersion != record.SourceVersion)
+            if (record.Discarded || record.Version != request.ExpectedVersion || !record.ReviewCurrent || record.Draft is null)
             { return InUseResult<InUseReport>.Fail("InUseConflict"); }
             if (request.Archive && InUseChecks.Missing(record.Source, record.Draft.Answers) is { } missing)
             {
@@ -209,8 +210,16 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             }
             if (request.Archive && !InUseChecks.RelationshipReady(record.Source))
             { return InUseResult<InUseReport>.Fail("InUseIncomplete"); }
-            InUseReport report = InUseWorkbook.Create(record, user.Id, DateTimeOffset.UtcNow) with
-            { PreparedByLabel = ActorLabel(user), PreparedByAccount = user.LoginName };
+            ApplicationUser? reviewer = await users.GetUserAsync(record.Draft.ReviewedBy, token);
+            InUseRecord exportRecord = record with
+            {
+                Draft = record.Draft with
+                {
+                    ReviewedByLabel = record.Draft.ReviewedByLabel ?? reviewer?.DisplayName,
+                    ReviewedByAccount = record.Draft.ReviewedByAccount ?? reviewer?.LoginName
+                }
+            };
+            InUseReport report = InUseWorkbook.Create(exportRecord, user.Id, DateTimeOffset.UtcNow, user.DisplayName, user.LoginName);
             report = DownloadPresentation(report);
             if (request.Archive)
             {
@@ -296,8 +305,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         users is SqlAccessRepository && identities is not null
             ? (await identities.ReadAsync(records.Where(r => r.AssigneeId.HasValue).Select(r => r.AssigneeId!.Value).Distinct().ToArray(), null, token)).ToDictionary(p => p.Id, p => p.Label)
             : InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
-    private static string ActorLabel(ApplicationUser user) => (string.IsNullOrWhiteSpace(user.DisplayName) ? user.LoginName ?? "Kayıtlı kullanıcı" : user.DisplayName)
-        + " · " + user.Id.ToString("N")[..8];
+    private static string ActorLabel(ApplicationUser user) => InUsePersonLabel.Format(user.DisplayName, user.LoginName);
     private static bool Text(string? value, int max, bool required = false) => value is not null && value.Length <= max
         && (!required || !string.IsNullOrWhiteSpace(value)) && !value.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t'));
     private static bool ValidDraft(SaveInUseDraftRequest request, InUseRecord record) =>

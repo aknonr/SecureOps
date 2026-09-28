@@ -32,8 +32,14 @@ if (-not ($dependencies.libraries.PSObject.Properties.Name -like "SecureOps.$Com
     throw 'Dependency manifest does not identify the packaged project.'
 }
 if ($Component -eq 'Worker') {
-    foreach ($name in @('Hangfire.Core','Hangfire.SqlServer','Microsoft.Data.SqlClient','SecureOps.Infrastructure')) {
+    foreach ($name in @('Hangfire.Core','Hangfire.SqlServer','Microsoft.Data.SqlClient','SecureOps.Infrastructure','Microsoft.Extensions.Hosting.WindowsServices','System.ServiceProcess.ServiceController','Serilog.Sinks.File','Microsoft.PowerShell.SDK','Microsoft.PowerShell.Commands.Management','Microsoft.PowerShell.Commands.Utility')) {
         if (!($dependencies.libraries.PSObject.Properties.Name -like "$name/*")) { throw "Missing Worker dependency: $name" }
+    }
+    foreach ($module in @('Microsoft.PowerShell.Management','Microsoft.PowerShell.Utility')) {
+        $moduleManifest = "runtimes/win/lib/net8.0/Modules/$module/$module.psd1"
+        if (!(Test-Path -LiteralPath (Join-Path $publishPath $moduleManifest) -PathType Leaf)) {
+            throw "Missing Worker PowerShell module manifest: $module"
+        }
     }
     foreach ($target in $dependencies.targets.PSObject.Properties.Value) {
         foreach ($library in $target.PSObject.Properties.Value) {

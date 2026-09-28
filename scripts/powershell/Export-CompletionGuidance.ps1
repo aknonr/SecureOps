@@ -8,6 +8,7 @@ $destination = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $destination) { throw 'Refusing to overwrite existing guidance.' }
 $files = @(
     'docs/post-rc626-continuation-tr.md',
+    'docs/worker-service-operations-tr.md',
     'docs/integrated-test-activation.md',
     'docs/continuation-b596058-evidence.md',
     'docs/rc626-mail-source-activation-tr.md',

@@ -162,7 +162,7 @@ public sealed partial class ResourceSqlTests
     [LocalResourceSqlFact]
     public async Task InUseExecution_RevocationAndSourceDrift_StopBeforeNextMutation_PreservePreviousEvidence()
     {
-        foreach (string reason in new[] { "revoked", "source" })
+        foreach (string reason in new[] { "revoked", "source", "notObserved" })
         {
             ExecutionFixture f = await ExecutionAsync();
             await f.Store.CreateAsync(f.Intent, f.Bytes, _token);
@@ -174,7 +174,8 @@ public sealed partial class ResourceSqlTests
             else
             {
                 var repository = new SqlInUseRepository(Configuration());
-                await repository.SaveAsync(f.Record with { Version = f.Record.Version + 1, SourceVersion = f.Record.SourceVersion + 1 },
+                await repository.SaveAsync(f.Record with { Version = f.Record.Version + 1,
+                    SourceVersion = f.Record.SourceVersion + (reason == "source" ? 1 : 0), SourceObservationMissing = reason == "notObserved" },
                     f.Record.Version, new AuditEvent { Actor = "synthetic", Action = "SyntheticSourceDrift" }, _token);
             }
             (await f.Store.ClaimAsync(f.Intent.OperationId, f.Policy.Fingerprint, "restarted-worker", _token)).Should().BeNull();

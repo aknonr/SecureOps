@@ -247,3 +247,103 @@ unchanged. Persisted trusted reviewer profiles, including missing/duplicate name
 are exercised without changing identity, authorization or authentication flows.
 Acceptance uses existing isolated LocalDB schema only: no migration/repair/grant
 or corporate execution. New synthetic records do not replace previous fixtures.
+
+## 2026-09-22 Manual Post-Close Verification
+
+Owner decision: new completion intents may defer automatic final OR readback.
+The supported legacy operation remains BPM_Actvty update with m_status=4 on the
+uniquely eligible activity, not a claim that the OR reached its terminal state.
+Keep attachment content proof, source eligibility/concurrency and write fences.
+Manual verification does not replace those preconditions or enable the unfinished
+corporate transport. No source navigation URL is established; do not invent one.
+
+Freeze Manual verification mode on new intents; old serialized intents retain
+SourceReadback mode. Version the execution fingerprint so old queued intents
+cannot silently adopt changed semantics. After BPM acknowledgement in Manual mode,
+persist Unconfirmed and stop dispatch. Unknown mutations never retry. An explicit
+negative Success response is Rejected; contradictory/malformed responses remain
+Unknown. Completed still requires a separate authoritative Closure/Verified event.
+
+An authorized operator may explicitly record manual closure confirmation for a
+stopped, attachment-verified BPM acknowledgement/unknown result. Compare exact OR,
+operation and revision inside the access/SQL transaction; record trusted confirmer
+identity/label and server UTC time in append-only evidence and audit. This is not
+system verification, does not release the active duplicate guard, does not alter
+the original initiator, and cannot increase verified-closure reporting counts.
+Existing 022 tables/JSON evidence support this without another SQL migration.
+Matched component rollout and stopped writers are required for rollback; older
+serializers/readers do not understand the new verification metadata.
+# 2026-09-22 clarification: WASAS activity, not whole-OR closure
+
+The approved business action uploads the reviewed report, updates the required
+properties and approves only the uniquely eligible WASAS activity. A subsequent
+team may remain pending while the overall OR remains Open. BPM acknowledgement,
+verified WASAS activity completion, observed next stage, manual attestation and
+verified overall OR closure are separate evidence categories. Historical manual
+closure attestations retain their original meaning. New activity intents use a
+new frozen execution contract; old blocked intents are not upgraded in place.
+
+Source refresh retains saved answers. Review freshness depends on server review
+context, not parent title or workflow progression; execution retains the full
+source hash/version fence. Field differences remain visible before re-review.
+New reports freeze trusted preparer/reviewer labels and accounts separately from
+their application identifiers. Existing archive bytes are never rewritten.
+
+Screenshots establish business semantics only. Attachment content reconciliation,
+keyed dynamic-property concurrency and unique-activity conditional update/response
+contracts remain required before corporate mutation. Final OR readback is not a
+prerequisite for advancing the WASAS activity. No target flag or SQL change is
+authorized by this decision.
+
+## 2026-09-22 Archive Integrity Follow-Up
+
+The supplied historical workbook now matches its immutable envelope byte for byte.
+Keep historical six-sheet bytes even when current exports use four corporate sheets.
+Archive integrity failures must map to `InUseArchiveIntegrityFailed` before the
+authorization/audit callback or any download; `InvalidDataException` is not an
+`IOException`. Do not reclassify exceptions raised by the authorization callback.
+This is a narrow error-category correction, not an archive repair or new format.
+Sealed E-08 remains unchanged; subsequent source/testing is recorded separately.
+
+## Scope Clarification After wip.4179fca3c22c
+
+The owner defers next-team details and the comprehensive workflow timeline. Keep
+only source-backed WASAS activity status for actionable/completed/verification-
+pending separation. Actionability retains all existing eligibility, authorization,
+attachment and concurrency guards; acknowledgement or manual confirmation is not
+authoritative activity completion. Missing/ambiguous readback remains pending;
+zero pending rows alone is not completion and does not permit automatic retry.
+Separate required upload/property/approval contracts (IU-05) from the minimal
+bounded activity-status query (IU-05-STATUS). Automatic post-approval readback and
+overall OR closure are not required; manual verification remains explicitly labelled.
+Next-team/timeline work is deferred as IU-07-NEXT, not a delivery gate. Preserve
+already stored observations and historical decisions above without expanding them.
+This is a documentation scope correction only; E-08 and the archive-integrity fix
+remain intact. The completed v19 comparison is not reopened.
+
+## List Ordering and Minimal Status Implementation
+
+Owner correction, 2026-09-23: chronological ordering is optional and deferred,
+not a delivery/source-owner prerequisite. Default API/UI ordering is `code`, with
+stable Code/record-ID ties before paging; UI labels it `OR numarasina gore` and
+disables date choices with an explanation. Old date-sort UI links fall back to
+code. Explicit oldest/newest backend support and its tests remain for future use
+with verified creation evidence. The date-first default described below is the
+superseded implementation checkpoint, not the active product default.
+
+The next implementation orders persisted lists before paging by verified parent
+request creation time, oldest by default or newest when selected. Unknown, invalid,
+offset-free and future dates sort last in both directions. Code and ordinal record
+identity break ties. Refresh/first-observation times are never creation dates.
+The real parser currently returns no creation date: a keyed parent creation field
+and timezone contract are still required, not guessed from a referenced RFC.
+
+Keep review and tracking views; add source-pending and verification-pending views.
+Only provenance-backed pending activity evidence without an active execution fence
+is a source-pending candidate; this is not permission to execute. Existing command
+eligibility, authorization and attachment/concurrency checks still apply. Missing
+discoveries retain answers and prior evidence but cannot assert current pending
+eligibility. Verified completion remains historical source evidence, distinct from
+overall OR closure; local intent and manual confirmation never promote completion.
+These rules are locally testable with labelled fixtures, not a replacement for the
+missing corporate IU-05-STATUS query. Next-team/timeline stay deferred.

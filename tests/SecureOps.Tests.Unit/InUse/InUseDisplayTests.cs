@@ -65,7 +65,7 @@ public sealed class InUseDisplayTests
         labels.Values.Distinct().Should().HaveCount(5);
         labels.Values.Should().NotContain(v => v.Contains("oidc:"));
         labels[users[0].Id].Should().StartWith("Deniz Örnek");
-        labels[users[2].Id].Should().StartWith("Profil adı bekleniyor");
+        labels[users[2].Id].Should().StartWith("Kullanıcı adı çözümlenemedi");
         labels[users[4].Id].Should().Be("synthetic.login");
     }
 

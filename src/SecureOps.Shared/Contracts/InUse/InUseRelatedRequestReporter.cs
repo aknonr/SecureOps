@@ -6,7 +6,7 @@ public sealed record InUseRelatedRequestReporter(string ParentId, string Service
     string State, string DisplayState, string ReferenceState, DateTimeOffset? LastVerifiedAt)
 {
     /// <summary>Observed business label; Requester compatibility names do not establish Istem Sahibi.</summary>
-    public const string Label = "\u0130lgili talebi bildiren";
+    public const string Label = "RFC talep eden";
 
     /// <summary>RFC-only resolution/freshness wording shared by UI and new workbook evidence.</summary>
     public string StateText(DateTimeOffset now) => EffectiveState(now) switch

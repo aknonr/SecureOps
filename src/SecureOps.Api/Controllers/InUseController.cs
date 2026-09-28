@@ -53,6 +53,12 @@ public sealed class InUseController(InUseService service) : ControllerBase
     [Authorize(Policy = Policies.CanCompleteInUse)]
     public async Task<ActionResult<InUseExecution>> ExecuteAsync(Guid id, StartInUseExecutionRequest request, CancellationToken token) =>
         Reply(await service.StartExecutionAsync(User, Context(), id, request, token));
+    /// <summary>Local manual attestation only; does not execute closure or establish a system-verified source outcome.</summary>
+    [HttpPost("{id:guid}/execution/manual-verification")]
+    [Authorize(Policy = Policies.CanReviewInUse)]
+    [Authorize(Policy = Policies.CanCompleteInUse)]
+    public async Task<ActionResult<InUseExecution>> ConfirmClosureAsync(Guid id, ConfirmInUseClosureRequest request, CancellationToken token) =>
+        Reply(await service.ConfirmClosureAsync(User, Context(), id, request, token));
     /// <summary>Immutable server review history and explicit reuse proposals, resolved from trusted source identity.</summary>
     [HttpGet("{id:guid}/servers/{serverId}/history")]
     [Authorize(Policy = Policies.CanReviewInUse)]

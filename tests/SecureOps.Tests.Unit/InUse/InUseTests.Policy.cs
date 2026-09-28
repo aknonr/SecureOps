@@ -61,7 +61,7 @@ public sealed partial class InUseTests
         record.Draft!.Policy!.Fingerprint.Should().Be(proposal.Fingerprint);
         record.PolicyProposal!.Fingerprint.Should().NotBe(proposal.Fingerprint);
         InUseReport report = (await fixture.Service.ExportAsync(_principal, _context, record.Id, new(record.Version), _token)).Value!;
-        report.PreparedByLabel.Should().Contain(fixture.User.Id.ToString("N")[..8]);
+        report.PreparedByLabel.Should().Be(InUsePersonLabel.Format(fixture.User.DisplayName, fixture.User.LoginName));
         report.EvidenceSheets.Single(s => s.Name == "ReviewEvidence").Rows.Should().Contain(r => r.Any(c => c.Contains(proposal.Fingerprint)));
     }
 

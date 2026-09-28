@@ -1,5 +1,26 @@
 # SecureOps API v1 UI Integration Contract
 
+## In Use Manual Verification, 2026-09-22
+
+New execution intents use Manual verification mode. Acknowledged BPM stops at
+Unconfirmed, not Completed; timeout/lost response stays Unknown with no replay.
+Success=false is Rejected. The authorized execution DTO includes frozen SourceCode.
+Only Completed plus Closure/Verified evidence permits a system-verified closure
+label. ManualVerification/ManuallyConfirmed is a separate attributed human event.
+
+POST `in-use/{id}/execution/manual-verification` accepts OperationId,
+ExpectedRevision and exact SourceCode. View, Review and Complete are required;
+current SQL authorization, stopped-state eligibility and revision are checked in
+the audit transaction. It accepts no actor/time/authoritative status from the
+browser. ConfirmedBy, ConfirmedByLabel and event At come from trusted server
+context. Repeated/stale/wrong-OR requests conflict; original initiator/evidence
+and the active duplicate fence survive. No remote call or retry occurs.
+
+This is not rc6.26 or sealed E-06 behavior. Real transport remains gated on IU-05
+attachment/conditional-update/eligible-task contracts, not automatic final OR
+readback alone. No source record navigation URL is established. See ADR-0020 and
+the single integrated-test-activation register for E-07 payload and acceptance.
+
 ## Post-rc6.26 Catalogue And Reporter Suggestion
 
 This source is not in installed rc6.26. `GET in-use/reports` requires current
@@ -141,7 +162,7 @@ reuse OR-to-Jira eligibility, claims or source-close commands. Additional gates:
 
 | Method/path suffix | Additional capability | Contract |
 |---|---|---|
-| GET root | none | persisted search (max 100), view=all/mine/unassigned, status=Unreviewed/Draft/Stale, page=1..100000, pageSize=1..100 default 25; matching total plus refresh state |
+| GET root | none | persisted search (max 100), view=all/mine/unassigned/review/tracking/pending/verification, status=Unreviewed/Draft/Stale/Discarded, sort=code/oldest/newest (default code; date modes retained, deferred in UI), page=1..100000, pageSize=1..100 default 25; matching total plus refresh state |
 | GET /overview | Reporting.ManagementView | audited stored OR counts, refresh health, up to five oldest confirmed-open parent records with verified creation evidence; no source call |
 | POST /{id}/completion-intent | InUse.Review | expectedVersion, commandId, reportSha256; current ready draft and exact private archive required. Saves actor-bound Blocked intent only; no external execution |
 | GET /{id} | none | distinct source ownership evidence, per-server evidence, local assignee, source and aggregate versions, nullable draft |
@@ -557,3 +578,15 @@ Legacy clients can omit/ignore the field; reads default without persisting.
 GUIDs, and returns only currently permitted ResourceLink entries in supplied order.
 No missing details or destination requests. UI opening remains a separate explicit
 native browser action. Personal-group additions reuse the versioned merge route.
+## E-08 In Use compatibility note
+
+Existing routes and manual-verification authorization remain unchanged. The
+historically named `ConfirmInUseClosureRequest` route now records the meaning frozen
+in the server intent, not a browser-selected interpretation: new
+`WasasActivityManual` means WASAS activity attestation, old modes mean the original
+OR attestation. `Completed` alone is not OR closure; inspect verified Closure
+evidence. New verified BPM activity retains its duplicate fence and is projected
+separately to tracking and `InUse.ActivityVerified` reporting. Query views add
+`review` and `tracking` with SQL-side count/paging. Manual confirmation is excluded.
+Optional source WASAS/stage observations remain absent with the current corporate
+adapter; their schema is not a newly invented corporate API contract.

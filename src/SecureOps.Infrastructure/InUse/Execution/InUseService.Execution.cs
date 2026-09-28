@@ -7,6 +7,16 @@ namespace SecureOps.Infrastructure.InUse;
 
 public sealed partial class InUseService
 {
+    /// <summary>Explicit local attestation by the authenticated, currently authorized operator.</summary>
+    public Task<InUseResult<InUseExecution>> ConfirmClosureAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        Guid id, ConfirmInUseClosureRequest request, CancellationToken token) => RunAsync(principal, context, Capabilities.InUseComplete, async user =>
+        {
+            if (!Reviewer(user))
+            { return InUseResult<InUseExecution>.Fail("AccessDenied"); }
+            return completion is null ? InUseResult<InUseExecution>.Fail("InUseCompletionUnavailable")
+                : await completion.ConfirmClosureAsync(id, user.Id, ActorLabel(user), request, token);
+        }, token);
+
     /// <summary>Readiness does not mutate or activate a historical blocked intent.</summary>
     public Task<InUseResult<InUseExecutionStatus>> ExecutionStatusAsync(ClaimsPrincipal principal, AccessOperationContext context,
         Guid id, CancellationToken token) => RunAsync(principal, context, Capabilities.InUseReview, async user =>

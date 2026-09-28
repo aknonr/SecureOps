@@ -194,12 +194,22 @@ public sealed partial class ResourceSqlTests
         finally { await connection.ExecuteAsync($"DROP TRIGGER audit.[{trigger}];"); }
         await repository.RefreshAsync(state.Version, new([source with { Title = "Changed source" }], false, "Partial"), null, Audit("InUseRefresh"), _token);
         InUseRecord stale = (await new SqlInUseRepository(configuration).GetAsync(record.Id, _token))!;
-        stale.Status.Should().Be("Stale");
+        stale.Status.Should().Be("Draft");
         stale.SourceVersion.Should().Be(record.SourceVersion + 1);
         stale.Draft.Should().BeEquivalentTo(record.Draft);
         InUseRefreshState partial = await repository.StateAsync(_token);
         await repository.RefreshAsync(partial.Version, null, "SourceUnavailableOrMalformed", Audit("InUseRefresh"), _token);
-        (await repository.GetAsync(record.Id, _token)).Should().BeEquivalentTo(stale);
+        InUseRecord unobserved = (await repository.GetAsync(record.Id, _token))!;
+        unobserved.Version.Should().Be(stale.Version + 1);
+        unobserved.SourceObservationMissing.Should().BeTrue();
+        unobserved.LastSeenAt.Should().Be(stale.LastSeenAt);
+        unobserved.ReviewSourceVersion.Should().Be(stale.ReviewSourceVersion);
+        unobserved.Status.Should().Be(stale.Status);
+        unobserved.Draft.Should().BeEquivalentTo(stale.Draft);
+        unobserved.AssigneeId.Should().Be(stale.AssigneeId);
+        unobserved.Source.Id.Should().Be(stale.Source.Id);
+        unobserved.Source.Code.Should().Be(stale.Source.Code);
+        unobserved.Source.Servers.Select(s => s.Fields).Should().BeEquivalentTo(stale.Source.Servers.Select(s => s.Fields));
         (await repository.StateAsync(_token)).LastSuccessfulAt.Should().Be(partial.LastSuccessfulAt);
         await repository.RefreshAsync((await repository.StateAsync(_token)).Version, new([], true), null, Audit("InUseRefresh"), _token);
         (await repository.QueryAsync(new(Search: sourceId, View: "mine", PageSize: 1), actor.UserId, _token)).Total.Should().Be(1);

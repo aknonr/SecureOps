@@ -2,6 +2,783 @@
 
 ## Owner exception and baseline
 
+### SDM-01 combined integration, 2026-09-28 (current)
+
+The active delivery source is now the isolated worktree
+`C:\SecureOpsBuild\secure-ops-sdm-integrated-test-20260928`, branch
+`feature/sdm-integrated-test-20260928`. Both input worktrees remain untouched.
+The shared base is `5c986a96f1f6639e47bf1432a87c3ac55e98054d`; the private
+`C:\SecureOpsBuild\validation\sdm-integrated-20260928\input-manifest.json`
+identifies the exact 96 backend and 18 UI changed-file snapshots by SHA256.
+The sole overlapping README was merged; no DTO field or route was invented.
+The audited UI uses the persisted record key, explicit confirmation, unknown-result
+stop and existing preview contract. Optional issue URL/replay metadata requested by
+UI remain absent; an operator verifies the saved key in the approved Jira UI.
+
+Initial combined checks: Release build zero warnings/errors; unit 1509/1509;
+normal integration 281 passed, 61 opt-ins skipped; ResourceSqlTests 49/49 on fresh
+`SecureOps_ResourcesV1_SdmMerged20260928C`. TRX files are under the same validation
+root's `tests` directory. SQL results overlap the normal-run skips, not extra
+normal tests. Mechanical whitespace corrections are restricted to the 25 reported
+files already changed by the input snapshots. Final payload and browser evidence
+will be recorded below before this candidate is considered locally verified.
+
+| ID | State / owner | Missing input or next action | Evidence |
+|---|---|---|---|
+| SDM-01-COMBINED | Local integration / delivery owner | Verify combined published browser journey and package manifests | Current worktree and private input manifest |
+| SDM-01-TARGET | Corporate acceptance pending / business + Jira + platform owners | One open TEST ServerRequest OR code, numeric source ID, current source fingerprint; approved destination/mapping and authenticated actor, approval reference/expiry/reason | No corporate candidate selected; do not reuse In Use samples |
+| SDM-01-RELEASE | Review candidate only / release owner | Numbered release script requires the original combined-delivery branch (line 17); do not switch/reset either dirty source worktree or weaken the guard | Separate matched review candidate, not deployment approval |
+| IU-05 | Separate source-contract dependency / source owner | The existing three upload/readback, conditional-field-update and WASAS-approval response contracts remain outstanding | Existing request below; not resent |
+| SCCM-SECURITY | Separate permission dependency / Cyber Defense | Detection detail and approval for the exact submitted binary; package receipt/approval not established | Existing sealed diagnostic package, unchanged |
+
+The current Turkish operator entry below contains the conditional Jira-only
+configuration/deployment review. It is not an executable target authorization:
+corporate selection, mapping, payload approval and SQL baseline are still open.
+
+### In Use SQL regression correction, 2026-09-28
+
+The audit-rollback assertion in
+`InUse_RoundTripConcurrencyStaleDraftAndAuditRollback` remains whole-record
+equality: a failed audited transaction must not change the record. The later
+source-unavailable refresh is a successful local state transition, so its old
+whole-record equality assertion was obsolete. It now checks `Version` advances
+once and `SourceObservationMissing=true`, while `LastSeenAt`,
+`ReviewSourceVersion`, draft, review status, assignee, OR identity and server
+answer fields remain as previously saved. `LastSuccessfulAt` also remains
+unchanged. This matches `InUseState.RetainUnobserved`; no product code or
+archived bytes were changed.
+
+Release integration-project build: zero warnings/errors. The focused isolated
+SQL case passed 1/1. A full 49-case ResourceSqlTests rerun against the reused
+`SecureOps_ResourcesV1_SdmOnly20260928A` fixture passed 47/49: two reporter
+tests could not find newly created reviewers in `AssigneesAsync`'s bounded first
+50 after prior test runs had accumulated eligible reviewers. This was not
+reported as a passing run. The protected fresh-database harness then created
+`SecureOps_ResourcesV1_SdmFresh20260928B`, applied test-only 001-024, and
+passed the full ResourceSqlTests suite 49/49 with zero skipped. Both databases
+are retained locally for inspection; neither is a corporate target. No target
+SQL, Jira, source mutation, deployment, flag change or package was performed.
+
+The SDM-01 controlled TEST sequence remains the Jira-only procedure in
+`docs/post-rc626-continuation-tr.md`; it requires an approved exact
+ServerRequest OR, destination/mapping and actor. This local SQL result does not
+establish corporate Jira or source-state acceptance. IU-05's three separate
+source-contract blockers remain unchanged.
+
+### SDM-01 Jira-only ServerRequest review, 2026-09-28
+
+The current checkout retains the In Use 4464 correction and its prior 252/252
+In Use unit result. IU-05 has exactly three activation blockers, not an
+operational corporate transport: (1) attachment identity/content readback and
+lost-response reconciliation, (2) keyed 4463/4464 target/value/version plus
+source-supported conditional update/conflict semantics, and (3) the unique
+eligible WASAS activity update's matched-count/acknowledgement/conflict semantics.
+The existing request builders do not close these contracts; the earlier bounded
+source-owner request remains the single request and was not resent here.
+
+New local evidence: Release integration-project build succeeded with zero
+warnings/errors. Focused Jira transfer/corporate adapter/pilot unit tests passed
+125/125. Four isolated LocalDB SDM tests passed 4/4 using the test-owned
+`SecureOps_ResourcesV1_SdmOnly20260928A` database (001-024 fixture schema,
+not the corporate target). A wider ResourceSqlTests run on that database was
+48 passed, 1 failed: the unchanged In Use test
+`InUse_RoundTripConcurrencyStaleDraftAndAuditRollback` expected the entire
+record to remain unchanged after a source-unavailable refresh, but the retained
+E-08 behavior set `SourceObservationMissing=true` and advanced Version from 4
+to 5. This SDM task did not alter that In Use behavior or rewrite its assertion;
+the wider run is not reported as passing. No browser or corporate TEST acceptance
+was executed.
+
+For SDM-01, exact-record ServerRequest policy, reviewed Jira field preview,
+source freshness, SQL transfer/command uniqueness, persisted Jira key before any
+optional source step, and Jira-only `SourceCloseRequested=false` are already
+implemented. Corporate Jira now independently rejects a ServerRetirement draft
+as it already did SoftwareInstallation. A retry blocked after an unknown Jira
+outcome no longer increments `RetryCount` or emits `WorkflowRetried`; an
+interrupted `CreatingJira` still fails at the claim boundary. Neither state
+permits a second create. Local focused results and the controlled TEST procedure
+are in the current SDM operator handoff. No corporate Jira/source write,
+configuration activation, deployment or SQL application was performed. One
+selected TEST ServerRequest OR, approved Jira destination/mapping, authenticated
+actor and explicit Jira-only intent remain required for corporate acceptance.
+
+### IU-05 supported wire correction, 2026-09-23
+
+The retained legacy script uses `DCM_DynamicCaseProperty` update for 4463/4464,
+`uploadattachment` for the OR XLSX, and a pending `BPM_Actvty` query followed by
+`m_status=4` update. The application already has one-attempt request builders for
+all three, exact archived-byte/hash and OR binding for upload, a stricter
+single-activity mutation predicate, durable no-retry evidence, and a bounded
+read-only OR/pending-activity collector. The script's positional environment
+value is not the accepted OR-wide rule. The standalone mutation client now
+checks 4464 against the reviewed `InUseRequiredFields.Environment` result:
+any PROD server proposes PROD; all known non-production servers propose TEST;
+missing/unknown values block the request. Synthetic unit checks cover mixed
+DEV/UAT, mixed PROD/DEV, unknown environment, and a mismatched proposal. The
+focused `InUseExecutionContractTests` run passed 29/29; this is local request
+behavior, not corporate field acceptance. Existing IU-05 transport registration
+and target flags remain blocked.
+
+Source-owner input is limited to part A of the existing Turkish handoff:
+attachment identity/content readback and lost-response reconciliation;
+4463/4464 keyed target/value/version plus actual conditional-update/conflict
+facility and accepted 4464 wire value; unique eligible BPM update matched-count
+and acknowledgement/conflict semantics. Existing read-only collector may show
+the selected OR and pending activity candidate, but cannot discover an
+undocumented attachment read operation or prove atomic update from a GET.
+Whole-OR closure, next-team tracking and optional OR date ordering are not
+IU-05 transport prerequisites. No corporate read/write, flag activation,
+deployment or package creation was performed in this correction.
+
+### Current owner correction: optional date sorting, 2026-09-23
+
+IU-07-LIST chronological ordering is **deferred/optional**, not a delivery blocker
+or required source-owner response. Default is stable Code/ordinal record ID before
+paging, labelled `OR numarasina gore`. UI date choices are disabled with an
+explanation and old date-sort links normalize to code. The implemented explicit
+oldest/newest backend path and date tests are preserved for later activation.
+This overrides date-default/date-input-required wording in historical entries below.
+
+Inspected existing `_sourceSelects`, In Use discovery and parser, retained keyed
+response regression examples in `EnterpriseAdapterContractTests`, the retained
+legacy In Use script OR query (323-334), and completion collector root projection.
+None establishes a parent creation field/type/timezone. `_activitySelects` includes
+`m_created_dt` on BPM_Actvty, not the parent OR; it is not reused. Parser CreatedAt
+remains null. No new field or timestamp fallback was invented.
+
+One execution of these same projections would not resolve the missing timestamp:
+they do not select it. Do not run the Falcon-held package, expand selectors or start
+another diagnostic just for sorting. Optional read-only evidence review, only if
+an already retained OR QueryResult from the established query exists: inspect one
+selected parent's returned keys and JSON types in the approved server session;
+retain only a candidate timestamp/type/offset and a consistent alias for the parent
+ID, removing names, descriptions, SessionID, Authorization and all credentials.
+Compare its documented semantics to the parent's initial creation, not activity or
+update time. No existing supporting field means stop and keep code ordering; no
+source-owner response is required to ship. This procedure was not executed here.
+
+IU-05 upload/field/approval work remains independent. Reinspection confirms the
+existing exact-byte attachment builder, keyed legacy property request builder,
+unique-WASAS mutation predicate and acknowledged/rejected/unknown response handling.
+Genuine remaining transport contracts: authoritative attachment identity/content
+and lost-response reconciliation; 4463/4464 keyed values/version and supported
+conditional-update/conflict semantics; unique eligible activity response/matched
+count semantics. No overall-OR closure, creation date or next-team requirement.
+The minimal status read contract remains separate from these mutation contracts.
+No unsupported transport was enabled and no corporate operation was performed.
+
+Local result: `0.1.0+5c986a96f1f6639e47bf1432a87c3ac55e98054d-wip.7f3f3bb077d9`,
+product SHA-256 `7F3F3BB077D942F05A3E5E4274BEE58CABE9AC04884F362BBB62C1AAB79BC900`.
+Evidence: `C:\SecureOpsBuild\validation\inuse-code-order-20260923`.
+Release solution build: zero warnings/errors. `tests/code-order-unit.trx`: 10
+focused cases passed (default/query validation, old-link fallback and URL flow),
+compiled before final version stamping with the same behavior. Final versioned
+build `tests/code-order-integration.trx`: 10 passed, zero failed/skipped, including
+memory/SQL code ordering before pagination, preserved explicit date sorting,
+activity tracking, approval acknowledgement/unknown/no-retry, source-drift fences,
+API authorization and OpenAPI comparison. OpenAPI generation is separate evidence,
+not an extra acceptance count. Only retained isolated synthetic LocalDB was used;
+no migrations. Prior 244-unit and other historical suites were not repeated.
+Source snapshot/input hashes, six nondeployable DLL references and manifests are
+retained by the same private recorder. No new package or installed-state claim.
+Browser/200% acceptance remains unexecuted; Falcon and corporate write restrictions
+are unchanged. E-08, archive fix and all earlier evidence roots are preserved.
+
+### Earlier implementation closeout: 2026-09-23
+
+Continued the existing list implementation without resetting work. HEAD/branch
+remain as below. Current product identity is
+`0.1.0+5c986a96f1f6639e47bf1432a87c3ac55e98054d-wip.c4218a49de92`;
+input SHA-256 `C4218A49DE92FF5931DADF583CAA8DF960994B37F812B624FAE98816D34D1DE5`.
+The IU-07-LIST / IU-05-STATUS matrix below remains current. Final correction makes
+SQL status comparison exact (case and trailing-space sensitive) and provenance
+whitespace checks match .NET, including tabs/Unicode spaces. Invalid date shapes
+are rejected consistently. Expanded memory/SQL fixtures cover these cases.
+
+New evidence is `C:\SecureOpsBuild\validation\inuse-list-20260923`:
+`build-final.log` has zero warnings/errors; `tests/inuse-integration-final.trx`
+has 10 passed, zero failed/skipped, on this source with the same six isolated SQL,
+two memory, one API and one OpenAPI gates listed below. No migrations or corporate
+calls. The initial build's one test-only explicit-type analyzer error was corrected
+and retained in `build-initial.log`. The prior 244 passing unit tests remain
+historical evidence in the 20260922 root; that unaffected suite was not rerun.
+Do not add overlapping runs to the final count. `source-identity.json`, all 644
+`product-inputs.json` entries, `source-at-closeout`, six DLL hashes in
+`build-reference.json`, `changed-files.json`, cumulative accounting and
+`evidence-files.sha256` identify the local result, not a deployable release.
+The identical private recorder is reused in this separate root, counted in
+`private-scaffolding.json`; it is not new product code. Prior roots/sealed artifacts
+and the archive fix remain unchanged. No installed-state or browser acceptance
+claim; the precise source-owner request remains part B of the linked Turkish guide.
+
+### 2026-09-22 implementation checkpoint: In Use list
+
+Same delivery checkout and branch; HEAD remains
+`5c986a96f1f6639e47bf1432a87c3ac55e98054d`. All inherited work is retained,
+including the byte-identical archive-integrity fix. New uncommitted product identity:
+`0.1.0+5c986a96f1f6639e47bf1432a87c3ac55e98054d-wip.e6c1442c8a6f`.
+Product input SHA-256: `E6C1442C8A6FEF48824F1BB0B3E303163FBA3F745E0D133820D0F7DBB9CE595A`.
+No commit, release ZIP, sealed-artifact modification, deployment or target action.
+E-08 and wip.4179fca3c22c remain separate retained evidence, not this build.
+
+| ID | Status / classification / owner | Change, verification and exact remaining input |
+| --- | --- | --- |
+| IU-07-LIST | Implemented and locally tested / engineering | Previously SQL and memory ordered by Code then Id. Both now sort by source Creation before paging, oldest default or newest selectable, unknown/invalid/future/offset-free dates last, binary Code + ordinal Id ties. UI date column shows UTC or explicit unavailable status; sort survives page/detail/back/refresh. No FirstSeenAt/LastSeenAt substitution. Real parser currently sets CreatedAt=null and does not populate InUseSource.Creation: source owner must supply the parent-OR creation select/key, type, timezone and sanitized keyed response. Until then affected target dates are explicitly unknown, with deterministic code/Id fallback. |
+| IU-05-STATUS | Local integration tested; corporate read contract missing / workflow owner | Existing review/tracking reused; pending/verification views added with provenance checks. Source-backed completion moves an externally completed WASAS activity to tracking while overall OR remains Open and saved answers remain current. Missing/failed discoveries retain answers and prior observation, set SourceObservationMissing, never infer completion. Durable active/uncertain executions stay verification-pending; manual attestation does not promote completion. Missing observation also blocks the next queued mutation; existing eligibility, authorization, archive and duplicate guards remain. Need part B of the Turkish handoff, not next-team/timeline. |
+| IU-05 | Existing real transport gaps unchanged / source API and workflow owner | Part A of the existing handoff: authoritative attachment content/lost-response reconciliation, keyed 4463/4464 values/version plus actual conditional-update/conflict facility, unique eligible WASAS approval response semantics. No invented endpoint, source field, status value or target activation. |
+| IU-07-UI | Code and component/query checks complete; browser acceptance unexecuted / authorized UI runner | Responsive date column and status filters implemented. Native desktop/mobile/themes/focus/200% checks remain under the recorded runner restriction; no host launch, workaround or browser screenshot claim. |
+
+New evidence root: `C:\SecureOpsBuild\validation\inuse-list-20260922`.
+`source-identity.json` and `product-inputs.json` identify all 644 product inputs;
+`build-reference.json` hashes six own DLLs in `build-reference` (not a runnable or
+deployable payload). `changed-files.json`, `cumulative-counts.json` and
+`test-results.json` retain scope and execution evidence. Private recorder line
+accounting is separate in `private-scaffolding.json`.
+
+Newly executed final checks against that build:
+- `build-final.log`: Release solution build, zero warnings/errors.
+- `tests/inuse-unit-final.trx`: 244 passed, zero failed/skipped. Includes ordering
+  query validation, activity provenance/fence labels, URL preservation, review
+  retention and existing archive/export safeguards; not browser acceptance.
+- `tests/inuse-integration-final.trx`: 10 passed, zero failed/skipped: six SQL
+  ordering/status/fence/search cases, two memory parity cases, one in-process API
+  authorization/binding case and one OpenAPI comparison without regeneration.
+  SQL ran only on retained synthetic LocalDB `SecureOps_ResourcesV1_activityfinal20260922`;
+  no migrations, corporate database or external provider operations.
+- First build found six test-only explicit-type analyzer errors, corrected. The
+  first unit run had 241 pass/three obsolete whole-record equality failures after
+  the new missing-observation marker; assertions now preserve all other data and
+  explicitly verify the one versioned marker change. Initial evidence retained in
+  `tests/inuse-unit.trx`; final suite above supersedes it. Earlier intermediate
+  passes and OpenAPI generation are not added to these totals.
+
+Corporate reconciliation remains unavailable; fixtures prove only the local
+contract path. Falcon/SCM/browser/source/SMTP and selected business acceptance
+gates below remain open with their existing owners. The v19 comparison is complete
+and was neither repeated nor requested. Next-team/timeline remain deferred.
+
+### Historical guidance-only scope checkpoint after wip.4179fca3c22c
+
+Owner priority: retain only the source-backed WASAS activity status needed to
+separate actionable, completed and verification-pending records. Next-team details
+and a comprehensive workflow timeline are deferred, not completion/release gates.
+Existing observations and historical E-07/E-08 evidence remain intact; their broader
+tracking wording is historical where it conflicts with this narrower scope.
+
+| ID | Status / owner | Required next action and boundary |
+| --- | --- | --- |
+| IU-05 | Required mutation contracts missing / source API and workflow owner | Attachment identity/content/lost-response reconciliation; keyed 4463/4464 values and actual conditional-update/conflict contract; unique eligible WASAS approval and response semantics. Existing authorization, required attachment, concurrency and duplicate fences remain mandatory. |
+| IU-05-STATUS | Minimal read contract missing / workflow owner, then engineering | Separate bounded query for the selected OR/WASAS activity identity and status; documented pending/completed meanings, keyed masked examples and zero/multiple/failed-read interpretation. Fresh eligibility plus existing guards permits action; authoritative WASAS completion permits completed tracking; acknowledgement, ambiguous result or unavailable read remains verification-pending, never automatically retried or inferred completed. Manual confirmation retains actor/time and its manual label. This is not mandatory automatic post-approval readback. |
+| IU-07-NEXT | Deferred / product owner | Next-team lookup, next-stage details and comprehensive timeline are outside current acceptance. No source-owner request or implementation gate for them in this delivery. Existing evidence is preserved, not expanded. |
+
+The v19 byte/four-server/12-answer investigation remains complete; no sample was
+requested or re-inspected. Product inputs still match wip.4179fca3c22c (643 files).
+This continuation edits guidance only: IU-05 handoff, controlled acceptance item 6,
+collector limits and ADR-0020. No build, suite, package, target action or new source
+contract is claimed. Overall OR closure is not an In Use approval prerequisite.
+
+### E-08 follow-up: supplied archive and workbook, 2026-09-22
+
+Active checkout/branch and HEAD 5c986a96f1f6639e47bf1432a87c3ac55e98054d
+were rechecked; all 643 sealed E-08 product inputs initially matched. Existing
+dirty work was retained. No commit, reset, deployment, target query, SQL, mail,
+service start or flag change. E-05/E-06/E-07/E-08 remain sealed; no new package.
+
+| ID | Status / classification / owner | Evidence and exact next action |
+| --- | --- | --- |
+| IU-07-D | Supplied-sample comparison complete locally; engineering | All three original envelopes pass size/SHA checks; 2,757 XLSX cells equal their JSON Sheets. Downloaded v19 is exactly the archived 7,653 bytes, source version 4, four servers and 12 saved answers. Original bytes/hashes unchanged. Current browser/Excel desktop acceptance is separate, not reopened as a missing sample. |
+| E-08-ARCH-01 | Code defect corrected locally; engineering | Corrupt envelopes were blocked but InvalidDataException bypassed the archive-specific error mapping, causing generic PersistenceUnavailable. Include it explicitly in the filter; six synthetic corruption cases check safe error, no callback, no content and no rewrite. E-08 binaries remain unchanged; the correction is uncommitted source plus the separate build below. |
+| IU-05 | Source-contract gap; Turuncu Hat API/workflow owner | Known exact-byte upload/property/activity request builders and durable guards already exist. Need authoritative attachment content/reconciliation, 4463/4464 keyed value/version and real conditional-update/conflict semantics, unique activity update acknowledgement/matched-count. Forward part A of the current Turkish handoff; part B is the separate IU-05-STATUS query. No final whole-OR readback prerequisite. |
+| IU-07-C | Tracking implementation retained; minimal read contract pending, workflow owner | Collector selects pending status 1/group 68 only; legacy script selects id, then writes m_status=4. Zero pending rows cannot be promoted to completion. Remaining source-backed status is scoped to IU-05-STATUS; next-team/timeline work is deferred under IU-07-NEXT. |
+| E-08-UI / QA-01 | Unexecuted test, runner restriction; authorized UI runner | Desktop/mobile/themes/focus/touch/native 200% against matched payload, using existing procedure. No host-policy retry, alternative launcher, synthetic screenshot or browser acceptance claim. |
+| OPS-02 | Unexecuted SCM acceptance and corporate permission; Windows runner/operations | Prior local Test/content-root/lock/log/shutdown checks retained. Actual service start/stop/logoff/crash recovery and console handover need the authorized isolated SCM runner, then target permission; no service installed here. |
+| OCO-01 / E-06-SEC-01 | Corporate execution permission; Cyber Defense + SCCM owner | Falcon stop before JSON remains unexplained. Need detection details and reviewed binary-specific permission, then one selected device/service/date journey. No false-positive claim or bypass; queue readiness not retested as connectivity. |
+| MAIL-01 / QA-02 | Unexecuted payload journey and target inputs; authorized runner + messaging owner | Existing preparation/restart safeguards and separate maintenance-end/restart fields retained. Source/MIME/process/SMTP gates remain separate; approved relay, selected immutable self-test and inbox observation still pending. Sending stays disabled. |
+| SDM-01 / RPT-01 | Corporate acceptance/input gap; source/Jira owners + operator | Retain implemented ServerRequest Jira-only guards and persisted-outcome reporting. Select exact destination/actor/intent and compare the same reporting cut. Local intent/manual attestation is not remote closure; no corporate transfer performed. |
+| DB-01 / REL-01 | Target schema and release gate; DBA/release owner | Catalogue 024 still not target-verified installed. 022/023 not replayed. Keep E-08 as the sealed review set; include the narrow correction in the eventual accepted successor, not another ZIP for unchanged blockers. |
+
+Private evidence: `C:\SecureOpsBuild\validation\inuse-archive-20260922`.
+`archive-comparison.json` records original/raw/XLSX hashes and sheet-level checks;
+no corporate samples were added to repository fixtures. The supplied v19 workbook
+SHA-256 is `6B7DB94FE5DA981093B0304A1378CF2CC2D64725EDD4E9F1E72530B240368A33`;
+envelope SHA-256 is `5A9EB125D1F9E9AE1E6C8DD6CE8B43C8ED03AA80388705D1DD193DA6795AE337`.
+It has the historical six-sheet order, no frozen panes/widths/filter/print setup,
+22 NMS columns and 29 server rows. Both checklists are blank, not completed checks.
+Each server has InternetOut=No, InternetIn=No, Microsegmented=Yes and raw DEV.
+PreparedBy/ReviewedBy are application GUIDs, not SIDs; the envelope has a frozen
+preparer label but no account. TechnicalCreator is Unknown/Unverified, not another
+actor to resolve. Per-answer origin evidence retains two distinct application
+actors; current draft reviewer/preparer identity must not replace those origins.
+The archived workbook is not the E-08 four-sheet exporter; historical re-download
+preserves its six sheets and identifiers. Only new versions get the new layout
+and trusted name/account snapshots. Local evidence does not reverify source facts.
+
+New private compatibility check directly loads actual sealed E-08 assemblies,
+then the patched assemblies, against copies of all three supplied envelopes.
+Both preserve bytes/preparer/time, derive the original OR/version download name,
+project catalogue host counts (2/4/4), and deny a false authorization callback.
+The deliberately damaged copies expose E-08's unclassified InvalidDataException;
+patched copies return InUseArchiveIntegrityFailed before the callback. Originals
+were never mutated. This is library compatibility, not an authenticated browser
+or target API test. Initial private runs are retained: storage-under-current-root
+was correctly rejected; the following run exposed the error-category defect.
+
+New product build: `0.1.0+5c986a96f1f6639e47bf1432a87c3ac55e98054d-wip.4179fca3c22c`;
+product-input SHA-256 `4179FCA3C22CA73CCF38D6D22D4954F440123C827494CAAFD4BE547D6D4A99D8`.
+`source-identity.json`/`product-inputs.json` identify the dirty source separately
+from E-08. Release solution build: zero warnings/errors. Newly executed focused
+tests: `tests/inuse-focused.trx` 204 passed, including six new corruption cases;
+`tests/inuse-api-focused.trx` one in-process API test passed. No full suite rerun,
+SQL run, process/browser or corporate test; historical totals remain separate.
+`e08-compatibility-observed/result.json` and `patched-compatibility-observed/result.json`
+record actual assembly hashes and the different error categories. This correction
+is locally tested source/build only, not a tested delivery payload or installation.
+
+### WASAS activity clarification, 2026-09-22 (IU-07 / E-08)
+
+This section supersedes whole-OR closure terminology for new In Use submissions.
+The owner-observed completed WASAS activity followed by a pending next team and
+overall Open process is a valid advancement, not a failed OR closure. Screenshots
+are business evidence, not an API response or proof of conditional-update support.
+No corporate source request, SQL change, flag activation, mail or deployment ran.
+
+| ID | Status and owner | Exact next action / evidence |
+| --- | --- | --- |
+| IU-07-A | Implemented locally; engineering | New frozen WasasActivityManual intent approves only the eligible WASAS activity. Acknowledged/unknown stops before OR readback, without retry. Verified BPM completion is distinct from verified Closure. Manual events have a new activity-specific code; historical E-07 closure attestations retain their meaning. Active duplicate fence remains after verified activity completion. |
+| IU-07-B | Implemented locally; engineering | Full source hash/version still fences execution. Independent review version retains unchanged answers after title/requester/workflow changes. Canonical field/server ordering avoids incidental invalidation. Actual server/context changes remain stale with before/after details and explicit re-review. |
+| IU-07-C | Implemented; browser acceptance pending, authorized UI runner | One save meaning, prominent proposal acknowledgement, separate answer-copy preview, visible RFC requester and server/RFC columns, separate WASAS/OR/stage labels. SQL count/page tracking uses verified activity evidence, never local/manual confirmation. Current corporate read adapter does not supply next-stage fields; UI says unavailable. |
+| IU-07-D | Implemented; supplied workbook comparison now complete, engineering | E-08 four-server fixture/export checks preserved. New follow-up above verifies the supplied historical v19 XLSX and all three envelopes. New-layout browser/Excel acceptance remains distinct; no longer request the missing sample. |
+| IU-05 | External transport contract missing; source owner | Provide one masked example each: attachment parent/ID/content or hash readback and lost-upload reconciliation; keyed dynamic case 4463/4464 target/version/conditional conflict; unique eligible WASAS BPM update matched-count/conflict/acknowledgement. Confirm 4464 TEST/PROD wire representation: legacy script copies a positional raw environment, while approved business rule is any PROD -> PROD, otherwise known non-production -> TEST. Do not request a final OR closure field as an activation prerequisite. |
+| E-08-UI | Not executed; authorized UI runner | Actual desktop/mobile/themes/keyboard/touch/200% browser zoom against matched new payload. HtmlRenderer is component coverage, not browser acceptance. Recorded host restriction remains; no alternative launcher/port used. |
+| E-06-SEC-01 | External hold unchanged; Cyber Defense/operator | Original diagnostic killed before JSON. Application package not reported supplied or approved. Obtain detection details/decision; E-05 permission would not authorize E-08 binaries. |
+
+Identity inspection: the supplied original v13 JSON SHA-256 still matches
+2FDB1ABB...0E5CD828A. Its Provenance ReviewedBy/PreparedBy fields are application
+GUIDs, not Windows SIDs. TechnicalCreator is separate source evidence; it is not
+relabelled as reviewer/preparer/requester/approver. At E-08 seal the v19 workbook
+was absent; the subsequent supplied-file comparison above closes that evidence gap.
+New reports resolve the exact saved reviewer GUID through the existing trusted
+application repository and freeze name/account beside stable technical IDs. The
+current downloader never replaces the reviewer. No directory search, role grant
+or source-display-name identity mapping was introduced. Missing identity uses the
+known account, then `Kullanıcı adı çözümlenemedi`.
+
+E-08 remains separate from sealed E-05/E-06/E-07. No new schema delta: existing
+022 execution/event reads support tracking; 024 catalogue migration remains the
+reviewed successor prerequisite, not target-verified installed. API/UI/Worker must
+be upgraded together with writes stopped; old serializers can drop new metadata.
+The exact new source/artifact/test identities are recorded in the E-08 closeout
+below after verification. Prior totals are historical, not added to new runs.
+
+#### E-08 local closeout and artifact identity
+
+One review payload set, not a numbered release or installation authorization:
+`C:\SecureOpsBuild\delivery-review\2026-09-22-inuse-wasas-activity`.
+Version `0.1.0+5c986a96f1f6639e47bf1432a87c3ac55e98054d-wip.f530ba994f6c`.
+Product-input SHA-256
+`F530BA994F6CB13029862AB2C284C9C4898806155C330CA5C34E49BE84330F10`.
+HEAD remains documentation closeout `5c986a96f1f6639e47bf1432a87c3ac55e98054d`,
+last committed product `c12abf29a60d2087728cd1e34879c0360a57c1c9`; current work is
+uncommitted. `source/product-inputs.json` and `source/identity.json` identify the
+build; `source/e08-changes.json`, byte-preserved changed files and closeout patch
+identify subsequent documentation separately. Nothing was committed or deployed.
+
+| Artifact under `packages/` | Files | SHA-256 |
+| --- | ---: | --- |
+| secureops-api-TEST-review.zip | 525 | `3815BDE91C956196FC7FA4E9192B460FC34D39404718799CC0C78FF1DABD8719` |
+| secureops-ui-TEST-review.zip | 542 | `4EC046927091E665E8F8B3BEBE2D14B9128D6183CA94A5370D91DC7064DB2669` |
+| secureops-worker-TEST-review.zip | 531 | `3416504A7A8CA8F43C94522EAC3DE36B6FBFA49CECD4674A5BEBE68B6E1D3553` |
+| secureops-database-024-review.zip | review inventory | `CEFDE6D7219536E75D98AFAB3ADA15F0EB5AA960899A1E2A4CC1E47E62EA37D9` |
+
+Newly executed, final matched build: Release build 0 warnings/errors; formatter
+verification passed; 1,447 unit tests and 279 normal integration passes with 59
+opt-ins skipped. Separate isolated SQL run: 16 passed, 0 skipped. These 16 match
+normal-run opt-in names; do not add overlapping historical/focused totals.
+Exact TRX paths relative to the review root:
+
+- `evidence/unit/dmtak_DEMET_2026-09-22_19_51_14.trx`
+- `evidence/integration/dmtak_DEMET_2026-09-22_19_51_20.trx`
+- `evidence/sql-regression/dmtak_DEMET_2026-09-22_19_53_20.trx`
+
+SQL ran only on `(localdb)\SecureOpsResourcesV1`, fresh test-owned database
+`SecureOps_ResourcesV1_activityfinal20260922`, with fixture 001-024 setup. Never
+apply that fixture command on the corporate SQL server. Coverage includes
+acknowledgement/timeout/rejection/manual attribution/restart/no duplicate,
+activity-verified tracking and reporting without OR closure, exact catalogue
+paging/metadata and historical archive preservation, trusted identity labels,
+source drift, revocation and audit rollback. Unit coverage includes unchanged
+answers across parent/stage/inventory STATUS changes versus changed environment,
+four-server/12-answer export, fallback identities and component rendering.
+
+Eight updated browser scripts passed `node --check` only. Current browser,
+200%-zoom, source/MIME/process/SMTP and corporate journeys remain unexecuted.
+No before/after browser screenshots were produced. Frozen panes/filter/print
+structure was inspected as XLSX XML, not by claiming an Excel desktop run.
+`evidence/review-inputs-and-syntax.json` retains original archive/XLSX integrity
+checks without copying corporate samples to fixtures. The four-server workbook
+was unavailable at that seal; the new follow-up above compares it without altering E-08.
+
+The preflight builds under `validation/inuse-activity-20260922/preflight-*` were
+not packaged or issued. A review corrected inventory STATUS review scope and
+primary-action policy gating; an exact-input guard then rejected a concurrent
+line-ending normalization. The final build began after formatting ended, with
+the new hash above. Prior logs remain retained, not counted as final evidence.
+E-05's 531 payload files and E-06/E-07 sealed manifests were reverified unchanged.
+`security/worker-comparison.json` distinguishes that diagnostic from this Worker.
+Neither payload is reported submitted to or approved by Cyber Defense.
+
+| Surface | Implemented / local evidence | Exact-payload journey | Installed / target configured / corporate / team availability |
+| --- | --- | --- | --- |
+| In Use review/export/list/identity | Unit, SQL and matching staged build verified | Browser/zoom pending | New behavior not installed; prior rc6.26 observation unchanged |
+| WASAS activity approval | Supported legacy request shapes, durable intent/manual/verified categories and guards tested with fixtures | Real attachment/conditional property/BPM response contract pending IU-05 | Disabled; no corporate approval executed |
+| Reporting | Verified activity is an OR-deduplicated metric, separate from acknowledgement and Closure/Verified | Corporate reconciliation pending | New metric not installed; no inferred closure or manual success |
+| Worker/OCO/mail/SDM | Prior independent fixes preserved in the same matched components | Prior external/security/process gates remain open | No activation, mail, service install or target change in E-08 |
+
+`New-PairedTestRelease.ps1:19` still rejects a dirty tree. Reviewed component ZIPs
+are the fullest permitted local candidate, not an exemption from final numbering,
+security or acceptance gates. Operator next action: obtain the single masked IU-05
+contract response from the source owner; no selected corporate OR is required to
+finish local work and no final OR closure contract is requested for this action.
+
+### Historical manual OR verification, 2026-09-22 (IU-06 / sealed E-07)
+
+Owner explicitly defers automatic post-close OR readback. That decision removes
+readback alone as a delivery blocker, not attachment content proof, eligibility,
+concurrency or authorization. Current source remains 5c986a9 plus preserved dirty
+changes; the sealed E-06 review ZIPs and E-05 diagnostic must not be overwritten.
+This continuation is not installed behavior or a new numbered release.
+
+Re-inspected private legacy script lines 701-730; its raw SHA-256 matches the
+retained BB07673B...C0D704 reference. Supported operation is BPM_Actvty update,
+m_status=4 after the uniquely eligible activity lookup. Existing wire adapter
+keeps the OR/model/status/group predicate and single-attempt authenticated path.
+Neither the legacy script nor its acknowledgement establishes terminal OR state.
+The script was read, not executed. No source record URL is established.
+
+New intents freeze Manual verification mode. After acknowledged BPM, existing SQL
+state Unconfirmed stops dispatch before automatic Closure readback. Unknown/timeouts
+stop without retry; explicit Success=false is failure, contradictory/malformed
+responses remain Unknown. Old intents retain SourceReadback semantics and a changed
+execution fingerprint prevents silent adoption. Closure/Verified remains the only
+system-verified completed result. Existing attachment/content, exact archive,
+initiator, source/review checks and duplicate fences remain in place.
+
+UI shows selected OR, saved server count/report version, exact archived hash and
+source attachment name before submission. It distinguishes the requested Turkish
+acknowledgement/unknown messages. Separate explicit manual confirmation records
+current authorized confirmer, label and server UTC time in append-only events/audit.
+It rechecks operation/OR/revision and access transactionally. It never sends another
+source request, releases the active fence or increments verified closure counts.
+No new migration/grant/feature flag: 022 execution tables already support these
+states/events; existing successor catalogue delta 024 is unchanged.
+
+IU-05 still needs one bounded source-owner response: keyed dynamic-case target and
+real conditional-update/version/conflict contract for 4463/4464; authoritative
+attachment parent/ID/content/hash lookup and lost-upload reconciliation; uniquely
+eligible BPM target/concurrency response semantics. Automatic terminal OR readback
+is deferred by decision, not requested as an activation prerequisite for IU-06.
+Until the remaining preconditions can be implemented, the real completion transport
+stays blocked. Flags, manual attestation and a selected OR cannot manufacture them.
+Corporate closure, final browser/mouse/touch/200%-zoom acceptance and new-payload
+security permission remain pending. Do not bypass either recorded host/Falcon hold.
+
+E-07 newly executed local evidence and concrete artifacts:
+`C:\SecureOpsBuild\delivery-review\2026-09-22-inuse-manual-verification`.
+Matched API/UI/Worker ProductVersion:
+`0.1.0+5c986a96f1f6639e47bf1432a87c3ac55e98054d-wip.9535a0bb7c48`.
+Product-input SHA-256:
+`9535A0BB7C4815541DA6AC34FB9BDEDA665A8AAFD524F55F56813CA8102135B7`.
+HEAD is unchanged; this is explicitly uncommitted source, not a product commit.
+source/identity.json, product-inputs.json, patches and changed-file copies bind it;
+source/e07-changes.json separates this task from the preserved E-06 changes.
+
+| Newly executed check | Result / exact evidence relative to E-07 root |
+|---|---|
+| Full format and matched Release build | Passed; 0 warnings/errors, evidence/format.log and build.log |
+| Unit regression | 1,434 passed; evidence/unit/dmtak_DEMET_2026-09-22_16_20_04.trx |
+| Normal integration | 279 passed, 58 opt-ins skipped; evidence/integration/dmtak_DEMET_2026-09-22_16_20_09.trx |
+| Relevant isolated SQL execution/manual verification/reporting regression | 10 passed, none skipped; evidence/sql-regression/dmtak_DEMET_2026-09-22_16_21_03.trx |
+| Publish/ZIP integrity | API 525, UI 542, Worker 531 members; tested entry/Shared/Infrastructure hashes match publishes and common dependencies match across components |
+| Preserved artifacts | 86 sealed E-06 files and 531 E-05 files match original manifests; evidence/preserved-artifacts.json; not target integrity verification |
+
+The 10 SQL cases include two new opt-ins skipped in the normal run. Do not add
+earlier focused 30-unit/2-SQL or E-06 totals. SQL used fresh test-only database
+SecureOps_ResourcesV1_manual20260922a on the guarded per-user LocalDB facility;
+existing harness applied 001-024 there only. No corporate SQL was run. New cases
+cover acknowledgement, lost response after synthetic closure, explicit rejection,
+no final readback/replay, original initiator versus confirmer, stale/wrong OR,
+concurrent attestations, revocation, audit rollback, and no InUse.Closed report fact.
+Existing execution recovery, source-drift, attachment, lifecycle and report tests
+remain passing. Synthetic component rendering and API authorization/OpenAPI passed;
+they are not mouse/touch/focus/200%-zoom or corporate acceptance.
+
+| E-07 review ZIP | SHA-256 |
+|---|---|
+| packages/secureops-api-TEST-review.zip | D21EEAA0BB588A98DAE75BBB828682AB4CE162C0F8784A8B2120B1E675DFA139 |
+| packages/secureops-ui-TEST-review.zip | 556553E240EF10D15265F11D5F5218B34844EECE2F43987E6E57A97A13A18F2E |
+| packages/secureops-worker-TEST-review.zip | 1D98238B5F19884048E1137200043E09943C7F9C6C0415BF737149BA259620BB |
+| packages/secureops-database-024-review.zip | 0E6DD162230C76ACA0A825B000538474170001FCD5B3964D24D8798460A3827C |
+
+DBA archive carries the unchanged applicable 024 scripts plus an E-07 note that
+manual verification adds no SQL. API/UI ZIPs exclude server-owned configuration;
+Worker has no configuration files. No secret or target flag change. These are
+unnumbered review artifacts, not a replacement for sealed E-06 or install approval.
+The dirty-tree numbered-release rule remains; final security/browser/target gates
+are not waived. Backend/UI/contracts/tests and linked guidance are the only new
+scope. Private profile evidence and all previous completed modules are preserved.
+
+### Consolidated review candidate and security hold (E-06 / SEC-01)
+
+Owner update received 2026-09-21: SCCM console installation is reported, but
+module compatibility and collection access are unverified. The separate SCCM
+diagnostic was run under the normal Worker identity, Test environment and installed
+configuration root. It terminated before JSON. Cyber Defense confirmed a Falcon
+process-killed event. The security/execution-permission request is open; the
+application package has NOT been supplied to the security team. Detection ID,
+technical detection details and approval decision are missing. This is an external
+execution dependency, not a false-positive conclusion, SCCM read success, or proof
+that the earlier collection failure had the same cause. No bypass via launcher,
+identity, host, path, policy, exclusion or changed binary is authorized.
+
+Preserve the E-05 diagnostic tree and its original file hashes. A consolidated
+Worker has a separate build identity and hashes even when code overlaps. Approval
+for the diagnostic does not approve another payload or service mode. Neither
+payload is recorded as delivered to or approved by security. Operator target hashes
+must be compared with the preserved local manifest; target equivalence is not
+established by the reported command alone. Do not rerun the E-05 command pending
+an explicit decision covering its exact bytes and execution context.
+
+Current HEAD remains 5c986a96f1f6639e47bf1432a87c3ac55e98054d, last committed
+product c12abf2; inherited dirty work is preserved. The owner authorizes consolidated
+local review artifacts now, without waiving final release gates. The numbered
+tool's `New-PairedTestRelease.ps1:19` dirty-tree rejection remains unchanged.
+Prepare unnumbered API/UI/Worker review ZIPs only through the existing lower-level
+payload/ZIP validators. Record product-input hash, dirty-file snapshot, build
+version, all payload/ZIP hashes, configuration review and 024-only SQL inventory.
+These are not an installable numbered successor, security approval or corporate
+acceptance. The final source commit and exact-payload gates still apply.
+
+Scope remains native service hosting, same-runspace SCCM diagnostics/dependencies,
+system-status presentation, archive catalogue/024, four-sheet export/lifecycle,
+OCO profiles/preparation, persisted mail outcomes, supported ServerRequest and
+management reporting. Maintenance end is not restart time. Production profiles
+remain review proposals. In Use transport still lacks IU-05 contracts; SMTP and
+incomplete completion remain disabled. None of these external dependencies blocks
+independent building, ordinary isolated tests or package integrity checks.
+
+Reviewed compatibility: API/UI/Worker must have matching Shared/Infrastructure
+and entry build identities; existing contracts/OpenAPI and SQL 023/024 boundaries
+remain. Test-only configuration and explicit root support survive consolidation.
+The same configured data-directory lock applies to new console/service processes,
+not rc6.26, another directory or another machine. SQL leases and Unknown recovery
+are still authoritative. Host shutdown requests bounded Hangfire disposal; actual
+SCM timing, logoff and crash/recovery remain unexecuted. Rollback stops all writers,
+coordinates component versions and retains 024, intents, audit, key rings and
+archives; old serializers must not overwrite new fields. No target changes.
+
+One narrow local correction found during consolidation: the profile validator
+accepts whitespace DescriptionTemplate with a literal Description, but proposal
+formatting previously selected the whitespace template. Formatting now uses the
+same IsNullOrWhiteSpace rule. Focused tests cover literal/whitespace/template
+selection, a distinct manual restart, and separate dynamically retrieved services.
+No new source field, production profile approval or external contract is added.
+
+E-06 local delivery result (newly executed, not E-04/E-05 reuse):
+`C:\SecureOpsBuild\delivery-review\2026-09-21-consolidated-test`.
+Matched ProductVersion for API/UI/Worker:
+`0.1.0+5c986a96f1f6639e47bf1432a87c3ac55e98054d-wip.9fa51778d1de`.
+Full product-input SHA-256:
+`9FA51778D1DED284CCECC4427A36FE36A4A95A7565CDA623DE803AF549D9675C`.
+This is HEAD plus explicitly uncommitted inputs, not a new commit SHA. The source
+directory records the hash recipe, product-input manifest, build-time workspace,
+tracked patch and untracked files; later documentation closeout is separate.
+
+New full format verification passed. Matched Release build: 0 warnings/errors.
+Unit `evidence/unit/dmtak_DEMET_2026-09-21_04_08_07.trx`: 1,425 passed.
+Integration `evidence/integration/dmtak_DEMET_2026-09-21_04_08_11.trx`: 279 passed,
+56 opt-ins skipped. The three new proposal cases are included in 1,425, not added.
+The earlier 54 isolated opt-in passes remain historical, not current payload
+acceptance. No excluded host/process/SCM/browser/SMTP gate was silently enabled.
+The local token remains non-elevated; no SCM test or security-blocked process ran.
+
+All three publishes match the tested build entry/Shared/Infrastructure hashes;
+Shared and Infrastructure match across components. Existing payload scans, API AD
+dependency/ZIP gate, UI asset/ZIP gate and Worker dependency/module/ZIP gate passed.
+Payload counts: API 525, UI 542, Worker 531. Server-owned web.config/appsettings
+are excluded; staging is NOT the deployment input. Complete manifests are under
+manifests/, and candidate-metadata.json binds versions, tests and all ZIP identities.
+
+| Review artifact relative to candidate root | SHA-256 |
+|---|---|
+| packages/secureops-api-TEST-review.zip | 289E84441EA108D5DA63B50159904D2750948410B614523D6C2D4614A96E8326 |
+| packages/secureops-ui-TEST-review.zip | C8F18B4ADF7E54B7CACC5F7AE5591CCE076E45228003595B56054F10ADB5EED6 |
+| packages/secureops-worker-TEST-review.zip | 7F5E135CD34BD801A7222D667F373B005D359DDE794A01BAD981271F2EC3D190 |
+| packages/secureops-database-024-review.zip | 198035238CECDA98184279CC4C2660CC083A06AF33789E8B50103E9BF3F8F48D |
+| security/preserved-diagnostic.zip | 00E8823327492BBDBBF2FD999AF83256DC37CF017A380EDFD76A7A141B90E2D3 |
+
+The last archive is a new transport container around the unchanged 531 local E-05
+files, NOT rebuilt diagnostic binaries or evidence of the original transfer ZIP.
+Old diagnostic ProductVersion remains `...-sccm-diagnostic-wip`; Worker DLL hash
+`6A3C157F345862B474448B5A6698D8CE4B2B1ADA31E95D0473778C0149E588EA`.
+Consolidated Worker DLL hash:
+`6D05FE7B37DD89311ACFF176427D0F0070AC26F379BD3D5CDB14825EFA9CBCFE`.
+security/worker-comparison.json lists five changed payload files, including EXE.
+The original E-05 tree/evidence and rc6.26 were read/hash-checked, not overwritten.
+
+Configuration review includes only the new operator-selected WorkerHosting data
+directory, explicit Test startup and preserved false mail/completion/PrepareSchema
+fences; no guessed relay, production profile, account or source grant. SQL review
+contains 024 migration+schema only for verified 023, narrow API SELECT/INSERT,
+backup/stop criteria and coordinated rollback; no apply, grants or replay. The
+candidate exports the current Turkish entry and service procedure. Review ZIPs
+are concrete delivery-preparation artifacts, not numbered release/install approval.
+Build SDK is 9.0.317; target remains framework-dependent net8.0, not a .NET 9
+server requirement. Diff against rc6.26 confirms only the two 024 SQL files were
+added to migrations/schema; 022/023 are unchanged and must not be replayed.
+Remaining acceptance and responsible owners stay in SEC-01, OPS-02, QA-01/02,
+DB-01, OCO-01/03, MAIL-01, SDM-01, IU-02/03/05 and RPT-01 below.
+
+### SCCM failure continuation, 2026-09-21 (E-05 / OCO-02)
+
+Pasted owner console evidence, not original-file integrity verification: the
+normal Worker starts in Test from its installed directory under the reported
+runtime account. Collection fails with ActionPreferenceStopException and
+AnnouncementSourceCollectionUnavailable. Five distinct JobIds are visible;
+their retry/attempt relationships were not supplied. E-04 queue readiness stays
+closed. The console does not identify the failed PowerShell operation or underlying
+ErrorRecord, so module, permission, CMSite and connectivity causes remain unproven.
+
+Source now separates Import-Module, New-PSDrive, Set-Location and Get-CMDevice
+invocations in one runspace and logs bounded error metadata: stage, fixed command,
+allowlisted error identifier plus full-ID hash, category, exception types/HResults,
+and invocation line/offset. Raw messages, TargetObject, script/position text,
+credentials and device payloads are excluded. A selected --sccm-diagnostics mode
+performs only that same bounded collection read, without hosting/queue dispatch,
+service lookup, SQL, mail or closure. Explicit absolute --contentRoot can reuse
+installed configuration without copying secrets; default remains executable root.
+
+Independent local defect: the former engine-only System.Management.Automation
+dependency cannot load built-in Microsoft.PowerShell.Management for New-PSDrive
+in the isolated in-process host. The real runspace test failed before the fix.
+The matching Microsoft.PowerShell.SDK 7.4.18 supplies built-in host modules; Roslyn
+workspace/compiler 4.9.2 and JsonSchema.Net 7.0.4 align its dependency requirements.
+No execution-policy weakening, module-path guess or corporate permission change.
+This is a local payload repair, NOT yet the target incident's proven root cause.
+Earlier worker-service-20260921 staging/tests below predate these source changes.
+Current local evidence is retained separately in sccm-diagnostics-20260921.
+
+Private legacy script was parsed as UTF-8 without execution. Lines 147-159 import
+the console manifest via SMS_ADMIN_UI_PATH, reuse/create CMSite and query the
+collection; current provider imports by name in a fresh Restricted runspace,
+uses a private site drive, ErrorAction Stop and a bounded collection read. The
+legacy script alone does not prove its executing PowerShell version/identity.
+Compare the actual module version/availability and runtime with target evidence;
+do not infer PowerShell incompatibility from ActionPreferenceStopException alone.
+
+Five private review candidates preserve each legacy mapping, Impact and Checks
+(script 122-126 and 225-252). All five bind and validate against retained rc6.26
+binaries in nested JSON, flat Worker keys and API environment XML with matching
+profile fingerprints. NonProd Scope is owner-approved; four production Scope
+texts are explicitly derived review proposals, not legacy verbatim text. Revision
+and existing recipients are omitted from the merge to preserve target settings;
+the owner must approve a new shared revision for changed content before use.
+No corporate values or samples were added to repository fixtures/docs.
+
+The owner-reported email has maintenance end 05:00 and restart 03:15; the raw email
+was not independently verified here. Legacy lines 226/233/239/245/251 substitute
+EndDate as restart, which is not a valid equivalence. The earlier NonProd template
+recommendation below is SUPERSEDED: review candidates label WorkEnd only as
+maintenance end and require separate restart review. Structured restart fields
+stay manual/NotDerivable, with no invented source selector or template token.
+Historical preparations/EML are immutable and are not rewritten.
+
+Dynamic profiles remain configuration-backed but limited to the existing five-name
+allowlist and startup options. One protected, reviewed master can generate both
+config surfaces and compare revisions/fingerprints at coordinated restart; there
+is no atomic hot reload or shared revision-store feature today. A future revisioned
+source would need validated atomic snapshots and existing job fingerprint guards,
+not a new management UI to unblock this incident. See the current Turkish entry
+for the selected diagnostic procedure and private review artifacts.
+
+Current local evidence: full unit `unit/dmtak_DEMET_2026-09-21_01_15_32.trx`,
+1,422 passed; integration `integration/dmtak_DEMET_2026-09-21_01_16_09.trx`,
+279 passed/56 opt-ins skipped. Earlier focused failures remain retained; corrected
+focused tests are included in the unit total, not added. The unnumbered Worker
+diagnostic publish identifies `5c986a9...-sccm-diagnostic-wip`, NOT a committed
+product source or release. All 531 published files passed the unchanged payload
+scanner after standard debug-symbol exclusion. A private checker used the actual
+published engine for Restricted FileSystem drive/location/Select-Object operations;
+it passed without corporate providers. Both rc6.26 and current published profile
+binders passed five-way configuration/fingerprint parity. The published EXE ran
+from a different current directory against synthetic Test-only config and an empty
+module path: ImportModule / Modules_ModuleNotFound was emitted as sanitized JSON,
+exit 2, no host/log/lock created. This tests failure reporting, not SCCM connectivity.
+`local-evidence.json` retains exact payload/source hashes and TRX filenames. The
+531-file diagnostic folder is an operator investigation input, not a successor ZIP.
+Final repository format verification passed. The tightened packaging contract
+rerun passed 4 tests (`release-gate/dmtak_DEMET_2026-09-21_01_23_03.trx`), overlapping
+the normal unit suite rather than adding to its total. The actual Worker runtime
+and PowerShell-manifest gate passed against staging without creating a ZIP.
+
+### Operational delivery, 2026-09-21 (E-04 / OPS-02)
+
+Recovered HEAD 5c986a96f1f6639e47bf1432a87c3ac55e98054d on the same branch;
+c12abf2 remains the last committed product. The two uncommitted guidance changes
+from the NonProd repair were preserved. New Worker hosting edits are working-tree
+source, not installed rc6.26 behavior or a new numbered candidate.
+
+Owner-supplied target observations now identify all three entry DLL ProductVersion
+values as 028cbd2 / rc6.26. Full target payload hashes were not reverified. Normal
+Worker identity/directory and explicit Test startup were supplied privately; only
+appsettings.Test.json is reported present. API/Worker compared settings, including
+repaired NonProd, match; API reports queue ready and one matching Worker. This
+supersedes the earlier current-configuration gap in E-02/E-03, not their historical
+snapshot bytes. No new raw diagnostic timestamp/hash was supplied for E-04.
+Queue readiness is not SCCM/TH collection acceptance. Mail and In Use completion
+remain disabled. The team uses WASAS; successor-specific and remote-effect
+availability still follows the per-module matrix, not a blanket unavailable claim.
+
+Owner now authorizes native Windows Service implementation. Existing WindowsServices
+dependency is connected, explicit executable content root preserves Test-only config,
+console and diagnostics modes remain, and configured local data directory provides
+bounded lifecycle logs and an exclusive process lock. Service mode rejects absent
+environment/data directory/job-server configuration. SQL leases/recovery and
+uncertain-effect policies are unchanged. Old rc6.26 does not honor the new local
+lock: the console must be stopped before service handover. Actual SCM/logoff/crash
+acceptance is pending; this local token is not elevated and no service was installed.
+The earlier UI host restriction was not bypassed. See the linked service procedure.
+
+External IU-05 contracts no longer block an honestly scoped Worker/fixes successor
+indefinitely. They still block real In Use completion itself. OPS-02 service,
+QA-01/02 exact-payload/browser/MIME and release validation gates remain required.
+Release inventory still ends at rc6.26; no new suffix is reserved or ZIP produced.
+SQL review confirms unchanged 024-only catalogue delta for verified 023, no Worker
+migration. Target 024 installation/ledger/object state still requires DBA evidence.
+
+Local evidence root: `C:\SecureOpsBuild\validation\worker-service-20260921`.
+Release build: zero warnings/errors. Full repository format verification passed;
+the final Worker line-ending correction also passed project whitespace verification.
+Focused Worker/release tests: 16 passed (included in normal totals, not added).
+Final unit TRX: `final-unit/dmtak_DEMET_2026-09-21_00_48_54.trx`, 1,411 passed.
+Staged-build integration TRX:
+`staged-build-tests/dmtak_DEMET_2026-09-21_00_46_14[1].trx`, 279 passed/56 skipped.
+Initial `regression/dmtak_DEMET_2026-09-21_00_42_22.trx` retains one
+FileSystemWatcher.Dispose NullReferenceException in API factory teardown (278
+passed); a full unchanged integration rerun also passed 279/56. No API workaround
+or hidden suppression was added. Opt-in SQL/process/MIME gates were not rerun or
+counted as passed by this normal run; earlier isolated evidence stays historical.
+
+The three unnumbered staging components identify
+`0.1.0+5c986a96f1f6639e47bf1432a87c3ac55e98054d-worker-service-wip`, explicitly a
+working-tree label, NOT a committed product SHA. All three payload scans passed
+(248 API / 265 UI / 254 Worker files); Worker runtime closure has 247 assets.
+The final published EXE diagnostics ran from another current directory using only
+a synthetic Test config: file binding verified, source disabled, host not started,
+data directory not created. Diagnostics preserves read-only behavior; this is not
+an actual service/process interruption test. `local-evidence.json` records payload
+and changed-source hashes, exact TRX filenames and the initial failure.
+No numbered release, target ACL/SQL/service change, corporate job or mail send.
+
 ### Recovered checkpoint, 2026-09-20
 
 Current locally tested product/build: `c12abf29a60d2087728cd1e34879c0360a57c1c9`.
@@ -75,7 +852,79 @@ mobile, keyboard/touch and real 200% zoom acceptance remains QA-01; the earlier
 host-policy denial was not bypassed. The named screenshot was not available in
 the inspected attachment paths, so no before/after image pair is claimed.
 
-### Remaining-work continuation from 03b0c04
+### NonProd configuration review, 2026-09-20 (E-03 / OCO-01)
+
+Incoming product c12abf2 / documentation 5c986a9 verified clean. This narrow
+review changes guidance only; product/build remains c12abf2 and rc6.26 remains
+owner-reported installed. These two guidance edits are in the working tree at
+5c986a9; no new commit, product build, release or target configuration change.
+
+Compared rc6.26 source 028cbd2 with c12abf2: AnnouncementSourceOptions,
+MaintenanceProfileCatalog, MaintenanceProfiles, AnnouncementValidation,
+AnnouncementSourceService, OperationsDiagnostics and Worker Program are unchanged.
+The relevant DI Configure<AnnouncementSourceOptions> registration is unchanged;
+later DI differences concern In Use, not this binder. Six inspected rc6.26
+Shared/Domain/Infrastructure/Worker/binder/JSON-provider DLL hashes match its
+retained manifest. The packaged binder is byte-identical in current staging.
+
+The reported Worker configuration has source/Hangfire enabled and a NonProd
+collection/fingerprint, but only CollectionId/Label are supplied. With that
+shape, exact profile failures are Scope, Impact, Checks, Description; Revision
+defaults to string "1". Global diagnostics emits AnnouncementSource:Profiles
+when no allowlisted profile is Configured; it fingerprints bound profiles before
+that validation. Reading the configured collection ID is not reading SCCM.
+Worker JSON has now been supplied as pasted chat evidence, not an original file
+with verified byte integrity. Capture: 2026-09-20T02:14:40.6917339+00:00;
+source check: 2026-09-20T02:14:40.8524852+00:00. Exact state is
+ConfigurationMissing, stage configuration, Missing [AnnouncementSource:Profiles].
+NotChecked/0/null does not establish a negative heartbeat check. The interactive
+diagnostic identity is not proof of the normal Worker identity or availability.
+Empty Worker asset/archive fields do not invalidate API E-02 observations or
+require adding API archive/branding configuration to this Worker.
+
+Private legacy mail_sscm.ps.txt SHA-256
+`4A0F86D26C729CCEADFE7F7CE1D8715CD8F78E14196662DD5BD28F1376B0C3EA`
+was parsed as UTF-8 data, never executed. NonProd collection maps at line 122;
+Impact, template and Checks come from lines 225-227. Only the two date expressions
+were translated into supported WorkStart/WorkEnd tokens, with no invented dates.
+Scope is dynamic deduplicated services at lines 75-86/291-292, not an approved
+fixed profile value. The current code proposes profile.Scope separately from
+the service list. **The owner has now approved the literal NonProd Scope.**
+The earlier empty-Scope review block remains immutable historical evidence, not
+the current merge candidate. No recipients or credentials
+were added to repository/fixtures. The current Turkish entry gives exact types,
+defaults, bounds, field provenance, precedence and operator steps.
+
+Evidence root: `C:\SecureOpsBuild\validation\nonprod-profile-review-20260920`.
+An isolated non-hosting checker loads the retained rc6.26 and c12abf2 option/catalog
+DLLs using the packaged binder (SHA starts BEAC12F7); 22 assertions per baseline
+passed with the same outcomes. Sparse supplied shape: 4 missing fields; the
+legacy-derived candidate: Scope only; an in-memory synthetic Scope positive
+control: Configured. The synthetic Scope is not saved in the operator candidate.
+Checks include defaults, bounds, template tokens, optional/invalid recipients,
+flat/nested parity, duplicate JSON keys and env/CLI leaf precedence. No host,
+corporate queries, SQL/ACL changes, queue execution, SMTP or acceptance action.
+Do not add these assertions to the retained normal regression test totals.
+
+Approved repair evidence: `C:\SecureOpsBuild\validation\nonprod-config-repair-20260920`.
+The four-leaf Worker merge and 23-entry API environment merge are private inputs,
+not replacement configuration files. The installed-baseline and current DLLs
+each passed 15 isolated assertions: approved profile Configured, no missing fields,
+flat Worker/API profile fingerprint parity, SMTP false and PrepareSchema=false.
+The pasted original profile fingerprint matches the sparse profile with defaults,
+including Revision="1". No host/provider/SQL was started. Assertions are not
+additional normal regression tests or target acceptance.
+The existing Compare-OperationsReadiness.ps1 returned exit 2 and 11 differences:
+source/Hangfire enablement, both providers, site/machine, three selectors and two
+NonProd entries absent from API. DB/TH/mail-policy fingerprints match; this does
+not prove connectivity. API E-02 remains disabled; no target change was performed.
+Next: operator records normal startup identity/overrides, reviews pending queue
+work before any normal Worker restart, backs up and merges the approved leaves,
+then collects paired diagnostics using the existing comparator. Profile repair
+may advance read-only diagnostics to SQL heartbeat SELECT. Named foreground
+ownership and an expressly selected terminal OCO job remain acceptance gates.
+
+### Historical remaining-work continuation from 03b0c04
 
 Verified incoming HEAD was `03b0c048d50cf926b5640116533df39c8685a37d`, clean on the
 existing delivery branch. The same cumulative owner exception applies; all older
@@ -128,15 +977,31 @@ This changes neither GUID archive paths nor the `<OR>_InUse.xlsx` remote contrac
 
 Owner exception remains cumulative, including inherited and new/untracked files.
 Counts below are the current cumulative Git diff, not sums of overlapping commits.
+The current list implementation updates this table; E-07/E-08 counts remain in their sealed copies.
 They include OpenAPI, new files and inherited work; a commit does not reset them.
+Private, non-deliverable profile checkers are additional validation scaffolding:
+earlier 112 C# + 11 project lines; approved repair 64 C# + 4 project lines outside
+Git. Neither is hidden in the repository diff or counted as product implementation.
+Current five-profile/published-host checker adds 57 C# + 4 project lines outside
+Git, plus a private evidence recorder; these are validation tools, not shipped code.
+E-06 adds 294 private PowerShell orchestration lines for source capture, existing
+package gates and review manifests; no release rule or permanent instruction changed.
+E-07 reuses private orchestration in a new root with separate manifests and preserved
+artifact verification; its script and private handoff line counts are recorded in
+the E-07 candidate evidence. No duplicate copied payload/guidance is counted as new
+product implementation; all new source/tests/OpenAPI and this guidance remain in
+the cumulative repository counts below.
+
+Post-E-08 private comparison/harness scaffolding is counted separately in
+`validation/inuse-archive-20260922/private-scaffolding.json`; it is not shipped code.
 
 | Baseline | Files | Additions | Deletions |
 |---|---:|---:|---:|
-| this continuation 69a9b839 | 20 | 913 | 127 |
-| immediate remaining-work checkpoint 03b0c04 | 58 | 2738 | 121 |
-| actual continuation 34c8837 | 82 | 4242 | 193 |
-| inherited rc6.24 8c1b58d | 132 | 8558 | 1183 |
-| complete post-rc6.22 aa9e4d2 | 166 | 11869 | 1343 |
+| this continuation 69a9b839 | 100 | 4791 | 374 |
+| immediate remaining-work checkpoint 03b0c04 | 124 | 6606 | 358 |
+| actual continuation 34c8837 | 137 | 8102 | 422 |
+| inherited rc6.24 8c1b58d | 182 | 12526 | 1520 |
+| complete post-rc6.22 aa9e4d2 | 206 | 15790 | 1633 |
 
 Scope includes workbook/metadata, local lifecycle/history invalidation, assignment,
 source readiness, catalogue/024, reviewed reporter crosswalk, tests and guidance.
@@ -194,21 +1059,28 @@ verified are separate states; no row below implies full team activation.
 | QA-01 Assignment, lifecycle, catalogue, OCO UI / test-runner restriction | Incoming 03b0c04 repairs retained; current browser script includes pointer, focus, themes, reflow and native zoom assertions | Authorized test runner | Run existing host/test procedure; prior tool-policy rejection not bypassed; OCO source journey separate | Current UI screenshot/200% acceptance pending |
 | IU-03 Four-sheet Excel and history / corporate acceptance | Prior real legacy hash/29 labels/22 headings and synthetic Excel acceptance retained; immutable download tests | Evidence owner / TEST operator | Original 27044-byte envelope and embedded 6788-byte XLSX now verified; next: old/new authorized target download hashes | rc6.26 installation is owner-reported; its historical six-sheet output is preserved; repaired exporter needs successor |
 | IU-04 Draft recovery / corporate acceptance | Versioned reset/discard/restart, retained archive and invalidated suggestions; API/unit/SQL tests | TEST operator | Current UI journey then exact installed successor trial/restart case | New-source behavior not yet installed |
-| IU-05 In Use upload and workflow / missing source contract + unfinished integration | Durable stages and known wire mutation client registered only for real source transport; no guessed readback dispatcher | Source API/workflow owner, then developer | Attachment parent/ID/content readback; keyed dynamic-case + true conditional concurrency; authoritative OR states. Implement full real completion transport against those facts | No confirmed real upload or OR closure; not feature-complete |
-| OCO-01 OCO source / target configuration + corporate acceptance | Existing adapters/proposals retained; E-02 API snapshot received, collection disabled | Integration operator | Normal-start Worker report; approved profile/provider/queue and exact selected OCO -> terminal job/count/date evidence | API source off at E-02; installed build identity and successful job unverified |
+| IU-05 In Use upload and WASAS approval / missing source contract + unfinished integration | Durable stages and known mutation client; E-08 activity scope, manual verification retained | Source API/workflow owner, then developer | Required upload/property/approval contracts; separate minimal status query in IU-05-STATUS. Next-team/timeline deferred under IU-07-NEXT. Complete real transport against verified facts | No confirmed real upload or WASAS activity completion; not feature-complete. Overall OR closure is not the acceptance criterion |
+| IU-06 Manual post-close verification / local implementation | Exact-OR confirmation, acknowledged versus unknown/rejected states, attributed manual audit; no replay or system-verified count | Developer / authorized TEST operator | E-07 local evidence below; controlled activation still requires IU-05 preconditions, matching payload/security and browser gates | Source-only until separately delivered/accepted; no corporate closure |
+| OCO-01 OCO source / target configuration + corporate acceptance | Existing adapters/proposals retained; E-04 reports repaired profile/API/Worker parity and ready queue | Integration operator / source owner | One selected OCO/profile job, reviewed devices/services and dates, terminal result | Queue/profile gap closed by supplied target observations; SCCM/TH journey pending |
+| OCO-02 SCCM collection failure / blocked by SEC-01 | E-05 staged diagnostic/dependency repair; E-06 reports console installed but process killed before JSON | Worker operator / SCCM owner / developer | First obtain exact-payload execution approval; only then one selected read with stage/ErrorRecord metadata and verified console compatibility | Five distinct jobs, no inferred retries; device/service counts unverified |
+| SEC-01 Falcon execution review / external dependency | E-06 owner update: confirmed process-killed event, request opened; package not supplied, no detection details or decision | Cyber Defense / security reviewer / operator | Operator supplies preserved diagnostic and separate consolidated manifests via approved channel; obtain detection ID/time/hash/technical details and explicit per-payload/context decision | No false-positive claim, no bypass or rerun; security receipt and approval both pending |
+| OCO-03 Five profiles and restart semantics / local review candidates | Legacy per-profile Impact/Checks retained; EndDate-as-restart recommendation superseded | Business owner / API and Worker operators | Approve production Scope, corrected description and shared revision; merge only reviewed leaves, compare all five fingerprints; separately verify restart time | Private rc6.26 binder evidence; no target profile activation or dynamic-profile redesign |
 | MAIL-01 Self-test/distribution / target configuration + corporate acceptance | Real SMTP and durable outcomes retained; prior local sink/restart evidence | Messaging owner / operator | Actual relay/TLS/envelope policy, remove false startup overrides only under staged guide; exact self-test preparation then separately reviewed audience | No target send, inbox or Outlook evidence |
 | SDM-01 OR to SDM / corporate acceptance + type-specific contract | ServerRequest positive policy; immutable Jira-only/close intent and durable link retained | Jira/source owner / operator | Exact selected OR/destination/actor; verify Jira result; other enum types need reviewed mappings, close needs final-state contract | No new target acceptance; not all types enabled |
 | RPT-01 Management reporting / corporate acceptance | rc6.26 SQL 023 snapshot/drilldown/export preserved; discarded-state repair retained | TEST operator | Reconcile exact selected authoritative outcomes with same dashboard snapshot/export | Installation/023 owner-reported; new-result reconciliation pending |
 | SRC-01 Collector / corporate acceptance | rc6.26 matched completion-evidence binary present; six package hashes rechecked | Source operator | Existing bounded read-only command; share only masked Evidence, not secrets; cannot discover undocumented attachment API | Not run here corporately |
-| OPS-01 Archive and operating window / target configuration | Immutable envelopes; existing archive; E-02 API reports ReadableWriteNotTested | TEST operator / operations owner | Authorized archive-write and original-byte readback acceptance; named foreground Worker session/window/restart owner | Supplied API read check verified; writing and Worker operation pending |
+| OPS-01 Archive / target configuration | Immutable envelopes; existing archive; E-02 API reports ReadableWriteNotTested | TEST operator / operations owner | Authorized archive-write and original-byte readback acceptance; service handover under OPS-02 | Read check verified; writing pending; E-04 supplies normal Worker operation |
 
 ## Activation boundaries
 
 ### Current module evidence states
 
 This table is a view of the same requirements above, not a second work register.
-"Reported" means owner-reported rc6.26, not observed target state. Current local
-product evidence is c12abf2 below; b596058's 1,382/279 results remain historical.
+"Reported" means owner-supplied evidence, not this agent's live target observation.
+E-04 entry versions verify rc6.26 source identity but not complete payload integrity.
+c12abf2 and b596058's results below remain historical committed-product evidence.
+E-06 now supplies matched review ZIPs and normal local tests for implemented rows;
+their full journeys remain unexecuted wherever the next column says pending.
 
 | Requirement | Implemented | Exact successor payload tested | Installed | Configured | Corporately verified | Available to team |
 |---|---|---|---|---|---|---|
@@ -216,9 +1088,10 @@ product evidence is c12abf2 below; b596058's 1,382/279 results remain historical
 | SDM-01 Transfer-and-close / other types | Closure contract missing; other type mappings unapproved | Blocked for unsupported effects | No supported closure claim | Gate remains off | No | No |
 | IU-01/03/04 Review, four-sheet export, reset, catalogue | Yes; catalogue requires 024 | Current browser pending | Successor not installed | 024 target not verified | Download/lifecycle/catalogue acceptance pending | Successor unavailable |
 | IU-02 RFC account proposal | Resolver implemented, empty by default | Current UI pending | Successor not installed | Reviewed mapping absent | No | Manual/unassigned path remains implemented |
-| IU-05 Real attachment and closure | Partial; corporate transport incomplete | Blocked on contract | Not available | Enabling a flag cannot unlock it | No | No |
-| OCO-01 Source and review | Real adapters/proposals implemented | Source process/UI pending | rc6.26 reported | API source disabled in E-02; Worker/profile pending | Terminal selected job missing | Not established |
-| MAIL-01 Self-test / distribution | Real transport and durable state implemented | SMTP/restart/MIME pending | rc6.26 reported | API flags false in E-02; Worker/relay/actor Mail pending | No send or inbox observation | Not established |
+| IU-05 Real attachment and WASAS activity approval | Partial; corporate transport incomplete | Blocked on attachment/conditional-update contracts, not final OR readback | Not available | Enabling a flag cannot unlock it | No | No |
+| IU-06 Manual post-close verification | Implemented E-07; automatic final readback deferred | Matched local build/unit/SQL; browser pending | Not installed | No new setting; real transport still IU-05-gated | No corporate closure/attestation trial | Not yet available |
+| OCO-01 Source and review | Real adapters/proposals; E-06 literal-template correction included | New source process/UI pending | rc6.26 entry versions E-04 | Repaired NonProd/API/Worker parity E-04; console installed E-06, compatibility unverified | SEC-01 blocks diagnosis; terminal OCO/device/service/date journey pending | Team uses WASAS; collection acceptance not established |
+| MAIL-01 Self-test / distribution | Real transport and durable state implemented | SMTP/restart/MIME pending | rc6.26 entry versions E-04 | API/Worker mail disabled; approved relay/actor Mail pending | No send or inbox observation | Disabled |
 | RPT-01 Persisted workflow reporting | Snapshot/drilldown/export implemented | Current outcome reconciliation pending | rc6.26/023 reported | Target 023 not independently observed | Same-cut target comparison missing | Not established |
 
 ### Additional gate records
@@ -226,12 +1099,14 @@ product evidence is c12abf2 below; b596058's 1,382/279 results remain historical
 | Stable ID / status | Owner | Precise input and next action | Evidence/build |
 |---|---|---|---|
 | E-01 Original evidence / closed locally | Developer | None for file integrity; target re-download remains IU-03 | Original manifest hashes and in-memory ZIP/XML comparison, 2026-09-20; originals unchanged |
-| E-02 API snapshot / received, limited target evidence | API operator / Worker operator | Worker diagnostics from normal directory/environment/identity with identical overrides, then existing Compare-OperationsReadiness.ps1; preserve role differences | Private original hash and both UTC times above; no product version or Worker evidence |
+| E-02 API snapshot / historical limited target evidence | API operator | Retain original capture; current settings superseded by E-04, archive write still pending | Private original hash and both UTC times above; snapshot has no product version |
+| E-03 Worker profile repair / closed for reported configuration | Worker/API operator | No repeat repair; preserve approved profile. OCO terminal acceptance remains OCO-01 | Earlier 22/15 isolated assertions retained; E-04 now supplies target parity and normal Worker provenance |
+| E-04 Target version/config/queue / received, limited verification | API/Worker operator | Full payload hashes, selected terminal workflow and new raw paired reports at service handover | Owner-supplied entry ProductVersions 028cbd2, Test Worker identity/path, repaired profile parity, ready queue/one Worker; no new raw capture timestamp |
 | UI-01 System-status usability / local source correction | Developer / authorized test runner | Current payload visual/keyboard/touch/themes/200% evidence under QA-01; no release for this change alone | Narrow Razor/scoped style/presentation tests; installed UI unchanged |
 | QA-02 Process/MIME/SMTP / runner restriction | Authorized test operator | Matching staged publish, fresh synthetic DB/Hangfire 9; run distinct procedures in current Turkish entry; return payload hashes, TRX, browser/zoom/source/SMTP evidence | 54/56 skipped names matched to separate passes; source process and browser MIME still pending |
 | DB-01 Catalogue upgrade / target prerequisite | DBA + release owner | Accepted successor, verified 023 definitions/DBA record, backup and stopped writes; review only packaged 024 and API SELECT/INSERT delta | 024 source and packaging switches inspected; target not accessed |
-| REL-01 Matched successor / blocked by QA-01/02 and IU-05 | Developer + release owner | Close required gates against final committed source, recheck next suffix, then one API/UI/Worker delivery with hashes and 024-only delta for verified 023 | No successor ZIP. Guidance export corrected; historical rc6.26 untouched |
-| OPS-02 Foreground availability / missing operating decision | Operations owner | Name operator/session, working window, queue monitor and restart owner; decide whether that window meets team need | No named session/window supplied; no unattended/service claim |
+| REL-01 Scoped matched successor / E-06 review artifacts prepared; final gated | Developer + release owner | Review four matched application/024 ZIPs and manifests; close SEC-01, OPS-02, QA-01/02 and final committed-source gates before numbering/install approval | IU-05 stays disabled without indefinitely blocking independent delivery. rc6.26 and E-05 diagnostic remain immutable |
+| OPS-02 Persistent Worker / implemented locally, SCM acceptance pending | Developer / authorized Windows runner / operations owner | Approved data directory and service-account rights; isolated SCM start/stop/logoff/crash and exact-payload recovery, then controlled console handover | Native service source with unchanged durable effect guards; local non-elevated token, no SCM installation or target change |
 
 If the source owner confirms that conditional update or authoritative readback is
 unsupported, record the dated answer against IU-05 rather than repeatedly asking
@@ -243,8 +1118,9 @@ completion. A changed business contract requires the owner's explicit decision.
 The owner must select exact source IDs, Jira project/type and actor for each
 controlled case. OCO self-test uses trusted Mail; distribution requires a reviewed
 immutable preparation and explicit To/Cc audience. Unknown outcomes stop mutation
-replay. Foreground Worker requires a named operator/session and operating window;
-this work does not install or promise an unattended Windows Service.
+replay. The old foreground Worker needs a named session until OPS-02 service
+acceptance and controlled handover. Native source support is not installed service
+availability, and this agent has not installed a service.
 
 ## Consolidated external facts (not repeated installation questions)
 
@@ -252,13 +1128,14 @@ this work does not install or promise an unattended Windows Service.
 |---|---|---|---|
 | `SMSS_oRFF.p_emb_dynamic_case_orff` keyed identity; properties 4463/4464 | Script request fields; bounded completion probe; durable execution/wire builder | Source owner: one selected OR's masked SET/KEY shape and documented conditional version/precondition semantics | Real In Use field effects |
 | `DataRestSecure.svc/json/uploadattachment` target and bytes | Known `fBase=SMSS_oRFF`, exact `fId`, `fName`, `datastring`, `SessionID`, `TenantId`; response serializer | Source owner: supported attachment identity/list/content readback with exact OR binding and hash/byte evidence, response-loss reconciliation | Confirmed upload; safe restart |
-| `BPM_Actvty`, models 103626/103627, status 1/group 68/main-object OR | Known query/update pattern; zero/multiple candidate guards; probe | Source owner: uniqueness/precondition semantics and activity readback; no first-row assumption | Eligible workflow action |
-| Authoritative OR state | Distinct closure evidence model; fixture readback; corporate verifier unavailable | Source owner: exact query/select, response representation and closed/further-workflow meanings | In Use and SDM verified source closure |
+| `BPM_Actvty`, models 103626/103627, status 1/group 68/main-object OR | Known query/update pattern; zero/multiple candidate guards; probe | Source owner: conditional approval, matched-count/conflict and acknowledgement semantics; no first-row assumption | Eligible WASAS approval; IU-05 required mutation contract |
+| Minimal WASAS activity status | Pending-only collector; source/manual evidence categories retained | Workflow owner: selected OR/activity identity, bounded keyed status response and pending/completed/unknown meanings; IU-05-STATUS | Actionable/completed/verification-pending separation; next-team/timeline deferred |
+| Authoritative overall OR state | Distinct historical closure evidence model; fixture readback; corporate verifier unavailable | Source owner: exact final-state contract only for separately approved SDM transfer-and-close | Not an In Use WASAS approval or minimal-tracking gate; historical closure evidence retained |
 | SDM type/project/issue fields/reporter/assignee | Exact enum includes ServerRequest, EnvironmentRequest, SoftwareInstallation, ConfigurationRequest, OperationalSupport, NotJiraEligible, NeedsManualReview, ServerRetirement; positive policy only ServerRequest | Jira/source owners: approved type-specific policy and bounded mandatory-field metadata for selected destination. Owner selects OR, actor and intent | No implicit activation of other types |
 | Unknown Jira create | Persisted command/link and reconciliation stop | Jira owner: authoritative exact correlation lookup for the selected project or reviewed manual remote identity evidence; empty searches do not prove absence | No duplicate creation after lost response |
-| OCO profile/collection/service/date source | Fixture and real SCCM/Turuncu Hat source adapters; selective apply | Integration owner: exact approved OCO/profile and API/Worker effective queue/provider/profile alignment, successful job evidence | Corporate retrieval |
+| OCO profile/collection/service/date source | Fixture and real adapters; E-04 confirms API/Worker profile/queue alignment | Integration owner: exact selected OCO/profile, successful terminal device/service/date evidence | Corporate retrieval |
 | Relay From/envelope/TLS and recipients | Real SMTP transport, immutable MIME and Worker; local rejection/unknown/revocation evidence retained | Messaging owner: approved relay policy/config revision. Operator: exact preparation, self-test actor Mail, separately reviewed distribution To/Cc; Outlook observation | Controlled mail activation |
-| Actual archive and runtime composition | Protected diagnostics report effective path/identity/provider source, not only JSON | TEST operator: effective API path, old/new hash manifests, installed 022, actual runtime identities, named foreground Worker window | Data-preserving activation |
+| Actual archive and runtime composition | E-02 archive read; E-04 runtime identity, entry versions and queue parity supplied | TEST operator: full target payload hashes, archive write/readback, verified schema ledger; OPS-02 service handover owner | Data-preserving activation |
 
 At the rc6.26 checkpoint no actual sample XLSX had been attached. Both sample
 availability gaps are now closed by the original-file verification above;

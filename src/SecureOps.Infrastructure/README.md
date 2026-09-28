@@ -1,5 +1,19 @@
 # SecureOps.Infrastructure
 
+Archive integrity follow-up after sealed E-08: `InvalidDataException` now maps to
+`InUseArchiveIntegrityFailed`, independently of `IOException`. Corrupt historical
+envelopes remain blocked before download/audit authorization and are never repaired
+in place. New synthetic cases exercise bytes, size, identity, preparer, retention
+and malformed JSON through both archive and service. Supplied archives are private
+review inputs, not repository fixtures; see the canonical IU-07-D follow-up.
+
+In Use manual-verification continuation (2026-09-22): new intents freeze Manual
+mode and stop Unconfirmed after BPM acknowledgement. Final source readback alone
+is no longer required; real dispatch still lacks attachment/concurrency contracts.
+Manual attestation uses the existing SQL access lock, exact OR/operation/revision,
+trusted confirmer and append-only audit; it never releases the duplicate fence or
+creates Closure/Verified evidence. No new schema or flag. See ADR-0020 and IU-06.
+
 The 03b0c04 continuation adds a SQL 024 archive catalogue. Verified envelope
 metadata is indexed atomically with its existing receipt; exact duplicates are
 no-ops and metadata conflicts fail. Search/count/page run under current access
@@ -49,6 +63,15 @@ Current implemented Phase 1A namespaces:
 - `Data/` — EF Core `SecureOpsDbContext`, entity configurations.
 - `Audit/` — `IAuditWriter` and SQL implementation (Dapper).
 - `PowerShell/` — `IPowerShellRunner` JEA implementation.
+
+The SCCM collection adapter uses the matching Microsoft.PowerShell.SDK 7.4.18
+in-process host, including Management/Utility modules needed by New-PSDrive and
+Select-Object. Engine-only hosting failed a local real-runspace regression test.
+Roslyn workspace/compiler and schema-test dependencies are aligned to that SDK;
+this does not change target execution policy, module installation or permissions.
+Its staged command failures expose bounded ErrorRecord metadata, not raw messages,
+target objects or source payloads. Selected Worker diagnostics uses the same read
+path and does not start corporate workflows. See integrated-test-activation E-05.
 - `Diagnostic/` — `IDiagnosticModule` implementations, `DiagnosticRunner`, `DiagnosticModuleRegistry`.
 - `Alerts/` — Alert normalization, repository.
 - `Integrations/` — External system adapters with interface + mock + real implementations:
@@ -94,3 +117,25 @@ only after envelope integrity/commit, including repair on re-download. Frozen
 execution bytes remain in SQL; no Worker filesystem archive permission is added.
 Historical receipt/provenance gaps remain labelled. See ADR-0023 and the integrated
 activation runbook; current source adapter contract gaps are not solved by fixtures.
+## In Use activity semantics (2026-09-22, E-08)
+
+New intents use `WasasActivityManual`, not whole-OR closure. Acknowledgement and
+unknown mutation outcomes stop without retry; authoritative BPM verification may
+complete the activity while preserving the duplicate fence. Only Closure/Verified
+supports OR-closed reporting. SQL tracking projects verified activity events with
+the same authorized count/page query. Manual events never enter that projection.
+Review freshness excludes parent workflow/title changes, but execution retains
+the full source/version/review guards. New report attribution uses exact trusted
+application profiles; no source-display-name matching or extra directory query.
+Corporate transport remains blocked on the precise IU-05 contracts in
+`docs/integrated-test-activation.md`. No new migration; existing catalogue 024
+remains the reviewed, target-unverified delta. See ADR-0020 for historical semantics.
+
+In Use lists default to stable Code/ordinal Id (`Sort=code`). Optional, deferred
+`Sort=oldest` orders source creation ascending; `newest` reverses
+known dates only. Unknown/invalid dates stay last; binary code and ordinal GUID
+break ties before SQL paging. No schema change. `pending` and `verification` views
+reuse normalized activity evidence and the durable active-execution fence. Missing
+refresh rows retain answers and the prior observation, never imply completion.
+The real parser still has no parent creation or completed-activity read contract;
+fixture reconciliation tests do not activate that corporate integration.

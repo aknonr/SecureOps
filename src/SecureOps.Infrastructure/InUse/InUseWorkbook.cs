@@ -29,9 +29,9 @@ public static partial class InUseWorkbook
         "check:MemoryAlarm", "check:CpuAlarm", "check:UpDownAlarm", "check:DiskAlarm"];
 
     /// <summary>Creates exact worksheet previews and their version-bound binary representation.</summary>
-    public static InUseReport Create(InUseRecord record, Guid actor, DateTimeOffset now)
+    public static InUseReport Create(InUseRecord record, Guid actor, DateTimeOffset now, string? preparerName = null, string? preparerAccount = null)
     {
-        if (record.Draft is null || record.Draft.SourceVersion != record.SourceVersion)
+        if (record.Draft is null || !record.ReviewCurrent)
         { throw new InvalidOperationException("Only current saved drafts may be exported."); }
         List<IReadOnlyList<string>> serverRows = [];
         for (int row = 0; row < _serverHeaders.Length; row++)
@@ -49,8 +49,13 @@ public static partial class InUseWorkbook
             new[] { "RecordId", record.Id.ToString("D") }, new[] { "SourceId", record.Source.Id }, new[] { "Code", record.Source.Code },
             new[] { "Version", record.Version.ToString(CultureInfo.InvariantCulture) },
             new[] { "SourceVersion", record.SourceVersion.ToString(CultureInfo.InvariantCulture) }, new[] { "SourceHash", record.SourceHash },
-            new[] { "LastSeenAt", record.LastSeenAt.ToString("O") }, new[] { "ReviewedBy", record.Draft.ReviewedBy.ToString("D") },
-            new[] { "ReviewedAt", record.Draft.ReviewedAt.ToString("O") }, new[] { "PreparedBy", actor.ToString("D") },
+            new[] { "LastSeenAt", record.LastSeenAt.ToString("O") },
+            new[] { "İnceleyen", InUsePersonLabel.Format(record.Draft.ReviewedByLabel, record.Draft.ReviewedByAccount) },
+            new[] { "ReviewedBy", record.Draft.ReviewedBy.ToString("D"), "Application user GUID; not Windows SID or source requester" },
+            new[] { "ReviewedAt", record.Draft.ReviewedAt.ToString("O") },
+            new[] { "Raporu hazırlayan", InUsePersonLabel.Format(preparerName, preparerAccount) },
+            new[] { "PreparedBy", actor.ToString("D"), "Application user GUID; not Windows SID or source approver" },
+            new[] { "WASAS adımını onaylayan", "Kaynak kanıtı alınmadı; hazırlayan veya inceleyenden türetilmez" },
             new[] { "PreparedAt", now.ToString("O") }, new[] { "Synthetic", record.Source.Synthetic.ToString() },
             new[] { "Relationships", record.Source.RelationshipEvidence }, new[] { "Notes", record.Draft.Notes },
             new[] { "RetainedEvidence", "Historical notes/checks are preserved; they do not verify changed answers or completed monitoring." },
@@ -89,11 +94,16 @@ public static partial class InUseWorkbook
         }
         InUseSheet[] sheets = [new("NMS", nmsRows), new("CheckList_THY", []), new("CheckList_TEKNIK", []), new("Sunucular", serverRows)];
         sheets = sheets.Select(s => new InUseSheet(s.Name, s.Rows.Select(r => (IReadOnlyList<string>)r.Select(Safe).ToArray()).ToArray())).ToArray();
-        byte[] bytes = Write(sheets, corporateLayout: true);
+        string attribution = "Hazırlayan: " + InUsePersonLabel.Format(preparerName, preparerAccount)
+            + " | İnceleyen: " + InUsePersonLabel.Format(record.Draft.ReviewedByLabel, record.Draft.ReviewedByAccount);
+        byte[] bytes = Write(sheets, corporateLayout: true, attribution);
         return new(record.Id, record.Version, record.SourceVersion, Convert.ToHexString(SHA256.HashData(bytes)),
             $"InUse-{record.Id:D}-v{record.Version}.xlsx", bytes, sheets)
         {
             PreparedBy = actor,
+            PreparedByLabel = InUsePersonLabel.Format(preparerName, null) == "Kullanıcı adı çözümlenemedi"
+                ? InUsePersonLabel.Format(null, preparerAccount) : preparerName,
+            PreparedByAccount = preparerAccount,
             PreparedAt = now,
             SourceId = record.Source.Id,
             SourceCode = record.Source.Code,
@@ -139,7 +149,7 @@ public static partial class InUseWorkbook
     /// <summary>Writes bounded caller-provided worksheet rows as safe text cells only.</summary>
     public static byte[] Write(IReadOnlyList<InUseSheet> sheets) => Write(sheets, corporateLayout: false);
 
-    private static byte[] Write(IReadOnlyList<InUseSheet> sheets, bool corporateLayout)
+    private static byte[] Write(IReadOnlyList<InUseSheet> sheets, bool corporateLayout, string? attribution = null)
     {
         using MemoryStream output = new();
         using (ZipArchive zip = new(output, ZipArchiveMode.Create, leaveOpen: true))
@@ -152,7 +162,10 @@ public static partial class InUseWorkbook
                 Element(writer, "Default", ns, ("Extension", "xml"), ("ContentType", "application/xml"));
                 Element(writer, "Override", ns, ("PartName", "/xl/workbook.xml"), ("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"));
                 if (corporateLayout)
-                { Element(writer, "Override", ns, ("PartName", "/xl/styles.xml"), ("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml")); }
+                {
+                    Element(writer, "Override", ns, ("PartName", "/xl/styles.xml"), ("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"));
+                    Element(writer, "Override", ns, ("PartName", "/docProps/core.xml"), ("ContentType", "application/vnd.openxmlformats-package.core-properties+xml"));
+                }
                 for (int i = 1; i <= sheets.Count; i++)
                 { Element(writer, "Override", ns, ("PartName", $"/xl/worksheets/sheet{i}.xml"), ("ContentType", "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml")); }
                 writer.WriteEndElement();
@@ -161,8 +174,19 @@ public static partial class InUseWorkbook
             {
                 writer.WriteStartElement("Relationships", _relationships);
                 Element(writer, "Relationship", _relationships, ("Id", "rId1"), ("Type", _officeRelationships + "/officeDocument"), ("Target", "xl/workbook.xml"));
+                if (corporateLayout)
+                { Element(writer, "Relationship", _relationships, ("Id", "core"), ("Type", _relationships + "/metadata/core-properties"), ("Target", "docProps/core.xml")); }
                 writer.WriteEndElement();
             });
+            if (corporateLayout)
+            {
+                Entry(zip, "docProps/core.xml", writer =>
+                {
+                    writer.WriteStartElement("cp", "coreProperties", "http://schemas.openxmlformats.org/package/2006/metadata/core-properties");
+                    writer.WriteElementString("dc", "description", "http://purl.org/dc/elements/1.1/", attribution ?? "");
+                    writer.WriteEndElement();
+                });
+            }
             Entry(zip, "xl/workbook.xml", writer =>
             {
                 writer.WriteStartElement("workbook", _spreadsheet);
@@ -182,6 +206,19 @@ public static partial class InUseWorkbook
                     writer.WriteEndElement();
                 }
                 writer.WriteEndElement();
+                if (corporateLayout)
+                {
+                    writer.WriteStartElement("definedNames", _spreadsheet);
+                    foreach (int index in Enumerable.Range(0, sheets.Count).Where(n => sheets[n].Rows.Count > 0))
+                    {
+                        writer.WriteStartElement("definedName", _spreadsheet);
+                        writer.WriteAttributeString("name", "_xlnm.Print_Titles");
+                        writer.WriteAttributeString("localSheetId", index.ToString(CultureInfo.InvariantCulture));
+                        writer.WriteString($"'{sheets[index].Name}'!$1:$1" + (sheets[index].Name == "Sunucular" ? ", 'Sunucular'!$A:$A" : ""));
+                        writer.WriteEndElement();
+                    }
+                    writer.WriteEndElement();
+                }
                 writer.WriteEndElement();
             });
             Entry(zip, "xl/_rels/workbook.xml.rels", writer =>
@@ -202,7 +239,12 @@ public static partial class InUseWorkbook
                 {
                     writer.WriteStartElement("worksheet", _spreadsheet);
                     if (corporateLayout && sheet.Rows.Count > 0)
-                    { WriteLayout(writer, sheet); }
+                    {
+                        writer.WriteStartElement("sheetPr", _spreadsheet);
+                        Element(writer, "pageSetUpPr", _spreadsheet, ("fitToPage", "1"));
+                        writer.WriteEndElement();
+                        WriteLayout(writer, sheet);
+                    }
                     writer.WriteStartElement("sheetData", _spreadsheet);
                     for (int rowIndex = 0; rowIndex < sheet.Rows.Count; rowIndex++)
                     {
@@ -231,6 +273,17 @@ public static partial class InUseWorkbook
                         writer.WriteEndElement();
                     }
                     writer.WriteEndElement();
+                    if (corporateLayout && sheet.Rows.Count > 0)
+                    {
+                        if (sheet.Name == "NMS")
+                        { Element(writer, "autoFilter", _spreadsheet, ("ref", $"A1:V{sheet.Rows.Count}")); }
+                        Element(writer, "pageMargins", _spreadsheet, ("left", "0.25"), ("right", "0.25"), ("top", "0.5"), ("bottom", "0.75"), ("header", "0.2"), ("footer", "0.3"));
+                        Element(writer, "pageSetup", _spreadsheet, ("orientation", "landscape"), ("paperSize", "8"), ("fitToWidth", "1"), ("fitToHeight", "0"));
+                        writer.WriteStartElement("headerFooter", _spreadsheet);
+                        string footer = (attribution ?? "").Replace("&", "&&", StringComparison.Ordinal);
+                        writer.WriteElementString("oddFooter", _spreadsheet, "&L" + (footer.Length > 200 ? footer[..200] + "..." : footer) + "&R&P / &N");
+                        writer.WriteEndElement();
+                    }
                     writer.WriteEndElement();
                 });
             }

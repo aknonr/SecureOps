@@ -68,7 +68,7 @@ public sealed class InUseReportArchive(IConfiguration configuration)
                 return allowed;
             }, token);
         }
-        catch (Exception exception) when (!authorizing && exception is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
+        catch (Exception exception) when (!authorizing && exception is IOException or InvalidDataException or UnauthorizedAccessException or InvalidOperationException or JsonException)
         {
             string code = exception switch
             {

@@ -42,8 +42,14 @@ public sealed class InUseHostedTests
         InUsePage page = (await admin.GetFromJsonAsync<InUsePage>("/api/v1/in-use?pageSize=1"))!;
         page.Total.Should().Be(2);
         page.Items.Should().ContainSingle();
+        (await admin.GetFromJsonAsync<InUsePage>("/api/v1/in-use?sort=newest&view=verification"))!.Items
+            .Should().OnlyContain(r => r.ActivityStatus == "VerificationPending");
+        (await admin.GetFromJsonAsync<InUsePage>("/api/v1/in-use?sort=oldest&view=pending"))!.Total.Should().Be(0,
+            "local source without activity evidence must not invent eligible WASAS activities");
         InUseRecord record = page.Items[0];
         string root = $"/api/v1/in-use/{record.Id}";
+        (await denied.PostAsJsonAsync(root + "/execution/manual-verification", new ConfirmInUseClosureRequest(Guid.NewGuid(), 1, record.Source.Code)))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.GetAsync("/api/v1/in-use/reports")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.GetAsync(root + "/reporter-suggestion")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.PostAsJsonAsync(root + "/reports/index", new IndexInUseReportsRequest(record.Version, [1]))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -76,7 +82,7 @@ public sealed class InUseHostedTests
         (await denied.PostAsJsonAsync(root + "/report", new ExportInUseRequest(record.Version))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.PostAsJsonAsync(root + "/report", new ExportInUseRequest(record.Version, true))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await denied.PostAsJsonAsync(root + "/report", new ExportInUseRequest(record.Version, ArchivedVersion: 1))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        foreach (string query in new[] { "page=0", "pageSize=101", "view=other", "status=closed" })
+        foreach (string query in new[] { "page=0", "pageSize=101", "view=other", "status=closed", "sort=other" })
         { (await admin.GetAsync("/api/v1/in-use?" + query)).StatusCode.Should().Be(HttpStatusCode.BadRequest); }
         JsonElement me = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/me");
         record = (await (await admin.PutAsJsonAsync(root + "/assignment", new AssignInUseRequest(record.Version,

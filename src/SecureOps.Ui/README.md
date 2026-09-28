@@ -1,5 +1,11 @@
 # SecureOps.Ui
 
+In Use closure now confirms the exact OR and archived report before submission,
+and distinguishes acknowledged, unknown, rejected, source-verified and manually
+confirmed results. Manual confirmation is explicit and capability-gated; its time
+is displayed in UTC. No source URL was inferred. Component rendering is locally
+testable; browser/200%-zoom and corporate closure still require their existing gates.
+
 ## System Status Presentation Continuation, 2026-09-20
 
 `/admin/system-status` keeps the authorized read-only diagnostic and JSON download
@@ -329,7 +335,7 @@ Two states are deliberately **not** toned as errors:
   outcome settles as `JiraCreateFailed` with `reconciliationRequired = true`; the flag, not the
   stage, is the signal. `CreatingJira` without an issue key is treated the same way as a secondary
   signal, covering the window before the flag is set. Either way: a prominent amber panel, create
-  blocked in every state, retry only if `retryEligible`, and an explicit duplicate-risk warning.
+  and retry blocked in every state, and an explicit duplicate-risk warning.
 
 **Idempotency belongs to the backend.** The UI sends no `Idempotency-Key`. The contract makes it
 optional and the API then derives a deterministic key from actor, command, and record — which is
@@ -340,8 +346,9 @@ already the desired behaviour, and generating one here would be a second competi
 and block a record nobody holds. Compare against `GET /identity/me`'s `name`, never the cookie
 principal: the API sees `demo:platform-admin` where the session says `platform-admin`.
 
-**`reconciliationRequired` outranks the state machine.** While it is set, create is blocked in every
-state and retry is offered only if `retryEligible` is also true.
+**`reconciliationRequired` outranks the state machine.** While it is set, create and retry are
+blocked in every state. The contract keeps `retryEligible` false here; a contradictory payload fails
+closed.
 
 **Never auto-retry.** Retry is offered when authoritative record state says a stage is resumable, not
 because a call failed. `WorkflowConflict` at `stage: "jira-reconciliation"` is mapped to a dedicated
@@ -349,6 +356,48 @@ non-retryable presentation, never to the generic conflict message.
 
 **No polling.** `GET /operational-records` is a rate-limited source refresh, not a passive read.
 Refresh is a deliberate operator action, plus an automatic re-read after every write.
+
+### Jira-only submission states (UI, 2026-09-28)
+
+`JiraSubmissionPanel` sits directly above the action buttons and names one phase, resolved by
+`JiraSubmissionView.PhaseOf` from the re-read record first and the page's last command second:
+
+| Phase | Shown when | Never |
+|---|---|---|
+| Ready | server preview held, `ActionsFor().Create`, create capability | shown for a review-only draft |
+| Submitting | create/retry command in flight (`aria-busy`) | shown while the dialog is still open |
+| Created | re-read record has `jiraExists`/`jiraIssueKey` | derived from a `JiraTransferResponse` alone |
+| Acknowledged | command answered, re-read record has no saved key | called a created issue |
+| Rejected | command refused, no key, outcome not unknown | offered as uncertain |
+| Uncertain | `reconciliationRequired`, key-less `CreatingJira`, or `stage=jira-reconciliation` | offers create or retry |
+
+- Ready shows the selected OR and source id, request type and its basis, Jira project/issue type/id,
+  every preview field, the transfer key as duplicate protection, and a prominent statement that the
+  Turuncu Hat record stays open (from `preview.sourceCloseRequested`, never assumed).
+- Transfer-and-close is not offered anywhere on this screen; the panel states why, using
+  `sourceCloseEnabled`. Unsupported request types show only server blocker guidance
+  (`TypeMappingPending`, `RetirementMappingPending`, `ApplicationMappingPending`, category codes).
+- The confirmation dialog requires ticking a statement naming the OR and the source outcome
+  (`SoConfirmStatement`); **Oluştur** stays disabled until then. Initial focus is the statement,
+  because with Oluştur disabled MudBlazor's focus trap left forward Tab unable to reach it.
+- An unacknowledged command stays Uncertain until an explicit **Yenile**; the automatic re-read can
+  race a request the server has not started. Create/retry stay disabled while Uncertain or
+  Acknowledged. Under `reconciliationRequired` retry is never offered, even if a payload
+  contradicts the contract by also sending `retryEligible=true`.
+- After a command settles, focus moves to the panel heading.
+- No Jira link is rendered: the contract carries no issue URL, and none is composed from the key.
+
+Backend contract needs (for Codex; nothing here is assumed by the UI):
+
+1. `jiraIssueUrl` (nullable, absolute https, server-derived from configuration) on
+   `OperationalRecordResponse` and `JiraTransferResponse`, to render the saved issue as a link.
+2. The transfer key (`idempotencyKey`) and the UTC time the Jira key was persisted on
+   `OperationalRecordResponse`, so duplicate protection stays visible after a page reload.
+3. A replay indicator on `JiraTransferResponse` (for example `replayed: true` when an existing key
+   was returned without a new Jira call), so "created now" and "already existed" can be told apart.
+
+Replay: `node tests/browser/sdm-jira-submission.cjs <playwright-core path> <UI URL> <API URL> <evidence dir>`
+against paired `Simulation` providers with `InMemory` persistence (every key is synthetic `SIM-*`).
 
 ## Resource catalogue and shift-start sets
 
@@ -2117,3 +2166,22 @@ open the exact owned draft; access/synthetic/historical limitations stay visible
 An unavailable response retains the previous cut and restores its applied filters.
 This is not target activation or an employee productivity ranking. See
 `docs/integrated-test-activation.md` and `docs/integrated-activation-tr.md`.
+## E-08 In Use activity review
+
+The primary action submits only the eligible WASAS activity, not overall OR
+closure. One `Cevapları kaydet` action persists answers and explicitly selected
+proposal review. Source diffs, independent RFC/server columns, saved state,
+required values and disabled reasons remain visible. Copying answers still needs
+a target/field preview. Tracking distinguishes source-verified completion from
+manual attestation. Next-team/stage display is deferred, not a current list gate.
+Current browser selectors are updated, but execution remains pending through the
+authorized runner; component rendering and syntax checks are not browser proof.
+See the single register `docs/integrated-test-activation.md`, IU-07 / E-08.
+
+List ordering defaults to `OR numarasina gore`, Code/record Id before paging.
+Date options are disabled with an explanation, including on old date-sort links;
+backend oldest/newest support is retained for later verified mapping, not a gate.
+The date column explicitly labels unavailable evidence and shows UTC, never the
+refresh timestamp. Source-pending and verification-pending filters complement the
+existing review/tracking views. The real source date/activity read contract is
+still absent; local fixtures and component checks are not corporate acceptance.

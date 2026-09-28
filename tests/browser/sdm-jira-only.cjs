@@ -48,7 +48,8 @@ const out = path.resolve(process.argv[6]);
         const dialog = page.getByRole('dialog', { name: 'Jira Kaydı Oluştur', exact: true });
         await dialog.waitFor();
         await page.waitForFunction(() => document.querySelector('[role="dialog"]')?.contains(document.activeElement));
-        assert.equal(await dialog.getByRole('button', { name: 'Vazgeç', exact: true }).evaluate(e => e === document.activeElement), true);
+        assert.equal(await dialog.getByRole('checkbox').evaluate(e => e === document.activeElement), true);
+        assert.equal(await dialog.getByRole('button', { name: 'Oluştur', exact: true }).isDisabled(), true);
         await dialog.getByText('Turuncu Hat kaydı açık bırakılacak.', { exact: true }).waitFor();
         await capture(page, out, name + '-confirmation');
         await dialog.getByRole('button', { name: 'Vazgeç', exact: true }).click();
@@ -57,6 +58,7 @@ const out = path.resolve(process.argv[6]);
         assert.equal(await page.getByRole('button', { name: 'Jira Kaydı Oluştur', exact: true }).isEnabled(), true);
         if (!confirm) return;
         await page.getByRole('button', { name: 'Jira Kaydı Oluştur', exact: true }).click();
+        await dialog.getByRole('checkbox').check();
         await dialog.getByRole('button', { name: 'Oluştur', exact: true }).evaluate(e => { e.click(); e.click(); });
     }
     try {
