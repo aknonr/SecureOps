@@ -359,6 +359,12 @@ Refresh is a deliberate operator action, plus an automatic re-read after every w
 
 ### Jira-only submission states (UI, 2026-09-28)
 
+Combined-source verification found duplicate access notifications during first
+render. Cached waiters now reuse the snapshot without another `Changed` event;
+explicit refresh and newly loaded access still notify. The OR list/detail subscribe
+after acquiring their initial access snapshot, avoiding a redundant initial load
+that can discard a just-requested preview. API authorization is unchanged.
+
 `JiraSubmissionPanel` sits directly above the action buttons and names one phase, resolved by
 `JiraSubmissionView.PhaseOf` from the re-read record first and the page's last command second:
 

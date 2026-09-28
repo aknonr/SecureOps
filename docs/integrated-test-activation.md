@@ -51,6 +51,15 @@ resend and API-to-Jira JSON create are different transports; neither grants
 corporate acceptance. The new test initially hit IDE0008 and was corrected
 before its successful run.
 
+A second combined browser failure exposed first-load reentrancy. The new
+`ConcurrentInitialReads_PublishOneChange_NotOnePerWaiter` test failed before the
+fix (expected one access change, observed two). Cached access waiters now do not
+publish another change; explicit refresh still publishes. OR list/detail register
+their change listeners after receiving the initial snapshot. This is a bounded
+integration defect correction, not a new access policy. Source `3a8b637` ZIPs
+are retained as superseded review outputs, not the final candidate; new source
+and hashes are required after this correction. No corporate writes occurred.
+
 ### In Use SQL regression correction, 2026-09-28
 
 The audit-rollback assertion in

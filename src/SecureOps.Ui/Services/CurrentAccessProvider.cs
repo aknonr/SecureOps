@@ -53,7 +53,7 @@ public sealed class CurrentAccessProvider : ICurrentAccessProvider, IDisposable
         }
 
         await _gate.WaitAsync(cancellationToken);
-
+        bool published = false;
         try
         {
             // Re-check inside the gate: concurrent first renders queue here, and only the first should
@@ -83,12 +83,16 @@ public sealed class CurrentAccessProvider : ICurrentAccessProvider, IDisposable
             }
 
             _snapshot = snapshot;
+            published = true;
             return snapshot;
         }
         finally
         {
             _gate.Release();
-            Changed?.Invoke();
+            if (published)
+            {
+                Changed?.Invoke();
+            }
         }
     }
 

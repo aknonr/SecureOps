@@ -556,8 +556,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        AccessProvider.Changed += OnAccessChanged;
         _access = await AccessProvider.GetAsync(CancellationToken.None);
+        AccessProvider.Changed += OnAccessChanged;
 
 if (_access.Can(Capabilities.OperationalRecordsView))
         {
