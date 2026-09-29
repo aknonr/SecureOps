@@ -10,6 +10,7 @@ public partial class ServiceAccountDetail
 {
     private AccountDetail? _detail;
     private IReadOnlyList<OrganizationView> _organizations = [];
+    private bool _directoryRequested;
     private IReadOnlyList<TeamView> _teams = [];
     private int _revision;
     private Guid? _loadedId;
