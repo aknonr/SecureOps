@@ -234,6 +234,93 @@ public sealed class ServiceAccountWorkflowSqlTests
             new { prefix })).Should().Be(0);
     }
 
+    /// <summary>
+    /// Scenario 4 completed: the two closure reviews reach their own outcomes. Request closure, evidence review
+    /// (verification of the review action) and account ownership verification are separate decisions; none of them
+    /// closes an account or adds completed password/deletion work.
+    /// </summary>
+    [ServiceAccountSqlFact]
+    public async Task LinuxCohort_TwoClosureReviews_ReachSeparateOutcomes_WithoutClosingAccounts()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        Guid team = await fx.TeamAsync("SYN LINUX EKIP " + fx.Suffix, org);
+        DateOnly first = new(2026, 9, 30);
+        List<AccountDetail> cohort = [];
+        for (int index = 0; index < 10; index++)
+        {
+            AccountDetail account = await CreateAccountAsync(fx, coordinator, org, "LNX" + index);
+            cohort.Add(index < 8
+                ? Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, account.Summary.Id,
+                    new CreateWorkRequest("PasswordChange", PlanStart: first.AddDays(index * 13), PlanEnd: first.AddDays(index * 13)), _token))
+                : account);
+        }
+
+        AccountDetail keep = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, cohort[8].Summary.Id,
+            new CreateWorkRequest("Review", Notes: "Kapanış incelemesi: kullanım kanıtı"), _token));
+        AccountDetail candidate = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, cohort[9].Summary.Id,
+            new CreateWorkRequest("Review", Notes: "Kapanış incelemesi: silme adayı"), _token));
+        candidate = Ok(await fx.Service.ChangeOwnershipAsync(coordinator.Principal, fx.Context, candidate.Summary.Id,
+            new OwnershipChangeRequest(candidate.Summary.Version, team, null, "Propose", "Sentetik öneri"), _token));
+        candidate = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, candidate.Summary.Id, new CreateWorkRequest("OwnershipConfirmation"), _token));
+        Guid keepReview = keep.Requests.Single().Id;
+        Guid candidateReview = candidate.Requests.Single(r => r.ActionType == "Review").Id;
+        Guid ownershipRequest = candidate.Requests.Single(r => r.ActionType == "OwnershipConfirmation").Id;
+
+        (await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, keep.Summary.Id,
+            new ReportActionRequest("Review", "Performed", "Closure", keepReview, ActualOn: new(2026, 9, 20), EvidenceNote: "inceleme"), _token))
+            .Field.Should().Be(ServiceAccountRules.Errors.ClosureKindNotAllowed, "a review cannot be recorded as the account's closure");
+
+        // Review 1: evidence review. The performed review is verified against an evidence file; then the request is completed.
+        keep = Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, keep.Summary.Id,
+            new ReportActionRequest("Review", "Performed", "Intermediate", keepReview, ActualOn: new(2026, 9, 20), EvidenceNote: "Kullanım kanıtı incelendi"), _token));
+        ActionView review = keep.Actions.Single();
+        keep = Ok(await fx.Service.AddEvidenceAsync(coordinator.Principal, fx.Context, keep.Summary.Id, "Action", review.Id, "inceleme.txt", "text/plain",
+            "sentetik inceleme kaydı"u8.ToArray(), "Sentetik", _token));
+        review = keep.Actions.Single();
+        keep = Ok(await fx.Service.VerifyActionAsync(coordinator.Principal, fx.Context, review.Id,
+            new VerifyActionRequest(review.Version, new(2026, 9, 21), VerificationNote: "Kanıt dosyası incelendi", EvidenceId: keep.Evidence.Single().Id), _token));
+        keep.Actions.Single().Result.Should().Be("Verified", "the evidence review is recorded on the same action");
+        keep.Actions.Single().VerifiedClosure.Should().BeFalse();
+        keep = Ok(await fx.Service.CloseRequestAsync(coordinator.Principal, fx.Context, keepReview,
+            new CloseWorkRequest(keep.Requests.Single().Version, "Completed"), _token));
+        keep.Requests.Single().Status.Should().Be("Closed");
+        keep.Summary.LifecycleState.Should().Be("Active", "completing a closure review does not close the account");
+        keep.Summary.OwnerTeam.Should().BeNull("a review does not verify ownership");
+
+        // Review 2: deletion candidate. The review completes; ownership verification and the deletion stay separate.
+        candidate = Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, candidate.Summary.Id,
+            new ReportActionRequest("Review", "Performed", "Intermediate", candidateReview, ActualOn: new(2026, 9, 22), EvidenceNote: "Silme adayı; sahip teyidi gerekli"), _token));
+        candidate = Ok(await fx.Service.CloseRequestAsync(coordinator.Principal, fx.Context, candidateReview,
+            new CloseWorkRequest(candidate.Requests.Single(r => r.Id == candidateReview).Version, "Completed"), _token));
+        (await fx.Service.CloseRequestAsync(coordinator.Principal, fx.Context, ownershipRequest,
+            new CloseWorkRequest(candidate.Requests.Single(r => r.Id == ownershipRequest).Version, "Completed"), _token))
+            .Field.Should().Be(ServiceAccountRules.Errors.OwnershipNotConfirmed, "closing the review does not verify ownership");
+        candidate = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, candidate.Summary.Id,
+            new CreateWorkRequest("Deletion", PlanStart: new(2026, 10, 15), PlanEnd: new(2026, 10, 15)), _token));
+        OwnershipView proposal = candidate.Ownership.Single(o => o.State == "Proposed");
+        candidate = Ok(await fx.Service.DecideOwnershipAsync(coordinator.Principal, fx.Context, candidate.Summary.Id, proposal.Id,
+            new OwnershipDecisionRequest(proposal.Version, "Confirm", "Sentetik ekip yazılı teyit verdi"), _token));
+        candidate = Ok(await fx.Service.CloseRequestAsync(coordinator.Principal, fx.Context, ownershipRequest,
+            new CloseWorkRequest(candidate.Requests.Single(r => r.Id == ownershipRequest).Version, "Completed"), _token));
+        candidate.Summary.OwnerTeam!.Id.Should().Be(team);
+        candidate.Summary.LifecycleState.Should().Be("Active");
+        candidate.Requests.Single(r => r.ActionType == "Deletion").Status.Should().Be("Open", "the deletion is planned work, not done");
+
+        ServiceAccountReport report = Ok(await fx.Service.WeeklyReportAsync(coordinator.Principal, fx.Context,
+            new WeeklyReportQuery(new(2026, 9, 1), Period: "Custom", PeriodEnd: new(2026, 12, 31)), _token));
+        report.Summary.UniqueAccounts.Should().Be(10);
+        report.Summary.DatedOpenPlanRequests.Should().Be(9, "eight password plans and the planned deletion");
+        report.Summary.PerformedActionReports.Should().Be(2, "only the two review reports");
+        report.Summary.VerifiedClosureAccounts.Should().Be(0);
+        string prefix = "SYN" + fx.Suffix + "_LNX%";
+        (await fx.CountAsync("""
+            SELECT COUNT(*) FROM svcacct.ActionEvents e JOIN svcacct.Accounts a ON a.Id = e.AccountId
+            WHERE a.AccountName LIKE @prefix AND e.ActionType IN ('PasswordChange','Deletion') AND e.Result IN ('Performed','Verified');
+            """, new { prefix })).Should().Be(0, "completed password/deletion totals do not increase");
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.Accounts WHERE AccountName LIKE @prefix AND LifecycleState = 'ClosureVerified';", new { prefix }))
+            .Should().Be(0);
+    }
+
     [ServiceAccountSqlFact]
     public async Task ParticipantTeam_WorksOnlyOnItsOwnRequest_AndLosesAccessWhenItCloses()
     {

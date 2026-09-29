@@ -156,4 +156,19 @@ public sealed class ServiceAccountDomainTests
         new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(SecureOps.Infrastructure.ServiceAccounts.SqlServiceAccountRepository.ModuleConnectionString(
             "Server=sql.invalid;Database=SecureOps;Integrated Security=True")).ApplicationName.Should().Be("SecureOps / Service Accounts");
     }
+
+    [Theory]
+    [InlineData(ServiceAccountActionType.Review, false)]
+    [InlineData(ServiceAccountActionType.OwnershipConfirmation, false)]
+    [InlineData(ServiceAccountActionType.PasswordChange, false)]
+    [InlineData(ServiceAccountActionType.Evaluate, false)]
+    [InlineData(ServiceAccountActionType.GmsaHandover, false)]
+    [InlineData(ServiceAccountActionType.GmsaConversion, true)]
+    [InlineData(ServiceAccountActionType.Deletion, true)]
+    public void OnlyDeletionOrGmsaConversion_CanBeAVerifiedAccountClosure(ServiceAccountActionType type, bool closes)
+    {
+        ActionFacts verified = new(type, ServiceAccountActionResult.Verified, ServiceAccountRecordKind.Closure, new(2026, 9, 20), new(2026, 9, 21),
+            true, true, true, false);
+        ServiceAccountRules.IsVerifiedClosure(verified).Should().Be(closes, "a closure review or ownership check does not retire the account");
+    }
 }

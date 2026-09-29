@@ -91,8 +91,15 @@
                 <MudItem xs="6" md="4">
                     <MudSelect T="string" @bind-Value="_report.RecordKind" Label="Kayıt türü" Variant="Variant.Outlined">
                         <MudSelectItem T="string" Value="@("Intermediate")">Ara adım</MudSelectItem>
-                        <MudSelectItem T="string" Value="@("Closure")">Hesap kapanışı</MudSelectItem>
+                        @if (CanClose)
+                        {
+                            <MudSelectItem T="string" Value="@("Closure")">Hesap kapanışı</MudSelectItem>
+                        }
                     </MudSelect>
+                    @if (!CanClose)
+                    {
+                        <p class="so-panel-text--sm mt-1">Hesap kapanışı yalnız silme veya gMSA dönüşümü için kaydedilir; kapanış incelemesi hesabı kapatmaz.</p>
+                    }
                 </MudItem>
                 <MudItem xs="12" md="4">
                     <MudSelect T="Guid?" @bind-Value="_report.RequestId" Label="@(Detail.Permissions.Work ? "İlgili talep" : "İlgili talep (zorunlu)")" Clearable="@Detail.Permissions.Work" Variant="Variant.Outlined">
@@ -121,6 +128,9 @@
     private Guid? _verifier, _evidenceId;
     private string? _note;
     private ReportModel _report = new();
+
+    private bool CanClose => Enum.TryParse(_report.ActionType, false, out SecureOps.Domain.ServiceAccounts.ServiceAccountActionType type)
+        && SecureOps.Domain.ServiceAccounts.ServiceAccountRules.CanCloseAccount(type);
     private int _seenRevision = -1;
 
     /// <summary>Account detail.</summary>
@@ -162,7 +172,7 @@
     private Task VoidAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/actions/{_target!.Id}/void", new VoidActionRequest(_target.Version, _note!.Trim())));
 
     private Task ReportAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/accounts/{Detail.Summary.Id}/actions",
-        new ReportActionRequest(_report.ActionType, _report.Result, _report.RecordKind, _report.RequestId, ServiceAccountUiText.ToDate(_report.ActualOn), null,
+        new ReportActionRequest(_report.ActionType, _report.Result, CanClose ? _report.RecordKind : "Intermediate", _report.RequestId, ServiceAccountUiText.ToDate(_report.ActualOn), null,
             _report.PerformerTeamId, _report.PerformerPersonId, string.IsNullOrWhiteSpace(_report.EvidenceNote) ? null : _report.EvidenceNote.Trim(),
             string.IsNullOrWhiteSpace(_report.OrNumber) ? null : [new SaExternalRef("OR", _report.OrNumber.Trim())])));
 

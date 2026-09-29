@@ -55,15 +55,29 @@ public static class ServiceAccountRules
         public const string DateInFuture = "ActualDateInFuture";
         /// <summary>Ownership confirmation completes only with a confirmed assignment.</summary>
         public const string OwnershipNotConfirmed = "OwnershipNotConfirmed";
+        /// <summary>Only a deletion or a gMSA conversion can be recorded as the account's closure.</summary>
+        public const string ClosureKindNotAllowed = "ClosureKindNotAllowed";
     }
 
     /// <summary>Rule 8: a non-void Performed or Verified action is a performed-action report; counted once.</summary>
     public static bool IsPerformedReport(ActionFacts action) =>
         !action.Voided && action.Result is ServiceAccountActionResult.Performed or ServiceAccountActionResult.Verified;
 
+    /// <summary>
+    /// Action types that can retire an account: a deletion or an actual gMSA conversion. A review (including a closure
+    /// review), an ownership confirmation, a password change, an evaluation or a handover never closes the account.
+    /// </summary>
+    public static bool CanCloseAccount(ServiceAccountActionType type) =>
+        type is ServiceAccountActionType.Deletion or ServiceAccountActionType.GmsaConversion;
+
+    /// <summary>A closure record kind is accepted only for action types that can close an account.</summary>
+    public static string? ValidateRecordKind(ServiceAccountActionType type, ServiceAccountRecordKind kind) =>
+        kind == ServiceAccountRecordKind.Closure && !CanCloseAccount(type) ? Errors.ClosureKindNotAllowed : null;
+
     /// <summary>Rule 6: verified closure conditions; record kind alone never closes.</summary>
     public static bool IsVerifiedClosure(ActionFacts action) =>
         !action.Voided
+        && CanCloseAccount(action.ActionType)
         && action.Result == ServiceAccountActionResult.Verified
         && action.RecordKind == ServiceAccountRecordKind.Closure
         && action.ActualOn is { } actual
