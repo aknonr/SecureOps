@@ -9,6 +9,16 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Pilot-readiness iteration 2026-09-29 (current state)
+
+Integration source, results and Windows commands: [HANDOFF.md](HANDOFF.md) (supersedes the
+`55ab73e` bundle). Windows runner: [WINDOWS-ACCEPTANCE.md](WINDOWS-ACCEPTANCE.md) — **not executed**.
+This round: pooled isolation leak fixed (`cd51dbf`); stale reminder job no-op, unused grants removed,
+reverse gate test (`4c27bbb`); HTTP composition tests through the real `Program` (`b8aad7e`). At
+`b8aad7e`: build 0/0, unit 1566/1568 (2 baseline), integration failing set identical to `e997c5b`,
+module 33/33 on a new database under the restricted role. The two first-run failures remain
+unexplained (see below). The tables in the next section describe the previous round.
+
 ## Continuation 2026-09-29 (sole implementation owner)
 
 Codex stopped Service Accounts edits; this module is continued by one owner. Final platform
