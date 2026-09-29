@@ -1,5 +1,6 @@
 @* Actions report what was planned, performed or verified. A performed action needs a real date; verification is a
    separate, evidenced record by a verifier. Nothing here changes a password, deletes an account or converts to gMSA. *@
+@using SecureOps.Domain.ServiceAccounts
 @using SecureOps.Shared.Contracts.ServiceAccounts
 @using SecureOps.Ui.Services.ServiceAccounts
 
@@ -129,8 +130,7 @@
     private string? _note;
     private ReportModel _report = new();
 
-    private bool CanClose => Enum.TryParse(_report.ActionType, false, out SecureOps.Domain.ServiceAccounts.ServiceAccountActionType type)
-        && SecureOps.Domain.ServiceAccounts.ServiceAccountRules.CanCloseAccount(type);
+    private bool CanClose => Enum.TryParse(_report.ActionType, false, out ServiceAccountActionType type) && ServiceAccountRules.CanCloseAccount(type);
     private int _seenRevision = -1;
 
     /// <summary>Account detail.</summary>
