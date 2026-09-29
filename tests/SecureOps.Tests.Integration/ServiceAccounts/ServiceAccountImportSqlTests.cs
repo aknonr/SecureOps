@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Infrastructure.ServiceAccounts.Import;
+using SecureOps.Infrastructure.ServiceAccounts.Reporting;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
@@ -221,6 +222,141 @@ public sealed class ServiceAccountImportSqlTests
         ImportBatchView committed = Ok(await commit);
         committed.Result!.AccountsCreated.Should().Be(1);
     }
+
+    /// <summary>
+    /// The reporting chain end to end: two weekly imports (one repeated), the live weekly report, an immutable sent
+    /// snapshot with a late entry, month and date-range reports and filtered XLSX export — with scope, duplicate-import,
+    /// row-limit and actor/audit checks.
+    /// </summary>
+    [ServiceAccountSqlFact]
+    public async Task WeeklyImports_Reports_SentSnapshot_Periods_AndExport_WorkTogetherWithinScope()
+    {
+        ServiceAccountSqlFixture fx = new();
+        string mineName = "SYN CHAIN A " + fx.Suffix, theirName = "SYN CHAIN B " + fx.Suffix;
+        Guid mine = await fx.OrganizationAsync(mineName), theirs = await fx.OrganizationAsync(theirName);
+        string[] all = [.. ServiceAccountCapabilities.All.Where(c => c != ServiceAccountCapabilities.Administer)];
+        SynUser coordinator = await fx.UserAsync(all), other = await fx.UserAsync(all);
+        await fx.GrantAsync(coordinator, ScopeKind.Organization, mine);
+        await fx.GrantAsync(other, ScopeKind.Organization, theirs);
+        string a1 = $"SYN{fx.Suffix}_CH1", a2 = $"SYN{fx.Suffix}_CH2", a3 = $"SYN{fx.Suffix}_CH3";
+
+        // Week 1 and its duplicate: the same file, period and declaration is a replay, not a second import.
+        byte[] week1 = List(mineName, (a1, 46000), (a2, 46000), (a3, 46000));
+        ImportBatchView first = await CommitStagedAsync(fx, coordinator,
+            await StageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "hafta1.xlsx", week1, new DateOnly(2026, 9, 14), Complete(mine)));
+        ImportBatchView repeated = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "hafta1-kopya.xlsx", week1,
+            new DateOnly(2026, 9, 14), Complete(mine));
+        repeated.Replay.Should().BeTrue();
+        repeated.Id.Should().Be(first.Id);
+        ImportBatchView recommitted = Ok(await fx.Service.CommitImportAsync(coordinator.Principal, fx.Context, first.Id,
+            new ImportCommitRequest(first.PreviewVersion, first.DecisionVersion), "baska-anahtar-" + fx.Suffix, _token));
+        recommitted.Result.Should().BeEquivalentTo(first.Result);
+        ImportBatchView second = await CommitStagedAsync(fx, coordinator,
+            await StageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "hafta2.xlsx", List(mineName, (a1, 46007), (a2, 46007)),
+                new DateOnly(2026, 9, 21), Complete(mine)));
+        second.Result!.NotSeenObservations.Should().Be(1);
+        second.Result.AccountsCreated.Should().Be(0);
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.Accounts WHERE ReportOrganizationId = @mine", new { mine })).Should().Be(3);
+        AccountDetail theirAccount = Ok(await fx.Service.CreateAccountAsync(other.Principal, fx.Context, new CreateAccountRequest($"SYN{fx.Suffix}_CHX", null, theirs, "s"), _token));
+        Ok(await fx.Service.ReportActionAsync(other.Principal, fx.Context, theirAccount.Summary.Id,
+            new ReportActionRequest("PasswordChange", "Performed", "Intermediate", ActualOn: new(2026, 9, 16), EvidenceNote: "başka kapsam"), _token));
+
+        Guid id1 = await AccountIdAsync(fx, a1), id2 = await AccountIdAsync(fx, a2);
+        Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, id1,
+            new ReportActionRequest("PasswordChange", "Performed", "Intermediate", ActualOn: new(2026, 9, 16), EvidenceNote: "hafta 1"), _token));
+        Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, id2,
+            new ReportActionRequest("Review", "Performed", "Intermediate", ActualOn: new(2026, 9, 23), EvidenceNote: "hafta 2"), _token));
+
+        DateTimeOffset cutoff = new(2026, 9, 20, 23, 0, 0, TimeSpan.FromHours(3));
+        ServiceAccountReport live = Ok(await fx.Service.WeeklyReportAsync(coordinator.Principal, fx.Context, new WeeklyReportQuery(new(2026, 9, 14), cutoff), _token));
+        live.Summary.UniqueAccounts.Should().Be(3, "another organization's account is not in this scope");
+        live.Weekly.Actions.InPeriod.Should().Be(1);
+        SnapshotItem sent = Ok(await fx.Service.CreateSnapshotAsync(coordinator.Principal, fx.Context,
+            new CreateSnapshotRequest(live.WeekStart, live.AsOf, null, null, "Manager", "Direktöre gönderilen"), _token));
+
+        // A late entry for the sent week changes the live report only.
+        Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, id1,
+            new ReportActionRequest("Review", "Performed", "Intermediate", ActualOn: new(2026, 9, 17), EvidenceNote: "geç girildi"), _token));
+        Ok(await fx.Service.SnapshotAsync(coordinator.Principal, fx.Context, sent.Id, _token)).Should().BeEquivalentTo(live, "a sent snapshot never changes");
+        Ok(await fx.Service.WeeklyReportAsync(coordinator.Principal, fx.Context, new WeeklyReportQuery(new(2026, 9, 14), cutoff), _token))
+            .Weekly.Actions.InPeriod.Should().Be(2);
+        (await fx.Service.SnapshotAsync(other.Principal, fx.Context, sent.Id, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
+
+        ServiceAccountReport month = Ok(await fx.Service.WeeklyReportAsync(coordinator.Principal, fx.Context,
+            new WeeklyReportQuery(new(2026, 9, 5), Period: "Month"), _token));
+        month.Weekly.Actions.InPeriod.Should().Be(3, "September holds the three in-scope actions, not the other organization's");
+        ServiceAccountReport range = Ok(await fx.Service.WeeklyReportAsync(coordinator.Principal, fx.Context,
+            new WeeklyReportQuery(new(2026, 9, 21), Period: "Custom", PeriodEnd: new(2026, 9, 27)), _token));
+        range.Weekly.Actions.InPeriod.Should().Be(1);
+        range.Weekly.Actions.Earlier.Should().Be(2);
+
+        string[] exported = ExportedNames(Ok(await fx.Service.ExportAccountsAsync(coordinator.Principal, fx.Context, new AccountListQuery(), _token)));
+        exported.Should().BeEquivalentTo([a1, a2, a3]);
+        ExportedNames(Ok(await fx.Service.ExportAccountsAsync(coordinator.Principal, fx.Context, new AccountListQuery(Status: "notseen"), _token)))
+            .Should().Equal(a3);
+        ReportExport pdf = Ok(await fx.Service.ExportSnapshotAsync(coordinator.Principal, fx.Context, sent.Id, "pdf", _token));
+        string creator;
+        await using (SqlConnection connection = fx.Connection())
+        {
+            creator = await connection.ExecuteScalarAsync<string>("SELECT DisplayName FROM security.Users WHERE UserId = @id", new { id = coordinator.User.Id }) ?? "?";
+        }
+
+        ReportPdfWriter.ExtractLines(pdf.Content).Should().Contain(l => l.Contains("Oluşturan", StringComparison.Ordinal)
+            && l.Contains(creator, StringComparison.Ordinal), "the sent copy names who created it");
+
+        string actor = coordinator.User.Id.ToString("D");
+        (await fx.CountAsync("SELECT COUNT(*) FROM audit.AuditLog WHERE Actor = @actor AND Action = 'ServiceAccount.ImportCommitted'", new { actor }))
+            .Should().Be(2, "the replayed commit is not audited as a second import");
+        (await fx.CountAsync("SELECT COUNT(*) FROM audit.AuditLog WHERE Actor = @actor AND Action = 'ServiceAccount.ReportSnapshotCreated'", new { actor })).Should().Be(1);
+        (await fx.CountAsync("SELECT COUNT(*) FROM audit.AuditLog WHERE Actor = @actor AND Action = 'ServiceAccount.AccountsExported'", new { actor })).Should().Be(2);
+        (await fx.CountAsync("SELECT COUNT(*) FROM audit.AuditLog WHERE Actor = @actor AND Action = 'ServiceAccount.AccountsExported' AND JSON_VALUE(DetailsJson, '$.Rows') = '3'",
+            new { actor })).Should().Be(1, "the export audit records the row count");
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.ReportSnapshots WHERE Id = @Id AND CreatedBy = @user", new { sent.Id, user = coordinator.User.Id })).Should().Be(1);
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.ImportBatches WHERE UploadedBy = @user AND CommittedBy = @user AND Status = 'Committed' AND Id IN @ids",
+            new { user = coordinator.User.Id, ids = new[] { first.Id, second.Id } })).Should().Be(2);
+    }
+
+    /// <summary>The export cap is exact: 5 000 rows export; one more is refused with the total, and nothing is written.</summary>
+    [ServiceAccountSqlFact]
+    public async Task AccountExport_RowLimitIsExact_AndRefusalIsNotAudited()
+    {
+        ServiceAccountSqlFixture fx = new();
+        Guid org = await fx.OrganizationAsync("SYN LIMIT " + fx.Suffix);
+        SynUser reporter = await fx.UserAsync(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Report);
+        await fx.GrantAsync(reporter, ScopeKind.Organization, org);
+        await SeedAccountsAsync(fx, org, 0, ServiceAccountService.MaxExportRows);
+        ReportExport full = Ok(await fx.Service.ExportAccountsAsync(reporter.Principal, fx.Context, new AccountListQuery(), _token));
+        ExportedNames(full).Should().HaveCount(ServiceAccountService.MaxExportRows);
+
+        await SeedAccountsAsync(fx, org, ServiceAccountService.MaxExportRows, 1);
+        SaResult<ReportExport> refused = await fx.Service.ExportAccountsAsync(reporter.Principal, fx.Context, new AccountListQuery(), _token);
+        refused.ErrorCode.Should().Be(SaErrors.Invalid);
+        refused.Field.Should().Be("tooManyRows");
+        refused.Current.Should().Be(ServiceAccountService.MaxExportRows + 1);
+        (await fx.CountAsync("SELECT COUNT(*) FROM audit.AuditLog WHERE Actor = @a AND Action = 'ServiceAccount.AccountsExported'",
+            new { a = reporter.User.Id.ToString("D") })).Should().Be(1, "only the delivered export is audited");
+    }
+
+    private static async Task SeedAccountsAsync(ServiceAccountSqlFixture fx, Guid org, int from, int count)
+    {
+        await using SqlConnection connection = fx.Connection();
+        await connection.ExecuteAsync("""
+            INSERT INTO svcacct.Accounts(Id, AccountName, NormalizedName, IdentityKey, IdentityState, ReportOrganizationId, LifecycleState, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
+            SELECT NEWID(), CONCAT(@prefix, n), UPPER(CONCAT(@prefix, n)), CONCAT('N:', UPPER(CONCAT(@prefix, n))), 'Provisional', @org, 'Active',
+                SYSUTCDATETIME(), @by, SYSUTCDATETIME(), @by
+            FROM (SELECT TOP (@count) @from + ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n FROM sys.all_objects a CROSS JOIN sys.all_objects b) numbers;
+            """, new { prefix = "SYNLIM" + fx.Suffix + "_", org, count, from, by = Guid.NewGuid() }, commandTimeout: 120);
+    }
+
+    private static async Task<Guid> AccountIdAsync(ServiceAccountSqlFixture fx, string name)
+    {
+        await using SqlConnection connection = fx.Connection();
+        return await connection.ExecuteScalarAsync<Guid>("SELECT Id FROM svcacct.Accounts WHERE AccountName = @name", new { name });
+    }
+
+    private static string[] ExportedNames(ReportExport export) =>
+        [.. SpreadsheetReader.Read(export.Content, new SpreadsheetLimits(), ["Hesaplar"], out _).Single().Rows
+            .Select(r => r.Cells.TryGetValue("A", out SheetCell? cell) ? cell.Text : null).OfType<string>().Where(t => t.StartsWith("SYN", StringComparison.Ordinal))];
 
     [ServiceAccountSqlFact]
     public async Task Absence_IsInferredOnlyFromAValidatedCompleteList()
