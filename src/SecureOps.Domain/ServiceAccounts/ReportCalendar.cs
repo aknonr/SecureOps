@@ -56,8 +56,13 @@ public static class ReportCalendar
     /// Places an event relative to the week starting <paramref name="weekStart"/> and the cut-off.
     /// Instants are compared exactly with the cut-off; date-only values by business date.
     /// </summary>
-    public static WeekPlacement Place(TimePrecision precision, DateOnly? date, DateTimeOffset? instant, DateOnly weekStart, DateTimeOffset asOf)
+    public static WeekPlacement Place(TimePrecision precision, DateOnly? date, DateTimeOffset? instant, DateOnly weekStart, DateTimeOffset asOf) =>
+        Place(precision, date, instant, weekStart, weekStart.AddDays(7), asOf);
+
+    /// <summary>Places an event relative to the business-date period [<paramref name="start"/>, <paramref name="endExclusive"/>) and the cut-off.</summary>
+    public static WeekPlacement Place(TimePrecision precision, DateOnly? date, DateTimeOffset? instant, DateOnly start, DateOnly endExclusive, DateTimeOffset asOf)
     {
+        DateOnly weekStart = start;
         if (precision == TimePrecision.Unknown || date is null)
         {
             return WeekPlacement.UnknownDate;
@@ -77,6 +82,6 @@ public static class ReportCalendar
             return WeekPlacement.Earlier;
         }
 
-        return local < weekStart.AddDays(7) ? WeekPlacement.InPeriod : WeekPlacement.LaterBeforeCutoff;
+        return local < endExclusive ? WeekPlacement.InPeriod : WeekPlacement.LaterBeforeCutoff;
     }
 }

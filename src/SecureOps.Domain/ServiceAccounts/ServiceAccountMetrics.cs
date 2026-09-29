@@ -12,9 +12,13 @@ public static class ServiceAccountMetrics
     private const int _maxDetailLines = 500;
 
     /// <summary>Computes the report for the week starting on the Monday of <paramref name="weekStart"/>.</summary>
-    public static ServiceAccountReport Compute(ReportFacts facts, DateOnly weekStart, DateTimeOffset asOf, string scopeLabel)
+    public static ServiceAccountReport Compute(ReportFacts facts, DateOnly weekStart, DateTimeOffset asOf, string scopeLabel) =>
+        Compute(facts, ReportCalendar.WeekStart(weekStart), ReportCalendar.WeekStart(weekStart).AddDays(7), asOf, scopeLabel, ReportPeriods.Week);
+
+    /// <summary>Computes the report for the business-date period [<paramref name="start"/>, <paramref name="endExclusive"/>).</summary>
+    public static ServiceAccountReport Compute(ReportFacts facts, DateOnly start, DateOnly endExclusive, DateTimeOffset asOf, string scopeLabel, string period)
     {
-        DateOnly monday = ReportCalendar.WeekStart(weekStart);
+        DateOnly monday = start;
         DateOnly reportDate = ReportCalendar.LocalDate(asOf);
         var accounts = facts.Accounts.ToDictionary(a => a.Id);
         RequestFact[] open = [.. facts.Requests.Where(r => r.Status == ServiceAccountRequestStatus.Open && accounts.ContainsKey(r.AccountId))];
@@ -40,17 +44,17 @@ public static class ServiceAccountMetrics
             facts.Communications.Count(c => c.Kind == CommunicationKind.Draft),
             facts.Findings.Count(f => accounts.ContainsKey(f.AccountId) && f.Status is FindingStatus.Open or FindingStatus.InReview));
 
-        return new ServiceAccountReport(DefinitionVersion, monday, monday.AddDays(7), asOf, scopeLabel, summary,
-            Weekly(facts, accounts, performed, actions, valid, monday, asOf),
+        return new ServiceAccountReport(DefinitionVersion, monday, endExclusive, asOf, scopeLabel, summary,
+            Weekly(facts, accounts, performed, actions, valid, monday, endExclusive, asOf),
             Workload(facts, accounts, open, reportDate), Plans(facts, accounts, dated, reportDate),
             Handovers(facts, accounts), Legacy(accounts.Values, facts.Requests),
             [
-                "Planlar gerçekleşen işlem sayılmaz; tarihsiz işlem haftaya dağıtılmaz.",
+                "Planlar gerçekleşen işlem sayılmaz; tarihsiz işlem döneme dağıtılmaz.",
                 "Doğrulanmış kapanış, işlem bildiriminden ayrı sayılır.",
                 "Bir mail kaç hesaba bağlı olursa olsun bir kez sayılır.",
                 "Geciken iş: açık talebin plan bitişi rapor tarihinden önce (takvim günü).",
                 "Bulgular ve başarısız taramalar tamamlanan iş sayılmaz."
-            ]);
+            ], period);
     }
 
     /// <summary>True when an open request has a valid plan range and a determined action.</summary>
@@ -62,16 +66,16 @@ public static class ServiceAccountMetrics
         request.Status == ServiceAccountRequestStatus.Open && request.PlanEnd is { } end && end < reportDate;
 
     private static WeeklyMovement Weekly(ReportFacts facts, Dictionary<Guid, AccountFact> accounts, ActionFact[] performed,
-        ActionFact[] actions, CommunicationFact[] valid, DateOnly monday, DateTimeOffset asOf)
+        ActionFact[] actions, CommunicationFact[] valid, DateOnly monday, DateOnly endExclusive, DateTimeOffset asOf)
     {
-        PlacementCounts actionCounts = Count(performed.Select(a => ReportCalendar.Place(a.Precision, a.Facts.ActualOn, a.ActualAt, monday, asOf)));
+        PlacementCounts actionCounts = Count(performed.Select(a => ReportCalendar.Place(a.Precision, a.Facts.ActualOn, a.ActualAt, monday, endExclusive, asOf)));
         // A verified closure is one account; the verification date places it.
         PlacementCounts closureCounts = Count(ClosureAccounts(actions).Values.Select(verifiedOn =>
-            ReportCalendar.Place(TimePrecision.DateOnly, verifiedOn, null, monday, asOf)));
-        WeekPlacement[] mailPlacement = [.. valid.Select(c => ReportCalendar.Place(c.Precision, c.OccurredOn, c.OccurredAt, monday, asOf))];
+            ReportCalendar.Place(TimePrecision.DateOnly, verifiedOn, null, monday, endExclusive, asOf)));
+        WeekPlacement[] mailPlacement = [.. valid.Select(c => ReportCalendar.Place(c.Precision, c.OccurredOn, c.OccurredAt, monday, endExclusive, asOf))];
         CommunicationFact[] inPeriodMails = [.. valid.Where((_, i) => mailPlacement[i] == WeekPlacement.InPeriod)];
         ReportActionLine[] lines = [.. performed
-            .Where(a => ReportCalendar.Place(a.Precision, a.Facts.ActualOn, a.ActualAt, monday, asOf) == WeekPlacement.InPeriod)
+            .Where(a => ReportCalendar.Place(a.Precision, a.Facts.ActualOn, a.ActualAt, monday, endExclusive, asOf) == WeekPlacement.InPeriod)
             .OrderBy(a => a.Facts.ActualOn).ThenBy(a => accounts[a.AccountId].Label, StringComparer.Ordinal).ThenBy(a => a.Id)
             .Take(_maxDetailLines)
             .Select(a => new ReportActionLine(accounts[a.AccountId].Label, ServiceAccountLabels.Action(a.Facts.ActionType),

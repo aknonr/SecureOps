@@ -141,4 +141,27 @@ public sealed record ServiceAccountReport(
     IReadOnlyList<PlanLine> DatedPlans,
     HandoverSummary Handover,
     LegacyOwnershipProjection Legacy,
-    IReadOnlyList<string> Notes);
+    IReadOnlyList<string> Notes,
+    string Period = ReportPeriods.Week);
+
+/// <summary>Report period kinds. The week stays the default; a month or a custom range uses the same metric rules.</summary>
+public static class ReportPeriods
+{
+    /// <summary>Monday–Sunday week (Europe/Istanbul).</summary>
+    public const string Week = "Week";
+    /// <summary>Calendar month.</summary>
+    public const string Month = "Month";
+    /// <summary>Explicit inclusive date range (at most <see cref="MaxCustomDays"/> days).</summary>
+    public const string Custom = "Custom";
+    /// <summary>Longest custom range.</summary>
+    public const int MaxCustomDays = 366;
+
+    /// <summary>Normalizes a period to [start, endExclusive); null when the request is invalid.</summary>
+    public static (DateOnly Start, DateOnly EndExclusive)? Resolve(string? period, DateOnly start, DateOnly? endInclusive) => (period ?? Week) switch
+    {
+        Week when endInclusive is null => (ReportCalendar.WeekStart(start), ReportCalendar.WeekStart(start).AddDays(7)),
+        Month when endInclusive is null => (new DateOnly(start.Year, start.Month, 1), new DateOnly(start.Year, start.Month, 1).AddMonths(1)),
+        Custom when endInclusive is { } end && end >= start && end.DayNumber - start.DayNumber < MaxCustomDays => (start, end.AddDays(1)),
+        _ => null
+    };
+}

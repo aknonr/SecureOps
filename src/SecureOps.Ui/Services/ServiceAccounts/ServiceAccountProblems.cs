@@ -55,6 +55,14 @@ public static class ServiceAccountProblems
         "expectedVersion" => "Kayıt değişmiş; güncel sürüm yüklendi.",
         "reason" => "Değişiklik veya temizleme için gerekçe gerekli.",
         "teamId" => "Sahip ekibi değiştirmek kurum düzeyinde kapsam gerektirir.",
+        "coverage" => "Tam liste beyanı yalnız koordinasyon listesi veya eski çalışma kitabı aktarımında yapılabilir.",
+        "coverageOrganizationIds" => "Tam liste için kapsamınızdaki kurum(lar)ı seçin; kısmi veya bilinmeyen kapsamda kurum seçilmez.",
+        "sourceReportDate" => "Kaynak rapor tarihi gerekli (tam liste beyanında zorunlu) ve ileri bir tarih olamaz.",
+        "period" => "Dönem geçersiz: tarih aralığında bitiş başlangıçtan önce olamaz ve aralık en çok 366 gün olabilir.",
+        "tooManyRows" => "Seçim 5.000 satırdan fazla; filtreyi daraltıp tekrar aktarın.",
+        "requestId" => "Bu hesapta yalnız ekibinize atanmış açık talep üzerinden işlem bildirebilirsiniz.",
+        "targetTeamId" => "Talebi başka ekibe aktarmak hesaptan sorumlu ekibin kararıdır.",
+        "ownerId" => "Kanıtı yalnız ekibinize atanmış talebe veya ona bağlı işleme ekleyebilirsiniz.",
         null => null,
         { } field => "Kontrol edilecek alan: " + field
     };

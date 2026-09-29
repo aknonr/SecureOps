@@ -11,10 +11,15 @@ namespace SecureOps.Api.ServiceAccounts;
 /// <summary>API wiring for the Service Accounts module: one additive call from Program.cs.</summary>
 public static class ServiceAccountsApiModule
 {
+    /// <summary>Module-owned rate limit for list exports (registered here; existing platform policies are unchanged).</summary>
+    public const string ExportRateLimit = "ServiceAccountExport";
+
     /// <summary>Registers module services and capability policies (reusing the platform capability handler).</summary>
     public static IServiceCollection AddServiceAccountsApi(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddServiceAccounts(configuration);
+        services.Configure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(options => options.AddPolicy(ExportRateLimit,
+            context => ApiRateLimits.Partition(context, ExportRateLimit, new SecureOps.Shared.Configuration.OperationRateLimitOptions { PermitLimit = 3, WindowSeconds = 60 })));
         services.Configure<AuthorizationOptions>(options =>
         {
             foreach ((string policy, string capability) in ServiceAccountPolicies.Map)

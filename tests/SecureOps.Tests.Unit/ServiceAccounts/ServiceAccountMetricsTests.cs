@@ -121,6 +121,40 @@ public sealed class ServiceAccountMetricsTests
         report.DatedPlans.Should().HaveCount(2).And.Contain(p => p.Overdue);
     }
 
+    [Fact]
+    public void MonthAndCustomPeriods_UseTheSameRules_AndReconcile()
+    {
+        AccountFact account = Account("SYN_PERIOD");
+        ActionFacts performed = new(ServiceAccountActionType.PasswordChange, ServiceAccountActionResult.Performed, ServiceAccountRecordKind.Intermediate,
+            new(2026, 9, 2), null, false, false, false, false);
+        ActionFact[] actions =
+        [
+            new(Guid.NewGuid(), account.Id, performed, TimePrecision.DateOnly, null, null),
+            new(Guid.NewGuid(), account.Id, performed with { ActualOn = new(2026, 9, 18) }, TimePrecision.DateOnly, null, null),
+            new(Guid.NewGuid(), account.Id, performed with { ActualOn = new(2026, 8, 31) }, TimePrecision.DateOnly, null, null)
+        ];
+        ReportFacts facts = new([account], [], actions, [], [], [], [], Teams());
+
+        (DateOnly start, DateOnly end) = ReportPeriods.Resolve(ReportPeriods.Month, new(2026, 9, 17), null)!.Value;
+        (start, end).Should().Be((new DateOnly(2026, 9, 1), new DateOnly(2026, 10, 1)));
+        ServiceAccountReport month = ServiceAccountMetrics.Compute(facts, start, end, _asOf, "Sentetik kapsam", ReportPeriods.Month);
+        month.Period.Should().Be(ReportPeriods.Month);
+        month.Weekly.Actions.InPeriod.Should().Be(2, "both September actions up to the cut-off fall in the month");
+        month.Weekly.Actions.Earlier.Should().Be(1);
+        month.Weekly.Actions.Reconciles.Should().BeTrue();
+
+        (start, end) = ReportPeriods.Resolve(ReportPeriods.Custom, new(2026, 8, 31), new(2026, 9, 2))!.Value;
+        ServiceAccountReport custom = ServiceAccountMetrics.Compute(facts, start, end, _asOf, "Sentetik kapsam", ReportPeriods.Custom);
+        custom.Weekly.Actions.InPeriod.Should().Be(2, "the inclusive end date is part of the range");
+        custom.Weekly.Actions.LaterBeforeCutoff.Should().Be(1);
+
+        ReportPeriods.Resolve(ReportPeriods.Custom, new(2026, 9, 2), new(2026, 9, 1)).Should().BeNull("an end before the start is invalid");
+        ReportPeriods.Resolve(ReportPeriods.Custom, new(2025, 1, 1), new(2026, 9, 1)).Should().BeNull("a range longer than 366 days is refused");
+        ReportPeriods.Resolve(ReportPeriods.Week, new(2026, 9, 17), new(2026, 9, 18)).Should().BeNull("a week has no explicit end");
+        ReportPeriods.Resolve("Quarter", new(2026, 9, 17), null).Should().BeNull();
+        ReportPeriods.Resolve(null, new(2026, 9, 17), null)!.Value.Start.Should().Be(_monday);
+    }
+
     private static ServiceAccountReport Compute(ReportFacts facts) => ServiceAccountMetrics.Compute(facts, _monday, _asOf, "Sentetik kapsam");
 
     private static AccountFact Account(string label) => new(Guid.NewGuid(), label, null, null);

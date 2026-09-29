@@ -29,6 +29,17 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     public async Task<ActionResult<ServiceAccountWorkSummary>> WorkSummaryAsync(CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.WorkSummaryAsync(User, Context(), cancellationToken));
 
+    /// <summary>XLSX export of the caller's filtered account list (Report capability, same scope and filters, capped, audited, rate limited).</summary>
+    [HttpGet("accounts/export")]
+    [Authorize(Policy = ServiceAccountPolicies.Report)]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting(ServiceAccountsApiModule.ExportRateLimit)]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportAsync([FromQuery] AccountListQuery query, CancellationToken cancellationToken)
+    {
+        SaResult<ReportExport> result = await service.ExportAccountsAsync(User, Context(), query, cancellationToken);
+        return result.IsSuccess ? File(result.Value!.Content, result.Value.ContentType, result.Value.FileName) : ServiceAccountReplies.Reply(this, result).Result!;
+    }
+
     /// <summary>Server-paged, scope-filtered account list with stable ordering.</summary>
     [HttpGet("accounts")]
     [ProducesResponseType(typeof(AccountPage), StatusCodes.Status200OK)]

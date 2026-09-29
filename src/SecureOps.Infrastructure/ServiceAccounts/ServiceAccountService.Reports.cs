@@ -39,7 +39,7 @@ public sealed partial class ServiceAccountService
             }
 
             SaResult<(ServiceAccountReport Report, SnapshotScope Scope, string Watermark)> computed = await ComputeAsync(caller,
-                new WeeklyReportQuery(request.WeekStart, request.AsOf, request.OrganizationId, request.TeamId), cancellationToken);
+                new WeeklyReportQuery(request.WeekStart, request.AsOf, request.OrganizationId, request.TeamId, request.Period, request.PeriodEnd), cancellationToken);
             if (!computed.IsSuccess)
             {
                 return SaResult<SnapshotItem>.Fail(computed.ErrorCode!, computed.Field);
@@ -99,6 +99,61 @@ public sealed partial class ServiceAccountService
                 : new ReportExport(name + ".pdf", "application/pdf", ReportPdfWriter.Write(document));
         }, cancellationToken);
 
+    /// <summary>Maximum rows in one account-list export; a larger selection must be narrowed with filters.</summary>
+    public const int MaxExportRows = 5000;
+
+    /// <summary>
+    /// Exports the caller's filtered account list (same server-side scope and filters as the list) as XLSX for reporting.
+    /// Capped, audited with the filter and row count, and never wider than the list the caller can already read.
+    /// </summary>
+    public Task<SaResult<ReportExport>> ExportAccountsAsync(ClaimsPrincipal principal, AccessOperationContext context, AccountListQuery query,
+        CancellationToken cancellationToken) =>
+        RunAsync(principal, context, ServiceAccountCapabilities.Report, async caller =>
+        {
+            if (!ValidText(query.Search, 100) || !SqlServiceAccountRepository.ValidListQuery(query))
+            {
+                return SaResult<ReportExport>.Fail(SaErrors.Invalid, "query");
+            }
+
+            AccountPage page = await repository!.ListAccountsAsync(caller.Scope, query with { Page = 1, PageSize = MaxExportRows + 1 }, Today, cancellationToken);
+            if (page.Total > MaxExportRows)
+            {
+                return SaResult<ReportExport>.Fail(SaErrors.Invalid, "tooManyRows", page.Total);
+            }
+
+            DateTimeOffset now = clock.GetUtcNow();
+            string scope = await ScopeLabelAsync(caller.Scope, query.OrganizationId, query.TeamId, cancellationToken);
+            ReportDocument document = new("Servis Hesapları Listesi",
+            [
+                ("Kapsam", scope),
+                ("Filtre", ExportFilter(query)),
+                ("Kesim", ReportCalendar.LocalDate(now).ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture)),
+                ("Satır", page.Total.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                ("Not", "Sahip ekip/kişi yalnız teyitli sahipliktir; takipçi sahip değildir. Kimlik durumu dizin doğrulaması değildir.")
+            ],
+            [
+                new ReportSection("Hesaplar", ["Hesap", "Domain", "Kimlik", "Rapor kurumu", "Sahip ekip", "Sahip kişi", "Takipçi (sahip değil)", "Açık iş",
+                    "En yakın vade", "Durum", "Son görülme", "Son listede"],
+                    [.. page.Items.Select(a => (IReadOnlyList<ReportCell>)[a.AccountName, a.Domain ?? "Bilinmiyor", a.IdentityState == "Provisional" ? "Geçici" : "Teyitli",
+                        a.ReportOrganization?.Label ?? "Atanmadı", a.OwnerTeam?.Label ?? "Yok", a.OwnerPerson?.Label ?? "Yok", a.FollowupPerson?.Label ?? "",
+                        a.OpenRequests, new ReportCell(Date: a.NearestDue), a.Status, new ReportCell(Date: a.LastObservedOn),
+                        a.LastPresence == "NotPresent" ? "Yok" : a.LastPresence is null ? "" : "Var"])])
+            ], now);
+            await repository.AuditReadAsync("AccountsExported", new { Rows = page.Total, query.Status, query.OrganizationId, query.TeamId, query.MyTeam,
+                Search = query.Search is not null }, caller.Actor, cancellationToken);
+            return new ReportExport($"servis-hesaplari-liste-{ReportCalendar.LocalDate(now):yyyy-MM-dd}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ReportWorkbookWriter.Write(document));
+        }, cancellationToken);
+
+    private static string ExportFilter(AccountListQuery query) => string.Join(" · ", new[]
+    {
+        query.Status is null ? null : "durum: " + query.Status,
+        query.MyTeam ? "yalnız ekiplerim" : null,
+        query.Search is null ? null : "arama",
+        query.Domain is null ? null : "domain: " + query.Domain,
+        query.DueBefore is { } due ? "vade ≤ " + due.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture) : null
+    }.OfType<string>().DefaultIfEmpty("yok"));
+
     private async Task<SaResult<(SnapshotRecord Record, ServiceAccountReport Report)>> LoadSnapshotAsync(SaCaller caller, Guid id, CancellationToken cancellationToken)
     {
         SnapshotRecord? record = await repository!.SnapshotAsync(id, cancellationToken);
@@ -131,9 +186,14 @@ public sealed partial class ServiceAccountService
             return SaResult<(ServiceAccountReport, SnapshotScope, string)>.Fail(SaErrors.Forbidden, "scope");
         }
 
+        if (ReportPeriods.Resolve(query.Period, query.WeekStart, query.PeriodEnd) is not { } period)
+        {
+            return SaResult<(ServiceAccountReport, SnapshotScope, string)>.Fail(SaErrors.Invalid, "period");
+        }
+
         string label = await ScopeLabelAsync(caller.Scope, query.OrganizationId, query.TeamId, cancellationToken);
         (ReportFacts facts, string watermark) = await repository!.ReportFactsAsync(caller.Scope, query.OrganizationId, query.TeamId, cancellationToken);
-        ServiceAccountReport report = ServiceAccountMetrics.Compute(facts, query.WeekStart, asOf, label);
+        ServiceAccountReport report = ServiceAccountMetrics.Compute(facts, period.Start, period.EndExclusive, asOf, label, query.Period ?? ReportPeriods.Week);
         SnapshotScope scope = new(caller.Scope.All, [.. caller.Scope.Organizations.Order()], [.. caller.Scope.Teams.Order()], query.OrganizationId, query.TeamId, label);
         return (report, scope, watermark);
     }

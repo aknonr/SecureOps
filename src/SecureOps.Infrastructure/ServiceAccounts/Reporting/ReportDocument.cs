@@ -46,11 +46,11 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
                 Row("Gerçekleşen işlem bildirimi (tümü)", s.PerformedActionReports),
                 Row("Doğrulanmış kapanış (tekil hesap)", s.VerifiedClosureAccounts),
                 Row("Geçerli mail (tarihli)", s.ValidMails),
-                Row("Tarihsiz mail (haftaya girmez)", s.UndatedMails),
+                Row("Tarihsiz mail (döneme girmez)", s.UndatedMails),
                 Row("Taslak mail (sayılmaz)", s.DraftMailsExcluded),
                 Row("Açık/incelenen teknik bulgu", s.OpenFindings)
             ]),
-            new("Haftalık uzlaşım", ["Tanım", "Dönem içi", "Daha eski", "Dönem sonrası (kesim öncesi)", "Kesim sonrası (hariç)", "Tarihi bilinmeyen", "Toplam", "Uzlaşıyor"],
+            new("Dönem uzlaşımı", ["Tanım", "Dönem içi", "Daha eski", "Dönem sonrası (kesim öncesi)", "Kesim sonrası (hariç)", "Tarihi bilinmeyen", "Toplam", "Uzlaşıyor"],
             [
                 Placement("Gerçekleşen işlem bildirimi", w.Actions),
                 Placement("Doğrulanmış kapanış (hesap)", w.VerifiedClosures),
@@ -83,11 +83,17 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
             ]),
             new("Tanımlar ve notlar", ["Not"], [.. report.Notes.Select(n => Row(n))])
         ];
-        return new ReportDocument("Servis Hesapları Haftalık Rapor",
+        return new ReportDocument(report.Period switch
+        {
+            ReportPeriods.Month => "Servis Hesapları Aylık Rapor",
+            ReportPeriods.Custom => "Servis Hesapları Dönem Raporu",
+            _ => "Servis Hesapları Haftalık Rapor"
+        },
         [
             ("Nüsha", label ?? snapshotId.ToString("D")),
             ("Kapsam", report.ScopeLabel),
-            ("Hafta", $"{report.WeekStart:dd.MM.yyyy} – {report.WeekEndExclusive.AddDays(-1):dd.MM.yyyy} (Pazartesi–Pazar, Europe/Istanbul)"),
+            (report.Period == ReportPeriods.Week ? "Hafta" : "Dönem", $"{report.WeekStart:dd.MM.yyyy} – {report.WeekEndExclusive.AddDays(-1):dd.MM.yyyy}"
+                + (report.Period == ReportPeriods.Week ? " (Pazartesi–Pazar, Europe/Istanbul)" : " (Europe/Istanbul iş günü tarihleri)")),
             ("Kesim (asOf)", ReportCalendar.LocalDate(report.AsOf).ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) + " " + report.AsOf.ToString("HH:mm zzz", CultureInfo.InvariantCulture)),
             ("Metrik tanımı", report.MetricDefinitionVersion),
             ("Oluşturan / zaman", createdBy + " / " + createdAt.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture)),

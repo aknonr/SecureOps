@@ -39,10 +39,13 @@ public sealed record ServiceAccountMe(bool Configured, IReadOnlyList<string> Cap
     IReadOnlyList<SaRef> Teams, bool HasScope);
 
 /// <summary>Weekly report query.</summary>
-public sealed record WeeklyReportQuery(DateOnly WeekStart, DateTimeOffset? AsOf = null, Guid? OrganizationId = null, Guid? TeamId = null);
+/// <remarks><c>Period</c>: Week (default, Monday of <c>WeekStart</c>), Month (month of <c>WeekStart</c>) or Custom (<c>WeekStart</c>..<c>PeriodEnd</c> inclusive, at most 366 days).</remarks>
+public sealed record WeeklyReportQuery(DateOnly WeekStart, DateTimeOffset? AsOf = null, Guid? OrganizationId = null, Guid? TeamId = null,
+    string? Period = null, DateOnly? PeriodEnd = null);
 
 /// <summary>Create an immutable snapshot of the report computed now for the given query.</summary>
-public sealed record CreateSnapshotRequest(DateOnly WeekStart, DateTimeOffset? AsOf, Guid? OrganizationId, Guid? TeamId, string Kind, string? Label);
+public sealed record CreateSnapshotRequest(DateOnly WeekStart, DateTimeOffset? AsOf, Guid? OrganizationId, Guid? TeamId, string Kind, string? Label,
+    string? Period = null, DateOnly? PeriodEnd = null);
 
 /// <summary>Snapshot list item.</summary>
 public sealed record SnapshotItem(Guid Id, string Kind, DateOnly PeriodStart, DateOnly PeriodEnd, DateTimeOffset AsOf, string ScopeLabel,
