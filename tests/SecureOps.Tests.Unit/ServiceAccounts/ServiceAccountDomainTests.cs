@@ -141,4 +141,19 @@ public sealed class ServiceAccountDomainTests
 
     private static ActionFacts Facts(ServiceAccountActionResult result, ServiceAccountRecordKind kind, DateOnly? actualOn) =>
         new(ServiceAccountActionType.PasswordChange, result, kind, actualOn, null, false, false, false, false);
+
+    [Fact]
+    public void ModuleConnectionString_UsesItsOwnPool_KeepsSettings_AndIsIdempotent()
+    {
+        const string configured = "Server=sql.invalid;Database=SecureOps;Integrated Security=True;Connect Timeout=15;Application Name=SecureOps.Api";
+        string module = SecureOps.Infrastructure.ServiceAccounts.SqlServiceAccountRepository.ModuleConnectionString(configured);
+        Microsoft.Data.SqlClient.SqlConnectionStringBuilder builder = new(module);
+        builder.ApplicationName.Should().Be("SecureOps.Api / Service Accounts");
+        builder.IntegratedSecurity.Should().BeTrue();
+        builder.ConnectTimeout.Should().Be(15);
+        builder.InitialCatalog.Should().Be("SecureOps");
+        SecureOps.Infrastructure.ServiceAccounts.SqlServiceAccountRepository.ModuleConnectionString(module).Should().Be(module);
+        new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(SecureOps.Infrastructure.ServiceAccounts.SqlServiceAccountRepository.ModuleConnectionString(
+            "Server=sql.invalid;Database=SecureOps;Integrated Security=True")).ApplicationName.Should().Be("SecureOps / Service Accounts");
+    }
 }

@@ -48,8 +48,29 @@ public sealed partial class SqlServiceAccountRepository
     /// <summary>Initializes the repository from <c>ConnectionStrings:SecureOpsDb</c>.</summary>
     public SqlServiceAccountRepository(IConfiguration configuration)
     {
-        _connectionString = configuration.GetConnectionString(AuditConnectionStrings.SecureOpsDb)
-            ?? throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required for Service Accounts SQL persistence.");
+        _connectionString = ModuleConnectionString(configuration.GetConnectionString(AuditConnectionStrings.SecureOpsDb)
+            ?? throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required for Service Accounts SQL persistence."));
+    }
+
+    /// <summary>Suffix that gives the module its own connection pool and a recognisable SQL program name.</summary>
+    public const string ApplicationNameSuffix = " / Service Accounts";
+
+    /// <summary>
+    /// The configured connection with a module-specific <c>Application Name</c>. SqlClient pools by connection string and a
+    /// pooled session keeps the isolation level of its last transaction, so the module's SERIALIZABLE transactions must not
+    /// share a pool with platform code (whose autocommit reads and READPAST queries would silently inherit it).
+    /// </summary>
+    public static string ModuleConnectionString(string configured)
+    {
+        SqlConnectionStringBuilder builder = new(configured);
+        string current = builder.ShouldSerialize("Application Name") && !string.IsNullOrWhiteSpace(builder.ApplicationName) ? builder.ApplicationName : "SecureOps";
+        if (!current.EndsWith(ApplicationNameSuffix, StringComparison.Ordinal))
+        {
+            builder.ApplicationName = (current.Length + ApplicationNameSuffix.Length > 128 ? current[..(128 - ApplicationNameSuffix.Length)] : current)
+                + ApplicationNameSuffix;
+        }
+
+        return builder.ConnectionString;
     }
 
     /// <summary>Loads the caller's active grants and the organization/team tree.</summary>
@@ -82,6 +103,13 @@ public sealed partial class SqlServiceAccountRepository
     {
         SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
+        // A pooled session may still carry SERIALIZABLE from the module's previous transaction; module reads outside a
+        // transaction always run at the platform default.
+        await using (SqlCommand reset = new("SET TRANSACTION ISOLATION LEVEL READ COMMITTED;", connection))
+        {
+            await reset.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         return connection;
     }
 

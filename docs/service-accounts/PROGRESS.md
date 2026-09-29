@@ -194,26 +194,38 @@ kept no deadlock graph, so they are **consistent with** this cause but not prove
 fixture now also records the failure type of non-SQL exceptions that are reported as persistence
 unavailable.
 
-### Other single failures after a fresh build (unexplained, not reproduced)
+### Other single failures after a fresh build (still unexplained, not reproduced)
 
-Two further single failures occurred, each on the first module SQL run right after a build, before
-the diagnostic capture below existed:
+Two single failures occurred, each on the first module SQL run right after a build (2026-09-28):
 
-1. `SentSnapshotNeverChanges_LiveReportPlacesLateActionInItsWeek_ExportsReconcile` (after the
-   coverage change). The assertion message was dropped by my own console filter; no TRX was kept.
-2. `ParticipantTeam_WorksOnlyOnItsOwnRequest_AndLosesAccessWhenItCloses`: a participant's
-   `CreateRequest` returned `ServiceAccountPersistenceUnavailable` instead of `AccessDenied` on a
-   path that only reads before denying.
+1. `SentSnapshotNeverChanges_LiveReportPlacesLateActionInItsWeek_ExportsReconcile` — message lost
+   (my console filter dropped it; no TRX was written). No retained evidence beyond that fact.
+2. `ParticipantTeam_WorksOnlyOnItsOwnRequest_AndLosesAccessWhenItCloses` — retained TRX
+   (`participant-c2b.trx`, 23:39:06 UTC): a participant's `CreateRequest` returned
+   `ServiceAccountPersistenceUnavailable` instead of `AccessDenied` on a path that only reads before
+   denying. The exception type and operation were not captured (the origin logging came later).
 
-No deadlock was recorded by `system_health` at either time, so neither is the 1205 cause above;
-the second must have been a SQL error or one of `DbException`/`IOException`/
-`InvalidOperationException`/`TimeoutException`, which the service reports as "persistence
-unavailable". Since then the module log records the SQL number/state/class or failure type plus a
-safe throwing `Origin` (type and method name only, no message or values), and the SQL test fixture
-appends every such entry to the file named by `SECUREOPS_SA_SQL_DIAGNOSTICS`. Afterwards 8 warm
-runs and 10 rebuild-then-run cycles passed (24/24 each) with no unexpected diagnostic (only the
-injected 51091 of the audit-rollback test). These passes are **non-reproduction, not a fix**; the
-next failing run will name its exception type and origin.
+What is known: `system_health` recorded no deadlock at either time, so neither is the 1205 cause
+above. The service reports SQL errors and `DbException`/`IOException`/`InvalidOperationException`/
+`TimeoutException` as "persistence unavailable"; the module log now names SQL number/state/class or
+failure type plus a safe `Origin` (type and method only), and the SQL fixture writes every such entry
+to `SECUREOPS_SA_SQL_DIAGNOSTICS`.
+
+Reproduction attempts (2026-09-29), all with TRX and diagnostics retained under the session evidence
+folder: 5 cycles of *new database* (harness + both role scripts) → `dotnet build --no-incremental` →
+first module SQL run: 28/28 each; earlier 8 warm runs and 10 rebuild-then-run cycles: 24/24 each. The
+only diagnostic ever captured is the intentional 51091 of the audit-rollback test. **Not reproduced;
+cause unknown; no fix is claimed for these two failures.**
+
+Demonstrated defect found while investigating (fixed, not claimed as the cause): SqlClient pools by
+connection string and a pooled session keeps the isolation level of its last transaction. The
+module's SERIALIZABLE transactions (import commit/re-plan, administration, communications) used the
+platform's `ConnectionStrings:SecureOpsDb` pool, so the next platform or module user of that session
+ran autocommit reads at SERIALIZABLE (and READPAST queries would be rejected). Fix: the module derives
+its own pool (`Application Name` + " / Service Accounts") and sets READ COMMITTED on every open.
+`ModuleSerializableWork_DoesNotLeakIsolationIntoPlatformPooledConnections`: without the fix 3/3 fail
+(next platform session isolation 4 = SERIALIZABLE), with the fix 3/3 pass. DBAs will see the module's
+sessions under that program name.
 
 ## Acceptance mapping (SPEC scenarios)
 
