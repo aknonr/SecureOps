@@ -3,10 +3,12 @@
 Status: **prepared, not executed.** The pilot journey (section 4) is **BLOCKED** until approved
 TEST identities exist. It was written in a Linux container that has no Windows
 authentication, LocalDB or IIS. Nothing here has been run, and none of it counts as pilot acceptance
-until a Windows runner records the evidence listed at the end. No corporate server, identity, flag or
-data is used; everything is synthetic and local.
+until a Windows runner records the evidence listed at the end. No production server, flag or data
+is used; all business data is synthetic. The only non-local input is the set of approved TEST
+identities of section 4.
 
-Source: branch `feature/service-accounts-continuation-20260929` (HEAD recorded in `HANDOFF.md`).
+Source: the pinned handoff `b4fdf8d` (`HANDOFF.md`) plus the follow-up branch recorded in
+`FOLLOWUP-20260930.md`; run this procedure at the follow-up HEAD.
 
 ## Why a Windows runner
 
@@ -45,7 +47,7 @@ $env:SECUREOPS_SA_SQL_DIAGNOSTICS = "$PWD\evidence\sa-diagnostics.log"
 dotnet test tests\SecureOps.Tests.Integration -c Release --no-build --filter "FullyQualifiedName~ServiceAccounts" --logger "trx;LogFileName=sa-sql.trx" --results-directory .\evidence
 ```
 
-Expected: all module tests pass on the first run (33 in this source: 30 SQL tests plus the three
+Expected: all module tests pass on the first run (36 at the follow-up HEAD: 33 SQL tests plus the three
 HTTP composition tests that need no database). The diagnostics file should contain only the
 intentional `Number=51091` entry of the audit-rollback test. Any other entry is the evidence that
 was missing for the two unexplained first-run failures: keep the TRX and the log.

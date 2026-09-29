@@ -9,7 +9,14 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
-## Pilot-readiness iteration 2026-09-29 (current state)
+## Follow-up 2026-09-30 (after the pinned handoff)
+
+The Codex handoff stays pinned at `b4fdf8d`. Module-only follow-up changes, results and what to
+integrate afterwards: [FOLLOWUP-20260930.md](FOLLOWUP-20260930.md). Scenario 4 completed (closure
+reviews never close accounts), reporting chain and export cap verified, Windows pilot journey now
+requires normal authentication with approved TEST identities (BLOCKED without them).
+
+## Pilot-readiness iteration 2026-09-29 (pinned handoff)
 
 Integration source, results and Windows commands: [HANDOFF.md](HANDOFF.md) (supersedes the
 `55ab73e` bundle). Windows runner: [WINDOWS-ACCEPTANCE.md](WINDOWS-ACCEPTANCE.md) — **not executed**.
