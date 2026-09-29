@@ -21,7 +21,16 @@ public static class ServiceAccountsWorkerModule
         ServiceAccountOptions settings = new();
         configuration.GetSection(ServiceAccountOptions.SectionName).Bind(settings);
         if (!jobServerConfigured || !settings.Enabled || !settings.Reminders.Enabled)
-        { return services; }
+        {
+            // Recurring jobs are never removed here (shared Hangfire state). A job registered while reminders were enabled
+            // may still fire after they are disabled: it must activate and finish without SQL instead of failing and retrying.
+            services.Configure<ServiceAccountOptions>(configuration.GetSection(ServiceAccountOptions.SectionName));
+            services.AddScoped(provider => new ServiceAccountReminderJob(null,
+                provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServiceAccountOptions>>(),
+                provider.GetService<TimeProvider>() ?? TimeProvider.System,
+                provider.GetRequiredService<ILogger<ServiceAccountReminderJob>>()));
+            return services;
+        }
         services.AddServiceAccounts(configuration);
         services.AddSingleton<IServiceAccountScheduleStore, HangfireServiceAccountScheduleStore>();
         services.AddHostedService<ServiceAccountReminderSchedule>();

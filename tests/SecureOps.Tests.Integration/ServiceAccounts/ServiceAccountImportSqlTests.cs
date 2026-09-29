@@ -178,6 +178,50 @@ public sealed class ServiceAccountImportSqlTests
         }
     }
 
+    /// <summary>
+    /// Reverse direction of the write gate: while a module write holds the shared gate, an import commit waits on the
+    /// application lock before taking any row lock, and completes once the write finishes.
+    /// </summary>
+    [ServiceAccountSqlFact]
+    public async Task ImportCommit_WaitsForAnInFlightModuleWrite_OnTheGateNotOnRows()
+    {
+        ServiceAccountSqlFixture fx = new();
+        string orgName = "SYN GATE ORG " + fx.Suffix;
+        Guid org = await fx.OrganizationAsync(orgName);
+        SynUser coordinator = await fx.UserAsync(_importer);
+        await fx.GrantAsync(coordinator, ScopeKind.Organization, org);
+        ImportBatchView staged = await StageAsync(fx, coordinator, ServiceAccountImportProfiles.CoordinationList, "gate.xlsx",
+            List(orgName, ($"SYN{fx.Suffix}_G1", 45000)), new DateOnly(2026, 9, 14));
+
+        await using SqlConnection writer = fx.Connection();
+        await writer.OpenAsync();
+        await using var transaction = (SqlTransaction)await writer.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
+        await writer.ExecuteAsync("""
+            DECLARE @result int;
+            EXEC @result = sp_getapplock @Resource = 'svcacct:import-commit', @LockMode = 'Shared', @LockOwner = 'Transaction', @LockTimeout = 5000;
+            IF @result < 0 THROW 51399, 'Synthetic writer gate unavailable.', 1;
+            """, transaction: transaction);
+        short writerSession = await writer.ExecuteScalarAsync<short>("SELECT CONVERT(smallint, @@SPID);", transaction: transaction);
+
+        Task<SaResult<ImportBatchView>> commit = fx.Service.CommitImportAsync(coordinator.Principal, fx.Context, staged.Id,
+            new ImportCommitRequest(staged.PreviewVersion, staged.DecisionVersion), "gate-" + fx.Suffix, _token);
+        int waitingOnGate = 0;
+        for (int attempt = 0; attempt < 150 && waitingOnGate == 0; attempt++)
+        {
+            waitingOnGate = await fx.CountAsync("""
+                SELECT COUNT(*) FROM sys.dm_os_waiting_tasks w JOIN sys.dm_tran_locks l ON l.lock_owner_address = w.resource_address
+                WHERE w.blocking_session_id = @writerSession AND l.resource_type = 'APPLICATION' AND l.request_status = 'WAIT';
+                """, new { writerSession });
+            if (waitingOnGate == 0) { await Task.Delay(TimeSpan.FromMilliseconds(100)); }
+        }
+
+        waitingOnGate.Should().Be(1, "the commit must queue on the application lock while a module write is in flight");
+        commit.IsCompleted.Should().BeFalse();
+        await transaction.CommitAsync();
+        ImportBatchView committed = Ok(await commit);
+        committed.Result!.AccountsCreated.Should().Be(1);
+    }
+
     [ServiceAccountSqlFact]
     public async Task Absence_IsInferredOnlyFromAValidatedCompleteList()
     {

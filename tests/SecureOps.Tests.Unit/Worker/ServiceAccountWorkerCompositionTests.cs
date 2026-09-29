@@ -46,6 +46,35 @@ public sealed class ServiceAccountWorkerCompositionTests
         store.Calls.Should().Be(2, "repeated startup updates the same recurring identity");
     }
 
+    /// <summary>
+    /// The Worker never removes a recurring job (shared Hangfire state). If the module or its reminders are later disabled,
+    /// a previously registered job still fires; Hangfire must be able to activate it and it must finish as a no-op
+    /// instead of failing and retrying.
+    /// </summary>
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task StaleRecurringJob_AfterDisable_ActivatesAndDoesNothing(bool moduleEnabled, bool remindersEnabled)
+    {
+        IConfiguration config = Configuration(moduleEnabled, remindersEnabled);
+        ServiceCollection services = new();
+        services.AddLogging();
+        services.AddSingleton(config);
+        services.AddSingleton(TimeProvider.System);
+        services.AddServiceAccountsWorker(config, jobServerConfigured: true);
+        using ServiceProvider provider = services.BuildServiceProvider();
+        using IServiceScope scope = provider.CreateScope();
+
+        // Same activation path as Hangfire's ASP.NET Core job activator.
+        var job = (SecureOps.Infrastructure.ServiceAccounts.Reminders.ServiceAccountReminderJob)ActivatorUtilities.GetServiceOrCreateInstance(
+            scope.ServiceProvider, typeof(SecureOps.Infrastructure.ServiceAccounts.Reminders.ServiceAccountReminderJob));
+        SecureOps.Shared.Contracts.ServiceAccounts.ReminderRunResult result = await job.RunAsync(CancellationToken.None);
+
+        result.Evaluated.Should().Be(0);
+        result.Enqueued.Should().Be(0);
+        services.Should().NotContain(d => d.ImplementationType == typeof(ServiceAccountReminderSchedule), "disabling never adds a schedule");
+    }
+
     private static IConfiguration Configuration(bool moduleEnabled, bool remindersEnabled) =>
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
