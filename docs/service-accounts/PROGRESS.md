@@ -9,6 +9,68 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Continuation 2026-09-29 (sole implementation owner)
+
+Codex stopped Service Accounts edits; this module is continued by one owner. Final platform
+integration remains with Codex. Everything below is local only: no push, merge, deployment,
+package, flag, migration number, corporate SQL/source/Jira/AD/SMTP call.
+
+| Item | Value |
+|---|---|
+| Handoff source | branch `feature/service-accounts-sdm-integration-20260929` at `e997c5b68cebcd23716860a9b06fdc25ebbb4493` + WIP patch (SHA-256 `4C1B5F50…D276D`, bundle `99AB894D…6ADD`, both verified) |
+| Restore | fresh clone of the bundle; patch applied after CRLF→LF normalization (lossless); 127 paths = handoff inventory (OpenAPI intentionally absent) |
+| Continuation branch | `feature/service-accounts-continuation-20260929` (new, local) |
+| Checkpoint commit | `c63d1bcd413189705e3b4caf8c3d90111e639492` (WIP exactly as handed over) |
+| Codex evidence carried as prior results (not rerun) | combined build 0/0; Worker composition 3/3; SA SQL 20/20 on two fresh DBs; injected install failure left no module objects |
+
+Changes after the checkpoint (each commit below the 1 000-line review cap, OpenAPI excluded):
+
+| Commit | Change |
+|---|---|
+| `53641a7` | VerifyAction root cause (deadlock 1205 with import commit) fixed by a shared write gate; deterministic reproduction test |
+| `8c2e995` | Explicit import coverage (Unknown/Partial/Complete + validated population); absence only from a complete list |
+| `bca5375` | Participant write boundary (visibility ≠ authority); manual accounts stay provisional; safe failure origin logging |
+| `fbe4cb7` | Entry work summary ("Takibinizdeki işler") on the list and team work pages; OpenAPI regenerated from the combined app |
+| `d42ede5` | Least-privilege runs as synthetic API/Worker role members; gate error 51312 |
+| `444b7f7` | Persisted-access composition test without access wrappers |
+| `761cb20` | Monthly/custom report periods; scoped, capped, audited, rate-limited account-list XLSX export |
+| `faa0815` | On-demand directory observation tab reusing the platform component and permission |
+
+Actual results in this container (Linux, SDK 10.0.112 with `-p:LangVersion=13`, SQL Server 2022 container):
+
+| Check | Result |
+|---|---|
+| `dotnet build SecureOps.sln -c Release` | 0 warnings, 0 errors |
+| Unit (all) | 1563/1565; the 2 failures (`AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`, `SccmFailureEvidenceTests.StagedInvocations…` PowerShell on Linux) also fail on clean `e997c5b` |
+| Module unit | 55/55 (incl. Worker composition 3/3) |
+| Integration (all) | 299 pass / 61 skip / 12 fail; failing set identical to clean `e997c5b` on this host (DPAPI key ring, image codec) |
+| Module SQL | 28/28 on fresh `SecureOps_SaCont2`, first run, repository connected as a member of `svcacct_api_runtime` only; negative control with one denied grant fails with SQL 229 |
+| Worker role | Worker statements succeed as a synthetic `svcacct_worker_runtime` member; History read denied |
+| OpenAPI | regenerated; semantic diff vs `e997c5b`: 0 removed/changed, 44 module paths added |
+| Not run | Windows toolchain, LocalDB/Integrated Security, IIS, HTTP pipeline with real auth, browser journey against the real composition, desktop Excel |
+
+The persisted-access test composes the production registrations (`AddSecureOpsInfrastructure` with
+`Access:RepositoryProvider=SqlServer`, SQL audit, `ApplicationAccessService`) and the module; roles are
+reviewed bundles created by a synthetic platform administrator, scope comes from module grants, and a
+bundle change is effective on the next call. It does not exercise HTTP or Integrated Security: the API
+host refuses SQL logins at startup and Linux has no Windows authentication. The earlier browser
+harness is not reused as authorization proof.
+
+Shared changes needing Codex coordination: regenerated `docs/contracts/secureops-api-v1.openapi.json`;
+two `src/SecureOps.Ui/README.md` route descriptions. No change to `Program.cs` files, platform
+policies, rate-limit policies, In Use, SDM/OR, OCO, SCCM, Windows Service lifecycle or process locking.
+The export rate limit is a new module-owned policy registered from `AddServiceAccountsApi`.
+
+Backlog decisions (not implemented, by design):
+
+- **Custom fields** (admin-defined, for accounts and requests): only `ServiceAccounts.Administer`
+  defines them; values are data, never authority or ownership. Needs a schema addition in the
+  unnumbered candidate and a review slice of its own.
+- **ML.NET / "yapay zeka önerisi"**: first explainable, rule-based suggestions (overdue, no reply
+  after N days, missing owner, plan without date), each showing its rule. ML.NET only through an
+  ADR on the Phase 7 track, local models on synthetic/approved data, no external AI service, and a
+  suggestion never changes data by itself.
+
 ### Reconciliation preview (read-only, nothing merged)
 
 - Merge base with the integrated head: `5c986a96f1f6639e47bf1432a87c3ac55e98054d`; the integrated
@@ -158,7 +220,7 @@ next failing run will name its exception type and origin.
 | # | Requirement | Evidence | Result |
 |---|---|---|---|
 | 1 | 390 accounts after first migration; earlier accounts preserved | Private reconciliation: package → 390 accounts; `LegacyPackageThenWorkbook_…` | Passed (357/1 split needs the unavailable previous baseline — not claimed) |
-| 2 | Re-import does not increase counts; older observation never moves latest back | Reconciliation: workbook 933 same / 0 new, package replay detected, counts unchanged; `CoordinationList_NewPeriodObservations_…`, `LegacyPackageThenWorkbook_…` | Passed |
+| 2 | Re-import does not increase counts; older observation never moves latest back | Reconciliation: workbook 933 same / 0 new, package replay detected, counts unchanged; `CoordinationList_NewPeriodObservations_…`, `LegacyPackageThenWorkbook_…`, `Absence_IsInferredOnlyFromAValidatedCompleteList` (absence only from a declared complete list) | Passed |
 | 3 | Handover flag OK → exactly 81; no acceptance/gMSA without evidence | Reconciliation: cohort 81, reported 81, accepted 0, gMSA completed 0; `FindingsAndHandover_AreNotCompletedWork_…` | Passed |
 | 4 | Linux cohort: 8 dated password plans (30 Sep–30 Dec 2026), 2 closure reviews; completed totals unchanged | Reconciliation: 8 open password plans in window, verified closures 0 | Partially verified (the two closure reviews cannot be isolated from aggregates without names) |
 | 5 | Ownership stays proposed; mail senders never become owners | Reconciliation: 321 proposals, 0 confirmed; `ConfirmingOwnershipInImport_RequiresAssignCapability`; harness journey ownership step | Passed |
@@ -170,7 +232,7 @@ next failing run will name its exception type and origin.
 | 11 | Performed→Verified same identity; deletion without OR not a verified closure; verification before action rejected | `Verification_OnSameAction_…`, `DeletionClosure_WithoutOr_…`, `PerformedThenVerified_IsOneAction_…`; harness journey (undated verify refused, deletion closure verify refused) | Passed |
 | 12 | One mail → N accounts counts once; provider ID dedupes; same-subject mails kept | `OneMailLinkedToTenAccounts_…`, `OneMailManyAccounts_CountsOnce_…`; harness journey (one mail, three accounts) | Passed |
 | 13 | Findings / failed scans are not completed work; gaps visible | `Plans_AwaitingDates_Overdue_Handover_AndFindingsDoNotCountAsWork`, `FindingsAndHandover_…` | Passed |
-| 14 | Other team refused on account/API/export/attachment; backend-scoped filters | `OtherTeam_CannotReadUpdateListOrDownload`, `ReportFiltersAreBackendScoped_…`, `ScopeIsEnforced_…`; harness journey team-lead step (UI and API) | Passed |
+| 14 | Other team refused on account/API/export/attachment; backend-scoped filters; visibility through an assigned request is not account-wide authority | `OtherTeam_CannotReadUpdateListOrDownload`, `ReportFiltersAreBackendScoped_…`, `ScopeIsEnforced_…`, `ParticipantTeam_WorksOnlyOnItsOwnRequest_…`, `AccountListExport_IsScopedFilteredAndAudited`, `PersistedRoleBundlesAndScopeGrants_…`; harness journey (temporary harness) | Passed |
 | 15 | Concurrent rowversion: one wins, other 409; commit/job twice → one result | `ConcurrentUpdates_OneWins_…`, `StalePreviewAndDecisionConflicts_…`, `RepeatedRunsCreateEachReminderOnce_…`, `ConcurrentClaims_…`; reconciliation repeated commits | Passed |
 | 16 | Invalid rows visible; failed transaction leaves nothing half-written; file/formula-injection tests | `AuditFailure_RollsBackTheWholeCommit`, parser rejection tests (macro, ratio, signature, missing header), `Xlsx_…NeutralizesFormulaText…` | Passed |
 | 17 | Sent snapshot unchanged; late action in the correct live week | `SentSnapshotNeverChanges_LiveReportPlacesLateActionInItsWeek_ExportsReconcile` | Passed |
@@ -251,7 +313,7 @@ another approach is acceptable is the reviewer's decision.
 
 ## Outstanding inputs (actionable, not invented)
 
-- Integrated-source reconciliation and migration number (Codex).
+- Migration number and final platform integration (Codex); corporate role bundles and first scope grants.
 - Role bundles containing the module actions and the first scope grants (corporate decision; the
   demo fixture is for local testing only).
 - Verified directory identities for people/accounts; approved evidence retention.
@@ -262,10 +324,11 @@ another approach is acceptable is the reviewer's decision.
 
 ## Proposed register entry (for Codex to place in the canonical register)
 
-> Service Accounts module (isolated, branch `feature/service-accounts-20260928`, baseline
-> `a3037175`): domain/contracts/infrastructure/API/UI/tests + unnumbered SQL candidate
-> `svcacct`. Linux verification: build clean, module unit 49/49, module SQL 19/19 in recorded runs
-> with one unresolved 3-failure run, browser journey 13/13 on a temporary harness (not production
-> composition), private reconciliation 390 accounts / cohort 81 / legacy 53-9. Pending:
-> reconciliation with `e997c5b`, migration number, role bundles/scope grants, review slicing (no
-> size exception), production-composition browser run, Windows/LocalDB/IIS/Excel checks.
+> Service Accounts module (continuation branch `feature/service-accounts-continuation-20260929`,
+> checkpoint `c63d1bc` on `e997c5b`): VerifyAction deadlock cause fixed (shared write gate),
+> explicit import coverage, participant write boundary, provisional manual identity, entry work
+> summary, monthly/custom periods, scoped export, on-demand directory observation. Linux: build 0/0,
+> unit 1563/1565 (2 baseline env failures), integration failing set identical to baseline, module SQL
+> 28/28 on a fresh DB under the least-privilege API role, persisted-access composition test passing.
+> Pending: migration number, corporate role bundles/scope grants, Windows/LocalDB/IIS/HTTP/Excel
+> checks, browser journey on the real composition, review of the bounded slices (no size exception).
