@@ -1,6 +1,7 @@
 # Service Accounts — Windows Acceptance Runner (NOT EXECUTED)
 
-Status: **prepared, not executed.** It was written in a Linux container that has no Windows
+Status: **prepared, not executed.** The pilot journey (section 4) is **BLOCKED** until approved
+TEST identities exist. It was written in a Linux container that has no Windows
 authentication, LocalDB or IIS. Nothing here has been run, and none of it counts as pilot acceptance
 until a Windows runner records the evidence listed at the end. No corporate server, identity, flag or
 data is used; everything is synthetic and local.
@@ -54,68 +55,86 @@ a member of `svcacct_api_runtime`, set `SECUREOPS_SA_SQL_RUNTIME_CONNECTION` to 
 as that principal, and rerun the filter on a *new* database. If no second principal is available,
 record "NOT RUN" (the Linux run covered it with a SQL login).
 
-## 4. Real API host with persisted access (allowed and denied journeys)
+## 4. Pilot journey: normal authentication and module authorization
 
-Run the API from the build output against `SecureOps_SaPilot01` with the platform's SQL stores and
-Integrated Security. Configuration (environment `Test`; values are local and synthetic):
+This is the only journey that can count toward module acceptance. It uses the API's normal
+authentication (OIDC), persisted approval, role bundles and module scope grants — nothing else.
+
+**Precondition — approved TEST identities.** Four identities issued by the organization's
+approved TEST OIDC provider, each with its real claims (issuer, subject, login name), approved for
+this test: a platform administrator, a module coordinator, a team member, and an outsider. Do not
+create them, share their credentials or put their names in the repository; record only the
+role each played.
+
+**If these identities are not available, this section is BLOCKED.** Record "BLOCKED: approved TEST
+identities unavailable" in the evidence and stop here. The local smoke test in section 4A never
+replaces this section.
+
+Configuration: the platform's normal Test/pilot settings from
+`docs/25-real-user-pilot-management-reporting-and-dotnet10.md` (OIDC enabled, `DemoAuth__Enabled=false`,
+`Access__DemoCompatibilityEnabled=false`, SQL access/session/audit stores with Integrated Security,
+first-admin bootstrap only through the documented `BootstrapAdmin__*` gate), plus the module:
 
 ```text
-ASPNETCORE_ENVIRONMENT=Test
-ConnectionStrings__SecureOpsDb=Server=(localdb)\SecureOpsResourcesV1;Database=SecureOps_SaPilot01;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=15
-Access__RepositoryProvider=SqlServer
-Audit__Provider=SqlServer
+ConnectionStrings__SecureOpsDb=<Integrated Security connection to the database from step 3>
 ServiceAccounts__Provider=SqlServer
 ServiceAccounts__Reminders__Enabled=false
-DemoAuth__Enabled=true                 # identity bridge only (Test/Demo/Development); it grants no rights
-Access__DemoCompatibilityEnabled=false # no automatic role bootstrap
 ```
 
-Identities. Preferred: the platform's Test OIDC provider with four **synthetic** test accounts
-(names below). Fallback smoke: the identity bridge's two fixed actors (`platform-admin`,
-`team-lead`), which covers rows 1–6 only.
+Rights are given only through the product:
 
-| Test identity | Platform role | Module bundle (created in step 4b) | Module scope grant |
-|---|---|---|---|
-| `SA-T-ADMIN` | `Admin` (seeded like the platform's own access tests) | `sa-pilot-admin`: View, Administer | none |
-| `SA-T-COORD` | none | `sa-pilot-coord`: View, Work, Assign, Verify, Import, Report | Organization `SYN PILOT ORG` |
-| `SA-T-MEMBER` | none | `sa-pilot-member`: View, Work | Team `SYN PILOT TEAM` |
-| `SA-T-OUTSIDER` | `ReadOnly` | none | none |
+a. The platform administrator is the documented first OIDC Admin (bootstrap gate) or an already
+   approved administrator. No role assignment by SQL.
+b. The administrator creates the module bundles with `POST /api/v1/access/roles/preview` and
+   `PUT /api/v1/access/roles` (preview token), and approves each pending identity with
+   `POST /api/v1/access/requests/{id}/approve` giving the bundle code and its reviewed version:
 
-Steps:
+   | Pilot role | Bundle | Actions |
+   |---|---|---|
+   | module administrator | `sa-pilot-admin` | View, Administer |
+   | coordinator | `sa-pilot-coord` | View, Work, Assign, Verify, Import, Report |
+   | team member | `sa-pilot-member` | View, Work |
+   | outsider | none (platform `ReadOnly`) | — |
 
-a. Seed `SA-T-ADMIN` with the platform `Admin` role only (same seeding as
-   `SqlAccessTestActors.AdminAsync`); every other right goes through the API.
-b. As `SA-T-ADMIN`: `POST /api/v1/access/roles/preview`, then `PUT /api/v1/access/roles` with the
-   preview token for each bundle above; approve each pending user via
-   `POST /api/v1/access/requests/{id}/approve` with the bundle code and `RoleVersions`.
-c. As module administrator (bundle `sa-pilot-admin` assigned to a second admin identity, or to
-   `SA-T-ADMIN` if the platform allows it): `POST /api/v1/service-accounts/organizations`,
-   `.../teams`, then `.../scope-grants` for coordinator and member.
-d. As coordinator: create account `SYNPILOT_A1` in `SYN PILOT ORG`, a request targeted at
-   `SYN PILOT TEAM`, stage/preview/commit a synthetic coordination list with coverage `Complete`.
+c. The module administrator creates `SYN PILOT ORG` and `SYN PILOT TEAM`
+   (`POST /api/v1/service-accounts/organizations`, `.../teams`) and the scope grants
+   (`POST /api/v1/service-accounts/scope-grants`): coordinator → Organization `SYN PILOT ORG`,
+   member → Team `SYN PILOT TEAM`.
+d. The coordinator creates `SYNPILOT_A1` in `SYN PILOT ORG`, a request targeted at
+   `SYN PILOT TEAM`, and imports a synthetic coordination list with coverage `Complete`.
 
-Expected results (capture status code and response body for each):
+Expected results (capture request, status and response body for each):
 
 | # | Caller | Call | Expected |
 |---|---|---|---|
-| 1 | anonymous | `GET /api/v1/service-accounts/me` | 401 |
-| 2 | `SA-T-ADMIN` before bundles | any module route | 403 (no platform role carries module actions) |
-| 3 | `SA-T-OUTSIDER` | `GET .../accounts`, `.../accounts/export` | 403 |
-| 4 | `SA-T-MEMBER` | `POST .../scope-grants` | 403 |
-| 5 | `SA-T-COORD` | `GET .../accounts` | 200, only `SYN PILOT ORG` accounts |
-| 6 | `SA-T-COORD` | `GET .../accounts/export` | 200 XLSX; audit `ServiceAccount.AccountsExported`; 4th call within a minute → 429 |
-| 7 | `SA-T-MEMBER` | `GET .../work-summary` | 200, `TeamOpenRequests` = 1 |
-| 8 | `SA-T-MEMBER` | `GET .../accounts/{A1}` | 200, `permissions.basis` = `Participant` |
-| 9 | `SA-T-MEMBER` | update own request notes | 200 |
-| 10 | `SA-T-MEMBER` | retarget own request / edit account / create request | 403 |
-| 11 | `SA-T-MEMBER` | account of another org by id | 404 (indistinguishable from missing) |
-| 12 | `SA-T-COORD` | import commit twice with the same `Idempotency-Key` | same result, no duplicates |
-| 13 | `SA-T-ADMIN` | remove Work from `sa-pilot-member` (preview + apply), then row 9 again | 403 on the next call |
-| 14 | any | module routes with `ServiceAccounts__Provider=Disabled` and a bundle holder | 503 `ServiceAccountsNotConfigured` |
+| 1 | no token | `GET /api/v1/service-accounts/me` | 401 |
+| 2 | platform administrator without a module bundle | any module route | 403 (no platform role carries module actions) |
+| 3 | outsider | `GET .../accounts`, `.../accounts/export` | 403 |
+| 4 | team member | `POST .../scope-grants` | 403 |
+| 5 | coordinator | `GET .../accounts` | 200, only `SYN PILOT ORG` accounts |
+| 6 | coordinator | `GET .../accounts/export` | 200 XLSX; audit `ServiceAccount.AccountsExported` with the row count; 4th call within a minute → 429 |
+| 7 | team member | `GET .../work-summary` | 200, `TeamOpenRequests` = 1 |
+| 8 | team member | `GET .../accounts/{A1}` | 200, `permissions.basis` = `Participant` |
+| 9 | team member | update own request notes | 200 |
+| 10 | team member | retarget own request / edit account / create request | 403 |
+| 11 | team member | account of another organization by id | 404 |
+| 12 | coordinator | import commit twice with the same `Idempotency-Key`, then re-stage the same file | same result; re-stage returns `replay: true`; no duplicates |
+| 13 | platform administrator | remove Work from `sa-pilot-member` (preview + apply), then row 9 again | 403 on the next call |
+| 14 | coordinator | report a `Review` action with record kind `Closure` | 400 `ClosureKindNotAllowed` |
+| 15 | coordinator | weekly live report, sent `Manager` snapshot, month and date-range reports, snapshot XLSX/PDF | 200; snapshot unchanged after a late entry; creator shown |
+| 16 | any bundle holder | module routes with `ServiceAccounts__Provider=Disabled` | 503 `ServiceAccountsNotConfigured` |
 
-UI (optional in this round): with the UI pointed at this API, `SA-T-MEMBER` opens
-`/service-accounts` and sees "Takibinizdeki işler" first; the account detail shows the participant
-notice and only the allowed controls.
+UI (same identities): the team member opens `/service-accounts` and sees "Takibinizdeki işler"
+first; the account detail shows the participant notice and only the allowed controls.
+
+## 4A. Local smoke test with the identity bridge (NOT acceptance)
+
+Purpose: check that a local host starts and routes before TEST identities are available.
+**It is not corporate or pilot authorization acceptance and must be reported as "local smoke".**
+The Test-environment bridge (`DemoAuth__Enabled=true`, `Access__DemoCompatibilityEnabled=false`)
+authenticates only two fixed local actors and grants nothing; rights still come from bundles and
+module grants as in 4b–4c. Only rows 1–6 of the table can be exercised. The automated equivalent of
+rows 1–2 runs without SQL in `ServiceAccountApiCompositionTests`.
 
 ## 5. Worker check
 
