@@ -62,6 +62,55 @@ public sealed class ServiceAccountAdminSqlTests
         Ok(await fx.Service.MeAsync(admin.Principal, fx.Context, _token)).ScopeKind.Should().Be("All", "verifying a person changes no access");
     }
 
+    [ServiceAccountSqlFact]
+    public async Task ConcurrentScopeGrants_CommitDistinctUsers_AndRejectTheSameGrantWithoutPartialAudit()
+    {
+        ServiceAccountSqlFixture fx = new();
+        SynUser admin = await fx.UserAsync(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Administer);
+        await fx.GrantAsync(admin, ScopeKind.All);
+        SynUser[] targets = new SynUser[8];
+        foreach (int index in Enumerable.Range(0, targets.Length))
+        {
+            targets[index] = await fx.UserAsync(ServiceAccountCapabilities.View);
+        }
+        IAccessRepository users = Substitute.For<IAccessRepository>();
+        foreach (SynUser user in targets)
+        {
+            users.GetUserAsync(user.User.CorporateIdentity, Arg.Any<CancellationToken>()).Returns(user.User);
+        }
+        TaskCompletionSource start = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<SaResult<Guid>>[] writes = targets.Select(async user =>
+        {
+            await start.Task;
+            return await fx.Service.CreateGrantAsync(admin.Principal, fx.Context,
+                new CreateScopeGrantRequest(user.User.CorporateIdentity, "All", null, null, "Synthetic concurrent grant"), users, _token);
+        }).ToArray();
+        start.SetResult();
+        foreach (SaResult<Guid> result in await Task.WhenAll(writes))
+        {
+            Ok(result).Should().NotBeEmpty();
+        }
+
+        SynUser duplicateTarget = await fx.UserAsync(ServiceAccountCapabilities.View);
+        users.GetUserAsync(duplicateTarget.User.CorporateIdentity, Arg.Any<CancellationToken>()).Returns(duplicateTarget.User);
+        TaskCompletionSource duplicateStart = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<SaResult<Guid>>[] duplicateWrites = Enumerable.Range(0, 2).Select(async _ =>
+        {
+            await duplicateStart.Task;
+            return await fx.Service.CreateGrantAsync(admin.Principal, fx.Context,
+                new CreateScopeGrantRequest(duplicateTarget.User.CorporateIdentity, "All", null, null, "Synthetic duplicate grant"), users, _token);
+        }).ToArray();
+        duplicateStart.SetResult();
+        SaResult<Guid>[] results = await Task.WhenAll(duplicateWrites);
+        results.Count(result => result.ErrorCode is null).Should().Be(1);
+        results.Count(result => result.ErrorCode == SaErrors.Invalid && result.Field == "duplicate").Should().Be(1);
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.ScopeGrants WHERE UserId = @id AND RevokedAt IS NULL",
+            new { id = duplicateTarget.User.Id })).Should().Be(1);
+        (await fx.CountAsync("SELECT COUNT(*) FROM audit.AuditLog WHERE Actor = @actor AND Action = 'ServiceAccount.ScopeGranted'",
+            new { actor = admin.User.Id.ToString("D") })).Should().Be(9);
+        fx.SqlDiagnostics.Should().BeEmpty("no deadlock, retry or swallowed persistence failure is allowed");
+    }
+
     private static T Ok<T>(SaResult<T> result)
     {
         result.ErrorCode.Should().BeNull($"field {result.Field}");

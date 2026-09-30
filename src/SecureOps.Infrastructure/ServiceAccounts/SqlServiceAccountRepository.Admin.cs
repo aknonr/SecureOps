@@ -221,7 +221,7 @@ public sealed partial class SqlServiceAccountRepository
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         if (await connection.ExecuteScalarAsync<int>(Cmd("""
-            SELECT COUNT(*) FROM svcacct.ScopeGrants WHERE UserId = @userId AND RevokedAt IS NULL AND ScopeKind = @Kind
+            SELECT COUNT(*) FROM svcacct.ScopeGrants WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @userId AND RevokedAt IS NULL AND ScopeKind = @Kind
               AND ISNULL(OrganizationId, '00000000-0000-0000-0000-000000000000') = ISNULL(@organizationId, '00000000-0000-0000-0000-000000000000')
               AND ISNULL(TeamId, '00000000-0000-0000-0000-000000000000') = ISNULL(@teamId, '00000000-0000-0000-0000-000000000000');
             """, new { userId, Kind = kind.ToString(), organizationId, teamId }, transaction, cancellationToken)) > 0)
