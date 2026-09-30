@@ -68,7 +68,7 @@ public sealed class ServiceAccountAdminSqlTests
         ServiceAccountSqlFixture fx = new();
         SynUser admin = await fx.UserAsync(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Administer);
         await fx.GrantAsync(admin, ScopeKind.All);
-        SynUser[] targets = new SynUser[8];
+        var targets = new SynUser[8];
         foreach (int index in Enumerable.Range(0, targets.Length))
         {
             targets[index] = await fx.UserAsync(ServiceAccountCapabilities.View);
