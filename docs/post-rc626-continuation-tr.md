@@ -2,8 +2,36 @@
 
 ## Durum ve kapsam
 
-Bu belge tek guncel Turkce operator girisidir. Son durum: 22 Eylul 2026.
+Bu belge tek guncel Turkce operator girisidir. Son durum: 30 Eylul 2026.
 Onceki snapshot'lar asagida tarihsel kanit olarak korunur.
+
+**Siradaki tek SQL kapisi:** 022/023 icin verdiginiz dar tanim karsilastirmasi
+eslesiyor; tekrar sorgulanmayacak. 024 halen `NotVisibleOrAbsent`.
+Operator oturumu sonucundan API izni cikarilmaz. Hazir dar sorgu:
+[`Read-SdmApiEffectivePermissions.sql`](../scripts/diagnostics/Read-SdmApiEffectivePermissions.sql).
+Yalniz normal API surecinin mevcut SQL baglantisinda 13 etkili izni okur:
+alti 022/023 nesnesinde SELECT/INSERT, executions tablosunda ayrica UPDATE.
+1 izin var, 0 izin yok, NULL belirsizdir. Sonuclar ve normal surec/ayar kaynagi
+kaniti ozel kanalda tutulur. Sorguyu kendi SSMS/sqlcmd oturumunuzda calistirmak
+API kaniti olmaz; runas/EXECUTE AS veya kimlik/grant degisikligi yapmayin.
+Kurulu API ve muhurli adayda bu sorguyu calistiran endpoint yoktur;
+`health/persistence` yalniz SELECT 1 yapar. **Once** normal API sureci icinde,
+mevcut baglantiyi degistirmeyen salt okunur destek yurutme yolunun ayri inceleme
+ve onayi gerekir. Bu belge helper kurma veya hedef degisikligi talimati degildir.
+
+SQL uygulama operatoru sizsiniz; baska bir kisiden varsayilan DBA makbuzu
+beklenmiyor. Gecmis execution log/change notu verilmedigi icin mevcut degil
+olarak kayitli. Daha sonraki 024-only uygulama ancak normal API izin kaniti,
+kabul edilmis eslesik payload, ayri onayli change, yedek/recovery noktasi,
+incelenmis 024/grant ve durdurulmus yazilarla yetkilendirilir. 023 farki veya
+kismi/mevcut 024 durumunda durun; 022/023 tekrar uygulanmaz. Su anda SQL
+uygulama, bayrak acma veya deploy yetkisi yoktur.
+
+Service Accounts pin'i ayri yerel integration dalina alindi; yeni Windows
+kaniti ve kalan sinirlar [tek durum kaydinda](integrated-test-activation.md)
+ve [integration kanitinda](service-accounts/INTEGRATION-20260930.md).
+Bu, kurulu rc6.26'yi veya muhurli deda848 paketlerini degistirmez. Sonraki
+follow-up alinmadi; Service Accounts pilotu, Jira-only tek OR kabulunden ayridir.
 
 **Guncel In Use karari (IU-07 / E-08):** Hedef yalniz uygun WASAS aktivitesini
 onaylayip sureci ilerletmektir; tum OR'yi kapatmak degildir. Sonraki ekip beklerken
@@ -226,7 +254,7 @@ SCM start/stop, tam logoff ve crash/recovery hedef/izinli runner kapilari acik.
 | Gelen testli urun kaynagi | `b596058fa0e1f82b278511f9a9e1c032c1130045`; kurtarma sirasinda uc Release DLL ProductVersion/hash ve TRX eslesti. Sonraki sistem-durumu UI duzeltmesi bu staging'de yok |
 | Gelen belge kapanisi | `69a9b839614d97aaed5ea9f600cc4841cf01d24d`; b596058 sonrasinda sadece iki Markdown dosyasi degismis |
 | Korunan/kuruldu bildirilen aday | rc6.26, `028cbd2e4ec7068d71a33088d7c651e4df21644a`; alti yerel paket hash/boyutu yeniden eslesti. Hedef kurulum bildirimi bagimsiz kurulum kaniti degil |
-| Gereken schema | Yeni katalog icin 024; 022/023 kuruldu bildirimi var. Hedef nesne/tanim ve DBA kaydi bekleniyor |
+| Gereken schema (20 Eylul tarihsel durum) | Yeni katalog icin 024; o tarihte 022/023 yalniz kuruldu bildirimiydi. 29 Eylul nesne kaniti ve SQL yurutme operatorunun guncel adimlari asagidadir |
 | Hedef kaniti | Saglanan API JSON: 20.09.2026 00:54:02 UTC capture, 00:54:21 UTC kaynak kontrolu. Kaynak/mail kapali, Worker kontrol edilmemis, 6 asset dogrulanmis, arsiv okuma dogrulanmis/yazma sinanmamis. Canli ajan gozlemi veya Worker raporu degil; urun surumu yok |
 | Bu devam | Onceki belge/ihrac/tarayici degisiklikleri korunuyor; sistem-durumu paneline dar UI duzeltmesi eklendi. Yeni host/tarayici/paket kabul sonucu yok; kurulmus davranis degil |
 
@@ -561,7 +589,7 @@ Worker kimligi gibi rol-farkli alanlar genel fingerprint esitligi gerektirmez.
 | Alan | Su anki hedef kaniti | Gereken deger / tam degisiklik | Sorumlu / dogrulama |
 |---|---|---|---|
 | API/UI/Worker ProductVersion | E-04 uc entry DLL 028cbd2/rc6.26 | Tam hedef payload hash'leri beklenir; yeni onarimlar yalniz successor'da | TEST operatoru; salt okunur envanter |
-| SQL 022/023 | Kuruldu bildirimi | Yeniden calistirma yok. ops.InUseExecutions, ops.InUseServerReviews, reporting.WorkflowSnapshots ve receipt tanimlari/index/trigger durumu | DBA; mevcut kurulum kaydi + sys.objects/columns/indexes/triggers |
+| SQL 022/023/024 | Operator TEST DB'yi teyit etti; 022/023 envanteri ve dar DDL metadatasi kaynakla anlamsal eslesiyor; 024 gorunmuyor | Yalniz normal API SQL baglamindaki etkin 022/023 izinleri acik. 022/023 tekrari yok; eski calistirma kaydi varsa saklanir, yoksa erisilemez yazilir | SQL yurutme operatoru; operator oturumundaki izin sonucunu API hakki sayma |
 | InUseReports:Directory | API: mevcut yol, ReadableWriteNotTested | Mevcut D:\SecureOpsData\InUseReports korunur; yazma ve eski/yeni hash-esit indirme kabul edilir | API operatoru; yetkili rapor olusturma/indirme |
 | DB target, Hangfire schema/queue/PrepareSchema | E-04 API/Worker eslesiyor; queue ready, bir Worker | Etkin degerler korunur; PrepareSchema=false. Servis devir sonrasi yeniden gozlem | API/Worker operatoru; hazir kuyruk kaynak baglantisi degil |
 | Announcements:Enabled, AnnouncementSource:Enabled | E-04 onarilmis NonProd/provider ayarlari API/Worker'da eslesiyor | Etkin degerleri koruyun; flag onarimini tekrar etmeyin | SCCM/Turuncu Hat sahibi; tek secili OCO/profil terminal isi |
@@ -612,51 +640,49 @@ OCO'dan gelir. Dogrudan OCO-servis baglantisi oldugu varsayilmaz.
 
 #### Salt okunur hedef on kontrolu
 
-Kaynak teslimi beklemede: `aknonr/SecureOps` 28.09.2026 anonim GitHub
-API/web denetiminde Public gorundu. Ozel gorunurluk dogrulanmadan bu dal
-gonderilmez. Yerel inceleme ZIP'leri ve hash'leri degismedi; onceki belge
-kapanisi `9f4f57d`, derlenen urun `deda848` olarak ayridir.
+Tarihsel not: `aknonr/SecureOps` 28.09.2026 denetiminde Public gorundu ve
+o anda push bekletildi. Sahip sonradan normal public push'a acikca izin verdi;
+bildirilen uzak uc `e997c5b68cebcd23716860a9b06fdc25ebbb4493`.
+Bu on kontrol yeni push veya yayin degildir. Yerel inceleme ZIP'leri aynen
+korunur; derlenen urun `deda848`, sonraki belge kapanisi ayri kimliktir.
 
-1. Normal yetkili TEST makinesinde mevcut IIS fiziksel yollarini dogrulayin.
-   API ve UI giris DLL'lerini asagidaki salt okunur PowerShell ile okuyun;
-   bildirilen rc6.26 veya halihazirda kurulu farkli ProductVersion ve SHA256
-   sonucunu kaydedin. Dosya yoksa gercek IIS fiziksel yolunu bulun, tahmin
-   edilmis baska kopyayi kurulu surum saymayin.
+1. IIS envanteri 29.09.2026'da secilen TEST sunucusunda salt okunur
+   alindi. Iki baslatilmis site tekil eslesti: API ve UI entry DLL'leri
+   `0.1.0+028cbd2e4ec7068d71a33088d7c651e4df21644a` (rc6.26).
+   Tam IIS yollari ve DLL hash'leri repo disi ozel kayitta saklanir:
+   `C:\SecureOpsBuild\validation\sdm-target-preflight-20260929\iis-entry-evidence.json`.
+   Bunlar tum kurulu payload'in hash'i degil; `deda848` adayinin kuruldugu
+   iddia edilemez. IIS betiginde `Add-Type -AssemblyName` bu sunucuda DLL'yi
+   bulamadi; `Microsoft.Web.Administration.dll` tam `inetsrv` yolundan
+   yuklenince rapor olustu. IIS ayari degismedi; ayni kaniti tekrar istemeyin.
 
-   ```powershell
-   $entries = [ordered]@{
-       Api = 'D:\Applications\api\wasasyonetimapi.thy.com\SecureOps.Api.dll'
-       Ui  = 'D:\Applications\ui\wasasyonetim.thy.com\SecureOps.Ui.dll'
-   }
-   foreach ($name in $entries.Keys) {
-       $path = $entries[$name]
-       $file = Get-Item -LiteralPath $path -ErrorAction Stop
-       [pscustomobject]@{
-           Component = $name
-           ProductVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($file.FullName).ProductVersion
-           SHA256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
-       }
-   }
-   ```
-
-2. DBA mevcut onayli TEST baglantisinda yalniz asagidaki SELECT'i calistirir.
-   Bu repoda migration ledger yoktur. Nesne gorunurlugu kurulum makbuzu yerine
-   gecmez; NULL sonuc sinirli metadata yetkisinden de kaynaklanabilir.
-   DBA 022/023/024 nesne, kolon, index, trigger ve grant tanimlarini
-   imzali kurulum kaydi ile karsilastirir; fark varsa durur. 022/023 tekrar
-   calistirilmaz; 024 bu on kontrolde uygulanmaz.
-
-   ```sql
-   SELECT DB_NAME() AS DatabaseName,
-          OBJECT_ID(N'ops.InUseServerReviews', N'U') AS M022Review,
-          OBJECT_ID(N'ops.InUseExecutions', N'U') AS M022Execution,
-          OBJECT_ID(N'ops.InUseExecutionEvents', N'U') AS M022Events,
-          OBJECT_ID(N'reporting.WorkflowSnapshots', N'U') AS M023Snapshots,
-          OBJECT_ID(N'reporting.WorkflowFacts', N'U') AS M023Facts,
-          OBJECT_ID(N'reporting.InUseArchiveReceipts', N'U') AS M023Receipts,
-          COL_LENGTH(N'ops.OperationalRecords', N'SourceSynthetic') AS M023SourceColumnBytes,
-          OBJECT_ID(N'reporting.InUseReportCatalogue', N'U') AS M024Catalogue;
-   ```
+2. Salt okunur [Read-SdmTargetSqlPreflight.sql](../scripts/diagnostics/Read-SdmTargetSqlPreflight.sql)
+   sorgusunun 29.09.2026 `18:51:01Z` sonuc ekranlari operatorce iletildi;
+   SQL yurutme operatoru bu sorguyu kendisinin calistirdigini teyit etti.
+   Sunucu/veritabani kimliginin onayli TEST hedefi oldugunu operator teyit etti;
+   `CanViewDatabaseDefinition=1`.
+   022 icin dokuz, 023 icin on beklenen nesne/kolon/index/trigger satiri
+   `Visible`; ilgili index/trigger'lar etkin. 024'un dort beklenen nesnesi
+   `NotVisibleOrAbsent`. Olasi harici ledger tablosu sonuclari bostur; bu,
+   eski degisiklik kaydi olmadigini kanitlamaz. Tam hedef kimligi
+   ve ekran transkripsiyonu ozel yerel kanitta saklanir:
+   `C:\SecureOpsBuild\validation\sdm-target-preflight-20260929\sql-object-evidence.json`.
+   Sonraki [Read-SdmContractDetails.sql](../scripts/diagnostics/Read-SdmContractDetails.sql)
+   sonucunun 1-5 kumeleri `sql/schema/022` ve `023` ile karsilastirildi:
+   kolon turleri/nullability, PK/UQ/CHECK/FK, index anahtar sirasi/filtre ve
+   alti tetikleyici anlamsal olarak eslesiyor; gereken metadata NULL/gorunmez
+   degil. Otomatik constraint adlari, CHECK terim sirasi ve bosluk farklari
+   islevsel fark degildir. Sorgu kolasyon, identity seed/increment, FK action
+   ve index storage seceneklerini dondurmedi; byte-esit tam DDL iddiasi yoktur.
+   024 metadata satiri yok; onceki 4/4 gorunmeme ile
+   tutarli. Onceki calistirma logu/degisiklik kaydi saglanmadi; varsa saklanir,
+   yoksa tarihsel kanit erisilemez olarak kaydedilir. Ayri DBA makbuzu
+   varsayilmaz. Altinci izin sonucu **operatorun SQL oturumuna** aittir; gorunen
+   hesap adi benzer olsa da API'nin etkin hakkini kanitlamaz. 024 satirindaki
+   sifir haklar da henuz gorunmeyen tablo ve operator oturumu baglamindadir;
+   API icin grant sonucu olarak yorumlanmaz. Normal API SQL
+   kimliginde onayli salt okunur hak kaniti yoksa tek SQL kapisi acik kalir;
+   kimlik degistirme veya yeni yetki verme bu adimda yapilmaz.
 
 3. Mevcut yetkili API `GET /api/v1/diagnostics/operations` raporunun yalniz
    allowlist `Settings` ve kaynak durumu kisimlarini, gizli alan eklemeden
@@ -665,14 +691,24 @@ kapanisi `9f4f57d`, derlenen urun `deda848` olarak ayridir.
    ve `web.config` environmentVariables katmanlarindan yalniz su anahtarlarin
    kaynak/degerini redakte ederek eslestirmesi gerekir:
    `OperationalRecords:{SourceProvider,RepositoryProvider,ReadOnlyIntegrationMode,ControlledTestWritesEnabled,SourceCloseEnabled}`,
-   `OperationalRecords:Pilot:{RuleSetVersion,SourceRecordId,SourceFingerprint,SourceScope,RequestType,MappingVersion,ApprovalReference,ExpiresAt}` ve
+   `OperationalRecords:Pilot:{RuleSetVersion,SourceRecordId,SourceFingerprint,SourceScope,RequestType,MappingVersion,ApprovalReference,TrackingReason,ExpiresAt}` ve
    `Jira:{Provider,ProjectKey,IssueType,IssueTypeId,MappingVersion,TeamCustomField,TeamValue,Labels,RequesterWatcherCustomField,ReporterMode,AssignmentMode,UnresolvedRequesterPolicy}`.
-   `TrackingReason` ve kisi eslemeleri gerekiyorsa kayitli onay referansiyla
-   ayrica incelenir. `Jira:Authorization`, URL'nin gizli kisimlari ve baglanti
+   Kisi eslemeleri gerekiyorsa kayitli onay referansiyla ayrica incelenir.
+   Yalniz izinli anahtar/deger/kaynak ve gerekiyorsa parmak izi paylasilir;
+   normal API prosesinin etkili degeri ile dosya/override katmanlari ayrilir.
+   `Jira:Authorization`, URL'nin gizli kisimlari ve baglanti
    dizeleri paylasilmaz. Dosya ve IIS katmanlari baska saglayici/override varsa
    etkin degerin kaniti sayilmaz; ayni prosesin etkin degeri dogrulanmadan
    yazma kapisi acilmaz. Bu turde ek bilgi icin Falcon engelli SCCM paketi
    calistirilmaz.
+   Kurulu rc6.26 DLL'leri birlesik Jira-only pilot adayindan eskidir;
+   `diagnostics/operations` endpoint'i Jira/Pilot anahtarlarini dondurmez.
+   Mevcut hedef dosya/override degerleri ile aday icin onaylanacak degisiklik
+   ayri listelenir; dosya gorunumu aday prosesinin etkin degeri sanilmaz.
+   `ReadOnlyIntegrationMode=true`, `ControlledTestWritesEnabled=false` ve
+   `SourceCloseEnabled=false` on izleme boyunca korunur. Kurulum ve yazma
+   kapisi ancak ayri izinli pencerede, secili OR ve canli on izleme sonrasi
+   degerlendirilir.
 
 4. Is/Jira sahibi bir acik TEST ServerRequest OR kodu/kaynak ID'si ve guncel
    kaynak parmak izini, onayli Jira proje/issue type/mapping, yetkili actor ve
@@ -723,19 +759,28 @@ Onaylar tamamlaninca operatorun inceleyecegi sira:
 
 1. Secili OR ve asagidaki preview kanitini, tam aday manifest/hash'lerini,
    API/UI/Worker surumlerini ve guvenlik onayini ayni degisiklik kaydina baglayin.
+   Hedef API/UI halen rc6.26'dadir; `deda848` inceleme ZIP'leri kurulu degildir
+   ve bu belge kurulum onayi vermez.
    Yerel test kurumsal Jira baglantisi/issue kabulunun yerine gecmez.
 2. Bakim penceresinde mevcut payload/config/ayri API-UI key ring yedeklerini,
    DB yedegini ve islenmekte/belirsiz komut listesini alin. Yeni yazmalari
    durdurun; mevcut Worker'i sahibiyle koordine edin, ikinci process baslatmayin.
-3. DBA gercek ledger/objeleri kontrol eder. 022/023 kuruluysa yeni katalog
-   farki yalniz 024'tur. 024 mevcutsa tekrar uygulanmaz. Eksik/belirsiz baseline
+3. SQL yurutme operatoru 022/023 tam tanim ve API izinlerini karsilastirir;
+   eski calistirma kaydi mevcutsa ekler, yoksa erisilemez diye kaydeder. 024
+   yoksa ve ayri onay verildiyse katalog farki yalniz 024'tur; 024 mevcutsa
+   tekrar uygulanmaz. 023 sozlesmesi farkliysa 024 adimi durur.
+   Eksik/belirsiz baseline
    varsa durun; yerel 001-024 fixture komutlari kurumsal sunucuda calistirilmaz.
    Bu Jira UI birlesmesi yeni migration eklemez.
 4. API/UI ayni kaynakli payload olarak koordine edilir; config/web.config ve
    sirlar ZIP'ten degistirilmez. Matched Worker da teslimata dahildir, fakat
    Jira-only dispatch API icindedir: bu kabul icin SCCM veya yeni servis
-   kurulumuna ihtiyac yoktur. Worker degisecekse ayrica mevcut servis/console
-   el degistirme kilavuzuna ve guvenlik onayina uyulur; eski/yeni birlikte yazmaz.
+   kurulumuna ihtiyac yoktur. Hedefte Worker icin Windows Service kaydi
+   bulunmadigi, eski isletimin PowerShell konsolu oldugu bildirildi; bos
+   `Win32_Service` sonucu ariza sayilmaz. Worker'in kurulu exe surumu, normal
+   konsol sahibi/oturumu ve calisma durumu bu IIS raporuyla dogrulanmadi.
+   Worker degisecekse ayri konsol-servis devir, tek proses kilidi, log/geri
+   donus ve guvenlik onayi gerekir; burada Worker veya SCCM tanilamasi baslatilmaz.
 5. Once yazma kapilari kapaliyken API/UI kimlik/payload, capability, kalici SQL
    ve exact OR onizlemesini dogrulayin. Eksik alan, mapping/fingerprint farki,
    bilinmeyen komut, app health hatasi veya yetki eksiginde durun.
@@ -748,7 +793,7 @@ Geri donus: once yeni yazmalari durdurun ve belirsiz islemleri Jira sahibiyle
 mutabik kilin. DLL geri almak Jira issue'sunu geri almaz. DB audit/link/intent
 silinmez; 024 icin otomatik down migration yoktur. Eski serializer yeni
 alanlari dusurebileceginden API/UI/Worker surumlerini birlikte koordine etmeden
-eski binary ile yazmaya izin vermeyin. Yedekten veri geri alma ayri DBA karari
+eski binary ile yazmaya izin vermeyin. Yedekten veri geri alma ayri onayli SQL islem karari
 gerektirir; basarili issue icin Jira sahibinin ayri iptal sureci kullanilir.
 
 #### Tek OR kabul kaniti
@@ -882,22 +927,48 @@ Salt syntax ve onceden kalan goruntuler bu kapilari kapatmaz.
 ## SQL farki ve geri donus
 
 024 katalog icin gerekceli yeni additive farktir; onceki lifecycle/export tek
-basina migration gerektirmiyordu. Sonraki paket `-UpgradeFromRc626` ile sadece
-024 delta uretebilir. 022/023 kurulu bildirimini object/DBA kanitiyla teyit edin;
-runtime PrepareSchema hep false. Genis grant veya migration replay yoktur.
-Bu kaynakta final paket kapisi gecilmediginden hedefte 024 uygulama talimati yoktur.
+basina migration gerektirmiyordu. Sonraki kabul edilmis paketin
+`-UpgradeFromRc626` deltasi yalniz 024 icermelidir. SQL yurutme operatoru
+bu degisikligi kendi onayli surecinde yapar; ayri DBA makbuzu varsayilmaz.
+Repo ledger'i yoktur. Eski calistirma logu/degisiklik kaydi varsa saklanir;
+yoksa tarihsel kanit erisilemez olarak kaydedilir. 29.09 envanterinde 022/023
+gorunur ve 024 gorunmez; sonraki dar tanim ciktilari 022/023 ile anlamsal
+eslesmistir. Bu, migration calistirma gecmisini veya API etkin haklarini kanitlamaz.
 
-DBA paket oncesi 023 makbuz tablosu ve kuruldu bildirilen 022/023 nesne, kolon,
-index, trigger tanimlarini kurulum kaydiyla karsilastirir; repo migration ledger
-olusturmaz. 024 tek metadata tablosu, receipt foreign key, code index ve immutable
-trigger ekler. 024 zaten varsa script durur; tanim farki otomatik onarilmaz.
-Dar runtime farki yalniz mevcut onayli API principal'ina bu tabloda SELECT/INSERT;
-Worker/UI icin yeni SQL veya arsiv yetkisi yok. Migration dosyasi SQLCMD `:r`
-ile schema dosyasini cagirir, iki dosyanin paket hash'i birlikte dogrulanir.
-Kabul edilmis successor, dogrulanmis 023, geri yukleme noktasi ve DBA/bakim
-penceresi olmadan uygulanmaz. Eksik/farkli nesne, farkli hash, yedek eksigi,
-surum uyumsuzlugu veya devam eden yazilar durma nedenidir. 001-024 test fixture
-komutu corporate SQL icin kullanilmaz; bu devam yeni hedef komutu vermiyor.
+Kosullu 024-only degisiklik sirasi (simdi **calistirilmaz**):
+
+1. Onayli TEST hedef kimligi ve 022/023 dar DDL karsilastirmasi operator
+   kanitiyla tamamlandi; envanter veya tanim sorgusu simdi tekrarlanmaz.
+   Normal API SQL kimliginin etkili 022/023 SELECT/INSERT ve execution UPDATE
+   haklari ayri, onayli salt okunur kanitla teyit edilir. Altinci sonucun
+   operator oturumuna ait olmasi bu kontrolu kapatmaz. Yeni bir 023 farki,
+   eksik API hakki veya asiri/genis izin sorusu varsa **dur**; 024 uygulanmaz.
+2. Ayri degisiklik onayi, secili matched API/UI/Worker payload'i ve reviewed
+   024 delta hash'leri olmadan ilerlenmez. Gozden gecirilecek tek giris
+   `sql/migrations/024-in-use-report-catalogue.sql`; SQLCMD `:r` ile
+   `sql/schema/024-in-use-report-catalogue.sql` dosyasini cagirir. Her iki
+   dosyanin hash'i kabul edilmis delta manifestiyle eslesmelidir. 024 nesnesi
+   zaten varsa veya kismen varsa durulur; yeniden oynatma/otomatik onarim yok.
+3. Bakim penceresinde mevcut DB ve uygulama/config yedegi ile geri yukleme
+   noktasi kaydedilir, yazilar durdurulur, belirsiz islemler ayiklanir.
+   SQLCMD migration dizini baglaminda yalniz 024 girisi, mevcut onayli hedef
+   baglantisi ve `-I -b` hata davranisiyla yurutulur; 001-024 fixture veya
+   022/023 hicbir zaman hedefte tekrar calistirilmaz. Bu belge baglanti bilgisi
+   veya simdi calistirilacak hedef komutu vermez.
+4. 024 DDL basarisi ayri dogrulanir: `reporting.InUseReportCatalogue` kolon/PK,
+   `reporting.InUseArchiveReceipts` icin FK, `IX_InUseReportCatalogue_Code`
+   key sirasi ve etkin `TR_InUseReportCatalogue_Immutable` tam schema dosyasiyla
+   ayni dar sozlesme sorgusunun post-change sonucunda karsilastirilir.
+   Runtime icin yalniz **mevcut onayli API DB principal'ina**
+   bu tabloda SELECT ve INSERT izni ayri incelenir; Worker/UI, DELETE, UPDATE,
+   DDL, rol atamasi veya genis grant eklenmez. Normal API SQL kimligindeki
+   etkili izinler ayri salt okunur dogrulanir; uygulama yazmasi bu adim degildir.
+5. SQL hata/belirsizlik, yedek eksigi, nesne/izin farki veya surum uyumsuzlugunda
+   uygulama yazilari kapali kalir; sonucu incelemeden migration tekrar edilmez.
+   Otomatik down yoktur. Geri yukleme yalniz onayli recovery kararidir;
+   audit, receipt ve arsiv baytlari silinmez. `Hangfire:PrepareSchema=false`
+   korunur. SQL kapisi kapaninca bile Jira one-OR kabul ve hedef flag onaylari
+   ayrica gerekir.
 
 Rollback basit DLL dusurme degildir: yeni yazilari durdurun, foreground Worker'i
 kontrollu durdurup tum bilesenleri koordine edin. Arsiv, intent/artifact, review,

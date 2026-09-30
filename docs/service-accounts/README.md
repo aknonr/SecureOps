@@ -1,8 +1,13 @@
 # Service Accounts Module — Design Note
 
-Status: isolated implementation on `feature/service-accounts-20260928`. Not integrated, not
-deployed, no corporate data or calls. Business rules: [SPEC.md](SPEC.md). Stage status and
-acceptance mapping: [PROGRESS.md](PROGRESS.md).
+Current integration status (2026-09-30): pinned `b4fdf8d` is integrated locally
+on `feature/service-accounts-pinned-integration-20260929`, based on `e997c5b`.
+Not deployed or corporately accepted; no follow-up code included. New Windows
+evidence and limitations: [INTEGRATION-20260930.md](INTEGRATION-20260930.md).
+The canonical requirements register remains [integrated-test-activation.md](../integrated-test-activation.md).
+Business rules: [SPEC.md](SPEC.md). Historical stage evidence: [PROGRESS.md](PROGRESS.md).
+The authority/baseline history below describes the original isolated development,
+not the current integration state.
 
 ## Authority and baseline
 
