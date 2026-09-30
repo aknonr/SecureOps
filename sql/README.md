@@ -32,6 +32,15 @@ sql/
 
 ## Current Reviewed Migrations
 
+The local combined review candidate additionally reserves **025-service-accounts**.
+Its SQLCMD wrapper requires 023/024 and includes the unchanged reviewed
+`pending/service-accounts/SA-001-service-accounts.sql` from the migrations working
+directory. Ship that include file with the wrapper; never execute only the wrapper
+without its dependency. API/Worker permission scripts remain separate and assign
+no principal. Observed TEST 022/023 is not replayed: the conditional sequence is
+024, verify/stop, then separately approved 025 and reviewed role scripts.
+Number reservation is local, not a target installation or shared-branch promotion.
+
 | Order | Description |
 |---|---|
 | 001 | Audit and application access schemas, tables, indexes, role seeds, and append-only/self-approval triggers |

@@ -38,8 +38,10 @@ try {
 
 Push-Location (Join-Path $root 'sql\pending\service-accounts')
 try {
-    Invoke-SaSql -Database $database -File 'SA-001-service-accounts.sql'
-    Write-Host 'applied SA-001-service-accounts.sql (candidate)'
+    if (-not (Test-Path (Join-Path $root 'sql/migrations/025-service-accounts.sql'))) {
+        Invoke-SaSql -Database $database -File 'SA-001-service-accounts.sql'
+        Write-Host 'applied SA-001-service-accounts.sql (candidate)'
+    } else { Write-Host 'Service Accounts installed through numbered 025' }
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-001-service-accounts.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate replay was not refused.' }
     Write-Host 'replay refused as expected'
