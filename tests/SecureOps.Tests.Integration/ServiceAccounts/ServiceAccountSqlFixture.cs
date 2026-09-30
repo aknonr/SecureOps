@@ -90,10 +90,21 @@ internal sealed class ServiceAccountSqlFixture
         var id = Guid.NewGuid();
         string identity = "synthetic:sa:" + id.ToString("N");
         await using SqlConnection connection = Connection();
+        await connection.OpenAsync();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
+        // Raw synthetic seeding must obey the platform administration boundary.
+        // Otherwise its Users insert can deadlock with a SERIALIZABLE role-impact scan.
+        await connection.ExecuteAsync("""
+            DECLARE @result int;
+            EXEC @result = sys.sp_getapplock @Resource = N'SecureOps.Access.Administration.v1',
+                @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
+            IF @result < 0 THROW 51000, 'Synthetic access setup lock unavailable.', 1;
+            """, transaction: transaction);
         await connection.ExecuteAsync("""
             INSERT INTO security.Users(UserId, CorporateIdentity, AuthenticationSource, AccessStatus, DisplayName)
             VALUES(@id, @identity, 'oidc', 'Approved', @display);
-            """, new { id, identity, display = "Sentetik " + id.ToString("N")[..6] });
+            """, new { id, identity, display = "Sentetik " + id.ToString("N")[..6] }, transaction);
+        await transaction.CommitAsync();
         ApplicationUser user = new(id, identity, "oidc", AccessStatus.Approved, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, 1, ["Synthetic"], capabilities);
         _users[identity] = user;
         return new SynUser(user, new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, identity)], "Synthetic")));
