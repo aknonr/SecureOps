@@ -11,15 +11,46 @@ Urun kodu: `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`. SQL/hazirlik commit'i
 ve paket hash'leri ayri `candidate.json` icindedir. Tek inceleme konumu:
 `C:\SecureOpsBuild\delivery-review\2026-10-01-service-accounts-combined\a457a33`.
 API/UI/Worker ZIP'leri eslesir; bu muhurli deda848 SDM paketini degistirmez.
-Numarali release guard korunur: mevcut dal/001-024 kosulu bu 001-025 adayini
-promote edemez. Paket dogrulamasi kurulum onayi veya kurumsal kabul degildir.
+`candidate.json` halen `readyForInstallation=false`; bu ZIP'leri dagitmayin.
+Numarali release guard dal/temiz kaynak/tam SHA kosullarini korur; 025 ancak
+023 karsilastirma kaniti ve hash'e bagli reviewed 024/025 kaydiyla acikca secilir.
+Bu degisiklik eski inceleme ZIP'lerini numarali release yapmaz. Mevcut hazirlik
+dalinda release uretilmez; ayri onayli promotion gerekir.
 
-**Dort kisi:** [tek kayittaki rol matrisi](integrated-test-activation.md).
+**Ilk sinirli API/UI pilotu:** yeni hesap acmak veya dort yeni kisi bulmak
+gerekmez. Mevcut onayli TEST kullanicilarindan yetkili erisim/modul yoneticisi
+ve ayri kapsamli pilot operatoru secilir; yonetici kendine scope veremez.
+Normal OIDC/persisted access korunur. Pilot operatorune yalniz incelenmis
+View/Work/Report bundle'i ve secili Organization/Team kapsami gerekir;
+Import/Assign/Verify bu ilk sinirli smoke'a dahil degildir. Onayli sentetik
+hesap/talep, kayit/detay, kapsamli rapor ve Excel kontrolu yapilir. Bu baslangic
+tum rol matrisinin veya kurumsal is sonucunun kabul edildigi anlamina gelmez.
+Mevcut kullanicilara bundle/scope vermek de AYRI onayli islemdir, burada yapilmadi.
+Tum yazarlar/consumer icin handover ve asagidaki go/no-go kapilari once kapanir.
+
+**Worker ilk pilotta:** API `ServiceAccounts:Provider=SqlServer`,
+`ServiceAccounts:Reminders:Enabled=false`; UI bu ayari/SQL'i tutmaz, API kullanir.
+Worker `ServiceAccounts:Provider=Disabled`, `ServiceAccounts:Reminders:Enabled=false`
+kalabilir; API/UI islemleri Worker'a bagli degildir. `Reminders=false` yalniz
+zamanlamayi kapatir: Administer yetkili `POST /api/v1/service-accounts/reminders/run`
+manuel degerlendirmeyi halen yapabilir. Ilk pilotta bu cagriyi yapmayin;
+ayar bir genel calistirma engeli olarak sunulmaz. Hatirlatma/Worker kabulunu sonraya birakin.
+Eslesmis Worker binary'si teslimat setinde kalir fakat durdurulmus/offline olabilir;
+SA icin baslatmak veya yeni Windows Service kurmak zorunlu degildir. Eski console
+calisiyorsa, yeni ortak DB/yazarlarla onaysiz karma surum calistirmayin: PID,
+kimlik, queue ve tamamlanmamis isleri saptayan onayli durdurma/handover penceresi
+gerekir. Calisacak Worker son eslesmis binary olmalidir; hash'e ozel guvenlik/host
+onayi olmadan baslatilmaz. Eski Falcon diagnostic izni buna aktarilmaz.
+
+**Tek go/no-go tablosu:** [kanonik kayittaki hazirlik ve ayri onaylar](integrated-test-activation.md#release-readiness-and-minimal-pilot-2026-10-01).
+
+**Daha sonraki tam dort-rol kabulü:** [tek kayittaki rol matrisi](integrated-test-activation.md).
 Yonetici View+Administer, koordinator View+Work+Assign+Verify+Import+Report,
 ekip uyesi View+Work alir. Kapsam disi kisi de View+Work ile ilgisiz Team
 kapsaminda denenir: bos liste ve dogrudan ID/kanit erisiminde 404 beklenir.
 Bu oneri hak atamaz; onayli OIDC kimlikleri ve versiyonlu bundle/scope karari
-erişim sahibinden gerekir. Yonetici kendine scope veremez; business scope'u
+erisim sahibinden gerekir. Mevcut onayli kimlikler kullanilabilir; dort yeni
+hesap acilmasi istenmez. Yonetici kendine scope veremez; business scope'u
 olmayan yonetici raporlayamaz veya is dogrulayamaz.
 
 **Kosullu SQL sirasi (simdi calistirilmaz):**
@@ -27,17 +58,20 @@ olmayan yonetici raporlayamaz veya is dogrulayamaz.
    uygulanmaz. Yeni 023 farki, belirsiz DB/principal, mevcut/kismi 024/025 veya
    SQL runtime rollerinde eski tanim varsa durun; otomatik onarim/replay yok.
 2. Change onayi; DB full backup/recovery noktasi ve config/API/UI/Worker
-   geri-donus kopyalari; normal API/Worker DB principal eslemesi gerekir.
+   geri-donus kopyalari; normal API DB principal eslemesi gerekir. Worker
+   kapali ilk pilot icin SA Worker runtime rolu/haklari aktivasyonu ertelenir.
    Islem/arsiv/bekleyen komutlari kaydedin; tum yazarlar ve recurring consumer
    kontrollu durdurulmadan schema degisikligine gecilmez. Burada durdurulmadilar.
-3. Adayin DBA/sql/migrations dizininden SQLCMD `-I -b` ve mevcut onayli
+3. Onayli nihai numarali teslimatin DBA/sql/migrations dizininden SQLCMD
+   `-I -b` ve mevcut onayli
    hedef baglantisiyla YALNIZ `024-in-use-report-catalogue.sql` uygulanir.
    DDL/FK/index/immutable trigger ve yedek kaniti teyit edilmeden 025'e gecilmez.
 4. Ayri onayli `025-service-accounts.sql` ayni dizinden calisir; schema wrapper
    `../pending/service-accounts/SA-001-service-accounts.sql` dosyasini dahil eder.
    25 yeni tablo/koruyucu trigger, kisit ve indeksler reviewed DDL ile karsilastirilir.
-   Ardindan ayri incelenmis `SA-API-permissions.sql`, `SA-Worker-permissions.sql`
-   dosyalari rol OLUSTURUR ama kimseyi uye yapmaz. Onayli kimlik eslemesi yoksa
+   Ardindan ayri incelenmis `SA-API-permissions.sql` rol OLUSTURUR ama kimseyi
+   uye yapmaz. `SA-Worker-permissions.sql` ve uyeligi ilk Worker-kapali pilot
+   icin gerekmez; dosya inceleme setinde kalir, sonra ayri onaylidir. Kimlik eslemesi yoksa
    uyelik adiminda durun; kimlik uydurmayin veya yeni login acmayin.
 5. 024 API deltasi yalniz `reporting.InUseReportCatalogue` SELECT/INSERT.
    SA API rolu: Organizations, Teams, People, ScopeGrants, Accounts,
@@ -50,8 +84,9 @@ olmayan yonetici raporlayamaz veya is dogrulayamaz.
    audit.AuditLog INSERT. TeamMemberships, DDL, db_owner veya audit degistirme yok.
    SA Worker rolu Accounts/WorkRequests SELECT, ReminderOutbox SELECT/INSERT/UPDATE.
    Normal access/session/audit ve Hangfire haklari bunlardan ayri kalir.
-6. Mevcut onayli API/Worker DB kullanicisi ilgili SQL rolune yalniz sonraki
-   onayli uyelik adiminda alinir; uygulama bundle'i SQL rolu degildir. Etkin API
+6. Mevcut onayli API DB kullanicisi ilgili SQL rolune yalniz sonraki
+   onayli uyelik adiminda alinir; Worker rolu/uyeligi sonraki Worker kabulune
+   kalabilir. Uygulama bundle'i SQL rolu degildir. Etkin API
    haklari halen bilinmiyor; operator SSMS sonucu bunlari kanitlamaz.
    Post-change metadata/grant karsilastirmasi ve normal kimlikle izin kaniti
    olmadan module pilotu baslatilmaz. Executor eklemek bu teslimata dahil degildir.
@@ -66,18 +101,20 @@ onayli recovery karari ve yeni veriyi/audit'i koruma planiyla yapilir.
 1. Mevcut sirlar, SQL baglantisi, API/UI ayri key ring, OIDC issuer/client ve
    Worker Test/contentRoot korunur. UI'ye entegrasyon/SQL/mail sirri eklenmez.
    Aday runtime config tasimaz. Baslangicta ServiceAccounts:Provider=Disabled ve
-   ServiceAccounts:Reminders:Enabled=false; sonraki onayli pilotta API/Worker
-   Provider=SqlServer, reminders ilk asamada false. Mail'in uc bayragi false,
+   ServiceAccounts:Reminders:Enabled=false; sonraki onayli ilk pilotta yalniz
+   API Provider=SqlServer; Worker Provider=Disabled, her iki hostta reminders false. Mail'in uc bayragi false,
    InUseCompletion kapali, PrepareSchema=false kalir. OCO/Jira gate'leri acilmaz.
 2. Onayli TEST OIDC ile normal login: DemoAuth=false, DemoCompatibility=false;
    persisted access/session ve fail-closed audit. Mevcut yonetici yolunu kullanin;
    yeni bootstrap kimligi/issuer tahmini yok. 401/403, bundle surumu ve scope
    kontrolu kaniti saklanir. Sentetik bridge bu kabulun yerine gecmez.
-3. Dort rol ile yalniz sentetik modül verisi: liste/detay/katilimci siniri,
+3. Ilk sinirli pilot yukaridaki mevcut iki onayli kullaniciyla ve sentetik veriyle
+   yapilir. Sonraki tam dort-rol kabulunde liste/detay/katilimci siniri,
    import preview/commit/replay, evidence erisimi, scope disi API denials,
    8 plan ve 2 Review, ClosureKindNotAllowed, snapshot/export. Mouse/klavye,
    mobil, iki tema ve GERCEK 200% zoom kaydi; yetkili Windows runner kullanilir.
-4. Worker kabulune ayrica final binary hash'i icin guvenlik/host ve calisma
+4. Sonraki Worker kabulu ilk API/UI pilotunun on kosulu degildir. Final binary
+   hash'i icin guvenlik/host ve calisma
    penceresi onayi gerekir. Eski Falcon diagnostic izni bu Worker'a gecmez.
    Onayli tek job-server/queue/schema9 ile once disabled startup recurring
    isleri degistirmemeli; sonra yalniz reminders onayi varsa enabled startup

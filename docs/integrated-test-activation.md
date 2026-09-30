@@ -2,6 +2,75 @@
 
 ## Owner exception and baseline
 
+### Release readiness and minimal pilot, 2026-10-01
+
+**NO-GO for deployment.** The retained a457 review has readyForInstallation=false;
+no new package, target action, flag or grant was produced by this readiness work.
+This section supersedes older instructions that treated four newly provisioned
+identities or enabled Worker reminders as prerequisites for a limited API/UI pilot.
+The full four-role matrix remains a later acceptance gate, not silently waived.
+
+Identity reconciliation: tested C# product `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`,
+candidate preparation `20356b542803f9cc14deb7e84cf57e351780f6a6`, previous docs-only
+closeout `52df5d3d40ec9c25f41ef0687e677a2d02f726ab`. Current readiness changes touch
+release selection, tests and guidance ONLY; src/contracts/build-input comparison
+with a457 is empty. No new product build is required by a runtime source change.
+The three existing ZIP identities/manifests below are retained, not rehashed or
+recreated; their embedded guidance reflects preparation203 and is historical
+where this current entry supersedes it. A later authorized numbered release must
+still publish and validate its EXACT approved source/version; this is not permission
+to relabel existing a457 binaries as that later SHA or to deploy review ZIPs.
+
+Numbered release guard still requires the original combined branch, clean source,
+now explicit ExpectedSource equality and existing per-assembly source checks.
+Get-ReleaseSqlPlan selects 025 ONLY with rc6.26/023, typed true verification/review
+flags, nonempty evidence references and matching hashes for all seven 024/025 DDL/
+dependency/role files. Exact numbered inventory and SQLCMD include closure are
+checked before any publish/directory creation. This records the supplied functional
+023 comparison, NOT an imaginary ledger or full historical installation receipt.
+Packaging review never authorizes target SQL. Old 001-024 releases stay immutable.
+
+New Windows checks on preparation HEAD52 plus the readiness working changes:
+18/18 selector/guard/include/SQLCMD checks; 10/10 SqlAssetContractTests (0 failures,
+0 skips). The latter updates the obsolete 24-file assertion to exact 25 and the
+new 025 filename, without weakening contract checks. The copied selected SQL
+tree installed in fresh LocalDB SecureOps_SaUpgradeRelease1001A: missing024
+refused with51300, injected51399 rolled back the entire module, then024/025 and
+unassigned roles installed with baseline rows/definitions retained. After adding
+the ordinary-file check for role scripts, the 17 selector checks passed again
+(overlap, NOT additional counts). Five modified PowerShell files parsed without
+errors. Calling the actual numbered-release entry on the current integration
+branch was refused before any directory/publish/package, as required. No unchanged
+full suite was repeated.
+Private evidence: C:\SecureOpsBuild\validation\sa-release-readiness-20261001
+(results.json, sql-assets.trx, selected-tree, failure fixture) and sibling.log;
+final selector evidence at sa-release-readiness-selector-final-20261001;
+branch refusal at sa-release-readiness-branch-20261001.log.
+The synthetic review.json used in tests is NOT corporate review/authorization.
+
+| Go/No-Go gate | Observed state | Prepare now | Separate approval / owner and closing evidence |
+|---|---|---|---|
+| SA-SQL-025: target024/025/roles | NO-GO: inspected022/023 match;024 NotVisibleOrAbsent;025/roles not target-verified; normal API rights unknown | Retain comparison; review024 then025/include and API-role script; do not repeat inventory | SQL execution operator (owner): approved change + backup, verified DB/principal mapping; apply024, compare/stop, separately approve025/API role/membership and normal-runtime evidence. Worker-role execution/membership deferred while Worker SA disabled |
+| Backup/recovery point | NO-GO: no current recovery evidence supplied | Plan full DB and coordinated config/API/UI/Worker backups; archive/audit preservation | Operator/change owner: named recoverable point, tested recovery procedure and approved writer/consumer stop |
+| Current runtime identities | NO-GO: older API/console evidence is not current SQL-principal proof; no Windows Service installed | Identify existing IIS AppPool identities and any running console PID/identity/queue read-only; no Worker execution | Runtime/access owner: normal API SQL identity and rights; UI separate ring/identity; console stop/handover if active. No mixed-version consumer or guessed principal |
+| Final payload/security decision | NO-GO: a457 is review-only; no numbered delivery approval | Review retained API/UI/Worker hashes, exclusion/manifests and pinned source; prepare evidence-bound promotion in independent clone | Release/change + security owners: approve exact final payload scope/hash and target operation. Worker execution needs its own binary permission; held SCCM diagnostic approval does not transfer |
+| SA-MIN-PILOT: OIDC/scope | NO-GO: selected existing approved users/bundles/scopes not recorded | Nominate existing TEST access/module administrator and distinct pilot operator; no four-account creation | Access owner: normal OIDC + persisted approval, reviewed View/Work/Report pilot bundle and selected Organization/Team scope; administrator grants another user, not self. No bridge/imported-person authorization |
+| Deployment window / Worker | NO-GO: window and active-console handover unknown | API SA SqlServer/remindersfalse; Worker SA Disabled/remindersfalse; stage matched Worker offline in the future approved plan, no service required for API/UI | Operations/change owner: explicit coordinated stop/install/start window. Do not leave rc6.26 consumer active with new writes; running Worker must be final matched/approved binary. This task starts/stops nothing |
+| Minimum smoke checks | NOT RUN on target | Prepare normal OIDC login, synthetic account/request, allowed scoped read/write/report/XLSX and401/403/hidden-ID denial; desktop Excel | Authorized TEST operator: execute ONLY after release/change, SQL/runtime and scope approvals; retain HTTP/UI/audit/export evidence. No manual reminders/run, mail, SCCM, Jira or In Use source writes |
+| Rollback owner | NO-GO: named rollback/window decision missing | Prepare stop/reconcile, coordinated binary/config restoration; retain024/025/data/outbox/snapshots/audit | Operator/change owner: designate recovery owner and decision point; no DROP/down; old serializers must not write new data; restore only with approved new-data/audit preservation |
+| SA-AUTH-MATRIX / later Worker acceptance | DEFERRED, not passed | Reuse existing approved users for the four-role matrix below; retain reminder/SCM/Excel journeys | Access/runtime owners: distinct role/scope observations; separately authorized Worker schedule/restart and security acceptance. Not required to create four new accounts or enable reminders for minimum API/UI pilot |
+
+Code confirms API ServiceAccountsModule is independent of Hangfire/Worker and UI
+uses the normal API client. Worker registration with ProviderDisabled or
+RemindersEnabled=false adds no schedule/store and makes stale jobs no-op.
+However API reminders/run (Administer) can still explicitly evaluate when the API
+module is enabled: false is a SCHEDULING switch, not an all-execution fence. This
+endpoint is excluded from the first pilot. No code change to this contract.
+Jira-only, IU-05 and SCCM/Falcon remain separate unchanged gates; SA approval is
+not source/Jira/mail activation. The next operator action is a scoped change
+request for the minimum API/UI pilot using existing approved users and the gates
+above, NOT execution of SQL or deployment of these review ZIPs.
+
 ### Service Accounts TEST review preparation, 2026-10-01
 
 **Prepared, not installed:** candidate `candidate.json` SHA-256
@@ -48,8 +117,8 @@ Windows-executed Linux evidence. Full a457 regression is reused, not rerun.
 |---|---|
 | SA-DELIVERY | Separate matched review destination `C:\SecureOpsBuild\delivery-review\2026-10-01-service-accounts-combined\a457a33`; candidate.json records tested product vs preparation source, ZIP/payload/support hashes. Not numbered or installation-ready; sealed deda848 candidate remains untouched |
 | SA-SQL-025 | Local fresh/upgrade/atomicity gates passed; target execution NOT approved. Operator must approve 024 then 025 and role scripts with backup, verified principal mapping and the stop/rollback procedure in the current operator entry |
-| SA-AUTH-MATRIX | Four approved OIDC TEST identities and reviewed bundles/scopes still missing; derive assignments from the matrix below, no accounts or grants created |
-| SA-WINDOWS-ACCEPTANCE | Normal OIDC API/UI, allowed/denied scope journeys, reminder hosting/restart and desktop Excel remain unexecuted. Synthetic bridge/SQL execution tokens are NOT acceptance |
+| SA-AUTH-MATRIX | Later full four-role acceptance uses existing approved OIDC TEST identities where available; reviewed bundles/scopes pending. Minimum two-user API/UI pilot is separate above; no accounts/grants created |
+| SA-WINDOWS-ACCEPTANCE | Normal OIDC minimum API/UI/Excel smoke remains unexecuted; full roles/reminder hosting are later gates, not minimum-pilot prerequisites. Synthetic bridge/SQL execution tokens are NOT acceptance |
 | SDM/IU/FALCON | Jira-only one-OR/effective API rights, IU-05 transport and SCCM/Falcon binary permission remain separate; no change to those target gates |
 
 Four-user matrix (bundle names are review proposals, NOT seeded roles):

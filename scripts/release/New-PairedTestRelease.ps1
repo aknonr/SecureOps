@@ -1,10 +1,13 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][ValidatePattern('^\d{4}-\d{2}-\d{2}-pilot-rc6\.\d+$')][string]$ReleaseName,
+    [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedSource,
     [string]$BrandingDirectory,
     [switch]$UpgradeFromRc621,
     [switch]$UpgradeFromRc622,
     [switch]$UpgradeFromRc624,
-    [switch]$UpgradeFromRc626)
+    [switch]$UpgradeFromRc626,
+    [switch]$IncludeServiceAccounts,
+    [string]$SqlUpgradeReview)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($UpgradeFromRc621 -or (@($UpgradeFromRc622,$UpgradeFromRc624,$UpgradeFromRc626 | Where-Object { $_ }).Count -gt 1)) { throw 'Choose one reviewed upgrade baseline: rc6.22 (022-024), rc6.24/022 (023-024), or rc6.26/023 (024 only).' }
@@ -15,8 +18,12 @@ try {
     $sha = (& git rev-parse HEAD).Trim()
     $branch = (& git branch --show-current).Trim()
     if ($LASTEXITCODE -ne 0 -or $branch -ne 'feature/combined-test-delivery-20260915') { throw 'Unexpected source branch.' }
+    if ($sha -cne $ExpectedSource) { throw 'HEAD does not match the exact reviewed release source.' }
     $dirty = @(& git status --porcelain | Where-Object { $_ -notmatch '^\?\? \.vscode/' })
-    if ($dirty.Count -ne 0) { throw 'Commit and verify the complete source before publishing.' }
+    if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) { throw 'Commit and verify the complete source before publishing.' }
+    $sqlPlan = & "$PSScriptRoot/Get-ReleaseSqlPlan.ps1" -RepositoryRoot $repo -ExpectedSource $ExpectedSource `
+        -UpgradeFromRc622:$UpgradeFromRc622 -UpgradeFromRc624:$UpgradeFromRc624 -UpgradeFromRc626:$UpgradeFromRc626 `
+        -IncludeServiceAccounts:$IncludeServiceAccounts -SqlUpgradeReview $SqlUpgradeReview
     if (Test-Path -LiteralPath $destination) { throw 'Refusing to overwrite an existing release.' }
     foreach ($folder in @('API','UI','Worker','DBA','manifests','evidence','staging/api','staging/ui','staging/worker','staging/database/sql/migrations','staging/database/sql/schema','staging/database/hangfire','staging/database-delta/sql/migrations','staging/database-delta/sql/schema')) {
         New-Item -ItemType Directory -Path (Join-Path $destination $folder) | Out-Null
@@ -40,11 +47,11 @@ try {
         $assemblies += [ordered]@{ component=$component; productVersion=$version.ProductVersion; fileVersion=$version.FileVersion; frameworks=$frameworks; sha256=(Get-FileHash -LiteralPath "$destination/staging/$($component.ToLowerInvariant())/SecureOps.$component.dll").Hash }
     }
     & "$PSScriptRoot/../powershell/Export-CompletionGuidance.ps1" -OutputDirectory "$destination/operator"
-    $runbook = "# $ReleaseName`r`n`r`nPaket derleme kaynagi: $sha`r`nGereken schema: 001-024.`r`n`r`n" +
+    $runbook = "# $ReleaseName`r`n`r`nPaket derleme kaynagi: $sha`r`nGereken schema: $($sqlPlan.RequiredSchema).`r`n`r`n" +
         "[Guncel operator girisi](operator/docs/post-rc626-continuation-tr.md).`r`n`r`n" +
         "[Tek gereksinim ve kabul matrisi](operator/docs/integrated-test-activation.md).`r`n`r`n" +
         "Belgelerdeki onceki urun/test/kurulum kimlikleri tarihsel kanittir. Bu paketin kabul sonucu release-metadata.json ve evidence/validation.json ile ayrica dogrulanir.`r`n" +
-        "Kurulum veya 024 uygulama onayi degildir; hedef DBA kaydi ve kabul kapilari gerekir.`r`n"
+        "Kurulum veya SQL uygulama onayi degildir; operatorun onayli change kaydi ve kabul kapilari gerekir. 024 dogrulanmadan 025 calistirilmaz; rol dosyalari ayri onaylidir.`r`n"
     [IO.File]::WriteAllText("$destination/operator-runbook-tr.md", $runbook, [Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath "$destination/operator-runbook-tr.md" -Destination "$destination/staging/database/operator-runbook-tr.md"
     Copy-Item -LiteralPath 'sql/README.md' -Destination "$destination/staging/database/DBA-README.md"
@@ -53,14 +60,12 @@ try {
     foreach ($database in @('database','database-delta')) {
         Copy-Item -LiteralPath "$destination/operator" -Destination "$destination/staging/$database/operator" -Recurse
     }
-    foreach ($folder in @('migrations','schema')) {
-        $files = @(Get-ChildItem "sql/$folder" -File -Filter '*.sql' | Sort-Object Name)
-        $numbers = @($files | ForEach-Object { $_.Name.Substring(0,3) }) -join ','
-        if ($numbers -cne ((1..24 | ForEach-Object { '{0:D3}' -f $_ }) -join ',')) { throw 'Expected the exact complete 001-024 SQL chain.' }
-        foreach ($file in $files) {
-            Copy-Item -LiteralPath $file.FullName -Destination "$destination/staging/database/sql/$folder/$($file.Name)"
-            $firstDelta = if ($UpgradeFromRc626) { 24 } elseif ($UpgradeFromRc624) { 23 } elseif ($UpgradeFromRc622) { 22 } else { 19 }
-            if ([int]$file.Name.Substring(0,3) -ge $firstDelta) { Copy-Item -LiteralPath $file.FullName -Destination "$destination/staging/database-delta/sql/$folder/$($file.Name)" }
+    foreach ($database in @('database','database-delta')) {
+        $selected = if ($database -eq 'database') { $sqlPlan.AllFiles } else { $sqlPlan.DeltaFiles }
+        foreach ($relative in @($selected) + @($sqlPlan.RoleFiles)) {
+            $target = Join-Path "$destination/staging/$database" $relative
+            New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $repo $relative) -Destination $target
         }
     }
     $assets = Get-Content -LiteralPath 'src/SecureOps.Worker/obj/project.assets.json' -Raw | ConvertFrom-Json
@@ -73,8 +78,8 @@ try {
     $apiZip = "$destination/API/secureops-api-TEST-$short.zip"
     $uiZip = "$destination/UI/secureops-ui-TEST-$short.zip"
     $workerZip = "$destination/Worker/secureops-worker-TEST-$short.zip"
-    $dbZip = "$destination/DBA/secureops-database-001-024-TEST-$($ReleaseName.Split('-')[-1]).zip"
-    $deltaRange = if ($UpgradeFromRc626) { '024' } elseif ($UpgradeFromRc624) { '023-024' } elseif ($UpgradeFromRc622) { '022-024' } else { '019-024' }
+    $dbZip = "$destination/DBA/secureops-database-$($sqlPlan.RequiredSchema)-TEST-$($ReleaseName.Split('-')[-1]).zip"
+    $deltaRange = $sqlPlan.DeltaRange
     $deltaZip = "$destination/DBA/secureops-database-delta-$deltaRange-TEST-$($ReleaseName.Split('-')[-1]).zip"
     $extraPackages = @()
     if ($BrandingDirectory) {
@@ -143,7 +148,9 @@ try {
     $collector = @(Get-ChildItem -LiteralPath "$destination/diagnostics" -File -Filter '*.zip')
     if ($collector.Count -ne 1) { throw 'Expected one matching collector archive.' }
     $packages += [ordered]@{ component='InUseEvidence'; path="diagnostics/$($collector[0].Name)"; bytes=$collector[0].Length; sha256=(Get-FileHash -LiteralPath $collector[0].FullName).Hash; manifest='diagnostics/payload.sha256'; manifestSha256=(Get-FileHash -LiteralPath "$destination/diagnostics/payload.sha256").Hash }
-    $metadata = [ordered]@{ release=$ReleaseName; branch=$branch; buildSource=$sha; requiredSchema='001-024'; upgradeFromVerified018='019-024'; productVersion="0.1.0+$sha"; fileVersion='0.1.0.0'; targetFramework='net8.0'; selfContained=$false; packages=$packages; corporateCallsPerformed=$false; deploymentPerformed=$false; requiredFences=@{ ReadOnlyIntegrationMode=$true; ControlledTestWritesEnabled=$false; SourceCloseEnabled=$false; AnnouncementMailEnabled=$false; InUseCompletionEnabled=$false; InUseAspectLookupEnabled=$false } }
+    $metadata = [ordered]@{ release=$ReleaseName; branch=$branch; buildSource=$sha; requiredSchema=$sqlPlan.RequiredSchema; upgradeFromVerified018='019-024'; productVersion="0.1.0+$sha"; fileVersion='0.1.0.0'; targetFramework='net8.0'; selfContained=$false; packages=$packages; corporateCallsPerformed=$false; deploymentPerformed=$false; requiredFences=@{ ReadOnlyIntegrationMode=$true; ControlledTestWritesEnabled=$false; SourceCloseEnabled=$false; AnnouncementMailEnabled=$false; InUseCompletionEnabled=$false; InUseAspectLookupEnabled=$false } }
+    $metadata.sqlUpgradeReview = $sqlPlan.Review
+    $metadata.sqlWorkingDirectory = 'DBA delta/sql/migrations; sqlcmd -I -b; verify 024 before separately approved 025; roles separate, no principal assigned'
     $metadata.workerHosting = 'Native Windows Service or console; service installation and acceptance are separate operator gates'
     if ($UpgradeFromRc622) {
         $metadata.Remove('upgradeFromVerified018')
@@ -155,7 +162,8 @@ try {
     }
     if ($UpgradeFromRc626) {
         $metadata.Remove('upgradeFromVerified018')
-        $metadata.upgradeFrom = 'Verified 001-023 and Hangfire schema 9; apply only reviewed additive 024'
+        $metadata.upgradeFrom = if ($IncludeServiceAccounts) { 'Compared 022/023 contract; reviewed 024, verify/stop, then separately approved 025 and runtime roles; no installed-script replay' }
+            else { 'Verified 001-023 and Hangfire schema 9; apply only reviewed additive 024' }
     }
     $metadata.operatorFiles = @(Get-Item "$destination/operator-runbook-tr.md"; Get-ChildItem "$destination/configuration" -File; Get-ChildItem "$destination/operator" -File -Recurse) | ForEach-Object {
         [ordered]@{ path=$_.FullName.Substring($destination.Length+1); sha256=(Get-FileHash -LiteralPath $_.FullName).Hash }

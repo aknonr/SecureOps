@@ -1,9 +1,13 @@
 # Service Accounts — Windows Acceptance Runner (NOT EXECUTED)
 
-Status: **prepared, not executed.** The pilot journey (section 4) is **BLOCKED** until approved
-TEST identities exist. It was written in a Linux container that has no Windows
-authentication, LocalDB or IIS. Nothing here has been run, and none of it counts as pilot acceptance
-until a Windows runner records the evidence listed at the end. No production server, flag or data
+Status: **corporate authentication acceptance not executed.** The original Linux
+runner and baseline counts in sections2/3 below are historical; actual combined
+Windows build/SQL evidence is in the canonical `../integrated-test-activation.md`.
+The current `../post-rc626-continuation-tr.md` distinguishes a minimum API/UI
+pilot with EXISTING approved TEST users and reminders/Worker module disabled from
+the later full four-role acceptance in section4. No four new accounts are required.
+Neither local bridge nor isolated SQL evidence substitutes for normal OIDC acceptance.
+No production server, flag or data
 is used; all business data is synthetic. The only non-local input is the set of approved TEST
 identities of section 4.
 
@@ -57,18 +61,21 @@ a member of `svcacct_api_runtime`, set `SECUREOPS_SA_SQL_RUNTIME_CONNECTION` to 
 as that principal, and rerun the filter on a *new* database. If no second principal is available,
 record "NOT RUN" (the Linux run covered it with a SQL login).
 
-## 4. Pilot journey: normal authentication and module authorization
+## 4. Later Full Four-Role Acceptance: Normal Authentication
 
-This is the only journey that can count toward module acceptance. It uses the API's normal
+This complete authorization matrix is NOT a prerequisite for the separately bounded
+first API/UI pilot in the current operator entry. It uses the API's normal
 authentication (OIDC), persisted approval, role bundles and module scope grants — nothing else.
 
-**Precondition — approved TEST identities.** Four identities issued by the organization's
+**Precondition — existing approved TEST identities.** Four identities issued by the organization's
 approved TEST OIDC provider, each with its real claims (issuer, subject, login name), approved for
 this test: a platform administrator, a module coordinator, a team member, and an outsider. Do not
 create them, share their credentials or put their names in the repository; record only the
 role each played.
 
-**If these identities are not available, this section is BLOCKED.** Record "BLOCKED: approved TEST
+Use existing approved users; do not create four new accounts. If the distinct
+role actors are unavailable, this FULL matrix is blocked, not necessarily the
+separately approved minimum pilot. Record "BLOCKED: approved TEST
 identities unavailable" in the evidence and stop here. The local smoke test in section 4A never
 replaces this section.
 

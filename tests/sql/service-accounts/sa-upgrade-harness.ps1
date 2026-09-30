@@ -1,8 +1,10 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9_]{1,30}$')][string]$DatabaseSuffix,
-    [Parameter(Mandatory)][string]$EvidenceDirectory)
+    [Parameter(Mandatory)][string]$EvidenceDirectory,
+    [string]$SqlAssetRoot)
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+$sql = if ($SqlAssetRoot) { (Resolve-Path -LiteralPath $SqlAssetRoot).Path } else { Join-Path $root 'sql' }
 $server = '(localdb)\SecureOpsResourcesV1'
 $database = 'SecureOps_SaUpgrade' + $DatabaseSuffix
 $evidence = [IO.Path]::GetFullPath($EvidenceDirectory)
@@ -16,7 +18,7 @@ function Invoke-LocalSql([string]$Query, [string]$File) {
 }
 & sqlcmd -S $server -E -I -b -d master -Q "IF DB_ID(N'$database') IS NOT NULL THROW 51000,'Refuse existing database.',1; CREATE DATABASE [$database];"
 if ($LASTEXITCODE -ne 0) { throw 'Fresh disposable creation failed.' }
-Push-Location (Join-Path $root 'sql/migrations')
+Push-Location (Join-Path $sql 'migrations')
 try {
     Get-ChildItem -File '*.sql' | Where-Object { [int]$_.Name.Substring(0,3) -le 23 } | Sort-Object Name | ForEach-Object {
         Invoke-LocalSql -File $_.Name
@@ -49,7 +51,7 @@ SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(nvarchar(max),(
     if ($LASTEXITCODE -eq 0) { throw 'Missing 024 prerequisite was accepted.' }
     Invoke-LocalSql -Query "IF SCHEMA_ID(N'svcacct') IS NOT NULL THROW 51000,'Partial module after prerequisite refusal.',1;"
     Invoke-LocalSql -File '024-in-use-report-catalogue.sql'
-    $candidate = [IO.File]::ReadAllText((Join-Path $root 'sql/pending/service-accounts/SA-001-service-accounts.sql'))
+    $candidate = [IO.File]::ReadAllText((Join-Path $sql 'pending/service-accounts/SA-001-service-accounts.sql'))
     if (($candidate.Split(@('COMMIT TRANSACTION;'),[StringSplitOptions]::None)).Length -ne 2) { throw 'Unexpected commit boundary.' }
     [IO.File]::WriteAllText($failureFile, $candidate.Replace('COMMIT TRANSACTION;', "THROW 51399, 'Synthetic install failure before commit.', 1;`nCOMMIT TRANSACTION;"))
     & sqlcmd -S $server -E -I -b -d $database -i $failureFile

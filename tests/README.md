@@ -1,5 +1,11 @@
 # tests/
 
+Numbered-release SQL selection has a focused Windows runner at
+`release/Test-PairedReleaseSqlSelection.ps1`. A new private evidence directory
+is mandatory; optional `-VerifySqlCmd -DatabaseSuffix <unique suffix>` exercises
+the exported include tree, missing024 rejection and transaction rollback ONLY
+on the hard-coded disposable LocalDB instance. No packaging or corporate action.
+
 Two test projects mirroring `src/`.
 
 Post-E-08 archive follow-up: six synthetic corruption cases in `InUseTests` verify
