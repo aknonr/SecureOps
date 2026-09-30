@@ -12,7 +12,10 @@ The full four-role matrix remains a later acceptance gate, not silently waived.
 
 Identity reconciliation: tested C# product `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`,
 candidate preparation `20356b542803f9cc14deb7e84cf57e351780f6a6`, previous docs-only
-closeout `52df5d3d40ec9c25f41ef0687e677a2d02f726ab`. Current readiness changes touch
+closeout `52df5d3d40ec9c25f41ef0687e677a2d02f726ab`. Release-readiness preparation
+commit `5d0c293316764937edab9674967b876fd927488b` preserves the exact executed
+script/test edits; runs reported HEAD52 plus those then-uncommitted changes,
+not a new tested C# product SHA. Current readiness changes touch
 release selection, tests and guidance ONLY; src/contracts/build-input comparison
 with a457 is empty. No new product build is required by a runtime source change.
 The three existing ZIP identities/manifests below are retained, not rehashed or
