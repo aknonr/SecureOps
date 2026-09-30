@@ -1,5 +1,9 @@
 # Pinned Windows Integration Evidence
 
+Historical b4-only evidence. Current follow-up source/results:
+[INTEGRATION-FOLLOWUP-20261001.md](INTEGRATION-FOLLOWUP-20261001.md).
+The closure defect noted below is fixed there, not by the historical tests here.
+
 This is supporting evidence, not another requirements register. Current status:
 [integrated-test-activation.md](../integrated-test-activation.md).
 

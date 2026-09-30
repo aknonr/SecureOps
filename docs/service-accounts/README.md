@@ -1,9 +1,9 @@
 # Service Accounts Module — Design Note
 
-Current integration status (2026-09-30): pinned `b4fdf8d` is integrated locally
+Current integration status (2026-10-01): pinned `b4fdf8d` plus `7e227ed` delta is integrated locally
 on `feature/service-accounts-pinned-integration-20260929`, based on `e997c5b`.
-Not deployed or corporately accepted; no follow-up code included. New Windows
-evidence and limitations: [INTEGRATION-20260930.md](INTEGRATION-20260930.md).
+Not deployed or corporately accepted. Combined Windows evidence and limitations:
+[INTEGRATION-FOLLOWUP-20261001.md](INTEGRATION-FOLLOWUP-20261001.md).
 The canonical requirements register remains [integrated-test-activation.md](../integrated-test-activation.md).
 Business rules: [SPEC.md](SPEC.md). Historical stage evidence: [PROGRESS.md](PROGRESS.md).
 The authority/baseline history below describes the original isolated development,

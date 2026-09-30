@@ -2,7 +2,58 @@
 
 ## Owner exception and baseline
 
+### Combined follow-up and capability-specific SQL gates, 2026-10-01
+
+Current combined tested source is `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`
+on `feature/service-accounts-pinned-integration-20260929`. The verified
+`b4fdf8d..7e227ed` module delta was integrated ONCE over clean `12027da`;
+the published SDM delivery and original Claude worktrees remain unchanged.
+Review-tagged Closure is fixed; scenario 4 retains eight plans and two review
+requests without inventing performed deletion or verified account closure.
+Two captured SQL deadlocks were addressed separately: synthetic user seeding
+now respects the existing access administration lock; concurrent repository
+scope-grant duplicate reads use UPDLOCK/HOLDLOCK. No retry/sleep was added.
+
+Windows build: 0 warnings/errors. Full unit: 1575 passed. Full normal integration:
+322 passed, 61 opt-ins skipped, 0 failed. Module 39 passes are INCLUDED in 322.
+Separate fresh ResourceSql: 49/49. These are NEW final-source results, not b4
+counts. Earlier 37/1 module and 366/9/7 integration runs, their diagnostics and
+deadlock graphs are preserved; eight of the latter failures were OCO fixture
+prerequisite mismatches and one exposed the scope-grant defect now fixed.
+Full evidence/limitations: [follow-up integration](service-accounts/INTEGRATION-FOLLOWUP-20261001.md).
+Directory index: [build workspace](build-workspace-index.md).
+
+**Correction of the earlier blanket SQL gate below:** the prepared 13-right
+probe covers separate In Use/reporting operations, not Jira-only issue creation.
+Installed rc6.26 and sealed deda848 have no approved executor. No endpoint is
+added; operator SQL, SELECT 1, similar account names and local role tests are
+NOT normal-API permission evidence. All effective target API rights remain unknown.
+
+| Capability / stable ID | Actual dependency and status | Owner / next evidence |
+|---|---|---|
+| Jira-only ServerRequest / SDM-01-SQL | Core requires OperationalRecords, JiraTransfers and CommandExecutions SELECT/INSERT/UPDATE; OperationalRecordWorkflowHistory SELECT/INSERT; OperationEvents SELECT/INSERT for evidence/history; AuditLog INSERT. These are outside the 13-right probe. Inspected 022/023 definitions still match; 024 is NOT a core dependency | API/change owner: retain existing approved runtime-access/configuration evidence, or separately approve a safe normal-process observation method; no executor presently available, no identity/grant changes |
+| Existing authentication/session baseline / ACCESS-SQL | Persisted Users, Roles/RoleAssignments and access-request checks are still required; configured SQL ApplicationSessions needs SELECT/INSERT/UPDATE. No module/pilot role is inferred from claims or SQL session labels | Access/API owner: approved actor and normal configured access/session flow; effective target rights unknown |
+| In Use lifecycle / IU-SQL-022 | Seven probe rights: ServerReviews SELECT/INSERT, Executions SELECT/INSERT/UPDATE, ExecutionEvents SELECT/INSERT. NOT a Jira-only gate | API/source owners: normal-process rights remain unknown; IU-05's three transport contracts remain separate |
+| Management reporting / REPORT-SQL-023 | Six probe rights: WorkflowSnapshots, WorkflowFacts, InUseArchiveReceipts SELECT/INSERT. Snapshot/dashboard/archive-receipt capabilities, NOT core persisted Jira-key verification | API/reporting owner: normal-process rights and later dashboard reconciliation remain pending |
+| In Use catalogue / DB-01-024 | Four scoped objects remain NotVisibleOrAbsent; catalogue SELECT/INSERT would be needed after separately approved 024, not for Jira-only creation | SQL execution operator + release/change owners: existing conditional 024-only procedure; no replay or inferred approval |
+| Service Accounts / SA-INTEGRATION | Follow-up/closure guard integrated, fresh module/role/scenario/report tests pass locally | Integration owner: current source above, separate from sealed SDM candidate; no new package/push |
+| Service Accounts / SA-FIRST-RUN | Captured local deadlocks fixed and tested; older lost-error first-run failures remain unresolved | Module owner: do not equate new passing runs with diagnosis of lost historical output |
+| Service Accounts / SA-PILOT | NOT accepted: approved normal-auth TEST identities, bundles/scopes, allowed authenticated HTTP/browser, restricted Windows principal connections and IIS remain pending | Access/TEST/module owners: WINDOWS-ACCEPTANCE.md; local synthetic SQL tokens and challenge/denial tests are limited evidence |
+
+Core dependency trace: `SqlOperationalRecordRepository` (browsing, evaluation,
+transfer and Evidence partials), `SqlCommandIdempotencyStore`,
+`SqlOperationEvidence`, plus configured persisted access/session repositories.
+No DDL, broad grant or DELETE is justified by this trace. Required permissions
+alone do not prove a corporate write succeeds. Unknown outcomes remain blocked
+across reloads, with no automatic retry; first one-OR acceptance excludes retry.
+024 approval still requires its exact reviewed script/grants, accepted matching
+payload, backup/recovery point and stopped writes. It does not authorize SDM,
+Service Accounts, In Use or Falcon activation. No target operation was performed.
+
 ### Independent SQL gate and pinned Service Accounts integration, 2026-09-30
+
+Historical b4-only snapshot; current follow-up and SQL capability split above
+supersede its all-13-as-SDM requirement, not its retained test/target observations.
 
 The approved local integration branch is
 `feature/service-accounts-pinned-integration-20260929`, worktree

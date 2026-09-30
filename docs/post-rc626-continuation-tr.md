@@ -2,10 +2,19 @@
 
 ## Durum ve kapsam
 
-Bu belge tek guncel Turkce operator girisidir. Son durum: 30 Eylul 2026.
+Bu belge tek guncel Turkce operator girisidir. Son durum: 1 Ekim 2026.
 Onceki snapshot'lar asagida tarihsel kanit olarak korunur.
 
-**Siradaki tek SQL kapisi:** 022/023 icin verdiginiz dar tanim karsilastirmasi
+**Guncel ayrim:** 13 hak In Use yasam dongusu (7) ve raporlama (6) icindir;
+Jira-only icin ortak zorunlu kapi degildir. 024 yalniz In Use katalog farkidir.
+Jira-only cekirdek ve access/session SQL haklari ayri ve hedef API'de halen
+bilinmiyor. Kurulu API'de onayli executor yok; endpoint eklenmez, operator
+oturumu API kaniti olmaz. [Guncel yetenek tablosu](integrated-test-activation.md)
+eski asagidaki genel SQL talimatinin yerine gecmektedir. Service Accounts
+birlesik follow-up yerelde test edildi; SDM muhurli paket degismedi ve hicbiri
+bu calismada kurulmadi. OIDC/browser pilot ve kurumsal kabul henuz yapilmadi.
+
+**Onceki 30 Eylul talimati (tarihsel, yetenek ayrimi yukarida):** 022/023 icin verdiginiz dar tanim karsilastirmasi
 eslesiyor; tekrar sorgulanmayacak. 024 halen `NotVisibleOrAbsent`.
 Operator oturumu sonucundan API izni cikarilmaz. Hazir dar sorgu:
 [`Read-SdmApiEffectivePermissions.sql`](../scripts/diagnostics/Read-SdmApiEffectivePermissions.sql).
@@ -681,7 +690,7 @@ korunur; derlenen urun `deda848`, sonraki belge kapanisi ayri kimliktir.
    hesap adi benzer olsa da API'nin etkin hakkini kanitlamaz. 024 satirindaki
    sifir haklar da henuz gorunmeyen tablo ve operator oturumu baglamindadir;
    API icin grant sonucu olarak yorumlanmaz. Normal API SQL
-   kimliginde onayli salt okunur hak kaniti yoksa tek SQL kapisi acik kalir;
+   kimliginde onayli salt okunur hak kaniti yoksa ilgili yetenek SQL kapisi acik kalir;
    kimlik degistirme veya yeni yetki verme bu adimda yapilmaz.
 
 3. Mevcut yetkili API `GET /api/v1/diagnostics/operations` raporunun yalniz
@@ -939,8 +948,8 @@ Kosullu 024-only degisiklik sirasi (simdi **calistirilmaz**):
 
 1. Onayli TEST hedef kimligi ve 022/023 dar DDL karsilastirmasi operator
    kanitiyla tamamlandi; envanter veya tanim sorgusu simdi tekrarlanmaz.
-   Normal API SQL kimliginin etkili 022/023 SELECT/INSERT ve execution UPDATE
-   haklari ayri, onayli salt okunur kanitla teyit edilir. Altinci sonucun
+   Katalog/arsiv icin normal API SQL kimliginin gerekli receipt/catalogue
+   haklari ayri kanit gerektirir; 13 hak veya 024 Jira-only onayi degildir. Altinci sonucun
    operator oturumuna ait olmasi bu kontrolu kapatmaz. Yeni bir 023 farki,
    eksik API hakki veya asiri/genis izin sorusu varsa **dur**; 024 uygulanmaz.
 2. Ayri degisiklik onayi, secili matched API/UI/Worker payload'i ve reviewed
