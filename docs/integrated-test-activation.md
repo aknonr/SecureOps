@@ -5,7 +5,24 @@
 ### Service Accounts TEST review preparation, 2026-10-01
 
 **Prepared, not installed:** candidate `candidate.json` SHA-256
-`EB7DFB230CBA929957D2FD8A3FDF2856AB12AB3791727D7C87673FED7A14F8B46EB6A59E97BEAA4051B9E3173D9E9AB7B11D6A9DDFD74A315E8C487CF4D96EA32E7503207B2B3A9B122748C42B5E2D80059A10F8293C65AA4AB9FF22ACE5BA03B`.
+`EB7DFB230CBA929957D2FD8A3FDF2856AB12AB3791727D3F508BB86A238D6E14`.
+
+Preparation source: `20356b542803f9cc14deb7e84cf57e351780f6a6`; all three entry
+ProductVersions identify a457a33. Seventeen SQL/guidance files match the support
+manifest; ZIP hashes, entries and dependency closures passed validation.
+
+| Payload | ZIP SHA-256 | Files |
+|---|---|---|
+| API/secureops-api-TEST-a457a33.zip | 467F28C267801391BAF9ED026A090535D306CAAB67C4B8906645F622B5FBF500 | 525 |
+| UI/secureops-ui-TEST-a457a33.zip | 35306E998E8232A8DAD1A2854C646DACFDD5A95ED5AC753FBCA1D58B439E8968 | 542 |
+| WORKER/secureops-worker-TEST-a457a33.zip | 04BA2BAF51595ED6826EF8233D10A8EAFE973060DE7928936CC60112F322FAAB | 531 |
+
+The first publish scanner rejected a NuGet native PDB before ZIP creation.
+Raw staging was preserved, and a separate symbol-free payload view passed the
+UNCHANGED scanner. No runtime configuration, private samples, test outputs or
+security-held diagnostic is in these ZIPs. The generator was explicitly tracked
+despite the repository's broad release-directory ignore; no ignore/scan guard
+was changed. Its later console hash-projection fix does not alter the packages.
 
 Product remains tested `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`; the later
 preparation adds SQLCMD 025/harnesses and delivery guidance, not C# behavior.
