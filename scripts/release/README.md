@@ -1,5 +1,15 @@
 # API Release Packaging
 
+`New-ServiceAccountsTestReview.ps1` prepares a separate matched review candidate,
+NOT a numbered successor. It requires the clean pinned integration branch and
+product-input equality to the supplied tested source. Entry versions retain that
+tested source; candidate metadata separately identifies SQL/docs preparation.
+It reuses the existing payload scanners and ZIP/dependency validators. Only the
+024/025 SQL dependency closure and unassigned role scripts are exported; no
+target configuration or private/local test evidence is packaged. The numbered
+release guard below is unchanged (combined branch and exact 001-024 inventory)
+and cannot yet promote this 001-025 candidate. No installation readiness is claimed.
+
 Current integrated continuation requires schema 001-024. Use `-UpgradeFromRc626`
 only with verified installed 023 for a 024-only delta. `-UpgradeFromRc624`
 requires verified 022 for a 023-024 delta; `-UpgradeFromRc622` includes

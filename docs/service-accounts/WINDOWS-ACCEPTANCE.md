@@ -96,12 +96,15 @@ b. The administrator creates the module bundles with `POST /api/v1/access/roles/
    | module administrator | `sa-pilot-admin` | View, Administer |
    | coordinator | `sa-pilot-coord` | View, Work, Assign, Verify, Import, Report |
    | team member | `sa-pilot-member` | View, Work |
-   | outsider | none (platform `ReadOnly`) | — |
+   | out-of-scope user | `sa-pilot-member` | View, Work; separate unrelated Team scope |
 
 c. The module administrator creates `SYN PILOT ORG` and `SYN PILOT TEAM`
    (`POST /api/v1/service-accounts/organizations`, `.../teams`) and the scope grants
    (`POST /api/v1/service-accounts/scope-grants`): coordinator → Organization `SYN PILOT ORG`,
-   member → Team `SYN PILOT TEAM`.
+   member → Team `SYN PILOT TEAM`; out-of-scope user → a different synthetic team
+   with no owner/request/handover link to the account. These are reviewed product
+   grants, not imported-person matching. Before adding its module bundle verify
+   the out-of-scope user's module call returns 403; afterwards test SQL data scope.
 d. The coordinator creates `SYNPILOT_A1` in `SYN PILOT ORG`, a request targeted at
    `SYN PILOT TEAM`, and imports a synthetic coordination list with coverage `Complete`.
 
@@ -111,7 +114,7 @@ Expected results (capture request, status and response body for each):
 |---|---|---|---|
 | 1 | no token | `GET /api/v1/service-accounts/me` | 401 |
 | 2 | platform administrator without a module bundle | any module route | 403 (no platform role carries module actions) |
-| 3 | outsider | `GET .../accounts`, `.../accounts/export` | 403 |
+| 3 | out-of-scope user | `GET .../accounts`, guessed account/evidence ID, `.../accounts/export` | 200 empty scoped list; hidden detail/evidence 404; export 403 (no Report) |
 | 4 | team member | `POST .../scope-grants` | 403 |
 | 5 | coordinator | `GET .../accounts` | 200, only `SYN PILOT ORG` accounts |
 | 6 | coordinator | `GET .../accounts/export` | 200 XLSX; audit `ServiceAccount.AccountsExported` with the row count; 4th call within a minute → 429 |

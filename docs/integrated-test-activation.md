@@ -2,6 +2,56 @@
 
 ## Owner exception and baseline
 
+### Service Accounts TEST review preparation, 2026-10-01
+
+Product remains tested `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`; the later
+preparation adds SQLCMD 025/harnesses and delivery guidance, not C# behavior.
+No 025 conflict exists in the inspected local branch/remote-reference inventory.
+Number reservation is LOCAL, not a promise that another writer cannot reserve it.
+024 remains a separate approved delta over observed 022/023. New 025 requires
+024 and includes the unchanged `sql/pending/service-accounts/SA-001-service-accounts.sql`;
+ship that dependency and the separate unassigned API/Worker role scripts.
+
+New disposable Windows evidence: `validation/sa-delivery-20261001` under the
+private build root; sibling `sa-delivery-*-20261001.log` files. Fresh numbered
+001-025 installation passed and replay was refused. Upgrade baseline 001-023
+retained synthetic user/OR/audit rows and column/trigger fingerprints through
+024 then 025. Missing 024 refused 025 before schema creation; injected 51399
+before COMMIT rolled back ALL module tables/triggers/schema. Both fresh and
+upgrade module runs passed 39/39 separately (not summed with previous suites).
+Initial harness attempts failed on an incorrect synthetic seed column and XML
+fingerprint aliases, not product behavior; their logs/databases are retained.
+Harnesses never target existing/shared databases. Linux harness change is not
+Windows-executed Linux evidence. Full a457 regression is reused, not rerun.
+
+| Gate | Current status / exact next evidence |
+|---|---|
+| SA-DELIVERY | Separate matched review destination `C:\SecureOpsBuild\delivery-review\2026-10-01-service-accounts-combined\a457a33`; candidate.json records tested product vs preparation source, ZIP/payload/support hashes. Not numbered or installation-ready; sealed deda848 candidate remains untouched |
+| SA-SQL-025 | Local fresh/upgrade/atomicity gates passed; target execution NOT approved. Operator must approve 024 then 025 and role scripts with backup, verified principal mapping and the stop/rollback procedure in the current operator entry |
+| SA-AUTH-MATRIX | Four approved OIDC TEST identities and reviewed bundles/scopes still missing; derive assignments from the matrix below, no accounts or grants created |
+| SA-WINDOWS-ACCEPTANCE | Normal OIDC API/UI, allowed/denied scope journeys, reminder hosting/restart and desktop Excel remain unexecuted. Synthetic bridge/SQL execution tokens are NOT acceptance |
+| SDM/IU/FALCON | Jira-only one-OR/effective API rights, IU-05 transport and SCCM/Falcon binary permission remain separate; no change to those target gates |
+
+Four-user matrix (bundle names are review proposals, NOT seeded roles):
+
+| User role | Module bundle / persisted scope | Allow | Deny / evidence |
+|---|---|---|---|
+| Administrator | `sa-pilot-admin`: View, Administer; no business scope needed for dictionaries/grants. Existing platform access-management capabilities are separately required for role preview/approval | Organization/team dictionaries, grant another approved user with reason/version | No Work/Assign/Verify/Import/Report; no self-grant. Capture pre-bundle 403, bundle version, reasoned grant audit, denied business call |
+| Coordinator | `sa-pilot-coord`: View, Work, Assign, Verify, Import, Report; Organization scope expands descendants/placed teams | Scoped requests/actions/evidence, ownership, imports and replay, reports/immutable snapshots/XLSX/PDF | No Administer; other organization detail/evidence/export excluded. Capture reviewed preview, commit/replay IDs, saved scope, audit, 8 plans + 2 review outcomes, Review Closure rejection |
+| Assigned member | `sa-pilot-member`: View, Work; Team scope | Confirmed owner-team work; participant works ONLY on its own open targeted request/action and associated evidence | No Verify/Assign/Import/Report/Administer; participant cannot change account ownership or another team's action. Capture request link, UI controls, direct API denials and access loss after participant request ends |
+| Out-of-scope user | Same View/Work bundle; DIFFERENT Team with no owner/request/handover link to tested account | Empty scoped list/summary; global picker labels remain visible by design | Hidden account/evidence inaccessible (404), business writes rejected, capability-only routes 403. Capture list + direct guessed-ID requests, not merely hidden buttons. Before bundle assignment also verify module 403 |
+
+Capability strings are `ServiceAccounts.<name>`. Source: Shared capability/policy
+catalog, Infrastructure ServiceAccountAccessActions, RunAsync/Permissions/
+MutateAccountAsync and Domain ServiceAccountScope. Administer is global module
+administration, not business verification. Visibility via participant/handover
+does not confer ownership authority. Application bundles are distinct from SQL
+runtime roles; no module data or imported person grants access.
+
+Exact conditional SQL/install/acceptance and recovery steps are in the single
+[Turkish operator entry](post-rc626-continuation-tr.md). Existing target evidence
+and unknown normal API permissions remain unchanged; no target call was made.
+
 ### Combined follow-up and capability-specific SQL gates, 2026-10-01
 
 Current combined tested source is `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`

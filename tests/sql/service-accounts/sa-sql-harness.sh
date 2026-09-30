@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Isolated Service Accounts SQL harness for a disposable SQL Server container (Linux/cloud runners).
-# Creates a NEW database, applies reviewed 001-024 in order, then the unnumbered svcacct candidate,
+# Creates a NEW database, applies numbered migrations (now 001-025) in order,
 # verifies replay refusal and prints the connection string for SECUREOPS_SA_SQL_TEST_CONNECTION.
 # It never targets an existing database and never runs against corporate servers.
 # Usage: SA_PASSWORD=... sa-sql-harness.sh <container> <new-database-name> [host-port]
@@ -22,8 +22,10 @@ for file in $(ls "$repo/sql/migrations" | sort); do
   sqlcmd "$work/sql/migrations" -d "$database" -i "$file" > /dev/null
   echo "applied $file"
 done
-sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-001-service-accounts.sql > /dev/null
-echo "applied SA-001-service-accounts.sql (candidate)"
+if [[ ! -f "$repo/sql/migrations/025-service-accounts.sql" ]]; then
+  sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-001-service-accounts.sql > /dev/null
+  echo "applied SA-001-service-accounts.sql (candidate)"
+fi
 if sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-001-service-accounts.sql > /dev/null 2>&1; then
   echo "Candidate replay was not refused." >&2; exit 1
 fi

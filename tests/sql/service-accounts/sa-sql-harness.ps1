@@ -8,7 +8,7 @@ param(
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# migrations 001-024 in order, then the unnumbered Service Accounts candidate, verifies replay refusal, and
+# numbered migrations in order (now 001-025), verifies module replay refusal, and
 # (unless -SkipRoleScripts) the two unnumbered role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'

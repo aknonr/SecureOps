@@ -5,6 +5,93 @@
 Bu belge tek guncel Turkce operator girisidir. Son durum: 1 Ekim 2026.
 Onceki snapshot'lar asagida tarihsel kanit olarak korunur.
 
+### Service Accounts birlesik TEST inceleme adayi
+
+Urun kodu: `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`. SQL/hazirlik commit'i
+ve paket hash'leri ayri `candidate.json` icindedir. Tek inceleme konumu:
+`C:\SecureOpsBuild\delivery-review\2026-10-01-service-accounts-combined\a457a33`.
+API/UI/Worker ZIP'leri eslesir; bu muhurli deda848 SDM paketini degistirmez.
+Numarali release guard korunur: mevcut dal/001-024 kosulu bu 001-025 adayini
+promote edemez. Paket dogrulamasi kurulum onayi veya kurumsal kabul degildir.
+
+**Dort kisi:** [tek kayittaki rol matrisi](integrated-test-activation.md).
+Yonetici View+Administer, koordinator View+Work+Assign+Verify+Import+Report,
+ekip uyesi View+Work alir. Kapsam disi kisi de View+Work ile ilgisiz Team
+kapsaminda denenir: bos liste ve dogrudan ID/kanit erisiminde 404 beklenir.
+Bu oneri hak atamaz; onayli OIDC kimlikleri ve versiyonlu bundle/scope karari
+erişim sahibinden gerekir. Yonetici kendine scope veremez; business scope'u
+olmayan yonetici raporlayamaz veya is dogrulayamaz.
+
+**Kosullu SQL sirasi (simdi calistirilmaz):**
+1. Siz SQL uygulama operatorusunuz. Gozlenen 022/023 sozlesmesi yeniden
+   uygulanmaz. Yeni 023 farki, belirsiz DB/principal, mevcut/kismi 024/025 veya
+   SQL runtime rollerinde eski tanim varsa durun; otomatik onarim/replay yok.
+2. Change onayi; DB full backup/recovery noktasi ve config/API/UI/Worker
+   geri-donus kopyalari; normal API/Worker DB principal eslemesi gerekir.
+   Islem/arsiv/bekleyen komutlari kaydedin; tum yazarlar ve recurring consumer
+   kontrollu durdurulmadan schema degisikligine gecilmez. Burada durdurulmadilar.
+3. Adayin DBA/sql/migrations dizininden SQLCMD `-I -b` ve mevcut onayli
+   hedef baglantisiyla YALNIZ `024-in-use-report-catalogue.sql` uygulanir.
+   DDL/FK/index/immutable trigger ve yedek kaniti teyit edilmeden 025'e gecilmez.
+4. Ayri onayli `025-service-accounts.sql` ayni dizinden calisir; schema wrapper
+   `../pending/service-accounts/SA-001-service-accounts.sql` dosyasini dahil eder.
+   25 yeni tablo/koruyucu trigger, kisit ve indeksler reviewed DDL ile karsilastirilir.
+   Ardindan ayri incelenmis `SA-API-permissions.sql`, `SA-Worker-permissions.sql`
+   dosyalari rol OLUSTURUR ama kimseyi uye yapmaz. Onayli kimlik eslemesi yoksa
+   uyelik adiminda durun; kimlik uydurmayin veya yeni login acmayin.
+5. 024 API deltasi yalniz `reporting.InUseReportCatalogue` SELECT/INSERT.
+   SA API rolu: Organizations, Teams, People, ScopeGrants, Accounts,
+   OwnershipAssignments, Handovers, WorkRequests, ActionEvents, Findings,
+   IdentityTransitions, ImportBatches, ReminderOutbox SELECT/INSERT/UPDATE;
+   Communications, PersonAliases, AccountAliases, ExternalRecords,
+   ExternalRecordLinks, CommunicationAccounts, AccountObservations, Evidence,
+   ReportSnapshots, History SELECT/INSERT; ImportRows SELECT/INSERT/DELETE
+   (yalniz commit edilmemis batch; trigger korur); security.Users SELECT,
+   audit.AuditLog INSERT. TeamMemberships, DDL, db_owner veya audit degistirme yok.
+   SA Worker rolu Accounts/WorkRequests SELECT, ReminderOutbox SELECT/INSERT/UPDATE.
+   Normal access/session/audit ve Hangfire haklari bunlardan ayri kalir.
+6. Mevcut onayli API/Worker DB kullanicisi ilgili SQL rolune yalniz sonraki
+   onayli uyelik adiminda alinir; uygulama bundle'i SQL rolu degildir. Etkin API
+   haklari halen bilinmiyor; operator SSMS sonucu bunlari kanitlamaz.
+   Post-change metadata/grant karsilastirmasi ve normal kimlikle izin kaniti
+   olmadan module pilotu baslatilmaz. Executor eklemek bu teslimata dahil degildir.
+
+**Geri donus:** yazilar/consumer durdurulur, tamamlanmamis islemler uzlastirilir;
+API/UI/Worker birlikte onayli onceki config/binary setine doner. 024/025 tablolar,
+arsiv, rapor snapshot, outbox ve audit SILINMEZ; down script yok. Eski binary yeni
+JSON alanlarini dusurebileceginden eski In Use/SA writer acilmaz. DB restore ancak
+onayli recovery karari ve yeni veriyi/audit'i koruma planiyla yapilir.
+
+**Ayar farki ve en kucuk Windows kabul sirasi (onay sonrasi):**
+1. Mevcut sirlar, SQL baglantisi, API/UI ayri key ring, OIDC issuer/client ve
+   Worker Test/contentRoot korunur. UI'ye entegrasyon/SQL/mail sirri eklenmez.
+   Aday runtime config tasimaz. Baslangicta ServiceAccounts:Provider=Disabled ve
+   ServiceAccounts:Reminders:Enabled=false; sonraki onayli pilotta API/Worker
+   Provider=SqlServer, reminders ilk asamada false. Mail'in uc bayragi false,
+   InUseCompletion kapali, PrepareSchema=false kalir. OCO/Jira gate'leri acilmaz.
+2. Onayli TEST OIDC ile normal login: DemoAuth=false, DemoCompatibility=false;
+   persisted access/session ve fail-closed audit. Mevcut yonetici yolunu kullanin;
+   yeni bootstrap kimligi/issuer tahmini yok. 401/403, bundle surumu ve scope
+   kontrolu kaniti saklanir. Sentetik bridge bu kabulun yerine gecmez.
+3. Dort rol ile yalniz sentetik modül verisi: liste/detay/katilimci siniri,
+   import preview/commit/replay, evidence erisimi, scope disi API denials,
+   8 plan ve 2 Review, ClosureKindNotAllowed, snapshot/export. Mouse/klavye,
+   mobil, iki tema ve GERCEK 200% zoom kaydi; yetkili Windows runner kullanilir.
+4. Worker kabulune ayrica final binary hash'i icin guvenlik/host ve calisma
+   penceresi onayi gerekir. Eski Falcon diagnostic izni bu Worker'a gecmez.
+   Onayli tek job-server/queue/schema9 ile once disabled startup recurring
+   isleri degistirmemeli; sonra yalniz reminders onayi varsa enabled startup
+   `service-accounts:reminders:v1:<mevcut queue>` tek job kaydeder. Tekrar
+   startup duplicate yaratmamali; false'a donuste eski job no-op olmali.
+   InApp/Draft outbox ve dedup kaniti alinir; mail GONDERILMEZ, SCCM okunmaz.
+5. Excel'de indirilen sentetik XLSX ve snapshot exportu acilir: hesap/scope,
+   creator/account, Turkce hucreler, genislikler, formulsuz metin, tarih ve
+   sayilar dogrulanir; kaydedilen snapshot ve indirilen hash korunur.
+   Kabul ciktilari ozel evidence dizininde kalir, pakete/repository'ye girmez.
+
+Bu adimlar hazirdir, hedefte uygulanmadi. Jira-only tek OR, In Use IU-05 ve
+SCCM/Falcon kapilari SA kabulunden ayri tutulur.
+
 **Guncel ayrim:** 13 hak In Use yasam dongusu (7) ve raporlama (6) icindir;
 Jira-only icin ortak zorunlu kapi degildir. 024 yalniz In Use katalog farkidir.
 Jira-only cekirdek ve access/session SQL haklari ayri ve hedef API'de halen
