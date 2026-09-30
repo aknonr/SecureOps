@@ -4,6 +4,9 @@
 
 ### Service Accounts TEST review preparation, 2026-10-01
 
+**Prepared, not installed:** candidate `candidate.json` SHA-256
+`EB7DFB230CBA929957D2FD8A3FDF2856AB12AB3791727D7C87673FED7A14F8B46EB6A59E97BEAA4051B9E3173D9E9AB7B11D6A9DDFD74A315E8C487CF4D96EA32E7503207B2B3A9B122748C42B5E2D80059A10F8293C65AA4AB9FF22ACE5BA03B`.
+
 Product remains tested `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`; the later
 preparation adds SQLCMD 025/harnesses and delivery guidance, not C# behavior.
 No 025 conflict exists in the inspected local branch/remote-reference inventory.
