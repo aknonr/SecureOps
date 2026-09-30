@@ -86,5 +86,5 @@ try {
         exclusions=@('appsettings*.json','web.config','secrets','private evidence','local test outputs','diagnostic package');
         releaseGuard='New-PairedTestRelease still requires the existing combined branch and exact 001-024 chain; unchanged, not run'}
     [IO.File]::WriteAllText((Join-Path $destination 'candidate.json'), ($record | ConvertTo-Json -Depth 9), [Text.UTF8Encoding]::new($false))
-    Write-Output ($payloads | Select-Object component,path,sha256,entrySha256 | ConvertTo-Json)
+    Write-Output ($payloads | ForEach-Object { [pscustomobject]$_ } | Select-Object component,path,sha256,entrySha256 | ConvertTo-Json)
 } finally { Pop-Location }
