@@ -52,6 +52,7 @@ public static class ServiceAccountProblems
         "RequestAlreadyClosed" => "Talep zaten kapalı.",
         "PlanEndBeforeStart" => "Plan bitişi başlangıçtan önce olamaz.",
         "OwnershipNotConfirmed" => "Sahiplik teyidi talebi, teyitli sahip ekip veya kişi olmadan kapatılamaz.",
+        "ClosureKindNotAllowed" => "Hesap kapanışı yalnız silme veya gMSA dönüşümü için kaydedilebilir; inceleme veya sahiplik teyidi hesabı kapatmaz.",
         "expectedVersion" => "Kayıt değişmiş; güncel sürüm yüklendi.",
         "reason" => "Değişiklik veya temizleme için gerekçe gerekli.",
         "teamId" => "Sahip ekibi değiştirmek kurum düzeyinde kapsam gerektirir.",

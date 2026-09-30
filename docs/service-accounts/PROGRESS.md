@@ -9,7 +9,14 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
-## Pilot-readiness iteration 2026-09-29 (current state)
+## Follow-up 2026-09-30 (after the pinned handoff)
+
+The Codex handoff stays pinned at `b4fdf8d`. Module-only follow-up changes, results and what to
+integrate afterwards: [FOLLOWUP-20260930.md](FOLLOWUP-20260930.md). Scenario 4 completed (closure
+reviews never close accounts), reporting chain and export cap verified, Windows pilot journey now
+requires normal authentication with approved TEST identities (BLOCKED without them).
+
+## Pilot-readiness iteration 2026-09-29 (pinned handoff)
 
 Integration source, results and Windows commands: [HANDOFF.md](HANDOFF.md) (supersedes the
 `55ab73e` bundle). Windows runner: [WINDOWS-ACCEPTANCE.md](WINDOWS-ACCEPTANCE.md) — **not executed**.
@@ -244,7 +251,7 @@ sessions under that program name.
 | 1 | 390 accounts after first migration; earlier accounts preserved | Private reconciliation: package → 390 accounts; `LegacyPackageThenWorkbook_…` | Passed (357/1 split needs the unavailable previous baseline — not claimed) |
 | 2 | Re-import does not increase counts; older observation never moves latest back | Reconciliation: workbook 933 same / 0 new, package replay detected, counts unchanged; `CoordinationList_NewPeriodObservations_…`, `LegacyPackageThenWorkbook_…`, `Absence_IsInferredOnlyFromAValidatedCompleteList` (absence only from a declared complete list) | Passed |
 | 3 | Handover flag OK → exactly 81; no acceptance/gMSA without evidence | Reconciliation: cohort 81, reported 81, accepted 0, gMSA completed 0; `FindingsAndHandover_AreNotCompletedWork_…` | Passed |
-| 4 | Linux cohort: 8 dated password plans (30 Sep–30 Dec 2026), 2 closure reviews; completed totals unchanged | Reconciliation: 8 open password plans in window, verified closures 0 | Partially verified (the two closure reviews cannot be isolated from aggregates without names) |
+| 4 | Linux cohort: 8 dated password plans (30 Sep–30 Dec 2026), 2 closure reviews; completed totals unchanged | Synthetic: `LinuxCohort_EightPlansAndTwoClosureReviews_…` (open state) and `LinuxCohort_TwoClosureReviews_ReachSeparateOutcomes_WithoutClosingAccounts` (evidence review verified, both review requests completed, ownership confirmed only by its own decision, deletion stays planned, 0 verified closures, 0 performed password/deletion); `OnlyDeletionOrGmsaConversion_CanBeAVerifiedAccountClosure`. Private reconciliation: 8 open password plans, verified closures 0 | Synthetic passed; the two real reviews in corporate data are not identified here (no names) |
 | 5 | Ownership stays proposed; mail senders never become owners | Reconciliation: 321 proposals, 0 confirmed; `ConfirmingOwnershipInImport_RequiresAssignCapability`; harness journey ownership step | Passed |
 | 6 | Turkish case variants of one verified person map to one; same name + different UPN stay two | `LabelKey_TurkishCase…`, `LabelKey_AccentFolded…`, `Identity_DomainsAreDistinct_AndSameNamedVerifiedPeopleAreAmbiguous` | Passed |
 | 7 | Same name in two domains → two AccountIds; no automatic merge | `IdentityKey_SameNameInTwoDomains…`, `Identity_DomainsAreDistinct_…`; reconciliation doubled-letter variant needed an explicit decision | Passed |
@@ -257,7 +264,7 @@ sessions under that program name.
 | 14 | Other team refused on account/API/export/attachment; backend-scoped filters; visibility through an assigned request is not account-wide authority | `OtherTeam_CannotReadUpdateListOrDownload`, `ReportFiltersAreBackendScoped_…`, `ScopeIsEnforced_…`, `ParticipantTeam_WorksOnlyOnItsOwnRequest_…`, `AccountListExport_IsScopedFilteredAndAudited`, `PersistedRoleBundlesAndScopeGrants_…`; harness journey (temporary harness) | Passed |
 | 15 | Concurrent rowversion: one wins, other 409; commit/job twice → one result | `ConcurrentUpdates_OneWins_…`, `StalePreviewAndDecisionConflicts_…`, `RepeatedRunsCreateEachReminderOnce_…`, `ConcurrentClaims_…`; reconciliation repeated commits | Passed |
 | 16 | Invalid rows visible; failed transaction leaves nothing half-written; file/formula-injection tests | `AuditFailure_RollsBackTheWholeCommit`, parser rejection tests (macro, ratio, signature, missing header), `Xlsx_…NeutralizesFormulaText…` | Passed |
-| 17 | Sent snapshot unchanged; late action in the correct live week | `SentSnapshotNeverChanges_LiveReportPlacesLateActionInItsWeek_ExportsReconcile` | Passed |
+| 17 | Sent snapshot unchanged; late action in the correct live week | `SentSnapshotNeverChanges_LiveReportPlacesLateActionInItsWeek_ExportsReconcile`, `WeeklyImports_Reports_SentSnapshot_Periods_AndExport_WorkTogetherWithinScope` (two weekly imports incl. a replayed duplicate, live report, sent snapshot with late entry, month and date-range reports, filtered export, scope, actor/audit), `AccountExport_RowLimitIsExact_AndRefusalIsNotAudited` (5 000 export, 5 001 refused) | Passed |
 | 18 | XLSX opens in desktop Excel without repair; PDF and XLSX reconcile | Structure (no formulas/macros/links, date serials, deterministic), PDF xref and value reconciliation tests; harness journey downloads (`PK`, `%PDF`) | Structural checks passed; **desktop Excel open not run** (no Excel on Linux) |
 
 Legacy ownership control: the labelled projection now reproduces 40 named accounts / 7 people +

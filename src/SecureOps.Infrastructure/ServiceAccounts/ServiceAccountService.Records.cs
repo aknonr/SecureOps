@@ -37,6 +37,11 @@ public sealed partial class ServiceAccountService
                 return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "result"));
             }
 
+            if (ServiceAccountRules.ValidateRecordKind(type, kind) is { } kindError)
+            {
+                return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, kindError));
+            }
+
             if (request.RequestId is { } requestId && detail.Requests.All(r => r.Id != requestId) || !ValidText(request.EvidenceNote, 2000)
                 || References(request.References) is null)
             {
@@ -67,6 +72,12 @@ public sealed partial class ServiceAccountService
                 || !ValidText(request.EvidenceNote, 2000) || References(request.AddReferences) is null)
             {
                 return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "result"));
+            }
+
+            if (kind is { } newKind && detail.Actions.FirstOrDefault(a => a.Id == actionId) is { } current
+                && ServiceAccountRules.ValidateRecordKind(Enum.Parse<ServiceAccountActionType>(current.ActionType), newKind) is { } kindError)
+            {
+                return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, kindError));
             }
 
             return ServiceAccountRules.ValidateReport(ServiceAccountActionResult.Performed, actual, Today) is { } rule

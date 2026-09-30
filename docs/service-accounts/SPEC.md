@@ -36,7 +36,11 @@ A complete-list declaration that is contradicted by rows outside its population 
    `Account closure` record kind alone does not create a closure.
 6. A verified closure needs result Verified, closure record kind, actual action date,
    verification date, verifier and evidence. The verification date cannot precede the action
-   date. A deletion closure additionally needs an OR number.
+   date. A deletion closure additionally needs an OR number. Only a deletion or an actual gMSA
+   conversion can be an account closure; a review (including a closure review), an ownership
+   confirmation, a password change, an evaluation or a handover is never recorded or counted as
+   one. Request closure, evidence review (verification of an action) and ownership verification
+   are separate outcomes.
 7. OR, OCO and Jira are distinct record types; none substitutes for another. OR is a service
    request/operation record, OCO a change record; the application's own IDs are independent.
 8. A performed-action report may be counted as a *report* even with incomplete evidence; it is
