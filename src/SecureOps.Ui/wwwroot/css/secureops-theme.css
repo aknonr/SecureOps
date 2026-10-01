@@ -4977,50 +4977,122 @@ html[data-so-appearance="light"] .so-auth-card {
     background: color-mix(in srgb, var(--so-appbar-text) 5%, transparent);
 }
 
+/* Navigation is chrome on the shared navy (theme DrawerBackground). Text and icons
+   come from the drawer palette; red appears only as the active marker, never as
+   text, because red type on navy does not meet contrast. */
 .so-drawer {
-    border-right-color: color-mix(in srgb, var(--so-border) 78%, transparent);
-    box-shadow: 8px 0 24px rgb(0 0 0 / 5%);
+    border-right: 1px solid color-mix(in srgb, var(--mud-palette-drawer-text) 10%, transparent);
+    box-shadow: 8px 0 24px rgb(0 0 0 / 8%);
+}
+
+.so-nav-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
 }
 
 .so-nav {
-    padding: 10px 0 22px;
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+    padding: 10px 0 14px;
 }
 
 .so-nav-group {
-    padding: 17px 18px 5px;
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
+    padding: 18px 20px 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--mud-palette-drawer-text) 62%, transparent);
 }
 
-.so-nav .mud-nav-link {
+.so-nav .mud-nav-link,
+.so-nav .mud-nav-group > .mud-nav-link {
     min-height: 42px;
-    margin: 2px 8px;
+    margin: 2px 10px;
     padding: 8px 12px;
-    border-radius: 5px;
+    border-radius: 6px;
     color: var(--mud-palette-drawer-text);
-    font-size: 0.84rem;
+    font-size: 0.86rem;
     line-height: 1.35;
 }
 
 .so-nav .mud-nav-link .mud-nav-link-icon {
-    margin-inline-end: 12px;
+    margin-inline-end: 10px;
     color: var(--mud-palette-drawer-icon);
 }
 
 .so-nav .mud-nav-link:hover,
 .so-nav .mud-nav-link:focus-visible {
-    background: color-mix(in srgb, var(--so-text-muted) 9%, transparent);
+    background: color-mix(in srgb, var(--mud-palette-drawer-text) 9%, transparent);
+    color: var(--mud-palette-drawer-text);
+}
+
+.so-nav .mud-nav-link:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--mud-palette-drawer-text) 70%, transparent);
+    outline-offset: -2px;
 }
 
 .so-nav .mud-nav-link.active {
-    color: var(--so-brand) !important;
-    background: color-mix(in srgb, var(--so-brand) 11%, transparent);
+    color: #ffffff !important;
+    background: color-mix(in srgb, var(--mud-palette-drawer-text) 14%, transparent) !important;
     box-shadow: inset 3px 0 0 var(--so-brand);
     font-weight: 650;
 }
 
 .so-nav .mud-nav-link.active .mud-nav-link-icon {
-    color: var(--so-brand) !important;
+    color: #ffffff !important;
+}
+
+/* Administration folds; its heading reads like the section headings above it. */
+.so-nav .so-nav-admin {
+    margin-top: 10px;
+}
+
+.so-nav .so-nav-admin > .mud-nav-link .mud-nav-link-text {
+    font-weight: 600;
+}
+
+.so-nav .so-nav-admin .mud-navgroup-collapse .mud-nav-link {
+    padding-inline-start: 22px;
+}
+
+.so-nav .mud-nav-link-expand-icon,
+.so-nav .mud-nav-link-expand-icon.mud-transform {
+    color: var(--mud-palette-drawer-icon) !important;
+    fill: currentColor !important;
+}
+
+.so-nav-footer {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid color-mix(in srgb, var(--mud-palette-drawer-text) 12%, transparent);
+}
+
+.so-nav-planned,
+.so-nav-env {
+    margin: 6px 22px 0;
+    font-size: 0.74rem;
+    line-height: 1.5;
+    color: color-mix(in srgb, var(--mud-palette-drawer-text) 62%, transparent);
+}
+
+.so-nav-planned a {
+    color: color-mix(in srgb, var(--mud-palette-drawer-text) 82%, transparent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.so-nav-planned a:focus-visible {
+    outline: 2px solid var(--mud-palette-drawer-text);
+    outline-offset: 2px;
+}
+
+.so-nav-env {
+    margin-bottom: 4px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 .so-main {

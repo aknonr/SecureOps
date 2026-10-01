@@ -32,6 +32,11 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-23 — Service Accounts scope grants are not readable from access screens | Open — UI shows a scope note |
 | G-24 — Provider health has no check time and no connectivity result | Open — UI labels "sınanmadı" |
 | G-25 — SQL, audit-store and Worker state are not in the System Status contract | Open — UI lists them as unknown |
+| G-26 — gMSA/MSA accounts cannot be looked up | Open — defect candidate, verify in TEST |
+| G-27 — Lookup purpose is unreadable in audit | Open — needs ADR-0008 / docs/27 decision |
+| G-28 — No bounded way to resolve an account from a person's name | Open — needs ADR decision |
+| G-29 — AD lookup does not show the Service Accounts inventory record | Open |
+| G-30 — The solution builds only with a specific SDK/language combination | Open — build hygiene |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -880,6 +885,86 @@ only as heartbeat evidence inside `GET /api/v1/diagnostics/operations`. **What t
 Status lists SQL Server, audit store, Hangfire/Worker and SMTP under "Bu sayfada durumu
 gösterilmeyenler" as unknown. **What would resolve it.** A documented, Admin-authorized status
 contract (state, observed-at, safe reason code) for these components.
+
+---
+
+## G-26 — gMSA/MSA accounts cannot be looked up
+
+**Endpoints:** `POST /api/v1/identity/lookup`, `POST /api/v1/directory/principals/*`
+**Severity:** High for the Service Accounts work (gMSA transition)
+**Status:** Open — found by reading code (2026-10-01); confirm with a non-sensitive TEST gMSA
+
+`IdentityLookup:AllowedAccountPattern` (`^[a-zA-Z0-9._@-]+$`) and the Directory Explorer input
+pattern (`^[a-zA-Z0-9._@ -]+$`) reject `$`, but every gMSA/MSA `sAMAccountName` ends in `$`.
+Lookups also use `UserPrincipal.FindByIdentity`; gMSA objects derive from the `computer` class, so
+that query is not expected to return them. `AccountTypeEvidence` can report
+`GroupManagedServiceAccount`, but that path is probably unreachable. The group pattern likewise
+rejects Turkish letters, parentheses and `&`, which real group names may contain.
+
+**What would resolve it.** Accept a single trailing `$`; resolve gMSA/MSA by exact `sAMAccountName`
+with an objectClass-bound search (or `ComputerPrincipal`); optionally return who may retrieve the
+managed password (`msDS-GroupMSAMembership`, resolved names) as evidence. Revisit the group pattern
+against the corporate naming standard. The UI would label the type from the existing evidence field.
+
+---
+
+## G-27 — Lookup purpose is unreadable in audit
+
+**Endpoints:** identity and directory read routes
+**Severity:** Medium — audit cannot answer "why was this looked up"
+**Status:** Open — needs an ADR-0008 / `docs/27` decision
+
+Purpose is optional and audited only as hash + length; the UI no longer asks for it. Comparable
+tools record a readable reason: CyberArk audits a `Reason` and optional ticketing system/ticket ID;
+Entra PIM can require justification and a ticket number shown in audit. KVKK md. 4 asks processing
+to be for a specific purpose and proportionate.
+
+**Proposal.** A structured purpose instead of free text: a reason code (e.g. Olay/Alarm, Değişiklik,
+Erişim talebi, Servis hesabı envanteri, Diğer) plus an optional validated reference (OR number or
+Jira key), both stored in clear; free text stays out of audit. Required for member enumeration,
+privileged analysis and export; optional for a basic lookup. The UI would add one compact selector
+and prefill the reference when navigating from an operational record.
+
+---
+
+## G-28 — No bounded way to resolve an account from a person's name
+
+**Endpoints:** none today
+**Severity:** Medium — operators often know a display name, not the `sAMAccountName`
+**Status:** Open — conflicts with ADR-0008 "no broad search"; needs an explicit decision
+
+**Proposal.** A disambiguation step rather than people search: AD ambiguous name resolution (ANR)
+with at least 3 characters, at most 10 results, returning only display name, `sAMAccountName` and
+object type; selecting one runs the existing exact lookup. Separate capability, rate limit and
+audit (target hash, result count).
+
+---
+
+## G-29 — AD lookup does not show the Service Accounts inventory record
+
+**Endpoints:** `POST /api/v1/directory/principals/service-evidence` and the Service Accounts API
+**Severity:** Medium
+**Status:** Open
+
+AD evidence and the inventory (owner, team, handover, gMSA plan) are on separate screens with no
+link. **What would resolve it.** A scope-checked "inventory match" for an exact account (record id,
+owning team, status) returned only when the caller holds `ServiceAccounts.View` and scope; the UI
+would show a link to the record.
+
+---
+
+## G-30 — The solution builds only with a specific SDK/language combination
+
+**Severity:** High for continuity (bus factor 1)
+**Status:** Open — observed 2026-10-01 on master `214690e`
+
+With SDK 8, `JiraIssueDraftService.cs` does not compile (C# 14 collection-expression conversion). With
+SDK 10 and `LangVersion=latest` (C# 14), `InUseServiceItemParserTests` does not compile
+(`Reverse()` binds to the span overload). `global.json` pins `8.0.100` with
+`rollForward: latestMajor`, so the result depends on the machine. Verification in this pass used
+SDK 10 with `-p:LangVersion=13`. Three `UiPersistentDataProtectionTests` fail rather than skip off
+Windows. **What would resolve it.** Pin one SDK and language version, fix the two sources, and skip
+the DPAPI tests on non-Windows.
 
 ---
 

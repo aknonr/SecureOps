@@ -66,6 +66,25 @@ public sealed class NavigationContractTests
     }
 
     [Fact]
+    public void NavigationGroups_FollowShiftWork_AndKeepAdministrationFolded()
+    {
+        string menu = NavMenu();
+
+        int shift = menu.IndexOf(">Vardiya işleri<", StringComparison.Ordinal);
+        int identity = menu.IndexOf(">Kimlik ve hesaplar<", StringComparison.Ordinal);
+        int links = menu.IndexOf(">Bağlantılar<", StringComparison.Ordinal);
+        int reports = menu.IndexOf(">Raporlar<", StringComparison.Ordinal);
+        shift.Should().BePositive();
+        identity.Should().BeGreaterThan(shift);
+        links.Should().BeGreaterThan(identity);
+        reports.Should().BeGreaterThan(links);
+
+        menu.Should().Contain("<MudNavGroup Title=\"Yönetim\"").And.Contain("@bind-Expanded=\"_adminExpanded\"");
+        menu.Should().NotContain("SONRAKİ FAZLAR").And.Contain("href=\"audit-compliance\"").And.Contain("href=\"diagnostics-readonly\"");
+        menu.Should().Contain("ServiceAccountCapabilities.View");
+    }
+
+    [Fact]
     public void TerminalApiSession_ForcesOnlyItsBrowserCircuitThroughReauthentication()
     {
         string layout = Ui("Shared", "MainLayout.razor");

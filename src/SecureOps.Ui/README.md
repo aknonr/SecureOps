@@ -43,7 +43,15 @@ UI-only pass (Claude) on branch `feature/ui-access-management-20261001`; no API,
   the card still follows the reader's appearance. Reduced motion freezes the timeline with aircraft
   on their routes. No place labels are drawn.
 
-Missing contract data is recorded as G-19 to G-25 in `docs/26-ui-backend-contract-gaps.md`.
+- **Navigasyon.** Groups follow shift work: Vardiya işleri (OR, In Use, Duyurular), Kimlik ve
+  hesaplar (AD kullanıcı/hesap, AD grup, Servis Hesapları), Bağlantılar, Raporlar, then a folded
+  **Yönetim** group that opens itself on its own routes. Planned pages moved to one footer line;
+  Erişimim and the non-production marker sit in the footer. The light theme's drawer now shares the
+  app bar navy (`SecureOpsTheme` DrawerBackground/Text/Icon, width 264px); the active item is white
+  text with the brand-red marker, because red text on navy fails contrast. Capability gates and
+  routes are unchanged.
+
+Missing contract data is recorded as G-19 to G-30 in `docs/26-ui-backend-contract-gaps.md`.
 Verification: targeted unit/render tests and a local Playwright run against a synthetic stub API
 (390px, emulated 200% zoom at 683px CSS width, light/dark, keyboard, denial, loading/error/empty).
 The stub is not committed. Windows/IIS/LocalDB, native browser zoom and corporate data remain unverified.
