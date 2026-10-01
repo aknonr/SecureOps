@@ -112,6 +112,75 @@ public sealed class ResourceViewTests
     }
 
     [Fact]
+    public void PartialSetNotice_DoesNotDescribeAListBelowItself()
+    {
+        // The notice is shown after the openable list, so it must not point the operator downwards.
+        ResourceView.PartialSetNotice.Should().NotContain("Aşağıda").And.Contain("yukarıda");
+    }
+
+    [Fact]
+    public void NotOpening_NamesOnlyVisibleSavedLinksTheResolutionLeftOut_InSavedOrder()
+    {
+        ResourceLink a = Link("A"), b = Link("B"), c = Link("C");
+        ShiftSetResponse saved = Set("Gece", a, b, c);
+
+        ResourceView.NotOpening(saved, [a]).Should().Equal(b, c);
+        ResourceView.NotOpening(saved, [c, b, a]).Should().BeEmpty();
+        // A resolved link the list never showed (a hidden member) is not reported as missing.
+        ResourceView.NotOpening(saved, [a, b, c, Link("Gizli")]).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Range_UsesTheServerPagingAndIsAbsentForAnEmptyPage()
+    {
+        ResourceLink[] five = [Link("1"), Link("2"), Link("3"), Link("4"), Link("5")];
+
+        ResourceView.Range(new ResourcePage(five, 2, 25, 30)).Should().Be("26–30 / 30");
+        ResourceView.Range(new ResourcePage(five, 1, 5, 30)).Should().Be("1–5 / 30");
+        ResourceView.Range(new ResourcePage([], 1, 25, 0)).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(0, 25, 1)]
+    [InlineData(25, 25, 1)]
+    [InlineData(26, 25, 2)]
+    [InlineData(30, 10, 3)]
+    [InlineData(5, 0, 5)]
+    public void PageCount_IsNeverZero(int total, int pageSize, int expected)
+    {
+        ResourceView.PageCount(total, pageSize).Should().Be(expected);
+    }
+
+    [Fact]
+    public void ActiveFilters_ListsOnlyWhatNarrowsTheList_InScreenOrder()
+    {
+        ResourceView.ActiveFilters(false, " ", null, "").Should().BeEmpty();
+        ResourceView.ActiveFilters(true, "  alarm ", "İzleme", " TEST ")
+            .Should().Equal("Yalnız favorilerim", "Arama: “alarm”", "Kategori: İzleme", "Ortam: TEST");
+    }
+
+    [Fact]
+    public void SavedToGroupNotice_NamesASingleLinkAndCountsSeveral()
+    {
+        ResourceView.SavedToGroupNotice([Link("Alarm konsolu")], "Gece vardiyam")
+            .Should().Be("“Alarm konsolu” kişisel grubunuza kaydedildi: Gece vardiyam.");
+        ResourceView.SavedToGroupNotice([Link("A"), Link("B")], "Gece vardiyam")
+            .Should().Be("2 bağlantı kişisel grubunuza kaydedildi: Gece vardiyam.");
+    }
+
+    [Fact]
+    public void SavedGroup_FindsAnExistingGroupByIdAndANewGroupByItsUniqueName()
+    {
+        ShiftSetResponse existing = Set("Sabah"), created = Set("Gece Vardiyam");
+        ResourcePreferencesResponse preferences = Preferences([existing, created]);
+
+        ResourceView.SavedGroup(preferences, existing.Id, "ignored").Should().BeSameAs(existing);
+        ResourceView.SavedGroup(preferences, null, " gece vardiyam ").Should().BeSameAs(created);
+        ResourceView.SavedGroup(preferences, Guid.NewGuid(), "Sabah").Should().BeNull();
+        ResourceView.SavedGroup(preferences, null, "Yok").Should().BeNull();
+    }
+
+    [Fact]
     public void IsFavourite_IsFalseBeforePreferencesLoad()
     {
         ResourceView.IsFavourite(null, Guid.NewGuid()).Should().BeFalse();

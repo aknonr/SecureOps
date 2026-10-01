@@ -40,7 +40,7 @@ public static class ResourceView
     /// </remarks>
     public const string PartialSetNotice =
         "Bu gruptaki bazı bağlantılar şu anda kullanılamıyor. Arşivlenmiş, kaldırılmış veya "
-        + "görüntüleme kapsamınız dışında olabilir. Aşağıda yalnızca şu anda açılabilen bağlantılar listelenir.";
+        + "görüntüleme kapsamınız dışında olabilir. Açma düğmesi yalnızca yukarıda listelenen, şu anda açılabilen bağlantıları açar.";
 
     /// <summary>Shown when a resolved set has nothing openable at all.</summary>
     public const string EmptySetNotice =
@@ -205,4 +205,89 @@ public static class ResourceView
                 || l.Purpose.Contains(search, StringComparison.OrdinalIgnoreCase) || l.Tags.Any(t => t.Contains(search, StringComparison.OrdinalIgnoreCase)))];
         return new([.. matching.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)], query.Page, query.PageSize, matching.Length);
     }
+
+    /// <summary>
+    /// Saved members the operator could see in the group but that the latest resolution did not return.
+    /// </summary>
+    /// <param name="saved">The group as last read from the personal projection.</param>
+    /// <param name="resolved">What the server says is openable right now, in opening order.</param>
+    /// <returns>The visible saved links that will not open, in saved order.</returns>
+    /// <remarks>
+    /// Both lists come from the server, so naming these entries reveals nothing the operator was not
+    /// already shown. Hidden members are absent from <paramref name="saved"/> and stay unnamed and
+    /// uncounted; <see cref="PartialSetNotice"/> covers them without inventing a reason.
+    /// </remarks>
+    public static IReadOnlyList<ResourceLink> NotOpening(ShiftSetResponse saved, IReadOnlyList<ResourceLink> resolved)
+    {
+        HashSet<Guid> openable = [.. resolved.Select(link => link.Id)];
+        return [.. saved.Links.Where(link => !openable.Contains(link.Id))];
+    }
+
+    /// <summary>The visible slice of a page, e.g. "26–32 / 32", computed from the server's own paging.</summary>
+    /// <param name="page">Server page; its own <see cref="ResourcePage.PageSize"/> is authoritative.</param>
+    /// <returns>An operator-facing range, or <see langword="null"/> for an empty page.</returns>
+    public static string? Range(ResourcePage page)
+    {
+        if (page.Items.Count == 0)
+        {
+            return null;
+        }
+        int first = ((page.Page - 1) * page.PageSize) + 1;
+        return $"{first}–{first + page.Items.Count - 1} / {page.Total}";
+    }
+
+    /// <summary>Number of pages for a total, never less than one so "Sayfa 1 / 1" reads correctly when empty.</summary>
+    /// <param name="total">Server total.</param>
+    /// <param name="pageSize">Page size used for the query.</param>
+    /// <returns>Page count.</returns>
+    public static int PageCount(int total, int pageSize) =>
+        Math.Max(1, (int)Math.Ceiling(total / (double)Math.Max(1, pageSize)));
+
+    /// <summary>Plain-language list of the filters that currently narrow the list.</summary>
+    /// <param name="favouritesOnly">Whether only the caller's favourites are listed.</param>
+    /// <param name="search">Search text.</param>
+    /// <param name="category">Display name of the selected category, if any.</param>
+    /// <param name="environment">Selected environment, if any.</param>
+    /// <returns>Filter descriptions in screen order; empty when nothing narrows the list.</returns>
+    public static IReadOnlyList<string> ActiveFilters(bool favouritesOnly, string? search, string? category, string? environment)
+    {
+        List<string> filters = [];
+        if (favouritesOnly)
+        {
+            filters.Add("Yalnız favorilerim");
+        }
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filters.Add($"Arama: “{search.Trim()}”");
+        }
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            filters.Add($"Kategori: {category}");
+        }
+        if (!string.IsNullOrWhiteSpace(environment))
+        {
+            filters.Add($"Ortam: {environment.Trim()}");
+        }
+        return filters;
+    }
+
+    /// <summary>Confirmation after links were saved to a personal group, worded for one or many links.</summary>
+    /// <param name="links">Links that were submitted.</param>
+    /// <param name="groupName">Name of the group the server confirmed.</param>
+    /// <returns>An operator-facing confirmation.</returns>
+    public static string SavedToGroupNotice(IReadOnlyList<ResourceLink> links, string groupName) =>
+        links.Count == 1
+            ? $"“{links[0].Name}” kişisel grubunuza kaydedildi: {groupName}."
+            : $"{links.Count} bağlantı kişisel grubunuza kaydedildi: {groupName}.";
+
+    /// <summary>Finds the group a confirmed save wrote to, by identifier or, for a new group, by its unique name.</summary>
+    /// <param name="preferences">The refreshed personal projection returned by the save.</param>
+    /// <param name="id">Existing group identifier, or <see langword="null"/> for a newly created group.</param>
+    /// <param name="name">Submitted group name.</param>
+    /// <returns>The confirmed group, or <see langword="null"/> when it cannot be identified.</returns>
+    /// <remarks>Names are unique per owner (ordinal, case-insensitive), the same rule <see cref="ValidateSet"/> applies.</remarks>
+    public static ShiftSetResponse? SavedGroup(ResourcePreferencesResponse preferences, Guid? id, string name) =>
+        id is { } existing
+            ? preferences.Sets.FirstOrDefault(set => set.Id == existing)
+            : preferences.Sets.FirstOrDefault(set => string.Equals(set.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
 }
