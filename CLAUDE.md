@@ -18,20 +18,7 @@ Details: `docs/agent-guides/060-ui.md` and `src/SecureOps.Ui/README.md` (search 
 
 ## Running the UI locally
 
-Verified recipe (synthetic InMemory data, no corporate systems):
-
-```bash
-# API, Demo environment with in-memory stores and demo actors
-ASPNETCORE_ENVIRONMENT=Demo DemoAuth__Enabled=true Audit__Provider=InMemory \
-Access__DemoCompatibilityEnabled=true ASPNETCORE_URLS=http://localhost:5000 \
-  dotnet run --project src/SecureOps.Api
-# UI must be HTTPS (antiforgery cookie is Secure); team-lead or platform-admin actor
-ASPNETCORE_ENVIRONMENT=Demo DemoMode__Enabled=true DemoMode__AllowMockAuthentication=true \
-IdentityLookupApi__BaseAddress=http://localhost:5000/ DemoMode__ApiDemoActor=platform-admin \
-ASPNETCORE_URLS=https://localhost:63947 dotnet run --project src/SecureOps.Ui
-```
-
-Browser journeys live in `tests/browser/*.cjs` (Playwright, loopback hosts only; shared helpers in `journey-support.cjs`). Seed data through the API with the `X-SecureOps-Demo-Actor` header. Say plainly which results came from this local setup versus Windows/IIS or corporate TEST.
+Canonical commands: `src/SecureOps.Ui/README.md` → *Running locally* (Demo launch profiles, synthetic InMemory data; the API also needs `Access__DemoCompatibilityEnabled=true`, and the UI runs on HTTPS because its antiforgery cookie is Secure). Browser journeys are `tests/browser/*.cjs` (Playwright, loopback hosts only; helpers in `journey-support.cjs`); seed data through the API with the `X-SecureOps-Demo-Actor` header. Say plainly which results came from this local setup versus Windows/IIS or corporate TEST.
 
 ## Domain vocabulary
 

@@ -1,4 +1,43 @@
 # SecureOps.Ui
+## Start here
+
+Blazor Server UI for WASAS SecureOps: `net8.0`, C# 12, SDK pinned in `global.json`, MudBlazor 6.16. It talks
+only to the SecureOps API; the API decides every permission ([the one rule](#the-one-rule-that-shapes-everything)).
+Agent rules: `AGENTS.md`, `CLAUDE.md`, `docs/agent-guides/060-ui.md`.
+
+**Reading status words.** *Implemented* means present in source; *local tested* means verified on a developer
+host with synthetic data; *installed* and *configured* refer to a TEST package and its settings; *accepted* means
+verified in corporate TEST by the owner. The dated sections below record each step with its SHA and evidence;
+none of them implies a later state. The single current remaining-work register is
+[`docs/integrated-test-activation.md`](../../docs/integrated-test-activation.md#requirementevidence-tracking).
+
+**Commands**
+
+| Task | Command / location |
+|---|---|
+| Run API + UI locally | [Running locally](#running-locally) (Demo profiles, synthetic InMemory data) |
+| Build | `dotnet build SecureOps.sln` (warnings are errors) |
+| UI unit and render tests | `dotnet test tests/SecureOps.Tests.Unit/SecureOps.Tests.Unit.csproj --filter "FullyQualifiedName~SecureOps.Tests.Unit.Ui"` |
+| Browser journeys | `tests/browser/*.cjs` — loopback hosts and synthetic data only; usage line at the top of each script |
+| Format gate | `dotnet format --verify-no-changes` (repository-wide; scoped runs are partial evidence) |
+
+**Feature navigation** (routes and capabilities: [Routes](#routes))
+
+| Feature | Routes | In this file | Contract / decision |
+|---|---|---|---|
+| Shell, sign-in, theme | `/login`, `/account`, `/dashboard` | [Layout](#layout), [Theme](#theme), [Error handling](#error-handling) | `docs/25-ui-enterprise-shell.md`, ADR-0014, ADR-0016 |
+| Access administration | `/access/*`, `/admin/sessions`, `/admin/system-status` | [Access administration](#access-administration), [Access pass 2026-10-01](#access-and-management-usability-pass-2026-10-01) | ADR-0010, ADR-0022, `docs/contracts/secureops-api-v1-ui-integration.md` |
+| Identity lookup, directory | `/identity-lookup`, `/directory/users`, `/directory/groups` | [Running locally](#running-locally) | ADR-0008, ADR-0013, ADR-0015, `docs/contracts/directory-group-analysis-ui-integration-delta.md` |
+| Operational Record → Jira, SDM | `/operational-records` | [Operational Record → Jira](#operational-record--jira), [SDM handoff](#sdm-management-and-test-delivery-handoff-2026-09-07) | ADR-0009, ADR-0012, ADR-0018, `docs/22-operational-record-jira-workflow.md` |
+| Application links, personal groups | `/resources`, `/resources/sets`, `/admin/resources` | [Resource catalogue](#resource-catalogue-and-shift-start-sets) | ADR-0019 |
+| In Use | `/in-use`, `/in-use/reports` | [In Use handoff](#in-use-v1-canonical-handoff-2026-09-08), [E-08](#e-08-in-use-activity-review) | ADR-0020 |
+| Planned announcements (Codex) | `/announcements`, `/announcements/preparations` | [Planned Announcements UI](#planned-announcements-ui) | ADR-0021, `docs/contracts/planned-announcements-v1.md` |
+| Management reporting | `/dashboard`, `/reporting/operators` | [Reporting continuation](#integrated-management-reporting-continuation) | ADR-0011, ADR-0023 |
+| Service Accounts (scoped exception) | `/service-accounts/*` | — | `docs/service-accounts/README.md` |
+
+Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../docs/26-ui-backend-contract-gaps.md).
+Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
+evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
 ## PR #3 Windows Verification, 2026-10-02
 
@@ -329,6 +368,8 @@ have to be invented.
 | `/error` | Unhandled server error, request reference only | anonymous |
 | `/`, `/dashboard` | Genel Bakış | authenticated |
 | `/identity-lookup` | PAM / AD lookup | `Identity.Lookup` |
+| `/directory/users` | Read-only AD user view with group context | `Identity.Lookup`; group panels `Identity.Groups.View` / `Identity.PrivilegedGroups.View` |
+| `/directory/groups` | Read-only AD group analysis | `Identity.Groups.View`; members and export need their own capability |
 | `/account` | Identity and session security | authenticated |
 | `/access/me` | Status, roles, grouped capabilities | authenticated |
 | `/access/requests` | Access-request decision queue | `Access.ApproveRequests` |
@@ -336,6 +377,7 @@ have to be invented.
 | `/access/users/{id}` | User detail, role editor, disable | `Access.ManageUsers` |
 | `/access/roles` | Role definitions by module, server impact preview, explicit apply | `Access.ManageUsers` and `Access.AssignRoles` |
 | `/admin/system-status` | Provider settings (configured ≠ healthy) and explicit workflow check | `Access.ManageUsers` (API: Admin); workflow check `SystemDiagnostics` |
+| `/admin/sessions` | Active application sessions and revocation | `Access.ManageUsers` |
 | `/operational-records` | OR → Jira workspace, grouped by attention | `OperationalRecords.View` |
 | `/operational-records/{id}` | Source, workflow, and Jira transfer | `OperationalRecords.View` |
 | `/resources` | Uygulama Bağlantıları: search, favourites, add to a personal group | `Resources.View` |
@@ -347,6 +389,10 @@ have to be invented.
 | `/service-accounts/imports` | Import preview, decisions and idempotent commit | `ServiceAccounts.Import` and organization scope |
 | `/service-accounts/reports` | Live report, immutable snapshots, XLSX/PDF | `ServiceAccounts.Report` |
 | `/service-accounts/admin` | Scope grants and dictionaries | `ServiceAccounts.Administer` |
+| `/in-use`, `/in-use/{id}` | In Use local review workspace | `InUse.View`; review, assign, refresh and completion need their own capability |
+| `/in-use/reports` | In Use report catalogue | `InUse.View` |
+| `/announcements`, `/announcements/preparations` | Planned announcement drafts and preparations (Codex-owned) | `Announcements.Drafts` / `Announcements.Prepare` per the contract |
+| `/reporting/operators` | Management reporting view | `Reporting.ManagementView` |
 | `/audit-compliance`, `/diagnostics-readonly` | Future-phase placeholders | authenticated |
 
 Interim auth endpoints: `POST /auth/sign-in`, `GET /auth/sign-out`. They establish identity only.
@@ -2232,8 +2278,9 @@ theme class.
 
 See `docs/agent-guides/060-ui.md`. Highlights:
 
-- No `localStorage` / `sessionStorage` — state is server-side.
-- No direct DbContext injection in `.razor`; the UI calls the API.
+- No `localStorage` / `sessionStorage` except the non-sensitive appearance preference `wasas.appearance`; all
+  other state is server-side.
+- No direct database access from the UI; it calls the API.
 - No direct PowerShell invocation.
 - No colour literals in CSS; extend the theme.
 - No leaderboards or per-operator comparison widgets ("audit is not surveillance").
@@ -2255,7 +2302,8 @@ cookie to the API; in Development/Demo, `DemoApiAuthHeaderHandler` sends the
 `DemoMode:ApiDemoActor` value in `X-SecureOps-Demo-Actor`, which the API's non-production bridge maps
 to an actor.
 
-**The Demo API also needs `Access__DemoCompatibilityEnabled=true`.** Without it the demo actor is
+**The Demo API also needs `Access__DemoCompatibilityEnabled=true`** (PowerShell: `$env:Access__DemoCompatibilityEnabled='true'`
+before starting the API; bash: prefix the command with `Access__DemoCompatibilityEnabled=true`). Without it the demo actor is
 created as `Pending`, every capability check denies, and the UI correctly shows the "awaiting
 approval" state — which looks like a broken demo. This is API launch configuration and is tracked as
 G-5 in `docs/26-ui-backend-contract-gaps.md`.
@@ -2274,8 +2322,10 @@ committed.
 
 ## Testing
 
-Pure UI logic is unit-tested in `tests/SecureOps.Tests.Unit/Ui/`: error translation, account input
-rules, lookup result reuse, and return-URL safety. `LocalReturnUrl` is `internal` and reachable via
+UI logic and component rendering are tested in `tests/SecureOps.Tests.Unit/Ui/` (render tests use
+`HtmlRenderer`, not bUnit): error translation, account input rules, lookup result reuse, return-URL safety
+and per-feature presentation. Browser journeys are `tests/browser/*.cjs` (Playwright against loopback hosts
+with synthetic data; each script's first line gives its arguments). `LocalReturnUrl` is `internal` and reachable via
 the `InternalsVisibleTo` entry in the csproj.
 
 Responsive and visual behaviour is validated in a real browser at 1440×900, 1366×768, and 390px in
