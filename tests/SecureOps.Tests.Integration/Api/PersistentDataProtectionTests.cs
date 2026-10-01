@@ -12,7 +12,7 @@ namespace SecureOps.Tests.Integration.Api;
 
 public sealed class PersistentDataProtectionTests
 {
-    [Fact]
+    [WindowsFact]
     public void PersistentKeyRing_SurvivesProviderRecreationForSessionAndDirectoryTokens()
     {
         string keyRingPath = TemporaryKeyRing();
@@ -46,7 +46,7 @@ public sealed class PersistentDataProtectionTests
         }
     }
 
-    [Fact]
+    [WindowsFact]
     public void ContinuationToken_IsApplicationPurposeTargetOperationExpiryAndIntegrityBound()
     {
         string keyRingPath = TemporaryKeyRing();
