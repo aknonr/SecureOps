@@ -1,149 +1,18 @@
-# 020 — Backend .NET Rules
+# 020 — Backend (.NET)
 
-## Applicability
+Owner: Codex. Read the README of each project you touch; it records current contracts and evidence.
 
-- **Purpose:** Backend rules for .NET 8, ASP.NET Core API, Hangfire, and EF Core.
-- **Applies to:** `src/SecureOps.Api/**/*.cs`, `src/SecureOps.Infrastructure/**/*.cs`, `src/SecureOps.Domain/**/*.cs`, and `src/SecureOps.Shared/**/*.cs`.
-- **Loading:** Routed explicitly from `AGENTS.md` or `docs/agent-guides/README.md`; do not assume automatic discovery.
+## Build settings (from `Directory.Build.props` / `global.json`)
 
-## Language and Framework
+`net8.0`, C# 12 (`LangVersion` pinned), SDK pinned in `global.json` with roll-forward disabled, nullable enabled, warnings as errors, analyzers and code style enforced in build, XML docs required outside tests. Package versions are central in `Directory.Packages.props`. Do not change the toolchain without an ADR.
 
-- Target framework: `net8.0`.
-- `<Nullable>enable</Nullable>` in every csproj.
-- `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` for `src/`.
-- `<ImplicitUsings>enable</ImplicitUsings>` for brevity.
-- `LangVersion`: latest stable.
+## Conventions that are specific here
 
-## Naming
-
-| Construct | Convention | Example |
-|---|---|---|
-| Namespace | `SecureOps.<Project>.<Folder>` | `SecureOps.Api.Controllers` |
-| Class | PascalCase | `DiagnosticJobRunner` |
-| Interface | `I` + PascalCase | `IDiagnosticRunner` |
-| Method | PascalCase, `Async` suffix for async | `RunDiagnosticAsync` |
-| Parameter / local | camelCase | `serverId`, `alertPayload` |
-| Constant | PascalCase | `MaxRetryAttempts` |
-| Private field | `_camelCase` | `_logger` |
-
-## Controllers (ASP.NET Core)
-
-- One controller per resource. Keep them thin.
-- Route: `api/v1/<resource>`.
-- Return `IActionResult` or `ActionResult<T>`.
-- Use `[Authorize]` with policy names from `SecureOps.Shared.Auth.Policies`.
-- Validate inputs with FluentValidation or DataAnnotations.
-
-```csharp
-[ApiController]
-[Route("api/v1/alerts")]
-[Authorize(Policy = Policies.OperatorOrAbove)]
-public sealed class AlertsController : ControllerBase
-{
-    private readonly IAlertService _alertService;
-
-    public AlertsController(IAlertService alertService)
-    {
-        _alertService = alertService;
-    }
-
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<AlertDetailDto>> GetByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        var result = await _alertService.GetByIdAsync(id, cancellationToken);
-        return result is null ? NotFound() : Ok(result);
-    }
-}
-```
-
-## Hangfire Jobs
-
-- All long-running diagnostic runs go through Hangfire.
-- Use `BackgroundJobClient` to enqueue, `IRecurringJobManager` for scheduled.
-- Job methods are public, take simple serializable parameters.
-- Jobs must be idempotent: re-running with the same input produces the same result.
-- Use `[AutomaticRetry(Attempts = 3)]` for transient failures.
-- Configure SQL Server storage in `Program.cs`.
-
-```csharp
-public sealed class DiagnosticJob
-{
-    private readonly IDiagnosticRunner _runner;
-
-    public DiagnosticJob(IDiagnosticRunner runner)
-    {
-        _runner = runner;
-    }
-
-    [AutomaticRetry(Attempts = 3, DelaysInSeconds = new[] { 30, 120, 300 })]
-    public async Task RunAsync(Guid alertId, CancellationToken cancellationToken)
-    {
-        await _runner.RunForAlertAsync(alertId, cancellationToken);
-    }
-}
-```
-
-## Validation
-
-Use FluentValidation:
-
-```csharp
-public sealed class CreateAlertCommandValidator : AbstractValidator<CreateAlertCommand>
-{
-    public CreateAlertCommandValidator()
-    {
-        RuleFor(x => x.ServerName).NotEmpty().MaximumLength(255);
-        RuleFor(x => x.AlertType).IsInEnum();
-        RuleFor(x => x.Severity).IsInEnum();
-    }
-}
-```
-
-## Error Handling
-
-- Use middleware for uncaught exceptions. Convert to `ProblemDetails` response.
-- Never expose stack traces in production responses.
-- Log full exception with `_logger.LogError(ex, "Context: {ServerName}", serverName)`.
-- Use `Result<T>` pattern for expected business failures, not exceptions.
-
-## EF Core (when used)
-
-- One `DbContext` per bounded context. Keep it lean.
-- Migrations live in `src/SecureOps.Infrastructure/Migrations/`.
-- Never call `SaveChanges()` synchronously. Always `SaveChangesAsync(cancellationToken)`.
-- Use `AsNoTracking()` for read-only queries.
-- No lazy loading. Explicit `Include()` only.
-
-## Logging (Serilog)
-
-- Structured logs only. No string interpolation in log messages.
-- Use semantic property names.
-
-```csharp
-// GOOD
-_logger.LogInformation("Diagnostic completed for {ServerName} in {DurationMs}ms",
-    serverName, durationMs);
-
-// BAD
-_logger.LogInformation($"Diagnostic completed for {serverName} in {durationMs}ms");
-```
-
-- Correlate logs with `TraceId` from `Activity.Current?.Id`.
-
-## Cancellation Tokens
-
-- Every async method that does I/O takes a `CancellationToken` and propagates it.
-- Cancellation tokens are the last parameter.
-- Never pass `CancellationToken.None` unless you have a specific reason — comment why.
-
-## Async / Await
-
-- No `async void` except event handlers.
-- No `.Result` or `.Wait()` — these deadlock under sync context.
-- No `Task.Run` to "make sync code async" — fix the sync code.
-
-## Reference
-
-Read `docs/03-architecture.md` and `docs/04-domain-model.md`.
+- **Routes and errors.** Controllers live under `api/v1/<resource>` and return RFC 7807 `ProblemDetails` with a stable `code`, `stage` and `retryable`; never stack traces.
+- **Authorization.** `[Authorize(Policy = Policies.CanX)]` (or the module's own policy class, e.g. `ServiceAccountPolicies`); policies are capability-based. Never check role or group names inline.
+- **Data access.** SQL Server through Dapper with parameters only; schema changes are new numbered scripts in `sql/schema/` with their dependencies stated (see `sql/README.md`). Scripts are never applied by application startup; corporate execution goes through the approved DBA process. There is no EF Core model.
+- **Concurrency.** Mutable aggregates carry a version; writes send the expected version and a stale write is a 409 that changes nothing.
+- **Idempotency.** External writes (Jira, mail) are preview-first and use durable idempotency keys; an unknown outcome is never retried automatically.
+- **Audit.** State changes and privileged reads write an audit event in the same transaction as the change.
+- **Async and logging.** Propagate `CancellationToken` through I/O; no `.Result`/`.Wait()`. Structured logging with message templates; never log secrets or full personal data.
+- **Contracts.** API shape changes update `docs/contracts/` and the OpenAPI snapshot in the same change, additively where possible.

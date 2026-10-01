@@ -1,5 +1,16 @@
 # Decisions Log
 
+## 2026-10-01 - Agent guidance rewritten for current models
+
+Owner decision: `AGENTS.md`, `CLAUDE.md` and `docs/agent-guides/` keep every hard rule and the
+Codex/Claude ownership split, but drop scaffolding written for weaker models (a 10-document
+mandatory reading order before any output, generic code samples, duplicated rule lists, fixed
+plan/confirm thresholds). Reading is now routed by task; each hard rule states its reason.
+Statements that contradicted the code were corrected: capability-based authorization (ADR-0010,
+ADR-0022) instead of AD-group roles, Dapper and numbered SQL scripts instead of EF Core, `HtmlRenderer`
+render tests instead of bUnit, pinned C# 12 / SDK, and a single canonical JEA allow-list in
+`docs/05-security-model.md`. No architectural decision changed; layer READMEs were not edited.
+
 ## 2026-09-07 - Original OR-to-Jira source review
 
 Original-script discovery is resolved by the externally supplied local file;
