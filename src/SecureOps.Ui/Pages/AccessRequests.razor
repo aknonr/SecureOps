@@ -137,6 +137,17 @@
                             </span>
                         }
                     }
+
+                    @* Moving on is an explicit choice: nothing is selected automatically, so a decision
+                       can never be made on a row the administrator has not opened. *@
+                    @if (_status == "Pending" && _selected is null && _requests is { Count: > 0 } remaining)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.SkipNext" Disabled="@(_busy || _loading)"
+                                   OnClick="() => Select(remaining[0])">
+                            Listedeki ilk bekleyen talebi aç
+                        </MudButton>
+                    }
                 </div>
                 <MudIconButton Icon="@Icons.Material.Filled.Close"
                                Size="Size.Small"
@@ -162,8 +173,30 @@
         }
 
         <div class="so-admin-grid">
-            <section class="so-panel so-admin-list">
-                <h2 class="so-panel-title">@CurrentTabLabel</h2>
+            <section class="so-panel so-admin-list" aria-labelledby="request-list-title">
+                <div class="request-list-head">
+                    <h2 class="so-panel-title" id="request-list-title">@CurrentTabLabel</h2>
+                    @if (_requests is not null && _total > 0)
+                    {
+                        <nav class="request-pagination" aria-label="Talep sayfaları">
+                            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" title="Önceki sayfa" aria-label="Önceki sayfa" Disabled="@(_busy || _loading || Page <= 1)" OnClick="() => NavigatePage(Page - 1)" />
+                            <span>Sayfa @Page / @AccessRequestPresentation.PageCount(_total)</span>
+                            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" title="Sonraki sayfa" aria-label="Sonraki sayfa" Disabled="@(_busy || _loading || Page * (long)AccessRequestPresentation.PageSize >= _total)" OnClick="() => NavigatePage(Page + 1)" />
+                        </nav>
+                    }
+                </div>
+                @if (_requests is not null && _total > 0)
+                {
+                    @* The server orders newest first and offers no other order; say so, so the oldest
+                       waiting requests are not assumed to be at the top. *@
+                    <p class="request-order">
+                        @_total talep · en yeni talep üstte@(_status == "Pending" && _total > AccessRequestPresentation.PageSize ? "; en uzun bekleyenler son sayfadadır" : "").
+                        @if (_status == "Pending" && LongWaitingOnPage > 0)
+                        {
+                            <span> Bu sayfada @LongWaitingOnPage talep @AccessRequestPresentation.LongWaitDays günü aştı.</span>
+                        }
+                    </p>
+                }
 
                 @if (_loading)
                 {
@@ -182,36 +215,45 @@
                 }
                 else
                 {
-                    <ul class="so-request-list">
+                    <ul class="so-request-list request-rows">
                         @foreach (AccessRequestResponse request in _requests)
                         {
+                            bool longWait = AccessRequestPresentation.IsLongWaiting(request, _now);
                             <li>
                                 <button type="button"
                                         class="so-request-row @(request.Id == _selected?.Id ? "so-request-row--active" : null)"
+                                        aria-current="@(request.Id == _selected?.Id ? "true" : null)"
                                         disabled="@_busy"
                                         @onclick="() => Select(request)">
                                     <span class="so-request-identity">
                                         <span class="so-request-name">
                                             @AccessIdentityDisplay.Name(request.Profile, request.CorporateIdentity)
                                         </span>
-                                        @if (AccessIdentityDisplay.SecondaryAccount(request.Profile) is { } account)
+                                        @if (AccessRequestPresentation.SecondaryLine(request.Profile) is { } secondary)
                                         {
-                                            <span class="so-request-meta">@account</span>
-                                        }
-                                        @if (request.Profile?.Email is { Length: > 0 } email)
-                                        {
-                                            <span class="so-request-meta">@email</span>
-                                        }
-                                        @if (AccessIdentityDisplay.Uid(request.Profile) is { } uid)
-                                        {
-                                            <span class="so-request-meta">Sicil No: @uid</span>
+                                            <span class="so-request-meta">@secondary</span>
                                         }
                                         <span class="so-request-meta">
-                                            Talep: @request.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                            @if (IsPending(request))
+                                            {
+                                                @AccessRequestPresentation.WaitingText(request.RequestedAt, _now)
+                                                <text> · </text>@AccessRequestPresentation.Time(request.RequestedAt)
+                                            }
+                                            else
+                                            {
+                                                <text>Karar: </text>@(request.DecidedAt is { } decided ? AccessRequestPresentation.Time(decided) : "zaman bildirilmedi")
+                                            }
                                         </span>
                                     </span>
-                                    <SoStatusBadge Label="@AccessLabels.RequestStatusLabel(request.Status)"
-                                                   Tone="@ToneForRequest(request.Status)" />
+                                    @if (longWait)
+                                    {
+                                        <SoStatusBadge Label="@($"{AccessRequestPresentation.LongWaitDays}+ gün")" Tone="SoStatusBadge.BadgeTone.Caution" Icon="@Icons.Material.Filled.Schedule" />
+                                    }
+                                    else
+                                    {
+                                        <SoStatusBadge Label="@AccessLabels.RequestStatusLabel(request.Status)"
+                                                       Tone="@ToneForRequest(request.Status)" />
+                                    }
                                 </button>
                             </li>
                         }
@@ -340,11 +382,6 @@
                 }
             </section>
         </div>
-        <nav class="request-pagination" aria-label="Talep sayfaları">
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" title="Önceki sayfa" aria-label="Önceki sayfa" Disabled="@(_busy || _loading || Page <= 1)" OnClick="() => NavigatePage(Page - 1)" />
-            <span>@Page / @Math.Max(1, (int)Math.Ceiling(_total / 25d)) · @_total talep</span>
-            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" title="Sonraki sayfa" aria-label="Sonraki sayfa" Disabled="@(_busy || _loading || Page * 25L >= _total)" OnClick="() => NavigatePage(Page + 1)" />
-        </nav>
     }
 </div>
 
@@ -355,6 +392,8 @@
     [SupplyParameterFromQuery(Name = "selected")] public Guid? SelectedId { get; set; }
     private string? _search;
     private long _total;
+    private DateTimeOffset _now = DateTimeOffset.Now;
+    private int LongWaitingOnPage => _requests?.Count(request => AccessRequestPresentation.IsLongWaiting(request, _now)) ?? 0;
     private int _generation;
     private ElementReference _detailElement;
     private sealed record ActionResult(string Title, string Detail, CurrentAccessResponse? Access);
@@ -464,10 +503,11 @@
 
         try
         {
-            AccessPage<AccessRequestResponse> page = await AccessAdmin.PageRequestsAsync(new(Search, _status, Page: Page), CancellationToken.None);
+            AccessPage<AccessRequestResponse> page = await AccessAdmin.PageRequestsAsync(new(Search, _status, Page: Page, PageSize: AccessRequestPresentation.PageSize), CancellationToken.None);
             if (generation != _generation) { return; }
             _requests = page.Items;
             _total = page.Total;
+            _now = DateTimeOffset.Now;
 
             // Keep the selection pointing at authoritative state: after a write the row's status
             // has changed, and holding the pre-write copy would let a stale action be offered.

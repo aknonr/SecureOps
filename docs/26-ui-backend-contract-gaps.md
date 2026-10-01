@@ -25,6 +25,13 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-16 — Only identity lookup has daily buckets | Open — confirmed out of scope by `b0e3b7b` |
 | G-17 — Zero and "no persisted history" are indistinguishable | ✅ **Resolved** by backend `b0e3b7b` |
 | G-18 — UI integration contract still calls the directory purpose required | Open — documentation only, no longer reached by the UI |
+| G-19 — `/access/me` gives held role codes but no role names | Open — UI shows "İş rolü" + code |
+| G-20 — Access-request page has one fixed order and no per-status counts | Open — UI states the order |
+| G-21 — Access-user page is ordered by `UserId` | Open — UI states the order is not by name |
+| G-22 — Role definitions carry no assigned-user count | Open — count only after preview |
+| G-23 — Service Accounts scope grants are not readable from access screens | Open — UI shows a scope note |
+| G-24 — Provider health has no check time and no connectivity result | Open — UI labels "sınanmadı" |
+| G-25 — SQL, audit-store and Worker state are not in the System Status contract | Open — UI lists them as unknown |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -762,6 +769,117 @@ route, or on `POST /api/v1/identity/lookup` — the field was removed from both 
 kept as an optional input nobody filled in. So the stale sentence can no longer mislead a UI author
 about what to send. It can still mislead a *backend* reader about what the routes accept, which is
 why the gap stays open rather than being closed by a UI change.
+
+---
+
+## G-19 — `/access/me` gives held role codes but no role names
+
+**Endpoint:** `GET /api/v1/access/me`
+**Severity:** Medium — the signed-in user cannot read the name of an administrator-defined role
+**Status:** Open (raised by the 2026-10-01 access/management UI pass)
+
+`roles` holds codes only. Fixed roles have UI labels, but a business role created on Rol tanımları
+has a generated code (`Business_…`) and its name is readable only through `GET /access/roles`, which
+requires an access-administration capability.
+
+**What the UI does.** Erişimim and Genel Bakış show such a role as **İş rolü**, with the code as a
+tooltip/inline code, and point to the capability list for what it grants. No name is guessed.
+
+**What would resolve it.** `name` (and optionally `purpose`) for each held role on `/access/me`,
+e.g. `heldRoles: [{ code, name, purpose }]`, without exposing other roles.
+
+---
+
+## G-20 — Access-request page has one fixed order and no per-status counts
+
+**Endpoint:** `GET /api/v1/access/requests/page`
+**Severity:** Medium when requests accumulate
+**Status:** Open
+
+Rows are ordered `RequestedAt DESC`; there is no sort parameter, so the longest-waiting pending
+requests are on the last page. The response total covers only the requested status, and each page
+read writes an `AccessRequestsViewed` audit event, so the UI does not issue extra reads to count the
+other tabs.
+
+**What the UI does.** States "en yeni talep üstte; en uzun bekleyenler son sayfadadır", shows the
+waiting time from `requestedAt`, labels pending requests older than 7 days, and keeps the pager above
+the list. It does not re-sort one page.
+
+**What would resolve it.** A `sort=oldest|newest` parameter (oldest first as the pending default) and
+`counts: { pending, approved, rejected }` from the same snapshot.
+
+---
+
+## G-21 — Access-user page is ordered by `UserId`
+
+**Endpoint:** `GET /api/v1/access/users/page`
+**Severity:** Low–medium
+**Status:** Open
+
+`ORDER BY u.UserId` is stable but meaningless to a person. **What the UI does.** Says the order is set
+by the server and is not by name or last sign-in. **What would resolve it.** A sort by display
+name/account and by `lastAuthenticatedAt`.
+
+---
+
+## G-22 — Role definitions carry no assigned-user count
+
+**Endpoint:** `GET /api/v1/access/roles`
+**Severity:** Low
+**Status:** Open
+
+`AccessRoleDefinition` has no count of users holding the role; only a preview returns
+`affectedUsers`. **What the UI does.** Shows action and module counts per role and nothing about
+holders until a preview. **What would resolve it.** `assignedUsers` on each definition, from the same
+read.
+
+---
+
+## G-23 — Service Accounts scope grants are not readable from access screens
+
+**Endpoints:** `GET /api/v1/access/me`, `GET /api/v1/access/users/{id}`
+**Severity:** Medium — a `ServiceAccounts.View` holder without a scope grant sees an empty module
+**Status:** Open
+
+Role capabilities and module scope grants are separate; scope is administered inside Servis
+Hesapları. **What the UI does.** Explains on Rol tanımları and Erişimim that scope is granted
+separately and is not shown there. **What would resolve it.** A read-only scope summary
+(team/organization names and kind) on the user detail and on `/access/me`.
+
+---
+
+## G-24 — Provider health has no check time and no connectivity result
+
+**Endpoints:** `GET /api/v1/health/enterprise-integrations`, `GET /api/v1/health/identity-provider`
+**Severity:** Medium — "Configured" is easy to read as healthy
+**Status:** Open
+
+For Turuncu Hat and Jira, `Configured` means a provider is selected and the API process has recorded
+no failed call since it started; `Unavailable` means the last call failed. No timestamps are
+returned. The identity endpoint always returns `Configured` and tracks no failures.
+
+**What the UI does.** Shows **Yapılandırıldı · sınanmadı** in an informational (not positive) tone,
+explains each state, shows the page's own read time in UTC, shows simulation/read-only/test-provider
+notices from the response, and renders an unreadable provider as **Okunamadı** instead of hiding it.
+
+**What would resolve it.** Per provider `lastSuccessAt`, `lastFailureAt` and process start time, and
+failure tracking for the identity provider. An explicit, authorized connectivity check would be a
+separate decision.
+
+---
+
+## G-25 — SQL, audit-store and Worker state are not in the System Status contract
+
+**Endpoints:** `GET /api/v1/health/persistence`, `GET /api/v1/health/audit-store` (exist in the API)
+**Severity:** Medium for an operator asking "is the platform up"
+**Status:** Open — needs a contract decision before the UI uses them
+
+These routes exist but are not described in `docs/contracts/secureops-api-v1-ui-integration.md`,
+are authenticated-only outside Development rather than Admin-scoped, and Worker/Hangfire state appears
+only as heartbeat evidence inside `GET /api/v1/diagnostics/operations`. **What the UI does.** System
+Status lists SQL Server, audit store, Hangfire/Worker and SMTP under "Bu sayfada durumu
+gösterilmeyenler" as unknown. **What would resolve it.** A documented, Admin-authorized status
+contract (state, observed-at, safe reason code) for these components.
 
 ---
 

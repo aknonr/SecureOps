@@ -6,6 +6,39 @@ confirmed results. Manual confirmation is explicit and capability-gated; its tim
 is displayed in UTC. No source URL was inferred. Component rendering is locally
 testable; browser/200%-zoom and corporate closure still require their existing gates.
 
+## Access And Management Usability Pass, 2026-10-01
+
+UI-only pass (Claude) on branch `feature/ui-access-management-20261001`; no API, SQL or contract change.
+
+- **Capability labels.** `AccessLabels` now describes every `ServiceAccounts.*` action, groups
+  capabilities by function (OR, In Use, OCO, Servis Hesapları, Kimlik, Bağlantılar, Erişim,
+  Denetim) and sorts unknown groups last. `ModuleOrder`/`ModuleGuidance` key on the server catalogue's
+  own module names. `HeldRoleLabel` shows an administrator-defined role as "İş rolü" (code as tooltip).
+- **Rol tanımları.** Wider role list (purpose, action and module counts, protected tag); the first
+  role opens on load (read only). Actions are `AccessModuleCard`s per server module with "x / y seçili",
+  written guidance, a Service Accounts scope note and an "Eklenecek/Çıkarılacak" word on changed rows.
+  Non-assignable historical actions are collapsed. A sticky bar summarises the definition draft; who
+  gains or loses access is still known only from the server preview, which remains mandatory.
+- **Erişim talepleri.** Compact rows (name, one secondary line, waiting time or decision time), a
+  7-day long-wait label, pager above the list and an explicit statement of the server order (newest
+  first). After a decision, "Listedeki ilk bekleyen talebi aç" is offered; nothing is auto-selected.
+  The approve dialog's permission difference is grouped by module (`AccessActionGroups`).
+- **Erişimim.** Status summary (status, role/capability/area counts, latest request and decision
+  time) and capability cards by area.
+- **Sistem Durumu.** `Configured` is informational "Yapılandırıldı · sınanmadı", never green;
+  `Unavailable` reads "Son çağrı başarısız"; an unreadable provider renders "Okunamadı". The page shows
+  its own UTC read time, the response's simulation/read-only notices and the test-directory note, and
+  lists SQL, audit store, Worker and SMTP as not reported here.
+- **Genel Bakış / Yönetim Panosu.** Management order is window → coverage → summary → attention →
+  detailed report → module panels (which keep their own filters) → quick access, with a focus-based
+  section bar. Quick access adds existing capability-gated routes only. The operator board no longer
+  says the directory "responds"; it shows "Yapılandırıldı · sınanmadı" and only to `Identity.Lookup`.
+
+Missing contract data is recorded as G-19 to G-25 in `docs/26-ui-backend-contract-gaps.md`.
+Verification: targeted unit/render tests and a local Playwright run against a synthetic stub API
+(390px, emulated 200% zoom at 683px CSS width, light/dark, keyboard, denial, loading/error/empty).
+The stub is not committed. Windows/IIS/LocalDB, native browser zoom and corporate data remain unverified.
+
 ## System Status Presentation Continuation, 2026-09-20
 
 `/admin/system-status` keeps the authorized read-only diagnostic and JSON download
@@ -228,7 +261,8 @@ wwwroot/css/     secureops-theme.css — semantic tokens only, no colour literal
 ### Shared components
 
 `SoPageHeader`, `SoProblemPanel`, `SoEmptyState`, `SoStatusBadge`, `SoLoading`, `SoFieldGrid` +
-`SoField`, plus the `.so-panel` CSS class. Use these rather than new one-off markup, so states look
+`SoField`, plus the `.so-panel` CSS class. Access screens add `AccessModuleCard` (one server catalogue
+module in the role editor) and `AccessActionGroups` (server-returned action codes grouped by module). Use these rather than new one-off markup, so states look
 the same everywhere.
 
 The four state components map to distinct situations, and mixing them trains operators to misread
@@ -260,6 +294,8 @@ have to be invented.
 | `/access/requests` | Access-request decision queue | `Access.ApproveRequests` |
 | `/access/users` | User list, grouped by access state | `Access.ManageUsers` |
 | `/access/users/{id}` | User detail, role editor, disable | `Access.ManageUsers` |
+| `/access/roles` | Role definitions by module, server impact preview, explicit apply | `Access.ManageUsers` and `Access.AssignRoles` |
+| `/admin/system-status` | Provider settings (configured ≠ healthy) and explicit workflow check | `Access.ManageUsers` (API: Admin); workflow check `SystemDiagnostics` |
 | `/operational-records` | OR → Jira workspace, grouped by attention | `OperationalRecords.View` |
 | `/operational-records/{id}` | Source, workflow, and Jira transfer | `OperationalRecords.View` |
 | `/resources` | Uygulama Bağlantıları: search, favourites, add to a personal group | `Resources.View` |

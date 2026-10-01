@@ -1,0 +1,58 @@
+@*
+    One module of the server action catalogue inside the role editor.
+
+    The checkboxes shape a proposed role definition only. Nothing here grants access: the page sends
+    the proposal to the server preview, and only that reviewed preview can be applied. A change against
+    the stored definition is labelled in words as well as marked, so it is not carried by colour alone.
+*@
+
+<fieldset class="module-card">
+    <legend>
+        <span class="module-name">@Module.Key</span>
+        <span class="module-count">@Module.Count(action => Selected.Contains(action.Code)) / @Module.Count() seçili</span>
+    </legend>
+    @if (AccessLabels.ModuleGuidance(Module.Key) is { } guidance) { <p class="module-guidance">@guidance</p> }
+    @if (Module.Any(action => AccessLabels.NeedsServiceAccountScope(action.Code)))
+    {
+        <p class="module-note">
+            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" aria-hidden="true" />
+            <span>Rol işlemi tek başına veri açmaz: kişi ayrıca Servis Hesapları › Modül yönetimi ekranından ekip veya organizasyon kapsamı almalıdır. Kapsam bilgisi bu ekranda okunamaz.</span>
+        </p>
+    }
+    @foreach (AccessActionDefinition action in Module)
+    {
+        bool isSelected = Selected.Contains(action.Code);
+        bool wasSelected = Original.Contains(action.Code);
+        <label class="module-action @(isSelected != wasSelected ? "module-action--changed" : null)">
+            <input type="checkbox" checked="@isSelected"
+                   disabled="@(Locked || (!action.Assignable && !wasSelected))"
+                   @onchange="e => OnToggle.InvokeAsync((action.Code, e.Value is true))" />
+            <span class="module-action-text">
+                <span class="module-action-name">
+                    @action.Name
+                    @if (isSelected && !wasSelected) { <span class="module-change">Eklenecek</span> }
+                    else if (!isSelected && wasSelected) { <span class="module-change">Çıkarılacak</span> }
+                </span>
+                <span class="module-action-desc">@action.Description</span>
+                <code class="module-action-code">@action.Code</code>
+            </span>
+        </label>
+    }
+</fieldset>
+
+@code {
+    /// <summary>Catalogue actions of one module, keyed by the server's module name.</summary>
+    [Parameter, EditorRequired] public IGrouping<string, AccessActionDefinition> Module { get; set; } = default!;
+
+    /// <summary>Codes in the proposed definition.</summary>
+    [Parameter, EditorRequired] public IReadOnlySet<string> Selected { get; set; } = default!;
+
+    /// <summary>Codes in the stored definition the proposal started from.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> Original { get; set; } = [];
+
+    /// <summary>Whether editing is disabled (protected role, busy, or a preview under review).</summary>
+    [Parameter] public bool Locked { get; set; }
+
+    /// <summary>Raised with the action code and its new selection state.</summary>
+    [Parameter] public EventCallback<(string Capability, bool Selected)> OnToggle { get; set; }
+}

@@ -45,6 +45,21 @@
                 </div>
             </div>
 
+            <dl class="my-access-summary">
+                <div><dt>Durum</dt><dd>@AccessLabels.StatusLabel(_access.Status ?? "")</dd></div>
+                <div><dt>Rol</dt><dd>@_access.Roles.Count</dd></div>
+                <div><dt>Yetki</dt><dd>@_access.Capabilities.Count</dd></div>
+                <div><dt>Alan</dt><dd>@CapabilityGroups.Count</dd></div>
+                @if (_access.LatestRequest is { } latest)
+                {
+                    <div><dt>Son talep</dt><dd>@AccessRequestPresentation.Time(latest.RequestedAt)</dd></div>
+                    @if (latest.DecidedAt is { } decidedAt)
+                    {
+                        <div><dt>Karar</dt><dd>@AccessLabels.RequestStatusLabel(latest.Status) · @AccessRequestPresentation.Time(decidedAt)</dd></div>
+                    }
+                }
+            </dl>
+
             @if (_access.IsAwaitingDecision && _access.Access!.PendingRequestId is { } requestId)
             {
                 <SoFieldGrid MinColumnWidth="260px">
@@ -73,12 +88,21 @@
                     @foreach (string role in _access.Roles)
                     {
                         <li class="so-role">
-                            <SoStatusBadge Label="@AccessLabels.RoleLabel(role)"
+                            <SoStatusBadge Label="@AccessLabels.HeldRoleLabel(role)"
                                            Tone="SoStatusBadge.BadgeTone.Info"
                                            Title="@role" />
                             @if (AccessLabels.RoleDescription(role) is { } description)
                             {
                                 <span class="so-role-text">@description</span>
+                            }
+                            else
+                            {
+                                @* /access/me returns role codes only; the definition's name is readable
+                                   only by role administrators. The code is shown rather than a guess. *@
+                                <span class="so-role-text">
+                                    Yönetici tarafından tanımlanmış rol. Adı bu ekranda okunamıyor; rol kodu:
+                                    <code class="so-code">@role</code>. Kapsadığı işlemler aşağıdaki yetkilerde yer alır.
+                                </span>
                             }
                         </li>
                     }
@@ -100,10 +124,16 @@
             }
             else
             {
-                @foreach (IGrouping<string, CapabilityDescriptor> group in AccessLabels.Group(_access.Capabilities))
+                <p class="so-panel-text so-panel-text--sm">Yetkiler işe göre gruplanmıştır. Her satır, sunucunun hesabınız için bildirdiği bir işlemdir.</p>
+                <div class="my-access-groups">
+                @foreach (IGrouping<string, CapabilityDescriptor> group in CapabilityGroups)
                 {
-                    <div class="so-cap-group">
-                        <p class="so-cap-group-name">@group.Key</p>
+                    <div class="so-cap-group my-access-group">
+                        <h3 class="my-access-group-name">@group.Key <span class="so-count">@group.Count()</span></h3>
+                        @if (group.Key == AccessLabels.Groups.ServiceAccounts)
+                        {
+                            <p class="so-cap-text">Servis hesabı verisi ayrıca ekip veya organizasyon kapsamıyla sınırlanır. Kapsamınız bu ekranda gösterilemiyor; ekranda kayıt görmüyorsanız modül yöneticinize başvurun.</p>
+                        }
                         <ul class="so-cap-list">
                             @foreach (CapabilityDescriptor capability in group)
                             {
@@ -119,6 +149,7 @@
                         </ul>
                     </div>
                 }
+                </div>
             }
 
             <p class="so-panel-text so-panel-text--sm mt-3">
@@ -139,6 +170,9 @@
     }
 
     private async Task RefreshAsync() => _access = await AccessProvider.RefreshAsync();
+
+    private IReadOnlyList<IGrouping<string, CapabilityDescriptor>> CapabilityGroups =>
+        _access is null ? [] : AccessLabels.Group(_access.Capabilities);
 
     private string StatusModifier => _access switch
     {

@@ -57,8 +57,11 @@
 
                 <div class="so-role-picker-caveat" aria-live="polite">
                     <strong>Yetki farkı</strong>
-                    <p>Eklenecek: @PermissionDifference(true)</p>
-                    <p>Kaldırılacak: @PermissionDifference(false)</p>
+                    <p>Seçili rol tanımlarına göre hesaplanır; kayıttan sonraki kesin yetkiler sunucudan okunur.</p>
+                    <p>Eklenecek</p>
+                    <AccessActionGroups Codes="PermissionDifference(true)" />
+                    <p>Kaldırılacak</p>
+                    <AccessActionGroups Codes="PermissionDifference(false)" />
                 </div>
 
                 @if (_roleError is not null)
@@ -258,12 +261,11 @@
         Dialog.Close(DialogResult.Ok(new Result(_reason.Trim(), roles, _definitions.Where(role => roles.Contains(role.Code)).ToDictionary(role => role.Code, role => role.Version))));
     }
 
-    private string PermissionDifference(bool added)
+    private string[] PermissionDifference(bool added)
     {
         string[] before = _definitions.Where(role => InitialRoles?.Contains(role.Code) == true).SelectMany(role => role.Capabilities).Distinct().ToArray();
         string[] after = _definitions.Where(role => _selectedRoles.Contains(role.Code)).SelectMany(role => role.Capabilities).Distinct().ToArray();
-        string[] difference = (added ? after.Except(before) : before.Except(after)).ToArray();
-        return difference.Length == 0 ? "Yok" : string.Join(", ", AccessLabels.Group(difference).SelectMany(group => group).Select(item => item.Label));
+        return (added ? after.Except(before) : before.Except(after)).ToArray();
     }
 
     private void Cancel() => Dialog.Cancel();

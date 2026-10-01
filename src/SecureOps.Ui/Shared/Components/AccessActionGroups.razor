@@ -1,0 +1,39 @@
+@*
+    A list of action codes returned by the server, grouped by catalogue module so a long difference
+    reads as "which areas change" rather than one comma-separated line. Codes absent from the
+    catalogue still render, by their Turkish label or raw identifier, so nothing silently disappears.
+*@
+
+@if (Codes.Count == 0)
+{
+    <p class="action-groups-empty">Yok</p>
+}
+else
+{
+    <dl class="action-groups">
+        @foreach (IGrouping<string, Item> group in Grouped())
+        {
+            <dt>@group.Key</dt>
+            <dd>@foreach (Item item in group) { <span class="so-chip so-chip--quiet" title="@item.Code">@item.Name</span> }</dd>
+        }
+    </dl>
+}
+
+@code {
+    /// <summary>Action codes exactly as the API returned them.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> Codes { get; set; } = [];
+
+    /// <summary>Server action catalogue; may be empty when the caller cannot read it.</summary>
+    [Parameter] public IReadOnlyList<AccessActionDefinition> Actions { get; set; } = [];
+
+    private sealed record Item(string Module, string Name, string Code);
+
+    private IEnumerable<IGrouping<string, Item>> Grouped() => Codes
+        .Distinct(StringComparer.Ordinal)
+        .Select(code => Actions.FirstOrDefault(action => action.Code == code) is { } action
+            ? new Item(action.Module, action.Name, code)
+            : new Item(AccessLabels.Describe(code).Group, AccessLabels.Describe(code).Label, code))
+        .GroupBy(item => item.Module)
+        .OrderBy(group => AccessLabels.ModuleOrder(group.Key))
+        .ThenBy(group => AccessLabels.GroupOrder(group.Key));
+}

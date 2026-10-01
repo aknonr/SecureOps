@@ -1,3 +1,10 @@
 .so-my-access { max-width:1180px;font-size:16px;line-height:1.5; }
-.so-my-access .so-panel { border-radius:0;box-shadow:none;background:transparent;border-bottom:1px solid var(--mud-palette-divider);padding:20px 0; }
+.so-my-access .so-panel { border-radius:0;box-shadow:none;background:transparent;border-bottom:1px solid var(--so-border);padding:20px 0; }
 .so-my-access ::deep .so-capability-label,.so-my-access p { font-size:16px; }
+.my-access-summary { display:flex;flex-wrap:wrap;gap:12px 32px;margin:16px 0 8px; }
+.my-access-summary dt { font-size:13px;color:var(--so-text-muted); }
+.my-access-summary dd { margin:0;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums; }
+.my-access-groups { display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:16px;align-items:start; }
+.my-access-group { margin:0;padding:12px 16px;border:1px solid var(--so-border);border-radius:var(--so-radius-sm);background:var(--so-surface); }
+.my-access-groups .so-cap-group + .so-cap-group { margin-top:0; }
+.my-access-group-name { display:flex;align-items:center;gap:8px;margin:0 0 4px;font-size:16px; }

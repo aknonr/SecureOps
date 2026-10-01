@@ -73,6 +73,22 @@
             }
             else if (_health is not null)
             {
+                <p class="so-panel-text so-panel-text--sm" aria-live="polite">
+                    Bu bilgi @OperationsReadinessPresentation.Time(_readAt) anında bu sayfa tarafından okundu.
+                    Sağlayıcıların kendi kontrol zamanı API tarafından bildirilmiyor.
+                </p>
+
+                @if (_health.SimulationMode || _health.ReadOnlyIntegrationMode)
+                {
+                    <div class="so-panel-note so-panel-note--caution" role="note">
+                        <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" aria-hidden="true" />
+                        <span>
+                            @if (_health.SimulationMode) { <strong>Simülasyon: </strong>@(_health.OperatorNotice ?? "Turuncu Hat ve Jira simülasyon sağlayıcısında.") }
+                            @if (_health.ReadOnlyIntegrationMode) { <strong>@(_health.ReadOnlyNotice ?? "Yazma kapalı.")</strong> }
+                        </span>
+                    </div>
+                }
+
                 <div class="so-status-grid">
                     <SoIntegrationCard Provider="_health.TuruncuHat"
                                        Title="Turuncu Hat"
@@ -80,27 +96,40 @@
                     <SoIntegrationCard Provider="_health.Jira"
                                        Title="Jira"
                                        Description="Operasyonel kayıtların aktarıldığı hedef sistem." />
-
-                    @if (_directory is not null)
-                    {
-                        <SoIntegrationCard Provider="_directoryProvider!"
-                                           Title="Dizin (AD)"
-                                           Description="Kimlik ve grup sorgularının kaynağı." />
-                    }
+                    @* The identity endpoint reports "Configured" for any selected provider and tracks no
+                       failures, so its meaning is narrower than the two cards above. *@
+                    <SoIntegrationCard Provider="_directoryProvider"
+                                       Title="Dizin (AD)"
+                                       Description="Kimlik ve grup sorgularının kaynağı."
+                                       StatusDetail="@DirectoryDetail"
+                                       Note="@DirectoryNote" />
                 </div>
 
-                <p class="so-panel-text so-panel-text--sm">
-                    <strong>Yapılandırıldı</strong>, bağlantı veya iş akışı kabulü değildir.
-                    Turuncu Hat sağlayıcısı tanımlı olsa da OCO kaynak toplama ayrı olarak kapalı olabilir.
-                    Yenile yalnız bu entegrasyon bilgilerini yeniler.
-                </p>
-
-                <details><summary>Sağlayıcı durumları</summary>
-                    <p class="so-panel-text so-panel-text--sm">Devre dışı: sağlayıcı etkin değil.
-                        Erişilemiyor: son çağrı başarısız. Bu kartlar yalnız sağlayıcı, yapılandırma
-                        ve durum bilgisini gösterir; uzak sistem hata içeriklerini göstermez.</p>
+                <details>
+                    <summary>Durumlar ne anlama gelir?</summary>
+                    <ul class="so-panel-text so-panel-text--sm">
+                        <li><strong>Yapılandırıldı · sınanmadı:</strong> sağlayıcı seçili; bağlantı veya iş akışı kabulü değildir.
+                            Turuncu Hat sağlayıcısı tanımlı olsa da OCO kaynak toplama ayrıca kapalı olabilir.</li>
+                        <li><strong>Son çağrı başarısız:</strong> bu API sürecinde o sağlayıcıya yapılan son çağrı başarısız oldu.</li>
+                        <li><strong>Devre dışı:</strong> sağlayıcı bu ortamda etkin değil.</li>
+                        <li><strong>Okunamadı:</strong> durum alınamadı; bilinmiyor olarak okuyun.</li>
+                    </ul>
+                    <p class="so-panel-text so-panel-text--sm">Kartlar yalnız sağlayıcı, seçim ve durum bilgisini gösterir; uzak sistem hata içeriklerini göstermez. Yenile yalnız bu bölümü yeniler.</p>
                 </details>
             }
+        </section>
+
+        <section class="so-panel" aria-labelledby="unreported-title">
+            <h2 class="so-panel-title" id="unreported-title">Bu sayfada durumu gösterilmeyenler</h2>
+            <p class="so-panel-text so-panel-text--sm">
+                Aşağıdakiler için bu sayfanın kullandığı yanıtlarda durum bilgisi yok. Durumları burada
+                <strong>bilinmiyor</strong> olarak kalır; çalıştıkları veya çalışmadıkları sonucu çıkarılamaz.
+            </p>
+            <ul class="so-panel-text so-panel-text--sm">
+                <li>SQL Server veritabanı ve denetim (audit) deposu</li>
+                <li>Hangfire / Worker hizmeti — yalnız aşağıdaki iş akışı kontrolünde heartbeat kaydı olarak görünür</li>
+                <li>SMTP bağlantısı — iş akışı kontrolü bağlantı sınamaz</li>
+            </ul>
         </section>
 
         @if (_access.Can(Capabilities.SystemDiagnostics))
@@ -114,6 +143,7 @@
     private IdentityProviderHealthResponse? _directory;
     private IntegrationProviderHealthResponse? _directoryProvider;
     private UiProblem? _problem;
+    private DateTimeOffset _readAt;
     private bool _loading;
     private bool _diagnosticsBusy;
 
@@ -149,6 +179,7 @@
         {
             _health = await Sessions.GetIntegrationHealthAsync(CancellationToken.None);
             await LoadDirectoryAsync();
+            _readAt = DateTimeOffset.UtcNow;
         }
         catch (SecureOpsApiException ex)
         {
@@ -183,6 +214,14 @@
             Logger.LogDebug("Identity provider health unavailable. Code: {Code}.", ex.Problem.Code);
         }
     }
+
+    private string? DirectoryDetail => _directory?.Status != "Configured"
+        ? null
+        : "Dizin sağlayıcısı seçili. Bu uç nokta bağlantı sınamaz ve başarısız çağrıları izlemez; sorgu sonucunu Kimlik sorgulama ekranı gösterir.";
+
+    private string? DirectoryNote => _directory is { RealDirectoryProviderEnabled: false }
+        ? "Kurumsal dizin bağlantısı bu ortamda etkin değil; sorgular test sağlayıcısından yanıtlanır."
+        : null;
 
     private void OnAccessChanged() => InvokeAsync(StateHasChanged);
 

@@ -16,3 +16,4 @@
 .so-access-pagination { display:flex;align-items:center;justify-content:flex-end;gap:16px;min-height:56px; }
 @media(max-width:1000px) { .so-access-filters { grid-template-columns:1fr 1fr; } .so-access-table-row,.so-access-table-head { grid-template-columns:minmax(160px,2fr) minmax(120px,1fr) minmax(110px,1fr); } .so-access-table-head span:last-child,.so-access-table-row span:last-child { display:none; } }
 @media(max-width:600px) { .so-access-filters { grid-template-columns:1fr;gap:12px; } .so-access-table-head { display:none; } .so-access-table-row { grid-template-columns:minmax(0,1fr) auto;gap:8px; } .so-access-table-row span:nth-child(2) { grid-column:1/-1;grid-row:2;font-size:13px; } }
+.so-access-roles { display:flex;flex-wrap:wrap;gap:4px; }

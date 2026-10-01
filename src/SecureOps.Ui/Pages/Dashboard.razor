@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @implements IDisposable
 @using Microsoft.Extensions.Logging
+@using SecureOps.Shared.Contracts.ServiceAccounts
 @inject ICurrentAccessProvider AccessProvider
 @inject ISignedInUserService Users
 @inject IIdentityLookupApiClient IdentityClient
@@ -89,8 +90,26 @@
     }
     else if (_managementView)
     {
-        <WorkflowReportsPanel />
-        @if (_snapshot.Can(Capabilities.InUseView)) { <InUseOverviewPanel /> }
+        @* Reading order: the window that governs the summary, whether its zeros are measurements,
+           the headline figures, what needs attention, the detail, and only then the module panels,
+           which carry their own date filters and must not read as governed by the picker above. *@
+        <nav class="dash-sections" aria-label="Pano bölümleri">
+            <span class="dash-sections-label">Bölümler:</span>
+            <button type="button" class="dash-section-link" @onclick="() => GoToAsync(_summaryHeading)">Özet</button>
+            @* Only sections that are on screen are offered; a hidden section has no element to focus. *@
+            @if (ReportShown)
+            {
+                <button type="button" class="dash-section-link" @onclick="() => GoToAsync(_attentionHeading)">İlgi gerektirenler</button>
+                <button type="button" class="dash-section-link" @onclick="() => GoToAsync(_detailHeading)">Ayrıntılı rapor</button>
+            }
+            <button type="button" class="dash-section-link" @onclick="() => GoToAsync(_modulesHeading)">Modül raporları</button>
+            @if (_available.Count > 0)
+            {
+                <button type="button" class="dash-section-link" @onclick="() => GoToAsync(_quickHeading)">Hızlı erişim</button>
+            }
+        </nav>
+
+        <h2 class="dash-band-title" tabindex="-1" @ref="_summaryHeading">Yönetim özeti</h2>
         <SoWindowPicker @bind-Preset="_preset"
                         Applied="_report?.Window"
                         Busy="_reportLoading"
@@ -156,7 +175,7 @@
             @* -- attention areas --------------------------------------------------------- *@
             <section class="so-panel">
                 <div class="so-panel-head">
-                    <h2 class="so-panel-title">İlgi gerektiren alanlar</h2>
+                    <h2 class="so-panel-title" tabindex="-1" @ref="_attentionHeading">İlgi gerektiren alanlar</h2>
                 </div>
 
                 @if (_attention.Count == 0)
@@ -196,6 +215,7 @@
                 }
             </section>
 
+            <h2 class="dash-band-title" tabindex="-1" @ref="_detailHeading">Ayrıntılı rapor <span class="dash-band-note">— yukarıda seçilen aralık</span></h2>
             <div class="so-report-grid">
                 @* -- AD / PAM activity ---------------------------------------------------- *@
                 <section class="so-panel so-panel--span">
@@ -469,23 +489,28 @@
 
             <SoLimitationList Items="_report.Limitations" />
 
-            @if (_available.Count > 0)
-            {
-                <section class="so-panel">
-                    <p class="so-eyebrow">Hızlı erişim</p>
-                    <ul class="so-quick">
-                        @foreach (OperatorTask task in _available)
-                        {
-                            <li>
-                                <a class="so-quick-link" href="@task.Route">
-                                    <MudIcon Icon="@task.Icon" aria-hidden="true" />
-                                    @task.Title
-                                </a>
-                            </li>
-                        }
-                    </ul>
-                </section>
-            }
+        }
+
+        <h2 class="dash-band-title" tabindex="-1" @ref="_modulesHeading">Modül raporları <span class="dash-band-note">— her panel kendi tarih ve filtre seçimini kullanır</span></h2>
+        @if (_snapshot.Can(Capabilities.InUseView)) { <InUseOverviewPanel /> }
+        <WorkflowReportsPanel />
+
+        @if (_available.Count > 0)
+        {
+            <section class="so-panel">
+                <h2 class="so-eyebrow dash-quick-title" tabindex="-1" @ref="_quickHeading">Hızlı erişim</h2>
+                <ul class="so-quick">
+                    @foreach (OperatorTask task in _available)
+                    {
+                        <li>
+                            <a class="so-quick-link" href="@task.Route">
+                                <MudIcon Icon="@task.Icon" aria-hidden="true" />
+                                @task.Title
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </section>
         }
     }
     else
@@ -528,51 +553,56 @@
                     }
                 </section>
 
-                <section class="so-panel">
-                    <div class="so-panel-head">
-                        <h2 class="so-panel-title">Sistem durumu</h2>
-                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
-                                   StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
-                            Yenile
-                        </MudButton>
-                    </div>
-
-                    @if (_providerHealth is not null)
-                    {
-                        <div class="so-status-row">
-                            <SoStatusBadge Label="Erişilebilir"
-                                           Tone="SoStatusBadge.BadgeTone.Positive"
-                                           Icon="@Icons.Material.Filled.CheckCircle" />
-                            <span class="so-status-text">
-                                Dizin sağlayıcısı yanıt veriyor. Kimlik sorgulama kullanılabilir.
-                            </span>
+                @if (_snapshot.Can(Capabilities.IdentityLookup))
+                {
+                    <section class="so-panel">
+                        <div class="so-panel-head">
+                            <h2 class="so-panel-title">Kimlik sorgulama sağlayıcısı</h2>
+                            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Refresh" OnClick="RefreshAsync">
+                                Yenile
+                            </MudButton>
                         </div>
 
-                        @if (!_providerHealth.RealDirectoryProviderEnabled)
+                        @* The endpoint reports the selected provider; it does not test a connection, so
+                           this reads as configured, never as reachable. *@
+                        @if (_providerHealth is not null)
                         {
+                            <div class="so-status-row">
+                                <SoStatusBadge Label="@(_providerHealth.Status == "Configured" ? "Yapılandırıldı · sınanmadı" : _providerHealth.Status)"
+                                               Tone="SoStatusBadge.BadgeTone.Info"
+                                               Icon="@Icons.Material.Filled.SettingsSuggest" />
+                                <span class="so-status-text">
+                                    Dizin sağlayıcısı seçili. Bağlantı burada sınanmaz; sorgunun sonucu kimlik sorgulama ekranında görünür.
+                                </span>
+                            </div>
+
+                            @if (!_providerHealth.RealDirectoryProviderEnabled)
+                            {
+                                <p class="so-panel-text so-panel-text--sm">
+                                    Bu ortamda kurumsal dizin bağlantısı henüz etkin değil; sonuçlar test
+                                    sağlayıcısından gelir.
+                                </p>
+                            }
+                        }
+                        else if (_providerProblem is not null)
+                        {
+                            <div class="so-status-row">
+                                <SoStatusBadge Label="Durum bilinmiyor"
+                                               Tone="SoStatusBadge.BadgeTone.Caution"
+                                               Icon="@Icons.Material.Filled.HelpOutline" />
+                                <span class="so-status-text">@_providerProblem.Title</span>
+                            </div>
                             <p class="so-panel-text so-panel-text--sm">
-                                Bu ortamda kurumsal dizin bağlantısı henüz etkin değil; sonuçlar test
-                                sağlayıcısından gelir.
+                                Sorgu çalıştırabilirsiniz; sorun sürerse ilgili ekrandaki hata mesajı yol gösterir.
                             </p>
                         }
-                    }
-                    else if (_providerProblem is not null)
-                    {
-                        <div class="so-status-row">
-                            <SoStatusBadge Label="Durum bilinmiyor"
-                                           Tone="SoStatusBadge.BadgeTone.Caution"
-                                           Icon="@Icons.Material.Filled.HelpOutline" />
-                            <span class="so-status-text">@_providerProblem.Title</span>
-                        </div>
-                        <p class="so-panel-text so-panel-text--sm">
-                            Sorgu çalıştırabilirsiniz; sorun sürerse ilgili ekrandaki hata mesajı yol gösterir.
-                        </p>
-                    }
-                    else
-                    {
-                        <SoLoading Message="Sistem durumu kontrol ediliyor…" Bare="true" />
-                    }
-                </section>
+                        else
+                        {
+                            <SoLoading Message="Sağlayıcı bilgisi okunuyor…" Bare="true" />
+                        }
+                    </section>
+                }
             </div>
 
             <aside class="so-dash-side">
@@ -584,9 +614,9 @@
                                        Icon="@Icons.Material.Filled.CheckCircle" />
                         @foreach (string role in _snapshot.Roles)
                         {
-                            <SoStatusBadge Label="@AccessLabels.RoleLabel(role)"
+                            <SoStatusBadge Label="@AccessLabels.HeldRoleLabel(role)"
                                            Tone="SoStatusBadge.BadgeTone.Info"
-                                           Title="@AccessLabels.RoleDescription(role)" />
+                                           Title="@(AccessLabels.RoleDescription(role) ?? role)" />
                         }
                     </div>
                     <p class="so-panel-text so-panel-text--sm">
@@ -636,6 +666,15 @@
     private IdentityProviderHealthResponse? _providerHealth;
     private UiProblem? _providerProblem;
 
+    private ElementReference _summaryHeading, _attentionHeading, _detailHeading, _modulesHeading, _quickHeading;
+
+    private bool ReportShown => !_reportLoading && _reportProblem is null && _report is not null && _coverage is not null
+        && ManagementReportView.HasEvidence(_report);
+
+    // Moving focus to a section heading scrolls it into view and lets keyboard and screen-reader users
+    // continue from there; no script is needed.
+    private static async Task GoToAsync(ElementReference heading) => await heading.FocusAsync();
+
     private bool _managementView;
     private ReportingWindowPreset _preset = ReportingWindowPreset.Last7Days;
     private ReportingWindowRequest _window = ReportingWindowSelection.ForPreset(ReportingWindowPreset.Last7Days);
@@ -679,7 +718,7 @@
         {
             await LoadReportAsync(_window);
         }
-        else
+        else if (_snapshot.Can(Capabilities.IdentityLookup))
         {
             await LoadProviderHealthAsync();
         }
@@ -759,6 +798,42 @@
                 Icons.Material.Filled.Assignment));
         }
 
+        if (snapshot.Can(Capabilities.InUseView))
+        {
+            tasks.Add(new OperatorTask(
+                "In Use",
+                "Sunucu kullanım incelemeleri ve raporları.",
+                "in-use",
+                Icons.Material.Filled.FactCheck));
+        }
+
+        if (snapshot.Can(Capabilities.AnnouncementDrafts))
+        {
+            tasks.Add(new OperatorTask(
+                "Planlı Çalışma Duyuruları",
+                "Kendi duyuru taslaklarınız ve hazırlıklarınız.",
+                "announcements",
+                Icons.Material.Filled.Email));
+        }
+
+        if (snapshot.Can(ServiceAccountCapabilities.View))
+        {
+            tasks.Add(new OperatorTask(
+                "Servis Hesapları",
+                "Kapsamınızdaki servis hesapları ve işleri; kapsam modül içinde ayrıca verilir.",
+                "service-accounts",
+                Icons.Material.Filled.ManageAccounts));
+        }
+
+        if (snapshot.Can(Capabilities.DirectoryGroupsView))
+        {
+            tasks.Add(new OperatorTask(
+                "AD Grup Analizi",
+                "Tam grup adına göre doğrudan üyelik ve grup kanıtı.",
+                "directory/groups",
+                Icons.Material.Filled.Groups));
+        }
+
         if (snapshot.Can(Capabilities.ResourcesView))
         {
             tasks.Add(new OperatorTask(
@@ -766,6 +841,29 @@
                 "Bağlantılarınız ve kişisel bağlantı gruplarınız.",
                 "resources",
                 Icons.Material.Filled.Link));
+        }
+
+        if (snapshot.Can(Capabilities.AccessApproveRequests))
+        {
+            tasks.Add(new OperatorTask(
+                "Erişim Talepleri",
+                "Karar bekleyen uygulama erişim talepleri.",
+                "access/requests",
+                Icons.Material.Filled.AdminPanelSettings));
+        }
+
+        if (snapshot.Can(Capabilities.AccessManageUsers))
+        {
+            tasks.Add(new OperatorTask(
+                "Kullanıcılar",
+                "Uygulama kullanıcıları, rolleri ve erişim durumu.",
+                "access/users",
+                Icons.Material.Filled.Group));
+            tasks.Add(new OperatorTask(
+                "Sistem Durumu",
+                "Sağlayıcı ayarları ve iş akışı kontrolleri.",
+                "admin/system-status",
+                Icons.Material.Filled.MonitorHeart));
         }
 
         return tasks;
