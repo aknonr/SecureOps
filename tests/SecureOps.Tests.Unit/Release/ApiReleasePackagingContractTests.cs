@@ -39,8 +39,12 @@ public sealed class ApiReleasePackagingContractTests
         string collector = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-InUseEvidencePackage.ps1"));
         collector.Should().Contain("Symbol outside fresh collector staging.").And.Contain("Remove-Item -LiteralPath $symbol.FullName")
             .And.Contain("Test-ApiReleasePayload.ps1");
-        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema='001-024'")
-            .And.Contain("Expected the exact complete 001-024 SQL chain.")
+        // Schema selection moved to the reviewed 024/025 selector; the publisher must consume its result.
+        string selector = File.ReadAllText(Path.Combine(root, "scripts", "release", "Get-ReleaseSqlPlan.ps1"));
+        selector.Should().Contain("$last = if ($IncludeServiceAccounts) { 25 } else { 24 }")
+            .And.Contain("Expected the exact complete 001-$last SQL chain; 025 must be explicitly reviewed.");
+        paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema=$sqlPlan.RequiredSchema")
+            .And.Contain("Get-ReleaseSqlPlan.ps1").And.Contain("-IncludeServiceAccounts:$IncludeServiceAccounts")
             .And.Contain("upgradeFromVerified018='019-024'").And.Contain("database-delta")
             .And.Contain("[switch]$UpgradeFromRc622").And.Contain("apply only reviewed additive 022")
             .And.Contain("[switch]$UpgradeFromRc624").And.Contain("apply only reviewed additive 023")
