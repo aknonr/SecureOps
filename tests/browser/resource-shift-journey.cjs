@@ -41,7 +41,10 @@ async function noOverflow(page, label) {
         await navigate(page, ui, 'resources');
 
         // Find: search narrows the list; the head states the range and the filter in words.
+        await page.waitForFunction(() => [...(document.querySelector('[aria-label="Bağlantı ara"]')?.attributes || [])]
+            .some(attribute => attribute.name.startsWith('_bl_')));
         await page.getByRole('textbox', { name: 'Bağlantı ara' }).fill(label);
+        await page.locator('.so-resource-filter-summary').filter({ hasText: `Arama: “${label}”` }).waitFor();
         const head = page.locator('.so-resource-results-head [role=status]');
         await head.filter({ hasText: '30 bağlantı · 1–' }).waitFor();
         results.range = (await head.innerText()).trim();
