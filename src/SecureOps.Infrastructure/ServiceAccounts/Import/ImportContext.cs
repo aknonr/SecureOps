@@ -40,4 +40,5 @@ public sealed record ImportContext(
     IReadOnlySet<Guid> AccountsWithGmsaTransition,
     ServiceAccountScope Scope,
     IReadOnlySet<Guid>? SqlTeams = null,
-    Guid? GmsaExecutorTeamId = null);
+    Guid? GmsaExecutorTeamId = null,
+    IReadOnlySet<Guid>? AccountsInGmsaFlow = null);

@@ -11,6 +11,7 @@ namespace SecureOps.Tests.Integration.ServiceAccounts;
 /// Usages, knowledge-base rule evaluation, team roles and gMSA routing on the real svcacct schema (SA-001 + SA-002).
 /// Team roles are module-wide, so every test that needs the executing team lives in this one (sequential) class.
 /// </summary>
+[Collection(ServiceAccountTeamRoleCollection.Name)]
 public sealed class ServiceAccountUsageSqlTests
 {
     private static readonly CancellationToken _token = CancellationToken.None;

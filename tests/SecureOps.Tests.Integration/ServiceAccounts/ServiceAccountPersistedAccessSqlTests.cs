@@ -101,7 +101,7 @@ public sealed class ServiceAccountPersistedAccessSqlTests
             .Should().BeGreaterThan(0, "module changes are audited in the platform audit log");
     }
 
-    private static async Task<string> PlatformAdminAsync(string connectionString, string prefix)
+    internal static async Task<string> PlatformAdminAsync(string connectionString, string prefix)
     {
         // Same seeding approach as the platform's own SQL access tests: one synthetic user with the protected Admin role.
         string identity = "synthetic-admin:" + prefix;
@@ -116,7 +116,7 @@ public sealed class ServiceAccountPersistedAccessSqlTests
         return identity;
     }
 
-    private static async Task<string> BundleAsync(SqlAccessRepository access, string admin, string code, IReadOnlyList<string> capabilities)
+    internal static async Task<string> BundleAsync(SqlAccessRepository access, string admin, string code, IReadOnlyList<string> capabilities)
     {
         AccessRoleChange change = new(code, "Sentetik " + code, "Sentetik test paketi", 0, capabilities);
         AccessRoleImpact preview = (await access.ChangeRoleAsync(change, admin, false, _token)).Value!;
@@ -125,7 +125,7 @@ public sealed class ServiceAccountPersistedAccessSqlTests
     }
 
     /// <summary>Approves a pending request with one role at its reviewed version (the platform refuses unreviewed custom roles).</summary>
-    private static async Task<(string, ClaimsPrincipal)> ApprovedAsync(IAccessRepository users, string admin, string identity, string role,
+    internal static async Task<(string, ClaimsPrincipal)> ApprovedAsync(IAccessRepository users, string admin, string identity, string role,
         IReadOnlyList<AccessRoleDefinition> reviewed)
     {
         EnsureAccessUserResult pending = await users.EnsureUserAsync(new CorporatePrincipal(identity, "test"), true, TimeSpan.Zero, _token);
