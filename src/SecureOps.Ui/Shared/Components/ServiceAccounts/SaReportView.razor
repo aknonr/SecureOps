@@ -68,20 +68,45 @@
     }
 </section>
 
-<section class="so-panel" aria-labelledby="sa-report-teams">
-    <h2 id="sa-report-teams" class="so-panel-title">Ekip iş yükü</h2>
-    @if (Report.TeamWorkload.Count == 0) { <SoEmptyState Title="Ekip verisi yok" /> }
-    else
-    {
-        <MudTable Items="Report.TeamWorkload" Dense="true" Breakpoint="Breakpoint.Sm" T="TeamWorkloadRow">
-            <HeaderContent><MudTh>Ekip</MudTh><MudTh>Sahip olunan hesap</MudTh><MudTh>Hedef olunan açık talep</MudTh><MudTh>Plan bitişi geçen</MudTh></HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Ekip">@context.Team</MudTd><MudTd DataLabel="Sahip olunan hesap">@context.OwnedAccounts</MudTd>
-                <MudTd DataLabel="Hedef olunan açık talep">@context.OpenRequestsAsTarget</MudTd><MudTd DataLabel="Plan bitişi geçen">@context.OverdueAsTarget</MudTd>
-            </RowTemplate>
-        </MudTable>
-    }
-</section>
+@if (Report.Directorate is { } directorate)
+{
+    <section class="so-panel" aria-labelledby="sa-report-directorate">
+        <h2 id="sa-report-directorate" class="so-panel-title">Direktörlük görünümü</h2>
+        <p class="so-panel-text--sm">Her satır bir ekip: sahip olunan hesaplar ve ekibe yönelik açık işler. Kişi bazlı sayı veya sıralama yoktur.</p>
+        @if (directorate.Count == 0) { <SoEmptyState Title="Ekip verisi yok" /> }
+        else
+        {
+            <MudTable Items="directorate" Dense="true" Breakpoint="Breakpoint.Sm" T="DirectorateRow">
+                <HeaderContent><MudTh>Organizasyon</MudTh><MudTh>Ekip</MudTh><MudTh>Sahip olunan hesap</MudTh><MudTh>Muhatap açık talep</MudTh><MudTh>Geciken</MudTh>
+                    <MudTh>Tarih bekleyen</MudTh><MudTh>Kurala aykırı</MudTh><MudTh>Bekleyen gMSA</MudTh><MudTh>Risk adayı</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Organizasyon">@context.Organization</MudTd><MudTd DataLabel="Ekip">@context.Team</MudTd>
+                    <MudTd DataLabel="Sahip olunan hesap">@context.OwnedAccounts</MudTd><MudTd DataLabel="Muhatap açık talep">@context.OpenRequestsAsTarget</MudTd>
+                    <MudTd DataLabel="Geciken">@context.OverdueAsTarget</MudTd><MudTd DataLabel="Tarih bekleyen">@context.AwaitingDateAsTarget</MudTd>
+                    <MudTd DataLabel="Kurala aykırı">@context.AgainstRule</MudTd><MudTd DataLabel="Bekleyen gMSA">@context.GmsaPending</MudTd>
+                    <MudTd DataLabel="Risk adayı">@context.RiskCandidates</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </section>
+}
+else
+{
+    <section class="so-panel" aria-labelledby="sa-report-teams">
+        <h2 id="sa-report-teams" class="so-panel-title">Ekip iş yükü</h2>
+        @if (Report.TeamWorkload.Count == 0) { <SoEmptyState Title="Ekip verisi yok" /> }
+        else
+        {
+            <MudTable Items="Report.TeamWorkload" Dense="true" Breakpoint="Breakpoint.Sm" T="TeamWorkloadRow">
+                <HeaderContent><MudTh>Ekip</MudTh><MudTh>Sahip olunan hesap</MudTh><MudTh>Hedef olunan açık talep</MudTh><MudTh>Plan bitişi geçen</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Ekip">@context.Team</MudTd><MudTd DataLabel="Sahip olunan hesap">@context.OwnedAccounts</MudTd>
+                    <MudTd DataLabel="Hedef olunan açık talep">@context.OpenRequestsAsTarget</MudTd><MudTd DataLabel="Plan bitişi geçen">@context.OverdueAsTarget</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </section>
+}
 
 <section class="so-panel" aria-labelledby="sa-report-handover">
     <h2 id="sa-report-handover" class="so-panel-title">Devir ve gMSA</h2>
@@ -101,6 +126,102 @@
     }
 </section>
 
+@if (Report.Rules is { } rules)
+{
+    <section class="so-panel" aria-labelledby="sa-report-rules">
+        <h2 id="sa-report-rules" class="so-panel-title">Bilgi bankası kuralları</h2>
+        <div class="d-flex flex-wrap gap-2">
+            <SoMetric Label="Değerlendirilen hesap" Value="@rules.Assessed.ToString()" />
+            <SoMetric Label="Kurala aykırı (plansız)" Value="@rules.AgainstRule.ToString()" />
+            @foreach (NamedCount path in rules.ByPath.Where(p => p.Count > 0)) { <SoMetric Label="@path.Label" Value="@path.Count.ToString()" /> }
+        </div>
+        <p class="so-panel-text--sm mt-1">Durum: @string.Join(" · ", rules.ByConformance.Select(c => $"{c.Label} {c.Count}")) · kural sürümü @rules.RuleSetVersion</p>
+        @if (rules.Lines.Count > 0)
+        {
+            <MudTable Items="rules.Lines" Dense="true" Breakpoint="Breakpoint.Sm" T="RuleLine" Class="mt-2">
+                <HeaderContent><MudTh>Hesap</MudTh><MudTh>Sahip ekip</MudTh><MudTh>Önerilen yol</MudTh><MudTh>Durum</MudTh><MudTh>Neden</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Hesap">@context.Account</MudTd><MudTd DataLabel="Sahip ekip">@(context.OwnerTeam ?? "—")</MudTd>
+                    <MudTd DataLabel="Önerilen yol">@context.Path<div class="so-panel-text--sm">@context.RuleCodes</div></MudTd>
+                    <MudTd DataLabel="Durum">@context.Conformance</MudTd><MudTd DataLabel="Neden"><span class="so-panel-text--sm">@context.Reason</span></MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </section>
+}
+
+@if (Report.Funnel is { } funnel)
+{
+    int top = Math.Max(1, funnel.Stages.Max(st => st.Count));
+    <section class="so-panel" aria-labelledby="sa-report-funnel">
+        <h2 id="sa-report-funnel" class="so-panel-title">gMSA hunisi (@funnel.Population hesap)</h2>
+        <table class="sa-bars" aria-describedby="sa-report-funnel">
+            <thead><tr><th scope="col">Aşama</th><th scope="col">Hesap</th><th scope="col">Beklenen</th></tr></thead>
+            <tbody>
+                @foreach (FunnelStage stage in funnel.Stages)
+                {
+                    <tr>
+                        <th scope="row">@stage.Label</th>
+                        <td><span class="sa-bar" style="--sa-bar:@Percent(stage.Count, top)" title="@($"{stage.Label}: {stage.Count}")" aria-hidden="true"></span><span class="sa-bar-value">@stage.Count</span></td>
+                        <td class="so-panel-text--sm">@stage.Expected</td>
+                    </tr>
+                }
+                <tr><th scope="row">Uygun değil</th><td><span class="sa-bar-value">@funnel.Ineligible</span></td><td class="so-panel-text--sm">Huniden ayrı sayılır.</td></tr>
+            </tbody>
+        </table>
+        <p class="so-panel-text--sm mt-1">@funnel.Note</p>
+    </section>
+}
+
+@if (Report.Trend is { } trend)
+{
+    int peak = Math.Max(1, trend.Points.Max(p => p.OpenAtWeekEnd));
+    <section class="so-panel" aria-labelledby="sa-report-trend">
+        <h2 id="sa-report-trend" class="so-panel-title">Trend (son @trend.Points.Count hafta)</h2>
+        <table class="sa-bars" aria-describedby="sa-report-trend">
+            <thead><tr><th scope="col">Hafta</th><th scope="col">Hafta sonu açık talep</th><th scope="col">Geciken</th><th scope="col">Doğrulanmış kapanış</th><th scope="col">Gerçekleşen işlem</th></tr></thead>
+            <tbody>
+                @foreach (TrendPoint point in trend.Points)
+                {
+                    <tr>
+                        <th scope="row">@point.WeekStart.ToString("dd.MM.yyyy")</th>
+                        <td><span class="sa-bar" style="--sa-bar:@Percent(point.OpenAtWeekEnd, peak)" title="@($"{point.WeekStart:dd.MM}: {point.OpenAtWeekEnd} açık")" aria-hidden="true"></span><span class="sa-bar-value">@point.OpenAtWeekEnd</span></td>
+                        <td>@point.OverdueAtWeekEnd</td><td>@point.VerifiedClosures</td><td>@point.PerformedActions</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="so-panel-text--sm mt-1">@trend.Note@(trend.UnknownCloseTime > 0 ? $" Kapanış zamanı bilinmeyen talep: {trend.UnknownCloseTime}." : "")</p>
+    </section>
+}
+
+@if (Report.Risk is { } risk)
+{
+    <section class="so-panel" aria-labelledby="sa-report-risk">
+        <h2 id="sa-report-risk" class="so-panel-title">Risk adayları (@risk.Candidates)</h2>
+        <p class="so-panel-text--sm">@string.Join(" · ", risk.ByCategory.Select(c => $"{c.Label}: {c.Count}"))</p>
+        @if (risk.Lines.Count == 0) { <SoEmptyState Title="Risk adayı yok" /> }
+        else
+        {
+            <MudTable Items="risk.Lines" Dense="true" Breakpoint="Breakpoint.Sm" T="RiskLine">
+                <HeaderContent><MudTh>Hesap</MudTh><MudTh>Sahip ekip</MudTh><MudTh>Neden</MudTh><MudTh>Kaynak tarihi</MudTh><MudTh>Son oturum</MudTh><MudTh>Son parola</MudTh><MudTh>Açık talep</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Hesap">@context.Account</MudTd><MudTd DataLabel="Sahip ekip">@(context.OwnerTeam ?? "—")</MudTd>
+                    <MudTd DataLabel="Neden">@context.Categories</MudTd><MudTd DataLabel="Kaynak tarihi">@ServiceAccountUiText.Date(context.SourceDate)</MudTd>
+                    <MudTd DataLabel="Son oturum">@ServiceAccountUiText.Date(context.LastLogon, "Yok")</MudTd>
+                    <MudTd DataLabel="Son parola">@ServiceAccountUiText.Date(context.PasswordLastSet, "Yok")</MudTd><MudTd DataLabel="Açık talep">@context.OpenRequests</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        <p class="so-panel-text--sm mt-1">@risk.Note</p>
+    </section>
+}
+
+@if (Report.Rules is null)
+{
+    <p class="so-panel-text--sm">Bu nüsha @Report.MetricDefinitionVersion metrik sürümüyle kaydedildi; kural, huni, trend, risk ve direktörlük bölümleri bu sürümde yoktur.</p>
+}
+
 @code {
     /// <summary>Report payload.</summary>
     [Parameter] public ServiceAccountReport Report { get; set; } = default!;
@@ -109,6 +230,9 @@
     [Parameter] public string Title { get; set; } = "Özet";
 
     private ReportSummary S => Report.Summary;
+
+    private static string Percent(int value, int max) =>
+        (value * 100.0 / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
 
     private IEnumerable<(string, PlacementCounts)> Placements =>
     [

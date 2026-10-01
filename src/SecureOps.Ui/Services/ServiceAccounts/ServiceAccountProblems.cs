@@ -64,6 +64,10 @@ public static class ServiceAccountProblems
         "requestId" => "Bu hesapta yalnız ekibinize atanmış açık talep üzerinden işlem bildirebilirsiniz.",
         "targetTeamId" => "Talebi başka ekibe aktarmak hesaptan sorumlu ekibin kararıdır.",
         "ownerId" => "Kanıtı yalnız ekibinize atanmış talebe veya ona bağlı işleme ekleyebilirsiniz.",
+        "kind" => "Kullanım türünü listeden seçin.",
+        "databaseEngine" => "Veritabanı motoru yalnız veritabanı kullanımında seçilir.",
+        "needVerified" => "İhtiyaç doğrulaması yalnız Windows servisi kullanımında işaretlenir.",
+        "role" => "Bu ekip bu rolde zaten var ya da başka bir yürütücü ekip tanımlı; önce mevcut olanı kaldırın.",
         null => null,
         { } field => "Kontrol edilecek alan: " + field
     };

@@ -24,6 +24,11 @@ public partial class ServiceAccountDetail
     private string? Lead => _detail is null ? null
         : $"{_detail.Summary.Domain ?? "Domain bilinmiyor"} · {(_detail.Summary.IdentityState == "Confirmed" ? "kimlik teyitli" : "kimlik geçici")}";
 
+    /// <summary>Usage tab title with the rule state so an against-rule account stands out without opening the tab.</summary>
+    private string UsageTabText => _detail?.Rule is { } rule && rule.Conformance == "Unplanned"
+        ? $"Kullanım ve kural ({(_detail.Usages ?? []).Count(u => !u.Removed)}) · kurala aykırı"
+        : $"Kullanım ve kural ({(_detail?.Usages ?? []).Count(u => !u.Removed)})";
+
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
