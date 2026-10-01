@@ -160,7 +160,7 @@ See `plans/PHASE-1-readonly-diagnostic-mvp.md`.
 - Pages load in < 2 seconds for typical data volumes.
 - Mobile-friendly (responsive) — operators may use tablets.
 - All UI flows have audit entries.
-- bUnit tests cover key components.
+- bUnit tests cover key components. *(Implementation note (2026-10-01): planned, not implemented as written — component render tests use `HtmlRenderer` in `tests/SecureOps.Tests.Unit/Ui/`; bUnit is pinned centrally but not referenced.)*
 
 See `plans/PHASE-2-web-ui-and-dashboard.md`.
 
