@@ -1,29 +1,44 @@
 @*
     One integration provider's state.
 
-    The status word is the server's, translated but never reinterpreted. An unrecognised value is
+    The status word is the server's, translated but never reinterpreted. "Configured" means a provider
+    is selected and, where the server tracks it, no failed call has been recorded by this API process;
+    no connection was tested. It is therefore informational, never green. An unrecognised value is
     shown as it arrived with a neutral tone, so a status added later reads as unknown rather than
-    being coloured green by a default branch.
+    being coloured green by a default branch. A provider whose state could not be read at all renders
+    as unknown instead of disappearing.
 *@
 
-<article class="so-integration so-integration--@ToneSlug">
+<article class="so-integration so-integration--@ToneSlug" aria-label="@Title">
     <div class="so-integration-head">
         <span class="so-integration-title">@Title</span>
         <SoStatusBadge Label="@StatusLabel" Tone="@Tone" Icon="@StatusIcon" />
     </div>
 
     <p class="so-integration-text">@Description</p>
+    <p class="so-integration-status">@(StatusDetail ?? DefaultDetail)</p>
 
-    <dl class="so-integration-meta">
-        <dt>Seçilen sağlayıcı</dt>
-        <dd><code class="so-code so-code--sm">@Provider.Selection</code></dd>
-    </dl>
+    @if (Note is not null)
+    {
+        <p class="so-integration-note">
+            <MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" aria-hidden="true" />
+            <span>@Note</span>
+        </p>
+    }
+
+    @if (Provider is not null)
+    {
+        <dl class="so-integration-meta">
+            <dt>Seçilen sağlayıcı</dt>
+            <dd><code class="so-code so-code--sm">@Provider.Selection</code></dd>
+        </dl>
+    }
 </article>
 
 @code {
-    /// <summary>Provider state exactly as the API returned it.</summary>
-    [Parameter, EditorRequired]
-    public IntegrationProviderHealthResponse Provider { get; set; } = default!;
+    /// <summary>Provider state exactly as the API returned it; <c>null</c> when it could not be read.</summary>
+    [Parameter]
+    public IntegrationProviderHealthResponse? Provider { get; set; }
 
     /// <summary>Operator-facing name of the integration.</summary>
     [Parameter, EditorRequired]
@@ -33,37 +48,60 @@
     [Parameter]
     public string? Description { get; set; }
 
-    private string StatusLabel => Provider.Status switch
+    /// <summary>Overrides the generic meaning of the status when the endpoint defines it differently.</summary>
+    [Parameter]
+    public string? StatusDetail { get; set; }
+
+    /// <summary>Optional server-derived qualification, such as a test provider being selected.</summary>
+    [Parameter]
+    public string? Note { get; set; }
+
+    private string? Status => Provider?.Status;
+
+    private string StatusLabel => Status switch
     {
-        "Configured" => "Yapılandırıldı",
+        null => "Okunamadı",
+        "Configured" => "Yapılandırıldı · sınanmadı",
         "Disabled" => "Devre dışı",
-        "Unavailable" => "Erişilemiyor",
+        "Unavailable" => "Son çağrı başarısız",
         "Healthy" => "Sağlıklı",
-        _ => Provider.Status
+        _ => Status
     };
 
-    // Disabled is neutral, not a fault: a provider that is deliberately off is a configuration
-    // decision, and colouring it red would send operators chasing a non-problem.
-    private SoStatusBadge.BadgeTone Tone => Provider.Status switch
+    private string DefaultDetail => Status switch
     {
-        "Configured" => SoStatusBadge.BadgeTone.Positive,
+        null => "Durum bilgisi alınamadı. Bu, sağlayıcının çalışmadığı anlamına gelmez; durum bilinmiyor.",
+        "Configured" => "Sağlayıcı seçili ve bu API süreci başladığından beri kayıtlı başarısız çağrı yok. Bağlantı ayrıca sınanmadı; zaman bilgisi bildirilmiyor.",
+        "Disabled" => "Bu ortamda sağlayıcı kapalı. Bu bir yapılandırma kararıdır, arıza değildir.",
+        "Unavailable" => "Bu API sürecindeki son çağrı başarısız oldu. Zamanı bildirilmiyor; bir sonraki başarılı çağrıya kadar böyle görünür.",
+        "Healthy" => "Sunucu sağlıklı olarak bildirdi.",
+        _ => "Sunucunun bildirdiği durum bu ekranda tanımlı değil; bilinmiyor olarak okuyun."
+    };
+
+    // Configured is informational, not positive: nothing was tested. Disabled is neutral, not a fault.
+    private SoStatusBadge.BadgeTone Tone => Status switch
+    {
+        "Configured" => SoStatusBadge.BadgeTone.Info,
         "Healthy" => SoStatusBadge.BadgeTone.Positive,
         "Disabled" => SoStatusBadge.BadgeTone.Neutral,
         "Unavailable" => SoStatusBadge.BadgeTone.Critical,
+        null => SoStatusBadge.BadgeTone.Caution,
         _ => SoStatusBadge.BadgeTone.Neutral
     };
 
-    private string ToneSlug => Provider.Status switch
+    private string ToneSlug => Status switch
     {
-        "Configured" or "Healthy" => "ok",
+        "Configured" => "configured",
+        "Healthy" => "ok",
         "Disabled" => "off",
         "Unavailable" => "down",
         _ => "unknown"
     };
 
-    private string StatusIcon => Provider.Status switch
+    private string StatusIcon => Status switch
     {
-        "Configured" or "Healthy" => Icons.Material.Filled.CheckCircle,
+        "Configured" => Icons.Material.Filled.SettingsSuggest,
+        "Healthy" => Icons.Material.Filled.CheckCircle,
         "Disabled" => Icons.Material.Filled.PauseCircle,
         "Unavailable" => Icons.Material.Filled.ErrorOutline,
         _ => Icons.Material.Filled.HelpOutline

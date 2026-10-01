@@ -1,0 +1,10 @@
+.dash-sections { display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0 0 12px;padding:8px 0;border-bottom:1px solid var(--so-border-soft); }
+.dash-sections-label { font-size:13px;color:var(--so-text-muted); }
+.dash-section-link { min-height:36px;padding:4px 10px;border:1px solid var(--so-border);border-radius:999px;background:transparent;color:var(--so-text);font:inherit;font-size:14px;cursor:pointer; }
+.dash-section-link:hover { background:color-mix(in srgb,var(--so-accent) 8%,transparent); }
+.dash-section-link:focus-visible { outline:2px solid var(--so-accent-strong);outline-offset:2px; }
+.dash-band-title { margin:24px 0 8px;font-size:20px;font-weight:700;scroll-margin-top:80px; }
+.dash-band-title:first-of-type { margin-top:8px; }
+.dash-band-note { font-size:14px;font-weight:400;color:var(--so-text-muted); }
+.dash-band-title:focus-visible,.dash-quick-title:focus-visible,h2[tabindex="-1"]:focus-visible { outline:2px solid var(--so-accent-strong);outline-offset:4px; }
+h2[tabindex="-1"] { scroll-margin-top:80px; }

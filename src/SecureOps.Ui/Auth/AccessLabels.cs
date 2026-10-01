@@ -1,4 +1,5 @@
 using SecureOps.Shared.Auth;
+using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Ui.Auth;
 
@@ -63,6 +64,18 @@ public static class AccessLabels
         /// <summary>Audit and diagnostics capabilities.</summary>
         public const string Oversight = "Denetim ve tanılama";
 
+        /// <summary>Planned OCO announcement capabilities.</summary>
+        public const string Announcements = "Planlı duyurular";
+
+        /// <summary>In Use review capabilities.</summary>
+        public const string InUse = "In Use";
+
+        /// <summary>Shared and personal application link capabilities.</summary>
+        public const string Resources = "Uygulama bağlantıları";
+
+        /// <summary>Service Accounts module capabilities.</summary>
+        public const string ServiceAccounts = "Servis Hesapları";
+
         /// <summary>Anything without a known group.</summary>
         public const string Other = "Diğer";
     }
@@ -95,23 +108,30 @@ public static class AccessLabels
 
     private static readonly Dictionary<string, CapabilityDescriptor> _capabilities = new(StringComparer.Ordinal)
     {
-        [Capabilities.AnnouncementDrafts] = new(Capabilities.AnnouncementDrafts, "Planlı duyurular", "Duyuru taslağı", "Kendi duyuru taslaklarını düzenler ve okur; kaynak sorgulama, hazırlama ve gönderme ayrı yetkilerdir."),
-        [Capabilities.AnnouncementSource] = new(Capabilities.AnnouncementSource, "Planlı duyurular", "Kaynak inceleme", "Kaynak toplama işi ister, öneriyi inceler ve seçtiği değişiklikleri uygular."),
-        [Capabilities.AnnouncementPrepare] = new(Capabilities.AnnouncementPrepare, "Planlı duyurular", "Değişmez hazırlık", "Kaydedilmiş duyurudan sürüme bağlı mail hazırlar ve indirir; göndermez."),
-        [Capabilities.AnnouncementSelfTest] = new(Capabilities.AnnouncementSelfTest, "Planlı duyurular", "Kendime mail denemesi", "Ayrı açık onayla yalnız kendi kayıtlı e-posta adresine deneme ister."),
-        [Capabilities.AnnouncementSend] = new(Capabilities.AnnouncementSend, "Planlı duyurular", "Duyuru gönderimi", "İncelenen hazırlığı seçili alıcılara açık onayla gönderme talebi oluşturur."),
+        [Capabilities.AnnouncementDrafts] = new(Capabilities.AnnouncementDrafts, Groups.Announcements, "Duyuru taslağı", "Kendi duyuru taslaklarını düzenler ve okur; kaynak sorgulama, hazırlama ve gönderme ayrı yetkilerdir."),
+        [Capabilities.AnnouncementSource] = new(Capabilities.AnnouncementSource, Groups.Announcements, "Kaynak inceleme", "Kaynak toplama işi ister, öneriyi inceler ve seçtiği değişiklikleri uygular."),
+        [Capabilities.AnnouncementPrepare] = new(Capabilities.AnnouncementPrepare, Groups.Announcements, "Değişmez hazırlık", "Kaydedilmiş duyurudan sürüme bağlı mail hazırlar ve indirir; göndermez."),
+        [Capabilities.AnnouncementSelfTest] = new(Capabilities.AnnouncementSelfTest, Groups.Announcements, "Kendime mail denemesi", "Ayrı açık onayla yalnız kendi kayıtlı e-posta adresine deneme ister."),
+        [Capabilities.AnnouncementSend] = new(Capabilities.AnnouncementSend, Groups.Announcements, "Duyuru gönderimi", "İncelenen hazırlığı seçili alıcılara açık onayla gönderme talebi oluşturur."),
         [Capabilities.DirectoryGroupsView] = new(Capabilities.DirectoryGroupsView, Groups.Identity, "Grup sorgulama", "Tam grup ve doğrudan üyelik bilgilerini okur."),
         [Capabilities.DirectoryGroupMembersView] = new(Capabilities.DirectoryGroupMembersView, Groups.Identity, "Grup üyelerini görüntüleme", "Tek grubun sınırlı doğrudan üyelerini okur."),
         [Capabilities.DirectoryPrivilegedGroupsView] = new(Capabilities.DirectoryPrivilegedGroupsView, Groups.Identity, "Ayrıcalıklı grupları görüntüleme", "Onaylı ayrıcalıklı grup kanıtını okur; üyelik değiştirmez."),
         [Capabilities.DirectoryGroupExport] = new(Capabilities.DirectoryGroupExport, Groups.Identity, "Grup raporu indirme", "Sınırlı üyelik raporu hazırlar ve indirir."),
         [Capabilities.ManagementReportingView] = new(Capabilities.ManagementReportingView, Groups.Oversight, "Yönetim raporları", "Yetkili toplu operasyon raporlarını görüntüler."),
-        [Capabilities.ResourcesView] = new(Capabilities.ResourcesView, "Uygulama bağlantıları", "Bağlantıları kullanma", "Bağlantıları görüntüler; kendi favorilerini ve gruplarını düzenler."),
-        [Capabilities.ResourcesManage] = new(Capabilities.ResourcesManage, "Uygulama bağlantıları", "Bağlantı kataloğunu yönetme", "Paylaşılan bağlantıları ve kategorileri düzenler."),
-        [Capabilities.InUseView] = new(Capabilities.InUseView, "In Use", "Kayıtları görüntüleme", "Kayıtlı In Use verisini okur."),
-        [Capabilities.InUseReview] = new(Capabilities.InUseReview, "In Use", "Yerel inceleme", "Yerel inceleme taslağı ve Excel hazırlığı."),
-        [Capabilities.InUseComplete] = new(Capabilities.InUseComplete, "In Use", "Talebe ekleme ve tamamlama", "Ayrıca etkinleştirilmiş ve doğrulanmış kaynak sözleşmesi kapsamında incelenen raporu talebe ekler ve tekil görevi tamamlar; OR kapanışı ayrıca doğrulanır."),
-        [Capabilities.InUseAssign] = new(Capabilities.InUseAssign, "In Use", "İnceleyici atama", "Onaylı uygulama kimliğine yerel atama."),
-        [Capabilities.InUseRefresh] = new(Capabilities.InUseRefresh, "In Use", "Salt okunur keşif", "Kategori 4241 / grup 68 kaynak okuması."),
+        [Capabilities.ResourcesView] = new(Capabilities.ResourcesView, Groups.Resources, "Bağlantıları kullanma", "Bağlantıları görüntüler; kendi favorilerini ve gruplarını düzenler."),
+        [Capabilities.ResourcesManage] = new(Capabilities.ResourcesManage, Groups.Resources, "Bağlantı kataloğunu yönetme", "Paylaşılan bağlantıları ve kategorileri düzenler."),
+        [Capabilities.InUseView] = new(Capabilities.InUseView, Groups.InUse, "Kayıtları görüntüleme", "Kayıtlı In Use verisini okur."),
+        [Capabilities.InUseReview] = new(Capabilities.InUseReview, Groups.InUse, "Yerel inceleme", "Yerel inceleme taslağı ve Excel hazırlığı."),
+        [Capabilities.InUseComplete] = new(Capabilities.InUseComplete, Groups.InUse, "Talebe ekleme ve tamamlama", "Ayrıca etkinleştirilmiş ve doğrulanmış kaynak sözleşmesi kapsamında incelenen raporu talebe ekler ve tekil görevi tamamlar; OR kapanışı ayrıca doğrulanır."),
+        [Capabilities.InUseAssign] = new(Capabilities.InUseAssign, Groups.InUse, "İnceleyici atama", "Onaylı uygulama kimliğine yerel atama."),
+        [Capabilities.InUseRefresh] = new(Capabilities.InUseRefresh, Groups.InUse, "Salt okunur keşif", "Kategori 4241 / grup 68 kaynak okuması."),
+        [ServiceAccountCapabilities.View] = new(ServiceAccountCapabilities.View, Groups.ServiceAccounts, "Hesapları görüntüleme", "Kapsam yetkisi verilen ekip veya organizasyonun servis hesaplarını ve işlerini okur."),
+        [ServiceAccountCapabilities.Work] = new(ServiceAccountCapabilities.Work, Groups.ServiceAccounts, "İş kaydı girme", "Talep/plan, işlem bildirimi, yazışma, bulgu ve kanıt ekler; başka ekibin sahipliğini değiştiremez."),
+        [ServiceAccountCapabilities.Assign] = new(ServiceAccountCapabilities.Assign, Groups.ServiceAccounts, "Sahiplik ve devir kararı", "Kapsamı içinde sahiplik atar veya onaylar; devir kabul/ret kararı verir."),
+        [ServiceAccountCapabilities.Verify] = new(ServiceAccountCapabilities.Verify, Groups.ServiceAccounts, "İşlemi doğrulama", "Bildirilen işlemi tarih, doğrulayan ve kanıtla doğrular; ayrı işlem oluşturmaz."),
+        [ServiceAccountCapabilities.Import] = new(ServiceAccountCapabilities.Import, Groups.ServiceAccounts, "Liste içe aktarma", "Kaynak listeyi önizler, karar verir ve onaylı aktarır; organizasyon kapsamı ayrıca gerekir."),
+        [ServiceAccountCapabilities.Report] = new(ServiceAccountCapabilities.Report, Groups.ServiceAccounts, "Rapor ve dışa aktarım", "Kapsamındaki rapor, değişmez nüsha ve Excel/PDF çıktısını alır."),
+        [ServiceAccountCapabilities.Administer] = new(ServiceAccountCapabilities.Administer, Groups.ServiceAccounts, "Modül yönetimi", "Ekip/organizasyon sözlüğünü ve kapsam yetkilerini yönetir; iş sonucunu değiştiremez."),
         [Capabilities.IdentityLookup] = new(
             Capabilities.IdentityLookup, Groups.Identity,
             "Kimlik sorgulama",
@@ -192,6 +212,19 @@ public static class AccessLabels
         _roleLabels.TryGetValue(role, out string? label) ? label : role;
 
     /// <summary>
+    /// Label for a role the caller holds, where only its code is known.
+    /// </summary>
+    /// <param name="role">Role identifier from <c>/access/me</c>.</param>
+    /// <returns>The Turkish label of a known role, otherwise the neutral "İş rolü".</returns>
+    /// <remarks>
+    /// <c>/access/me</c> returns codes only and administrator-defined role names are readable only by
+    /// role administrators, so an unknown code is named generically instead of shown as an opaque
+    /// identifier. Callers keep the code available as a tooltip.
+    /// </remarks>
+    public static string HeldRoleLabel(string role) =>
+        _roleLabels.TryGetValue(role, out string? label) ? label : "İş rolü";
+
+    /// <summary>
     /// Returns a Turkish description for a role identifier.
     /// </summary>
     /// <param name="role">Role identifier.</param>
@@ -253,20 +286,78 @@ public static class AccessLabels
     public static IReadOnlyList<IGrouping<string, CapabilityDescriptor>> Group(
         IEnumerable<string> capabilities)
     {
-        string[] order =
-        [
-            Groups.Identity,
-            Groups.OperationalRecords,
-            Groups.AccessAdministration,
-            Groups.Oversight,
-            Groups.Other
-        ];
-
         return capabilities
             .Distinct(StringComparer.Ordinal)
             .Select(Describe)
             .GroupBy(descriptor => descriptor.Group)
-            .OrderBy(group => Array.IndexOf(order, group.Key))
+            .OrderBy(group => GroupOrder(group.Key))
             .ToArray();
     }
+
+    /// <summary>Functional display order; an unknown group sorts last, never first.</summary>
+    private static readonly string[] _groupOrder =
+    [
+        Groups.OperationalRecords,
+        Groups.InUse,
+        Groups.Announcements,
+        Groups.ServiceAccounts,
+        Groups.Identity,
+        Groups.Resources,
+        Groups.AccessAdministration,
+        Groups.Oversight,
+        Groups.Other
+    ];
+
+    /// <summary>
+    /// Sort position of a capability group.
+    /// </summary>
+    /// <param name="group">Group name from <see cref="Groups"/>.</param>
+    /// <returns>Position in the functional order; unknown groups follow every known one.</returns>
+    public static int GroupOrder(string group)
+    {
+        int index = Array.IndexOf(_groupOrder, group);
+        return index < 0 ? _groupOrder.Length : index;
+    }
+
+    /// <summary>
+    /// Server catalogue module names (<c>AccessActionDefinition.Module</c>) in functional order, with
+    /// written guidance. Guidance explains what the module is for; it never states a grant.
+    /// </summary>
+    private static readonly (string Module, string Guidance)[] _modules =
+    [
+        ("OR / SDM", "Operasyonel kayıtlar ve Jira aktarımı. Görüntüleme, önizleme ve yayınlama ayrı işlemlerdir."),
+        ("In Use", "Sunucu kullanım incelemeleri, atama, kaynak okuması ve raporlar."),
+        ("OCO", "Planlı çalışma duyuruları: taslak, kaynak, hazırlık, kendime deneme ve gönderim ayrı işlemlerdir."),
+        ("Servis Hesapları", "Servis hesabı envanteri ve işleri. Veri ayrıca, modül içinde verilen ekip/organizasyon kapsamıyla sınırlanır."),
+        ("Kimlik", "PAM/AD hesap ve grup sorguları; salt okunur, sınırlı ve kayıt altında."),
+        ("Bağlantılar", "Uygulama bağlantı kataloğu ve kişisel bağlantı grupları."),
+        ("Erişim", "WASAS kullanıcıları, erişim talepleri ve rol atamaları."),
+        ("Raporlar", "Toplu yönetim raporları; kişi bazlı performans ölçüsü değildir."),
+        ("Sistem", "Yetkili sağlık ve tanı bilgisi."),
+        ("Tarihsel", "Eski sabit rollerden kalan haklar. Yeni bir role eklenemez; mevcut rollerde yalnız kaldırılabilir.")
+    ];
+
+    /// <summary>Display position of a server catalogue module; unknown modules sort last.</summary>
+    /// <param name="module">Module name from the server action catalogue.</param>
+    /// <returns>Sort position.</returns>
+    public static int ModuleOrder(string module)
+    {
+        int index = Array.FindIndex(_modules, entry => entry.Module == module);
+        return index < 0 ? _modules.Length : index;
+    }
+
+    /// <summary>Written guidance for a server catalogue module, or <c>null</c> when none is written.</summary>
+    /// <param name="module">Module name from the server action catalogue.</param>
+    /// <returns>Guidance sentence.</returns>
+    public static string? ModuleGuidance(string module) =>
+        Array.Find(_modules, entry => entry.Module == module).Guidance;
+
+    /// <summary>
+    /// Whether a capability belongs to the Service Accounts module, whose data additionally needs a
+    /// team or organization scope grant administered inside that module.
+    /// </summary>
+    /// <param name="capability">Capability identifier.</param>
+    /// <returns><c>true</c> for <c>ServiceAccounts.*</c> identifiers.</returns>
+    public static bool NeedsServiceAccountScope(string capability) =>
+        capability.StartsWith("ServiceAccounts.", StringComparison.Ordinal);
 }

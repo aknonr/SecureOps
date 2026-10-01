@@ -1,5 +1,7 @@
 @*
-    Primary navigation, grouped by what the operator is doing rather than by which team built it.
+    Primary navigation, grouped by the work an operator is doing on shift rather than by which team
+    built a module: shift work first, then identity and account questions, then links, reports and
+    administration.
 
     Every entry is gated on a capability returned by GET /api/v1/access/me — never on a role name,
     and never on "looks like an administrator". An account with an Admin-sounding role but without
@@ -7,18 +9,21 @@
     anyway and offering them is a dead end that reads as a permissions bug.
 
     A group heading appears only when at least one of its entries does, so the menu never shows an
-    empty section. Planned capabilities stay listed but visibly inert, because "what is coming next"
-    is part of what this navigation is meant to communicate.
+    empty section. Planned capabilities stay reachable but move to one quiet footer line, because the
+    roadmap is context, not work to do on this shift.
 *@
 
 @using SecureOps.Shared.Contracts.ServiceAccounts
 @implements IDisposable
 @inject ICurrentAccessProvider AccessProvider
+@inject NavigationManager Navigation
+@inject IDemoModeState ShellMode
 
+<nav class="so-nav-shell" aria-label="Ana menü">
 <MudNavMenu Dense="true" Class="so-nav">
     <AuthorizeView>
         <Authorized Context="signedIn">
-            @* Management users receive the same route under RAPORLAMA below. Rendering it twice
+            @* Management users receive the same route under RAPORLAR below. Rendering it twice
                makes two entries appear selected, so the ungrouped overview is for operators whose
                dashboard is the operational board. *@
             @if (!Can(Capabilities.ManagementReportingView))
@@ -28,49 +33,31 @@
                 </MudNavLink>
             }
 
-            @if (Can(Capabilities.OperationalRecordsView))
+            @if (CanAnyShiftWork)
             {
-                <div class="so-nav-group">OPERASYON</div>
+                <div class="so-nav-group">Vardiya işleri</div>
 
-                <MudNavLink Href="operational-records" Icon="@Icons.Material.Filled.Assignment">
-                    Operasyonel Kayıtlar
-                </MudNavLink>
+                @if (Can(Capabilities.OperationalRecordsView))
+                {
+                    <MudNavLink Href="operational-records" Icon="@Icons.Material.Filled.Assignment">
+                        Operasyonel Kayıtlar
+                    </MudNavLink>
+                }
+
+                @if (Can(Capabilities.InUseView))
+                {
+                    <MudNavLink Href="in-use" Icon="@Icons.Material.Filled.FactCheck">In Use</MudNavLink>
+                }
+
+                @if (Can(Capabilities.AnnouncementDrafts))
+                {
+                    <MudNavLink Href="announcements" Icon="@Icons.Material.Filled.Campaign">Planlı Çalışma Duyuruları</MudNavLink>
+                }
             }
 
-            @* Every operator with Resources.View gets the catalogue; management is a separate
-               capability the API grants only to Admin and the assigned curator role. *@
-            @if (Can(Capabilities.InUseView))
+            @if (CanAnyIdentity)
             {
-                <MudNavLink Href="in-use" Icon="@Icons.Material.Filled.FactCheck">In Use</MudNavLink>
-            }
-
-            @if (Can(Capabilities.AnnouncementDrafts))
-            { <MudNavLink Href="announcements" Icon="@Icons.Material.Filled.Email">Planlı Çalışma Duyuruları</MudNavLink> }
-
-            @* Service Accounts: gated on the module's own View capability; import, reports and module administration
-               are reached from the module pages, each behind its own capability. *@
-            @if (Can(ServiceAccountCapabilities.View))
-            {
-                <MudNavLink Href="service-accounts" Icon="@Icons.Material.Filled.ManageAccounts">Servis Hesapları</MudNavLink>
-            }
-
-            @if (Can(Capabilities.ResourcesView))
-            {
-                <div class="so-nav-group">KAYNAKLAR</div>
-
-                <MudNavLink Href="resources" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Link">
-                    Uygulama Bağlantıları
-                </MudNavLink>
-
-                <MudNavLink Href="resources/sets" Icon="@Icons.Material.Filled.PlaylistPlay">
-                    Kişisel bağlantı gruplarım
-                </MudNavLink>
-
-            }
-
-            @if (CanAnyDirectory)
-            {
-                <div class="so-nav-group" lang="en">ACTIVE DIRECTORY</div>
+                <div class="so-nav-group">Kimlik ve hesaplar</div>
 
                 @if (Can(Capabilities.IdentityLookup))
                 {
@@ -85,6 +72,29 @@
                         AD Grup Analizi
                     </MudNavLink>
                 }
+
+                @* Service Accounts: gated on the module's own View capability; import, reports and
+                   module administration are reached from the module pages, each behind its own
+                   capability. *@
+                @if (Can(ServiceAccountCapabilities.View))
+                {
+                    <MudNavLink Href="service-accounts" Icon="@Icons.Material.Filled.ManageAccounts">Servis Hesapları</MudNavLink>
+                }
+            }
+
+            @* Every operator with Resources.View gets the catalogue; management is a separate
+               capability the API grants only to Admin and the assigned curator role. *@
+            @if (Can(Capabilities.ResourcesView))
+            {
+                <div class="so-nav-group">Bağlantılar</div>
+
+                <MudNavLink Href="resources" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Link">
+                    Uygulama Bağlantıları
+                </MudNavLink>
+
+                <MudNavLink Href="resources/sets" Icon="@Icons.Material.Filled.PlaylistPlay">
+                    Kişisel bağlantı gruplarım
+                </MudNavLink>
             }
 
             @* Cross-user analytics is a separate privilege from doing the work. An operator who can
@@ -97,76 +107,85 @@
                no current product evidence asks for it at that level. *@
             @if (Can(Capabilities.ManagementReportingView))
             {
-                <div class="so-nav-group">RAPORLAMA</div>
+                <div class="so-nav-group">Raporlar</div>
 
                 <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Insights">
                     Yönetim Panosu
                 </MudNavLink>
             }
 
+            @* Administration is folded by default and opens itself when the current page is one of
+               its own, so the everyday menu stays short without hiding where the operator is. *@
             @if (CanAnyAdministration)
             {
-                <div class="so-nav-group">YÖNETİM</div>
+                <MudNavGroup Title="Yönetim" Icon="@Icons.Material.Filled.AdminPanelSettings"
+                             @bind-Expanded="_adminExpanded" Class="so-nav-admin">
+                    @if (Can(Capabilities.ResourcesView) && Can(Capabilities.ResourcesManage))
+                    {
+                        <MudNavLink Href="admin/resources" Icon="@Icons.Material.Filled.FolderSpecial" data-guide="management-link">
+                            Bağlantı Yönetimi
+                        </MudNavLink>
+                    }
 
-                @if (Can(Capabilities.ResourcesView) && Can(Capabilities.ResourcesManage))
-                {
-                    <MudNavLink Href="admin/resources" Icon="@Icons.Material.Filled.FolderSpecial" data-guide="management-link">
-                        Bağlantı Yönetimi
-                    </MudNavLink>
-                }
+                    @if (Can(Capabilities.AccessApproveRequests))
+                    {
+                        <MudNavLink Href="access/requests" Icon="@Icons.Material.Filled.HowToReg">
+                            Erişim Talepleri
+                        </MudNavLink>
+                    }
 
-                @if (Can(Capabilities.AccessApproveRequests))
-                {
-                    <MudNavLink Href="access/requests" Icon="@Icons.Material.Filled.AdminPanelSettings">
-                        Erişim Talepleri
-                    </MudNavLink>
-                }
+                    @* Gated on ManageUsers rather than ApproveRequests: the users read model is a
+                       different capability, and an approver without it would get a blocked page. *@
+                    @if (Can(Capabilities.AccessManageUsers))
+                    {
+                        <MudNavLink Href="access/users" Icon="@Icons.Material.Filled.Group">
+                            Kullanıcılar
+                        </MudNavLink>
 
-                @* Gated on ManageUsers rather than ApproveRequests: the users read model is a
-                   different capability, and an approver without it would get a blocked page. *@
-                @if (Can(Capabilities.AccessManageUsers))
-                {
-                    <MudNavLink Href="access/users" Icon="@Icons.Material.Filled.Group">
-                        Kullanıcılar
-                    </MudNavLink>
+                        <MudNavLink Href="admin/sessions" Icon="@Icons.Material.Filled.Devices">
+                            Aktif Oturumlar
+                        </MudNavLink>
 
-                    <MudNavLink Href="admin/sessions" Icon="@Icons.Material.Filled.Devices">
-                        Aktif Oturumlar
-                    </MudNavLink>
-
-                    <MudNavLink Href="admin/system-status" Icon="@Icons.Material.Filled.MonitorHeart">
-                        Sistem Durumu
-                    </MudNavLink>
-                }
+                        <MudNavLink Href="admin/system-status" Icon="@Icons.Material.Filled.MonitorHeart">
+                            Sistem Durumu
+                        </MudNavLink>
+                    }
+                </MudNavGroup>
             }
 
-            <div class="so-nav-group">HESABIM</div>
+            <div class="so-nav-footer">
+                <MudNavLink Href="access/me" Icon="@Icons.Material.Filled.VerifiedUser">
+                    Erişimim
+                </MudNavLink>
 
-            <MudNavLink Href="access/me" Icon="@Icons.Material.Filled.VerifiedUser">
-                Erişimim
-            </MudNavLink>
+                <p class="so-nav-planned">
+                    <span>Planlandı:</span>
+                    <a href="audit-compliance">Denetim ve Uyum</a>
+                    <span aria-hidden="true">·</span>
+                    <a href="diagnostics-readonly">Salt Okunur Tanılama</a>
+                </p>
 
-            <div class="so-nav-group">SONRAKİ FAZLAR</div>
-
-            <MudNavLink Href="audit-compliance" Icon="@Icons.Material.Filled.FactCheck">
-                Denetim ve Uyum
-                <span class="so-nav-tag">Planlandı</span>
-            </MudNavLink>
-
-            <MudNavLink Href="diagnostics-readonly" Icon="@Icons.Material.Filled.Terminal">
-                Salt Okunur Tanılama
-                <span class="so-nav-tag">Planlandı</span>
-            </MudNavLink>
+                @if (ShellMode.ShowEnvironmentMarker)
+                {
+                    <p class="so-nav-env">@ShellMode.EnvironmentName ortamı · üretim değildir</p>
+                }
+            </div>
         </Authorized>
     </AuthorizeView>
 </MudNavMenu>
+</nav>
 
 @code {
     private AccessSnapshot? _snapshot;
+    private bool _adminExpanded;
+
+    private static readonly string[] _adminRoutes = ["admin/", "access/requests", "access/users", "access/roles"];
 
     protected override async Task OnInitializedAsync()
     {
         AccessProvider.Changed += OnAccessChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+        _adminExpanded = IsAdminRoute(Navigation.Uri);
         _snapshot = await AccessProvider.GetAsync();
     }
 
@@ -176,14 +195,37 @@
         StateHasChanged();
     });
 
+    // Opens the group when navigation lands inside it; never folds it while the operator is there.
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (!_adminExpanded && IsAdminRoute(args.Location))
+        {
+            _adminExpanded = true;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private bool IsAdminRoute(string uri)
+    {
+        string relative = Navigation.ToBaseRelativePath(uri);
+        return _adminRoutes.Any(route => relative.StartsWith(route, StringComparison.OrdinalIgnoreCase));
+    }
+
     private bool Can(string capability) => _snapshot?.Can(capability) == true;
 
-    private bool CanAnyDirectory =>
-        Can(Capabilities.IdentityLookup) || Can(Capabilities.DirectoryGroupsView);
+    private bool CanAnyShiftWork =>
+        Can(Capabilities.OperationalRecordsView) || Can(Capabilities.InUseView) || Can(Capabilities.AnnouncementDrafts);
+
+    private bool CanAnyIdentity =>
+        Can(Capabilities.IdentityLookup) || Can(Capabilities.DirectoryGroupsView) || Can(ServiceAccountCapabilities.View);
 
     private bool CanAnyAdministration =>
         Can(Capabilities.AccessApproveRequests) || Can(Capabilities.AccessManageUsers)
         || Can(Capabilities.ResourcesView) && Can(Capabilities.ResourcesManage);
 
-    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+    public void Dispose()
+    {
+        AccessProvider.Changed -= OnAccessChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
 }

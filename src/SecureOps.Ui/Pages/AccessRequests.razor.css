@@ -3,9 +3,15 @@
 .so-page ::deep .mud-button-root,.so-page input,.so-page select { min-height:44px; }
 .so-access-requests ::deep .so-panel { background:transparent;box-shadow:none;border-radius:0;padding:16px 0; }
 .so-access-requests ::deep .so-admin-grid { gap:24px; }
-.so-access-requests ::deep .so-admin-detail { border-left:1px solid var(--mud-palette-divider);padding-left:24px; }
+.so-access-requests ::deep .so-admin-detail { border-left:1px solid var(--so-border);padding-left:24px;position:sticky;top:76px; }
 .request-search { display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0; }
-.request-search input { flex:1;min-width:180px;max-width:480px;height:40px;padding:0 12px;border:1px solid var(--mud-palette-lines-inputs);background:var(--mud-palette-surface);color:var(--mud-palette-text-primary);border-radius:4px; }
-.request-search input:focus { outline:2px solid var(--mud-palette-primary);outline-offset:2px; }
-.request-pagination { display:flex;align-items:center;justify-content:flex-start;gap:12px;min-height:56px; }
-@media(max-width:700px) { .so-access-requests ::deep .so-admin-detail { border-left:0;border-top:1px solid var(--mud-palette-divider);padding:16px 0; } .request-search label { width:100%; } }
+.request-search input { flex:1;min-width:180px;max-width:480px;height:40px;padding:0 12px;border:1px solid var(--so-border-input);background:var(--so-surface);color:var(--so-text);border-radius:4px; }
+.request-search input:focus { outline:2px solid var(--so-accent-strong);outline-offset:2px; }
+.request-list-head { display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap; }
+.request-pagination { display:flex;align-items:center;gap:4px;font-size:14px;font-variant-numeric:tabular-nums; }
+.request-order { margin:4px 0 0;font-size:14px;color:var(--so-text-muted); }
+.request-rows ::deep .so-request-row { padding:10px 12px;border-bottom:1px solid var(--so-border-soft);border-radius:0; }
+.request-rows ::deep .so-request-name { font-size:16px; }
+.request-rows ::deep .so-request-meta { font-size:14px; }
+.request-rows ::deep .so-request-row:focus-visible { outline:2px solid var(--so-accent-strong);outline-offset:-2px; }
+@media(max-width:1024px) { .so-access-requests ::deep .so-admin-detail { position:static;border-left:0;border-top:1px solid var(--so-border);padding:16px 0; } .request-search label { width:100%; } }

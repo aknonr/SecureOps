@@ -1,5 +1,12 @@
 # tests/
 
+G-30 build policy: exact SDK 9.0.317 (`global.json`, no roll-forward), C# 12.0,
+analyzer level 9.0, unchanged net8.0 runtime. Build/test without a LangVersion
+command-line override. DPAPI key persistence uses WindowsFact/WindowsTheory;
+Windows runs must execute these cases, not skip them. Portable ephemeral and
+configuration rejection cases run everywhere. No other platform failures are
+waived. See docs/26-ui-backend-contract-gaps.md, G-30.
+
 Numbered-release SQL selection has a focused Windows runner at
 `release/Test-PairedReleaseSqlSelection.ps1`. A new private evidence directory
 is mandatory; optional `-VerifySqlCmd -DatabaseSuffix <unique suffix>` exercises

@@ -4183,51 +4183,12 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
 
 /* -- sign-in field motion ------------------------------------------------ */
 
-/* The hub pulses slowly and the aircraft flies the highlighted route once every
-   quarter minute. Both are ambient: slow enough to read as atmosphere rather
-   than as something demanding attention on a sign-in screen. */
-.so-auth-hub-glow {
-    transform-origin: 430px 540px;
-    animation: so-hub-pulse 4.5s ease-in-out infinite;
-}
-
-.so-auth-route-hot {
-    filter: drop-shadow(0 0 6px rgb(201 1 25 / 45%));
-}
-
-.so-auth-plane {
-    offset-path: path("M322 193 Q 250 120 168 104");
-    offset-rotate: auto;
-    animation: so-plane-fly 16s ease-in-out infinite;
-}
-
+/* The hub pulse is shared with the loading panel. Aircraft on the sign-in field are
+   driven by SVG animateMotion in LoginLayout.cshtml, so they always ride the drawn
+   route; see the flight-network rules below. */
 @keyframes so-hub-pulse {
     0%, 100% { transform: scale(0.9); opacity: 0.75; }
     50%      { transform: scale(1.12); opacity: 1; }
-}
-
-
-@keyframes so-plane-fly {
-    0%   { offset-distance: 0%; opacity: 0; }
-    8%   { opacity: 1; }
-    35%  { offset-distance: 100%; opacity: 1; }
-    88%  { offset-distance: 100%; opacity: 1; }
-    100% { offset-distance: 100%; opacity: 0; }
-}
-
-/* Nothing on this page needs motion to be understood: the route, the hub, and
-   the aircraft are all decoration. Under reduced motion the route is simply
-   drawn and the aircraft parked at its end. */
-@media (prefers-reduced-motion: reduce) {
-    .so-auth-hub-glow,
-    .so-auth-plane {
-        animation: none;
-    }
-
-    .so-auth-plane {
-        offset-distance: 100%;
-        opacity: 1;
-    }
 }
 
 /* =============================================================================
@@ -4296,6 +4257,28 @@ html[data-so-appearance="night"] .so-auth-body {
     --so-art-muted: #9eacbf;
 }
 
+/* The artwork (photo, routes, lockup) follows the Istanbul clock via data-so-sky;
+   declared after the appearance blocks so the sky wins for --so-art-* only. */
+html[data-so-sky="day"] .so-auth-body {
+    --so-art-route: rgb(255 255 255 / 92%);
+    --so-art-route-glow: rgb(10 40 70 / 55%);
+    --so-art-route-node: #ffffff;
+    --so-art-text: #172334;
+    --so-art-plane-bright: #ffffff;
+    --so-art-plane: #e8edf2;
+    --so-art-plane-shade: #aeb8c4;
+}
+
+html[data-so-sky="night"] .so-auth-body {
+    --so-art-route: rgb(255 214 160 / 80%);
+    --so-art-route-glow: rgb(244 181 106 / 70%);
+    --so-art-route-node: #ffd9a6;
+    --so-art-text: #ffffff;
+    --so-art-plane-bright: #ffffff;
+    --so-art-plane: #dfe6ef;
+    --so-art-plane-shade: #8f9bab;
+}
+
 .so-auth-shell {
     isolation: isolate;
     min-height: 100svh;
@@ -4321,6 +4304,9 @@ html[data-so-appearance="night"] .so-auth-shell::before {
 }
 
 .so-auth-art {
+    --so-photo-x: 48%;
+    /* Own stacking context so the route overlay always stays beneath the sign-in card. */
+    z-index: 0;
     position: absolute;
     inset: 0 auto 0 0;
     width: 100%;
@@ -4380,7 +4366,7 @@ html[data-so-appearance="night"] .so-auth-shell::before {
     background-image: url("../brand/approved/wasas-earth-day.webp");
     background-repeat: no-repeat;
     background-size: auto 100%;
-    background-position: 48% center;
+    background-position: var(--so-photo-x) center;
     filter: saturate(0.92) brightness(1.02) contrast(0.98);
 }
 
@@ -4393,26 +4379,12 @@ html[data-so-appearance="night"] .so-auth-shell::before {
         linear-gradient(180deg, rgb(8 32 55 / 7%), transparent 38%, rgb(8 32 55 / 4%));
 }
 
-html[data-so-appearance="dark"] .so-auth-photo,
-html[data-so-appearance="night"] .so-auth-photo {
+html[data-so-sky="night"] .so-auth-photo {
     background-image: url("../brand/approved/wasas-earth-night.webp");
-}
-
-html[data-so-appearance="dark"] .so-auth-photo {
     filter: saturate(0.92) brightness(0.78) contrast(1.06);
 }
 
-html[data-so-appearance="dark"] .so-auth-photo::after {
-    background:
-        linear-gradient(90deg, rgb(1 8 17 / 10%) 0 54%, rgb(2 8 16 / 54%) 76%, rgb(2 8 16 / 84%) 100%),
-        linear-gradient(180deg, rgb(1 8 17 / 12%), rgb(1 8 17 / 24%));
-}
-
-html[data-so-appearance="night"] .so-auth-photo {
-    filter: saturate(0.92) brightness(0.78) contrast(1.06);
-}
-
-html[data-so-appearance="night"] .so-auth-photo::after {
+html[data-so-sky="night"] .so-auth-photo::after {
     background:
         linear-gradient(90deg, rgb(1 8 17 / 10%) 0 54%, rgb(2 8 16 / 54%) 76%, rgb(2 8 16 / 84%) 100%),
         linear-gradient(180deg, rgb(1 8 17 / 12%), rgb(1 8 17 / 24%));
@@ -4422,19 +4394,63 @@ html[data-so-appearance="light"] .so-auth-map {
     filter: drop-shadow(0 1px 1px rgb(26 73 104 / 18%));
 }
 
-.so-auth-field {
+/* -- flight network ------------------------------------------------------ */
+
+/* The overlay is sized and placed exactly like the photo background: full height,
+   the photo's own aspect ratio, and the same horizontal position (left X% plus
+   translateX(-X%) is background-position X%). Route coordinates are photo pixels,
+   so Istanbul stays under the hub at every viewport and breakpoint. */
+.so-auth-flights {
+    position: absolute;
     z-index: 2;
-    width: 62%;
+    top: 0;
+    left: var(--so-photo-x);
+    height: 100%;
+    width: auto;
+    aspect-ratio: 1672 / 468;
+    transform: translateX(calc(-1 * var(--so-photo-x)));
     overflow: visible;
+    pointer-events: none;
 }
 
-.so-auth-routes {
-    opacity: 0.55;
+.so-auth-route {
+    stroke: var(--so-art-route);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-dasharray: 1 7;
+    animation: so-route-flow 2.4s linear infinite;
+    filter: drop-shadow(0 0 2px var(--so-art-route-glow));
 }
 
 .so-auth-destinations {
-    opacity: 0.76;
+    fill: var(--so-art-route-node);
     filter: drop-shadow(0 0 4px var(--so-art-route-node));
+}
+
+.so-auth-plane use {
+    filter: drop-shadow(0 4px 4px rgb(0 0 0 / 38%));
+}
+
+.so-aircraft-navlights {
+    display: none;
+}
+
+html[data-so-sky="night"] .so-aircraft-navlights {
+    display: inline;
+}
+
+.so-aircraft-strobe {
+    animation: so-strobe 1.4s steps(1, end) infinite;
+}
+
+/* Dashes travel away from the hub: the network reads as departures from Istanbul. */
+@keyframes so-route-flow {
+    to { stroke-dashoffset: -16; }
+}
+
+@keyframes so-strobe {
+    0%, 100% { opacity: 0; }
+    8%       { opacity: 1; }
 }
 
 .so-auth-stage {
@@ -4559,7 +4575,9 @@ html[data-so-appearance="light"] .so-auth-card {
 }
 
 .so-auth-hub-glow {
-    transform-origin: 463px 198px;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: so-hub-pulse 4.5s ease-in-out infinite;
 }
 
 .so-auth-hub-ring {
@@ -4567,18 +4585,6 @@ html[data-so-appearance="light"] .so-auth-card {
     stroke: var(--so-art-accent);
     stroke-width: 1.8;
     filter: drop-shadow(0 0 6px var(--so-art-accent));
-}
-
-.so-auth-route-hot {
-    filter: drop-shadow(0 0 4px rgb(201 1 25 / 50%));
-}
-
-.so-auth-plane {
-    offset-path: path("M463 198 Q 350 82 199 123");
-    offset-distance: 0%;
-    offset-rotate: auto;
-    animation: so-plane-fly-reference 14s linear infinite;
-    filter: drop-shadow(0 4px 5px rgb(0 0 0 / 42%));
 }
 
 .so-aircraft-shadow {
@@ -4597,13 +4603,6 @@ html[data-so-appearance="light"] .so-auth-card {
     stroke-linecap: round;
 }
 
-@keyframes so-plane-fly-reference {
-    0%, 2% { offset-distance: 0%; opacity: 0; }
-    7% { offset-distance: 0%; opacity: 1; }
-    78% { offset-distance: 100%; opacity: 1; }
-    84%, 100% { offset-distance: 100%; opacity: 0; }
-}
-
 @media (max-width: 1099px) {
     .so-auth-art {
         width: 100%;
@@ -4616,8 +4615,8 @@ html[data-so-appearance="light"] .so-auth-card {
         width: 100%;
     }
 
-    .so-auth-photo {
-        background-position: 36% center;
+    .so-auth-art {
+        --so-photo-x: 36%;
     }
 
     .so-auth-stage {
@@ -4640,8 +4639,8 @@ html[data-so-appearance="light"] .so-auth-card {
         opacity: 0.46;
     }
 
-    .so-auth-photo {
-        background-position: 38% center;
+    .so-auth-art {
+        --so-photo-x: 38%;
     }
 
     .so-auth-stage {
@@ -4664,8 +4663,8 @@ html[data-so-appearance="light"] .so-auth-card {
 }
 
 @media (max-width: 520px) {
-    .so-auth-photo {
-        background-position: 39% center;
+    .so-auth-art {
+        --so-photo-x: 39%;
     }
 
     .so-auth-stage {
@@ -4722,10 +4721,10 @@ html[data-so-appearance="light"] .so-auth-card {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .so-auth-plane {
-        offset-distance: 58%;
+    .so-auth-route,
+    .so-auth-hub-glow,
+    .so-aircraft-strobe {
         animation: none;
-        opacity: 1;
     }
 }
 
@@ -4978,50 +4977,122 @@ html[data-so-appearance="light"] .so-auth-card {
     background: color-mix(in srgb, var(--so-appbar-text) 5%, transparent);
 }
 
+/* Navigation is chrome on the shared navy (theme DrawerBackground). Text and icons
+   come from the drawer palette; red appears only as the active marker, never as
+   text, because red type on navy does not meet contrast. */
 .so-drawer {
-    border-right-color: color-mix(in srgb, var(--so-border) 78%, transparent);
-    box-shadow: 8px 0 24px rgb(0 0 0 / 5%);
+    border-right: 1px solid color-mix(in srgb, var(--mud-palette-drawer-text) 10%, transparent);
+    box-shadow: 8px 0 24px rgb(0 0 0 / 8%);
+}
+
+.so-nav-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
 }
 
 .so-nav {
-    padding: 10px 0 22px;
+    display: flex;
+    flex-direction: column;
+    flex: 1 0 auto;
+    padding: 10px 0 14px;
 }
 
 .so-nav-group {
-    padding: 17px 18px 5px;
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
+    padding: 18px 20px 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--mud-palette-drawer-text) 62%, transparent);
 }
 
-.so-nav .mud-nav-link {
+.so-nav .mud-nav-link,
+.so-nav .mud-nav-group > .mud-nav-link {
     min-height: 42px;
-    margin: 2px 8px;
+    margin: 2px 10px;
     padding: 8px 12px;
-    border-radius: 5px;
+    border-radius: 6px;
     color: var(--mud-palette-drawer-text);
-    font-size: 0.84rem;
+    font-size: 0.86rem;
     line-height: 1.35;
 }
 
 .so-nav .mud-nav-link .mud-nav-link-icon {
-    margin-inline-end: 12px;
+    margin-inline-end: 10px;
     color: var(--mud-palette-drawer-icon);
 }
 
 .so-nav .mud-nav-link:hover,
 .so-nav .mud-nav-link:focus-visible {
-    background: color-mix(in srgb, var(--so-text-muted) 9%, transparent);
+    background: color-mix(in srgb, var(--mud-palette-drawer-text) 9%, transparent);
+    color: var(--mud-palette-drawer-text);
+}
+
+.so-nav .mud-nav-link:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--mud-palette-drawer-text) 70%, transparent);
+    outline-offset: -2px;
 }
 
 .so-nav .mud-nav-link.active {
-    color: var(--so-brand) !important;
-    background: color-mix(in srgb, var(--so-brand) 11%, transparent);
+    color: #ffffff !important;
+    background: color-mix(in srgb, var(--mud-palette-drawer-text) 14%, transparent) !important;
     box-shadow: inset 3px 0 0 var(--so-brand);
     font-weight: 650;
 }
 
 .so-nav .mud-nav-link.active .mud-nav-link-icon {
-    color: var(--so-brand) !important;
+    color: #ffffff !important;
+}
+
+/* Administration folds; its heading reads like the section headings above it. */
+.so-nav .so-nav-admin {
+    margin-top: 10px;
+}
+
+.so-nav .so-nav-admin > .mud-nav-link .mud-nav-link-text {
+    font-weight: 600;
+}
+
+.so-nav .so-nav-admin .mud-navgroup-collapse .mud-nav-link {
+    padding-inline-start: 22px;
+}
+
+.so-nav .mud-nav-link-expand-icon,
+.so-nav .mud-nav-link-expand-icon.mud-transform {
+    color: var(--mud-palette-drawer-icon) !important;
+    fill: currentColor !important;
+}
+
+.so-nav-footer {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid color-mix(in srgb, var(--mud-palette-drawer-text) 12%, transparent);
+}
+
+.so-nav-planned,
+.so-nav-env {
+    margin: 6px 22px 0;
+    font-size: 0.74rem;
+    line-height: 1.5;
+    color: color-mix(in srgb, var(--mud-palette-drawer-text) 62%, transparent);
+}
+
+.so-nav-planned a {
+    color: color-mix(in srgb, var(--mud-palette-drawer-text) 82%, transparent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.so-nav-planned a:focus-visible {
+    outline: 2px solid var(--mud-palette-drawer-text);
+    outline-offset: 2px;
+}
+
+.so-nav-env {
+    margin-bottom: 4px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 .so-main {

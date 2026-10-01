@@ -11,11 +11,17 @@ namespace SecureOps.Tests.Integration.Ui;
 
 public sealed class UiPersistentDataProtectionTests
 {
-    [Theory]
-    [InlineData("Ephemeral", false, false)]
+    [Fact]
+    public Task Antiforgery_EphemeralRestartRejectsToken() =>
+        AssertAntiforgeryRestartAsync("Ephemeral", false, false);
+
+    [WindowsTheory]
     [InlineData("FileSystemDpapi", false, true)]
     [InlineData("FileSystemDpapi", true, false)]
-    public async Task Antiforgery_RestartRequiresPersistentKeysAndStableApplication(string mode, bool differentApplication, bool valid)
+    public Task Antiforgery_RestartRequiresPersistentKeysAndStableApplication(string mode, bool differentApplication, bool valid) =>
+        AssertAntiforgeryRestartAsync(mode, differentApplication, valid);
+
+    private static async Task AssertAntiforgeryRestartAsync(string mode, bool differentApplication, bool valid)
     {
         string path = Path.Combine(Path.GetTempPath(), $"secureops-csrf-{Guid.NewGuid():N}");
         WebApplication Host(string application)
@@ -62,7 +68,7 @@ public sealed class UiPersistentDataProtectionTests
         }
     }
 
-    [Fact]
+    [WindowsFact]
     public void PersistentKeyRing_SurvivesUiProviderRecreation()
     {
         string keyRingPath = Path.Combine(Path.GetTempPath(), $"secureops-ui-dp-{Guid.NewGuid():N}");

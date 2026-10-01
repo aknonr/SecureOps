@@ -68,9 +68,11 @@ public static class SecureOpsTheme
             Background = "#EEF1F6",
             BackgroundGrey = "#E4E9F1",
             Surface = "#FFFFFF",
-            DrawerBackground = "#FFFFFF",
-            DrawerText = "#28344A",
-            DrawerIcon = "#46566E",
+            // Navigation is chrome, so it shares the app bar's navy: one L-shaped corporate frame
+            // around a light reading surface, in every appearance.
+            DrawerBackground = "#14233F",
+            DrawerText = "#D9E1EE",
+            DrawerIcon = "#9FB1CB",
             AppbarBackground = "#14233F",
             AppbarText = "#FFFFFF",
             TextPrimary = "#1A2433",
@@ -141,7 +143,7 @@ public static class SecureOpsTheme
         },
         LayoutProperties = new LayoutProperties
         {
-            DrawerWidthLeft = "248px",
+            DrawerWidthLeft = "264px",
             DefaultBorderRadius = "8px"
         },
         Typography = new Typography

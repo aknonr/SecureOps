@@ -41,7 +41,9 @@
             <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search">Ara</MudButton>
         </form>
         @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="LoadAsync" /> }
-        <div aria-live="polite" class="so-access-count">@(_page is null ? "" : $"{_page.Total} eşleşen kullanıcı")</div>
+        @* The server pages users in its own stable order, not by name or last sign-in; say so rather
+           than imply an order the list does not have. *@
+        <div aria-live="polite" class="so-access-count">@(_page is null ? "" : $"{_page.Total} eşleşen kullanıcı · sıralama sunucu tarafından belirlenir (ada veya son oturuma göre değildir)")</div>
         @if (_loading) { <SoLoading Message="Kullanıcılar yükleniyor" Bare="true" /> }
         else if (_page?.Items.Count == 0) { <p>Eşleşen kullanıcı yok.</p> }
         else if (_page is not null)
@@ -52,7 +54,11 @@
                 {
                     <a class="so-access-table-row" role="row" href="@DetailLink(user.UserId)">
                         <span role="cell"><strong>@AccessIdentityDisplay.Name(user.Profile, user.CorporateIdentity)</strong><small>@user.Profile?.Account</small><small>@user.Profile?.Email</small></span>
-                        <span role="cell">@string.Join(", ", user.Roles.Select(code => _roles.FirstOrDefault(role => role.Code == code) is { } role ? RoleName(role) : AccessLabels.RoleLabel(code)))</span>
+                        <span role="cell" class="so-access-roles">
+                            @if (user.Roles.Count == 0) { <small>Rol yok</small> }
+                            @foreach (string roleCode in user.Roles)
+                            { <span class="so-chip so-chip--quiet" title="@roleCode">@(_roles.FirstOrDefault(role => role.Code == roleCode) is { } role ? RoleName(role) : AccessLabels.RoleLabel(roleCode))</span> }
+                        </span>
                         <span role="cell"><SoStatusBadge Label="@AccessUserView.StatusLabel(user)" Tone="@AccessUserView.StatusTone(user)" /></span>
                         <span role="cell">@user.LastAuthenticatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")<MudIcon Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" /></span>
                     </a>

@@ -148,9 +148,30 @@ public sealed class WasasBrandingTests
             renderedMarkup,
             "<g class=\"so-auth-routes\".*?</g>",
             RegexOptions.Singleline);
-        Regex.Matches(routes.Value, "<path ").Should().HaveCount(4);
-        css.Should().Contain("animation: so-plane-fly-reference 14s linear infinite");
-        css.Should().Contain("84%, 100% { offset-distance: 100%; opacity: 0; }");
+        Regex.Matches(routes.Value, "<path ").Should().HaveCount(7);
+    }
+
+    [Fact]
+    public void LoginFlights_RideTheirDrawnRoutesBothWays_AndSkyFollowsIstanbulClock()
+    {
+        string layout = File.ReadAllText(Path.Combine(UiRoot(), "Pages", "LoginLayout.cshtml"));
+        string css = File.ReadAllText(Path.Combine(UiRoot(), "wwwroot", "css", "secureops-theme.css"));
+
+        // Every route carries one outbound and one inbound aircraft bound to that same path, so the
+        // drawn line and the flown path cannot diverge (the old offset-path copy did).
+        string[] routeIds = Regex.Matches(layout, "<path id=\"(so-route-[a-z-]+)\"").Select(m => m.Groups[1].Value).ToArray();
+        routeIds.Should().HaveCount(7).And.OnlyHaveUniqueItems();
+        foreach (string id in routeIds)
+        {
+            Regex.Matches(layout, $"<mpath href=\"#{id}\" />").Should().HaveCount(2, id);
+        }
+
+        layout.Should().Contain("keyPoints=\"1;0\"").And.Contain("rotate=\"auto-reverse\"");
+        layout.Should().Contain("timeZone: \"Europe/Istanbul\"").And.Contain("dataset.soSky");
+        layout.Should().Contain("pauseAnimations()");
+        css.Should().Contain("html[data-so-sky=\"night\"] .so-auth-photo");
+        css.Should().Contain("aspect-ratio: 1672 / 468");
+        css.Should().NotContain("so-plane-fly-reference");
     }
 
     [Fact]

@@ -1,0 +1,3 @@
+.so-integration--configured { border-left-color:var(--so-info); }
+.so-integration-status { margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--so-text); }
+.so-integration-note { display:flex;gap:6px;align-items:flex-start;margin:8px 0 0;font-size:14px;color:var(--so-text-muted); }

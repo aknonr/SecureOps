@@ -1,10 +1,83 @@
 # SecureOps.Ui
 
+## PR #3 Windows Verification, 2026-10-02
+
+The original UI tip 77a59dc is combined with the G-30 deterministic toolchain
+repair. SDK 9.0.317 is exact; C# 12.0/analyzers 9.0 target net8.0 without a
+command-line language override. Runtime inputs c7ff942 passed Windows solution
+build, 1,597 unit and 322 integration (61 opt-in skips); 663 UI/render cases
+are part of the unit total. Native DPAPI cases run on Windows, never skipped.
+See the single docs/integrated-test-activation.md register for TRX paths and
+separate isolated SQL/browser evidence, retained failures and limitations.
+The access browser now matches the explanatory queue/impact text while retaining
+exact count, preview, concurrency and denied-actor assertions. The PR3 usability
+runner checks both themes/mobile/keyboard and actual Chrome 200% zoom with
+physical-width screenshots. These are synthetic local composition journeys,
+not normal corporate OIDC, IIS, SQL permissions or installation acceptance.
+G-19 through G-25 fallbacks remain; G-26 gMSA is a separate supported-directory
+repair/real TEST check, not silently fixed. G-27 through G-29 are not implemented.
+The older a457 review packages lack this UI. A new exact-source matched review
+is required; neither source merge nor this evidence authorizes deployment.
+
 In Use closure now confirms the exact OR and archived report before submission,
 and distinguishes acknowledged, unknown, rejected, source-verified and manually
 confirmed results. Manual confirmation is explicit and capability-gated; its time
 is displayed in UTC. No source URL was inferred. Component rendering is locally
 testable; browser/200%-zoom and corporate closure still require their existing gates.
+
+## Access And Management Usability Pass, 2026-10-01
+
+UI-only pass (Claude) on branch `feature/ui-access-management-20261001`; no API, SQL or contract change.
+
+- **Capability labels.** `AccessLabels` now describes every `ServiceAccounts.*` action, groups
+  capabilities by function (OR, In Use, OCO, Servis Hesapları, Kimlik, Bağlantılar, Erişim,
+  Denetim) and sorts unknown groups last. `ModuleOrder`/`ModuleGuidance` key on the server catalogue's
+  own module names. `HeldRoleLabel` shows an administrator-defined role as "İş rolü" (code as tooltip).
+- **Rol tanımları.** Wider role list (purpose, action and module counts, protected tag); the first
+  role opens on load (read only). Actions are `AccessModuleCard`s per server module with "x / y seçili",
+  written guidance, a Service Accounts scope note and an "Eklenecek/Çıkarılacak" word on changed rows.
+  Non-assignable historical actions are collapsed. A sticky bar summarises the definition draft; who
+  gains or loses access is still known only from the server preview, which remains mandatory.
+- **Erişim talepleri.** Compact rows (name, one secondary line, waiting time or decision time), a
+  7-day long-wait label, pager above the list and an explicit statement of the server order (newest
+  first). After a decision, "Listedeki ilk bekleyen talebi aç" is offered; nothing is auto-selected.
+  The approve dialog's permission difference is grouped by module (`AccessActionGroups`).
+- **Erişimim.** Status summary (status, role/capability/area counts, latest request and decision
+  time) and capability cards by area.
+- **Sistem Durumu.** `Configured` is informational "Yapılandırıldı · sınanmadı", never green;
+  `Unavailable` reads "Son çağrı başarısız"; an unreadable provider renders "Okunamadı". The page shows
+  its own UTC read time, the response's simulation/read-only notices and the test-directory note, and
+  lists SQL, audit store, Worker and SMTP as not reported here.
+- **Genel Bakış / Yönetim Panosu.** Management order is window → coverage → summary → attention →
+  detailed report → module panels (which keep their own filters) → quick access, with a focus-based
+  section bar. Quick access adds existing capability-gated routes only. The operator board no longer
+  says the directory "responds"; it shows "Yapılandırıldı · sınanmadı" and only to `Identity.Lookup`.
+
+- **Giriş sayfası.** The flight overlay is locked to the photograph's pixel space (1672x468, same
+  height and `--so-photo-x` position as the photo), so the Istanbul hub stays aligned at every size.
+  Seven routes leave Istanbul for Europe, the Americas and Asia; each carries an outbound and an
+  inbound aircraft driven by SVG `animateMotion` + `mpath` on that same path (the old CSS
+  `offset-path` copy had drifted from the drawn line). The artwork's day/night follows the Istanbul
+  clock (`data-so-sky`, 07:00–19:00 day; appearance is the fallback), night adds navigation lights;
+  the card still follows the reader's appearance. Reduced motion freezes the timeline with aircraft
+  on their routes. No place labels are drawn.
+
+- **Navigasyon.** Groups follow shift work: Vardiya işleri (OR, In Use, Duyurular), Kimlik ve
+  hesaplar (AD kullanıcı/hesap, AD grup, Servis Hesapları), Bağlantılar, Raporlar, then a folded
+  **Yönetim** group that opens itself on its own routes. Planned pages moved to one footer line;
+  Erişimim and the non-production marker sit in the footer. The light theme's drawer now shares the
+  app bar navy (`SecureOpsTheme` DrawerBackground/Text/Icon, width 264px); the active item is white
+  text with the brand-red marker, because red text on navy fails contrast. Capability gates and
+  routes are unchanged.
+
+Missing contract data is recorded as G-19 to G-30 in `docs/26-ui-backend-contract-gaps.md`.
+Verification: targeted unit/render tests and a local Playwright run against a synthetic stub API
+(390px, emulated 200% zoom at 683px CSS width, light/dark, keyboard, denial, loading/error/empty).
+The stub is not committed. Windows/IIS/LocalDB, native browser zoom and corporate data remain unverified.
+Handoff check (Linux, SDK 10.0.112, no `LangVersion` override): `SecureOps.Ui` builds clean, but the
+solution does not build as committed (G-30). With the G-30 test line changed in a throw-away copy only,
+the 663 `SecureOps.Tests.Unit.Ui` tests pass; the remaining unit and integration failures match master
+exactly and are platform-dependent (recorded under G-30).
 
 ## System Status Presentation Continuation, 2026-09-20
 
@@ -228,7 +301,8 @@ wwwroot/css/     secureops-theme.css — semantic tokens only, no colour literal
 ### Shared components
 
 `SoPageHeader`, `SoProblemPanel`, `SoEmptyState`, `SoStatusBadge`, `SoLoading`, `SoFieldGrid` +
-`SoField`, plus the `.so-panel` CSS class. Use these rather than new one-off markup, so states look
+`SoField`, plus the `.so-panel` CSS class. Access screens add `AccessModuleCard` (one server catalogue
+module in the role editor) and `AccessActionGroups` (server-returned action codes grouped by module). Use these rather than new one-off markup, so states look
 the same everywhere.
 
 The four state components map to distinct situations, and mixing them trains operators to misread
@@ -260,6 +334,8 @@ have to be invented.
 | `/access/requests` | Access-request decision queue | `Access.ApproveRequests` |
 | `/access/users` | User list, grouped by access state | `Access.ManageUsers` |
 | `/access/users/{id}` | User detail, role editor, disable | `Access.ManageUsers` |
+| `/access/roles` | Role definitions by module, server impact preview, explicit apply | `Access.ManageUsers` and `Access.AssignRoles` |
+| `/admin/system-status` | Provider settings (configured ≠ healthy) and explicit workflow check | `Access.ManageUsers` (API: Admin); workflow check `SystemDiagnostics` |
 | `/operational-records` | OR → Jira workspace, grouped by attention | `OperationalRecords.View` |
 | `/operational-records/{id}` | Source, workflow, and Jira transfer | `OperationalRecords.View` |
 | `/resources` | Uygulama Bağlantıları: search, favourites, add to a personal group | `Resources.View` |

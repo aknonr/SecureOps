@@ -25,6 +25,18 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-16 — Only identity lookup has daily buckets | Open — confirmed out of scope by `b0e3b7b` |
 | G-17 — Zero and "no persisted history" are indistinguishable | ✅ **Resolved** by backend `b0e3b7b` |
 | G-18 — UI integration contract still calls the directory purpose required | Open — documentation only, no longer reached by the UI |
+| G-19 — `/access/me` gives held role codes but no role names | Open — UI shows "İş rolü" + code |
+| G-20 — Access-request page has one fixed order and no per-status counts | Open — UI states the order |
+| G-21 — Access-user page is ordered by `UserId` | Open — UI states the order is not by name |
+| G-22 — Role definitions carry no assigned-user count | Open — count only after preview |
+| G-23 — Service Accounts scope grants are not readable from access screens | Open — UI shows a scope note |
+| G-24 — Provider health has no check time and no connectivity result | Open — UI labels "sınanmadı" |
+| G-25 — SQL, audit-store and Worker state are not in the System Status contract | Open — UI lists them as unknown |
+| G-26 — gMSA/MSA accounts cannot be looked up | Open — defect candidate, verify in TEST |
+| G-27 — Lookup purpose is unreadable in audit | Open — needs ADR-0008 / docs/27 decision |
+| G-28 — No bounded way to resolve an account from a person's name | Open — needs ADR decision |
+| G-29 — AD lookup does not show the Service Accounts inventory record | Open |
+| G-30 — The solution builds only with a specific SDK/language combination | Repair implemented — pinned SDK/language; Windows verification below |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -762,6 +774,235 @@ route, or on `POST /api/v1/identity/lookup` — the field was removed from both 
 kept as an optional input nobody filled in. So the stale sentence can no longer mislead a UI author
 about what to send. It can still mislead a *backend* reader about what the routes accept, which is
 why the gap stays open rather than being closed by a UI change.
+
+---
+
+## G-19 — `/access/me` gives held role codes but no role names
+
+**Endpoint:** `GET /api/v1/access/me`
+**Severity:** Medium — the signed-in user cannot read the name of an administrator-defined role
+**Status:** Open (raised by the 2026-10-01 access/management UI pass)
+
+`roles` holds codes only. Fixed roles have UI labels, but a business role created on Rol tanımları
+has a generated code (`Business_…`) and its name is readable only through `GET /access/roles`, which
+requires an access-administration capability.
+
+**What the UI does.** Erişimim and Genel Bakış show such a role as **İş rolü**, with the code as a
+tooltip/inline code, and point to the capability list for what it grants. No name is guessed.
+
+**What would resolve it.** `name` (and optionally `purpose`) for each held role on `/access/me`,
+e.g. `heldRoles: [{ code, name, purpose }]`, without exposing other roles.
+
+---
+
+## G-20 — Access-request page has one fixed order and no per-status counts
+
+**Endpoint:** `GET /api/v1/access/requests/page`
+**Severity:** Medium when requests accumulate
+**Status:** Open
+
+Rows are ordered `RequestedAt DESC`; there is no sort parameter, so the longest-waiting pending
+requests are on the last page. The response total covers only the requested status, and each page
+read writes an `AccessRequestsViewed` audit event, so the UI does not issue extra reads to count the
+other tabs.
+
+**What the UI does.** States "en yeni talep üstte; en uzun bekleyenler son sayfadadır", shows the
+waiting time from `requestedAt`, labels pending requests older than 7 days, and keeps the pager above
+the list. It does not re-sort one page.
+
+**What would resolve it.** A `sort=oldest|newest` parameter (oldest first as the pending default) and
+`counts: { pending, approved, rejected }` from the same snapshot.
+
+---
+
+## G-21 — Access-user page is ordered by `UserId`
+
+**Endpoint:** `GET /api/v1/access/users/page`
+**Severity:** Low–medium
+**Status:** Open
+
+`ORDER BY u.UserId` is stable but meaningless to a person. **What the UI does.** Says the order is set
+by the server and is not by name or last sign-in. **What would resolve it.** A sort by display
+name/account and by `lastAuthenticatedAt`.
+
+---
+
+## G-22 — Role definitions carry no assigned-user count
+
+**Endpoint:** `GET /api/v1/access/roles`
+**Severity:** Low
+**Status:** Open
+
+`AccessRoleDefinition` has no count of users holding the role; only a preview returns
+`affectedUsers`. **What the UI does.** Shows action and module counts per role and nothing about
+holders until a preview. **What would resolve it.** `assignedUsers` on each definition, from the same
+read.
+
+---
+
+## G-23 — Service Accounts scope grants are not readable from access screens
+
+**Endpoints:** `GET /api/v1/access/me`, `GET /api/v1/access/users/{id}`
+**Severity:** Medium — a `ServiceAccounts.View` holder without a scope grant sees an empty module
+**Status:** Open
+
+Role capabilities and module scope grants are separate; scope is administered inside Servis
+Hesapları. **What the UI does.** Explains on Rol tanımları and Erişimim that scope is granted
+separately and is not shown there. **What would resolve it.** A read-only scope summary
+(team/organization names and kind) on the user detail and on `/access/me`.
+
+---
+
+## G-24 — Provider health has no check time and no connectivity result
+
+**Endpoints:** `GET /api/v1/health/enterprise-integrations`, `GET /api/v1/health/identity-provider`
+**Severity:** Medium — "Configured" is easy to read as healthy
+**Status:** Open
+
+For Turuncu Hat and Jira, `Configured` means a provider is selected and the API process has recorded
+no failed call since it started; `Unavailable` means the last call failed. No timestamps are
+returned. The identity endpoint always returns `Configured` and tracks no failures.
+
+**What the UI does.** Shows **Yapılandırıldı · sınanmadı** in an informational (not positive) tone,
+explains each state, shows the page's own read time in UTC, shows simulation/read-only/test-provider
+notices from the response, and renders an unreadable provider as **Okunamadı** instead of hiding it.
+
+**What would resolve it.** Per provider `lastSuccessAt`, `lastFailureAt` and process start time, and
+failure tracking for the identity provider. An explicit, authorized connectivity check would be a
+separate decision.
+
+---
+
+## G-25 — SQL, audit-store and Worker state are not in the System Status contract
+
+**Endpoints:** `GET /api/v1/health/persistence`, `GET /api/v1/health/audit-store` (exist in the API)
+**Severity:** Medium for an operator asking "is the platform up"
+**Status:** Open — needs a contract decision before the UI uses them
+
+These routes exist but are not described in `docs/contracts/secureops-api-v1-ui-integration.md`,
+are authenticated-only outside Development rather than Admin-scoped, and Worker/Hangfire state appears
+only as heartbeat evidence inside `GET /api/v1/diagnostics/operations`. **What the UI does.** System
+Status lists SQL Server, audit store, Hangfire/Worker and SMTP under "Bu sayfada durumu
+gösterilmeyenler" as unknown. **What would resolve it.** A documented, Admin-authorized status
+contract (state, observed-at, safe reason code) for these components.
+
+---
+
+## G-26 — gMSA/MSA accounts cannot be looked up
+
+**Endpoints:** `POST /api/v1/identity/lookup`, `POST /api/v1/directory/principals/*`
+**Severity:** High for the Service Accounts work (gMSA transition)
+**Status:** Open — found by reading code (2026-10-01); confirm with a non-sensitive TEST gMSA
+
+`IdentityLookup:AllowedAccountPattern` (`^[a-zA-Z0-9._@-]+$`) and the Directory Explorer input
+pattern (`^[a-zA-Z0-9._@ -]+$`) reject `$`, but every gMSA/MSA `sAMAccountName` ends in `$`.
+Lookups also use `UserPrincipal.FindByIdentity`; gMSA objects derive from the `computer` class, so
+that query is not expected to return them. `AccountTypeEvidence` can report
+`GroupManagedServiceAccount`, but that path is probably unreachable. The group pattern likewise
+rejects Turkish letters, parentheses and `&`, which real group names may contain.
+
+**What would resolve it.** Accept a single trailing `$`; resolve gMSA/MSA by exact `sAMAccountName`
+with an objectClass-bound search (or `ComputerPrincipal`); optionally return who may retrieve the
+managed password (`msDS-GroupMSAMembership`, resolved names) as evidence. Revisit the group pattern
+against the corporate naming standard. The UI would label the type from the existing evidence field.
+
+---
+
+## G-27 — Lookup purpose is unreadable in audit
+
+**Endpoints:** identity and directory read routes
+**Severity:** Medium — audit cannot answer "why was this looked up"
+**Status:** Open — needs an ADR-0008 / `docs/27` decision
+
+Purpose is optional and audited only as hash + length; the UI no longer asks for it. Comparable
+tools record a readable reason: CyberArk audits a `Reason` and optional ticketing system/ticket ID;
+Entra PIM can require justification and a ticket number shown in audit. KVKK md. 4 asks processing
+to be for a specific purpose and proportionate.
+
+**Proposal.** A structured purpose instead of free text: a reason code (e.g. Olay/Alarm, Değişiklik,
+Erişim talebi, Servis hesabı envanteri, Diğer) plus an optional validated reference (OR number or
+Jira key), both stored in clear; free text stays out of audit. Required for member enumeration,
+privileged analysis and export; optional for a basic lookup. The UI would add one compact selector
+and prefill the reference when navigating from an operational record.
+
+---
+
+## G-28 — No bounded way to resolve an account from a person's name
+
+**Endpoints:** none today
+**Severity:** Medium — operators often know a display name, not the `sAMAccountName`
+**Status:** Open — conflicts with ADR-0008 "no broad search"; needs an explicit decision
+
+**Proposal.** A disambiguation step rather than people search: AD ambiguous name resolution (ANR)
+with at least 3 characters, at most 10 results, returning only display name, `sAMAccountName` and
+object type; selecting one runs the existing exact lookup. Separate capability, rate limit and
+audit (target hash, result count).
+
+---
+
+## G-29 — AD lookup does not show the Service Accounts inventory record
+
+**Endpoints:** `POST /api/v1/directory/principals/service-evidence` and the Service Accounts API
+**Severity:** Medium
+**Status:** Open
+
+AD evidence and the inventory (owner, team, handover, gMSA plan) are on separate screens with no
+link. **What would resolve it.** A scope-checked "inventory match" for an exact account (record id,
+owning team, status) returned only when the caller holds `ServiceAccounts.View` and scope; the UI
+would show a link to the record.
+
+---
+
+## G-30 — The solution builds only with a specific SDK/language combination
+
+**Severity:** High for continuity (bus factor 1)
+**Status:** Repair implemented on PR #3; historical reproductions below remain labelled.
+
+**Current policy (2026-10-02).** `global.json` requires SDK **9.0.317** exactly,
+`rollForward: disable`, no prerelease. This is the installed Windows build SDK,
+not a runtime upgrade: every project still targets **net8.0**, with **C# 12.0**
+and analyzer level **9.0** explicitly selected in Directory.Build.props. Install
+that reviewed SDK on build agents; fail if absent rather than silently selecting
+SDK 8/10. SDK updates require an explicit reviewed pin change and regression.
+SDK selection and target runtime are independent:
+[Microsoft SDK selection](https://learn.microsoft.com/en-us/dotnet/core/versions/selection),
+[global.json matching](https://learn.microsoft.com/en-us/dotnet/core/tools/global-json).
+
+The Jira review-only labels now use an explicit read-only array (empty for
+installation/retirement, cloned server labels otherwise); no C# 14 collection
+conversion is required. Parser regression uses `Enumerable.Reverse(rows)`
+explicitly, never an instance/span Reverse that could return void.
+DPAPI persistence cases are WindowsFact/WindowsTheory only; ephemeral antiforgery
+and portable fail-closed validation continue on every OS. Windows never skips
+these DPAPI cases. Unrelated Linux PowerShell/Skia/path failures are NOT skipped.
+Windows PR baseline on SDK 9.0.317 built with zero warnings/errors; that does not
+invalidate the retained SDK 8/10 Linux reproductions or count as repaired-source
+acceptance. Exact new-source test evidence is recorded in the canonical register.
+
+With SDK 8, `JiraIssueDraftService.cs` does not compile (C# 14 collection-expression conversion). With
+SDK 10 and `LangVersion=latest` (C# 14), `InUseServiceItemParserTests` does not compile
+(`Reverse()` binds to the span overload). `global.json` pins `8.0.100` with
+`rollForward: latestMajor`, so the result depends on the machine. Three `UiPersistentDataProtectionTests`
+fail rather than skip off Windows. **What would resolve it.** Pin one SDK and language version, fix
+the two sources, and skip the DPAPI tests on non-Windows.
+
+**Reproduction, 2026-10-01 (Linux, Ubuntu-packaged SDKs, no `LangVersion` override).** Both failures
+are in files the UI branch does not change; they reproduce identically on master `214690e`.
+
+- SDK 8.0.131 (`global.json` pinned to it with `rollForward: disable`), `dotnet build SecureOps.sln`:
+  `src/SecureOps.Infrastructure/OperationalRecords/JiraIssueDraftService.cs(204,80): error CS7036:
+  There is no argument given that corresponds to the required parameter 'list' of
+  'ReadOnlyCollection<string>.ReadOnlyCollection(IList<string>)'`.
+- SDK 10.0.112 (selected by the committed `global.json`), `dotnet build SecureOps.sln`:
+  `tests/SecureOps.Tests.Unit/InUse/InUseServiceItemParserTests.cs(43,68): error CS0023: Operator '.'
+  cannot be applied to operand of type 'void'`. All `src/` projects, including `SecureOps.Ui`, build
+  with 0 warnings and 0 errors.
+- Off-Windows test failures, identical on master and the UI branch once line 43 is changed (in a
+  throw-away copy only) to `Enumerable.Reverse(rows)`: unit 4 (`ApiReleasePackagingContractTests` x2,
+  missing `src/SecureOps.Api/obj/project.assets.json`; `SccmFailureEvidenceTests`, PowerShell
+  execution policy unsupported; `AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`,
+  publish-directory message precedes the expected one); integration 12 (DPAPI "requires Windows" x5,
+  SkiaSharp native library x7). These are Codex-owned.
 
 ---
 

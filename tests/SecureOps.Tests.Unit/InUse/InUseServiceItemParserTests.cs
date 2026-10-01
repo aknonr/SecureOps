@@ -40,7 +40,7 @@ public sealed class InUseServiceItemParserTests
         List<Dictionary<string, string?>>[] rows = Enumerable.Range(0, 4).Select(Row).ToArray();
         rows.Should().OnlyContain(row => row.Count == 27);
         IReadOnlyList<InUseServer> expected = Parse(rows);
-        IReadOnlyList<InUseServer> reordered = Parse(rows.Reverse().Select(row => row.AsEnumerable().Reverse()));
+        IReadOnlyList<InUseServer> reordered = Parse(Enumerable.Reverse(rows).Select(row => row.AsEnumerable().Reverse()));
         JsonSerializer.Serialize(reordered).Should().Be(JsonSerializer.Serialize(expected));
         expected.Select(s => s.Id).Should().Equal("1000", "1001", "1002", "1003");
         for (int i = 0; i < 4; i++)

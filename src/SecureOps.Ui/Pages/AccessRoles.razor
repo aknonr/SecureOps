@@ -7,11 +7,21 @@
 @inject IAccessAdminApiClient AccessAdmin
 @inject IJSRuntime Js
 
+@*
+    Role definitions are edited against the server's registered action catalogue, grouped by the
+    module the server assigns. The UI grants nothing: a checkbox only shapes a proposal, the server
+    computes the impact preview, and only that reviewed preview can be applied. Protected roles stay
+    read-only here and on the server.
+*@
+
 <NavigationLock ConfirmExternalNavigation="Dirty" OnBeforeInternalNavigation="BeforeNavigateAsync" />
 
 <PageTitle>Rol tanımları · @WasasBrand.Name</PageTitle>
 <div class="so-page so-page--wide">
-    <SoPageHeader Title="Rol tanımları"><Actions><MudButton Href="access/users" StartIcon="@Icons.Material.Filled.ArrowBack">Kullanıcılar</MudButton></Actions></SoPageHeader>
+    <SoPageHeader Title="Rol tanımları"
+                  Lead="Rollerin hangi işlemleri kapsadığını modüllere göre inceleyin; değişikliği önce etkisini görerek uygulayın.">
+        <Actions><MudButton Href="access/users" StartIcon="@Icons.Material.Filled.ArrowBack">Kullanıcılar</MudButton></Actions>
+    </SoPageHeader>
     @if (_access is null) { <SoLoading Message="Yetkiler doğrulanıyor" /> }
     else if (!_access.Can(Capabilities.AccessManageUsers) || !_access.Can(Capabilities.AccessAssignRoles))
     { <MudAlert Severity="Severity.Warning">Rol tanımı için kullanıcı yönetimi ve rol atama yetkileri gerekir.</MudAlert> }
@@ -20,58 +30,115 @@
         @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
         @if (_message is not null) { <MudAlert Severity="Severity.Success" role="status">@_message</MudAlert> }
         <div class="role-workspace">
-            <aside aria-label="Rol tanımları">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Disabled="_busy" OnClick="NewRole">Yeni rol</MudButton>
-                <ul>@foreach (AccessRoleDefinition role in _roles)
-                    { <li><button type="button" class="@(_selected?.Code == role.Code ? "selected" : "")" disabled="@_busy" @onclick="() => SelectReviewedAsync(role)"><strong>@RoleName(role)</strong><small>@role.Capabilities.Count yetki @if (role.Protected) { <span>· Korumalı</span> }</small></button></li> }
+            <aside aria-label="Rol listesi">
+                <div class="role-list-head">
+                    <h2>Roller <span class="role-count">@_roles.Count</span></h2>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Disabled="_busy" OnClick="NewRole">Yeni rol</MudButton>
+                </div>
+                @if (_loading) { <SoLoading Message="Roller yükleniyor" Bare="true" /> }
+                else if (_roles.Count == 0 && _problem is null) { <p class="role-muted">Kayıtlı rol tanımı yok.</p> }
+                <ul class="role-list">
+                    @foreach (AccessRoleDefinition role in _roles)
+                    {
+                        bool selected = _selected?.Code == role.Code;
+                        <li>
+                            <button type="button" class="role-item @(selected ? "selected" : null)" aria-current="@(selected ? "true" : null)" disabled="@_busy" @onclick="() => SelectReviewedAsync(role)">
+                                <span class="role-item-name">@RoleName(role)</span>
+                                @if (role.Purpose is { Length: > 0 } purpose) { <span class="role-item-purpose">@purpose</span> }
+                                <span class="role-item-meta">
+                                    @role.Capabilities.Count işlem · @ModuleCount(role.Capabilities) modül
+                                    @if (role.Protected) { <span class="role-tag"><MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" aria-hidden="true" />Korumalı</span> }
+                                </span>
+                            </button>
+                        </li>
+                    }
                 </ul>
             </aside>
-            <section aria-label="Rol ayrıntısı">
-                @if (_selected is null) { <p>Rol seçilmedi.</p> }
+            <section class="role-detail" aria-label="Rol ayrıntısı">
+                @if (_selected is null)
+                {
+                    <div class="role-intro">
+                        <h2>Bir rol seçin</h2>
+                        <p>Soldaki listeden bir rol seçerek kapsadığı işlemleri modül modül görün veya <strong>Yeni rol</strong> ile yeni bir iş rolü oluşturun.</p>
+                        <ul>
+                            <li>Bu ekran yetki vermez; yalnız bir rol tanımı önerir. Etkisi sunucuda hesaplanır ve ancak incelendikten sonra uygulanır.</li>
+                            <li>Korumalı çekirdek yönetici rolü görüntülenebilir, değiştirilemez.</li>
+                            <li>Kişiye rol atamak için kullanıcının kendi kaydındaki <strong>Rolleri değiştir</strong> işlemi kullanılır.</li>
+                        </ul>
+                    </div>
+                }
                 else
                 {
-                    <h2>@RoleName(_selected)</h2>
-                    @if (_selected.Protected) { <MudAlert Severity="Severity.Info">Çekirdek yönetici rolü değiştirilemez.</MudAlert> }
-                    <label class="role-field" for="role-name">Rol adı</label>
-                    <input id="role-name" @bind="_name" @bind:event="oninput" maxlength="100" disabled="@Locked" />
-                    <label class="role-field" for="role-purpose">Amaç</label>
-                    <textarea id="role-purpose" @bind="_purpose" @bind:event="oninput" maxlength="500" rows="2" disabled="@Locked"></textarea>
+                    <header class="role-detail-head">
+                        <div>
+                            <h2>@(_selected.Version == 0 ? "Yeni rol" : RoleName(_selected))</h2>
+                            <p class="role-muted">
+                                @(_selected.Version == 0 ? "Henüz kaydedilmedi" : $"Sürüm {_selected.Version}") ·
+                                <span aria-live="polite">@_capabilities.Count işlem seçili, @ModuleCount(_capabilities) modül</span>
+                            </p>
+                        </div>
+                        @if (_selected.Protected) { <SoStatusBadge Label="Korumalı" Tone="SoStatusBadge.BadgeTone.Info" Icon="@Icons.Material.Filled.Lock" /> }
+                    </header>
+                    @if (_selected.Protected) { <MudAlert Severity="Severity.Info">Çekirdek yönetici rolü değiştirilemez. Kapsadığı işlemler aşağıda yalnız bilgi için listelenir.</MudAlert> }
+                    <div class="role-fields">
+                        <div>
+                            <label class="role-field" for="role-name">Rol adı</label>
+                            <input id="role-name" @bind="_name" @bind:event="oninput" maxlength="100" disabled="@Locked" />
+                        </div>
+                        <div>
+                            <label class="role-field" for="role-purpose">Amaç</label>
+                            <textarea id="role-purpose" @bind="_purpose" @bind:event="oninput" maxlength="500" rows="2" disabled="@Locked"></textarea>
+                        </div>
+                    </div>
                     @if (_validation is not null) { <p role="alert" class="role-error">@_validation</p> }
                     @if (_current is not null)
                     {
-                        <div role="alert" class="role-impact">
+                        <div role="alert" class="role-impact role-impact--conflict">
                             <h3>Rol başka bir işlemde değişti</h3>
-                            <p>Girdiğiniz değişiklikler korunuyor. Güncel rol: @RoleName(_current), v@_current.Version.</p>
+                            <p>Girdiğiniz değişiklikler korunuyor. Güncel rol: @RoleName(_current), sürüm @_current.Version.</p>
                             <p>Güncel amaç: @_current.Purpose</p>
-                            <p>Güncel yetkiler: @ActionNames(_current.Capabilities)</p>
+                            <AccessActionGroups Codes="_current.Capabilities" Actions="_actions" />
                             <MudButton StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="Rebase">Bu sürümle farkları yeniden incele</MudButton>
                         </div>
                     }
-                    <h3>İzin verilen işlemler</h3>
-                    @foreach (var group in _actions.GroupBy(action => action.Module))
+                    <h3 class="role-section-title">Modüllere göre işlemler</h3>
+                    <p class="role-muted">Her işlem sunucuda kayıtlı, uygulanmış bir eylemdir. Açıklamalar sunucu kataloğundan gelir.</p>
+                    <div class="role-modules">
+                        @foreach (IGrouping<string, AccessActionDefinition> module in Modules(assignable: true))
+                        {
+                            <AccessModuleCard Module="module" Selected="_capabilities" Original="_selected.Capabilities" Locked="Locked" OnToggle="Toggle" />
+                        }
+                    </div>
+                    @foreach (IGrouping<string, AccessActionDefinition> module in Modules(assignable: false))
                     {
-                        <fieldset><legend>@group.Key</legend>
-                            @foreach (AccessActionDefinition action in group)
-                            {
-                                <label class="role-capability"><input type="checkbox" checked="@_capabilities.Contains(action.Code)" disabled="@(Locked || (!action.Assignable && !_selected.Capabilities.Contains(action.Code)))" @onchange="e => Toggle(action.Code, e.Value is true)" />
-                                    <span><strong>@action.Name</strong><small>@action.Description</small></span>
-                                </label>
-                            }
-                        </fieldset>
+                        <details class="role-legacy" open="@module.Any(action => _capabilities.Contains(action.Code))">
+                            <summary>@module.Key — @module.Count(action => _capabilities.Contains(action.Code)) / @module.Count() bu rolde</summary>
+                            <AccessModuleCard Module="module" Selected="_capabilities" Original="_selected.Capabilities" Locked="Locked" OnToggle="Toggle" />
+                        </details>
                     }
                     @if (_impact is not null)
                     {
                         <section class="role-impact" aria-label="Yetki değişikliği önizlemesi" role="status" tabindex="-1" @ref="_impactElement">
                             <h3>Uygulanacak değişiklik</h3>
-                            <p>@_impact.AffectedUsers kullanıcı · @_impact.UsersGaining yetki kazanacak · @_impact.UsersLosing yetki kaybedecek</p>
-                            <dl><dt>Eklenecek yetkiler</dt><dd>@ActionNames(_impact.AddedCapabilities)</dd><dt>Kaldırılacak yetkiler</dt><dd>@ActionNames(_impact.RemovedCapabilities)</dd></dl>
-                            <p>Etkin erişim yeniden doğrulanacak. Bekleyen işlemler yeni yetkilerle değerlendirilecek.</p>
-                            <MudButton StartIcon="@Icons.Material.Filled.Edit" Disabled="_busy" OnClick="() => _impact = null">Düzelt</MudButton>
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Check" Disabled="_busy" OnClick="SaveAsync">Değişikliği uygula</MudButton>
+                            <p class="role-impact-counts"><strong>@_impact.AffectedUsers</strong> kullanıcı etkilenir · <strong>@_impact.UsersGaining</strong> yetki kazanır · <strong>@_impact.UsersLosing</strong> yetki kaybeder</p>
+                            <div class="role-impact-diff">
+                                <div><h4>Eklenecek işlemler</h4><AccessActionGroups Codes="_impact.AddedCapabilities" Actions="_actions" /></div>
+                                <div><h4>Kaldırılacak işlemler</h4><AccessActionGroups Codes="_impact.RemovedCapabilities" Actions="_actions" /></div>
+                            </div>
+                            <p class="role-muted">Sayılar ve farklar sunucunun önizlemesidir. Etkin erişim yeniden doğrulanacak; bekleyen işlemler yeni yetkilerle değerlendirilecek.</p>
+                            <div class="role-actions">
+                                <MudButton StartIcon="@Icons.Material.Filled.Edit" Disabled="_busy" OnClick="() => _impact = null">Düzelt</MudButton>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Check" Disabled="_busy" OnClick="SaveAsync">Değişikliği uygula</MudButton>
+                            </div>
                         </section>
                     }
                     else if (!_selected.Protected && _current is null)
-                    { <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Preview" Disabled="_busy" OnClick="PreviewAsync">Etkiyi incele</MudButton> }
+                    {
+                        <div class="role-actionbar">
+                            <p aria-live="polite">@DraftSummary</p>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Preview" Disabled="_busy" OnClick="PreviewAsync">Etkiyi incele</MudButton>
+                        </div>
+                    }
                 }
             </section>
         </div>
@@ -90,7 +157,7 @@
     private string? _validation, _message;
     private string _name = "", _purpose = "";
     private HashSet<string> _capabilities = [];
-    private bool _busy;
+    private bool _busy, _loading;
     private ElementReference _impactElement;
     private bool Locked => _busy || _impact is not null || _selected?.Protected == true;
     [CascadingParameter] public MainLayout? Shell { get; set; }
@@ -100,8 +167,15 @@
         AccessProvider.Changed += AccessChanged;
         _access = await AccessProvider.GetAsync(CancellationToken.None);
         if (!_access.Can(Capabilities.AccessManageUsers) || !_access.Can(Capabilities.AccessAssignRoles)) { return; }
-        try { _roles = await AccessAdmin.RolesAsync(CancellationToken.None); _actions = await AccessAdmin.ActionsAsync(CancellationToken.None); }
+        _loading = true;
+        try
+        {
+            _roles = await AccessAdmin.RolesAsync(CancellationToken.None); _actions = await AccessAdmin.ActionsAsync(CancellationToken.None);
+            // Opening on a definition rather than a blank pane: selecting only reads, so nothing is proposed.
+            if (_roles.Count > 0) { Select(_roles[0]); }
+        }
         catch (SecureOpsApiException exception) { _problem = exception.Problem; }
+        finally { _loading = false; }
     }
     private void Select(AccessRoleDefinition role)
     {
@@ -123,7 +197,7 @@
         StateHasChanged();
     });
     public void Dispose() => AccessProvider.Changed -= AccessChanged;
-    private void Toggle(string capability, bool selected) { if (selected) { _capabilities.Add(capability); } else { _capabilities.Remove(capability); } _impact = null; }
+    private void Toggle((string Capability, bool Selected) change) { if (change.Selected) { _capabilities.Add(change.Capability); } else { _capabilities.Remove(change.Capability); } _impact = null; }
     private async Task PreviewAsync()
     {
         if (_busy || _selected is null) { return; }
@@ -170,5 +244,31 @@
         catch (SecureOpsApiException refresh) { _problem = refresh.Problem; }
     }
     private static string RoleName(AccessRoleDefinition role) => role.Name == role.Code ? AccessLabels.RoleLabel(role.Code) : role.Name;
-    private string ActionNames(IReadOnlyList<string> codes) => codes.Count == 0 ? "Yok" : string.Join(", ", codes.Select(code => _actions.FirstOrDefault(action => action.Code == code)?.Name ?? code));
+
+    // Groups the server catalogue by its own module names. Non-assignable (historical) actions are
+    // rendered apart so they do not read as something an administrator can add.
+    private IEnumerable<IGrouping<string, AccessActionDefinition>> Modules(bool assignable) => _actions
+        .Where(action => action.Assignable == assignable)
+        .GroupBy(action => action.Module)
+        .OrderBy(group => AccessLabels.ModuleOrder(group.Key));
+
+    private int ModuleCount(IEnumerable<string> codes) => codes
+        .Select(code => _actions.FirstOrDefault(action => action.Code == code)?.Module ?? AccessLabels.Describe(code).Group)
+        .Distinct(StringComparer.Ordinal).Count();
+
+    // A difference between the edited definition and the stored one. It is not an effective-access
+    // statement: who gains or loses what is only known from the server preview.
+    private string DraftSummary
+    {
+        get
+        {
+            if (_selected is null) { return ""; }
+            int added = _capabilities.Count(code => !_selected.Capabilities.Contains(code));
+            int removed = _selected.Capabilities.Count(code => !_capabilities.Contains(code));
+            bool textChanged = _name != RoleName(_selected) || _purpose != _selected.Purpose;
+            return added == 0 && removed == 0 && !textChanged
+                ? "Tanımda değişiklik yok."
+                : $"Tanım taslağı: {added} işlem eklendi, {removed} işlem çıkarıldı{(textChanged ? ", ad/amaç değişti" : "")}. Etkisi sunucu önizlemesiyle görülür.";
+        }
+    }
 }
