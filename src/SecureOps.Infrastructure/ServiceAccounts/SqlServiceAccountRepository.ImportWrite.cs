@@ -125,6 +125,15 @@ public sealed partial class SqlServiceAccountRepository
             });
         }
 
+        foreach (Guid accountId in work.GmsaTransitions)
+        {
+            await Run("""
+                IF NOT EXISTS (SELECT 1 FROM svcacct.IdentityTransitions WHERE AccountId = @accountId AND Target = 'gMSA')
+                    INSERT INTO svcacct.IdentityTransitions(Id, AccountId, HandoverId, Target, Suitability, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
+                    VALUES(NEWID(), @accountId, NULL, 'gMSA', 'Unknown', @now, @UserId, @now, @UserId);
+                """, new { accountId, now, actor.UserId });
+        }
+
         foreach (RequestAdd request in work.Requests)
         {
             bool closed = request.Status == ServiceAccountRequestStatus.Closed;

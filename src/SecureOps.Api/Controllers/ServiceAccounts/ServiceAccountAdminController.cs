@@ -111,4 +111,24 @@ public sealed class ServiceAccountAdminController(ServiceAccountService service,
     [ProducesResponseType(typeof(Guid), StatusCodes.Status200OK)]
     public async Task<ActionResult<Guid>> RevokeAsync(Guid id, RevokeScopeGrantRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.RevokeGrantAsync(User, ServiceAccountReplies.Context(this), id, request, cancellationToken));
+
+    /// <summary>Active team roles: SQL teams and the gMSA executing team (configuration only).</summary>
+    [HttpGet("team-roles")]
+    [ProducesResponseType(typeof(IReadOnlyList<TeamRoleView>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<TeamRoleView>>> TeamRolesAsync(CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.TeamRolesAsync(User, ServiceAccountReplies.Context(this), cancellationToken));
+
+    /// <summary>Assigns a team role with a reason; grants no access.</summary>
+    [HttpPost("team-roles")]
+    [Authorize(Policy = ServiceAccountPolicies.Administer)]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status200OK)]
+    public async Task<ActionResult<Guid>> CreateTeamRoleAsync(CreateTeamRoleRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.CreateTeamRoleAsync(User, ServiceAccountReplies.Context(this), request, cancellationToken));
+
+    /// <summary>Revokes a team role with a reason.</summary>
+    [HttpPost("team-roles/{id:guid}/revoke")]
+    [Authorize(Policy = ServiceAccountPolicies.Administer)]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status200OK)]
+    public async Task<ActionResult<Guid>> RevokeTeamRoleAsync(Guid id, RevokeTeamRoleRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.RevokeTeamRoleAsync(User, ServiceAccountReplies.Context(this), id, request, cancellationToken));
 }

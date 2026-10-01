@@ -18,6 +18,12 @@ public sealed class ServiceAccountOptions
     /// <summary>Reminder rules (explicit calendar days only; business days need an approved holiday calendar).</summary>
     public ServiceAccountReminderOptions Reminders { get; set; } = new();
 
+    /// <summary>Risk list: no logon for at least this many calendar days (measured from the source report date).</summary>
+    public int RiskLogonDays { get; set; } = SecureOps.Domain.ServiceAccounts.RiskThresholds.DefaultLogonDays;
+
+    /// <summary>Risk list: password unchanged for at least this many calendar days (measured from the source report date).</summary>
+    public int RiskPasswordDays { get; set; } = SecureOps.Domain.ServiceAccounts.RiskThresholds.DefaultPasswordDays;
+
     /// <summary>True when SQL persistence is configured.</summary>
     public bool Enabled => string.Equals(Provider, "SqlServer", StringComparison.OrdinalIgnoreCase);
 }

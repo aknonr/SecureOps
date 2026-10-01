@@ -173,6 +173,12 @@ public sealed partial class ImportPlanner
             .Where(d => d.Proposed is not null || d.Current is not null)];
         string decision = DecisionFor(key, account.OwnsCreation ? ImportDecisions.Create : ImportDecisions.Apply,
             account.OwnsCreation ? (account.Candidates.Count > 0 ? [ImportDecisions.Create, ImportDecisions.Link, ImportDecisions.Skip] : _createOrSkip) : _applyOrSkip);
+        Guid? executor = GmsaRoute(account.Existing?.OwnerTeamId, row[StagedFields.SourceTeam]);
+        if (executor is not null)
+        {
+            diff.Add(new ImportFieldDiff("gMSA yönlendirme (SQL-EKIP)", null, TeamName(executor.Value), "Kural: gMSA değerlendirmesi talebi (uygunluk değil)"));
+        }
+
         if (account.Id is { } accountId && decision != ImportDecisions.Skip)
         {
             _observed.Add((accountId, profile));
@@ -180,6 +186,11 @@ public sealed partial class ImportPlanner
             if (_input.Profile == ServiceAccountImportProfiles.DbaHandover && ServiceAccountText.Same(row[StagedFields.HandoverFlag], "OK"))
             {
                 PlanDbaHandover(accountId, row, warnings);
+            }
+
+            if (executor is { } target)
+            {
+                PlanGmsaRouting(accountId, target, warnings);
             }
         }
 
@@ -195,8 +206,51 @@ public sealed partial class ImportPlanner
             ? account.Candidates.Count > 0 ? [ImportDecisions.Create, ImportDecisions.Link, ImportDecisions.Skip] : _createOrSkip
             : _applyOrSkip;
         return Row(key, row, classification, account, diff, warnings, allowed, allowed[0], account.NeedsDecision,
-            new { profile, latest = latest?.SourceReportDate });
+            new { profile, latest = latest?.SourceReportDate, gmsaRoute = executor });
     }
+
+    /// <summary>
+    /// 2026-10-01 owner decision: an account of a team configured as an SQL team (its current owner team, or the source team
+    /// named in the row) is evaluated as gMSA by the configured executing team. Only existing teams match; a label never
+    /// creates a team here. Returns the executing team, or null when the rule does not apply or is not configured.
+    /// </summary>
+    private Guid? GmsaRoute(Guid? ownerTeamId, string? sourceTeamLabel)
+    {
+        if (_context.GmsaExecutorTeamId is not { } executor || _context.SqlTeams is not { Count: > 0 } sqlTeams)
+        {
+            return null;
+        }
+
+        bool sourceIsSql = ServiceAccountText.LabelKey(sourceTeamLabel) is { } key && _teams.TryGetValue(key, out (Guid Id, bool New) team) && !team.New
+            && sqlTeams.Contains(team.Id);
+        return sourceIsSql || ownerTeamId is { } owner && sqlTeams.Contains(owner) ? executor : null;
+    }
+
+    /// <summary>
+    /// Plans one open gMSA evaluation request targeted at the executing team (idempotent per account and team, the same
+    /// source key as the legacy package) and a gMSA transition with unknown suitability. Nothing else changes: no
+    /// ownership, no suitability, no handover acceptance.
+    /// </summary>
+    private void PlanGmsaRouting(Guid accountId, Guid executor, List<string> warnings)
+    {
+        string sourceKey = "request:" + accountId.ToString("N") + ":GmsaHandover:" + executor.ToString("N");
+        if (_context.SourceKeys.Contains(sourceKey) || !_plannedKeys.Add(sourceKey))
+        {
+            return;
+        }
+
+        warnings.Add("GmsaRoutedToExecutor");
+        _work.Requests.Add(new RequestAdd(Guid.NewGuid(), accountId, ServiceAccountActionType.GmsaHandover, ServiceAccountRequestStatus.Open, executor,
+            null, null, null, null, null, null, null, null,
+            "Kural SQL-EKIP (karar 2026-10-01): SQL ekibine ait hesap gMSA olarak değerlendirilir. Talep içe aktarmada otomatik açıldı; uygunluk ayrıca karar ister.",
+            sourceKey, null, null, null));
+        if (!_context.AccountsWithGmsaTransition.Contains(accountId) && _gmsaPlanned.Add(accountId))
+        {
+            _work.GmsaTransitions.Add(accountId);
+        }
+    }
+
+    private string TeamName(Guid id) => _context.Teams.FirstOrDefault(t => t.Id == id)?.Name ?? id.ToString("D");
 
     private void PlanDbaHandover(Guid accountId, StagedRow row, List<string> warnings)
     {

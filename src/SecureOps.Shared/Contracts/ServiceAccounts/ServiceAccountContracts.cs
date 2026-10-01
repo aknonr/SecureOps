@@ -209,7 +209,9 @@ public sealed record AccountDetail(
     IReadOnlyList<EvidenceView> Evidence,
     IReadOnlyList<SourceRowView> Sources,
     IReadOnlyList<HistoryView> History,
-    AccountPermissions Permissions);
+    AccountPermissions Permissions,
+    IReadOnlyList<UsageView>? Usages = null,
+    RuleEvaluationView? Rule = null);
 
 /// <summary>Create an account manually (no automatic provisioning from names).</summary>
 public sealed record CreateAccountRequest(string AccountName, string? Domain, Guid? ReportOrganizationId, string Reason);

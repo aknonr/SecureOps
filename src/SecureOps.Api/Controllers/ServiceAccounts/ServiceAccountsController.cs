@@ -164,6 +164,34 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     public async Task<ActionResult<AccountDetail>> DecideHandoverAsync(Guid id, HandoverDecisionRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.DecideHandoverAsync(User, Context(), id, request, cancellationToken));
 
+    /// <summary>Records where the account is used (knowledge-base rule input).</summary>
+    [HttpPost("accounts/{id:guid}/usages")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> CreateUsageAsync(Guid id, CreateUsageRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.CreateUsageAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>Updates an active usage at the expected version.</summary>
+    [HttpPatch("usages/{id:guid}")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> UpdateUsageAsync(Guid id, UpdateUsageRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.UpdateUsageAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>Removes a usage with a reason (kept for history).</summary>
+    [HttpPost("usages/{id:guid}/remove")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> RemoveUsageAsync(Guid id, RemoveUsageRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.RemoveUsageAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>Records or clears a reasoned rule exception (verifier).</summary>
+    [HttpPost("usages/{id:guid}/exception")]
+    [Authorize(Policy = ServiceAccountPolicies.Verify)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> UsageExceptionAsync(Guid id, UsageExceptionRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.SetUsageExceptionAsync(User, Context(), id, request, cancellationToken));
+
     /// <summary>Updates gMSA suitability, plan or completion reference.</summary>
     [HttpPatch("transitions/{id:guid}")]
     [Authorize(Policy = ServiceAccountPolicies.Assign)]

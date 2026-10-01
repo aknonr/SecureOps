@@ -123,6 +123,9 @@ public sealed class ImportWork
     public List<FindingAdd> Findings { get; } = [];
     /// <summary>Handovers.</summary>
     public List<HandoverAdd> Handovers { get; } = [];
+
+    /// <summary>Accounts that get a gMSA transition record (suitability unknown) without a handover, from gMSA routing.</summary>
+    public List<Guid> GmsaTransitions { get; } = [];
     /// <summary>Rows applied without change.</summary>
     public int Unchanged { get; set; }
     /// <summary>Rows skipped by decision.</summary>

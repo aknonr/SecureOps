@@ -164,6 +164,13 @@ public static class ServiceAccountInsights
         return stages;
     }
 
+    /// <summary>Turkish label of a funnel stage code.</summary>
+    public static string StageLabel(string code) => code == "Ineligible" ? "Uygun değil" : _stages.FirstOrDefault(s => s.Code == code).Label ?? code;
+
+    /// <summary>What is expected at a funnel stage.</summary>
+    public static string StageExpected(string code) => code == "Ineligible" ? "Uygun değil kararı verildi; bilgi bankasındaki diğer yollar değerlendirilir."
+        : _stages.FirstOrDefault(s => s.Code == code).Expected ?? string.Empty;
+
     /// <summary>gMSA funnel.</summary>
     public static GmsaFunnel Funnel(IReadOnlyDictionary<Guid, string> stages) => new(stages.Count,
         [.. _stages.Select(s => new FunnelStage(s.Code, s.Label, stages.Values.Count(v => v == s.Code), s.Expected))],

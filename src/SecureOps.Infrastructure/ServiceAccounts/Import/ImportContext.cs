@@ -24,7 +24,10 @@ public sealed record ContextObservation(Guid AccountId, string Profile, DateOnly
 /// <summary>Existing communication identified by a legacy reference.</summary>
 public sealed record ContextCommunication(Guid Id, IReadOnlyCollection<Guid> Accounts);
 
-/// <summary>Current database state used to plan (preview) and re-plan (commit) one import batch.</summary>
+/// <summary>
+/// Current database state used to plan (preview) and re-plan (commit) one import batch. SQL teams and the gMSA executing
+/// team come from the module's team roles (SA-002); without an executing team no gMSA routing is planned.
+/// </summary>
 public sealed record ImportContext(
     IReadOnlyList<ContextAccount> Accounts,
     IReadOnlyList<ContextNamed> Teams,
@@ -35,4 +38,6 @@ public sealed record ImportContext(
     IReadOnlyDictionary<string, ContextCommunication> CommunicationsByLegacy,
     IReadOnlyList<ContextObservation> LatestObservations,
     IReadOnlySet<Guid> AccountsWithGmsaTransition,
-    ServiceAccountScope Scope);
+    ServiceAccountScope Scope,
+    IReadOnlySet<Guid>? SqlTeams = null,
+    Guid? GmsaExecutorTeamId = null);
