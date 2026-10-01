@@ -4,6 +4,7 @@
 // confirmation to that group, see which saved links will and will not open, then open with one click.
 // Destinations are intercepted harmless pages under the UI origin; no corporate site is contacted.
 // Playwright's default popup handling is used, so the popup count is NOT evidence of browser policy.
+// WASAS_CHROME optionally selects an installed browser on Windows; unset retains bundled Chromium.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -30,7 +31,7 @@ async function noOverflow(page, label) {
             url: new URL(`harmless/shift/${i}`, ui).href, environment: i % 2 ? 'TEST' : 'PROD', displayOrder: i
         } }));
 
-        browser = await chromium.launch();
+        browser = await chromium.launch({ executablePath: process.env.WASAS_CHROME || undefined });
         const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
         await context.route(new URL('harmless/**', ui).href, route => route.fulfill({ status: 200, contentType: 'text/html', body: '<title>harmless</title>' }));
         page = await context.newPage();
