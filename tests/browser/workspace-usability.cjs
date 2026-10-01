@@ -49,7 +49,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         const search = page.getByLabel('Bağlantı ara', { exact: true });
         await page.waitForFunction(() => [...(document.querySelector('[aria-label="Bağlantı ara"]')?.attributes || [])].some(a => a.name.startsWith('_bl_')));
         await search.fill('Çalışma alanı örneği');
-        await page.waitForFunction(() => document.querySelector('.so-resource-results-head [role=status]')?.textContent.trim() === '28 bağlantı');
+        await page.waitForFunction(() => document.querySelector('.so-resource-results-head [role=status]')?.textContent.split(' · ')[0].trim() === '28 bağlantı');
         assert.equal(await rows.count(), 25);
         assert.match(await page.locator('link[href*="secureops-theme.css"]').getAttribute('href'), /\?v=/);
         const grid = await page.locator('.so-resource-discovery > .so-resource-filters').evaluate(e => ({ display: getComputedStyle(e).display, columns: getComputedStyle(e).gridTemplateColumns }));
@@ -101,7 +101,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         await navigate(page, ui, 'resources');
         assert.equal(await page.locator('.so-workspace--list.so-workspace--compact').count(), 1);
         await search.fill('Çalışma alanı örneği');
-        await page.waitForFunction(() => document.querySelector('.so-resource-results-head [role=status]')?.textContent.trim() === '28 bağlantı');
+        await page.waitForFunction(() => document.querySelector('.so-resource-results-head [role=status]')?.textContent.split(' · ')[0].trim() === '28 bağlantı');
         await capture(page, out, 'after-links-list');
         await page.getByRole('button', { name: 'Hesap menüsü', exact: true }).click();
         await page.locator('.so-user-menu-popover.mud-popover-open .mud-list-item').filter({ hasText: /^Koyu/ }).click();
