@@ -60,8 +60,15 @@ Current implemented Phase 1A namespaces:
 - `OperationalRecords/` contains source/Jira/requester boundaries, fail-closed classification, preview and transfer services, durable repositories, and fake local adapters.
 - `Sessions/` contains provider-neutral lifecycle service plus in-memory and SQL authoritative session repositories.
 
-- `Data/` — EF Core `SecureOpsDbContext`, entity configurations.
-- `Audit/` — `IAuditWriter` and SQL implementation (Dapper).
+Folders present today: `Access/`, `Announcements/`, `Audit/`, `Commands/`, `Directory/`, `Identity/`, `InUse/`,
+`OperationalRecords/`, `Persistence/`, `Reporting/`, `Resources/`, `ServiceAccounts/`, `Sessions/`. SQL access in
+all of them is Dapper over the numbered scripts in `sql/schema/` and `sql/migrations/`; there is no EF Core `DbContext`. ADR-0001 still
+records "EF Core for CRUD, Dapper for high-volume audit writes", so this is an open divergence between the approved
+decision and the implementation, to be resolved by an ADR amendment or by the code — not by this README.
+
+**Planned layout from the original architecture — not present unless listed above:**
+
+- `Data/` — EF Core `SecureOpsDbContext`, entity configurations (per ADR-0001; see the divergence above).
 - `PowerShell/` — `IPowerShellRunner` JEA implementation.
 
 The SCCM collection adapter uses the matching Microsoft.PowerShell.SDK 7.4.18

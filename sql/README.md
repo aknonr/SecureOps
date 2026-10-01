@@ -27,7 +27,7 @@ SQL Server schema and migration scripts. Files under `schema/` are reviewed cont
 ```
 sql/
 ├── schema/     # DDL for tables, views, triggers, stored procedures
-└── migrations/ # Versioned migration scripts (V001, V002, ...)
+└── migrations/ # Numbered migration scripts (001-…, same numbers as schema/)
 ```
 
 ## Current Reviewed Migrations

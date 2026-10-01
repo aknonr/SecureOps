@@ -7,9 +7,9 @@ Codex/Claude ownership split, but drop scaffolding written for weaker models (a 
 mandatory reading order before any output, generic code samples, duplicated rule lists, fixed
 plan/confirm thresholds). Reading is now routed by task; each hard rule states its reason.
 Statements that contradicted the code were corrected: capability-based authorization (ADR-0010,
-ADR-0022) instead of AD-group roles, Dapper and numbered SQL scripts instead of EF Core, `HtmlRenderer`
+ADR-0022) instead of AD-group roles, the Dapper-only data access (recorded as an open divergence from ADR-0001's EF Core-for-CRUD decision, not as a new decision), `HtmlRenderer`
 render tests instead of bUnit, pinned C# 12 / SDK, and a single canonical JEA allow-list in
-`docs/05-security-model.md`. No architectural decision changed; layer READMEs were not edited.
+`docs/05-security-model.md`. No architectural decision changed. Code is treated as the observed implementation; it never overrides a hard rule or an approved decision.
 
 ## 2026-09-07 - Original OR-to-Jira source review
 
