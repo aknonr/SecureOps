@@ -11,8 +11,10 @@ No production server, flag or data
 is used; all business data is synthetic. The only non-local input is the set of approved TEST
 identities of section 4.
 
-Source: the pinned handoff `b4fdf8d` (`HANDOFF.md`) plus the follow-up branch recorded in
-`FOLLOWUP-20260930.md`; run this procedure at the follow-up HEAD.
+Source: the pinned handoff `b4fdf8d` (`HANDOFF.md`), the follow-up `7e227ed` (`FOLLOWUP-20260930.md`) and the
+knowledge-base/report branch `feature/service-accounts-kb-rules-reports-20261001` (`KB-RULES-20261001.md`); run this
+procedure at that branch's HEAD. **That code requires SQL candidate 2 (`SA-002-usage-rules.sql` and
+`SA-002-API-permissions.sql`)**: account detail, reports and import read `svcacct.AccountUsages` and `svcacct.TeamRoles`.
 
 ## Why a Windows runner
 
@@ -22,6 +24,11 @@ Source: the pinned handoff `b4fdf8d` (`HANDOFF.md`) plus the follow-up branch re
 - On Linux these parts ran: module SQL tests (least-privilege runtime role), a DI-level
   persisted-access composition test, and HTTP denial tests through the real `Program`
   (`ServiceAccountApiCompositionTests`). The allowed HTTP/UI journey below did not run.
+- Knowledge-base branch, on Linux: the persisted-access SQL test `ServiceAccountKbPersistedAccessSqlTests` (rows 17–28
+  at service level, without HTTP) and a browser boundary journey on the real API `Program` and UI host
+  (`tests/browser/service-accounts-kb-boundary.cjs`: anonymous 401 and 403 for both demo actors on all new routes, module
+  screens refuse, navigation hides the module, also with `Provider=Disabled`). A local Kerberos/AD surrogate for
+  Integrated Security was not run (not permitted in that environment), so rows 17–28 in the browser remain Windows steps.
 
 ## 1. Prerequisites
 
@@ -30,6 +37,13 @@ Source: the pinned handoff `b4fdf8d` (`HANDOFF.md`) plus the follow-up branch re
 - A clean clone at the recorded HEAD. `git status` must be clean.
 
 ## 2. Build and non-SQL tests
+
+Use the repository's pinned SDK (`global.json`: 8.0.100, `rollForward: latestMajor`, `LangVersion=latest`) with **no
+`LangVersion` override**; record `dotnet --version`. Known before this branch: on Linux with SDK 8.0.131 (Ubuntu
+source build) the solution does not compile at the base `7e227ed` either — `CS7036` at
+`src/SecureOps.Infrastructure/OperationalRecords/JiraIssueDraftService.cs:204` and then `CS0121` at
+`src/SecureOps.Ui/Services/SignedInUser.cs:33` (platform code). Linux results in the handoff notes were measured with SDK
+10.0.112 and `-p:LangVersion=13` and do **not** pass the pinned toolchain gate. Record the Windows result as it is.
 
 ```powershell
 git rev-parse HEAD            # must equal the HEAD in HANDOFF.md
@@ -51,13 +65,13 @@ $env:SECUREOPS_SA_SQL_DIAGNOSTICS = "$PWD\evidence\sa-diagnostics.log"
 dotnet test tests\SecureOps.Tests.Integration -c Release --no-build --filter "FullyQualifiedName~ServiceAccounts" --logger "trx;LogFileName=sa-sql.trx" --results-directory .\evidence
 ```
 
-Expected: all module tests pass on the first run (36 at the follow-up HEAD: 33 SQL tests plus the three
+Expected: all module tests pass on the first run (39 at the knowledge-base HEAD: 36 SQL tests plus the three
 HTTP composition tests that need no database). The diagnostics file should contain only the
 intentional `Number=51091` entry of the audit-rollback test. Any other entry is the evidence that
 was missing for the two unexplained first-run failures: keep the TRX and the log.
 
 Optional least-privilege rerun: map a second local Windows principal to a database user that is only
-a member of `svcacct_api_runtime`, set `SECUREOPS_SA_SQL_RUNTIME_CONNECTION` to a connection that runs
+a member of `svcacct_api_runtime` (role scripts SA-API, then SA-002-API), set `SECUREOPS_SA_SQL_RUNTIME_CONNECTION` to a connection that runs
 as that principal, and rerun the filter on a *new* database. If no second principal is available,
 record "NOT RUN" (the Linux run covered it with a SQL login).
 
@@ -136,6 +150,25 @@ Expected results (capture request, status and response body for each):
 | 15 | coordinator | weekly live report, sent `Manager` snapshot, month and date-range reports, snapshot XLSX/PDF | 200; snapshot unchanged after a late entry; creator shown |
 | 16 | any bundle holder | module routes with `ServiceAccounts__Provider=Disabled` | 503 `ServiceAccountsNotConfigured` |
 
+Knowledge-base rules, gMSA routing and report v2 (same identities; add a bundle `sa-pilot-verify` = View, Verify for the
+coordinator, or a fifth TEST identity as verifier). Setup: the module administrator creates teams `SYN PILOT SQL` and
+`SYN PILOT WASAS` in `SYN PILOT ORG` and accounts `SYNPILOT_G1`, `SYNPILOT_G2`, `SYNPILOT_G3` in `SYN PILOT ORG`.
+
+| # | Caller | Call / screen | Expected |
+|---|---|---|---|
+| 17 | team member, coordinator | `POST .../team-roles` | 403; module administrator → 200 |
+| 18 | module administrator | Admin → "gMSA yönlendirme": `SYN PILOT SQL` = SQL ekibi, `SYN PILOT WASAS` = yürütücü; a second executor | 200, 200; second executor 400 `role` |
+| 19 | coordinator | revoke the executor, stage a DBA list (target `SYN PILOT WASAS`) naming G1 with Ekip `SYN PILOT SQL` | preview has no "gMSA yönlendirme" line; commit opens no request |
+| 20 | coordinator | create a manual GmsaHandover request for G2, restore the executor, stage a list with G1, G2, G3 | "gMSA yönlendirme (SQL-EKIP)" only for G1 and G3; after commit exactly one GmsaHandover request each for G1, G2, G3 and no ownership change |
+| 21 | coordinator | stage the same accounts again in a later list | no routing line, no new request |
+| 22 | coordinator | detail of G1 → "Kullanım ve kural": add Database/Oracle | "Manuel inceleme bekliyor", rule `KB-VT-ORACLE`, reason says unverified; no removal recommended |
+| 23 | coordinator | add ScheduledTask; try "İstisna kaydet" | badge "Kurala aykırı (plansız)"; exception button absent; direct `POST usages/{id}/exception` → 403 |
+| 24 | verifier | record the exception with a reason | 200; badge returns to manual review; history and audit rows present |
+| 25 | team member | G1 detail / `POST accounts/{G1}/usages` | 404 / 404 (out of scope is indistinguishable from missing) |
+| 26 | coordinator | Reports: live report, save snapshot A, change data, save snapshot B, "Nüsha karşılaştırma" A→B | directorate view, rules list, gMSA funnel, 12-week trend and risk candidates visible; comparison shows the change; reopened A unchanged (same SHA-256 prefix) |
+| 27 | coordinator | snapshot A XLSX and PDF | sheets include "Direktörlük görünümü", "Bilgi bankası kuralları", "İncelenecek hesaplar", "gMSA hunisi", "Trend (son haftalar)", "Risk adayları"; **desktop Excel opens without a repair prompt**; PDF opens |
+| 28 | coordinator | a snapshot created with the pre-branch build (`7e227ed`) before upgrading, after upgrading | opens with the "bu sürümde yoktur" notice; XLSX/PDF without the new sheets; hash unchanged |
+
 UI (same identities): the team member opens `/service-accounts` and sees "Takibinizdeki işler"
 first; the account detail shows the participant notice and only the allowed controls.
 
@@ -164,4 +197,7 @@ recurring job is not removed automatically; removing it is an operator decision.
 - `SELECT Action, COUNT(*) FROM audit.AuditLog WHERE Action LIKE 'ServiceAccount.%' GROUP BY Action;`
 - `SELECT program_name, transaction_isolation_level FROM sys.dm_exec_sessions WHERE program_name LIKE '%Service Accounts%';`
   (module sessions use their own pool.)
+- `SELECT Role, COUNT(*) FROM svcacct.TeamRoles WHERE RevokedAt IS NULL GROUP BY Role;` and
+  `SELECT UsageKind, COUNT(*) FROM svcacct.AccountUsages GROUP BY UsageKind;`
+- Screenshots of rows 18–27 at 1440 px and 390 px.
 - A short list of anything that differed from the expected column.

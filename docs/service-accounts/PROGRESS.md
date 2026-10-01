@@ -14,8 +14,10 @@ activation, no corporate SQL/source/Jira/AD/SMTP call.
 On top of the follow-up line: usage records and the explained knowledge-base rule engine, owner decision 2026-10-01
 (SQL-team accounts are evaluated as gMSA by the configured executing team, routed automatically on import), gMSA funnel,
 12-week trend, risk candidates, directorate view, snapshot comparison, SQL candidate SA-002 and ADR-0024 (proposed,
-read-only discovery). Details, hashes and results: [KB-RULES-20261001.md](KB-RULES-20261001.md). Module integration
-38/38 under the restricted role on three new databases; failing sets identical to the base.
+read-only discovery). Completed 2026-10-02: Oracle corrected to an unverified manual review, duplicate gMSA routing
+fixed, persisted-access verification, browser boundary journey on the real composition (allowed journeys blocked on
+Linux, see Windows rows 17–28), master conflict analysis. Details, hashes and results:
+[KB-RULES-20261001.md](KB-RULES-20261001.md). Module integration 39/39 under the restricted role (SDK 9.0.317, no override).
 
 ## Follow-up 2026-09-30 (after the pinned handoff)
 
