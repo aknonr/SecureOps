@@ -108,6 +108,8 @@ type+number) and links, Communications and account links, Findings, Handovers,
 IdentityTransitions, ImportBatches (server-held bytes + hash), ImportRows (raw/normalized,
 classification, decision), AccountObservations, Evidence (bytes in SQL, scoped download),
 ReportSnapshots (immutable payload + exports), ReminderOutbox, History.
+Candidate 2 (`SA-002`): AccountUsages (where an account is used; reasoned exception and removal, never deleted) and
+TeamRoles (SQL teams and the single gMSA executing team; configuration, never access).
 
 Dates: plan/business dates are `date`; events carry `datetimeoffset` only when a real instant is
 known; `TimePrecision` records DateOnly/Instant/Unknown. Source timestamps without a timezone

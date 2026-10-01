@@ -9,6 +9,14 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Knowledge-base rules and report v2 (2026-10-01)
+
+On top of the follow-up line: usage records and the explained knowledge-base rule engine, owner decision 2026-10-01
+(SQL-team accounts are evaluated as gMSA by the configured executing team, routed automatically on import), gMSA funnel,
+12-week trend, risk candidates, directorate view, snapshot comparison, SQL candidate SA-002 and ADR-0024 (proposed,
+read-only discovery). Details, hashes and results: [KB-RULES-20261001.md](KB-RULES-20261001.md). Module integration
+38/38 under the restricted role on three new databases; failing sets identical to the base.
+
 ## Follow-up 2026-09-30 (after the pinned handoff)
 
 The Codex handoff stays pinned at `b4fdf8d`. Module-only follow-up changes, results and what to
