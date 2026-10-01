@@ -831,6 +831,54 @@ popup policy without reopening all already-open tabs. In Use waiting age/dashboa
 persisted RFC ownership and controlled upload/completion/reconciliation remain
 active LOCAL work; the combined milestone is NOT complete.
 
+### Shift Set Journey Pass, 2026-10-01
+
+UI-only (Claude), branch `claude/quirky-goldberg-1uxpt7` from master `214690e`. Files: `Pages/Resources.razor`,
+`Pages/ShiftSets.razor`, `Shared/Components/ResolvedResourceLinks.razor` (each with a new scoped `.razor.css`) and
+`Services/ResourceView.cs`. No API, DTO, SQL, Worker, policy, NavMenu, theme or `_Host` opener change.
+
+- **Find.** The result head states total, visible range and page (`30 bağlantı · 1–25 / 30 gösteriliyor ·
+  Sayfa 1 / 2`) from the server's own paging, and a "Listeyi daraltan" line names each active filter. An empty
+  filtered result offers Filtreleri temizle as well as Tüm bağlantılara dön. Favouriting reports what changed.
+- **Add to a personal group.** The confirmation names the link (or counts several) and the group the server
+  confirmed, with a **Grubu aç** link to `/resources/sets?set={id}`; that page selects the group on arrival
+  (`?set=` is only a selection hint; an unknown id falls back to the usual default).
+- **Understand what will open.** Each group shows its link count. Before preparing, the page says how many links
+  are saved and that tabs open only on the operator's own click. The prepared list is numbered in opening order
+  with each destination host. Saved links the operator could see but the resolution did not return are named
+  under `PartialSetNotice`, without address or anchor, so they can never be part of the batch. Hidden members
+  remain unnamed and uncounted, as the contract requires.
+- **Open.** Unchanged: one native `N bağlantıyı aç` click through `window.secureOpsLinks.openMany`; the status
+  says opening was *requested*, never that a tab or destination opened.
+- **Feedback.** Create, rename, delete, default, reorder and remove each leave a `role=status` sentence. Preparing
+  reads "Erişim denetleniyor…". Returning to editing after a resolution that left links out re-reads the group,
+  so a reorder is not built from a link that is no longer visible (previously the server correctly rejected it
+  with 404 and the page recovered with an error).
+
+**Verification (Linux, SDK 10.0.112, no `LangVersion` override).** `SecureOps.Ui` builds with zero warnings/errors.
+The test project does not build as committed (G-30); in a throw-away copy with only that test line changed,
+`ResourceViewTests`/`ResourceWorkspaceTests`/`ResourceExperienceTests`/`ResourceApiClientTests` pass 62/62 (13 new),
+all `SecureOps.Tests.Unit.Ui` tests pass, and the remaining unit (4) and integration (12) failures are the same
+platform-dependent set as master. `tests/browser/resource-shift-journey.cjs` passes against the local Demo API
+with synthetic InMemory data (real API code, not a stub) and Playwright's bundled Chromium: search, favourite,
+create-and-save, save-by-selection, Grubu aç, archive-then-prepare with the left-out link named, keyboard
+activation of prepare, one-click batch open (attempt message only), reorder/remove feedback, 1440/390 widths and
+a 720 CSS-pixel viewport at device scale 2 as a 200% zoom approximation, with no horizontal overflow and no page
+errors. Playwright's default popup handling is used, so its popup count is not evidence of browser policy.
+`workspace-usability.cjs` and `resource-experience.cjs` now read only the total from the richer status line;
+on this Linux host both, and `resource-ui.cjs`, stop at the same step on master as on this branch (selection
+text, first-use guide and a removed page-size button respectively), so they were not usable as regression gates
+here. Windows/IIS, native browser zoom, managed popup policy and screen readers were not tested.
+
+**Backend contract notes (recorded, not implemented).** To be numbered in `docs/26-ui-backend-contract-gaps.md`
+after the open access/G-30 change there merges.
+
+1. *Frequently used links.* The catalogue has no per-owner usage signal or "favourites first" ordering, so the UI
+   relies on Favorilerim and search. Any "recently opened" list would be personal activity data and needs an
+   audit-framing decision (not employee monitoring) before a contract.
+2. *Favourites view paging.* Favorilerim pages the bounded personal projection client-side (at most 200); a
+   server query parameter `favouritesOnly` would let the two views share one paging path.
+
 ### In Use V1 Canonical Handoff, 2026-09-08
 
 #### Recovery And Local Acceptance Closeout, 2026-09-14
