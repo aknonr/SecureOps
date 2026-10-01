@@ -34,6 +34,15 @@ UI-only pass (Claude) on branch `feature/ui-access-management-20261001`; no API,
   section bar. Quick access adds existing capability-gated routes only. The operator board no longer
   says the directory "responds"; it shows "Yapılandırıldı · sınanmadı" and only to `Identity.Lookup`.
 
+- **Giriş sayfası.** The flight overlay is locked to the photograph's pixel space (1672x468, same
+  height and `--so-photo-x` position as the photo), so the Istanbul hub stays aligned at every size.
+  Seven routes leave Istanbul for Europe, the Americas and Asia; each carries an outbound and an
+  inbound aircraft driven by SVG `animateMotion` + `mpath` on that same path (the old CSS
+  `offset-path` copy had drifted from the drawn line). The artwork's day/night follows the Istanbul
+  clock (`data-so-sky`, 07:00–19:00 day; appearance is the fallback), night adds navigation lights;
+  the card still follows the reader's appearance. Reduced motion freezes the timeline with aircraft
+  on their routes. No place labels are drawn.
+
 Missing contract data is recorded as G-19 to G-25 in `docs/26-ui-backend-contract-gaps.md`.
 Verification: targeted unit/render tests and a local Playwright run against a synthetic stub API
 (390px, emulated 200% zoom at 683px CSS width, light/dark, keyboard, denial, loading/error/empty).

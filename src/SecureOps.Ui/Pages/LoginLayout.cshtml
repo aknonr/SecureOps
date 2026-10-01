@@ -7,8 +7,10 @@
 
     Composition: one full-bleed photographic Earth field, with the sign-in card floating over its
     right side. Generated local geography remains beneath the artwork as a graceful fallback. A
-    single dynamic route overlay carries the hub and aircraft in every appearance. No place names
-    are drawn: the geography carries the meaning.
+    flight-network overlay locked to the photograph carries the Istanbul hub, routes to Europe, the
+    Americas and Asia, and outbound and inbound aircraft. The artwork's day or night follows the
+    Istanbul clock (data-so-sky); the card follows the reader's appearance. No place names are
+    drawn: the geography carries the meaning.
 
     Below the split breakpoint the field stays as an atmospheric backdrop and the card becomes the
     page, because on a phone an illustration above the fold pushes the actual sign-in action off it.
@@ -43,6 +45,16 @@
                     : "light";
             }
             document.documentElement.dataset.soAppearance = mode;
+
+            // The sign-in artwork follows the hub's clock, not the reader's theme: day over Istanbul
+            // shows the daylight Earth, night shows city lights. Falls back to the appearance when the
+            // time zone cannot be resolved. Presentation only; nothing is stored.
+            var sky = mode === "light" ? "day" : "night";
+            try {
+                var hour = parseInt(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Istanbul" }).format(new Date()), 10);
+                if (!isNaN(hour)) { sky = hour >= 7 && hour < 19 ? "day" : "night"; }
+            } catch (e) { }
+            document.documentElement.dataset.soSky = sky;
             document.documentElement.style.colorScheme = mode === "light" ? "light" : "dark";
         })();
     </script>
@@ -56,10 +68,14 @@
         <div class="so-auth-lights"></div>
         <div class="so-auth-photo"></div>
 
-        @* The map and routes share longitude -25..100 and latitude 72..-38. The hub is Türkiye,
-           expressed only by location art; no place label is rendered. *@
-        <svg class="so-auth-field" viewBox="0 0 1000 660" preserveAspectRatio="xMidYMid slice"
-             role="presentation" aria-hidden="true" focusable="false">
+        @* Flight network locked to the photograph's own pixel space (1672x468). The overlay is sized
+           and positioned exactly like the photo background (same height, same horizontal position
+           variable), so Istanbul stays under the hub at every viewport. Routes leave Istanbul for
+           Europe, the Americas and Asia; long-haul routes leave the frame instead of naming a city.
+           Every aircraft rides its own route with SVG animateMotion + mpath, so the drawn line and
+           the flown path cannot drift apart. Outbound and inbound aircraft share each route.
+           No place label is rendered: the geography carries the meaning. *@
+        <svg class="so-auth-flights" viewBox="0 0 1672 468" role="presentation" aria-hidden="true" focusable="false">
             <defs>
                 <radialGradient id="so-hub-glow" cx="50%" cy="50%" r="50%">
                     <stop offset="0%" stop-color="var(--so-art-accent)" stop-opacity="0.95" />
@@ -70,45 +86,119 @@
                     <stop offset="58%" stop-color="var(--so-art-plane)" />
                     <stop offset="100%" stop-color="var(--so-art-plane-shade)" />
                 </linearGradient>
+                @* Same silhouette as SoAircraft.razor (nose toward +x), inlined because this layout
+                   runs without a Blazor circuit. Navigation lights show only in the night sky. *@
+                <symbol id="so-auth-aircraft" viewBox="-40 -30 80 60" overflow="visible">
+                    <path class="so-aircraft-shadow" d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
+                    <path class="so-aircraft-body" fill="url(#so-aircraft-body)" d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
+                    <path class="so-aircraft-tail" d="M-30 -3 L-25 -14 L-19 -14 L-20 -3 Z" />
+                    <path class="so-aircraft-cabin" d="M-18 0 H27" />
+                    <g class="so-aircraft-navlights">
+                        <circle cx="-9" cy="-24" r="2.4" fill="#ff3b3b" />
+                        <circle cx="-9" cy="24" r="2.4" fill="#2bff88" />
+                        <circle class="so-aircraft-strobe" cx="-33" cy="0" r="2.6" fill="#ffffff" />
+                    </g>
+                </symbol>
             </defs>
 
-            <g class="so-auth-network" transform="translate(50 95)">
-            @* Destinations reached from the Türkiye hub. Thin and low-contrast so the single red
-               route reads as the subject rather than as one line among many. *@
-            <g class="so-auth-routes" fill="none" stroke="var(--so-art-route)" stroke-width="1.05">
-                <path d="M463 198 Q 350 145 245 165" />
-                <path d="M463 198 Q 455 105 520 88" />
-                <path d="M463 198 Q 560 175 675 245" />
-                <path d="M463 198 Q 425 285 405 390" />
+            <g class="so-auth-routes" fill="none">
+                @* Batı Avrupa *@
+                <path id="so-route-eu-west" class="so-auth-route" d="M684 207 Q 575 112 470 130" />
+                @* Kuzey/Orta Avrupa *@
+                <path id="so-route-eu-north" class="so-auth-route" d="M684 207 Q 650 120 598 66" />
+                @* Güney Avrupa *@
+                <path id="so-route-eu-south" class="so-auth-route" d="M684 207 Q 610 196 528 186" />
+                @* Kuzey Amerika (Atlantik üzeri) *@
+                <path id="so-route-am-north" class="so-auth-route" d="M684 207 Q 520 18 -160 62" />
+                @* Güney Amerika *@
+                <path id="so-route-am-south" class="so-auth-route" d="M684 207 Q 470 250 -160 400" />
+                @* Uzak Doğu Asya *@
+                <path id="so-route-as-east" class="so-auth-route" d="M684 207 Q 1000 30 1860 110" />
+                @* Orta Doğu ve Güney Asya *@
+                <path id="so-route-as-south" class="so-auth-route" d="M684 207 Q 870 250 1180 500" />
             </g>
 
-            <g class="so-auth-destinations" fill="var(--so-art-route-node)">
-                <circle cx="245" cy="165" r="2.2" />
-                <circle cx="520" cy="88" r="2.2" />
-                <circle cx="675" cy="245" r="2.2" />
-                <circle cx="405" cy="390" r="2.2" />
+            <g class="so-auth-destinations">
+                <circle cx="470" cy="130" r="3.2" />
+                <circle cx="598" cy="66" r="3.2" />
+                <circle cx="528" cy="186" r="3.2" />
             </g>
 
-            @* The one highlighted route, drawn persistently so the page's signature element is never
-               absent while somebody is looking at it. *@
-            <path id="so-auth-route" class="so-auth-route-hot"
-                  d="M463 198 Q 350 82 199 123"
-                  fill="none" stroke="var(--so-art-accent)" stroke-width="2.1" />
+            <circle class="so-auth-hub-glow" cx="684" cy="207" r="30" fill="url(#so-hub-glow)" />
+            <circle class="so-auth-hub-ring" cx="684" cy="207" r="7" />
+            <circle cx="684" cy="207" r="3" fill="var(--so-art-hub-core)" />
 
-            <circle class="so-auth-hub-glow" cx="463" cy="198" r="25" fill="url(#so-hub-glow)" />
-            <circle class="so-auth-hub-ring" cx="463" cy="198" r="5.5" />
-            <circle cx="463" cy="198" r="2.2" fill="var(--so-art-hub-core)" />
-
-            @* Same silhouette as SoAircraft.razor, inlined because this layout runs without a
-               Blazor circuit and therefore renders no components. A test pins the two together. *@
-            <g class="so-auth-plane">
-                <path class="so-aircraft-shadow"
-                      d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
-                <path class="so-aircraft-body" fill="url(#so-aircraft-body)"
-                      d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
-                <path class="so-aircraft-tail" d="M-30 -3 L-25 -14 L-19 -14 L-20 -3 Z" />
-                <path class="so-aircraft-cabin" d="M-18 0 H27" />
-            </g>
+            <g class="so-auth-traffic">
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="9s" begin="0s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-eu-west" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="9s" begin="0s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="9s" begin="4.5s" repeatCount="indefinite" rotate="auto-reverse" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-eu-west" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="9s" begin="4.5s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="8s" begin="2.5s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-eu-north" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="8s" begin="2.5s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="8s" begin="6.5s" repeatCount="indefinite" rotate="auto-reverse" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-eu-north" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="8s" begin="6.5s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="7s" begin="4.5s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-eu-south" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="7s" begin="4.5s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="7s" begin="8s" repeatCount="indefinite" rotate="auto-reverse" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-eu-south" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="7s" begin="8s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="15s" begin="1s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-am-north" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="15s" begin="1s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="15s" begin="8.5s" repeatCount="indefinite" rotate="auto-reverse" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-am-north" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="15s" begin="8.5s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="16s" begin="6s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-am-south" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="16s" begin="6s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="16s" begin="14s" repeatCount="indefinite" rotate="auto-reverse" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-am-south" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="16s" begin="14s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="15s" begin="3s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-as-east" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="15s" begin="3s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="15s" begin="10.5s" repeatCount="indefinite" rotate="auto-reverse" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-as-east" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="15s" begin="10.5s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="12s" begin="8s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-as-south" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="12s" begin="8s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
+                <g class="so-auth-plane" opacity="0">
+                    <animateMotion dur="12s" begin="14s" repeatCount="indefinite" rotate="auto-reverse" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#so-route-as-south" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.06;0.9;1" dur="12s" begin="14s" repeatCount="indefinite" />
+                    <use href="#so-auth-aircraft" x="-15" y="-11" width="30" height="22" />
+                </g>
             </g>
         </svg>
         </div>
@@ -122,6 +212,16 @@
                 <span>AIRLINES</span>
             </span>
         </div>
+
+        @* SMIL ignores prefers-reduced-motion, so under that preference the timeline is frozen at a
+           moment where aircraft are visibly on their routes; nothing on the page depends on motion. *@
+        <script>
+            (function () {
+                var svg = document.querySelector(".so-auth-flights");
+                if (!svg || !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches) { return; }
+                try { svg.setCurrentTime(9); svg.pauseAnimations(); } catch (e) { svg.classList.add("is-static"); }
+            })();
+        </script>
 
         <main class="so-auth-stage">
             @RenderBody()
