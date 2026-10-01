@@ -833,7 +833,7 @@ active LOCAL work; the combined milestone is NOT complete.
 
 ### Shift Set Journey Pass, 2026-10-01
 
-UI-only (Claude), branch `claude/quirky-goldberg-1uxpt7` from master `214690e`. Files: `Pages/Resources.razor`,
+UI-only (Claude), branch `claude/quirky-goldberg-1uxpt7` from master `e670617`. Files: `Pages/Resources.razor`,
 `Pages/ShiftSets.razor`, `Shared/Components/ResolvedResourceLinks.razor` (each with a new scoped `.razor.css`) and
 `Services/ResourceView.cs`. No API, DTO, SQL, Worker, policy, NavMenu, theme or `_Host` opener change.
 
@@ -855,29 +855,27 @@ UI-only (Claude), branch `claude/quirky-goldberg-1uxpt7` from master `214690e`. 
   so a reorder is not built from a link that is no longer visible (previously the server correctly rejected it
   with 404 and the page recovered with an error).
 
-**Verification (Linux, SDK 10.0.112, no `LangVersion` override).** `SecureOps.Ui` builds with zero warnings/errors.
-The test project does not build as committed (G-30); in a throw-away copy with only that test line changed,
-`ResourceViewTests`/`ResourceWorkspaceTests`/`ResourceExperienceTests`/`ResourceApiClientTests` pass 62/62 (13 new),
-all `SecureOps.Tests.Unit.Ui` tests pass, and the remaining unit (4) and integration (12) failures are the same
-platform-dependent set as master. `tests/browser/resource-shift-journey.cjs` passes against the local Demo API
-with synthetic InMemory data (real API code, not a stub) and Playwright's bundled Chromium: search, favourite,
-create-and-save, save-by-selection, Grubu aç, archive-then-prepare with the left-out link named, keyboard
-activation of prepare, one-click batch open (attempt message only), reorder/remove feedback, 1440/390 widths and
-a 720 CSS-pixel viewport at device scale 2 as a 200% zoom approximation, with no horizontal overflow and no page
-errors. Playwright's default popup handling is used, so its popup count is not evidence of browser policy.
-`workspace-usability.cjs` and `resource-experience.cjs` now read only the total from the richer status line;
-on this Linux host both, and `resource-ui.cjs`, stop at the same step on master as on this branch (selection
-text, first-use guide and a removed page-size button respectively), so they were not usable as regression gates
-here. Windows/IIS, native browser zoom, managed popup policy and screen readers were not tested.
+**Verification (Linux).** The committed `global.json` pins SDK 9.0.317, which this host could not install, so a
+throw-away copy changed only `global.json` to the installed SDK 10.0.112; `LangVersion` stays 12.0 and no source
+was edited. There the full solution builds with zero warnings/errors. `ResourceViewTests`, `ResourceWorkspaceTests`,
+`ResourceExperienceTests` and `ResourceApiClientTests` pass 62/62 (13 new) and all `SecureOps.Tests.Unit.Ui` tests
+pass. Full unit: 1,607 passed, 3 failed; master in the same setup: 1,594 passed, the same 3 failed (the toolchain
+contract, which rejects the substituted SDK, plus two platform-dependent tests). Integration: the same 7 failures
+as master (Windows DPAPI/SkiaSharp). No result is a Windows or corporate TEST pass.
 
-**Backend contract notes (recorded, not implemented).** To be numbered in `docs/26-ui-backend-contract-gaps.md`
-after the open access/G-30 change there merges.
+`tests/browser/resource-shift-journey.cjs` passes against the local Demo API with synthetic InMemory data (real API
+code, not a stub) and Playwright's bundled Chromium: search, favourite, create-and-save, save-by-selection, Grubu aç,
+archive-then-prepare with the left-out link named, keyboard activation of prepare, one-click batch open (attempt
+message only), reorder/remove feedback, 1440/390 widths and a 720 CSS-pixel viewport at device scale 2 as a 200% zoom
+approximation, with no horizontal overflow and no page errors; a dark-appearance capture was checked by eye.
+Playwright's default popup handling is used, so its popup count is not evidence of browser policy.
+`workspace-usability.cjs` and `resource-experience.cjs` now read only the total from the richer status line; on this
+Linux host they, and `resource-ui.cjs`, stop at the same step on master as on this branch (selection text, first-use
+guide and a removed page-size button respectively), so they were not usable as regression gates here. Windows/IIS,
+native browser zoom, managed popup policy and screen readers were not tested.
 
-1. *Frequently used links.* The catalogue has no per-owner usage signal or "favourites first" ordering, so the UI
-   relies on Favorilerim and search. Any "recently opened" list would be personal activity data and needs an
-   audit-framing decision (not employee monitoring) before a contract.
-2. *Favourites view paging.* Favorilerim pages the bounded personal projection client-side (at most 200); a
-   server query parameter `favouritesOnly` would let the two views share one paging path.
+**Backend contract notes (recorded, not implemented):** G-31 (no usage signal for frequently used links) and
+G-32 (favourites view has no server-side paging) in `docs/26-ui-backend-contract-gaps.md`.
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 

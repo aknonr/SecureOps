@@ -37,6 +37,8 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-28 — No bounded way to resolve an account from a person's name | Open — needs ADR decision |
 | G-29 — AD lookup does not show the Service Accounts inventory record | Open |
 | G-30 — The solution builds only with a specific SDK/language combination | Repair implemented — pinned SDK/language; Windows verification below |
+| G-31 — No per-owner usage signal for frequently used links | Open — needs an audit-framing decision before a contract |
+| G-32 — Favourites view has no server-side paging | Open — low |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1003,6 +1005,32 @@ are in files the UI branch does not change; they reproduce identically on master
   execution policy unsupported; `AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`,
   publish-directory message precedes the expected one); integration 12 (DPAPI "requires Windows" x5,
   SkiaSharp native library x7). These are Codex-owned.
+
+---
+
+## G-31 — No per-owner usage signal for frequently used links
+
+**Endpoints:** `GET /api/v1/resources/links`, `GET /api/v1/resources/me`
+**Severity:** Low–medium — an operator looking for "the link I use every shift" has search and Favorilerim only
+**Status:** Open (raised by the 2026-10-01 shift set journey pass)
+
+The catalogue query has no "favourites first" or "recently opened" ordering, and the API records no per-owner
+opening history. **What the UI does.** Points to Favorilerim and personal groups for frequently used links and
+invents no usage order. **What would resolve it.** Either a `favouritesFirst` sort on the catalogue query, or —
+only after an explicit decision that frames it as a personal convenience, not employee activity monitoring — a
+bounded, owner-only "recently opened" list.
+
+---
+
+## G-32 — Favourites view has no server-side paging
+
+**Endpoint:** `GET /api/v1/resources/me`
+**Severity:** Low
+**Status:** Open
+
+Favorilerim filters and pages the bounded personal projection (at most 200 favourites) in the UI, while Tüm
+bağlantılar pages on the server. Both show the same range and page wording. **What would resolve it.** A
+`favouritesOnly` parameter on `GET /api/v1/resources/links` so both views share one paging path.
 
 ---
 
