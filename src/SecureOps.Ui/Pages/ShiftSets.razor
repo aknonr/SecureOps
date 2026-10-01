@@ -38,6 +38,7 @@
     {
         <ResourceHelp Surface="groups" Preferences="_preferences" PreferencesChanged="PreferencesChanged"
                       CanManage="@_access.Can(Capabilities.ResourcesManage)" Disabled="_busy" />
+        @if (_notice is not null) { <p class="so-workspace-notice" role="status">@_notice</p> }
         @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="LoadPreferencesAsync" RetryLabel="Güncel kayıtları yükle" /> }
         @if (_preferences is null && _problem is null) { <SoLoading Message="Gruplarınız getiriliyor…" /> }
         else if (_preferences is { Sets.Count: 0 })
@@ -68,6 +69,7 @@
                                         {
                                             <span>Kişisel grup</span>
                                         }
+                                        <span>· @group.Links.Count bağlantı</span>
                                     </span>
                                 </div>
                             </MudButton>
@@ -92,14 +94,18 @@
                                 @(set.IsDefault ? "Varsayılanı kaldır" : "Varsayılan yap")
                             </MudButton>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.OpenInNew"
-                                       data-guide="prepare-links" Disabled="_busy" OnClick="@(() => PrepareOpenAsync(set))">
-                                @(_resolvedSetId == set.Id ? "Bağlantıları yeniden denetle" : "Açmak için hazırla")
+                                       data-guide="prepare-links" Disabled="@(_busy || set.Links.Count == 0)" OnClick="@(() => PrepareOpenAsync(set))">
+                                @(_preparing ? "Erişim denetleniyor…" : _resolvedSetId == set.Id ? "Bağlantıları yeniden denetle" : "Açmak için hazırla")
                             </MudButton>
                         </div>
+                        @if (_resolved is null && set.Links.Count > 0)
+                        {
+                            <p class="so-panel-text so-panel-text--sm">@set.Links.Count bağlantı kayıtlı. Açmak için hazırla güncel erişiminizi denetler ve hangilerinin açılacağını gösterir; sekmeler yalnız siz açma düğmesine bastığınızda açılır.</p>
+                        }
                         @if (_resolvedSetId == set.Id && _resolved is { } ready)
                         {
-                            <ResolvedResourceLinks @key="ready" Links="ready.Links" />
-                            <MudButton StartIcon="@Icons.Material.Filled.Edit" OnClick="ClearResolved">Düzenlemeye dön</MudButton>
+                            <ResolvedResourceLinks @key="ready" Links="ready.Links" NotOpening="ResourceView.NotOpening(set, ready.Links)" />
+                            <MudButton StartIcon="@Icons.Material.Filled.Edit" Disabled="_busy" OnClick="@(() => ReturnToEditingAsync(set, ready))">Düzenlemeye dön</MudButton>
                         }
                         @if (set.Links.Count == 0)
                         {
@@ -137,10 +143,14 @@
 </div>
 
 @code {
+    /// <summary>Group to show first, e.g. after saving links to it from Uygulama Bağlantıları.</summary>
+    [SupplyParameterFromQuery(Name = "set")] public Guid? SetFromQuery { get; set; }
+
     private AccessSnapshot? _access;
     private ResourcePreferencesResponse? _preferences;
     private UiProblem? _problem;
-    private bool _busy;
+    private string? _notice;
+    private bool _busy, _preparing;
     private bool _focusGroup;
     private ElementReference _groupHeading;
 
@@ -151,7 +161,7 @@
     private ShiftSetResponse? Selected => _preferences?.Sets.FirstOrDefault(s => s.Id == _selectedSetId)
         ?? _preferences?.Sets.FirstOrDefault(s => s.IsDefault) ?? _preferences?.Sets.OrderBy(s => s.Name).FirstOrDefault();
 
-    private void SelectGroup(Guid id) { _selectedSetId = id; ClearResolved(); }
+    private void SelectGroup(Guid id) { _selectedSetId = id; _notice = null; ClearResolved(); }
     private void PreferencesChanged(ResourcePreferencesResponse preferences) { _preferences = preferences; ClearResolved(); }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -166,6 +176,7 @@
     protected override async Task OnInitializedAsync()
     {
         AccessProvider.Changed += OnAccessChanged;
+        _selectedSetId = SetFromQuery;
         _access = await AccessProvider.GetAsync(CancellationToken.None);
 
         if (_access.Can(Capabilities.ResourcesView))
@@ -189,6 +200,7 @@
     {
         _busy = true;
         _problem = null;
+        _notice = null;
         ClearResolved();
         StateHasChanged();
 
@@ -226,14 +238,15 @@
 
         ClearResolved();
         await MutateAsync(preferences => ResourceApi.DeleteSetAsync(
-            set.Id, preferences.Version, CancellationToken.None));
+            set.Id, preferences.Version, CancellationToken.None), $"“{set.Name}” grubu silindi.");
     }
 
     private Task MakeDefaultAsync(ShiftSetResponse set) =>
         MutateAsync(preferences => ResourceApi.SaveSetAsync(
             set.Id,
             new SaveShiftSetRequest(set.Name, [], !set.IsDefault, preferences.Version),
-            CancellationToken.None));
+            CancellationToken.None),
+            set.IsDefault ? $"“{set.Name}” artık varsayılan grup değil." : $"“{set.Name}” varsayılan grup yapıldı.");
 
     private async Task MoveAsync(ShiftSetResponse set, int index, int offset)
     {
@@ -242,7 +255,8 @@
         UiProblem? problem = await MutateAsync(preferences => ResourceApi.SaveSetAsync(
             set.Id,
             new SaveShiftSetRequest(set.Name, reordered, set.IsDefault, preferences.Version),
-            CancellationToken.None));
+            CancellationToken.None),
+            $"“{set.Links[index].Name}” {index + offset + 1}. sıraya taşındı.");
         _focusGroup = problem is null;
     }
 
@@ -254,14 +268,15 @@
         UiProblem? problem = await MutateAsync(preferences => ResourceApi.SaveSetAsync(
             set.Id,
             new SaveShiftSetRequest(set.Name, remaining, set.IsDefault, preferences.Version, [link.Id]),
-            CancellationToken.None));
+            CancellationToken.None),
+            $"“{link.Name}” gruptan çıkarıldı. Katalogdaki bağlantı etkilenmedi.");
         _focusGroup = problem is null;
     }
 
     // Every personal mutation goes through here so the version guard, the refreshed state and the
     // conflict recovery are written once. A rejected stale request changes nothing server-side, so
     // the only correct response is to re-read before the operator tries again.
-    private async Task<UiProblem?> MutateAsync(Func<ResourcePreferencesResponse, Task<ResourcePreferencesResponse>> mutate)
+    private async Task<UiProblem?> MutateAsync(Func<ResourcePreferencesResponse, Task<ResourcePreferencesResponse>> mutate, string successNotice)
     {
         if (_preferences is null || _busy)
         {
@@ -270,6 +285,7 @@
 
         _busy = true;
         _problem = null;
+        _notice = null;
         ClearResolved();
         StateHasChanged();
 
@@ -278,6 +294,7 @@
             Guid[] before = [.. _preferences.Sets.Select(s => s.Id)];
             _preferences = await mutate(_preferences);
             _selectedSetId = _preferences.Sets.FirstOrDefault(s => !before.Contains(s.Id))?.Id ?? _selectedSetId;
+            _notice = successNotice;
             return null;
         }
         catch (SecureOpsApiException ex)
@@ -318,7 +335,8 @@
                     SaveShiftSetRequest request = new(name, ids, set?.IsDefault ?? false, version);
                     return await MutateAsync(_ => set is null
                         ? ResourceApi.CreateSetAsync(request, CancellationToken.None)
-                        : ResourceApi.SaveSetAsync(set.Id, request, CancellationToken.None));
+                        : ResourceApi.SaveSetAsync(set.Id, request, CancellationToken.None),
+                        set is null ? $"“{name.Trim()}” grubu oluşturuldu. Uygulama Bağlantıları sayfasından bağlantı ekleyebilirsiniz." : $"Grup adı güncellendi: {name.Trim()}.");
                 }) }
         };
 
@@ -335,8 +353,9 @@
         {
             return;
         }
-        _busy = true;
+        _busy = _preparing = true;
         _problem = null;
+        _notice = null;
         long generation = _opening.Clear();
         _resolvedSetId = set.Id;
         StateHasChanged();
@@ -355,8 +374,20 @@
         }
         finally
         {
-            _busy = false;
+            _busy = _preparing = false;
         }
+    }
+
+    // A resolution that left out a saved link the list still shows means the local list is older than the
+    // catalogue. Re-read it before editing, so a reorder is not built from a link that is no longer visible.
+    private async Task ReturnToEditingAsync(ShiftSetResponse set, ShiftSetResponse resolved)
+    {
+        if (ResourceView.NotOpening(set, resolved.Links).Count > 0)
+        {
+            await LoadPreferencesAsync();
+            return;
+        }
+        ClearResolved();
     }
 
     private void ClearResolved()

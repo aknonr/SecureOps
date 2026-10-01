@@ -1,0 +1,2 @@
+/* Link count beside a group name wraps instead of overflowing on narrow screens. */
+::deep .so-set-option-meta { flex-wrap: wrap; column-gap: var(--so-space-1); }
