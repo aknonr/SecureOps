@@ -331,8 +331,7 @@ Cleanup jobs are Hangfire recurring jobs, scheduled monthly.
 
 This two-ID model preserves the upstream technical origin while also tracking the operational record used by the organization. In the current workflow, the durable reference operators are most likely to use across acknowledgment, closure, audit, and handover is `TuruncuhatEvtId`, while `ExternalId` remains important for source-system correlation and intake idempotency.
 
-## Why EF Core (and When Not)
+## Data Access
 
-- **EF Core** for normal CRUD on `dbo.*` tables.
-- **Dapper** for high-volume audit writes (lower allocation overhead).
-- **Raw ADO.NET** never needed in MVP.
+Dapper with parameterized SQL for all persistence, including audit writes; the schema is the numbered scripts in
+`sql/` (ADR-0001, amended 2026-10-01). There is no ORM model.

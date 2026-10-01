@@ -57,10 +57,10 @@ Phase 1A current status: P1A-01 through P1A-11 are implemented in the backend an
 | P1-02 | Add `.editorconfig`, `.gitignore`, `Directory.Build.props` | S | Consistent build settings |
 | P1-03 | Add Serilog + structured logging in API and Worker | S | Logs to file + console |
 | P1-04 | Add health endpoint `/api/v1/health` | S | Returns 200 with build info |
-| P1-05 | Add EF Core DbContext skeleton | M | DbContext compiles, empty model |
+| P1-05 | ~~Add EF Core DbContext skeleton~~ — **superseded** 2026-10-01 (ADR-0001 amendment: Dapper retained) | — | — |
 | P1-06 | First SQL migration: Servers, Alerts, AlertEvents, audit.AuditLog + trigger | M | DB schema deployed |
 
-*P1-05 implementation note (2026-10-01): not implemented — data access is Dapper over numbered SQL scripts (`sql/schema/`, `sql/migrations/`) with no `DbContext`; this diverges from ADR-0001 and awaits an owner decision (see `AGENTS.md`).*
+*Implementation status (2026-10-01): P1-06 is partly implemented — `audit.AuditLog` and its trigger exist (`sql/schema/001-…`); Servers, Alerts and AlertEvents tables do not exist yet.*
 | P1-07 | Seed pilot servers from `docs/pilot-servers.md` | S | Servers table populated |
 | P1-08 | Add Hangfire to Worker with SQL storage | M | Hangfire dashboard accessible |
 

@@ -37,10 +37,10 @@ Note: IdentityLookup / PamAdUserLookup is delivered in Phase 1A. It is backend-o
 | P1-T02 | `.editorconfig`, `.gitignore`, `Directory.Build.props` | 2h | root |
 | P1-T03 | Add Serilog with file + console sinks | 3h | `Api/Program.cs`, `Worker/Program.cs` |
 | P1-T04 | Health endpoint `/api/v1/health` | 1h | `Api/Controllers/HealthController.cs` |
-| P1-T05 | EF Core DbContext skeleton | 3h | `Infrastructure/Data/SecureOpsDbContext.cs` |
+| P1-T05 | ~~EF Core DbContext skeleton~~ — **superseded** 2026-10-01 (ADR-0001 amendment: Dapper retained) | — | — |
 | P1-T06 | First SQL migration: core tables + audit trigger | 5h | `sql/migrations/V001_*.sql` |
 
-*Implementation note (2026-10-01): P1-T05 is not implemented — data access is Dapper with no `DbContext`, which diverges from ADR-0001 and awaits an owner decision (see `AGENTS.md`). P1-T06 is implemented as numbered scripts `sql/schema/001-…` and `sql/migrations/001-…` (not `V001_*`); see `sql/README.md`.*
+*Implementation status (2026-10-01): P1-T06 is partly implemented — `audit.AuditLog` and its append-only trigger exist in `sql/schema/001-audit-and-access-control.sql` (scripts are named `001-…`, not `V001_*`); the Phase 1 diagnostic tables (Servers, Alerts, AlertEvents) do not exist yet.*
 | P1-T07 | Seed pilot servers from doc | 2h | `sql/seed/Servers.sql` |
 | P1-T08 | Add Hangfire with SQL storage to Worker | 4h | `Worker/Program.cs` |
 

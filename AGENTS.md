@@ -47,7 +47,7 @@ These are business and security constraints, not style preferences. They hold ev
 |---|---|
 | Stack | .NET 8 (`net8.0`, C# 12, SDK pinned in `global.json`), ASP.NET Core API, Worker Service — ADR-0001. .NET 8 support ends 2026-11-10; moving to .NET 10 needs an ADR. |
 | UI | Blazor Server + MudBlazor 6.16 (not React/Angular) — ADR-0001, ADR-0007 |
-| Data | SQL Server, append-only audit. ADR-0001 says EF Core for CRUD and Dapper for audit writes; the implementation uses Dapper and numbered scripts in `sql/schema/` and `sql/migrations/` throughout, with no EF Core model — an open divergence the owner must settle by ADR amendment or code change |
+| Data | SQL Server via Dapper (parameterized SQL) and numbered scripts in `sql/schema/` / `sql/migrations/`; append-only audit — ADR-0001 (amended 2026-10-01) |
 | Jobs | Hangfire on SQL Server, hosted by the Worker — ADR-0003 |
 | Automation | PowerShell Remoting + JEA only; Ansible optional from Phase 6 — ADR-0003 |
 | Access | Authentication source → corporate principal → approval → role → capability; authentication claims never grant access directly — ADR-0010, ADR-0022 |

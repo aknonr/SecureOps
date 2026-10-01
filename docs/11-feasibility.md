@@ -70,7 +70,7 @@ If any assumption breaks, dates slide accordingly. The schedule is **honest**, n
 | R8 | Hangfire SQL Server schema conflicts | Low | Low | Separate Hangfire schema; standard pattern |
 | R9 | Pilot servers reject WinRM (firewall, GPO) | Medium | Medium | Phase 0 connectivity test; coordinate with network team |
 | R10 | Performance: diagnostic jobs slow on first deploy | Medium | Medium | Timeouts; profile and tune; circuit breakers |
-| R11 | Schema migration breaks audit history | Low | High | EF Core migrations tested in test environment; rollback plan |
+| R11 | Schema migration breaks audit history | Low | High | Numbered migration scripts tested in isolated SQL harnesses before DBA execution; rollback plan |
 | R12 | Management priorities shift during multi-phase build | Medium | Medium | Phase-by-phase value; visible incremental deliveries |
 | R13 | Test environment unavailable or shared with other projects | Medium | High | Request dedicated in Phase 0; develop on mocks if needed |
 | R14 | Phase 7 AI hardware budget rejected | Medium | Low | Project is valuable without AI; surface this in management communication |

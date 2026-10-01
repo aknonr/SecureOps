@@ -1,6 +1,6 @@
 # ADR-0001 — Technology Stack
 
-**Status:** Accepted
+**Status:** Accepted; amended 2026-10-01 (data access — see Amendment 1)
 **Date:** 2026-05
 **Decision makers:** Project owner
 
@@ -30,7 +30,7 @@ The stack is:
 | UI | **Blazor Server + MudBlazor** |
 | Background jobs | **Hangfire** with SQL Server storage |
 | Database | SQL Server (existing enterprise) |
-| Data access | EF Core for CRUD, Dapper for high-volume audit writes |
+| Data access | Dapper with parameterized SQL over numbered SQL Server scripts — *amended 2026-10-01; originally "EF Core for CRUD, Dapper for high-volume audit writes" (Amendment 1)* |
 | Logging | Serilog with structured JSON |
 | PowerShell | `System.Management.Automation` + JEA |
 | Authentication | Windows Authentication via Active Directory |
@@ -135,11 +135,37 @@ Rejected for MVP because:
 - All projects target `net8.0`.
 - Solution projects are `SecureOps.Api`, `SecureOps.Worker`, `SecureOps.Ui`, `SecureOps.Domain`, `SecureOps.Infrastructure`, and `SecureOps.Shared`.
 - `SecureOps.Shared` is an accepted shared/common layer for cross-process contracts, authorization policy constants, and strongly typed configuration options. It may depend on `SecureOps.Domain` only.
-- `SecureOps.Shared` must not contain ASP.NET pipeline code, EF Core mappings, SQL access, PowerShell execution, file audit IO, external integration clients, or Blazor components.
+- `SecureOps.Shared` must not contain ASP.NET pipeline code, data-access mappings, SQL access, PowerShell execution, file audit IO, external integration clients, or Blazor components.
 - Nullable reference types enabled.
 - TreatWarningsAsErrors enabled.
 - Latest analyzer level.
 - `.editorconfig` at repo root enforces style.
+
+## Amendment 1 — Data access (2026-10-01)
+
+**Original decision (2026-05):** EF Core for CRUD on `dbo.*` tables, Dapper for high-volume audit writes.
+
+**What was built:** every persistence path — access, sessions, operational records, resources, In Use, announcements,
+reporting, Service Accounts and audit — uses Dapper with parameterized SQL in `SecureOps.Infrastructure`. The
+schema is a sequence of numbered, reviewed scripts in `sql/schema/` and `sql/migrations/` (see `sql/README.md`).
+No EF Core model or `DbContext` was created.
+
+**Decision (owner):** Dapper with parameterized SQL and numbered SQL scripts is the approved data-access approach.
+EF Core adoption is no longer a planned requirement.
+
+**Why the current approach is retained:**
+
+- Schema scripts are reviewed contracts executed through the approved DBA process and never by application
+  startup; explicit, versioned SQL fits that process better than generated ORM migrations.
+- Append-only audit triggers, constraints and the transactional pairing of a change with its audit event are
+  expressed directly in SQL and covered by isolated SQL tests.
+- Optimistic concurrency uses explicit version columns checked in the statements themselves.
+- One maintainer: a single, working data-access style is cheaper to keep correct than two.
+
+**Consequences:** guidance, plans and READMEs no longer require an EF Core model; tasks that asked for one are
+marked superseded, not implemented. The EF Core package references still present in `SecureOps.Infrastructure`
+are unused; removing them is a separate code change and not part of this amendment. Introducing an ORM later
+requires a new ADR.
 
 ## References
 
