@@ -15,6 +15,7 @@ public sealed class JiraIssueDraftServiceTests
     [Theory]
     [InlineData(OperationalRecordClassification.ServerRequest)]
     [InlineData(OperationalRecordClassification.SoftwareInstallation)]
+    [InlineData(OperationalRecordClassification.ServerRetirement)]
     public async Task BuildReview_ConfirmedTypes_RemainDeclarationsWithoutEligibilityOrIdentityLookup(OperationalRecordClassification type)
     {
         OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
@@ -31,10 +32,11 @@ public sealed class JiraIssueDraftServiceTests
         review.RequestType.Should().Be(type);
         review.RecordVersion.Should().Be(record.Version);
         review.BlockingConditions.Should().Contain(["CategoryPolicyPending", "OperatorDeclarationOnly", "RequesterUnresolved"]);
-        if (type == OperationalRecordClassification.SoftwareInstallation)
+        if (type != OperationalRecordClassification.ServerRequest)
         {
             review.FieldMapping.Labels.Should().BeEmpty();
-            review.BlockingConditions.Should().Contain("ApplicationMappingPending");
+            review.BlockingConditions.Should().Contain(type == OperationalRecordClassification.SoftwareInstallation
+                ? "ApplicationMappingPending" : "RetirementMappingPending");
         }
         else
         {

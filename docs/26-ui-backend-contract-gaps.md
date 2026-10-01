@@ -36,7 +36,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-27 — Lookup purpose is unreadable in audit | Open — needs ADR-0008 / docs/27 decision |
 | G-28 — No bounded way to resolve an account from a person's name | Open — needs ADR decision |
 | G-29 — AD lookup does not show the Service Accounts inventory record | Open |
-| G-30 — The solution builds only with a specific SDK/language combination | Open — build hygiene |
+| G-30 — The solution builds only with a specific SDK/language combination | Repair implemented — pinned SDK/language; Windows verification below |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -956,7 +956,28 @@ would show a link to the record.
 ## G-30 — The solution builds only with a specific SDK/language combination
 
 **Severity:** High for continuity (bus factor 1)
-**Status:** Open — observed 2026-10-01 on master `214690e`
+**Status:** Repair implemented on PR #3; historical reproductions below remain labelled.
+
+**Current policy (2026-10-02).** `global.json` requires SDK **9.0.317** exactly,
+`rollForward: disable`, no prerelease. This is the installed Windows build SDK,
+not a runtime upgrade: every project still targets **net8.0**, with **C# 12.0**
+and analyzer level **9.0** explicitly selected in Directory.Build.props. Install
+that reviewed SDK on build agents; fail if absent rather than silently selecting
+SDK 8/10. SDK updates require an explicit reviewed pin change and regression.
+SDK selection and target runtime are independent:
+[Microsoft SDK selection](https://learn.microsoft.com/en-us/dotnet/core/versions/selection),
+[global.json matching](https://learn.microsoft.com/en-us/dotnet/core/tools/global-json).
+
+The Jira review-only labels now use an explicit read-only array (empty for
+installation/retirement, cloned server labels otherwise); no C# 14 collection
+conversion is required. Parser regression uses `Enumerable.Reverse(rows)`
+explicitly, never an instance/span Reverse that could return void.
+DPAPI persistence cases are WindowsFact/WindowsTheory only; ephemeral antiforgery
+and portable fail-closed validation continue on every OS. Windows never skips
+these DPAPI cases. Unrelated Linux PowerShell/Skia/path failures are NOT skipped.
+Windows PR baseline on SDK 9.0.317 built with zero warnings/errors; that does not
+invalidate the retained SDK 8/10 Linux reproductions or count as repaired-source
+acceptance. Exact new-source test evidence is recorded in the canonical register.
 
 With SDK 8, `JiraIssueDraftService.cs` does not compile (C# 14 collection-expression conversion). With
 SDK 10 and `LangVersion=latest` (C# 14), `InUseServiceItemParserTests` does not compile

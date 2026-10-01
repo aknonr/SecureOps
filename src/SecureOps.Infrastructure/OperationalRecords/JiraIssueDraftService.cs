@@ -201,7 +201,8 @@ public sealed class JiraIssueDraftService : IJiraIssueDraftService
         (string summary, string description) = Content(record);
         bool close = _operationalOptions.SourceCloseEnabled && !_operationalOptions.ReadOnlyIntegrationMode;
         JiraIssueFieldMapping mapping = new(_options.IssueTypeId, _options.TeamCustomField, _options.TeamValue,
-            _options.RequesterWatcherCustomField, installation || retirement ? [] : Array.AsReadOnly((string[])_options.Labels.Clone()));
+            _options.RequesterWatcherCustomField,
+            Array.AsReadOnly(installation || retirement ? Array.Empty<string>() : (string[])_options.Labels.Clone()));
         string fingerprint = OperationalRecordIdempotency.Create(record.SourceRecordId,
             JsonSerializer.Serialize(new { Kind = "review-only-v1", record.SourceConcurrencyToken, record.Version, requestType, summary, description, mapping, close }));
         return new(record.Id, record.OrCode, _options.ProjectKey, _options.IssueType, summary, description,
