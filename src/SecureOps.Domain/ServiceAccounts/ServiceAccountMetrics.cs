@@ -6,8 +6,8 @@ namespace SecureOps.Domain.ServiceAccounts;
 /// </summary>
 public static class ServiceAccountMetrics
 {
-    /// <summary>Version stamped on every live report and snapshot.</summary>
-    public const string DefinitionVersion = "sa-metrics-v1";
+    /// <summary>Version stamped on every live report and snapshot (v2 adds rules, gMSA funnel, trend, risk and directorate sections).</summary>
+    public const string DefinitionVersion = "sa-metrics-v2";
 
     private const int _maxDetailLines = 500;
 
@@ -44,7 +44,7 @@ public static class ServiceAccountMetrics
             facts.Communications.Count(c => c.Kind == CommunicationKind.Draft),
             facts.Findings.Count(f => accounts.ContainsKey(f.AccountId) && f.Status is FindingStatus.Open or FindingStatus.InReview));
 
-        return new ServiceAccountReport(DefinitionVersion, monday, endExclusive, asOf, scopeLabel, summary,
+        ServiceAccountReport report = new(DefinitionVersion, monday, endExclusive, asOf, scopeLabel, summary,
             Weekly(facts, accounts, performed, actions, valid, monday, endExclusive, asOf),
             Workload(facts, accounts, open, reportDate), Plans(facts, accounts, dated, reportDate),
             Handovers(facts, accounts), Legacy(accounts.Values, facts.Requests),
@@ -55,6 +55,22 @@ public static class ServiceAccountMetrics
                 "Geciken iş: açık talebin plan bitişi rapor tarihinden önce (takvim günü).",
                 "Bulgular ve başarısız taramalar tamamlanan iş sayılmaz."
             ], period);
+        if (facts.Insights is not { } insight)
+        {
+            return report;
+        }
+
+        Dictionary<Guid, AccountRuleEvaluation> rules = ServiceAccountInsights.Evaluate(facts, insight);
+        Dictionary<Guid, string> funnel = ServiceAccountInsights.FunnelStages(facts, rules);
+        Dictionary<Guid, string[]> risk = ServiceAccountInsights.RiskCategories(facts, insight);
+        return report with
+        {
+            Rules = ServiceAccountInsights.Rules(facts, rules),
+            Funnel = ServiceAccountInsights.Funnel(funnel),
+            Trend = ServiceAccountInsights.Trend(facts, endExclusive, asOf),
+            Risk = ServiceAccountInsights.Risk(facts, insight, risk),
+            Directorate = ServiceAccountInsights.Directorate(facts, insight, rules, funnel, risk, reportDate)
+        };
     }
 
     /// <summary>True when an open request has a valid plan range and a determined action.</summary>
