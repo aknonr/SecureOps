@@ -1,0 +1,379 @@
+@page "/resources/sets"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+@inject IResourceApiClient ResourceApi
+@inject ICurrentAccessProvider AccessProvider
+@inject IDialogService Dialogs
+@inject ILogger<ShiftSets> Logger
+
+<PageTitle>Kişisel bağlantı gruplarım · @WasasBrand.Name</PageTitle>
+
+<div class="so-page so-page--wide so-resource-page so-shift-sets">
+    <SoPageHeader Title="Kişisel bağlantı gruplarım" Lead="Birlikte kullandığınız bağlantıları kaydedin. Örnek: Gece vardiyam. Bu grup yalnız size aittir; bağlantılara erişim yetkisini değiştirmez.">
+        <Actions>
+            <MudButton Href="resources" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Search">Bağlantı keşfet</MudButton>
+            @if (_access?.Can(Capabilities.ResourcesView) == true)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           data-guide="new-group" Disabled="@(_busy || _preferences is null || !ResourceView.CanCreateSet(_preferences))"
+                           OnClick="CreateSetAsync">Yeni kişisel grup oluştur</MudButton>
+            }
+            <MudTooltip Text="Yenile"><MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="Yenile"
+                Disabled="_busy" OnClick="LoadPreferencesAsync" /></MudTooltip>
+        </Actions>
+    </SoPageHeader>
+    @if (_access is null) { <SoLoading Message="Yetkileriniz doğrulanıyor…" /> }
+    else if (!_access.IsResolved) { <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" /> }
+    else if (!_access.Can(Capabilities.ResourcesView))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">Kişisel gruplar için uygulama bağlantılarını görüntüleme yetkisi gerekir. <MudLink Href="access/me">Erişimim</MudLink> sayfasını kontrol edin.</p>
+        </section>
+    }
+    else
+    {
+        <ResourceHelp Surface="groups" Preferences="_preferences" PreferencesChanged="PreferencesChanged"
+                      CanManage="@_access.Can(Capabilities.ResourcesManage)" Disabled="_busy" />
+        @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="LoadPreferencesAsync" RetryLabel="Güncel kayıtları yükle" /> }
+        @if (_preferences is null && _problem is null) { <SoLoading Message="Gruplarınız getiriliyor…" /> }
+        else if (_preferences is { Sets.Count: 0 })
+        {
+            <SoEmptyState Title="İlk kişisel bağlantı grubunuzu oluşturun" Description="Uygulama Bağlantıları sayfasından bağlantıları seçip Seçilenleri grubuma kaydet ile adlandırabilirsiniz."
+                          Icon="@Icons.Material.Outlined.FolderOpen" />
+            <MudButton OnClick="CreateSetAsync" StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Outlined" Disabled="_busy">Grup oluştur</MudButton>
+        }
+        else if (_preferences is not null)
+        {
+            <div class="so-groups-workspace">
+                <aside class="so-groups-sidebar" aria-label="Gruplarım" data-guide="group-list">
+                    <h2>Gruplarım <span class="so-count-chip">@_preferences.Sets.Count</span></h2>
+                    <div class="so-group-choices">
+                        @foreach (ShiftSetResponse group in _preferences.Sets.OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name))
+                        {
+                            <MudButton FullWidth="true" Variant="Variant.Text" Disabled="_busy" aria-pressed="@(Selected?.Id == group.Id)"
+                                       Class="@(Selected?.Id == group.Id ? "is-selected" : null)" OnClick="@(() => SelectGroup(group.Id))">
+                                <div class="so-set-option">
+                                    <span class="so-set-option-name">@group.Name</span>
+                                    <span class="so-set-option-meta">
+                                        @if (group.IsDefault)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.PushPin" Size="Size.Small" />
+                                            <span>Varsayılan grup</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Kişisel grup</span>
+                                        }
+                                    </span>
+                                </div>
+                            </MudButton>
+                        }
+                    </div>
+                    <p class="so-panel-text so-panel-text--sm">Varsayılan grup tercihinizdir. Hiçbir bağlantı otomatik açılmaz.</p>
+                </aside>
+                @if (Selected is { } set)
+                {
+                    <section class="so-group-detail" aria-label="Seçili grup" @key="set.Id">
+                        <div class="so-group-detail-head">
+                            <div><span class="so-eyebrow">Kişisel grup</span><h2 @ref="_groupHeading" tabindex="-1">@set.Name</h2></div>
+                            <div class="so-inline-actions">
+                                <MudButton StartIcon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="@(() => RenameSetAsync(set))" Disabled="_busy">Yeniden adlandır</MudButton>
+                                <MudTooltip Text="Grubu sil"><MudIconButton Icon="@Icons.Material.Outlined.Delete" aria-label="Grubu sil"
+                                    OnClick="@(() => DeleteSetAsync(set))" Disabled="_busy" /></MudTooltip>
+                            </div>
+                        </div>
+                        <div class="so-group-toolbar">
+                            <MudButton StartIcon="@(set.IsDefault ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                                       OnClick="@(() => MakeDefaultAsync(set))" Disabled="_busy" Size="Size.Small">
+                                @(set.IsDefault ? "Varsayılanı kaldır" : "Varsayılan yap")
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.OpenInNew"
+                                       data-guide="prepare-links" Disabled="_busy" OnClick="@(() => PrepareOpenAsync(set))">
+                                @(_resolvedSetId == set.Id ? "Bağlantıları yeniden denetle" : "Açmak için hazırla")
+                            </MudButton>
+                        </div>
+                        @if (_resolvedSetId == set.Id && _resolved is { } ready)
+                        {
+                            <ResolvedResourceLinks @key="ready" Links="ready.Links" />
+                            <MudButton StartIcon="@Icons.Material.Filled.Edit" OnClick="ClearResolved">Düzenlemeye dön</MudButton>
+                        }
+                        @if (set.Links.Count == 0)
+                        {
+                            <SoEmptyState Title="Görüntülenebilir bağlantı yok" Description="@ResourceView.EmptySetNotice" Icon="@Icons.Material.Outlined.LinkOff" />
+                            <MudButton Href="resources" StartIcon="@Icons.Material.Filled.Add">Bağlantı ekle</MudButton>
+                        }
+                        else if (_resolved is null)
+                        {
+                            <ol class="so-set-list" data-guide="group-order">
+                                @for (int index = 0; index < set.Links.Count; index++)
+                                {
+                                    int position = index;
+                                    ResourceLink link = set.Links[index];
+                                    <li class="so-set-item" @key="link.Id">
+                                        <span class="so-set-order" aria-label="Sıra">@(index + 1)</span>
+                                        <div class="so-set-body"><strong>@link.Name</strong><span class="so-resource-host">@ResourceView.Host(link)</span></div>
+                                        <a class="so-resource-name" href="@link.Url" target="_blank" rel="noopener noreferrer" aria-label="@($"{link.Name}: Aç")">Aç <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /></a>
+                                        <div class="so-set-controls">
+                                            <MudTooltip Text="Yukarı taşı"><MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small"
+                                                aria-label="@($"{link.Name}: Yukarı taşı")" Disabled="@(_busy || index == 0)" OnClick="@(() => MoveAsync(set, position, -1))" /></MudTooltip>
+                                            <MudTooltip Text="Aşağı taşı"><MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                                aria-label="@($"{link.Name}: Aşağı taşı")" Disabled="@(_busy || index == set.Links.Count - 1)" OnClick="@(() => MoveAsync(set, position, 1))" /></MudTooltip>
+                                            <MudTooltip Text="Gruptan çıkar"><MudIconButton Icon="@Icons.Material.Filled.RemoveCircleOutline" Size="Size.Small"
+                                                aria-label="@($"{link.Name}: Gruptan çıkar")" Disabled="_busy" OnClick="@(() => RemoveAsync(set, link))" /></MudTooltip>
+                                        </div>
+                                    </li>
+                                }
+                            </ol>
+                        }
+                    </section>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+    private ResourcePreferencesResponse? _preferences;
+    private UiProblem? _problem;
+    private bool _busy;
+    private bool _focusGroup;
+    private ElementReference _groupHeading;
+
+    private readonly ResourceResolutionState<ShiftSetResponse> _opening = new();
+    private ShiftSetResponse? _resolved => _opening.Value;
+    private Guid? _resolvedSetId;
+    private Guid? _selectedSetId;
+    private ShiftSetResponse? Selected => _preferences?.Sets.FirstOrDefault(s => s.Id == _selectedSetId)
+        ?? _preferences?.Sets.FirstOrDefault(s => s.IsDefault) ?? _preferences?.Sets.OrderBy(s => s.Name).FirstOrDefault();
+
+    private void SelectGroup(Guid id) { _selectedSetId = id; ClearResolved(); }
+    private void PreferencesChanged(ResourcePreferencesResponse preferences) { _preferences = preferences; ClearResolved(); }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusGroup && Selected is not null)
+        {
+            _focusGroup = false;
+            await _groupHeading.FocusAsync(preventScroll: true);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ResourcesView))
+        {
+            await LoadPreferencesAsync();
+        }
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        ClearResolved();
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.ResourcesView))
+        {
+            await LoadPreferencesAsync();
+        }
+    }
+
+    private async Task LoadPreferencesAsync()
+    {
+        _busy = true;
+        _problem = null;
+        ClearResolved();
+        StateHasChanged();
+
+        try
+        {
+            _preferences = await ResourceApi.GetPreferencesAsync(CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            Logger.LogDebug("Resource preferences unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task CreateSetAsync() => PromptNameAsync(null);
+
+    private Task RenameSetAsync(ShiftSetResponse set) => PromptNameAsync(set);
+
+    private async Task DeleteSetAsync(ShiftSetResponse set)
+    {
+        bool? confirmed = await Dialogs.ShowMessageBox(
+            "Grubu sil",
+            $"\"{set.Name}\" grubu ve kayıtlı tüm seçimleri silinecek. Bu işlem yalnızca sizin grubunuzu kaldırır; katalogdaki bağlantılar etkilenmez.",
+            yesText: "Sil",
+            cancelText: "Vazgeç");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        ClearResolved();
+        await MutateAsync(preferences => ResourceApi.DeleteSetAsync(
+            set.Id, preferences.Version, CancellationToken.None));
+    }
+
+    private Task MakeDefaultAsync(ShiftSetResponse set) =>
+        MutateAsync(preferences => ResourceApi.SaveSetAsync(
+            set.Id,
+            new SaveShiftSetRequest(set.Name, [], !set.IsDefault, preferences.Version),
+            CancellationToken.None));
+
+    private async Task MoveAsync(ShiftSetResponse set, int index, int offset)
+    {
+        IReadOnlyList<Guid> reordered = ResourceView.Move(ResourceView.LinkIds(set), index, offset);
+
+        UiProblem? problem = await MutateAsync(preferences => ResourceApi.SaveSetAsync(
+            set.Id,
+            new SaveShiftSetRequest(set.Name, reordered, set.IsDefault, preferences.Version),
+            CancellationToken.None));
+        _focusGroup = problem is null;
+    }
+
+    private async Task RemoveAsync(ShiftSetResponse set, ResourceLink link)
+    {
+        Guid[] remaining = ResourceView.LinkIds(set).Where(id => id != link.Id).ToArray();
+
+        ClearResolved();
+        UiProblem? problem = await MutateAsync(preferences => ResourceApi.SaveSetAsync(
+            set.Id,
+            new SaveShiftSetRequest(set.Name, remaining, set.IsDefault, preferences.Version, [link.Id]),
+            CancellationToken.None));
+        _focusGroup = problem is null;
+    }
+
+    // Every personal mutation goes through here so the version guard, the refreshed state and the
+    // conflict recovery are written once. A rejected stale request changes nothing server-side, so
+    // the only correct response is to re-read before the operator tries again.
+    private async Task<UiProblem?> MutateAsync(Func<ResourcePreferencesResponse, Task<ResourcePreferencesResponse>> mutate)
+    {
+        if (_preferences is null || _busy)
+        {
+            return UiProblemFactory.FromResponse(409, null);
+        }
+
+        _busy = true;
+        _problem = null;
+        ClearResolved();
+        StateHasChanged();
+
+        try
+        {
+            Guid[] before = [.. _preferences.Sets.Select(s => s.Id)];
+            _preferences = await mutate(_preferences);
+            _selectedSetId = _preferences.Sets.FirstOrDefault(s => !before.Contains(s.Id))?.Id ?? _selectedSetId;
+            return null;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _problem = ex.Problem;
+            Logger.LogDebug("Personal set update failed. Code: {Code}.", ex.Problem.Code);
+
+            await LoadPreferencesAsync();
+            _problem = ex.Problem;
+            return ex.Problem;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task PromptNameAsync(ShiftSetResponse? set)
+    {
+        if (_busy || _preferences is null)
+        {
+            return;
+        }
+        string title = set is null ? "Yeni grup" : "Grubu yeniden adlandır";
+        long version = _preferences.Version;
+        DialogParameters parameters = new()
+        {
+            { nameof(ShiftSetNameDialog.Title), title },
+            { nameof(ShiftSetNameDialog.Name), set?.Name ?? string.Empty },
+            { nameof(ShiftSetNameDialog.Save), (Func<string, Task<UiProblem?>>)(async name =>
+                {
+                    IReadOnlyList<Guid> ids = [];
+                    string? invalid = ResourceView.ValidateSet(name, ids, _preferences.Sets, set?.Id);
+                    if (invalid is not null)
+                    {
+                        return UiProblemFactory.FromResponse(400, null) with { Explanation = invalid };
+                    }
+                    SaveShiftSetRequest request = new(name, ids, set?.IsDefault ?? false, version);
+                    return await MutateAsync(_ => set is null
+                        ? ResourceApi.CreateSetAsync(request, CancellationToken.None)
+                        : ResourceApi.SaveSetAsync(set.Id, request, CancellationToken.None));
+                }) }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<ShiftSetNameDialog>(
+            title, parameters, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+        await dialog.Result;
+    }
+
+    // Resolution happens on its own click. The result is what the server says is openable right now,
+    // which can be shorter than what was saved; the opening button then works from that list only.
+    private async Task PrepareOpenAsync(ShiftSetResponse set)
+    {
+        if (_busy)
+        {
+            return;
+        }
+        _busy = true;
+        _problem = null;
+        long generation = _opening.Clear();
+        _resolvedSetId = set.Id;
+        StateHasChanged();
+
+        try
+        {
+            var resolved = await ResourceApi.ResolveSetAsync(set.Id, CancellationToken.None);
+            _opening.Accept(generation, resolved);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            if (!_opening.IsCurrent(generation)) return;
+            _resolvedSetId = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Set resolution failed. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void ClearResolved()
+    {
+        _opening.Clear();
+        _resolvedSetId = null;
+    }
+
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        ClearResolved();
+        StateHasChanged();
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        if (_access.Can(Capabilities.ResourcesView)) await LoadPreferencesAsync();
+        else _preferences = null;
+        StateHasChanged();
+    });
+
+    public void Dispose() { ClearResolved(); AccessProvider.Changed -= OnAccessChanged; }
+}

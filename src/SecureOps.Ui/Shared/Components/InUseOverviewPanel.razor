@@ -1,0 +1,37 @@
+@using SecureOps.Shared.Contracts.InUse
+@inject InUseApiClient Api
+<section class="so-inuse-band so-inuse" aria-label="In Use yönetim özeti">
+    <h2 class="so-panel-title">In Use</h2>
+    <MudButton OnClick="LoadAsync" Disabled="_loading" StartIcon="@Icons.Material.Filled.Refresh">Kayıtlı özeti yenile</MudButton>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    else if (_summary is { } s)
+    {
+        <div class="so-exec">
+            <SoMetric Label="Kaynakta açık (son kanıt)" Value="@s.Open.ToString()" />
+            <SoMetric Label="Kaynak durumu bilinmiyor" Value="@s.Unknown.ToString()" />
+            <SoMetric Label="İnceleme / eksik cevap bekleyen" Value="@s.AwaitingAnswers.ToString()" />
+            <SoMetric Label="Excel hazır (yerel yapısal kontrol)" Value="@s.ReportReady.ToString()" />
+        </div>
+        <p>@s.Total kayıtlı OR · Son başarılı kaynak okuması: @(s.Refresh.LastSuccessfulAt?.ToLocalTime().ToString("g") ?? "Henüz yok")</p>
+        @if (s.Refresh.Stale || !s.Refresh.Complete) { <MudAlert Severity="Severity.Warning">Kaynak verisi eski veya eksik olabilir. Sayımlar son kayıtlı kanıta aittir; güncel kurumsal envanter değildir.</MudAlert> }
+        <h3>Kaynak tarihine göre en uzun bekleyen açık OR'lar</h3>
+        @if (s.Oldest.Count == 0) { <p>Doğrulanmış açık durum ve kaynak açılış tarihi birlikte bulunamadı.</p> }
+        <ul>@foreach (var r in s.Oldest) { <li><a href="@($"in-use/{r.Id}")">@r.Code</a> · @r.CreatedAt.ToLocalTime().ToString("g")</li> }</ul>
+        <p>Atama eksikliği hata sayılmaz. Excel hazır olması kurumsal şablon kabulü veya kaynak tamamlama yetkisi değildir.</p>
+    }
+    else { <SoLoading Message="Kayıtlı In Use özeti okunuyor" /> }
+</section>
+@code {
+    private InUseOverview? _summary;
+    private UiProblem? _problem;
+    private bool _loading;
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        if (_loading) return;
+        _loading = true;
+        try { _summary = await Api.GetAsync<InUseOverview>("/overview", CancellationToken.None); _problem = null; }
+        catch (SecureOpsApiException ex) { _problem = ex.Problem; }
+        finally { _loading = false; }
+    }
+}

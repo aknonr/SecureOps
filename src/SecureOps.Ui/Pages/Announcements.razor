@@ -1,0 +1,180 @@
+@page "/announcements"
+@attribute [Authorize]
+@implements IDisposable
+@using SecureOps.Shared.Contracts.Announcements
+@using Microsoft.AspNetCore.Components.Routing
+@inject AnnouncementApiClient Api
+@inject IResourceApiClient Resources
+@inject ICurrentAccessProvider Access
+@inject IJSRuntime Js
+@inject IDialogService Dialogs
+@inject NavigationManager Navigation
+
+<PageTitle>Planlı Çalışma Duyuruları · @WasasBrand.Name</PageTitle>
+<NavigationLock ConfirmExternalNavigation="_dirty" OnBeforeInternalNavigation="LeavingAsync" />
+<MudHidden Breakpoint="Breakpoint.LgAndUp" IsHidden="_wide" IsHiddenChanged="WidthChanged" />
+<div class="so-page so-announcements" aria-busy="@_busy.ToString().ToLowerInvariant()">
+    <SoPageHeader Title="Planlı Çalışma Duyuruları">
+        <Actions>
+            @if (_allowed)
+            {
+                <MudButton Href="/announcements/preparations" StartIcon="@Icons.Material.Filled.History">Hazırlık geçmişi</MudButton>
+                @if (_form is null)
+                { <MudButton data-guide="announcement-new" StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="NewAsync">Yeni duyuru</MudButton> }
+                else { <MudButton StartIcon="@Icons.Material.Filled.ArrowBack" Disabled="_busy" OnClick="BackAsync">Taslaklar</MudButton> }
+            }
+        </Actions>
+    </SoPageHeader>
+    @if (_allowed)
+    { <ResourceHelp Surface="announcements" Preferences="_preferences" PreferencesChanged="@(p => _preferences = p)" Disabled="_busy" /> }
+    @if (_problem is not null)
+    {
+        <SoProblemPanel Problem="_problem" />
+        @if (_form is null) { <MudButton OnClick="InitializeAsync" Disabled="_busy">Yeniden dene</MudButton> }
+        @if (_form is not null && _version > 0)
+        { <MudButton OnClick="CompareAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.CompareArrows">Güncel kayıtla karşılaştır</MudButton> }
+        @foreach (string key in _problem.Fields.Where(k => AnnouncementForm.Fields.Any(f => f.Key == k) || k is "To" or "Cc" or "BannerRevision" or "TemplateRevision" or "AffectedServices"))
+        { <MudButton OnClick="@(() => FocusAsync(key))">@FieldLabel(key) alanına git</MudButton> }
+    }
+    @if (_busy) { <SoLoading Message="İşlem sürüyor" /> }
+    @if (_notice is not null) { <p role="status">@_notice</p> }
+    @if (_allowed && _form is null && _page is not null)
+    {
+        @if (_page.Total == 0) { <SoEmptyState Title="Henüz taslak yok" Description="" /> }
+        else
+        {
+            <MudTable T="AnnouncementSummary" Items="_page.Items" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+                <HeaderContent><MudTh>Konu / OCO</MudTh><MudTh>Çalışma zamanı</MudTh><MudTh>Güncelleme</MudTh><MudTh>Alanlar</MudTh><MudTh /></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Konu / OCO"><strong>@context.Subject</strong><br />@context.OcoReference</MudTd>
+                    <MudTd DataLabel="Çalışma zamanı">@context.WorkStart<br />@context.WorkEnd</MudTd>
+                    <MudTd DataLabel="Güncelleme">@context.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Alanlar">@(context.MissingFieldCount is null ? "Kontrol edilmeli" : context.MissingFieldCount == 0 ? "Tam" : $"{context.MissingFieldCount} eksik")</MudTd>
+                    <MudTd><MudButton OnClick="@(() => OpenAsync(context.Id))" Disabled="_busy" StartIcon="@Icons.Material.Filled.Edit" aria-label="@($"Düzenle: {context.Subject}")">Düzenle</MudButton></MudTd>
+                </RowTemplate>
+            </MudTable>
+            <nav class="so-inline-actions" aria-label="Taslak sayfaları">
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki sayfa" Disabled="@(_busy || _page.Page == 1)" OnClick="@(() => PageAsync(_page.Page - 1))" />
+                <span>@_page.Page / @Math.Max(1, (int)Math.Ceiling(_page.Total / 25d)) · @_page.Total taslak</span>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki sayfa" Disabled="@(_busy || _page.Page * 25 >= _page.Total)" OnClick="@(() => PageAsync(_page.Page + 1))" />
+            </nav>
+        }
+    }
+    @if (_allowed && _form is not null)
+    {
+        <div class="so-announcement-summary" aria-label="Güncel duyuru">
+            <strong>@(_form.Values["OcoReference"].Length == 0 ? "Yeni duyuru" : _form.Values["OcoReference"])</strong>
+            <span role="status">@(_dirty ? "Kaydedilmemiş değişiklikler" : _version > 0 ? $"Kaydedildi · Sürüm {_version}" : "Yeni taslak")</span>
+            <span>Gönderen: @(_page?.CurrentSender ?? "Kayıtlı e-posta eksik; taslak kaydedilebilir")</span>
+        </div>
+        <section class="so-announcement-stage" aria-labelledby="announcement-stage-work">
+        <h2 id="announcement-stage-work">1. Çalışma bilgileri</h2>
+        <AnnouncementField Key="OcoReference" Label="OCO kayıt numarası" Type="text" Value="@_form.Values["OcoReference"]" Error="@FieldError("OcoReference")" ValueChanged="@(value => Change("OcoReference", value))" />
+        @if (_canSource)
+        { <MudButton StartIcon="@(_sourceOpen ? Icons.Material.Filled.Edit : Icons.Material.Filled.CloudDownload)" OnClick="@(() => _sourceOpen = !_sourceOpen)">@(_sourceOpen ? "Elle düzenlemeye geç" : "Kaynaktan getir")</MudButton> }
+        @if (_sourceOpen && _canSource)
+        {
+            <AnnouncementSourceReview @key="_id" DraftId="_id" Version="_version" OcoReference="@_form.Values["OcoReference"]"
+                Services="_form.Services" EnsureSaved="SaveForSourceAsync" Locked="@(_busy || _dirty || _comparison is not null || !_canSource)" ApplyRequested="ApplySourceAsync" AccessLost="SourceAccessLostAsync" />
+        }
+        @if (!_sourceOpen) { <p role="status">Elle düzenleme · Girilen bilgiler kaynak doğrulaması değildir.</p> }
+        </section>
+        @if (_comparison is { } current)
+        {
+            <section aria-label="Kayıt karşılaştırması">
+                <h2>Değişiklikleriniz korunuyor</h2>
+                <dl>@foreach (var difference in _form.Differences(current.Content))
+                    { <dt>@difference.Label</dt><dd>Kayıtlı: @difference.Saved<br />Sizde: @difference.Local</dd> }</dl>
+                <MudButton OnClick="AcceptComparison" Disabled="_busy">Farkları inceledim; düzenlemelerimle devam et</MudButton>
+            </section>
+        }
+        @if (!_wide)
+        {
+            <div class="so-inline-actions" role="group" aria-label="Duyuru görünümü">
+                <MudButton aria-pressed="@((!_previewTab).ToString().ToLowerInvariant())" Variant="@(_previewTab ? Variant.Text : Variant.Filled)" OnClick="@(() => PreviewTab(false))">Düzenle</MudButton>
+                <MudButton aria-pressed="@_previewTab.ToString().ToLowerInvariant()" Variant="@(_previewTab ? Variant.Filled : Variant.Text)" OnClick="@(() => PreviewTab(true))">Önizleme</MudButton>
+            </div>
+        }
+        <div class="so-announcement-workspace">
+        <div hidden="@(!_wide && _previewTab)">
+        <EditForm Model="_form" OnSubmit="SaveAsync">
+            <fieldset disabled="@_busy" data-guide="announcement-details">
+                @if (_form.Template != "oco-table-v3")
+                { <MudButton id="announcement-TemplateRevision" StartIcon="@Icons.Material.Filled.Upgrade" OnClick="UpgradeAsync">Yeni duyuru biçimine yükselt</MudButton> }
+                @if (!_banners.Any(b => b.State == "PresentNotValidated"))
+                { <p role="alert">Kullanılabilir görsel paketi yok. Yöneticiniz görsel kurulumunu tamamladıktan sonra görselleri yenileyin.</p> }
+                <h2>2. Duyuru ve alıcılar</h2>
+                <div class="so-announcement-grid">
+                    @foreach (var f in AnnouncementForm.Fields.Where(f => !f.Optional && f.Key != "OcoReference"))
+                    { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" Error="@FieldError(f.Key)" ValueChanged="@(value => Change(f.Key, value))" /> }
+                    <label class="so-announcement-field" for="announcement-BannerRevision">Görsel
+                        <select id="announcement-BannerRevision" @bind="_form.Banner" @bind:after="Changed">
+                            <option value="">Seçin</option>
+                            @if (_form.Banner.Length > 0 && !_banners.Any(b => b.Revision == _form.Banner))
+                            { <option value="@_form.Banner" disabled>Önceki görsel kullanılamıyor</option> }
+                            @foreach (var banner in _banners)
+                            { <option value="@banner.Revision" disabled="@(banner.State != "PresentNotValidated")">@banner.Label@(banner.State == "PresentNotValidated" ? "" : " (kullanılamıyor)")</option> }
+                        </select>
+                    </label>
+                </div>
+                @if (_form.Template is "oco-table-v2" or "oco-table-v3")
+                {
+                    <section aria-label="Etkilenen servisler"><h2>Etkilenen servisler (@_form.Services.Length)</h2>
+                        <label class="so-announcement-field" for="announcement-AffectedServices">Çalışmadan etkilenen servisler
+                            <textarea id="announcement-AffectedServices" rows="8" maxlength="16000" @bind="_form.ServicesText" @bind:event="oninput" @bind:after="Changed"></textarea>
+                        </label>
+                    </section>
+                }
+                @if (AnnouncementTime.TryRead(_form.Values["WorkStart"], out var start) && AnnouncementTime.TryRead(_form.Values["WorkEnd"], out var finish) && start.Offset != finish.Offset)
+                { <p role="status">Başlangıç ve bitiş farklı UTC farkları kullanıyor. Sıralama gerçek zamanlarına göre denetlenir; hazırlamadan önce iki saat dilimini de inceleyin.</p> }
+                <MudButton OnClick="BannersAsync" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_busy">Görselleri yenile</MudButton>
+                @foreach (string kind in new[] { "To", "Cc" })
+                {
+                    <section id="@($"announcement-{kind}")" tabindex="-1" aria-label="@(kind == "To" ? "Alıcılar" : "Bilgi")">
+                        <h2>@(kind == "To" ? "Alıcılar" : "Bilgi (CC)")</h2>
+                        @foreach (var recipient in _form.Recipients.Where(r => r.Kind == kind))
+                        {
+                            <div @key="recipient" class="so-announcement-recipient">
+                                <input type="email" aria-label="@(kind == "To" ? "Alıcı adresi" : "Bilgi adresi")" maxlength="254" @bind="recipient.Address" @bind:event="oninput" @bind:after="Changed" />
+                                <MudIconButton Icon="@Icons.Material.Filled.RemoveCircleOutline" aria-label="Adresi kaldır" OnClick="@(() => Remove(recipient))" />
+                            </div>
+                        }
+                        <MudButton StartIcon="@Icons.Material.Filled.Add" Disabled="@(_form.Recipients.Count(r => r.Kind == kind) >= 50)" OnClick="@(() => Add(kind))">@(kind == "To" ? "Alıcı ekle" : "Bilgi ekle")</MudButton>
+                    </section>
+                }
+                <details open="@_optional"><summary @onclick="() => _optional = !_optional">İsteğe bağlı ayrıntılar</summary>
+                    <div class="so-announcement-grid">@foreach (var f in AnnouncementForm.Fields.Where(f => f.Optional))
+                    { <AnnouncementField @key="f.Key" Key="@f.Key" Label="@f.Label" Type="@f.Type" Value="@_form.Values[f.Key]" Error="@FieldError(f.Key)" ValueChanged="@(value => Change(f.Key, value))" /> }</div>
+                </details>
+            </fieldset>
+            <div class="so-inline-actions so-announcement-actions">
+                <MudButton data-guide="announcement-save" ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" Disabled="@(_busy || _comparison is not null)">Kaydet</MudButton>
+                <MudButton data-guide="announcement-preview" OnClick="PreviewAsync" StartIcon="@Icons.Material.Filled.Visibility" Disabled="@(_busy || _dirty || _version == 0)">Önizle</MudButton>
+                <MudButton data-guide="announcement-download" OnClick="DownloadAsync" StartIcon="@Icons.Material.Filled.Download" Disabled="@(_busy || _dirty || _version == 0)">Maili indir</MudButton>
+                @if (_canPrepare)
+                { <MudButton OnClick="PrepareAsync" StartIcon="@Icons.Material.Filled.FactCheck" Disabled="@(_busy || _dirty || _version == 0)">İncelemeye hazırla</MudButton> }
+                <span role="status" data-save-state>@(_dirty ? "Kaydedilmemiş değişiklikler" : _version > 0 ? "Güncel içerik kaydedildi" : "Yeni taslak")</span>
+            </div>
+        </EditForm>
+        </div>
+            <section class="so-announcement-preview" aria-label="Duyuru önizlemesi" hidden="@(!PreviewVisible)">
+                <h2>3. Önizleme ve hazırlık</h2>
+                <div class="so-preview-status" role="status" aria-live="polite">
+                    <span>@PreviewStatus</span>
+                    <span>@(_previewStale && _html is not null ? "Önceki önizleme; güncel alanları yansıtmıyor" : "")</span>
+                </div>
+                @if (_html is null)
+                { <div class="so-preview-empty"><MudIcon Icon="@Icons.Material.Filled.Description" /><p>Taslak önizlemesi bekleniyor</p><p>Eksik alanlar aşağıda listelenir. Taslağınızı kaydetmeye devam edebilirsiniz.</p></div> }
+                @if (_html is not null)
+                { <AnnouncementPreviewFrame @key="_id" Html="@_html" HtmlGeneration="_htmlGeneration" Generation="_previewRequests.Generation" Presented="PreviewPresented" /> }
+                <div class="so-preview-feedback">
+                @if (_previewProblem is not null && _previewFields.Count == 0)
+                { <p>@_previewProblem.Explanation <MudButton OnClick="SchedulePreview">Yeniden dene</MudButton></p> }
+                @if (_previewFields.Count > 0)
+                { <div class="so-inline-actions">@foreach (string key in _previewFields.Where(k => AnnouncementForm.Fields.Any(f => f.Key == k) || k is "To" or "Cc" or "BannerRevision" or "AffectedServices"))
+                    { <MudButton OnClick="@(() => FocusAsync(key))">@FieldLabel(key) alanını kontrol et</MudButton> }</div> }
+                </div>
+            </section>
+        </div>
+    }
+</div>

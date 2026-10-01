@@ -1,0 +1,116 @@
+@page "/in-use/reports"
+@attribute [Authorize]
+@using SecureOps.Shared.Contracts.InUse
+@using SecureOps.Shared.Contracts.Api
+@implements IDisposable
+@inject InUseApiClient Api
+@inject ICurrentAccessProvider AccessProvider
+@inject IJSRuntime Js
+
+<PageTitle>Rapor geçmişi · @WasasBrand.Name</PageTitle>
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Rapor geçmişi"><Actions><MudButton Href="/in-use" StartIcon="@Icons.Material.Filled.ArrowBack">In Use</MudButton></Actions></SoPageHeader>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    @if (_access is null && !_accessRejected) { <SoLoading Message="Yetkiler doğrulanıyor" /> }
+    else if (!Allowed) { <SoEmptyState Title="In Use inceleme yetkisi gerekli" /> }
+    else
+    {
+        <MudGrid>
+            <MudItem xs="12" md="4"><MudTextField T="string" Label="OR, sunucu, hazırlayan veya hesap" aria-label="Rapor ara" @bind-Value="_search" MaxLength="100" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="6" md="2"><MudDatePicker Label="Başlangıç (UTC)" @bind-Date="_from" /></MudItem>
+            <MudItem xs="6" md="2"><MudDatePicker Label="Bitiş günü (UTC)" @bind-Date="_to" /></MudItem>
+            <MudItem xs="6" md="2"><MudNumericField T="long?" Label="Sürüm" @bind-Value="_version" Min="1" /></MudItem>
+            <MudItem xs="6" md="2"><MudSelect T="string" Label="Durum" @bind-Value="_status">
+                <MudSelectItem T="string" Value="@(string.Empty)">Tümü</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Current")">Güncel</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Superseded")">Önceki</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Discarded")">Kaldırılmış taslak</MudSelectItem>
+            </MudSelect></MudItem>
+        </MudGrid>
+        <MudButton OnClick="SearchAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Search" Variant="Variant.Filled" Color="Color.Primary">Ara</MudButton>
+        @if (_busy) { <SoLoading Message="Rapor geçmişi okunuyor" /> }
+        @if (_page is not null)
+        {
+            <p role="status">@_page.Total rapor · Veri zamanı: @_page.AsOf.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")</p>
+            <MudAlert Severity="Severity.Info">Yalnız doğrulanmış ve indekslenmiş arşivler. Eski arşiv kapsamı eksik olabilir; bilinmeyen bilgiler tamamlanmış sayılmaz.</MudAlert>
+            <MudTable Items="_page.Items" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent><MudTh>OR / sunucular</MudTh><MudTh>Asıl hazırlayan</MudTh><MudTh>Hazırlama (UTC)</MudTh><MudTh>Sürüm / durum</MudTh><MudTh>Dosya</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="OR / sunucular"><MudLink Href="@($"/in-use/{context.RecordId}")">@(context.SourceCode ?? "OR bilgisi arşivde yok")</MudLink><div>@string.Join(", ", context.Hostnames)</div></MudTd>
+                    <MudTd DataLabel="Asıl hazırlayan">@(context.PreparedByLabel ?? "Hazırlayan etiketi arşivde yok")<div>@(context.PreparedByAccount ?? "Hesap bilgisi arşivde yok")</div></MudTd>
+                    <MudTd DataLabel="Hazırlama (UTC)">@(context.PreparedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss") ?? "Bilinmiyor")</MudTd>
+                    <MudTd DataLabel="Sürüm / durum">v@context.Version · @Status(context.Status)<div>@(context.AttachmentStatus == "Verified" ? "Kaynak eki doğrulandı" : context.AttachmentStatus == "Unknown" ? "Uzak işlem sonucu belirsiz" : "Kaynak eki doğrulanmadı")</div></MudTd>
+                    <MudTd DataLabel="Dosya"><div class="report-name">@context.FileName</div><MudButton StartIcon="@Icons.Material.Filled.Download" Disabled="_busy" OnClick="@(() => DownloadAsync(context))">İndir</MudButton></MudTd>
+                </RowTemplate>
+            </MudTable>
+            <MudButton StartIcon="@Icons.Material.Filled.ChevronLeft" Disabled="@(_busy || _number == 1)" OnClick="PreviousAsync">Önceki</MudButton>
+            <span>Sayfa @_number</span>
+            <MudButton EndIcon="@Icons.Material.Filled.ChevronRight" Disabled="@(_busy || _number * 25 >= _page.Total)" OnClick="NextAsync">Sonraki</MudButton>
+        }
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+    private InUseReportPage? _page;
+    private UiProblem? _problem;
+    private string _search = "", _status = "";
+    private DateTime? _from, _to;
+    private long? _version;
+    private int _number = 1, _generation;
+    private bool _busy, _accessRejected;
+    private readonly CancellationTokenSource _lifetime = new();
+    private bool Allowed => !_accessRejected && _access?.Can(Capabilities.InUseView) == true && _access.Can(Capabilities.InUseReview);
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += AccessChanged;
+        _access = await AccessProvider.GetAsync(_lifetime.Token);
+        await LoadAsync();
+    }
+    private Task SearchAsync() { _number = 1; return LoadAsync(); }
+    private Task PreviousAsync() { _number--; return LoadAsync(); }
+    private Task NextAsync() { _number++; return LoadAsync(); }
+    private Task LoadAsync() => RunAsync(async generation =>
+    {
+        string dates = (_from is null ? "" : "&from=" + _from.Value.ToString("yyyy-MM-dd") + "T00:00:00Z")
+            + (_to is null ? "" : "&to=" + _to.Value.AddDays(1).ToString("yyyy-MM-dd") + "T00:00:00Z");
+        InUseReportPage page = await Api.GetAsync<InUseReportPage>($"/reports?search={Uri.EscapeDataString(_search ?? "")}&page={_number}&pageSize=25"
+            + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status) + (_version is null ? "" : "&version=" + _version) + dates, _lifetime.Token);
+        if (generation == _generation) { _page = page; }
+    });
+    private Task DownloadAsync(InUseReportEntry entry) => RunAsync(async generation =>
+    {
+        InUseReport report = await Api.SendAsync<InUseReport>(HttpMethod.Post, $"/{entry.RecordId}/report",
+            new ExportInUseRequest(entry.CurrentRecordVersion, false, entry.Version), _lifetime.Token);
+        if (generation != _generation) { return; }
+        await Js.InvokeVoidAsync("secureOpsDownload", report.FileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(report.Content));
+    });
+    private async Task RunAsync(Func<int, Task> action)
+    {
+        if (_busy || !Allowed) { return; }
+        _busy = true; _problem = null;
+        int generation = _generation;
+        try { await action(generation); }
+        catch (SecureOpsApiException ex)
+        {
+            if (generation == _generation)
+            {
+                _problem = ex.Problem; _page = null;
+                if (ex.Problem.Kind is UiProblemKind.Forbidden or UiProblemKind.AccessDisabled or UiProblemKind.AccessPending or UiProblemKind.SessionExpired)
+                { _access = null; _accessRejected = true; ++_generation; }
+            }
+        }
+        catch (JSException) { _problem = UiProblemFactory.FromResponse(0, new ProblemDetailsPayload { Code = "InUseDownloadFailed" }); }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { _busy = false; }
+    }
+    private void AccessChanged() => InvokeAsync(async () =>
+    {
+        ++_generation; _page = null;
+        _access = await AccessProvider.GetAsync(_lifetime.Token); _accessRejected = false;
+        StateHasChanged();
+    });
+    private static string Status(string status) => status switch { "Current" => "Güncel", "Discarded" => "Kaldırılmış taslak", _ => "Önceki sürüm" };
+    public void Dispose() { AccessProvider.Changed -= AccessChanged; ++_generation; _lifetime.Cancel(); _lifetime.Dispose(); }
+}

@@ -23,10 +23,11 @@ Phase 1A adds a backend-only privileged account identity lookup for incident res
 - Input safety: controller validation, service normalization, and provider-level guards all reject wildcard, LDAP-filter, bulk, too-long, and outside-allow-list input.
 - Provider behavior: AD lookup is exact-match only by `sAMAccountName`; exact UPN fallback is allowed only for UPN-shaped input.
 - Data minimization: response contains only display name, account name, UPN, mail, department, title, manager display name, enabled state, locked state, and source.
-- Audit minimization: audit stores normalized/matched account identifiers, purpose/context, source IP, correlation ID, and status; it does not store returned personal detail fields.
+- Audit minimization: audit stores target hash/length, optional purpose hash/length, source IP, correlation ID, and status; it does not store raw target or returned personal detail fields.
 - File audit: Development/Test can use `Audit.Provider=File`, writing JSONL to a configurable directory such as `D:\SecureOps\Audit`. The audit directory must not be inside the publish folder.
 - Queueing: persistent audit providers use a bounded in-memory queue. Request threads enqueue only; file IO runs in a background worker. Queue full + fail-closed prevents AD/PAM provider access.
-- Rate limiting: `POST /api/v1/identity/lookup` uses the `IdentityLookup` rate-limit policy partitioned by authenticated user + endpoint, not IP only.
+- Rate limiting: exact and bulk lookup use separate named policies partitioned by authenticated actor plus operation, not IP only.
+- Read deduplication: normalized exact-account results use an optional bounded short TTL cache and single-flight provider call. Exceptions are not cached; aggregate metrics contain no account labels.
 - Forwarded headers: `X-Forwarded-For` and `X-Forwarded-Proto` are supported for load balancer deployments. `X-Correlation-ID` is accepted when it matches the safe format.
 
 ## Audit Storage Behavior
@@ -108,7 +109,7 @@ Current hardening status: .NET 8-compatible patch-level package updates have bee
 - Confirm Swagger requires authentication in the non-development test environment.
 - Confirm TeamLead/Admin can call `POST /api/v1/identity/lookup` from Swagger/Postman with fake or approved test accounts only.
 - Confirm Operator-only and Auditor-only users receive 403 and `IdentityLookupForbidden` is audited.
-- Confirm invalid wildcard, bulk, LDAP-filter-like, raw DN, too-long, and empty-purpose requests return 400 and write `IdentityLookupRejected`.
+- Confirm invalid wildcard, bulk, LDAP-filter-like, raw DN, too-long account, and unsafe supplied purpose return 400 and write `IdentityLookupRejected`; omitted/blank purpose succeeds.
 - Confirm audit queue/sink failure causes `AuditUnavailable` before AD access.
 - Confirm directory timeout returns `DirectoryProviderTimeout` and writes `IdentityLookupProviderTimeout`.
 - Confirm `GET /api/v1/health/audit-store` and `GET /api/v1/health/identity-provider` do not expose paths, connection strings, real accounts, or personal details.

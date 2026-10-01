@@ -1,0 +1,400 @@
+@using SecureOps.Ui.Pages
+
+@*
+    The three sections that come from the bounded nested-group walk.
+
+    One server call produces nested groups, effective members, and parent groups together, so all
+    three share a single result — and all three sit behind one explicit button. The walk can take
+    seconds and consumes a rate-limit slot; running it because someone clicked a tab would spend an
+    operator's quota on a question they had not asked.
+
+    Completeness is carried through everywhere. A bounded result comes back as HTTP 200 with
+    isComplete=false, and the one thing that must never follow from it is a conclusion that something
+    is absent. Partial evidence is also not exportable — the server refuses, and the button is not
+    offered.
+*@
+
+@if (Loading)
+{
+    <SoLoading Message="İç içe grup analizi çalışıyor…" Variant="SoLoading.LoadingVariant.Block" />
+}
+else if (Problem is not null)
+{
+    <SoProblemPanel Problem="Problem" OnRetry="@(() => OnRun.InvokeAsync())" RetryLabel="Tekrar Dene" />
+}
+else if (Analysis is null)
+{
+    <section class="so-panel so-analysis-prompt">
+        <h3 class="so-panel-title">@Title</h3>
+        <p class="so-panel-text">@Explanation</p>
+        <p class="so-panel-text so-panel-text--sm">
+            Bu analiz iç içe grup ilişkilerini sunucu tarafında tarar ve süre, derinlik ve sonuç
+            sınırları içinde çalışır. Maliyetli olduğu için otomatik başlatılmaz.
+        </p>
+        <div class="so-panel-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AccountTree"
+                       OnClick="@(() => OnRun.InvokeAsync())">
+                Analizi Çalıştır
+            </MudButton>
+        </div>
+    </section>
+}
+else
+{
+    <section class="so-panel">
+        <div class="so-panel-head">
+            <h3 class="so-subhead so-subhead--flush">
+                @Title
+                <span class="so-count-chip">@ItemCount</span>
+            </h3>
+            <div class="so-panel-head-actions">
+                @if (Section == DirectoryGroup.GroupTab.EffectiveMembers && CanExport && _isComplete && ItemCount > 0)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                               Disabled="@Exporting"
+                               StartIcon="@Icons.Material.Filled.Download"
+                               OnClick="@(() => OnExport.InvokeAsync())">
+                        Dışa Aktar (CSV)
+                    </MudButton>
+                }
+                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="@(() => OnRun.InvokeAsync())">
+                    Yeniden Çalıştır
+                </MudButton>
+            </div>
+        </div>
+
+        <p class="so-panel-text so-panel-text--sm">@Explanation</p>
+
+        @if (!_isComplete)
+        {
+            @* The partial-result banner. Everything below it is real evidence; what it is not is a
+               complete answer, and no absence may be concluded from it. *@
+            <div class="so-partial-notice so-partial-notice--problem" role="status">
+                <span class="so-partial-icon" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.WarningAmber" Size="Size.Small" />
+                </span>
+                <div>
+                    <p class="so-partial-title">
+                        Analiz belirlenen güvenlik/performans sınırları içinde kısmi tamamlandı.
+                    </p>
+                    <p class="so-panel-text so-panel-text--sm">
+                        Aşağıdaki kayıtlar geçerlidir, ancak liste eksik olabilir. Bu sonuç bir
+                        üyeliğin bulunmadığı kararı için kullanılmamalıdır.
+                    </p>
+                    @if (_limits.Count > 0)
+                    {
+                        <ul class="so-traversal-list">
+                            @foreach (string limit in _limits)
+                            {
+                                <li>@limit</li>
+                            }
+                        </ul>
+                    }
+                    @if (Section == DirectoryGroup.GroupTab.EffectiveMembers && CanExport)
+                    {
+                        <p class="so-panel-text so-panel-text--sm">
+                            Kısmi sonuçlar dışa aktarılamaz.
+                        </p>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (Section == DirectoryGroup.GroupTab.NestedGroups)
+        {
+            @if (Analysis.DirectNestedGroups.Count == 0)
+            {
+                <p class="so-panel-text so-panel-text--sm so-unknown">
+                    Bu grubun doğrudan üyesi olan başka bir grup bulunmuyor.
+                </p>
+            }
+            else
+            {
+                <div class="so-table-scroll">
+                    <table class="so-plain-table so-group-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">@DirectoryView.GroupNameLabel</th>
+                                <th scope="col">@DirectoryView.GroupAccountLabel</th>
+                                <th scope="col">@DirectoryView.CategoryLabelName</th>
+                                <th scope="col">@DirectoryView.ScopeLabelName</th>
+                                <th scope="col"><span class="sr-only">İşlem</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (DirectoryGroupSummaryDto group in Analysis.DirectNestedGroups)
+                            {
+                                DirectoryGroupSummaryDto captured = group;
+                                <tr>
+                                    <th scope="row">@DirectoryView.GroupName(group)</th>
+                                    <td>
+                                        @if (DirectoryView.ShowAccountNameSeparately(group.Name, group.SamAccountName))
+                                        {
+                                            <code class="so-code so-code--sm">@group.SamAccountName</code>
+                                        }
+                                        else
+                                        {
+                                            <span class="so-unknown">—</span>
+                                        }
+                                    </td>
+                                    <td title="@DirectoryView.CategoryExplanation(group.Category)">
+                                        @DirectoryView.CategoryLabel(group.Category)
+                                    </td>
+                                    <td title="@DirectoryView.ScopeExplanation(group.Scope)">
+                                        @DirectoryView.ScopeLabel(group.Scope)
+                                    </td>
+                                    <td>
+                                        <a class="so-row-link"
+                                           href="@DirectoryRoutes.Group(DirectoryView.ExactGroupIdentifier(captured))">
+                                            Grubu İncele
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (Analysis.TopologyNodes.Count > Analysis.DirectNestedGroups.Count)
+                {
+                    <p class="so-panel-text so-panel-text--sm">
+                        Sunucu tarafında toplam @Analysis.TopologyNodes.Count grup düğümü ve
+                        @Analysis.TopologyEdges.Count ilişki çözümlendi. Daha derindeki grupları görmek
+                        için ilgili grubun kendi analizine geçin.
+                    </p>
+                }
+            }
+        }
+        else if (Section == DirectoryGroup.GroupTab.EffectiveMembers)
+        {
+            @if (Analysis.EffectiveMembers.Count == 0)
+            {
+                <p class="so-panel-text so-panel-text--sm so-unknown">
+                    İç içe gruplar açıldığında bu grupta etkin üye bulunmuyor.
+                </p>
+            }
+            else
+            {
+                @* Presentation only. The server already bounded this list; this decides how much of
+                   it is on screen at once, and the totals below always report the whole result so
+                   paging can never make a partial answer look like a complete one. *@
+                <div class="so-panel-head so-panel-head--sub">
+                    <span class="so-pager-state">
+                        @Analysis.EffectiveMembers.Count üyeden @(EffectiveFirst + 1)–@EffectiveLast arası
+                    </span>
+                    <MudSelect T="int" Value="_effectivePageSize" ValueChanged="ChangeEffectivePageSize"
+                               Label="Sayfa boyutu" Dense="true" Margin="Margin.Dense"
+                               Variant="Variant.Outlined" Class="so-page-size">
+                        @foreach (int size in PageSizes)
+                        {
+                            <MudSelectItem T="int" Value="@size">@size</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+
+                <div class="so-table-scroll">
+                    <table class="so-plain-table so-member-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Üye</th>
+                                <th scope="col">AD Hesap Adı</th>
+                                <th scope="col">@DirectoryView.ObjectTypeLabel</th>
+                                <th scope="col"><span class="sr-only">İşlem</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (DirectoryMemberDto member in EffectivePage)
+                            {
+                                DirectoryMemberDto captured = member;
+                                <tr>
+                                    <th scope="row">@DirectoryView.MemberName(member)</th>
+                                    <td>
+                                        @if (DirectoryView.ShowAccountNameSeparately(member.Name, member.SamAccountName))
+                                        {
+                                            <code class="so-code so-code--sm">@member.SamAccountName</code>
+                                        }
+                                        else
+                                        {
+                                            <span class="so-unknown">—</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <SoStatusBadge Label="@DirectoryView.MemberTypeLabel(member.MemberType)"
+                                                       Tone="SoStatusBadge.BadgeTone.Neutral" />
+                                    </td>
+                                    <td>
+                                        @if (string.Equals(member.MemberType, "User", StringComparison.Ordinal))
+                                        {
+                                            <a class="so-row-link"
+                                               href="@DirectoryRoutes.User(DirectoryView.ExactMemberIdentifier(captured))">
+                                                Hesabı İncele
+                                            </a>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (Analysis.EffectiveMembers.Count > _effectivePageSize)
+                {
+                    <div class="so-pager">
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.ChevronLeft"
+                                   Disabled="@(_effectivePage == 0)"
+                                   OnClick="@(() => _effectivePage--)">
+                            Önceki
+                        </MudButton>
+
+                        <span class="so-pager-state">Sayfa @(_effectivePage + 1) / @EffectivePageCount</span>
+
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                   EndIcon="@Icons.Material.Filled.ChevronRight"
+                                   Disabled="@(_effectivePage + 1 >= EffectivePageCount)"
+                                   OnClick="@(() => _effectivePage++)">
+                            Sonraki
+                        </MudButton>
+                    </div>
+                }
+            }
+        }
+        else
+        {
+            <SoMembershipGroupTable Title="Doğrudan Üst Gruplar"
+                                    Description="Bu grup, aşağıdaki grupların doğrudan üyesidir."
+                                    Items="Analysis.ParentMemberships.DirectParents"
+                                    EmptyText="Bu grup başka bir grubun doğrudan üyesi değil." />
+
+            <SoMembershipGroupTable Title="Dolaylı Üst Gruplar"
+                                    Description="Araya giren gruplar üzerinden ulaşılan üst gruplar."
+                                    Items="Analysis.ParentMemberships.TransitiveParents"
+                                    ShowDepth="true"
+                                    EmptyText="Dolaylı üst grup bulunmadı." />
+
+            <SoTraversalNotice Traversal="Analysis.ParentMemberships.Traversal" />
+        }
+    </section>
+}
+
+@code {
+    /// <summary>Which of the three analysis-backed sections to render.</summary>
+    [Parameter, EditorRequired]
+    public DirectoryGroup.GroupTab Section { get; set; }
+
+    /// <summary>Analysis result, or <c>null</c> when it has not been run yet.</summary>
+    [Parameter]
+    public DirectoryGroupAnalysisResponse? Analysis { get; set; }
+
+    /// <summary>Failure from the analysis call, when there was one.</summary>
+    [Parameter]
+    public UiProblem? Problem { get; set; }
+
+    /// <summary>Whether the analysis is currently running.</summary>
+    [Parameter]
+    public bool Loading { get; set; }
+
+    /// <summary>Whether the caller holds the export capability.</summary>
+    [Parameter]
+    public bool CanExport { get; set; }
+
+    /// <summary>Whether an export is already running.</summary>
+    [Parameter]
+    public bool Exporting { get; set; }
+
+    /// <summary>Raised when the operator asks for the bounded walk.</summary>
+    [Parameter]
+    public EventCallback OnRun { get; set; }
+
+    /// <summary>Raised when the operator asks for a CSV of the effective members.</summary>
+    [Parameter]
+    public EventCallback OnExport { get; set; }
+
+    /// <summary>Page sizes offered for the effective-member list.</summary>
+    private static readonly int[] PageSizes = [25, 50, 100];
+
+    private bool _isComplete = true;
+    private IReadOnlyList<string> _limits = [];
+    private int _effectivePageSize = 25;
+    private int _effectivePage;
+
+    // Windowing over the server's already-bounded result. It changes how much is rendered at once,
+    // never what the result claims: the count and the partial-result banner always describe the
+    // whole analysis.
+    private IEnumerable<DirectoryMemberDto> EffectivePage =>
+        Analysis is null
+            ? []
+            : Analysis.EffectiveMembers.Skip(EffectiveFirst).Take(_effectivePageSize);
+
+    private int EffectiveFirst => _effectivePage * _effectivePageSize;
+
+    private int EffectiveLast => Analysis is null
+        ? 0
+        : Math.Min(EffectiveFirst + _effectivePageSize, Analysis.EffectiveMembers.Count);
+
+    private int EffectivePageCount => Analysis is null
+        ? 1
+        : Math.Max(1, (int)Math.Ceiling(Analysis.EffectiveMembers.Count / (double)_effectivePageSize));
+
+    private void ChangeEffectivePageSize(int pageSize)
+    {
+        _effectivePageSize = pageSize;
+        _effectivePage = 0;
+    }
+
+    private DirectoryGroupAnalysisResponse? _pagedAnalysis;
+
+    protected override void OnParametersSet()
+    {
+        // Reset only when the evidence itself changed. A re-run must not leave the operator on a
+        // page number that belonged to the previous result; an unrelated parent re-render must not
+        // yank them back to page one mid-read.
+        if (!ReferenceEquals(_pagedAnalysis, Analysis))
+        {
+            _pagedAnalysis = Analysis;
+            _effectivePage = 0;
+        }
+
+        if (Analysis is null)
+        {
+            _isComplete = true;
+            _limits = [];
+            return;
+        }
+
+        // Parent-group evidence carries its own traversal, so the parents view judges completeness
+        // against that rather than against the descendant walk.
+        DirectoryTraversalMetadataDto traversal = Section == DirectoryGroup.GroupTab.ParentGroups
+            ? Analysis.ParentMemberships.Traversal
+            : Analysis.DescendantTraversal;
+
+        _limits = DirectoryView.TraversalLimits(traversal);
+        _isComplete = Analysis.IsComplete && !traversal.IsTruncated && _limits.Count == 0;
+    }
+
+    private string Title => Section switch
+    {
+        DirectoryGroup.GroupTab.NestedGroups => "İç İçe Gruplar",
+        DirectoryGroup.GroupTab.EffectiveMembers => "Tüm Etkin Üyeler",
+        _ => DirectoryView.MemberOfLabel
+    };
+
+    private string Explanation => Section switch
+    {
+        DirectoryGroup.GroupTab.NestedGroups =>
+            "Bu grubun doğrudan üyesi olan gruplar. Her biri kendi analizinde açılabilir.",
+        DirectoryGroup.GroupTab.EffectiveMembers =>
+            "İç içe grup üyelikleri açılarak elde edilen etkin üyeleri gösterir.",
+        _ => "Bu AD grubunun başka hangi grupların üyesi olduğunu gösterir."
+    };
+
+    private int ItemCount => Analysis is null ? 0 : Section switch
+    {
+        DirectoryGroup.GroupTab.NestedGroups => Analysis.DirectNestedGroups.Count,
+        DirectoryGroup.GroupTab.EffectiveMembers => Analysis.EffectiveMembers.Count,
+        _ => Analysis.ParentMemberships.DirectParents.Count + Analysis.ParentMemberships.TransitiveParents.Count
+    };
+}

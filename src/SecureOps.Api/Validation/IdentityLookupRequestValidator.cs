@@ -18,8 +18,9 @@ public sealed class IdentityLookupRequestValidator : AbstractValidator<IdentityL
             .MaximumLength(128);
 
         RuleFor(x => x.Purpose)
-            .NotEmpty()
-            .MaximumLength(500);
+            .MaximumLength(500)
+            .Must(value => string.IsNullOrWhiteSpace(value) || !value.Any(char.IsControl))
+            .WithMessage("Purpose contains unsupported control characters.");
 
         RuleFor(x => x.TuruncuhatEvtId)
             .MaximumLength(100);

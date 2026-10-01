@@ -1,0 +1,53 @@
+@using System.Globalization
+@using SecureOps.Shared.Contracts.Reporting
+
+@*
+    Named counts as a proportional list.
+
+    The bar is a way of drawing the count next to it, scaled against the largest count in the same
+    list. It encodes nothing the API did not send: no share of a total the server never reported, no
+    percentage, no ranking score. The number stays the value; the bar only makes the relative sizes
+    readable at a glance.
+*@
+
+@if (Items.Count == 0 || Items.All(item => item.Count == 0))
+{
+    <p class="so-panel-text so-panel-text--sm">@EmptyText</p>
+}
+else
+{
+    <ul class="so-bars">
+        @foreach (NamedCountResponse item in Items)
+        {
+            <li class="so-bar-row">
+                <span class="so-bar-label">@LabelFor(item.Name)</span>
+                <span class="so-bar-track" aria-hidden="true">
+                    <span class="so-bar-fill" style="width: @Width(item.Count)"></span>
+                </span>
+                <span class="so-bar-value">@ManagementReportView.Count(item.Count)</span>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    /// <summary>Named counts exactly as the API returned them.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<NamedCountResponse> Items { get; set; } = [];
+
+    /// <summary>Translates a server category name into an operator-facing label.</summary>
+    [Parameter, EditorRequired]
+    public Func<string, string> LabelFor { get; set; } = name => name;
+
+    /// <summary>Shown when every count is zero.</summary>
+    [Parameter]
+    public string EmptyText { get; set; } = "Kayıt yok.";
+
+    private long Peak => Items.Count == 0 ? 0 : Math.Max(1, Items.Max(item => item.Count));
+
+    // Invariant, not the UI culture: a Turkish decimal comma is not a valid CSS length.
+    private string Width(long count) =>
+        count <= 0
+            ? "0%"
+            : (count * 100d / Peak).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+}

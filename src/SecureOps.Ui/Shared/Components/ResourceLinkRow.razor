@@ -1,0 +1,52 @@
+@using SecureOps.Domain.Resources
+
+<li class="so-resource-item" data-guide="link-actions">
+    <label class="so-resource-select"><input type="checkbox" checked="@Selected" disabled="@SelectionDisabled" @onchange="e => SelectedChanged.InvokeAsync(e.Value is true)" aria-label="@($"{Link.Name}: Seç")" /></label>
+    <div class="so-resource-main">
+        <div class="so-resource-head">
+            <h3 class="so-resource-title">@Link.Name</h3>
+            @if (!string.IsNullOrWhiteSpace(Link.Environment))
+            {
+                <span class="so-chip so-chip--quiet">@Link.Environment</span>
+            }
+        </div>
+        <p class="so-resource-purpose">@Link.Purpose</p>
+        <div class="so-resource-meta">
+            <span class="so-resource-host">@ResourceView.Host(Link)</span>
+            @if (!string.IsNullOrWhiteSpace(CategoryName)) { <span>@CategoryName</span> }
+        </div>
+        <details class="so-resource-details">
+            <summary>Ayrıntılar</summary>
+            <p>@Link.Purpose</p>
+            @if (!string.IsNullOrWhiteSpace(Link.Notes)) { <p><strong>Erişim notu:</strong> @Link.Notes</p> }
+            @if (!string.IsNullOrWhiteSpace(Link.Location)) { <p><strong>Konum:</strong> @Link.Location</p> }
+            @if (Link.Tags.Count > 0) { <p><strong>Etiketler:</strong> @string.Join(", ", Link.Tags)</p> }
+            <p class="so-resource-host">@Link.Url</p>
+        </details>
+    </div>
+    <div class="so-resource-actions">
+        <a class="so-resource-open mud-button-root mud-button mud-button-outlined mud-button-outlined-default mud-button-outlined-size-small"
+           href="@Link.Url" target="_blank" rel="noopener noreferrer" aria-label="@($"{Link.Name}: Aç")">
+            <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /> Aç
+        </a>
+        <MudIconButton Color="Color.Default" Size="Size.Small" Disabled="Disabled"
+                   Icon="@(Favourite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)" title="@(Favourite ? "Favorilerden çıkar" : "Favorilere ekle")"
+                   aria-label="@($"{Link.Name}: {(Favourite ? "Favorilerden çıkar" : "Favorilere ekle")}")"
+                   OnClick="OnFavourite" />
+        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small" Disabled="Disabled"
+                   StartIcon="@Icons.Material.Filled.PlaylistAdd" aria-label="@($"{Link.Name}: Grubuma kaydet")"
+                   OnClick="OnAdd">Grubuma kaydet</MudButton>
+    </div>
+</li>
+
+@code {
+    [Parameter, EditorRequired] public ResourceLink Link { get; set; } = default!;
+    [Parameter] public string? CategoryName { get; set; }
+    [Parameter] public bool Favourite { get; set; }
+    [Parameter] public bool Selected { get; set; }
+    [Parameter] public bool SelectionDisabled { get; set; }
+    [Parameter] public EventCallback<bool> SelectedChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnFavourite { get; set; }
+    [Parameter] public EventCallback OnAdd { get; set; }
+}

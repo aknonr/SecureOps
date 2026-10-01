@@ -1,6 +1,13 @@
 # CLAUDE.md — Claude Code Specific Instructions
 
-This file extends `AGENTS.md` with Claude Code–specific guidance. Read `AGENTS.md` first, then this file.
+This file extends `AGENTS.md` with Claude-specific UI/UX guidance. Read and honor `AGENTS.md` first, then this file. Repository-wide security and ownership rules remain canonical in `AGENTS.md` and must not be duplicated or overridden here.
+
+## Ownership And Routing
+
+- Claude owns UI/UX work only: Razor, CSS, layout, theme, navigation, accessibility, and visual behavior under `src/SecureOps.Ui/`. Exception: Planned OCO Announcements UI and backend are assigned to Codex by explicit user instruction; see AGENTS.md.
+- Read `docs/agent-guides/README.md`, `docs/agent-guides/060-ui.md`, `src/SecureOps.Ui/README.md`, the applicable `docs/contracts/` files, and relevant UI design documents before editing.
+- Do not silently change backend, API, domain, infrastructure, SQL, authentication, authorization, integrations, migrations, or API contracts.
+- When UI work needs a missing or changed backend contract, report the exact contract need for Codex ownership instead of inventing data, routes, permissions, or state in the UI.
 
 ---
 
@@ -18,7 +25,7 @@ You are working in a repository owned by a single Windows System Administrator w
 ## Tool Use Priority
 
 1. **Plan first.** For any task that touches more than 2 files or introduces a new component, write a short plan and confirm before editing.
-2. **Read the docs.** `docs/` and `.cursor/rules/` are the source of truth. Code that contradicts docs is a bug.
+2. **Read the docs.** `docs/`, `docs/agent-guides/`, contracts, and applicable layer README files are the source of truth. Code that contradicts them is a bug.
 3. **Edit small.** One concern per edit. Multiple unrelated edits in one diff make review hard.
 4. **Run verification.** After code changes, run `dotnet build` and `dotnet test`. If the environment cannot run them, say so explicitly and list what should be verified manually.
 5. **Update docs in the same turn.** If a code change alters behavior described in `docs/`, update the doc in the same turn — not as a follow-up.
@@ -66,7 +73,7 @@ You are working in a repository owned by a single Windows System Administrator w
 
 | Pattern | Reason |
 |---|---|
-| `localStorage` or `sessionStorage` in Blazor | Use server state or scoped DI |
+| `localStorage`/`sessionStorage` for anything but a non-sensitive presentation preference | Use server state or scoped DI. The one sanctioned exception is the appearance mode (`wasas.appearance`): it carries no identity, no authorization, and is never sent to the API. Never a cookie for it — a cookie travels on every request and belongs to authentication. |
 | Direct SQL string concatenation | Always parameterized queries or EF Core |
 | `Stop-Service`, `Restart-Service`, `Remove-Item` in any PowerShell | Read-only MVP |
 | External HTTP to OpenAI, Anthropic, Google AI | No public AI |

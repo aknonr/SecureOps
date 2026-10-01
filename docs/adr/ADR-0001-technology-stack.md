@@ -34,7 +34,7 @@ The stack is:
 | Logging | Serilog with structured JSON |
 | PowerShell | `System.Management.Automation` + JEA |
 | Authentication | Windows Authentication via Active Directory |
-| Authorization | AD-group-based via ASP.NET Core authorization policies |
+| Authorization | ASP.NET Core authorization policies; direct AD-group grants superseded by ADR-0010 application capabilities |
 
 Hosting model:
 
@@ -144,6 +144,6 @@ Rejected for MVP because:
 ## References
 
 - `docs/03-architecture.md`
-- `.cursor/rules/010-architecture-rules.mdc`
-- `.cursor/rules/020-backend-dotnet-rules.mdc`
+- `docs/agent-guides/010-architecture.md`
+- `docs/agent-guides/020-backend-dotnet.md`
 - `ADR-0007-iis-hosting-model.md`

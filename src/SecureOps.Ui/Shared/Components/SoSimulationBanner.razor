@@ -1,0 +1,46 @@
+@*
+    TEST simulation notice.
+
+    The single most important thing an operator needs to know before pressing "Jira Kaydı Oluştur"
+    is whether a real Jira issue will appear. When both providers are configured as Simulation the
+    backend says so on every record, preview, and transfer response, and this states it plainly.
+
+    Deliberately prominent and deliberately not alarming. It is not a fault, and styling it as one
+    would teach operators to dismiss the one banner that changes what a button means. The wording
+    comes from the server when it supplies a notice; nothing here decides that a run is simulated.
+*@
+
+@if (Active)
+{
+    <div class="so-simulation" role="status">
+        <span class="so-simulation-icon" aria-hidden="true">
+            <MudIcon Icon="@Icons.Material.Filled.Science" />
+        </span>
+        <div class="so-simulation-text">
+            <p class="so-simulation-title">TEST SİMÜLASYONU</p>
+            <p class="so-simulation-body">
+                Bu işlem gerçek Turuncu Hat veya Jira sisteminde kayıt oluşturmaz.
+            </p>
+            @* Server-supplied wording, shown as an addition rather than a replacement so the
+               guarantee above is always present even if the notice changes. *@
+            @if (!string.IsNullOrWhiteSpace(Notice))
+            {
+                <p class="so-simulation-note">@Notice</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Whether the backend reported simulation mode for this response.</summary>
+    /// <remarks>
+    /// Comes from <c>simulationMode</c>. The UI never decides this for itself: a client-side
+    /// simulation would be a screen that lies about what the server is going to do.
+    /// </remarks>
+    [Parameter]
+    public bool Active { get; set; }
+
+    /// <summary>Server-supplied notice text, when one was returned.</summary>
+    [Parameter]
+    public string? Notice { get; set; }
+}

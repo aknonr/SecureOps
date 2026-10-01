@@ -1,0 +1,44 @@
+@*
+    Page heading with an optional lead paragraph and a right-aligned action slot.
+
+    Every page uses this so the h1, the supporting sentence, and the primary action sit at the same
+    place on every route. The h1 is a real heading element because App.razor moves focus to "h1" after
+    navigation.
+*@
+
+<header class="so-page-header">
+    <div class="so-page-header-text">
+        <h1 class="so-page-title">@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Lead))
+        {
+            <p class="so-page-lead">@Lead</p>
+        }
+        @if (LeadContent is not null)
+        {
+            <div class="so-page-lead">@LeadContent</div>
+        }
+    </div>
+
+    @if (Actions is not null)
+    {
+        <div class="so-page-header-actions">@Actions</div>
+    }
+</header>
+
+@code {
+    /// <summary>Page title rendered as the h1.</summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Optional one-line description of what the page is for.</summary>
+    [Parameter]
+    public string? Lead { get; set; }
+
+    /// <summary>Optional rich alternative to <see cref="Lead"/>.</summary>
+    [Parameter]
+    public RenderFragment? LeadContent { get; set; }
+
+    /// <summary>Optional page-level actions aligned to the trailing edge.</summary>
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+}

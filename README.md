@@ -1,8 +1,15 @@
 # Secure Ops Automation & AI Analysis Hub
 
+Current backend TEST deployment readiness, migrations, bootstrap access, exact runtime configuration, release validation, and rollback are documented in `docs/24-api-test-deployment-readiness.md`. Frontend integrations must consume `docs/contracts/secureops-api-v1.openapi.json` and `docs/contracts/secureops-api-v1-ui-integration.md`.
+
+Current post-rc6.26 work and separate source/payload/target acceptance are tracked
+in `docs/integrated-test-activation.md`; executable Turkish handoff:
+`docs/post-rc626-continuation-tr.md`. The archive catalogue adds SQL 024; it is not
+installed by this source change. No successor release or full activation is claimed.
+
 An enterprise Windows operations platform that receives monitoring alarms, runs read-only diagnostics, captures structured audit data, and surfaces actionable findings to shift engineers.
 
-> **Status:** Phase 1A backend IdentityLookup implemented and hardened; Phase 1 read-only diagnostics not started.
+> **Status:** The real Turuncu Hat read-only import is deployed and verified in TEST at source `0ec0376`; external writes remain disabled, and deterministic SDM classification plus the broader controlled pilot remain pending.
 > **Owner:** CONTOSO Turkish Technology (placeholder)
 > **Stack:** .NET 8, Blazor Server, SQL Server, PowerShell Remoting + JEA
 > **MVP timeline:** 6–8 weeks
@@ -33,7 +40,7 @@ Later phases add rule-based analysis, private AI-assisted summarization, and app
 
 ## Getting Started
 
-This repo contains documentation, agent rules, contracts, a .NET solution, Phase 1A IdentityLookup backend code, audit persistence hardening, and unit/integration tests. The Phase 1 read-only diagnostic MVP is still planned and has not been implemented yet.
+This repo contains documentation, agent rules, a .NET solution, working Phase 1A IdentityLookup backend code, provider-neutral access approval, audit persistence hardening, the durable Operational Record to Jira backend foundation, and backend-authoritative management reporting. The corporate Turuncu Hat read-only import is verified in TEST; Jira creation, Turuncu Hat completion, and approved deterministic classification rules remain deferred. Local automated tests continue to use deterministic substitutes rather than corporate endpoints.
 
 ### For AI coding agents
 
@@ -56,11 +63,15 @@ This repo contains documentation, agent rules, contracts, a .NET solution, Phase
 | `docs/` | Project memory. Architecture, security, integrations, diagnostics, AI strategy, ADRs. |
 | `plans/` | Phase-by-phase implementation plans with task breakdown. |
 | `contracts/` | JSON schemas and example payloads for cross-component contracts. |
-| `.cursor/rules/` | Cursor agent rules. Also useful as reference for any agent. |
+| `docs/agent-guides/` | Portable detailed agent guidance, routed from `AGENTS.md` and `CLAUDE.md`. |
 | `src/` | .NET solution: Api, Worker, Ui, Domain, Infrastructure, Shared. Phase 1A code currently lives mainly in Api, Infrastructure, and Shared. |
 | `tests/` | Unit and integration test projects. Current tests cover Phase 1A identity lookup, audit hardening, authorization, validation, correlation, and rate-limit metadata. |
 | `scripts/powershell/` | Empty diagnostic and JEA script folders reserved for Phase 1. |
-| `sql/` | Empty schema and migration folders reserved for Phase 1 SQL work. |
+| `sql/` | Reviewed offline audit/access-control SQL assets; never executed by local tests. |
+
+## Local Identity Lookup Boundary
+
+Basic PAM-style account identifiers are ordinary exact directory-account inputs, handled through the same read-only `sAMAccountName` path as other accounts. Account-owner resolution and vendor PAM integration remain planned. Local development uses fakes only and cannot validate corporate AD, PAM, SQL, IIS, or load-balancer behavior.
 
 ---
 

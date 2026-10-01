@@ -75,6 +75,15 @@ Rejected:
 
 ## Implementation Notes
 
+### Matched Local Release Preparation, 2026-09-12
+
+API/UI payload integrity is separate from installation readiness. The paired
+packager records exact committed source, assembly/runtime versions and manifests,
+but never grants deployment approval. Failed mandatory gates remain explicit;
+historical scoped formatting is not an exception to the repository-wide DoD.
+Existing server-owned configuration, key rings, reports and SQL remain outside
+runtime ZIPs. Unchanged DBA assets do not authorize migration replay.
+
 - API and UI as separate IIS sites or applications under one site.
 - HTTPS only; HSTS enabled; TLS 1.2 minimum.
 - App pool identity: `CONTOSO\svc-secureops`.

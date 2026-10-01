@@ -7,6 +7,18 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
       "applicationUrl": "https://localhost:63947;http://localhost:63948"
+    },
+    "SecureOps.Ui (Demo)": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "login",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Demo",
+        "DemoMode__Enabled": "true",
+        "DemoMode__AllowMockAuthentication": "true",
+        "IdentityLookupApi__BaseAddress": "http://localhost:5000/"
+      },
+      "applicationUrl": "https://localhost:63947;http://localhost:63948"
     }
   }
 }

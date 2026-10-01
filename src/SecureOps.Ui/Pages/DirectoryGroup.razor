@@ -1,0 +1,470 @@
+@page "/directory/groups"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@inject IDirectoryApiClient Directory
+@inject ICurrentAccessProvider AccessProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ILogger<DirectoryGroup> Logger
+
+<PageTitle>AD Grup Analizi · @WasasBrand.Name</PageTitle>
+
+@*
+    Exact Active Directory group analysis.
+
+    Cost is the organising principle. Group metadata comes back in milliseconds; member enumeration
+    can take hundreds of milliseconds; the nested-group walk is bounded but expensive, and on some
+    real groups member enumeration fails only after ten seconds. So nothing loads unless the operator
+    opens it, and the expensive walk sits behind an explicit button rather than a tab click.
+
+    The consequence that matters most: a fast successful overview plus a failed member enumeration is
+    not "Active Directory is down". The overview stays on screen and only the failing section reports
+    its own problem, with its own retry.
+
+    Nested groups are navigated by running each group's own exact lookup. The browser never builds
+    topology; the server returns it.
+*@
+
+<div class="so-page so-page--wide">
+    @if (_access is null)
+    {
+        <SoPageHeader Title="AD Grup Analizi" />
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoPageHeader Title="AD Grup Analizi" />
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.DirectoryGroupsView))
+    {
+        <SoPageHeader Title="AD Grup Analizi" />
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu bilgi için yetkiniz bulunmuyor</h2>
+            <p class="so-panel-text">
+                Grup sorgulamak için <code class="so-code">@Capabilities.DirectoryGroupsView</code>
+                yetkisi gerekir. Hesabınızda tanımlı yetkileri
+                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+        </section>
+    }
+    else if (_submittedGroup is null)
+    {
+        @* -- search state ------------------------------------------------------------------- *@
+        <SoPageHeader Title="AD Grup Analizi"
+                      Lead="Active Directory üzerindeki bir grubu adı veya AD grup hesap adıyla sorgulayarak grup bilgilerini, üyelerini, iç içe grup ilişkilerini ve üst grup üyeliklerini inceleyebilirsiniz." />
+
+        <section class="so-panel so-search-panel">
+            <EditForm Model="_model" OnValidSubmit="@(() => GoToGroup(_model.Group))">
+                <DataAnnotationsValidator />
+
+                <div class="so-search-row">
+                    <MudTextField @bind-Value="_model.Group"
+                                  Label="Grup adı veya AD grup hesap adı"
+                                  Placeholder="GRP-ORNEK-OPERASYON"
+                                  HelperText="Tek bir grup. Tam ad veya AD grup hesap adı kabul edilir."
+                                  Required="true"
+                                  Immediate="true"
+                                  MaxLength="256"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Groups"
+                                  Variant="Variant.Outlined"
+                                  Class="so-search-field" />
+
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@_loading"
+                               StartIcon="@Icons.Material.Filled.ManageSearch"
+                               Class="so-search-button">
+                        Sorgula
+                    </MudButton>
+                </div>
+            </EditForm>
+
+            <div class="so-search-hints">
+                <span class="so-hint-label">Örnek biçimler</span>
+                <code class="so-code so-code--sm">GRP-ORNEK-OPERASYON</code>
+                <code class="so-code so-code--sm">Ornek Operasyon Ekibi</code>
+            </div>
+
+            <p class="so-panel-text so-panel-text--sm">
+                Tam grup adıyla sorgulanır. Joker karakter, LDAP filtresi veya dizin taraması
+                desteklenmez.
+            </p>
+        </section>
+    }
+    else
+    {
+        @* -- result state ------------------------------------------------------------------- *@
+        @if (_trail.Count > 1)
+        {
+            <nav class="so-breadcrumb" aria-label="Grup gezinme geçmişi">
+                <span class="so-breadcrumb-root">Active Directory</span>
+                @for (int i = 0; i < _trail.Count; i++)
+                {
+                    string step = _trail[i];
+                    bool isCurrent = i == _trail.Count - 1;
+                    <span class="so-breadcrumb-sep" aria-hidden="true">›</span>
+                    @if (isCurrent)
+                    {
+                        <span class="so-breadcrumb-current">@step</span>
+                    }
+                    else
+                    {
+                        <button type="button" class="so-breadcrumb-link"
+                                @onclick="@(() => GoToGroup(step))">
+                            @step
+                        </button>
+                    }
+                }
+            </nav>
+        }
+
+        <div class="so-result-head">
+            <div class="so-result-query">
+                <span class="so-result-query-label">AD Grup Analizi</span>
+                <code class="so-code so-result-query-value">@_submittedGroup</code>
+            </div>
+            <div class="so-result-actions">
+                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                           Disabled="@_loading"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="@(() => LoadGroupAsync(_submittedGroup!, refresh: true))">
+                    Yenile
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="StartNewQuery">
+                    Yeni Sorgu
+                </MudButton>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <SoLoading Message="Grup bilgileri getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+        }
+        else if (_problem is not null)
+        {
+            <SoProblemPanel Problem="_problem"
+                            OnRetry="@(() => LoadGroupAsync(_submittedGroup!, refresh: true))" />
+        }
+        else if (_group is not null)
+        {
+            <SoGroupHeader Group="_group" />
+
+            <div class="so-tabs" role="tablist" aria-label="Grup analizi bölümü">
+                @foreach (GroupTab tab in AvailableTabs)
+                {
+                    GroupTab captured = tab;
+                    <button type="button"
+                            role="tab"
+                            class="so-tab @(tab == _tab ? "so-tab--active" : null)"
+                            aria-selected="@(tab == _tab)"
+                            @onclick="() => _tab = captured">
+                        @TabLabel(tab)
+                    </button>
+                }
+            </div>
+
+            @switch (_tab)
+            {
+                case GroupTab.Overview:
+                    <SoGroupOverview Group="_group" />
+                    break;
+
+                case GroupTab.DirectMembers:
+                    @* Keyed on the lookup key, not on what was typed: the same group reached by two
+                       different search strings is one group and must not remount. *@
+                    <SoGroupDirectMembers @key="@($"members:{LookupKey}")"
+                                          Group="@LookupKey"
+                                          CanExport="@_canExport"
+                                          Exporting="@_exporting"
+                                          OnExport="@(() => ExportAsync("DirectMembers"))" />
+                    break;
+
+                case GroupTab.NestedGroups:
+                case GroupTab.EffectiveMembers:
+                case GroupTab.ParentGroups:
+                    <SoGroupAnalysisSection Section="_tab"
+                                            Analysis="_analysis"
+                                            Problem="_analysisProblem"
+                                            Loading="_analysisLoading"
+                                            CanExport="@_canExport"
+                                            Exporting="@_exporting"
+                                            OnRun="@(() => RunAnalysisAsync(refresh: false))"
+                                            OnExport="@(() => ExportAsync("EffectiveMembers"))" />
+                    break;
+
+                case GroupTab.MembershipCheck:
+                    <SoGroupMembershipCheck @key="@($"check:{LookupKey}")"
+                                            Group="@LookupKey"
+                                            GroupDisplayName="@DirectoryView.GroupName(_group)" />
+                    break;
+            }
+
+            @if (_exportProblem is not null)
+            {
+                <SoProblemPanel Problem="_exportProblem" />
+            }
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Sections of the group analysis, each with its own cost.</summary>
+    public enum GroupTab
+    {
+        /// <summary>Group metadata only. Cheap, and the landing section.</summary>
+        Overview,
+
+        /// <summary>Explicit member links, paged.</summary>
+        DirectMembers,
+
+        /// <summary>Groups that are direct members of this group.</summary>
+        NestedGroups,
+
+        /// <summary>Leaf principals reached by expanding nested groups.</summary>
+        EffectiveMembers,
+
+        /// <summary>Groups this group is itself a member of.</summary>
+        ParentGroups,
+
+        /// <summary>Whether one exact account reaches this group.</summary>
+        MembershipCheck
+    }
+
+    private readonly GroupModel _model = new();
+    private readonly List<string> _trail = [];
+
+    private AccessSnapshot? _access;
+    private string? _submittedGroup;
+    private DirectoryGroupDetailDto? _group;
+    private UiProblem? _problem;
+    private bool _loading;
+    private GroupTab _tab = GroupTab.Overview;
+
+    private DirectoryGroupAnalysisResponse? _analysis;
+    private UiProblem? _analysisProblem;
+    private bool _analysisLoading;
+
+    private UiProblem? _exportProblem;
+    private bool _exporting;
+    private bool _canExport;
+
+    /// <summary>Group supplied by a link from another screen.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "group")]
+    public string? GroupQuery { get; set; }
+
+    // Member enumeration and the nested walk are a separate capability from reading the group, so an
+    // operator who may see that a group exists does not automatically see who is in it.
+    private IEnumerable<GroupTab> AvailableTabs =>
+        _access?.Can(Capabilities.DirectoryGroupMembersView) == true
+            ? Enum.GetValues<GroupTab>()
+            : [GroupTab.Overview, GroupTab.MembershipCheck];
+
+    private static string TabLabel(GroupTab tab) => tab switch
+    {
+        GroupTab.Overview => "Genel Bakış",
+        GroupTab.DirectMembers => "Doğrudan Üyeler",
+        GroupTab.NestedGroups => "İç İçe Gruplar",
+        GroupTab.EffectiveMembers => "Tüm Etkin Üyeler",
+        GroupTab.ParentGroups => "Üyesi Olduğu Gruplar",
+        _ => "Üyelik Kontrolü"
+    };
+
+    // The exact identifier every call after the overview uses. The server's lookupKey wins over
+    // sAMAccountName, which wins over the display name; what the operator typed is never replayed,
+    // because it found the group once but does not identify it.
+    private string LookupKey =>
+        (_group is null ? null : DirectoryView.ExactGroupIdentifier(_group)) ?? _submittedGroup ?? string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        _canExport = _access.Can(Capabilities.DirectoryGroupExport);
+    }
+
+    // The URL is the state. Every arrival — a link from the account screen, a nested group, the
+    // search form, browser Back, browser Forward, a tab restored from history — comes through here,
+    // so all of them behave the same way and none of them depends on component memory surviving.
+    protected override async Task OnParametersSetAsync()
+    {
+        string? target = string.IsNullOrWhiteSpace(GroupQuery) ? null : GroupQuery.Trim();
+
+        if (string.Equals(target, _submittedGroup, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (target is null)
+        {
+            ResetToSearch();
+            return;
+        }
+
+        await LoadGroupAsync(target, refresh: false);
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        _canExport = _access.Can(Capabilities.DirectoryGroupExport);
+    }
+
+    // Navigation, not loading. Pushing the group into the URL is what gives the operator Back,
+    // Forward, a shareable address, and a link that opens in a new tab.
+    private void GoToGroup(string? group)
+    {
+        if (!string.IsNullOrWhiteSpace(group))
+        {
+            Navigation.NavigateTo(DirectoryRoutes.Group(group));
+        }
+    }
+
+    private async Task LoadGroupAsync(string target, bool refresh)
+    {
+        _submittedGroup = target;
+        _model.Group = target;
+        RecordTrail(target);
+
+        // A new group invalidates every analysed section; keeping them would describe one group's
+        // nesting under another's name.
+        _analysis = null;
+        _analysisProblem = null;
+        _exportProblem = null;
+        _tab = GroupTab.Overview;
+
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            DirectoryGroupDetailResponse response =
+                await Directory.GetGroupAsync(target, null, refresh, CancellationToken.None);
+            _group = response.Group;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _group = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Directory group lookup failed. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // Revisiting a group already on the trail truncates back to it rather than appending, so the
+    // breadcrumb shows where the operator is instead of everywhere they have been.
+    private void RecordTrail(string target)
+    {
+        int existing = _trail.FindIndex(step => string.Equals(step, target, StringComparison.OrdinalIgnoreCase));
+
+        if (existing >= 0)
+        {
+            _trail.RemoveRange(existing + 1, _trail.Count - existing - 1);
+            return;
+        }
+
+        _trail.Add(target);
+    }
+
+    // The bounded nested-group walk. Never automatic: the operator asks for it, because it is the one
+    // call here that can take seconds and consume a rate-limit slot. One call produces the nested
+    // groups, the effective members, and the parent groups, so all three share this result.
+    private async Task RunAnalysisAsync(bool refresh)
+    {
+        if (_group is null)
+        {
+            return;
+        }
+
+        _analysisLoading = true;
+        _analysisProblem = null;
+        StateHasChanged();
+
+        try
+        {
+            _analysis = await Directory.AnalyzeGroupAsync(LookupKey, null, refresh, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _analysis = null;
+            _analysisProblem = ex.Problem;
+            Logger.LogDebug("Group analysis unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _analysisLoading = false;
+        }
+    }
+
+    private async Task ExportAsync(string mode)
+    {
+        if (_group is null || _exporting)
+        {
+            return;
+        }
+
+        _exporting = true;
+        _exportProblem = null;
+        StateHasChanged();
+
+        try
+        {
+            DirectoryExportFile file = await Directory.ExportGroupAsync(
+                LookupKey, mode, null, CancellationToken.None);
+
+            // The server produced the bytes, the file name, and the content type. The browser only
+            // hands them to the operator; nothing is generated or reformatted here.
+            await JS.InvokeVoidAsync(
+                "secureOpsDownload", file.FileName, file.ContentType, Convert.ToBase64String(file.Content));
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _exportProblem = ex.Problem;
+            Logger.LogWarning(
+                "Group export failed. Mode: {Mode}. Code: {Code}. CorrelationId: {CorrelationId}.",
+                mode, ex.Problem.Code, ex.Problem.CorrelationId);
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
+
+    // Navigates to the bare page. The reset itself happens in OnParametersSetAsync when the query
+    // string comes back empty, so "Yeni Sorgu" is a history entry like every other move here.
+    private void StartNewQuery() => Navigation.NavigateTo(DirectoryRoutes.GroupsPath);
+
+    private void ResetToSearch()
+    {
+        _submittedGroup = null;
+        _group = null;
+        _problem = null;
+        _analysis = null;
+        _analysisProblem = null;
+        _exportProblem = null;
+        _trail.Clear();
+        _model.Group = string.Empty;
+        _tab = GroupTab.Overview;
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+
+    private sealed class GroupModel
+    {
+        [Required(ErrorMessage = "Grup zorunludur.")]
+        [MaxLength(256)]
+        public string Group { get; set; } = string.Empty;
+    }
+}

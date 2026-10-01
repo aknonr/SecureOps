@@ -5,7 +5,7 @@
     Blazor Server + MudBlazor. Hosted on IIS in-process.
     Phase 2 deliverable; minimal status page in Phase 1.
 
-    See: docs/03-architecture.md, .cursor/rules/060-ui-rules.mdc
+    See: docs/03-architecture.md, docs/agent-guides/060-ui.md
   -->
 
   <PropertyGroup>
@@ -13,6 +13,12 @@
     <AssemblyName>SecureOps.Ui</AssemblyName>
     <UserSecretsId>secureops-ui-dev</UserSecretsId>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- LocalReturnUrl guards open-redirect and sign-in-loop cases and stays internal to the shell;
+         the unit tests assert that behavior directly. -->
+    <InternalsVisibleTo Include="SecureOps.Tests.Unit" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
@@ -26,6 +32,7 @@
 
     <!-- Auth -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
 
     <!-- Logging -->
     <PackageReference Include="Serilog.AspNetCore" />

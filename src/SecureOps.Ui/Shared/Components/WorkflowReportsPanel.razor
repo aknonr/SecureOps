@@ -1,0 +1,117 @@
+@using SecureOps.Shared.Contracts.Reporting
+@inject IManagementReportingApiClient Reporting
+@inject IJSRuntime Js
+@implements IDisposable
+
+<section class="workflow-report" aria-labelledby="workflow-report-title">
+    <h2 id="workflow-report-title">İş akışı sonuçları</h2>
+    <div class="workflow-filters">
+        <label>Başlangıç tarihi<input disabled="@_busy" type="date" @bind="_from" /></label>
+        <label>Bitiş tarihi (dahil)<input disabled="@_busy" type="date" @bind="_to" /></label>
+        <label>Saat dilimi<select disabled="@_busy" @bind="_zone"><option>UTC+03:00</option><option>UTC</option></select></label>
+        <label class="workflow-demo"><input disabled="@_busy" type="checkbox" @bind="_demo" /> Demo ve kökeni bilinmeyen kayıtları dahil et</label>
+        <MudButton StartIcon="@Icons.Material.Filled.Refresh" Disabled="_busy" OnClick="CaptureAsync">Raporu yenile</MudButton>
+    </div>
+    @if (_error is not null)
+    { <div role="alert" class="workflow-error"><p>@_error</p><MudButton OnClick="CaptureAsync" Disabled="_busy">Yeni rapor oluştur</MudButton></div> }
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="CaptureAsync" /> }
+    @if (_busy) { <p role="status">Rapor hazırlanıyor…</p> }
+    @if (_report is { } report)
+    {
+        <p>Kesit: @At(report.AsOf) · @report.Request.TimeZone · OCO kapsamı: yalnız kendi kayıtlarınız</p>
+        @if (report.Request.IncludeSynthetic) { <strong>DEMO RAPORU: Sentetik ve kökeni doğrulanmamış kayıtlar dahil.</strong> }
+        <p>Güncel durum kesit zamanına aittir. Dönem ölçüleri ayrı olay zamanlarını kullanır. Eski arşiv/köken kanıtı eksik olabilir; kayıt bulunmaması tamamlanmış bir sıfır ölçümü değildir.</p>
+        <div class="workflow-filters">
+            <label>Modül<select aria-label="Modül" disabled="@_busy" @bind="_module" @bind:after="FilterAsync"><option value="">Tümü</option><option value="InUse">In Use</option><option value="Sdm">OR → SDM</option><option value="Oco">Planlı OCO</option></select></label>
+            <label>Durum<select aria-label="Durum" disabled="@_busy" @bind="_status" @bind:after="FilterAsync"><option value="">Tümü</option>@foreach (string value in _statuses) { <option value="@value">@State(value)</option> }</select></label>
+            <label>Tür<select aria-label="Tür" disabled="@_busy" @bind="_type" @bind:after="FilterAsync"><option value="">Tümü</option>@foreach (string value in _types) { <option value="@value">@WorkflowReportText.Type(value)</option> }</select></label>
+            <MudButton StartIcon="@Icons.Material.Filled.Download" Disabled="_busy" OnClick="ExportAsync">Yönetim Excel'ini indir</MudButton>
+        </div>
+        <div class="workflow-table" tabindex="0" role="region" aria-label="İş akışı ölçüleri">
+            <table><thead><tr><th>Ölçü</th><th>Birim</th><th>Zaman temeli</th><th>Sayı</th><th></th></tr></thead><tbody>
+            @foreach (var metric in report.Metrics)
+            {
+                <tr><td>@metric.Label</td><td>@metric.Unit</td><td>@Basis(metric.TimeBasis)</td><td>@metric.Count</td>
+                    <td><MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.List" Disabled="_busy" OnClick="@(() => MetricAsync(metric.Key))">Kayıtlar</MudButton></td></tr>
+            }
+            </tbody></table>
+        </div>
+        @if (report.Metrics.Count == 0) { <p>Bu filtrelerde kayıtlı kanıt bulunamadı.</p> }
+        @if (_metric.Length > 0) { <MudButton OnClick="ClearMetricAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.FilterAltOff">Ölçü filtresini kaldır</MudButton> }
+        <h3>Katkıda bulunan kayıtlar (@report.Total)</h3>
+        <div class="workflow-table" tabindex="0" role="region" aria-label="Rapora katkıda bulunan kayıtlar">
+            <table><thead><tr><th>Kayıt</th><th>Tür / durum</th><th>İşlemi başlatan / hazırlayan</th><th>İnceleyici</th><th>Zaman</th><th>Sonuç / sonraki adım</th></tr></thead><tbody>
+            @foreach (var row in report.Items)
+            { <tr><td><a href="@Link(row)">@row.Reference</a></td><td>@WorkflowReportText.Type(row.RecordType)<br />@State(row.Status)</td><td>@(row.Actor ?? "Bilinmiyor")</td><td>@(row.Assignee ?? "Atanmamış / uygulanmaz")</td><td>@(row.OccurredAt is { } at ? At(at) : "Bilinmiyor")</td><td>@row.Detail</td></tr> }
+            </tbody></table>
+        </div>
+        <div class="workflow-pages">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki sayfa" Disabled="@(_busy || _page == 1)" OnClick="PreviousAsync" />
+            <span>Sayfa @_page</span>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki sayfa" Disabled="@(_busy || _page * 25 >= report.Total)" OnClick="NextAsync" />
+        </div>
+        <h3>Kaynak ve Worker durumu</h3>
+        @foreach (var health in report.Readiness)
+        { <p><strong>@health.Module: @State(health.State)</strong> · Son gözlem: @(health.LastSuccess is { } at ? At(at) : "Bilinmiyor") · @health.Reason</p> }
+    }
+    else if (!_busy && _error is null) { <p>Seçtiğiniz dönem için kayıtlı iş akışı sonuçlarını görüntüleyin.</p> }
+</section>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private DateTime _from = DateTime.UtcNow.AddHours(3).Date.AddDays(-7), _to = DateTime.UtcNow.AddHours(3).Date;
+    private string _zone = "UTC+03:00", _module = "", _status = "", _type = "", _metric = "";
+    private bool _demo, _busy;
+    private int _page = 1;
+    private string? _error;
+    private UiProblem? _problem;
+    private WorkflowReport? _report;
+    private readonly string[] _statuses = ["Unreviewed", "Draft", "Stale", "Reviewed", "Archived", "Verified", "Acknowledged", "VerifiedClosed", "Queued", "Running", "Succeeded", "Partial", "Failed", "Unknown", "Unconfirmed", "Blocked", "Dispatching", "Accepted", "Denied", "Prepared", "Completed", "JiraCreateFailed", "OperationalRecordCloseFailed"];
+    private readonly string[] _types = ["InUse", "ServerRequest", "SoftwareInstallation", "ServerRetirement", "EnvironmentRequest", "ConfigurationRequest", "OperationalSupport", "NeedsManualReview", "NotJiraEligible", "Source", "Preparation", "SelfTest", "Send"];
+    private WorkflowReportFilter Filter => new(Empty(_module), Empty(_status), Empty(_type), Empty(_metric), _page, 25);
+    private static string? Empty(string value) => value.Length == 0 ? null : value;
+    private Task CaptureAsync() => RunAsync(async () =>
+    {
+        TimeSpan offset = _zone == "UTC" ? TimeSpan.Zero : TimeSpan.FromHours(3);
+        var from = new DateTimeOffset(DateTime.SpecifyKind(_from.Date, DateTimeKind.Unspecified), offset);
+        var to = new DateTimeOffset(DateTime.SpecifyKind(_to.Date.AddDays(1), DateTimeKind.Unspecified), offset);
+        if (to > DateTimeOffset.UtcNow) { to = DateTimeOffset.UtcNow; }
+        _report = await Reporting.CaptureWorkflowsAsync(new(from, to, _zone, _demo), _lifetime.Token);
+        _page = 1; _module = _status = _type = _metric = "";
+    });
+    private Task FilterAsync() { _page = 1; return ReadAsync(); }
+    private Task MetricAsync(string key) { _metric = key; return FilterAsync(); }
+    private Task ClearMetricAsync() { _metric = ""; return FilterAsync(); }
+    private Task PreviousAsync() { _page--; return ReadAsync(); }
+    private Task NextAsync() { _page++; return ReadAsync(); }
+    private Task ReadAsync() => RunAsync(async () => { if (_report is { } report) { _report = await Reporting.ReadWorkflowsAsync(report.Id, Filter, _lifetime.Token); } });
+    private Task ExportAsync() => RunAsync(async () =>
+    {
+        if (_report is not { } report) { return; }
+        byte[] bytes = await Reporting.ExportWorkflowsAsync(report.Id, report.Filter, _lifetime.Token);
+        await Js.InvokeVoidAsync("secureOpsDownload", _lifetime.Token, $"WASAS_IsAkislari_{report.Id:N}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(bytes));
+    });
+    private async Task RunAsync(Func<Task> work)
+    {
+        if (_busy) { return; }
+        _busy = true; _error = null; _problem = null;
+        try { await work(); }
+        catch (SecureOpsApiException ex) { _problem = ex.Problem; _error = "Rapor güncellenmedi. Önceki kesit korunuyor; yeni rapor oluşturabilirsiniz."; }
+        catch (Exception ex) when (ex is not OperationCanceledException) { _error = "Rapor alınamadı. Süresi dolmuş veya yetkisi değişmiş rapor için yeni kesit oluşturun. Önceki sonuçlar güncellenmedi; hata sıfır değildir."; }
+        finally
+        {
+            if (_report is { } retained)
+            {
+                _module = retained.Filter.Module ?? ""; _status = retained.Filter.Status ?? "";
+                _type = retained.Filter.RecordType ?? ""; _metric = retained.Filter.Metric ?? ""; _page = retained.Page;
+            }
+            _busy = false;
+        }
+    }
+    private string At(DateTimeOffset value) => value.ToOffset(_report?.Request.TimeZone == "UTC" ? TimeSpan.Zero : TimeSpan.FromHours(3)).ToString("dd.MM.yyyy HH:mm:ss");
+    private static string Link(WorkflowFact row) => row.Module switch { "InUse" => $"in-use/{row.RecordId:D}", "Sdm" => $"operational-records/{row.RecordId:D}", _ => $"announcements?draft={row.RecordId:D}" };
+    private static string Basis(string value) => WorkflowReportText.Basis(value);
+    private static string State(string value) => WorkflowReportText.State(value);
+    public void Dispose() { _lifetime.Cancel(); _lifetime.Dispose(); }
+}

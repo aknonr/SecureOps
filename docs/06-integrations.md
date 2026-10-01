@@ -140,6 +140,8 @@ IdentityLookup constraints:
 - One exact account per request.
 - Account values are accepted only in the POST body of `/api/v1/identity/lookup`; no URL/query-string account lookup is allowed.
 - Default provider is mock in development; production can enable the read-only AD provider by configuration.
+- `GET /api/v1/identity/lookup/capabilities` reports effective behavior of the active provider. `supportsUpnLookup` is true only when exact UPN lookup is supported and enabled.
+- The mock provider performs deterministic exact sAMAccountName lookup and optional exact UPN lookup over the same seeded identities. Unknown exact values remain NotFound.
 - Audit write availability is required before provider access; lookup fails closed if audit is unavailable.
 - Provider implementations enforce max length, exact-input validation, and exact-match result verification.
 - Real AD provider calls use a short timeout (`IdentityLookup:ProviderTimeoutSeconds`, default 3 seconds). Provider timeout returns the safe user-facing `DirectoryProviderTimeout` error code and writes `IdentityLookupProviderTimeout`.
@@ -294,8 +296,12 @@ Every integration has a config section:
 - **Smoke tests** against real integrations: separate test project, runs only in environments with real systems available.
 - **Contract tests**: validate JSON payloads against `contracts/schemas/*.schema.json`.
 
+## Operational Record and Jira Backend Foundation
+
+The backend replacement for the legacy operator-driven workflow is documented in `docs/22-operational-record-jira-workflow.md`. It uses `IOperationalRecordClient`, `IRequesterResolver`, and `IJiraClient` boundaries. Defaults remain disabled, Fake is synthetic-only, and typed Turuncu Hat/Jira adapters require explicit validated runtime selection. No PowerShell is launched and no browser credential is collected. Real external TEST remains blocked by the sanitized fixture gate in `docs/integrations/turuncu-hat-jira-contract-gaps.md`; Jira create keeps durable SQL idempotency and unknown-outcome reconciliation.
+
 ## Reference
 
 - `contracts/schemas/` — JSON schemas for all payloads
 - `contracts/examples/` — sample payloads
-- `.cursor/rules/030-worker-service-rules.mdc` — Worker-side patterns
+- `docs/agent-guides/030-worker-service.md` — Worker-side patterns

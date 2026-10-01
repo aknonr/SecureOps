@@ -1,0 +1,43 @@
+<section class="so-review-evidence" data-guide="review-evidence">
+    <h2 class="so-panel-title">Kanıtlar ve engeller</h2>
+    @if (Record.EvaluatedAt is not { } evaluatedAt)
+    {
+        <p class="so-panel-text">Kaydedilmiş SDM değerlendirmesi yok. Bu durum yayımlama uygunluğu veya onay anlamına gelmez.</p>
+    }
+    else
+    {
+        <SoFieldGrid MinColumnWidth="200px">
+            <SoField Label="Aday önerisi">@(Record.SdmCandidateRecommended ? "Öneriliyor" : "Önerilmiyor")</SoField>
+            <SoField Label="Yayımlama uygunluğu">@(Record.JiraEligible ? "Uygun" : "Koşullar sağlanmadı")</SoField>
+            <SoField Label="Dış sisteme yazma">@(Record.ExternalWriteEligible ? "Uygun" : "İzin verilmiyor")</SoField>
+            <SoField Label="Değerlendirme zamanı">@evaluatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</SoField>
+        </SoFieldGrid>
+        @if (Record.BlockingConditions.Count > 0)
+        {
+            <h3 class="so-subhead">Eksik kaynak bilgisi</h3>
+            <ul>@foreach (string code in Record.ReasonCodes.Where(c => c is "RequesterMissing" or "InvalidTitle" or "InvalidDescription" or "InfrastructureReferenceMissing")) { <li>@SdmEvidenceView.Guidance(code)</li> }</ul>
+            <h3 class="so-subhead">Yayımlama koşulları ve engeller</h3>
+            <ul class="so-warning-list">
+                @foreach (string guidance in Record.BlockingConditions.Select(SdmEvidenceView.Guidance).Distinct(StringComparer.Ordinal))
+                {
+                    <li>@guidance</li>
+                }
+            </ul>
+        }
+        @foreach (string code in Record.ReasonCodes.Except(Record.BlockingConditions))
+        {
+            <p class="so-panel-text so-panel-text--sm">@SdmEvidenceView.Guidance(code)</p>
+        }
+        <details class="so-technical">
+            <summary>Değerlendirme referansı</summary>
+            <p class="so-panel-text">@Record.RuleSetVersion</p>
+            <p class="so-panel-text">@string.Join(", ", Record.ReasonCodes)</p>
+        </details>
+    }
+</section>
+
+@code {
+    /// <summary>Backend-owned evaluation and publication evidence.</summary>
+    [Parameter, EditorRequired]
+    public OperationalRecordResponse Record { get; set; } = default!;
+}

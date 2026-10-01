@@ -1,0 +1,13 @@
+.workflow-report { margin-block: 1.5rem; border-block: 1px solid var(--mud-palette-divider); padding-block: 1.25rem; font-size: 1rem; scroll-margin-top: 6rem; }
+.workflow-report h2 { font-size: 1.35rem; }
+.workflow-report h3 { font-size: 1.1rem; margin-top: 1.25rem; }
+.workflow-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin-block: 1rem; }
+.workflow-filters label { display: flex; flex-direction: column; gap: .35rem; min-width: 10rem; }
+.workflow-filters input, .workflow-filters select { min-height: 44px; padding: .5rem; border: 1px solid var(--mud-palette-divider); color: var(--mud-palette-text-primary); background: var(--mud-palette-surface); border-radius: 4px; max-width: 100%; }
+.workflow-filters .workflow-demo { flex-direction: row; align-items: center; max-width: 22rem; }
+.workflow-table { overflow-x: auto; max-width: 100%; margin-block: 1rem; }
+.workflow-table table { width: 100%; border-collapse: collapse; text-align: left; }
+.workflow-table th, .workflow-table td { padding: .75rem; border-bottom: 1px solid var(--mud-palette-divider); vertical-align: top; overflow-wrap: anywhere; min-width: 7rem; }
+.workflow-pages { display: flex; align-items: center; gap: 1rem; }
+.workflow-error { border-left: 3px solid var(--mud-palette-error); padding: 1rem; }
+@media (max-width: 600px) { .workflow-filters label { flex: 1 1 100%; min-width: 0; } }

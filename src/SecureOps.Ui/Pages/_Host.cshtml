@@ -1,0 +1,236 @@
+@page "/"
+@namespace SecureOps.Ui.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using Microsoft.AspNetCore.Components.Web
+@using SecureOps.Ui
+@using SecureOps.Ui.Services
+@{
+    // The one place the browser session can be read for a circuit. Inside a live circuit there is no
+    // HttpContext, so this request hands the correlation value to the root component, which seeds it
+    // for every API client the circuit will create. Blazor encrypts root parameters into the
+    // prerendered marker, so this does not put the value in the page source.
+    string? browserSessionKey = User.FindFirst(SignedInUserService.BrowserSessionClaim)?.Value;
+}
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@WasasBrand.Name</title>
+    <base href="~/" />
+
+    @* Approved corporate emblem, served from this application. Versioned so a palette or asset
+       change is not held back by a cached tab icon. *@
+    <link rel="icon" href="~/brand/favicon-32.png?v=2" type="image/png" sizes="32x32" />
+    <link rel="icon" href="~/brand/favicon-16.png?v=2" type="image/png" sizes="16x16" />
+    <link rel="alternate icon" href="~/brand/favicon.ico?v=2" sizes="16x16 32x32" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="application-name" content="@WasasBrand.Name" />
+
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="~/css/secureops-theme.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/in-use.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/SecureOps.Ui.styles.css" rel="stylesheet" asp-append-version="true" />
+    <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
+</head>
+<body>
+    <component type="typeof(App)" render-mode="ServerPrerendered"
+               param-BrowserSessionKey="browserSessionKey" />
+
+    @* Blazor's built-in circuit failure banner. Reworded from the framework default so a dropped
+       connection reads as a recoverable state rather than an application error. *@
+    <div id="blazor-error-ui">
+        <span>Sunucu bağlantısı kesildi. Sayfayı yenileyerek devam edebilirsiniz.</span>
+        <a href="" class="reload">Yenile</a>
+        <a class="dismiss" aria-label="Kapat">×</a>
+    </div>
+
+    <script src="_framework/blazor.server.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script>
+        // Appearance preference. Presentation only: no identity, no authorization, nothing the API
+        // is told about, and never a cookie -- a cookie would travel on every request and belongs to
+        // authentication, not to which palette somebody prefers.
+        window.secureOpsAppearance = {
+            read: function () {
+                try {
+                    var value = localStorage.getItem("wasas.appearance");
+                    if (value === "night") {
+                        localStorage.setItem("wasas.appearance", "dark");
+                        return "dark";
+                    }
+                    return value === "light" || value === "dark" ? value : null;
+                } catch (e) { return null; }
+            },
+            write: function (v) {
+                try { localStorage.setItem("wasas.appearance", v === "light" ? "light" : "dark"); }
+                catch (e) { }
+            }
+        };
+
+        // Only a scroll position is retained in this page instance; no report or actor data is stored.
+        window.secureOpsInUseScroll = { position: null, restore: function () {
+            const saved = this.position;
+            this.position = null;
+            if (saved && saved.query === location.search) requestAnimationFrame(() => scrollTo(0, saved.y));
+        }};
+        document.addEventListener('click', function (event) {
+            const link = event.target.closest('a[href]');
+            if (location.pathname === '/in-use' && link && /^\/in-use\/[a-f0-9-]+(?:\?|$)/i.test(link.getAttribute('href'))) {
+                window.secureOpsInUseScroll.position = { query: location.search, y: scrollY };
+            }
+        });
+
+        // FocusOnNavigate keeps page changes accessible. Track the initiating input so its heading
+        // ring is retained for keyboard navigation but suppressed after a pointer click.
+        document.documentElement.dataset.soInputModality = "pointer";
+        window.addEventListener("pointerdown", function () {
+            document.documentElement.dataset.soInputModality = "pointer";
+        }, true);
+        window.addEventListener("keydown", function (event) {
+            if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+                document.documentElement.dataset.soInputModality = "keyboard";
+            }
+        }, true);
+
+        // Hands the operator a file the server produced. The bytes, the name, and the content type
+        // all come from the API response; nothing is generated or reformatted here, which is what
+        // keeps an export traceable to the audited server-side operation.
+        // Batch opening of shift-start links.
+        //
+        // Single links are ordinary anchors with target/rel set in markup — no JavaScript is
+        // involved and the browser handles them natively. This exists only because opening several
+        // tabs requires several window.open calls inside one user gesture, which markup cannot do.
+        //
+        // Dispatch in the browser click handler: Blazor Server interop requires a round trip and
+        // cannot guarantee that transient user activation is still available on arrival.
+        //
+        // noopener,noreferrer on every call: the opened page gets no window.opener handle back into
+        // WASAS and no Referer header. This handler attaches no credential or authorization header.
+        // Normal destination cookie and authentication behavior belongs to the browser and target.
+        //
+        // The returned count is attempts that came back without a handle. It is a hint, not proof:
+        // a browser may block silently and still return an object, or return null for reasons
+        // unrelated to blocking. The caller must never report success from it — the only honest
+        // claim is that opening was attempted, which is why the individual links stay on screen.
+        window.secureOpsLinks = {
+            openMany: function (urls) {
+                if (!Array.isArray(urls)) { return 0; }
+                var withoutHandle = 0;
+                for (var i = 0; i < urls.length; i++) {
+                    var handle = null;
+                    try {
+                        handle = window.open(urls[i], '_blank', 'noopener,noreferrer');
+                    } catch (e) {
+                        handle = null;
+                    }
+                    if (!handle) { withoutHandle++; }
+                }
+                return withoutHandle;
+            }
+        };
+
+        document.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-so-open-links]');
+            if (!button || button.disabled || !event.isTrusted) { return; }
+            var panel = button.closest('.so-set-resolved');
+            if (!panel) { return; }
+            var urls = Array.from(panel.querySelectorAll('[data-so-open-url]'))
+                .map(function (link) { return link.href; });
+            if (!urls.length) { return; }
+            window.secureOpsLinks.openMany(urls);
+            panel.querySelector('[data-so-open-status]').hidden = false;
+        });
+
+        // MudBlazor 6 puts select attributes on a hidden input, not its keyboard target.
+        // Transfer resource field names to that target without replacing its keyboard behavior.
+        function labelResourceSelects() {
+            // MudBlazor 6 does not forward dialog attributes to its outer dialog container.
+            document.querySelectorAll('[data-sdm-dialog-title]').forEach(function (title) {
+                var dialog = title.closest('[role="dialog"]');
+                if (dialog) {
+                    dialog.setAttribute('aria-labelledby', title.id);
+                    dialog.setAttribute('aria-modal', 'true');
+                    var cancel = dialog.querySelector('[data-sdm-cancel]');
+                    if (cancel && !dialog.dataset.sdmFocusSet) {
+                        dialog.dataset.sdmFocusSet = 'true';
+                        cancel.focus();
+                    }
+                }
+            });
+            document.querySelectorAll('.so-resource-filters .mud-select, .so-resource-dialog .mud-select')
+                .forEach(function (select) {
+                    var input = select.querySelector('input[aria-label]');
+                    var target = select.querySelector('div.mud-input-slot[tabindex="0"]');
+                    if (input && target) {
+                        target.setAttribute('aria-label', input.getAttribute('aria-label'));
+                        target.setAttribute('role', 'button');
+                        target.setAttribute('aria-haspopup', 'listbox');
+                    }
+                });
+            document.querySelectorAll('.so-resource-dialog button svg[aria-label="Increment"], .so-resource-dialog button svg[aria-label="Decrement"]')
+                .forEach(function (icon) {
+                    // The library labels an aria-hidden icon instead of the actual spin button.
+                    var button = icon.closest('button');
+                    var field = button.closest('.mud-input-control')?.querySelector('input[aria-label]');
+                    var label = (field?.getAttribute('aria-label') || 'Değer') + (icon.getAttribute('aria-label') === 'Increment' ? ': Artır' : ': Azalt');
+                    button.setAttribute('aria-label', label);
+                    button.setAttribute('title', label);
+                    button.setAttribute('tabindex', '0');
+                });
+            // MudBlazor 6 autocomplete has native keyboard navigation but omits combobox semantics.
+            var input = document.querySelector('.so-resource-environment-filter input');
+            if (!input) { return; }
+            var list = document.querySelector('.mud-popover-open .so-resource-environment-options');
+            input.setAttribute('role', 'combobox');
+            input.setAttribute('aria-autocomplete', 'list');
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('aria-expanded', list ? 'true' : 'false');
+            input.setAttribute('maxlength', '40');
+            if (list) {
+                list.id = 'so-resource-environment-options';
+                list.setAttribute('role', 'listbox');
+                list.setAttribute('aria-label', 'Ortamlar');
+                input.setAttribute('aria-controls', list.id);
+                list.querySelectorAll('.mud-list-item').forEach(function (item) {
+                    item.setAttribute('role', 'option');
+                    item.setAttribute('aria-selected', item.classList.contains('mud-selected-item') ? 'true' : 'false');
+                });
+                var selected = list.querySelector('.mud-selected-item');
+                if (selected) { input.setAttribute('aria-activedescendant', selected.id); }
+                else { input.removeAttribute('aria-activedescendant'); }
+            } else {
+                input.removeAttribute('aria-controls');
+                input.removeAttribute('aria-activedescendant');
+            }
+        }
+        new MutationObserver(labelResourceSelects).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        labelResourceSelects();
+
+        window.secureOpsDownload = function (fileName, contentType, base64) {
+            var binary = atob(base64);
+            var bytes = new Uint8Array(binary.length);
+            for (var i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
+
+            var url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            // Revoked on the next tick so the click has already been handled.
+            setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+        };
+        window.secureOpsAnnouncements = { visible: function () { return !document.hidden; }, focus: function (id) {
+            var target = document.getElementById(id);
+            if (!target) return;
+            var details = target.closest('details');
+            if (details) details.open = true;
+            target.focus();
+        } };
+    </script>
+    <script src="~/js/workspace-guide.js" asp-append-version="true"></script>
+</body>
+</html>

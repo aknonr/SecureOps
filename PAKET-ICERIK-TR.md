@@ -1,13 +1,13 @@
 # Paket İçeriği — Secure Ops Repo İskeleti
 
-Bu paket, **Secure Ops Automation & AI Analysis Hub** projesi için ajan dostu repo iskeletidir. Hem Cursor hem Claude Code hem GitHub Copilot ile çalışacak şekilde yapılandırılmıştır.
+Bu paket, **Secure Ops Automation & AI Analysis Hub** projesi için ajan dostu repo iskeletidir. Codex, Claude ve Zed gibi araçlar için taşınabilir talimat yönlendirmesi içerir.
 
 ## Toplam İstatistik
 
 - **65 dosya**
 - **34 markdown dosyası** (dokümantasyon)
 - **6 JSON Schema** + **6 örnek JSON** (contracts)
-- **10 Cursor rule** (.mdc)
+- **10 taşınabilir agent guide** (.md)
 - **8 .NET csproj** (6 src + 2 tests, hepsi boş iskelet)
 - **1 sln** + **3 ortak build dosyası** (Directory.Build.props, Directory.Packages.props, global.json)
 - **3 ajan entry dosyası** (AGENTS.md, CLAUDE.md, .github/copilot-instructions.md)
@@ -19,7 +19,7 @@ Bu paket, **Secure Ops Automation & AI Analysis Hub** projesi için ajan dostu r
 - Tüm dokümantasyon (İngilizce, `docs/14-management-summary-tr.md` hariç).
 - Tüm karar kayıtları (7 ADR).
 - Tüm faz planları (Phase 0–8).
-- Tüm Cursor kuralları (10 mdc).
+- Tüm taşınabilir agent guide dosyaları (10 Markdown).
 - Tüm contract schema'ları ve örnekleri.
 - .NET solution iskeleti (boş `.csproj`'lar — kod yok, sadece referanslar ve paket listesi).
 - Tüm config dosyaları (`.editorconfig`, `.gitignore`, `Directory.Build.props`, `Directory.Packages.props`, `global.json`).
@@ -32,7 +32,7 @@ Bu paket, **Secure Ops Automation & AI Analysis Hub** projesi için ajan dostu r
 - Test sınıfları.
 - Runbook'lar (`docs/runbooks/`, Faz 1 Sprint 6'da üretilir).
 
-Bu kararın gerekçesi: senin onayladığın kapsam **"Doküman + iskelet + Faz 0 task'ları"** idi. Faz 1 kod üretimi, ya Cursor/Claude Code üzerinden ya da Phase 1 sprint'lerinde manuel yapılır.
+Bu kararın gerekçesi: senin onayladığın kapsam **"Doküman + iskelet + Faz 0 task'ları"** idi. Faz 1 kod üretimi, bir kodlama ajanı üzerinden ya da Phase 1 sprint'lerinde manuel yapılır.
 
 ## Klasör Haritası
 
@@ -47,7 +47,7 @@ secure-ops-repo/
 ├── Directory.Build.props              ← Tüm projelere uygulanan ortak ayarlar
 ├── Directory.Packages.props           ← Merkezi NuGet versiyon yönetimi
 ├── SecureOps.sln                      ← Solution dosyası (8 proje)
-├── .cursor/rules/                     ← Cursor kuralları (10 .mdc)
+├── docs/agent-guides/                 ← Taşınabilir ajan rehberleri (10 .md + README)
 ├── .github/
 │   └── copilot-instructions.md
 ├── docs/                              ← Proje hafızası (15 doküman + 7 ADR)
@@ -89,9 +89,9 @@ secure-ops-repo/
 
 1. `AGENTS.md` okunur (mandatory reading order tanımlı).
 2. Kullanıcı talebi gelir → ajan ilgili faz planını ve docs'u okur.
-3. Karar verirken `.cursor/rules/050-security-audit-rules.mdc` boundary'lerine bakar.
+3. Karar verirken `docs/agent-guides/050-security-audit.md` boundary'lerine bakar.
 4. Mimari değişiklik gerekiyorsa önce ADR önerisi yazar.
-5. Kod üretirken `.cursor/rules/020-backend-dotnet-rules.mdc` ve ilgili kural dosyasını uygular.
+5. Kod üretirken `docs/agent-guides/020-backend-dotnet.md` ve ilgili rehberi uygular.
 6. Tamamlanınca `docs/13-definition-of-done.md` checklist'ine bakar.
 
 ## Ne Demek "Kişi Takibi Değil"
@@ -99,12 +99,12 @@ secure-ops-repo/
 Bu çerçeveleme repoda 18 yerde, tutarlı dille korunur. Yönetime mailinde verdiğin söz buralarda kayıt altında:
 
 - `AGENTS.md` 10 non-negotiable rule, madde 4
-- `.cursor/rules/050-security-audit-rules.mdc` madde 10
+- `docs/agent-guides/050-security-audit.md` madde 10
 - `docs/01-current-operations-context.md` Audit Reframing bölümü
 - `docs/05-security-model.md` Audit Is Not Surveillance bölümü
 - `docs/08-audit-model.md` reinforcement bölümü
 - `docs/14-management-summary-tr.md` Audit Çerçevelemesi bölümü
-- `.cursor/rules/060-ui-rules.mdc` UI enforcement bölümü
+- `docs/agent-guides/060-ui.md` UI enforcement bölümü
 - `plans/PHASE-4-audit-and-alarm-response-verification.md` Anti-Surveillance Enforcement bölümü
 
 İleride bir ajan veya geliştirici bir leaderboard veya "fastest responder" widget'ı önerse, repo bu öneriyi reddeder.
@@ -116,7 +116,7 @@ Bu çerçeveleme repoda 18 yerde, tutarlı dille korunur. Yönetime mailinde ver
 3. Faz 0'ı başlat: `plans/PHASE-0-discovery-and-project-setup.md`.
 4. İlk hafta paydaş mailleri at, Bilgi Güv ve Siber Güv toplantılarını ayarla.
 5. JEA PoC için bir test sunucusu iste.
-6. Bittikten sonra: Cursor veya Claude Code ile Faz 1 Sprint 1'i başlat.
+6. Bittikten sonra: uygun kodlama ajanı ile Faz 1 Sprint 1'i başlat.
 
 ## Kontrol Edildi
 

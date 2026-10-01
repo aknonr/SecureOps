@@ -1,0 +1,69 @@
+@*
+    Route table and the two states a route can fail in.
+
+    NotAuthorized covers both "not signed in" and "signed in without the required policy";
+    RedirectToLogin distinguishes them so the operator lands on sign-in or on an explanation rather
+    than a blank page.
+*@
+
+@inject IApiSessionContext ApiSession
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    <RedirectToLogin />
+                </NotAuthorized>
+                <Authorizing>
+                    <div class="so-page so-page--narrow">
+                        <SoLoading Message="Oturumunuz doğrulanıyor…" />
+                    </div>
+                </Authorizing>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            @* Report the real outcome. The fallback route answers 200 for every unmatched path, so
+               without this a genuinely unknown URL would return "200 OK" carrying a Not Found page. *@
+            <SoHttpStatus Code="404" />
+            <LayoutView Layout="@typeof(MainLayout)">
+                <div class="so-page so-page--narrow">
+                    <section class="so-panel so-panel--notice">
+                        <span class="so-notice-icon" aria-hidden="true">
+                            <MudIcon Icon="@Icons.Material.Filled.SearchOff" />
+                        </span>
+                        <h1 class="so-page-title">Sayfa bulunamadı</h1>
+                        <p class="so-panel-text">
+                            Aradığınız sayfa taşınmış veya adres hatalı olabilir.
+                        </p>
+                        <div class="so-panel-actions">
+                            <MudButton Href="dashboard" Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                                Genel Bakış'a dön
+                            </MudButton>
+                        </div>
+                    </section>
+                </div>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+
+@code {
+    /// <summary>Browser-session correlation value captured by the request that started the circuit.</summary>
+    /// <remarks>
+    /// Supplied by <c>_Host.cshtml</c>. A circuit has no <c>HttpContext</c>, so the value cannot be
+    /// read from the authentication cookie once the connection is live — it has to be handed in at
+    /// the root. Blazor Server encrypts root component parameters into the prerendered marker, so
+    /// the value is not readable in the page source and cannot be tampered with by the client.
+    /// </remarks>
+    [Parameter]
+    public string? BrowserSessionKey { get; set; }
+
+    // Seeded synchronously at the root, before any page or layout resolves an API client. Doing this
+    // in an async lifecycle method further down the tree would race the first API call, and a call
+    // that misses the correlation value opens a second application session.
+    protected override void OnInitialized() => ApiSession.Seed(BrowserSessionKey);
+}

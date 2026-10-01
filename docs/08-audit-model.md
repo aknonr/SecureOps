@@ -1,8 +1,30 @@
 # 08 — Audit Model
 
+Announcement drafts add transactional `AnnouncementDraftSaved` and fail-closed
+`AnnouncementDraftRead` / `AnnouncementDownloadPrepared`: internal actor/id/version, template revision and
+banner hash only. No content/recipients or Sent claim. Revisions are append-only.
+`AnnouncementDraftsListed` / `AnnouncementBannersRead` audit only actor and returned
+count; audit failure blocks metadata responses. No content, recipient or path data.
+
+Announcement source operations add `AnnouncementSourceJobSubmitted`, `AnnouncementSourceJobStarted`,
+`AnnouncementSourceJobCompleted` and `AnnouncementSourceApplied`. Each state write and its required
+audit share a SQL transaction; reviewed apply includes the draft-saved audit in that transaction.
+Job audits contain internal job/draft IDs, profile/state, attempt identity/count and bounded outcome
+metadata only. Apply audit includes draft/job/version, selected field count and recipient-review choice.
+`AnnouncementSourceRead` records owner, optional draft/job IDs and Profiles/Status/Proposal operation;
+audit failure blocks the response. No raw source text, device names, recipient addresses or OCO values
+are recorded. Dispatch retries are operational logs, not claims of application or mail delivery.
+
 The audit subsystem is the project's most important non-functional feature. This document is the canonical specification.
 
 ## Principles
+
+Resource catalogue mutations add `ResourceCategorySaved`, `ResourceLinkSaved`,
+and `ResourcePreferencesSaved`. Evidence contains internal actor/entry IDs,
+version, Created/Replaced disposition, and nullable archive/active flags. Shared
+state and audit commit in one SQL transaction; audit failure rolls back the write.
+Personal audit omits set names and selected links. No target URL, query value,
+content, credential, profile or browsing/opening telemetry is recorded.
 
 1. **Append-only.** UPDATE and DELETE on audit tables are blocked at the SQL layer.
 2. **Complete.** Every state-changing operation and every privileged read writes an audit entry.
@@ -44,24 +66,47 @@ The audit subsystem is the project's most important non-functional feature. This
 | Identity lookup failed | API | `IdentityLookupFailed` |
 | Identity lookup provider timeout | API | `IdentityLookupProviderTimeout` |
 | Identity lookup authorization denied | API | `IdentityLookupForbidden` |
+| Directory group query requested | API | `DirectoryGroupQueryRequested` |
+| Directory group query completed or not found | API | `DirectoryGroupQueryCompleted` |
+| Directory group query rejected before provider access | API | `DirectoryGroupQueryRejected` |
+| Directory group provider query failed | API | `DirectoryGroupQueryFailed` |
+| Directory group authorization denied | API | `DirectoryGroupQueryForbidden` |
+| Directory query rate limited before provider access | API | `DirectoryGroupQueryRateLimited` |
 | Audit query executed | UI/API | `AuditQueried` |
 | Configuration changed (admin) | UI | `ConfigurationChanged` |
 | RBAC mapping changed (admin) | UI | `RbacChanged` |
 | User session opened | UI | `SessionStarted` |
 | User session ended | UI | `SessionEnded` |
+| SecureOps application session started | API | `ApplicationSessionStarted` |
+| SecureOps application session idle timeout | API | `ApplicationSessionIdleTimedOut` |
+| SecureOps application session absolute timeout | API | `ApplicationSessionAbsoluteTimedOut` |
+| SecureOps application session logout | API | `ApplicationSessionLoggedOut` |
+| SecureOps application session revoked | API | `ApplicationSessionRevoked` |
+| SecureOps application session terminated after access disable | API | `ApplicationSessionAccessDisabled` |
+| SecureOps application session terminated after access-version change | API | `ApplicationSessionAccessChanged` |
 | Login failed (informational) | UI | `LoginFailed` |
 | Authorization denied | API/UI | `AuthorizationDenied` |
+| Management report requested | API | `ManagementReportRequested` |
+| Management report viewed | API | `ManagementReportViewed` |
+| Management report failed | API | `ManagementReportFailed` |
+| Duplicate Jira create prevented | API | `JiraDuplicateCreatePrevented` |
 | Phase 7 AI prompt sent | AI service | `AiPromptSent` (separate AiAuditLog) |
 | Phase 8 remediation requested | UI | `RemediationRequested` |
 | Phase 8 remediation approved | UI | `RemediationApproved` |
 | Phase 8 remediation executed | Worker | `RemediationExecuted` |
 | Phase 8 remediation aborted | UI/Worker | `RemediationAborted` |
 
+Terminal Directory Explorer actions are projected only as aggregate `DirectoryExplorer` adoption and operator-workflow counts. They do not alter exact identity-lookup metrics, and no group/member payload enters reporting.
+
+Application-session audit details contain internal session/user identifiers, reason codes, authentication method, and access version only. Raw cookie values, corporate credentials, directory payloads, IP/device details, and heartbeat activity are excluded. Management reporting may aggregate starts and terminal reasons; it must not infer employee performance.
+
 ### What is NOT Audited
 
 - Routine read of the alert list (covered by session entries).
 - Health check endpoints.
 - UI navigation events that do not access specific records.
+
+Management reporting reads are privileged and therefore audited. The report audit details contain only report type, UTC window, outcome code, and request correlation data; aggregate results and per-operator rows are not copied into `DetailsJson`.
 
 ## Audit Entry Schema
 
@@ -82,6 +127,15 @@ public sealed record AuditEvent
 Serialized to JSON for `DetailsJson` column (see `docs/04-domain-model.md` for table DDL).
 
 ## DetailsJson Conventions
+
+`OperationalRecordSdmEvaluated` contains internal operational-record ID, frozen
+classification value, Jira eligibility, and bounded safe evaluation evidence:
+ruleset, ordered reason/blocker codes, input/source digests, recommendation,
+stale/source-changed flags, and evaluated-at metadata. Actor is
+`system:sdm-evaluator`; no requester, employee, raw source prose, or session data
+is copied. SQL commits record evidence, append-only workflow history, and the
+audit insert atomically. Unchanged input emits no evaluation event. Minimum
+36-month audit retention and existing history triggers remain unchanged.
 
 Each action defines its own `Details` shape:
 
@@ -111,22 +165,22 @@ Each action defines its own `Details` shape:
 { "turuncuhatEvtId": "EVT-54321", "actionTaken": true }
 
 // IdentityLookupRequested
-{ "normalizedAccount": "sample-admin", "accountInputHash": "<sha256>", "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Requested" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": null, "purposeLength": null, "legacyEventReferencesProvided": false, "resultStatus": "Requested" }
 
 // IdentityLookupSucceeded
-{ "normalizedAccount": "sample-admin", "matchedAccount": "sample-admin", "accountInputHash": "<sha256>", "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Succeeded" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": "<sha256-or-null>", "purposeLength": 18, "legacyEventReferencesProvided": false, "resultStatus": "Succeeded" }
 
 // IdentityLookupNotFound
-{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "NotFound" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": null, "purposeLength": null, "resultStatus": "NotFound" }
 
 // IdentityLookupRejected
-{ "normalizedAccount": null, "accountProvided": true, "accountLength": 12, "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Rejected", "rejectedFields": ["Account"] }
+{ "normalizedAccount": null, "accountProvided": true, "accountLength": 12, "accountInputHash": "<sha256>", "purposeHash": null, "purposeLength": null, "legacyEventReferencesProvided": false, "resultStatus": "Rejected", "rejectedFields": ["Account"] }
 
 // IdentityLookupFailed
-{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "Failed", "errorCode": "ProviderUnavailable" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": null, "purposeLength": null, "resultStatus": "Failed", "errorCode": "ProviderUnavailable" }
 
 // IdentityLookupProviderTimeout
-{ "normalizedAccount": "sample-admin", "purpose": "EVT-00000 incident response verification", "turuncuhatEvtId": "EVT-00000", "resultStatus": "ProviderTimeout", "errorCode": "DirectoryProviderTimeout" }
+{ "accountInputHash": "<sha256>", "accountLength": 12, "purposeHash": null, "purposeLength": null, "resultStatus": "ProviderTimeout", "errorCode": "DirectoryProviderTimeout" }
 
 // IdentityLookupForbidden
 { "endpoint": "/api/v1/identity/lookup", "method": "POST", "statusCode": 403, "resultStatus": "Forbidden" }
@@ -137,7 +191,7 @@ Each action defines its own `Details` shape:
 
 Document each shape in `contracts/schemas/audit-event.schema.json`.
 
-Identity lookup audit details must not store returned personal detail fields such as display name, mail, department, title, manager display name, group membership, SID, DN, phone, address, password metadata, or raw LDAP attributes. Store the normalized account, matched account identifier, account input hash/length, purpose/context, correlation ID, source IP, and outcome metadata only. Rejected suspicious input should not store raw account text.
+Identity and directory audit details must not store returned personal detail fields such as display name, mail, department, title, manager display name, group membership, SID, DN, phone, address, password metadata, SPNs, or raw LDAP attributes. Store target hash/length, optional purpose hash/length, correlation ID, source IP, operation, counts/limits, and outcome metadata only. Rejected suspicious input must not store raw account text. Group export audit stores mode, format, row count, target hash, and outcome, never exported rows.
 
 ## Audit Persistence Providers
 

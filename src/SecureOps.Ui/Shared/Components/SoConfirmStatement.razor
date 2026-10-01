@@ -1,0 +1,47 @@
+@*
+    An explicit confirmation statement: a native checkbox with its sentence as the label.
+
+    Kept as its own component so it can take focus on its own first render. Dialog content is rendered
+    by the dialog host in a later batch than the component that declares it, so the declaring
+    component's first after-render is too early to focus anything inside it.
+*@
+
+<label class="so-confirm-statement">
+    <input type="checkbox" checked="@Checked" @onchange="OnChangedAsync" @ref="_input"
+           aria-describedby="@DescribedBy" data-sdm-ack />
+    <span>@Text</span>
+</label>
+
+@code {
+    private ElementReference _input;
+
+    /// <summary>The statement the operator confirms.</summary>
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    /// <summary>Whether the statement is ticked.</summary>
+    [Parameter]
+    public bool Checked { get; set; }
+
+    /// <summary>Raised when the operator ticks or unticks the statement.</summary>
+    [Parameter]
+    public EventCallback<bool> CheckedChanged { get; set; }
+
+    /// <summary>Id of the element explaining what the statement gates.</summary>
+    [Parameter]
+    public string? DescribedBy { get; set; }
+
+    /// <summary>Take focus when first rendered.</summary>
+    [Parameter]
+    public bool AutoFocus { get; set; }
+
+    private Task OnChangedAsync(ChangeEventArgs args) => CheckedChanged.InvokeAsync(args.Value is true);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && AutoFocus)
+        {
+            await _input.FocusAsync();
+        }
+    }
+}

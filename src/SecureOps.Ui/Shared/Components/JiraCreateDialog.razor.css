@@ -1,0 +1,7 @@
+.so-dialog-ack-hint {
+    margin: var(--so-space-2) 0 0;
+    font-size: 0.85rem;
+    color: var(--so-text-muted);
+}
+
+.so-dialog-source { margin: 0 0 var(--so-space-3); }

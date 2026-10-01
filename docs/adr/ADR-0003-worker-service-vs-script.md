@@ -87,5 +87,31 @@ Rejected:
 
 ## References
 
+## Operational delivery continuation (2026-09-21)
+
+The owner now authorizes implementing native Windows Service hosting, replacing
+the temporary foreground-only operating model. This does not authorize target
+installation or broaden remote effects. Use the existing WindowsServices package
+and the same Hangfire server/SQL leases, not a wrapper or a second scheduler.
+Console and read-only diagnostics remain available. All modes load configuration
+from the executable directory, with the existing environment/CLI precedence.
+Service mode requires an explicit environment and a pre-provisioned absolute local
+WorkerHosting:DataDirectory for bounded lifecycle logs and a process lock. Console
+mode uses that same lock when configured; diagnostics never acquires it or writes
+logs. This local lock is not a remote idempotency/concurrency guarantee and cannot
+fence an old rc6.26 console process. Stop the old console before service handover.
+No uncertain mail/upload is retried by changing lifetime or SCM recovery policy.
+Actual SCM/logoff/restart and corporate job acceptance remain separately recorded
+in the single integrated-test-activation.md register. Operator procedures are in
+worker-service-operations-tr.md, linked from the current Turkish entry.
+
+For selected read-only SCCM diagnosis, an explicit absolute content-root argument
+may reuse the installed configuration from a separate diagnostic payload. Default
+root remains executable-relative. The in-process PowerShell host now uses its
+matching SDK rather than the engine alone: an isolated test demonstrated missing
+built-in Management commands. Runtime policy and remote permissions are unchanged;
+this local dependency defect is not presumed to explain the target's generic
+ActionPreferenceStopException. Staged safe ErrorRecord metadata is required first.
+
 - `docs/03-architecture.md`
-- `.cursor/rules/030-worker-service-rules.mdc`
+- `docs/agent-guides/030-worker-service.md`

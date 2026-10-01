@@ -1,0 +1,122 @@
+@using Microsoft.Extensions.Logging
+@inject IDirectoryApiClient Directory
+@inject ILogger<SoDirectoryGroups> Logger
+
+@*
+    How this account holds its groups.
+
+    Active Directory records three different relationships and they are removed in three different
+    places, which is why the contract keeps them apart and why this screen never merges them:
+
+      Doğrudan  — an explicit memberOf link. Removed on the group itself.
+      Birincil  — the account's primaryGroupID. Not in memberOf at all, and it cannot be removed
+                  from a member list; the account's primary group has to change.
+      Dolaylı   — reached through another group. Removed somewhere further up the chain.
+
+    Presenting these as one list is what makes an operator revoke the wrong thing, or report that a
+    removal failed when it was never an explicit membership to begin with.
+*@
+
+@if (_loading)
+{
+    <SoLoading Message="Grup üyelikleri getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+}
+else if (_problem is not null)
+{
+    <SoProblemPanel Problem="_problem" OnRetry="@(() => LoadAsync(refresh: true))" />
+}
+else if (_memberships is not null)
+{
+    <section class="so-panel">
+        <div class="so-panel-head">
+            <h3 class="so-subhead so-subhead--flush">@DirectoryView.MemberOfLabel</h3>
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       OnClick="@(() => LoadAsync(refresh: true))">
+                Yenile
+            </MudButton>
+        </div>
+
+        <SoTraversalNotice Traversal="_memberships.Traversal" />
+
+        <SoMembershipGroupTable Title="Doğrudan Üyelik"
+                                Description="Hesap bu gruplara doğrudan eklenmiş. Bir üyeliği kaldırmak gerekiyorsa yeri burasıdır."
+                                Items="_direct"
+                                EmptyText="Bu hesaba doğrudan atanmış grup yok." />
+
+        @if (_primary.Count > 0)
+        {
+            <SoMembershipGroupTable Title="Birincil Grup"
+                                    Description="Hesabın Active Directory birincil grubudur. Bu ilişki üye listesinden kaldırılamaz; hesabın birincil grup tanımının değişmesi gerekir."
+                                    Items="_primary"
+                                    Tone="SoMembershipGroupTable.SectionTone.Distinct" />
+        }
+
+        <SoMembershipGroupTable Title="Dolaylı / İç İçe Üyelik"
+                                Description="Başka gruplar üzerinden erişilen gruplar. Bunlar hesaptan doğrudan kaldırılamaz; zincirdeki ilgili grup üyeliğinin değişmesi gerekir."
+                                Items="_transitive"
+                                ShowDepth="true"
+                                EmptyText="İç içe üyelik bulunmadı." />
+
+        <p class="so-panel-text so-panel-text--sm">
+            Active Directory <code class="so-code so-code--sm">memberOf</code> yalnızca doğrudan
+            üyelikleri içerir ve birincil grubu kapsamaz. Bu ekran birincil grubu ayrıca çözümleyerek
+            gösterir.
+        </p>
+    </section>
+}
+
+@code {
+    /// <summary>Exact account, as the server normalized it.</summary>
+    [Parameter, EditorRequired]
+    public string Account { get; set; } = string.Empty;
+
+    private DirectoryPrincipalMembershipsResponse? _memberships;
+    private IReadOnlyList<DirectoryMembershipGroupDto> _direct = [];
+    private IReadOnlyList<DirectoryMembershipGroupDto> _primary = [];
+    private IReadOnlyList<DirectoryMembershipGroupDto> _transitive = [];
+    private UiProblem? _problem;
+    private bool _loading;
+
+    // Loaded when the tab is first opened rather than with the lookup. Each directory call is
+    // audited, bounded, and rate-limited, so fetching every section up front would spend an
+    // operator's quota on evidence they may not have asked for.
+    protected override Task OnInitializedAsync() => LoadAsync(refresh: false);
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _memberships = await Directory.GetMembershipsAsync(Account, null, refresh, CancellationToken.None);
+            Split(_memberships);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _memberships = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Directory memberships unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // The contract returns direct and transitive sets; primary membership arrives inside the direct
+    // set marked by its membershipKind. Splitting it out here keeps the three relationships visually
+    // separate without inventing anything the server did not say.
+    private void Split(DirectoryPrincipalMembershipsResponse memberships)
+    {
+        _primary = memberships.DirectGroups
+            .Where(item => string.Equals(item.Group.MembershipKind, "Primary", StringComparison.Ordinal))
+            .ToArray();
+        _direct = memberships.DirectGroups
+            .Where(item => !string.Equals(item.Group.MembershipKind, "Primary", StringComparison.Ordinal))
+            .ToArray();
+        _transitive = memberships.TransitiveGroups;
+    }
+}

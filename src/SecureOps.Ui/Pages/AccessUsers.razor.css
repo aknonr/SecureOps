@@ -1,0 +1,18 @@
+.so-page { max-width:1440px;font-size:16px;line-height:1.5; }
+.so-page label,.so-page input,.so-page select,.so-page .so-access-table-row { font-size:16px; }
+.so-page small { font-size:14px; }
+.so-page ::deep .mud-button-root,.so-page input,.so-page select { min-height:44px; }
+.so-access-filters { display:grid;grid-template-columns:minmax(200px,2fr) minmax(160px,1fr) minmax(160px,1fr) auto;gap:16px;align-items:end;padding:20px 0;border-bottom:1px solid var(--mud-palette-divider); }
+.so-access-filters label { display:grid;gap:6px;font-size:14px;min-width:0; }
+.so-access-filters input,.so-access-filters select { height:40px;width:100%;min-width:0;padding:0 10px;border:1px solid var(--mud-palette-lines-inputs);border-radius:4px;background:var(--mud-palette-surface);color:var(--mud-palette-text-primary); }
+.so-access-filters input:focus,.so-access-filters select:focus { outline:2px solid var(--mud-palette-primary);outline-offset:2px; }
+.so-access-count { padding:12px 0;font-size:14px; }
+.so-access-table-row,.so-access-table-head { display:grid;grid-template-columns:minmax(200px,2fr) minmax(170px,2fr) minmax(130px,1fr) minmax(155px,1fr);gap:16px;align-items:center;padding:14px 8px;border-bottom:1px solid var(--mud-palette-divider); }
+.so-access-table-head { font-size:13px;font-weight:600;color:var(--mud-palette-text-secondary); }
+.so-access-table-row { color:var(--mud-palette-text-primary);text-decoration:none;font-size:14px; }
+.so-access-table-row:hover,.so-access-table-row:focus-visible { background:var(--mud-palette-action-default-hover);outline:2px solid var(--mud-palette-primary);outline-offset:-2px; }
+.so-access-table-row span { min-width:0;overflow-wrap:anywhere; }
+.so-access-table-row small { display:block;color:var(--mud-palette-text-secondary);font-size:13px; }
+.so-access-pagination { display:flex;align-items:center;justify-content:flex-end;gap:16px;min-height:56px; }
+@media(max-width:1000px) { .so-access-filters { grid-template-columns:1fr 1fr; } .so-access-table-row,.so-access-table-head { grid-template-columns:minmax(160px,2fr) minmax(120px,1fr) minmax(110px,1fr); } .so-access-table-head span:last-child,.so-access-table-row span:last-child { display:none; } }
+@media(max-width:600px) { .so-access-filters { grid-template-columns:1fr;gap:12px; } .so-access-table-head { display:none; } .so-access-table-row { grid-template-columns:minmax(0,1fr) auto;gap:8px; } .so-access-table-row span:nth-child(2) { grid-column:1/-1;grid-row:2;font-size:13px; } }

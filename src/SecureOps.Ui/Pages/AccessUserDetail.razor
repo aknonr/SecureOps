@@ -1,0 +1,280 @@
+@page "/access/users/{UserId:guid}"
+@attribute [Authorize]
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+@inject IAccessAdminApiClient AccessAdmin
+@inject IDialogService Dialogs
+@inject NavigationManager Navigation
+
+<PageTitle>Kullanıcı erişimi · @WasasBrand.Name</PageTitle>
+<div class="so-page so-page--wide so-user-workspace">
+    <SoPageHeader Title="@HeaderTitle">
+        <Actions>
+            <MudButton Href="@ReturnLink" StartIcon="@Icons.Material.Filled.ArrowBack">Listeye dön</MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" title="Güncel kaydı yükle" aria-label="Güncel kaydı yükle" Disabled="@(_busy || _loading)" OnClick="() => LoadAsync(clearAction: true)" />
+        </Actions>
+    </SoPageHeader>
+    @if (_access is null || _loading) { <SoLoading Message="Kullanıcı yükleniyor" /> }
+    else if (!_access.IsResolved) { <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" /> }
+    else if (!_access.Can(Capabilities.AccessManageUsers)) { <MudAlert Severity="Severity.Warning">Kullanıcı yönetimi yetkiniz yok.</MudAlert> }
+    else if (_user is not null)
+    {
+        @if (_result is not null) { <MudAlert Severity="Severity.Success" role="status">@_result</MudAlert> }
+        @if (_actionProblem is not null) { <SoProblemPanel Problem="_actionProblem" OnRetry="() => LoadAsync(clearAction: false)" RetryLabel="Güncel durumu yükle" /> }
+        @if (_loadProblem is not null) { <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: false)" /> }
+        <section class="user-summary" aria-label="Kullanıcı özeti">
+            <div><SoStatusBadge Label="@AccessUserView.StatusLabel(_user)" Tone="@AccessUserView.StatusTone(_user)" /><p>@_user.Profile?.Account</p><p>@_user.Profile?.Email</p></div>
+            <div><span class="user-caption">Son oturum</span><p>@_user.LastAuthenticatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</p><span class="user-caption">Kayıt sürümü @_user.Version</span></div>
+            <div class="user-actions">
+                @if (_access.Can(Capabilities.AccessAssignRoles)) { <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ManageAccounts" Disabled="@(_busy || !AccessUserView.IsApproved(_user))" OnClick="ReplaceRolesAsync">Rolleri değiştir</MudButton> }
+                <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Block" Disabled="@(_busy || !AccessUserView.IsApproved(_user))" OnClick="DisableAsync">Erişimi kapat</MudButton>
+            </div>
+        </section>
+        @if (AccessUserView.IsRejected(_user)) { <MudAlert Severity="Severity.Warning">Son erişim talebi reddedildi. Bekleyen talep yok; yeniden giriş yeni talep oluşturmaz.</MudAlert> }
+        @if (_attempted is not null && _actionProblem is not null)
+        {
+            <section class="user-comparison" role="status">
+                <h2>Uygulanamayan seçiminiz</h2>
+                <p>Seçtiğiniz roller: @string.Join(", ", _attempted.Roles.Select(RoleName))</p>
+                <p>Güncel roller: @string.Join(", ", _user.Roles.Select(RoleName))</p>
+                @if (!string.IsNullOrWhiteSpace(_attempted.Reason)) { <p>Gerekçeniz: @_attempted.Reason</p> }
+            </section>
+        }
+        <div class="user-access-layout">
+            <section aria-label="Geçerli yetkiler">
+                <h2>Atanmış roller</h2>
+                <div class="so-chip-row">@foreach (string role in _user.Roles) { <span class="so-chip">@RoleName(role)</span> }</div>
+                <h2>Yapabileceği işlemler (@_user.Capabilities.Count)</h2>
+                @if (_user.Capabilities.Count == 0) { <p>Tanımlı yetki yok.</p> }
+                @foreach (var group in AccessLabels.Group(_user.Capabilities))
+                {
+                    <details class="user-capabilities" open>
+                        <summary>@group.Key (@group.Count())</summary>
+                        <dl>@foreach (var capability in group)
+                            { <dt>@capability.Label</dt><dd>@capability.Description<small>Sağlayan: @string.Join(", ", _roleDefinitions.Where(role => _user.Roles.Contains(role.Code) && role.Capabilities.Contains(capability.Capability)).Select(role => RoleName(role.Code)))</small></dd> }</dl>
+                    </details>
+                }
+            </section>
+            <aside>
+                <h2>Talep geçmişi</h2>
+                @if (_user.RequestHistory.Count == 0) { <p>Kayıt yok.</p> }
+                @foreach (AccessRequestResponse request in _user.RequestHistory)
+                {
+                    <div class="user-history"><strong>@AccessLabels.RequestStatusLabel(request.Status)</strong><time>@request.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</time>
+                        @if (request.DecidedAt is { } time) { <p>Karar: @time.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</p> }
+                        @if (!string.IsNullOrWhiteSpace(request.DecisionReason)) { <p>@request.DecisionReason</p> }
+                        @if (!string.IsNullOrWhiteSpace(request.DecidedByCorporateIdentity)) { <details><summary>Karar veren teknik kimliği</summary><code>@request.DecidedByCorporateIdentity</code></details> }
+                    </div>
+                }
+                <details class="user-profile"><summary>Profil ve teknik kayıt</summary>
+                    <dl><dt>Görünen ad</dt><dd>@_user.Profile?.DisplayName</dd><dt>Sicil</dt><dd>@_user.Profile?.Uid</dd><dt>İlk oturum</dt><dd>@_user.FirstAuthenticatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd><dt>Kimlik doğrulama</dt><dd>@_user.AuthenticationSource</dd><dt>Uygulama kimliği</dt><dd>@_user.UserId</dd><dt>Kurumsal teknik kimlik</dt><dd>@_user.CorporateIdentity</dd></dl>
+                    @if (AccessIdentityDisplay.NeedsProfileBackfill(_user.Profile, _user.CorporateIdentity)) { <p>@AccessIdentityDisplay.ProfileRefreshNotice</p> }
+                </details>
+            </aside>
+        </div>
+    }
+    else if (_loadProblem is not null) { <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: true)" /> }
+</div>
+
+@code {
+    /// <summary>User whose access record is shown.</summary>
+    [Parameter]
+    public Guid UserId { get; set; }
+
+    private AccessSnapshot? _access;
+    private AccessUserResponse? _user;
+    private UiProblem? _loadProblem;
+    private UiProblem? _actionProblem;
+    private string? _result;
+    private bool _loading;
+    private bool _busy;
+    private CancellationTokenSource _read = new();
+    private Guid _requestedUserId;
+    private AccessActionDialog.Result? _attempted;
+    private IReadOnlyList<AccessRoleDefinition> _roleDefinitions = [];
+    [SupplyParameterFromQuery(Name = "returnTo")] public string? ReturnTo { get; set; }
+    private string ReturnLink => ReturnTo is not null && (ReturnTo.StartsWith("/access/users?", StringComparison.Ordinal) || ReturnTo.StartsWith("/access/requests?", StringComparison.Ordinal))
+        && !ReturnTo.Contains('\\') && !ReturnTo.Contains('\r') && !ReturnTo.Contains('\n') ? ReturnTo : "/access/users";
+    private string RoleName(string code) => _roleDefinitions.FirstOrDefault(role => role.Code == code) is { } role && role.Name != code ? role.Name : AccessLabels.RoleLabel(code);
+
+    private string HeaderTitle => _user is null
+        ? "Kullanıcı erişimi"
+        : AccessIdentityDisplay.Name(_user.Profile, _user.CorporateIdentity);
+
+    private string HeaderLead => _user is null
+        ? "Kullanıcının erişim durumu, rolleri ve yetkileri."
+        : "Erişim durumu, roller, geçerli yetkiler ve talep geçmişi.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.AccessManageUsers))
+        {
+            await LoadAsync(clearAction: true);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Navigating between two user detail routes reuses the component, so the record has to be
+        // re-read rather than left showing the previous user.
+        if (_requestedUserId != UserId && _access?.Can(Capabilities.AccessManageUsers) == true)
+        {
+            _attempted = null;
+            await LoadAsync(clearAction: true);
+        }
+    }
+
+    private async Task LoadAsync(bool clearAction)
+    {
+        _read.Cancel(); _read.Dispose(); _read = new();
+        CancellationToken token = _read.Token;
+        Guid targetId = UserId;
+        _requestedUserId = targetId;
+        _loading = true;
+        _loadProblem = null;
+
+        if (clearAction)
+        {
+            _actionProblem = null;
+            _result = null;
+        }
+
+        StateHasChanged();
+
+        try
+        {
+            IReadOnlyList<AccessRoleDefinition> definitions = await AccessAdmin.RolesAsync(token);
+            AccessUserResponse user = await AccessAdmin.GetUserAsync(targetId, token);
+            if (!token.IsCancellationRequested && targetId == UserId) { _roleDefinitions = definitions; _user = user; }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (SecureOpsApiException ex)
+        {
+            if (!token.IsCancellationRequested) { _loadProblem = ex.Problem; _user = null; }
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested) { _loading = false; StateHasChanged(); }
+        }
+    }
+
+    private Task ReplaceRolesAsync() => RunAsync(
+        AccessActionDialog.AccessAction.ReplaceRoles,
+        async (confirmed, target) =>
+        {
+            await AccessAdmin.ReplaceRolesAsync(
+                target.UserId, confirmed.Roles, target.Version, CancellationToken.None, confirmed.RoleVersions);
+
+            return "Roller güncellendi";
+        });
+
+    private Task DisableAsync() => RunAsync(
+        AccessActionDialog.AccessAction.Disable,
+        async (confirmed, target) =>
+        {
+            await AccessAdmin.DisableAsync(
+                target.UserId, confirmed.Reason, target.Version, CancellationToken.None);
+
+            return "Erişim kapatıldı";
+        });
+
+    private async Task RunAsync(
+        AccessActionDialog.AccessAction action,
+        Func<AccessActionDialog.Result, AccessUserResponse, Task<string>> execute)
+    {
+        if (_busy || _user is null)
+        {
+            return;
+        }
+
+        AccessUserResponse target = _user;
+        DialogParameters parameters = new()
+        {
+            { nameof(AccessActionDialog.Action), action },
+            {
+                nameof(AccessActionDialog.SubjectLabel),
+                AccessIdentityDisplay.Name(_user.Profile, _user.CorporateIdentity)
+            },
+            // Seeded from the record just read, so the administrator edits the real set rather than
+            // a guess. This is what makes replace semantics safe.
+            { nameof(AccessActionDialog.InitialRoles), _user.Roles },
+            { nameof(AccessActionDialog.ProposedRoles), _attempted?.Roles },
+            { nameof(AccessActionDialog.InitialReason), _attempted?.Reason }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<AccessActionDialog>(
+            title: string.Empty,
+            parameters,
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        DialogResult? outcome = await dialog.Result;
+
+        if (outcome is null || outcome.Canceled || outcome.Data is not AccessActionDialog.Result confirmed)
+        {
+            return;
+        }
+
+        // Set before the first await: the action buttons bind Disabled to this, so a second click
+        // finds them already disabled.
+        _busy = true;
+        _attempted = confirmed;
+        _actionProblem = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            _result = await execute(confirmed, target);
+            _attempted = null;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        // Always re-read, success or failure. On a conflict this is the whole remedy: the version
+        // that was submitted is stale, so the administrator must see the current record before
+        // deciding whether the action is still wanted. Nothing is re-sent automatically.
+        await LoadAsync(clearAction: false);
+
+        // The administrator may have changed their own authority.
+        await AccessProvider.RefreshAsync(CancellationToken.None);
+    }
+
+    private static SoStatusBadge.BadgeTone RequestTone(string status) => status switch
+    {
+        AccessRequestStatuses.Approved => SoStatusBadge.BadgeTone.Positive,
+        AccessRequestStatuses.Rejected => SoStatusBadge.BadgeTone.Critical,
+        AccessRequestStatuses.Pending => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static string HistoryModifier(AccessRequestResponse request) => request.Status switch
+    {
+        AccessRequestStatuses.Approved => "ok",
+        AccessRequestStatuses.Rejected => "no",
+        _ => "wait"
+    };
+
+    private async Task RefreshAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+        StateHasChanged();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        if (!_access.Can(Capabilities.AccessManageUsers)) { _read.Cancel(); _user = null; }
+        StateHasChanged();
+    });
+
+    public void Dispose() { AccessProvider.Changed -= OnAccessChanged; _read.Cancel(); _read.Dispose(); }
+}

@@ -1,0 +1,131 @@
+@*
+    Report window control.
+
+    Presets send no bounds; a custom range sends explicit UTC bounds. The component refuses a range
+    the API would reject and says why next to the fields, rather than letting the operator discover
+    it as a validation error panel after a round-trip. The server re-validates regardless.
+
+    Dates are UTC calendar days. That is stated on the control because it is not what an operator
+    would assume, and in Istanbul it puts three hours of "today" in a different bucket than local
+    time would.
+*@
+
+<section class="so-panel so-window">
+    <div class="so-window-row">
+        <div class="so-tabs" role="tablist" aria-label="Rapor aralığı">
+            @foreach (ReportingWindowPreset preset in _presets)
+            {
+                ReportingWindowPreset captured = preset;
+                <button type="button"
+                        role="tab"
+                        class="so-tab @(preset == Preset ? "so-tab--active" : null)"
+                        aria-selected="@(preset == Preset ? "true" : "false")"
+                        disabled="@Busy"
+                        @onclick="() => SelectAsync(captured)">
+                    @ReportingWindowSelection.Label(preset)
+                </button>
+            }
+        </div>
+
+        @if (Applied is not null)
+        {
+            <span class="so-window-range">@RangeText(Applied)</span>
+        }
+    </div>
+
+    @if (Preset == ReportingWindowPreset.Custom)
+    {
+        <div class="so-window-custom">
+            <label class="so-window-date">
+                <span>Başlangıç (UTC)</span>
+                <input type="date" @bind="_from" max="@DateTime.UtcNow.ToString("yyyy-MM-dd")" disabled="@Busy" />
+            </label>
+
+            <label class="so-window-date">
+                <span>Bitiş (UTC, dahil)</span>
+                <input type="date" @bind="_to" max="@DateTime.UtcNow.ToString("yyyy-MM-dd")" disabled="@Busy" />
+            </label>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Search"
+                       Disabled="@Busy"
+                       OnClick="ApplyCustomAsync">
+                Uygula
+            </MudButton>
+        </div>
+
+        @if (_error is not null)
+        {
+            <p class="so-window-error" role="alert">@_error</p>
+        }
+        else
+        {
+            <p class="so-window-hint">En fazla @ReportingWindowSelection.MaximumCustomDays günlük aralık seçilebilir.</p>
+        }
+    }
+</section>
+
+@code {
+    private static readonly ReportingWindowPreset[] _presets =
+    [
+        ReportingWindowPreset.Today,
+        ReportingWindowPreset.Last7Days,
+        ReportingWindowPreset.Last30Days,
+        ReportingWindowPreset.Custom
+    ];
+
+    /// <summary>Currently selected preset.</summary>
+    [Parameter]
+    public ReportingWindowPreset Preset { get; set; } = ReportingWindowPreset.Last7Days;
+
+    /// <summary>Raised when the preset changes, so the parent can keep its own copy.</summary>
+    [Parameter]
+    public EventCallback<ReportingWindowPreset> PresetChanged { get; set; }
+
+    /// <summary>Raised with a window that is ready to send.</summary>
+    [Parameter]
+    public EventCallback<ReportingWindowRequest> OnWindowChanged { get; set; }
+
+    /// <summary>The window the displayed report was actually built from, echoed by the API.</summary>
+    [Parameter]
+    public ReportingWindowResponse? Applied { get; set; }
+
+    /// <summary>Whether a report load is in flight.</summary>
+    [Parameter]
+    public bool Busy { get; set; }
+
+    private DateTime? _from;
+    private DateTime? _to;
+    private string? _error;
+
+    private async Task SelectAsync(ReportingWindowPreset preset)
+    {
+        Preset = preset;
+        _error = null;
+        await PresetChanged.InvokeAsync(preset);
+
+        // Switching to Custom opens the fields but changes nothing on screen: there is no range to
+        // send yet, and silently reloading with a half-entered range would be worse than waiting.
+        if (preset != ReportingWindowPreset.Custom)
+        {
+            await OnWindowChanged.InvokeAsync(ReportingWindowSelection.ForPreset(preset));
+        }
+    }
+
+    private async Task ApplyCustomAsync()
+    {
+        ReportingWindowRequest request = ReportingWindowSelection.ForCustom(_from, _to, DateTimeOffset.UtcNow);
+        _error = request.Error;
+
+        if (request.IsValid)
+        {
+            await OnWindowChanged.InvokeAsync(request);
+        }
+    }
+
+    // The API echoes the window it resolved, which is the honest thing to display: a preset the
+    // operator picked is a request, and this is what was measured.
+    private static string RangeText(ReportingWindowResponse window) =>
+        $"{window.FromInclusiveUtc.UtcDateTime:dd.MM.yyyy HH:mm} – "
+        + $"{window.ToExclusiveUtc.UtcDateTime:dd.MM.yyyy HH:mm} UTC";
+}

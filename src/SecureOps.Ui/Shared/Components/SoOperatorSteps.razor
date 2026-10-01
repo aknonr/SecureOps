@@ -1,0 +1,51 @@
+@*
+    Where this transfer has got to.
+
+    The workflow has twelve durable states with names that mean something to the people who built it
+    and nothing to a Windows administrator on shift. This collapses them into the five things the
+    operator actually does, in order, and marks how far the record has got.
+
+    Restrained on purpose: a line of steps, not a wizard. It does not drive the workflow and it does
+    not enable anything — the buttons remain governed by authoritative state. It answers one
+    question, which is "what has already happened here".
+
+    Position comes from the record's durable state, so a browser refresh, a second operator, or a
+    record picked up hours later all show the same thing.
+*@
+
+<ol class="so-steps" aria-label="Operasyon kaydı ilerlemesi">
+    @for (int index = 0; index < OperationalRecordView.OperatorSteps.Count - (IncludeSourceClose ? 0 : 1); index++)
+    {
+        bool done = index < Current;
+        bool active = index == Current;
+
+        <li class="so-step @(done ? "so-step--done" : null) @(active ? "so-step--active" : null)"
+            aria-current="@(active ? "step" : null)">
+            <span class="so-step-marker" aria-hidden="true">
+                @if (done)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                }
+                else
+                {
+                    @(index + 1)
+                }
+            </span>
+            <span class="so-step-label">@OperationalRecordView.OperatorSteps[index]</span>
+            @* Read by assistive technology only; the visual state is carried by the marker. *@
+            <span class="sr-only">@(done ? "tamamlandı" : active ? "sıradaki adım" : "bekliyor")</span>
+        </li>
+    }
+</ol>
+
+@code {
+    /// <summary>
+    /// Zero-based index of the step the record is on; the step count when the transfer is finished.
+    /// </summary>
+    [Parameter]
+    public int Current { get; set; }
+
+    /// <summary>False when source closing is not part of the intended workflow.</summary>
+    [Parameter]
+    public bool IncludeSourceClose { get; set; } = true;
+}

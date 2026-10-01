@@ -1,0 +1,136 @@
+@using SecureOps.Shared.Contracts.Resources
+@implements IAsyncDisposable
+@inject IResourceApiClient ResourceApi
+@inject IJSRuntime Js
+
+<div class="so-resource-help">
+    @if (Preferences is not null && !Dismissed && !_open)
+    {
+        <div class="so-guide-invitation" data-guide-invitation>
+            <MudIcon Icon="@Icons.Material.Outlined.Explore" />
+            <span>@if (Announcement) { <strong>Bu modülün nasıl kullanıldığını öğrenmek ister misiniz?</strong> }
+                else { <strong>Bağlantılarınızı düzenlemeye başlayın</strong><br /> <text>Kısa Kullanım Rehberi ile arama, favori ve grupları keşfedin.</text> }</span>
+            <div class="so-inline-actions">
+                <MudButton id="@($"resource-guide-start-{Surface}")" Variant="Variant.Outlined" Color="Color.Primary" OnClick="StartAsync" Disabled="@(_saving || Disabled)">@(Announcement ? "Başlat" : "Başla")</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="DismissAsync" Disabled="@(_saving || Disabled)">@(Announcement ? "Şimdi değil" : "Daha sonra")</MudButton>
+            </div>
+        </div>
+    }
+    <div class="so-guide-replay">
+        <MudButton id="@($"resource-guide-replay-{Surface}")" Variant="Variant.Text" Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.HelpOutline" OnClick="StartAsync"
+                   Disabled="@(_saving || Disabled)">@(Announcement ? "Kullanım rehberi" : "Nasıl kullanılır?")</MudButton>
+    </div>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    @if (_open)
+    {
+        ResourceGuideStep step = Steps[_index];
+        <aside @ref="_panel" popover="manual" class="so-resource-guide" role="dialog" aria-modal="false" aria-label="Kullanım Rehberi" @onkeydown="KeyDownAsync">
+            <div class="so-guide-heading">
+                <span class="so-eyebrow">Kullanım Rehberi · @(_index + 1) / @Steps.Count</span>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Rehberi kapat" Size="Size.Small" OnClick="CloseAsync" />
+            </div>
+            <h2 tabindex="-1">@step.Title</h2>
+            <p>@step.Description</p>
+            @if (_missing) { <p class="so-panel-text so-panel-text--sm">Bu kontrol şu anda kullanılamıyor. Adımı atlayabilir veya rehberi kapatıp uygun kaydı seçebilirsiniz.</p> }
+            <div class="so-guide-controls">
+                <MudButton StartIcon="@Icons.Material.Filled.ChevronLeft" Disabled="@(_index == 0)" OnClick="Back">Geri</MudButton>
+                <MudButton OnClick="CloseAsync">@(Announcement ? "Çıkış" : "Atla")</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ChevronRight"
+                           OnClick="NextAsync">@(_index == Steps.Count - 1 ? "Bitir" : "İleri")</MudButton>
+            </div>
+        </aside>
+    }
+</div>
+
+@code {
+    [Parameter] public string Surface { get; set; } = "links";
+    [Parameter] public bool CanManage { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public ResourcePreferencesResponse? Preferences { get; set; }
+    [Parameter] public EventCallback<ResourcePreferencesResponse> PreferencesChanged { get; set; }
+    private IReadOnlyList<ResourceGuideStep> Steps => ResourceGuideSteps.For(Surface, CanManage);
+    private ElementReference _panel;
+    private bool _open, _saving, _pendingTarget, _missing, _interactive, _restoreFocus;
+    private int _index;
+    private UiProblem? _problem;
+    private bool Announcement => Surface == "announcements";
+    private bool Dismissed => (Announcement ? Preferences?.AnnouncementGuideDismissed : Preferences?.GuideDismissed) == true;
+
+    protected override void OnParametersSet() => _index = Math.Min(_index, Steps.Count - 1);
+
+    private async Task DismissAsync()
+    {
+        if (_saving || Preferences is null || Dismissed) return;
+        _saving = true;
+        _problem = null;
+        try
+        {
+            ResourcePreferencesResponse saved = await ResourceApi.DismissGuideAsync(Preferences.Version, CancellationToken.None,
+                Announcement ? "announcements" : "resources");
+            await PreferencesChanged.InvokeAsync(saved);
+        }
+        catch (SecureOpsApiException exception)
+        {
+            _problem = exception.Problem;
+            try { await PreferencesChanged.InvokeAsync(await ResourceApi.GetPreferencesAsync(CancellationToken.None)); }
+            catch (SecureOpsApiException refresh) { _problem = refresh.Problem; }
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task StartAsync()
+    {
+        await Js.InvokeVoidAsync("secureOpsResourceGuide.begin");
+        if (Announcement) await DismissAsync();
+        _index = 0;
+        _open = true;
+        _pendingTarget = true;
+    }
+
+    private void Back() { _index = Math.Max(0, _index - 1); _pendingTarget = true; }
+    private async Task NextAsync()
+    {
+        if (_index == Steps.Count - 1) await CloseAsync();
+        else { ++_index; _pendingTarget = true; }
+    }
+
+    private async Task CloseAsync()
+    {
+        _open = false;
+        _pendingTarget = false;
+        _restoreFocus = true;
+        await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", false);
+    }
+
+    private async Task KeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") await CloseAsync();
+        else if (args.Key == "ArrowRight") await NextAsync();
+        else if (args.Key == "ArrowLeft") Back();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _interactive = true;
+        if (_restoreFocus)
+        {
+            _restoreFocus = false;
+            await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", true);
+            if (Announcement) await Js.InvokeVoidAsync("secureOpsAnnouncements.focus", $"resource-guide-replay-{Surface}");
+        }
+        if (_open && _pendingTarget)
+        {
+            _pendingTarget = false;
+            _missing = !await Js.InvokeAsync<bool>("secureOpsResourceGuide.show", Steps[_index].Target, _panel);
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_interactive) return;
+        try { await Js.InvokeVoidAsync("secureOpsResourceGuide.clear", false); }
+        catch (JSDisconnectedException) { /* The circuit ended; there is no browser focus to restore. */ }
+    }
+}

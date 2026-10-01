@@ -1,0 +1,63 @@
+@using SecureOps.Domain.Resources
+@using SecureOps.Shared.Contracts.Resources
+
+<MudDialog Class="so-dialog so-resource-dialog" DefaultFocus="DefaultFocus.FirstChild">
+    <TitleContent><div class="so-dialog-title"><MudIcon Icon="@Icons.Material.Filled.PlaylistAdd" /><span>Seçilenleri grubuma kaydet</span></div></TitleContent>
+    <DialogContent>
+        <div class="so-dialog-subject"><span class="so-dialog-subject-label">Eklenecek bağlantılar</span><strong>@(Selection.Count == 1 ? Selection[0].Name : $"{Selection.Count} seçili bağlantı")</strong></div>
+        <p class="so-panel-text">Birlikte kullandığınız bağlantıları kaydedin. Örnek: Gece vardiyam. Bu grup yalnız size aittir; bağlantılara erişim yetkisini değiştirmez.</p>
+        @if (_refreshed) { <p role="status">Güncel gruplar getirildi. Seçiminizi kontrol edip yeniden kaydedin.</p> }
+        <div class="so-group-choices" role="group" aria-label="Kişisel grup seçimi">
+            @foreach (ShiftSetResponse set in Current.Sets.OrderByDescending(s => s.IsDefault).ThenBy(s => s.Name))
+            {
+                bool already = Selection.All(link => ResourceView.Contains(set, link.Id));
+                <MudButton FullWidth="true" Variant="Variant.Outlined" aria-pressed="@(!_create && _selectedId == set.Id)"
+                           Disabled="@(already || set.Links.Count >= ResourceView.MaxLinksPerSet)"
+                           OnClick="@(() => Select(set.Id))" Class="@(!_create && _selectedId == set.Id ? "is-selected" : null)">
+                    <div class="so-set-option">
+                        <span class="so-set-option-name">@set.Name</span>
+                        <span class="so-set-option-meta">@(already ? "Bu bağlantı grupta zaten var" : set.IsDefault ? "Varsayılan grup" : "Kişisel grup")</span>
+                    </div>
+                </MudButton>
+            }
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Text" OnClick="Create"
+                       Disabled="@(!ResourceView.CanCreateSet(Current))" aria-pressed="@_create">Yeni kişisel grup oluştur</MudButton>
+        </div>
+        @if (_create)
+        {
+            <MudTextField @bind-Value="_name" Label="Grup adı" aria-label="Grup adı" Variant="Variant.Outlined"
+                          Required="true" Immediate="true" MaxLength="80" AutoFocus="true" />
+        }
+    </DialogContent>
+    <DialogActions><ResourceSaveActions Save="ConfirmAsync" RefreshConflict="RefreshAsync" SubmitLabel="@(_create ? "Oluştur ve kaydet" : "Grubuma kaydet")" /></DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public ResourceLink? Link { get; set; }
+    [Parameter] public IReadOnlyList<ResourceLink>? Links { get; set; }
+    private IReadOnlyList<ResourceLink> Selection => Links ?? (Link is null ? [] : [Link]);
+    [Parameter, EditorRequired] public ResourcePreferencesResponse Preferences { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<Task<ResourcePreferencesResponse>> RefreshPreferences { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<Guid?, SaveShiftSetRequest, Task<UiProblem?>> Save { get; set; } = default!;
+    private Guid? _selectedId;
+    private bool _create;
+    private string _name = string.Empty;
+    private ResourcePreferencesResponse? _latest;
+    private ResourcePreferencesResponse Current => _latest ?? Preferences;
+    private bool _refreshed;
+    protected override void OnInitialized() => _create = Preferences.Sets.Count == 0;
+    private void Create() { _create = true; _selectedId = null; }
+    private void Select(Guid id) { _selectedId = id; _create = false; }
+    private async Task RefreshAsync() { _latest = await RefreshPreferences(); _refreshed = true; StateHasChanged(); }
+
+    private Task<UiProblem?> ConfirmAsync()
+    {
+        ShiftSetResponse? selected = _create ? null : Current.Sets.FirstOrDefault(s => s.Id == _selectedId);
+        Guid[] selectedIds = Selection.Select(link => link.Id).Distinct().ToArray();
+        string? invalid = _create ? ResourceView.ValidateSet(_name, selectedIds, Current.Sets, null)
+            : selected is null ? "Bir grup seçin veya yeni grup oluşturun." : null;
+        if (invalid is not null) return Task.FromResult<UiProblem?>(UiProblemFactory.FromResponse(400, null) with { Explanation = invalid });
+        IReadOnlyList<Guid> ids = selected is null ? selectedIds : ResourceView.LinkIds(selected).Concat(selectedIds).Distinct().ToArray();
+        return Save(selected?.Id, new(selected?.Name ?? _name.Trim(), ids, selected?.IsDefault ?? false, Current.Version));
+    }
+}

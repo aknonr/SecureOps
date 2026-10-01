@@ -11,7 +11,7 @@ Security is the defining constraint of this project. This document is the canoni
 | Webhook spoofing | Medium | Medium | HMAC-signed payloads, source IP allowlist |
 | Audit tampering | High | Low | Append-only triggers, separate DB role for audit writes |
 | Privilege escalation through UI | High | Low | Server-side authorization on every endpoint |
-| Identity lookup misuse as people search | Medium | Medium | TeamLead/Admin only; exact lookup only; purpose required; all lookups audited |
+| Identity lookup misuse as people search | Medium | Medium | TeamLead/Admin only; exact lookup only; bounded rate; all requests/outcomes audited with target hash |
 | Leakage of internal data via AI (Phase 7) | High | Medium | Self-hosted only + mandatory masking |
 | Misuse as employee surveillance | Medium | Medium | UI framing, role separation, audit of audit queries |
 
@@ -19,10 +19,13 @@ Security is the defining constraint of this project. This document is the canoni
 
 ### Web UI and API
 
-- **Windows Authentication** via Active Directory.
-- Service principal: the IIS app pool runs under a domain-joined service account.
-- User identity flows through `HttpContext.User`.
-- No custom token issuance, no JWT in MVP.
+- Corporate OIDC readiness is implemented but disabled by default. Current Demo/Test authentication remains available until activation is separately approved.
+- The browser UI uses Authorization Code flow with PKCE. The UI stores the API access token only in its server-side browser-session store and relays it to the API as a bearer token.
+- The API validates issuer, signature, audience, and lifetime, then reduces the token to a bounded reviewed identity. SecureOps does not issue its own corporate identity token.
+- `issuer + sub` produces the opaque stable access identity. Validated `loginname`, `displayname`, `mail`, and `uid` claims are stored as bounded nullable profile metadata; changing them does not change access identity or authorization. `loginname` remains the exact Jira and optional Active Directory lookup identity.
+- `uygulama-role` is retained only as non-authoritative evidence. It never grants a SecureOps role or capability.
+- Authentication establishes only a corporate principal. Persisted SecureOps Access -> Role -> Capability remains the authorization authority, and unknown authenticated users remain pending.
+- SecureOps never requests or handles the user's LDAP/Jira password. The Jira integration credential remains only the REST technical identity.
 
 ### Webhook Endpoint
 
@@ -40,24 +43,37 @@ If the approved Turuncuhat integration is webhook-based, the approved caller inv
 
 ## Authorization (RBAC)
 
-### Roles
+### Application Roles
 
-| Role | AD Group (placeholder) | Permissions |
-|---|---|---|
-| Operator | `CONTOSO\SecureOps-Operators` | View alerts, view diagnostic results, view personal audit, copy ticket text |
-| TeamLead | `CONTOSO\SecureOps-Leads` | All Operator + trigger manual diagnostic, view team audit, manage server tags |
-| Admin | `CONTOSO\SecureOps-Admins` | All TeamLead + configuration changes, rule management, system administration |
-| Auditor | `CONTOSO\SecureOps-Auditors` | Read-only access to all audit data, including AI audit |
+Resources.View is available to approved users through all reviewed roles.
+Resources.Manage is granted only to Admin and the limited ResourceCurator role,
+not Lead. Existing Access.AssignRoles administrators can assign ResourceCurator
+with the versioned role-replacement endpoint; it grants no other capability and
+no destination-system permission. No real user is granted this role by migration.
+Private favourites and shift sets are owned by internal UserId and cannot be
+read or changed by another user, including Admin. Current category visibility and
+link active/archive state are rechecked on every saved-reference response.
 
-Phase 1A identity lookup uses `TeamLeadOrAbove`. Operators do not receive this privileged read in the first release.
+| Role | Permissions |
+|---|---|
+| Operator | View Operational Records and generate read-only Jira previews |
+| Lead | Identity lookup, Operational Record create/retry, diagnostics and team view |
+| Admin | All implemented application capabilities, including access approval, role assignment, and management reporting |
+| JiraPublisher | Operational Record view/preview/create/retry |
+| Auditor | Read-only audit, workflow diagnostics, and management reporting |
+| ReadOnly | Operational Record view only |
 
-Group names are configured in `appsettings.json`; the table `dbo.RbacRoles` maps codes to group names.
+Phase 1A identity lookup requires the `Identity.Lookup` capability. Operators do not receive this privileged read in the first release.
 
-### Future Authentication and Role Strategy
+Management summary and paginated operator-activity reporting require the separate `Reporting.ManagementView` capability, assigned only to Admin and Auditor. These privileged reads are themselves audited. Reports expose bounded process evidence and must not rank, compare, or score individuals.
 
-MVP authentication remains Windows Authentication. Future production UI options should prefer corporate SSO/OIDC if the organization standardizes it, or Windows Integrated Authentication/Kerberos for intranet IIS if approved. Direct LDAP/AD password login is not the preferred model because it would make SecureOps handle user passwords directly.
+First-seen authenticated users are `Pending` and receive no operational capability. Administrators approve requests and assign persisted application roles. Disabled status is checked on each capability-protected request. The optional first-Admin bootstrap accepts only one exact server-configured login name from a validated OIDC issuer, requires SQL persistence, and permanently closes after any Admin assignment has ever existed. It is not an authentication-claim or AD-group authorization path.
 
-AD group mapping remains the authorization boundary. PAM/BeyondTrust may verify privileged sessions or supply metadata later, but it is not the normal application login mechanism.
+### Authentication and Role Strategy
+
+OIDC activation remains server-owned and requires the approved corporate metadata/client contract. Direct LDAP/AD password login is prohibited because it would make SecureOps handle user passwords directly.
+
+The persisted SecureOps access record remains the authorization boundary regardless of authentication source. PAM/BeyondTrust may verify privileged sessions or supply metadata later, but it is not the normal application login mechanism. OIDC resolves issuer/subject to the same corporate-principal boundary and does not rewrite application authorization.
 
 Future role vocabulary, subject to ADR before implementation:
 
@@ -112,7 +128,7 @@ Forbidden:
 - Wildcard, bulk, fuzzy, or directory-browsing search.
 - Returning group membership, SID, distinguished name, phone, address, password metadata, or raw LDAP attributes.
 
-Every lookup requires a purpose/context value and writes audit entries for request and outcome. Audit details must not store returned personal-detail fields beyond the matched account identifier.
+Every lookup writes audit entries for request and outcome. Purpose/context is optional for read-only identity and directory lookup; supplied text is represented only by hash and length, and no default reason is fabricated. Audit details must not store returned personal-detail fields or raw directory targets.
 
 Production hardening:
 - `POST /api/v1/identity/lookup` is the only endpoint that accepts an account value. The API must not add `GET` lookup routes by account because account values would leak into URLs, browser history, proxy logs, and IIS access logs.
@@ -237,7 +253,7 @@ To add a cmdlet:
 2. Get Bilgi Güvenliği approval (recorded in the ADR).
 3. Update `SecureOpsDiagnosticRole.psrc`.
 4. Update this whitelist section.
-5. Update `.cursor/rules/050-security-audit-rules.mdc`.
+5. Update `docs/agent-guides/050-security-audit.md`.
 6. Redeploy the JEA endpoint to all target servers.
 
 ## Service Account
@@ -265,6 +281,14 @@ Until that decision is recorded:
 - Architecture and implementation notes referring to direct WinRM + JEA describe the current documented model, not a closed decision.
 
 ## Audit (See `docs/08-audit-model.md` for Detail)
+
+Directory Explorer privileged reads require `Identity.Groups.View` or `Identity.Groups.Members.View`; privileged-group analysis separately requires `Identity.PrivilegedGroups.View`. All operations use exact server-controlled queries under the API process identity and reject raw LDAP/filter input and credentials. Recursive Phase 2 reads are bounded by depth, nodes, edges, paths, timeout, cache, and rate limits, return explicit truncation metadata, and audit only safe counts/outcomes rather than membership, SPN, health, path, or raw-DN payloads.
+
+## Application Session Governance
+
+SecureOps tracks an opaque server-side application session after corporate authentication. The cookie contains no credential, role, access decision, directory identity, network address, or device data and cannot grant access by itself. Each protected request remains subject to authentication plus current application access and `AccessVersion` validation. Idle timeout, absolute timeout, logout, administrative revocation, access disable, and access-version change end effective sessions. Last-seen persistence is throttled and heartbeats are not audited.
+
+Pilot and Production require a persistent ASP.NET Core Data Protection key ring protected at rest. Runtime key-ring paths, certificates, and ACLs are server-owned configuration; key material is never stored in source control. Negotiate remains the interim authentication provider and no LDAP username/password login is introduced.
 
 - Append-only `audit.AuditLog` table.
 - UPDATE/DELETE blocked by trigger.
@@ -370,6 +394,6 @@ If a security issue is detected:
 
 ## References
 
-- `.cursor/rules/050-security-audit-rules.mdc` — agent enforcement rules
+- `docs/agent-guides/050-security-audit.md` — agent enforcement rules
 - `docs/08-audit-model.md` — audit specification
 - `docs/10-ai-rag-strategy.md` — AI-specific security (Phase 7)

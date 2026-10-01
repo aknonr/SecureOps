@@ -1,0 +1,190 @@
+@page "/admin/system-status"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@inject ISessionApiClient Sessions
+@inject IIdentityLookupApiClient IdentityClient
+@inject ICurrentAccessProvider AccessProvider
+@inject ILogger<SystemStatus> Logger
+
+<PageTitle>Sistem Durumu · @WasasBrand.Name</PageTitle>
+
+@*
+    Integration state for the providers SecureOps talks to.
+
+    Only what the API returns: provider name, configured selection, and a status word. No URL, no
+    credential, no account, no remote response body. Those are the things an operational status page
+    tends to accumulate and the reason it then cannot be shown to the people who need it.
+
+    Only three providers are reported, so only three appear. SQL Server, Hangfire, and the audit
+    store have no entry on this endpoint, and inventing tiles for them would put a green light next
+    to something nobody checked.
+*@
+
+<div class="so-page">
+    <SoPageHeader Title="Sistem Durumu"
+                  Lead="Kurumsal sağlayıcı ayarları ve ayrı iş akışı kontrolleri.">
+        <Actions>
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@(_loading || _diagnosticsBusy)"
+                       aria-label="Kurumsal entegrasyonları yenile"
+                       OnClick="ReloadAsync">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.AccessManageUsers))
+    {
+        @* The endpoint is Admin-only on the server. Gating on the administrative capability the
+           access contract exposes keeps the UI's guess aligned with the server's rule without
+           reading a role name. *@
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Sistem durumunu görüntülemek yönetici yetkisi gerektirir. Hesabınızda tanımlı
+                yetkileri <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+        </section>
+    }
+    else
+    {
+        <section class="so-panel">
+            <div class="so-panel-head">
+                <h2 class="so-panel-title">Kurumsal entegrasyonlar</h2>
+            </div>
+
+            @if (_problem is not null)
+            {
+                <SoProblemPanel Problem="_problem" OnRetry="ReloadAsync" RetryLabel="Yeniden dene" />
+            }
+            else if (_loading && _health is null)
+            {
+                <SoLoading Message="Durum getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+            }
+            else if (_health is not null)
+            {
+                <div class="so-status-grid">
+                    <SoIntegrationCard Provider="_health.TuruncuHat"
+                                       Title="Turuncu Hat"
+                                       Description="Operasyonel kayıtların alındığı kaynak sistem." />
+                    <SoIntegrationCard Provider="_health.Jira"
+                                       Title="Jira"
+                                       Description="Operasyonel kayıtların aktarıldığı hedef sistem." />
+
+                    @if (_directory is not null)
+                    {
+                        <SoIntegrationCard Provider="_directoryProvider!"
+                                           Title="Dizin (AD)"
+                                           Description="Kimlik ve grup sorgularının kaynağı." />
+                    }
+                </div>
+
+                <p class="so-panel-text so-panel-text--sm">
+                    <strong>Yapılandırıldı</strong>, bağlantı veya iş akışı kabulü değildir.
+                    Turuncu Hat sağlayıcısı tanımlı olsa da OCO kaynak toplama ayrı olarak kapalı olabilir.
+                    Yenile yalnız bu entegrasyon bilgilerini yeniler.
+                </p>
+
+                <details><summary>Sağlayıcı durumları</summary>
+                    <p class="so-panel-text so-panel-text--sm">Devre dışı: sağlayıcı etkin değil.
+                        Erişilemiyor: son çağrı başarısız. Bu kartlar yalnız sağlayıcı, yapılandırma
+                        ve durum bilgisini gösterir; uzak sistem hata içeriklerini göstermez.</p>
+                </details>
+            }
+        </section>
+
+        @if (_access.Can(Capabilities.SystemDiagnostics))
+        { <OperationsReadinessPanel RefreshBusy="_loading" BusyChanged="@(busy => _diagnosticsBusy = busy)" /> }
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+    private EnterpriseIntegrationHealthResponse? _health;
+    private IdentityProviderHealthResponse? _directory;
+    private IntegrationProviderHealthResponse? _directoryProvider;
+    private UiProblem? _problem;
+    private bool _loading;
+    private bool _diagnosticsBusy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.AccessManageUsers))
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.AccessManageUsers))
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_loading || _diagnosticsBusy) { return; }
+        _loading = true;
+        _problem = null;
+        StateHasChanged();
+
+        try
+        {
+            _health = await Sessions.GetIntegrationHealthAsync(CancellationToken.None);
+            await LoadDirectoryAsync();
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _health = null;
+            _problem = ex.Problem;
+            Logger.LogDebug("Integration health unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+    }
+
+    // The directory provider is reported by a different endpoint in a different shape. It is mapped
+    // onto the same card rather than given its own layout, because to an operator it is one more
+    // integration; the mapping is presentational and adds no status the API did not state.
+    private async Task LoadDirectoryAsync()
+    {
+        try
+        {
+            _directory = await IdentityClient.GetProviderHealthAsync(CancellationToken.None);
+            _directoryProvider = new IntegrationProviderHealthResponse(
+                "Directory",
+                _directory.Provider,
+                _directory.Status);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _directory = null;
+            _directoryProvider = null;
+            Logger.LogDebug("Identity provider health unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

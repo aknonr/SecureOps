@@ -8,7 +8,7 @@ public static class IdentityLookupRateLimits
     /// <summary>
     /// Rate-limit policy for the privileged identity lookup endpoint.
     /// </summary>
-    public const string Lookup = "IdentityLookup";
+    public const string Lookup = ApiRateLimits.IdentityLookup;
 
     /// <summary>
     /// Builds a rate-limit partition key from authenticated user and endpoint.
@@ -20,7 +20,6 @@ public static class IdentityLookupRateLimits
         string actor = httpContext.User.Identity?.IsAuthenticated == true
             ? httpContext.User.Identity.Name ?? "authenticated-unknown"
             : "anonymous";
-        string endpoint = $"{httpContext.Request.Method}:{httpContext.Request.Path.Value}".ToLowerInvariant();
-        return $"{actor}|{endpoint}";
+        return $"{actor.ToLowerInvariant()}|{ApiRateLimits.IdentityLookup}";
     }
 }

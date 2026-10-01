@@ -1,0 +1,59 @@
+@page "/error"
+@attribute [AllowAnonymous]
+@inject NavigationManager Navigation
+
+<PageTitle>Beklenmeyen hata · @WasasBrand.Name</PageTitle>
+
+@*
+    Terminal handler for unhandled server errors (wired via UseExceptionHandler outside Development).
+
+    Shows no exception text, type, or stack: the operator gets the request identifier to quote, and
+    the detail stays in server-side logs where it belongs.
+*@
+
+<div class="so-page so-page--narrow">
+    <section class="so-panel so-panel--notice">
+        <span class="so-notice-icon so-notice-icon--error" aria-hidden="true">
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" />
+        </span>
+
+        <h1 class="so-page-title">Beklenmeyen bir hata oluştu</h1>
+        <p class="so-panel-text">
+            İstek tamamlanamadı. Hata kaydedildi; işleminizi tekrar denemeyi seçebilirsiniz.
+        </p>
+
+        <ul class="so-next-steps">
+            <li>Sayfayı yenileyip işlemi tekrarlayın.</li>
+            <li>Sorun sürerse platform yöneticinize başvurun.</li>
+        </ul>
+
+        @if (_requestId is not null)
+        {
+            <p class="so-problem-reference">
+                <span>Destek referansı</span>
+                <code>@_requestId</code>
+            </p>
+        }
+
+        <div class="so-panel-actions">
+            <MudButton Href="dashboard" Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                Genel Bakış'a dön
+            </MudButton>
+        </div>
+    </section>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? _requestId;
+
+    protected override void OnInitialized()
+    {
+        // Available only during the server-rendered pass; a circuit-side render leaves it null rather
+        // than inventing an identifier that would not match anything in the logs.
+        _requestId = System.Diagnostics.Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
+}

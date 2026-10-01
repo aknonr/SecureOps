@@ -50,10 +50,16 @@ public sealed class IdentityLookupOptions
     /// </summary>
     public int ProviderTimeoutSeconds { get; set; } = 3;
 
+    /// <summary>Maximum accounts accepted by one bulk lookup request.</summary>
+    public int BulkMaxAccounts { get; set; } = 20;
+
     /// <summary>
     /// Rate-limit settings for the privileged identity lookup endpoint.
     /// </summary>
     public IdentityLookupRateLimitOptions RateLimit { get; set; } = new();
+
+    /// <summary>Short-lived exact-account cache and single-flight settings.</summary>
+    public IdentityLookupCacheOptions Cache { get; set; } = new();
 
     /// <summary>
     /// Optional AD domain name for PrincipalContext.
@@ -64,6 +70,19 @@ public sealed class IdentityLookupOptions
     /// Optional AD container distinguished name.
     /// </summary>
     public string? Container { get; set; }
+}
+
+/// <summary>Bounded identity lookup cache settings.</summary>
+public sealed class IdentityLookupCacheOptions
+{
+    /// <summary>Whether short-lived result caching and request coalescing are enabled.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Result lifetime in seconds.</summary>
+    public int TtlSeconds { get; set; } = 30;
+
+    /// <summary>Maximum exact-account entries retained in memory.</summary>
+    public int MaxEntries { get; set; } = 500;
 }
 
 /// <summary>

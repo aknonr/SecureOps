@@ -1,0 +1,38 @@
+@*
+    One label/value pair inside a SoFieldGrid.
+
+    Absent values render an em dash rather than collapsing, so a directory result with missing optional
+    attributes keeps a stable shape and the operator can tell "no value" from "field not returned".
+*@
+
+<div class="so-field">
+    <dt class="so-field-label">@Label</dt>
+    <dd class="so-field-value">
+        @if (ChildContent is not null)
+        {
+            @ChildContent
+        }
+        else if (string.IsNullOrWhiteSpace(Value))
+        {
+            <span class="so-field-empty" title="Bu alan için değer dönmedi">—</span>
+        }
+        else
+        {
+            @Value
+        }
+    </dd>
+</div>
+
+@code {
+    /// <summary>Field name.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Plain text value.</summary>
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>Rich value content, taking precedence over <see cref="Value"/>.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

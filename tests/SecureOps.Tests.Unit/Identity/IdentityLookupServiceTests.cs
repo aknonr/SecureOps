@@ -194,6 +194,9 @@ public sealed class IdentityLookupServiceTests
         auditJson.Should().NotContain("example.admin@contoso.local");
         auditJson.Should().NotContain("Windows Operations");
         auditJson.Should().NotContain("Example Manager");
+        auditJson.Should().NotContain("EVT-54321 incident response verification");
+        auditJson.Should().NotContain("\"pam12356\"");
+        auditJson.Should().Contain("purposeHash").And.Contain("legacyEventReferencesProvided");
     }
 
     private static IdentityLookupService CreateService(
@@ -204,6 +207,10 @@ public sealed class IdentityLookupServiceTests
             new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions())),
             new MockPamAccountResolver(),
             provider,
+            new IdentityReadThroughCache(
+                Options.Create(new IdentityLookupOptions { Cache = new IdentityLookupCacheOptions { Enabled = false } }),
+                new IdentityLookupCacheMetrics(),
+                TimeProvider.System),
             audit,
             NullLogger<IdentityLookupService>.Instance);
     }
@@ -220,6 +227,8 @@ public sealed class IdentityLookupServiceTests
 
     private sealed class ThrowingDirectoryProvider : IIdentityDirectoryProvider
     {
+        public bool SupportsUpnLookup => false;
+
         public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("Directory unavailable.");
@@ -228,6 +237,8 @@ public sealed class IdentityLookupServiceTests
 
     private sealed class TimeoutDirectoryProvider : IIdentityDirectoryProvider
     {
+        public bool SupportsUpnLookup => false;
+
         public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
         {
             throw new TimeoutException("Directory provider timed out.");
@@ -237,6 +248,8 @@ public sealed class IdentityLookupServiceTests
     private sealed class CountingDirectoryProvider : IIdentityDirectoryProvider
     {
         public int Calls { get; private set; }
+
+        public bool SupportsUpnLookup => false;
 
         public Task<DirectoryUserRecord?> FindUserAsync(string normalizedAccount, CancellationToken cancellationToken)
         {

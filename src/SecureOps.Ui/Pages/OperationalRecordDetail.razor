@@ -1,0 +1,878 @@
+@page "/operational-records/{RecordId:guid}"
+@attribute [Authorize]
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+@inject IOperationalRecordApiClient Records
+@inject IIdentityLookupApiClient Identity
+@inject IDialogService Dialogs
+
+<PageTitle>Operasyonel kayıt · @WasasBrand.Name</PageTitle>
+
+@*
+    One operational record and its Jira transfer.
+
+    Three panels, kept apart on purpose: SOURCE (what came from the source system), WORKFLOW (where
+    SecureOps has got to, and who holds the claim), and JIRA (preview, issue, retry). Flattening
+    these into one "status" is what lets an operator read "failed" on a record whose Jira issue
+    already exists and then create a second one.
+
+    Nothing here decides anything. Action availability comes from authoritative record state via
+    OperationalRecordView; capability comes from /access/me; and after every write the record is
+    re-read rather than patched locally.
+*@
+
+<div class="so-page so-request-review">
+    <SoPageHeader Title="@HeaderTitle" Lead="@HeaderLead">
+        <Actions>
+            <MudButton Variant="Variant.Text" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Href="operational-records">
+                Kayıtlar
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@(_busy || _loading)"
+                       OnClick="() => LoadAsync(clearAction: true)">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="RefreshAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.OperationalRecordsView))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Operasyonel kayıtları görüntülemek için
+                <code class="so-code">@Capabilities.OperationalRecordsView</code> yetkisi gerekir.
+            </p>
+        </section>
+    }
+    else if (_loading && _record is null)
+    {
+        <SoLoading Message="Kayıt yükleniyor…" />
+    }
+    else if (_record is null)
+    {
+        @if (_loadProblem is not null)
+        {
+            <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: true)" />
+        }
+        else
+        {
+            <SoEmptyState Title="Kayıt bulunamadı"
+                          Description="Bu operasyonel kayıt kaldırılmış olabilir."
+                          Icon="@Icons.Material.Outlined.SearchOff" />
+        }
+    }
+    else
+    {
+        OperationalRecordView.Actions actions = OperationalRecordView.ActionsFor(_record);
+        JiraSubmissionView.Phase phase = JiraSubmissionView.PhaseOf(_record, _preview, actions,
+            _access.Can(Capabilities.OperationalRecordsCreateJira), _submitting, _attempt);
+        OperationalRecordView.Ownership owner =
+            OperationalRecordView.OwnershipOf(_record, DateTimeOffset.UtcNow, _actor);
+
+        @* Above everything else. Whether a real Jira issue will be created changes the meaning of
+           every button below, so it cannot sit further down the page. *@
+        <SoSimulationBanner Active="@SimulationActive" Notice="@SimulationNotice" />
+
+        @* Distinct from simulation: the data below is real, only the writes are closed. *@
+        <SoReadOnlyIntegrationBanner Active="@ReadOnlyActive" Notice="@ReadOnlyNotice" />
+
+        @* Where this transfer has got to, in the operator's own sequence rather than in workflow
+           state names. Derived from durable state, so it survives a refresh and agrees between
+           two operators looking at the same record. *@
+        <SoOperatorSteps Current="@OperationalRecordView.CurrentStep(_record)"
+                         IncludeSourceClose="@(_record.SourceCloseRequested || _record.WorkflowState == OperationalRecordWorkflowState.Completed
+                             || (!OperationalRecordView.HasJira(_record) && _record.SourceCloseEnabled))" />
+
+        @if (_result is not null)
+        {
+            <section class="so-panel so-panel--result" role="status">
+                <span class="so-notice-icon so-notice-icon--ok" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" />
+                </span>
+                <div class="so-result-body">
+                    <h2 class="so-panel-title">@_result</h2>
+                    <p class="so-panel-text">
+                        Aşağıdaki durum işlemden sonra sunucudan yeniden okundu.
+                    </p>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                               aria-label="Kapat" OnClick="() => _result = null" />
+            </section>
+        }
+
+        @* An unacknowledged create that the re-read has resolved to a persisted key is no longer
+           unknown; the submission panel states how it was resolved instead of a stale "may or may
+           not exist" notice beside the saved key. *@
+        @if (_actionProblem is not null && (!OperationalRecordView.OutcomeUnknown(_record)
+            || _actionProblem.Stage != UiProblemFactory.ReconciliationStage
+            || _actionProblem.CorrelationId != _record.CorrelationId)
+            && !(JiraSubmissionView.IsUncertain(_actionProblem) && phase == JiraSubmissionView.Phase.Created
+                 && !OperationalRecordView.OutcomeUnknown(_record)))
+        {
+            @* Held apart from the load problem: every write is followed by a re-read, and one
+               shared field would let that re-read erase the message explaining what happened. *@
+            <SoProblemPanel Problem="_actionProblem"
+                            OnRetry="() => LoadAsync(clearAction: true)"
+                            RetryLabel="Güncel durumu yükle" />
+        }
+
+        @if (_loadProblem is not null)
+        {
+            <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: true)" />
+        }
+
+        @* The unknown-outcome state gets its own prominent panel rather than a status badge. It is
+           the one condition where the safe move is to stop and check Jira by hand. *@
+        @if (OperationalRecordView.OutcomeUnknown(_record))
+        {
+            <section class="so-panel so-panel--attention">
+                <span class="so-notice-icon so-notice-icon--warn" aria-hidden="true">
+                    <MudIcon Icon="@Icons.Material.Filled.HelpOutline" />
+                </span>
+                <div class="so-result-body">
+                    <h2 class="so-panel-title">@(OperationalRecordView.HasJira(_record) ? "Kaynak sonucu doğrulanmalı" : "Jira sonucu doğrulanmalı")</h2>
+<p class="so-panel-text">
+                        @OperationalRecordView.StateDetail(_record)
+                    </p>
+                    @* Whether an issue exists is the first thing to check by hand, so it is stated
+                       here rather than only in the Jira panel further down. *@
+                    @if (OperationalRecordView.HasJira(_record))
+                    {
+                        <p class="so-panel-text">
+                            Sunucu bu kayıt için bir Jira kaydı bulunduğunu bildiriyor:
+                            <code class="so-code so-code--strong">@_record.JiraIssueKey</code>.
+                            Yeni bir kayıt oluşturulmamalıdır.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="so-panel-text">
+                            Kayıtlı bir Jira anahtarı yok. Jira tarafında bu operasyonel kayda ait
+                            bir kayıt oluşup oluşmadığını elle doğrulayın.
+                        </p>
+                    }
+                    <p class="so-panel-text so-panel-text--sm">
+                        Sonuç doğrulanana kadar bu ekranda yeni gönderim veya yeniden deneme sunulmaz.
+                        Mutabakat için destek referansıyla platform yöneticisine başvurun.
+                    </p>
+                    @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
+                    {
+                        <p class="so-problem-reference">
+                            <span>Destek referansı</span>
+                            <code>@_record.CorrelationId</code>
+                        </p>
+                    }
+                </div>
+            </section>
+        }
+
+        <section class="so-review-summary" data-guide="review-summary">
+            <h2 class="so-panel-title">Talep incelemesi</h2>
+            <p><strong>@_record.OrCode</strong> · @_record.Title</p>
+            <p class="so-review-description">@_record.Description</p>
+            <SoStatusBadge Label="@OperationalRecordView.StateLabel(_record)" Tone="@OperationalRecordView.StateTone(_record)" />
+        </section>
+        <ResourceHelp Surface="review" Disabled="@_busy" />
+
+        @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview)
+            && _record.WorkflowState is OperationalRecordWorkflowState.Imported or OperationalRecordWorkflowState.Classified
+                or OperationalRecordWorkflowState.NeedsManualReview or OperationalRecordWorkflowState.Eligible)
+        {
+            <section class="so-review-type" data-guide="review-type">
+                <h2 class="so-panel-title">Talep türü</h2>
+                <label for="sdm-request-type" class="so-field-label">Talep türü (operatör beyanı)</label>
+                <select id="sdm-request-type" class="so-request-type" @bind="_declaredType" @bind:after="ClearReviewDraft" disabled="@_busy" data-sdm-review-type>
+                    <option value="">Doğrulanmadı / kapsam dışı</option>
+                    <option value="ServerRequest">Sunucu Talebi</option>
+                    <option value="SoftwareInstallation">Uygulama Kurulumu</option>
+                    <option value="ServerRetirement">Sunucu İadesi/Emekliliği</option>
+                </select>
+                <p>Tür seçimi yayımlama onayı değildir. Sunucu İadesi/Emekliliği yalnız talep takibidir; altyapı silme veya kaynak kapatma yetkisi vermez.</p>
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="SDM takip gerekçesi (öneri)">@SdmEvidenceView.TrackingReason(_declaredType)</SoField>
+                    <SoField Label="İstenen iş / beklenen sonuç">@_record.Description</SoField>
+                    <SoField Label="Doğrulanmış sunucu referansı">@(_record.ServerReference ?? "Kaynakta doğrulanmış ilişki yok; açıklamadan çıkarılmaz.")</SoField>
+                </SoFieldGrid>
+                <MudButton StartIcon="@Icons.Material.Filled.Preview" Variant="Variant.Outlined" Color="Color.Primary"
+                           Disabled="@(_busy || _declaredType is null)" OnClick="ReviewAsync">İnceleme taslağı hazırla</MudButton>
+                @if (!_record.SimulationMode)
+                { <MudButton StartIcon="@Icons.Material.Filled.Verified" Disabled="_busy" OnClick="ValidatePilotAsync">Onaylı tek kayıt politikasını doğrula ve önizle</MudButton> }
+            </section>
+        }
+        else if (!_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
+        { <p>İnceleme taslağı hazırlamak için Jira önizleme yetkisi gerekir. Kayıt ve engelleri aşağıda inceleyebilirsiniz.</p> }
+
+        <SoSdmEvidence Record="_record" />
+        <OperationHistoryPanel RecordType="OperationalRecord" RecordId="_record.Id" />
+
+        <details class="so-review-technical">
+            <summary>Kaynak ayrıntıları ve WASAS iş akışı</summary>
+        <div class="so-detail-grid">
+            @* ---------------------------------------------------------------- SOURCE *@
+            <section class="so-panel">
+                <h2 class="so-panel-title">Kaynak kayıt</h2>
+
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="Kaynak kayıt no">
+                        <code class="so-code">@_record.SourceRecordId</code>
+                    </SoField>
+                    <SoField Label="OR kodu">
+                        <code class="so-code">@_record.OrCode</code>
+                    </SoField>
+                    @* Nullable since the legacy Turuncu Hat projection carries no source timestamp.
+                       Shown as unknown rather than hidden: "we do not know when this was raised" is
+                       itself worth seeing, and an invented or defaulted date would be worse. *@
+                    <SoField Label="Oluşturulma">
+                        @if (_record.CreatedAt is { } createdAt)
+                        {
+                            @createdAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        }
+                        else
+                        {
+                            <span class="so-unknown">Kaynak sistemde tarih yok</span>
+                        }
+                    </SoField>
+                    @if (!string.IsNullOrWhiteSpace(_record.Requester))
+                    {
+                        <SoField Label="Talep eden">@_record.Requester</SoField>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_record.Environment))
+                    {
+                        <SoField Label="Ortam">@_record.Environment</SoField>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_record.ServerReference))
+                    {
+                        <SoField Label="Sunucu">@_record.ServerReference</SoField>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_record.ApplicationReference))
+                    {
+                        <SoField Label="Uygulama">@_record.ApplicationReference</SoField>
+                    }
+                </SoFieldGrid>
+
+                <h3 class="so-subhead">Başlık</h3>
+                <p class="so-panel-text">@_record.Title</p>
+
+                @if (!string.IsNullOrWhiteSpace(_record.Description))
+                {
+                    <h3 class="so-subhead">Açıklama</h3>
+                    <p class="so-source-description">@_record.Description</p>
+                }
+
+                <h3 class="so-subhead">Kaynak tazeliği</h3>
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="Son doğrulama">
+                        @if (_record.LastSourceValidationAt is { } validated)
+                        {
+                            @validated.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        }
+                        else
+                        {
+                            <span class="so-field-empty">Henüz doğrulanmadı</span>
+                        }
+                    </SoField>
+                    <SoField Label="Kayıt sürümü">
+                        <code class="so-code">@_record.Version</code>
+                    </SoField>
+                </SoFieldGrid>
+                <p class="so-panel-text so-panel-text--sm">
+                    Kaynak durumu, hassas geçişlerden hemen önce sunucu tarafında yeniden doğrulanır.
+                </p>
+            </section>
+
+            @* -------------------------------------------------------------- WORKFLOW *@
+            <section class="so-panel">
+                <h2 class="so-panel-title">WASAS iş akışı</h2>
+
+                <div class="so-state-head">
+                    @* Category first, stage second. The category is what the operator is deciding
+                       from; the stage is what support asks about. *@
+                    <SoStatusBadge Label="@OperationalRecordView.PresentationLabel(_record.PresentationState)"
+                                   Tone="@OperationalRecordView.PresentationTone(_record.PresentationState)"
+                                   Icon="@OperationalRecordView.PresentationIcon(_record.PresentationState)" />
+
+                    <SoStatusBadge Label="@OperationalRecordView.StateLabel(_record)"
+                                   Tone="@OperationalRecordView.StateTone(_record)"
+                                   Icon="@OperationalRecordView.StateIcon(_record)" />
+                </div>
+
+                @if (OperationalRecordView.StateDetail(_record) is { Length: > 0 } detail)
+                {
+                    <p class="so-panel-text">@detail</p>
+                }
+
+                <SoFieldGrid MinColumnWidth="220px">
+                    <SoField Label="Sınıflandırma">@_record.Classification</SoField>
+                    <SoField Label="Aktarıma uygunluk">
+                        <SoStatusBadge Label="@(_record.JiraEligible ? "Uygun" : "Uygun değil")"
+                                       Tone="@(_record.JiraEligible
+                                                ? SoStatusBadge.BadgeTone.Positive
+                                                : SoStatusBadge.BadgeTone.Neutral)" />
+                    </SoField>
+                    <SoField Label="Son güncelleme">
+                        @_record.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </SoField>
+                    <SoField Label="Deneme sayısı">@_record.RetryCount</SoField>
+                </SoFieldGrid>
+
+                @if (!string.IsNullOrWhiteSpace(_record.EligibilityReason))
+                {
+                    <p class="so-panel-text so-panel-text--sm">@_record.EligibilityReason</p>
+                }
+
+                <h3 class="so-subhead">Sahiplik</h3>
+@switch (owner)
+                {
+                    case OperationalRecordView.Ownership.Available:
+                        <p class="so-panel-text">Bu kayıt üzerinde etkin bir kilit yok.</p>
+                        break;
+
+                    case OperationalRecordView.Ownership.Mine:
+                        <div class="so-panel-note">
+                            <MudIcon Icon="@Icons.Material.Outlined.LockPerson" Size="Size.Small" />
+                            <span>
+                                Bu kayıt <strong>sizde</strong>. İşlemi siz sürdürebilirsiniz.
+                            </span>
+                        </div>
+                        break;
+
+                    case OperationalRecordView.Ownership.Other:
+                        <div class="so-panel-note so-panel-note--caution">
+                            <MudIcon Icon="@Icons.Material.Outlined.Lock" Size="Size.Small" />
+                            <span>
+                                Bu kayıt şu anda <strong>başka bir operatör tarafından
+                                işleniyor</strong>. Deneyeceğiniz işlemler sunucu tarafından
+                                reddedilir.
+                            </span>
+                        </div>
+                        break;
+
+                    default:
+                        @* Lapsed: metadata about a past claim. Explicitly not ownership — saying
+                           otherwise would stop operators working a record nobody holds. *@
+                        <div class="so-panel-note">
+                            <MudIcon Icon="@Icons.Material.Outlined.LockOpen" Size="Size.Small" />
+                            <span>
+                                Önceki kilit sona erdi; kayıt şu anda <strong>kimsede
+                                değil</strong>. Aşağıdaki bilgi yalnızca geçmiş kayıttır.
+                            </span>
+                        </div>
+                        break;
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_record.ClaimedBy) || _record.ClaimExpiresAt is not null)
+                {
+                    <SoFieldGrid MinColumnWidth="220px">
+                        @if (!string.IsNullOrWhiteSpace(_record.ClaimedBy))
+                        {
+                            <SoField Label="@(owner == OperationalRecordView.Ownership.Lapsed ? "Önceki sahip" : "Sahip")">
+                                @_record.ClaimedBy
+                            </SoField>
+                        }
+                        @if (_record.ClaimedAt is { } claimedAt)
+                        {
+                            <SoField Label="Alınma">
+                                @claimedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")
+                            </SoField>
+                        }
+                        @if (_record.ClaimExpiresAt is { } expires)
+                        {
+                            <SoField Label="Kilit bitişi">
+                                @expires.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")
+                            </SoField>
+                        }
+                    </SoFieldGrid>
+                }
+            </section>
+
+            @* ------------------------------------------------------------------ JIRA *@
+        </div>
+        </details>
+            <section class="so-review-preview" data-guide="review-preview">
+                <h2 class="so-panel-title">Önizleme ve işlem</h2>
+
+                @* Ready, sending, created, refused and unknown are resolved from the re-read record
+                   first; a command response alone is never shown as a created issue. *@
+                <JiraSubmissionPanel Record="_record" Preview="_preview" Phase="phase" Attempt="_attempt"
+                                     UnavailableReason="@UnavailableReason(actions)" FocusRequest="_focusRequest" />
+
+                @* Error codes, mapping versions, and record identifiers are support material. They
+                   are kept — they are what a support call needs — and folded away, because an
+                   operator deciding whether to press "Jira Kaydı Oluştur" is not reading them. *@
+                <details class="so-technical">
+                    <summary>Teknik ayrıntılar ve destek bilgisi</summary>
+                    <SoFieldGrid MinColumnWidth="240px">
+                        @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
+                        {
+                            <SoField Label="Destek referansı">
+                                <code class="so-code so-code--sm">@_record.CorrelationId</code>
+                            </SoField>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_record.LastErrorCode))
+                        {
+                            <SoField Label="Son hata kodu">
+                                <code class="so-code so-code--sm">@_record.LastErrorCode</code>
+                            </SoField>
+                        }
+                        @if (_preview is not null)
+                        {
+                            <SoField Label="Eşleme sürümü">
+                                <code class="so-code so-code--sm">@_preview.MappingVersion</code>
+                            </SoField>
+                        }
+                        <SoField Label="Kayıt tanımlayıcısı">
+                            <code class="so-code so-code--sm">@_record.Id</code>
+                        </SoField>
+                        <SoField Label="Kayıt sürümü">
+                            <code class="so-code so-code--sm">@_record.Version</code>
+                        </SoField>
+                        <SoField Label="Deneme sayısı">@_record.RetryCount</SoField>
+                    </SoFieldGrid>
+                </details>
+
+                <div class="so-panel-actions so-panel-actions--wrap">
+                    @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Preview"
+                                   Disabled="@(_busy || !actions.Preview || _declaredType is not null)"
+                                   OnClick="PreviewAsync">
+                            Jira Taslağını Önizle
+                        </MudButton>
+                    }
+
+                    @if (_access.Can(Capabilities.OperationalRecordsCreateJira))
+                    {
+                        @* Creation requires a preview first: the confirmation must show what will
+                           actually be sent, and only the server can say what that is. *@
+<MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.AddTask"
+                                       Disabled="@(_busy || phase != JiraSubmissionView.Phase.Ready || _declaredType is not null)"
+                                       OnClick="CreateAsync">
+                                Jira Kaydı Oluştur
+                            </MudButton>
+                        </MudTooltip>
+                    }
+
+                    @if (_access.Can(Capabilities.OperationalRecordsRetry))
+                    {
+<MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.RestartAlt"
+                                       Disabled="@(_busy || !actions.Retry || phase is JiraSubmissionView.Phase.Uncertain or JiraSubmissionView.Phase.Acknowledged)"
+                                       OnClick="RetryAsync">
+                                Yeniden Dene
+                            </MudButton>
+                        </MudTooltip>
+                    }
+                </div>
+
+                @* The actions stay visible rather than disappearing; why they are disabled is stated
+                   by the submission panel directly above them. *@
+
+                @if (_busy)
+                {
+                    <SoLoading Message="@_busyMessage" Bare="true" />
+                }
+            </section>
+    }
+</div>
+
+@code {
+    /// <summary>Record being shown.</summary>
+    [Parameter]
+    public Guid RecordId { get; set; }
+
+    private AccessSnapshot? _access;
+    private OperationalRecordResponse? _record;
+    private JiraPreviewResponse? _preview;
+    private OperationalRecordClassification? _declaredType;
+    private UiProblem? _loadProblem;
+    private UiProblem? _actionProblem;
+    private string? _result;
+    private string _busyMessage = "İşlem uygulanıyor…";
+    private string? _actor;
+    private bool _loading;
+    private bool _busy;
+    // Narrower than _busy: only while a create/retry command is actually in flight, so the panel
+    // does not say "sending" while the confirmation dialog is still open.
+    private bool _submitting;
+    // Outcome of the last create/retry, held until an explicit refresh so an unacknowledged
+    // command stays "uncertain" even if the automatic re-read races the server.
+    private JiraSubmissionView.Attempt? _attempt;
+    private int _focusRequest;
+    private int _generation;
+    private Guid? _loadedId;
+    private bool _disposed;
+
+    // Simulation is reported independently on the record, the preview, and the transfer result. Any
+    // of them saying so is enough: the operator must be told before the button, and a preview that
+    // announces a simulated run must not be contradicted by a record fetched a moment earlier.
+    private bool SimulationActive =>
+        _record?.SimulationMode == true || _preview?.SimulationMode == true;
+
+    // Same either/or reasoning as simulation: the preview and the record both report the mode, and
+    // the operator must be told before the button regardless of which one was fetched last.
+    private bool ReadOnlyActive =>
+        _record?.ReadOnlyIntegrationMode == true || _preview?.ReadOnlyIntegrationMode == true;
+
+    private string? ReadOnlyNotice =>
+        _preview?.ReadOnlyNotice ?? _record?.ReadOnlyNotice;
+
+    private string? SimulationNotice =>
+        _preview?.SimulationNotice ?? _record?.SimulationNotice;
+
+    // Every reason that applies, in the order an operator can act on them. Only shown while the
+    // panel is in its unavailable phase; the created/uncertain/rejected phases explain themselves.
+    private string UnavailableReason(OperationalRecordView.Actions actions)
+    {
+        List<string> reasons = [];
+        if (actions.BlockedReason is { Length: > 0 } blocked) reasons.Add(blocked);
+        if (actions.WriteFenceReason is { Length: > 0 } fenced) reasons.Add(fenced);
+        if (reasons.Count == 0 && _access?.Can(Capabilities.OperationalRecordsCreateJira) != true)
+            reasons.Add("Jira yayımlama yetkiniz yok. Gerekiyorsa yetkili yöneticinizden erişim talep edin.");
+        if (reasons.Count == 0 && _preview is null) reasons.Add("Jira kaydı oluşturmadan önce önizleme alın.");
+        return string.Join(" ", reasons);
+    }
+
+    private string HeaderTitle => _record is null ? "Operasyonel kayıt" : _record.OrCode;
+
+    private string HeaderLead => _record is null
+        ? "Kaynak kayıt, iş akışı ve Jira aktarım durumu."
+        : _record.Title;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        AccessProvider.Changed += OnAccessChanged;
+
+if (_access.Can(Capabilities.OperationalRecordsView))
+        {
+            await ResolveActorAsync();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == RecordId) return;
+        _loadedId = RecordId;
+        Invalidate();
+        if (_access?.Can(Capabilities.OperationalRecordsView) == true)
+            await LoadAsync(clearAction: true);
+    }
+
+    private void Invalidate()
+    {
+        ++_generation;
+        _record = null;
+        _loadProblem = null;
+        _declaredType = null;
+        _loading = _busy = _submitting = false;
+        _attempt = null;
+        ClearReviewDraft();
+    }
+
+    private bool Current(int generation) => !_disposed && generation == _generation;
+
+    /// <summary>
+    /// Reads the operator's identity as the API names it, for comparison against <c>claimedBy</c>.
+    /// </summary>
+    /// <remarks>
+    /// See the list page: the cookie principal differs from the API's actor string, so comparing it
+    /// would report every claim as somebody else's. Without an actor the UI simply never reports a
+    /// claim as the current operator's.
+    /// </remarks>
+    private async Task ResolveActorAsync()
+    {
+        try
+        {
+            _actor = (await Identity.GetCurrentIdentityAsync(CancellationToken.None)).Name;
+        }
+        catch (SecureOpsApiException)
+        {
+            _actor = null;
+        }
+    }
+
+    private async Task LoadAsync(bool clearAction)
+    {
+        int generation = ++_generation;
+        _loading = true;
+        _loadProblem = null;
+
+        if (clearAction)
+        {
+            _actionProblem = null;
+            _result = null;
+            _attempt = null;
+        }
+
+        StateHasChanged();
+
+        try
+        {
+            OperationalRecordResponse latest = await Records.GetAsync(RecordId, CancellationToken.None);
+            if (!Current(generation)) return;
+            if (_record is not null && !SdmEvidenceView.SameSource(_record, latest))
+            {
+                _preview = null;
+            }
+            _record = latest;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            if (!Current(generation)) return;
+            _loadProblem = ex.Problem;
+            _record = null;
+            _preview = null;
+        }
+        finally
+        {
+            if (Current(generation))
+            {
+                _loading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (_busy || _loading)
+        {
+            return;
+        }
+
+        int generation = _generation;
+        _busy = true;
+        _busyMessage = "Önizleme hazırlanıyor…";
+        _actionProblem = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            JiraPreviewResponse preview = await Records.PreviewAsync(RecordId, CancellationToken.None);
+            if (!Current(generation)) return;
+            _preview = preview;
+            _result = "Önizleme hazırlandı";
+        }
+        catch (SecureOpsApiException ex)
+        {
+            if (!Current(generation)) return;
+            _actionProblem = ex.Problem;
+            // A failed preview must not leave an earlier draft on screen next to a new error.
+            _preview = null;
+        }
+        finally
+        {
+            if (Current(generation)) _busy = false;
+        }
+
+        if (Current(generation)) await LoadAsync(clearAction: false);
+    }
+
+    private Task ValidatePilotAsync() { _declaredType = null; ClearReviewDraft(); return PreviewAsync(); }
+
+    private void ClearReviewDraft()
+    {
+        _preview = null;
+        _result = null;
+        _actionProblem = null;
+    }
+
+    private async Task ReviewAsync()
+    {
+        if (_busy || _loading || _record is null || _declaredType is null) return;
+        int generation = _generation;
+        _busy = true;
+        _busyMessage = "İnceleme taslağı hazırlanıyor…";
+        _preview = null;
+        _result = null;
+        _actionProblem = null;
+        try
+        {
+            JiraPreviewResponse preview = await Records.ReviewAsync(RecordId, new(_declaredType.Value, _record.Version), CancellationToken.None);
+            if (Current(generation)) _preview = preview;
+        }
+        catch (SecureOpsApiException ex) { if (Current(generation)) _actionProblem = ex.Problem; }
+        finally { if (Current(generation)) _busy = false; }
+        if (Current(generation)) await LoadAsync(clearAction: false);
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_busy || _loading || _record is null || _preview is null || _preview.ReviewOnly || _declaredType is not null)
+        {
+            return;
+        }
+
+        int generation = _generation;
+        _busy = true;
+        _busyMessage = "Yayımlama kararı bekleniyor…";
+        DialogParameters parameters = new()
+        {
+            { nameof(JiraCreateDialog.Record), _record },
+            { nameof(JiraCreateDialog.Preview), _preview }
+        };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<JiraCreateDialog>(
+            title: string.Empty,
+            parameters,
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        DialogResult? outcome = await dialog.Result;
+
+        if (!Current(generation)) return;
+
+        if (outcome is null || outcome.Canceled)
+        {
+            _busy = false;
+            return;
+        }
+
+        // Set before the first await: every action button binds Disabled to this, so a second
+        // click finds them already disabled and no second command can be issued.
+        _busy = true;
+        _submitting = true;
+        _busyMessage = "Jira kaydı oluşturuluyor. Sonuç doğrulanana kadar sayfadan ayrılmayın…";
+        _actionProblem = null;
+        _result = null;
+        _attempt = null;
+        StateHasChanged();
+
+        try
+        {
+            JiraTransferResponse transfer = await Records.CreateJiraAsync(RecordId, CancellationToken.None);
+            if (!Current(generation)) return;
+
+            // Held as an acknowledgement only. Whether an issue exists is decided by the re-read
+            // record below; a response is never presented as a saved Jira issue on its own.
+            _attempt = new(transfer, null);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            if (!Current(generation)) return;
+            _actionProblem = ex.Problem;
+            _attempt = new(null, ex.Problem);
+        }
+        finally
+        {
+            if (Current(generation)) _busy = _submitting = false;
+            // The draft is consumed by the attempt; keeping it would let a stale preview justify a
+            // second create against a record whose state has moved on.
+            if (Current(generation)) _preview = null;
+        }
+
+        if (Current(generation)) await SettleAsync();
+    }
+
+    // Re-reads authoritative state, then moves focus to the submission outcome so keyboard and
+    // screen-reader users are not left on a button that has just been disabled.
+    private async Task SettleAsync()
+    {
+        await LoadAsync(clearAction: false);
+        if (!_disposed && _record is not null)
+        {
+            _focusRequest++;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RetryAsync()
+    {
+        if (_busy || _loading || _record is null)
+        {
+            return;
+        }
+
+        int generation = _generation;
+        _busy = true;
+        _busyMessage = "Yeniden deneme kararı bekleniyor…";
+
+        // A retry without a persisted key asks Jira to create the issue again, so it is confirmed
+        // exactly like the first create rather than dispatched on a single click.
+        IDialogReference dialog = await Dialogs.ShowAsync<JiraRetryDialog>(
+            title: string.Empty,
+            new DialogParameters { { nameof(JiraRetryDialog.Record), _record } },
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
+        DialogResult? outcome = await dialog.Result;
+        if (!Current(generation)) return;
+        if (outcome is null || outcome.Canceled)
+        {
+            _busy = false;
+            return;
+        }
+
+        _submitting = true;
+        _busyMessage = "Aktarım sürdürülüyor…";
+        _actionProblem = null;
+        _result = null;
+        _attempt = null;
+        StateHasChanged();
+
+        try
+        {
+            JiraTransferResponse transfer = await Records.RetryAsync(RecordId, CancellationToken.None);
+            if (!Current(generation)) return;
+            _attempt = new(transfer, null);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            if (!Current(generation)) return;
+            _actionProblem = ex.Problem;
+            _attempt = new(null, ex.Problem);
+        }
+        finally
+        {
+            if (Current(generation)) _busy = _submitting = false;
+        }
+
+        if (Current(generation)) await SettleAsync();
+    }
+
+    private async Task RefreshAccessAsync()
+    {
+        await AccessProvider.RefreshAsync(CancellationToken.None);
+        await RevalidateAccessAsync();
+    }
+
+    private async Task RevalidateAccessAsync()
+    {
+        AccessSnapshot latest = await AccessProvider.GetAsync(CancellationToken.None);
+        if (_disposed) return;
+        bool changed = _access?.Access?.UserId != latest.Access?.UserId
+            || _access?.Access?.Version != latest.Access?.Version
+            || _access?.Access?.AccessStatus != latest.Access?.AccessStatus
+            || !(_access?.Access?.Capabilities ?? []).SequenceEqual(latest.Access?.Capabilities ?? []);
+        _access = latest;
+        if (changed || !latest.IsResolved)
+        {
+            Invalidate();
+            if (latest.Can(Capabilities.OperationalRecordsView)) await LoadAsync(clearAction: true);
+        }
+        StateHasChanged();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(RevalidateAccessAsync);
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ++_generation;
+        AccessProvider.Changed -= OnAccessChanged;
+    }
+}

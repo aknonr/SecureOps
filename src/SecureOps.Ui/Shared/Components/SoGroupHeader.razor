@@ -1,0 +1,42 @@
+@*
+    Who this group is, above every analysis section.
+
+    Stays on screen when a member enumeration or a nested walk fails underneath it. A successful
+    metadata read is real evidence and discarding it because a second, slower call failed is what
+    turns "the member list timed out" into "Active Directory is down".
+*@
+
+<section class="so-panel so-principal">
+    <div class="so-principal-head">
+        <span class="so-avatar so-avatar--xl so-avatar--group" aria-hidden="true">
+            <MudIcon Icon="@Icons.Material.Filled.Groups" />
+        </span>
+        <div class="so-principal-text">
+            <h2 class="so-principal-name">@DirectoryView.GroupName(Group)</h2>
+            @if (DirectoryView.ShowAccountNameSeparately(Group.Name, Group.SamAccountName))
+            {
+                <code class="so-code so-principal-account">@Group.SamAccountName</code>
+            }
+        </div>
+        <div class="so-principal-badges">
+            <SoStatusBadge Label="@DirectoryView.CategoryLabel(Group.Category)"
+                           Tone="SoStatusBadge.BadgeTone.Info"
+                           Title="@DirectoryView.CategoryExplanation(Group.Category)" />
+            <SoStatusBadge Label="@DirectoryView.ScopeLabel(Group.Scope)"
+                           Tone="SoStatusBadge.BadgeTone.Neutral"
+                           Title="@DirectoryView.ScopeExplanation(Group.Scope)" />
+            @if (Group.DirectMemberCount is { } count)
+            {
+                <SoStatusBadge Label="@($"{count} doğrudan üye")"
+                               Tone="SoStatusBadge.BadgeTone.Neutral"
+                               Title="Yalnızca açık üye bağlantıları sayılır." />
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    /// <summary>Group metadata exactly as the API returned it.</summary>
+    [Parameter, EditorRequired]
+    public DirectoryGroupDetailDto Group { get; set; } = default!;
+}

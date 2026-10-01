@@ -1,0 +1,85 @@
+@page "/announcements/preparations"
+@page "/announcements/preparations/{Id:guid}"
+@attribute [Authorize]
+@implements IDisposable
+@using SecureOps.Domain.Announcements
+@using SecureOps.Shared.Contracts.Announcements
+@inject AnnouncementApiClient Api
+@inject ICurrentAccessProvider Access
+@inject IJSRuntime Js
+
+<PageTitle>Hazırlık geçmişi · @WasasBrand.Name</PageTitle>
+<div class="so-page" style="overflow-wrap:anywhere" aria-busy="@_busy.ToString().ToLowerInvariant()">
+    <SoPageHeader Title="Hazırlık geçmişi"><Actions><MudButton Href="/announcements" StartIcon="@Icons.Material.Filled.ArrowBack">Taslaklar</MudButton></Actions></SoPageHeader>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    @if (_busy) { <SoLoading Message="Hazırlık yükleniyor" /> }
+    @if (_page is not null)
+    {
+        @if (_page.Total == 0) { <SoEmptyState Title="Henüz hazırlık yok" Description="" /> }
+        <MudTable T="PreparationSummary" Items="_page.Items" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+            <HeaderContent><MudTh>Konu</MudTh><MudTh>Hazırlayan / zaman</MudTh><MudTh>Durum</MudTh><MudTh /></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Konu">@context.Subject <small>v@(context.Version)</small></MudTd>
+                <MudTd DataLabel="Hazırlayan / zaman">@context.PreparedBy<br />@context.PreparedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                <MudTd DataLabel="Durum">Değişmez hazırlık</MudTd>
+                <MudTd><MudButton Href="@($"/announcements/preparations/{context.Id}")" StartIcon="@Icons.Material.Filled.Visibility">İncele</MudButton></MudTd>
+            </RowTemplate>
+        </MudTable>
+        <nav class="so-inline-actions" aria-label="Hazırlık sayfaları">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki sayfa" Disabled="@(_busy || _page.Page == 1)" OnClick="@(() => LoadAsync(_page.Page - 1))" />
+            <span>@_page.Page / @Math.Max(1, (int)Math.Ceiling(_page.Total / 25d)) · @_page.Total hazırlık</span>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki sayfa" Disabled="@(_busy || _page.Page * 25 >= _page.Total)" OnClick="@(() => LoadAsync(_page.Page + 1))" />
+        </nav>
+    }
+    @if (_snapshot is { } s)
+    {
+        <h2>@s.Draft.Content.Subject</h2><p role="status">Değişmez hazırlık · v@(s.Draft.Version)</p>
+        @if (s.SourceReview is { } review)
+        { <p>Kaynak inceleme v@(review.Version) · @review.AppliedCapturedAt · Alıcı profili: @(review.Profile ?? "Elle düzenlendi"). Dağıtım talebi alıcıları, onaylanmış nihai gönderim listesi değildir.</p> }
+        <dl class="preparation-summary"><dt>Gönderen</dt><dd>@s.Draft.Sender</dd><dt>Alıcı</dt><dd>@string.Join("; ", s.Draft.Content.To)</dd>
+            <dt>Bilgi</dt><dd>@string.Join("; ", s.Draft.Content.Cc)</dd><dt>Hazırlayan</dt><dd>@s.PreparedBy · @s.PreparedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd></dl>
+        <div class="so-inline-actions"><MudButton OnClick="DownloadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Hazırlanan maili indir</MudButton>
+            <MudButton Href="/announcements/preparations" StartIcon="@Icons.Material.Filled.History">Geçmiş</MudButton></div>
+        <details><summary>Kayıt ayrıntıları</summary><p>Nihai duyuru · @s.Draft.TemplateRevision · @s.Draft.Content.BannerRevision · v@(s.Draft.Version)</p><p>@s.Fingerprint</p></details>
+        <AnnouncementMailPanel @key="s.Id" PreparationId="s.Id" DraftId="s.Draft.Id" />
+        <OperationHistoryPanel RecordType="Announcement" RecordId="s.Draft.Id" />
+        <iframe title="Hazırlanan duyuru" sandbox="" referrerpolicy="no-referrer" style="width:100%;height:650px;border:1px solid var(--mud-palette-lines-default)"
+                srcdoc="@_previewHtml"></iframe>
+    }
+</div>
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private PreparationPage? _page;
+    private PreparedAnnouncement? _snapshot;
+    private string? _previewHtml;
+    private UiProblem? _problem;
+    private bool _busy, _disposed;
+    private CancellationTokenSource _pending = new();
+    private const string _policy = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'unsafe-inline'\">";
+    protected override void OnInitialized() => Access.Changed += AccessChanged;
+    protected override Task OnParametersSetAsync() => LoadAsync(1);
+    private async Task LoadAsync(int page)
+    {
+        if (_disposed) { return; }
+        _pending.Cancel(); _pending.Dispose(); _pending = new();
+        CancellationToken token = _pending.Token;
+        _snapshot = null; _previewHtml = null; _page = null; _problem = null; _busy = true;
+        try
+        {
+            if (Id is { } id) { PreparedAnnouncement result = await Api.PreparedAsync(id, null, 0, token); if (!token.IsCancellationRequested) { _snapshot = result; _previewHtml = _policy + result.Html; } }
+            else { PreparationPage result = await Api.PreparationsAsync(page, token); if (!token.IsCancellationRequested) { _page = result; } }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (SecureOpsApiException ex) { if (!token.IsCancellationRequested) { _problem = ex.Problem; } }
+        finally { if (!token.IsCancellationRequested) { _busy = false; } }
+    }
+    private async Task DownloadAsync()
+    {
+        CancellationToken token = _pending.Token;
+        try { PreparedAnnouncement s = await Api.PreparedAsync(Id!.Value, null, 0, token); await Js.InvokeVoidAsync("secureOpsDownload", token, $"prepared-announcement-{s.Id:N}.eml", "message/rfc822", Convert.ToBase64String(s.Email)); }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (SecureOpsApiException ex) { if (!token.IsCancellationRequested) { _snapshot = null; _problem = ex.Problem; } }
+    }
+    private void AccessChanged() { if (!_disposed) { _ = InvokeAsync(async () => { _snapshot = null; _page = null; await LoadAsync(1); StateHasChanged(); }); } }
+    public void Dispose() { _disposed = true; Access.Changed -= AccessChanged; _pending.Cancel(); _pending.Dispose(); }
+}

@@ -1,0 +1,403 @@
+@page "/admin/sessions"
+@attribute [Authorize]
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@inject ISessionApiClient SessionsClient
+@inject ICurrentAccessProvider AccessProvider
+@inject IDialogService Dialogs
+@inject ILogger<Sessions> Logger
+
+<PageTitle>Aktif Oturumlar · @WasasBrand.Name</PageTitle>
+
+@*
+    Application-session administration.
+
+    Everything shown here is what the contract exposes and nothing more. No IP address, no device,
+    no user agent, and above all no session handle — the opaque cookie is the credential, and a
+    screen that displayed it would turn a diagnostic view into a way to impersonate people.
+
+    The identity column leads with a person, not a record. An administrator about to interrupt
+    someone's work has to recognise who that is; a persisted GUID cannot be recognised, only
+    cross-referenced. Internal identifiers stay available under "Teknik ayrıntılar" for support,
+    which is the only job they actually do here.
+*@
+
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Aktif Oturumlar"
+                  Lead="WASAS üzerinde açık uygulama oturumlarını görüntüleyebilir ve gerektiğinde sonlandırabilirsiniz.">
+        <Actions>
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_loading"
+                       OnClick="ReloadAsync">
+                Yenile
+            </MudButton>
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null)
+    {
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.AccessManageUsers))
+    {
+        <section class="so-panel so-panel--blocked">
+            <h2 class="so-panel-title">Bu alana erişim yetkiniz yok</h2>
+            <p class="so-panel-text">
+                Oturum yönetimi için <code class="so-code">@Capabilities.AccessManageUsers</code>
+                yetkisi gerekir. Hesabınızda tanımlı yetkileri
+                <MudLink Href="access/me">Erişimim</MudLink> sayfasından görebilirsiniz.
+            </p>
+        </section>
+    }
+    else
+    {
+        @if (_actionProblem is not null)
+        {
+            @* Kept separate from the list problem: a failed revoke must survive the reload that
+               follows it, or the administrator sees the list refresh and assumes it worked. *@
+            <SoProblemPanel Problem="_actionProblem" />
+        }
+
+        @if (_revoked is not null)
+        {
+            <section class="so-panel so-panel--notice">
+                <SoStatusBadge Label="Oturum sonlandırıldı"
+                               Tone="SoStatusBadge.BadgeTone.Positive"
+                               Icon="@Icons.Material.Filled.CheckCircle" />
+                <p class="so-panel-text">
+                    <code class="so-code so-code--sm">@_revoked.SessionId</code> kimlikli oturum
+                    @_revoked.EndedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") itibarıyla
+                    sonlandırıldı.
+                </p>
+            </section>
+        }
+
+        <section class="so-panel">
+            <div class="so-panel-head">
+                <h2 class="so-panel-title">
+                    Açık oturumlar
+                    @if (_page is not null)
+                    {
+                        <span class="so-count-chip">@Listed.Count()</span>
+                    }
+                </h2>
+                <div class="so-panel-head-actions">
+                    <MudSelect T="int" Value="_pageSize" ValueChanged="ChangePageSizeAsync"
+                               Label="Sayfa boyutu" Dense="true" Margin="Margin.Dense"
+                               Variant="Variant.Outlined" Class="so-page-size">
+                        @foreach (int size in _pageSizes)
+                        {
+                            <MudSelectItem T="int" Value="@size">@size</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </div>
+
+            @if (_listProblem is not null)
+            {
+                <SoProblemPanel Problem="_listProblem" OnRetry="ReloadAsync" RetryLabel="Yeniden yükle" />
+            }
+            else if (_page is null)
+            {
+                <SoLoading Message="Oturumlar getiriliyor…" Variant="SoLoading.LoadingVariant.Block" />
+            }
+            else if (!Listed.Any())
+            {
+                <SoEmptyState Title="Açık oturum yok"
+                              Description="Bu sayfada listelenecek etkin WASAS oturumu bulunmuyor."
+                              Icon="@Icons.Material.Outlined.NoAccounts" />
+            }
+            else
+            {
+                <div class="so-table-scroll">
+                    <table class="so-plain-table so-session-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Kullanıcı</th>
+                                <th scope="col">Kimlik Doğrulama</th>
+                                <th scope="col">Oturum Başlangıcı</th>
+                                <th scope="col">Son Aktivite</th>
+                                <th scope="col">Bitiş / Süre</th>
+                                <th scope="col">Durum</th>
+                                <th scope="col"><span class="sr-only">İşlem</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (ApplicationSessionResponse session in Listed)
+                            {
+                                ApplicationSessionResponse captured = session;
+                                bool mine = IsMine(session);
+                                string? account = SessionView.Account(session);
+                                string? uid = SessionView.Uid(session);
+
+                                <tr class="@(mine ? "so-row--self" : null)">
+                                    <th scope="row">
+                                        <span class="so-session-user">
+                                            <span class="so-session-name">@SessionView.Name(session)</span>
+                                            @* Only when it says something the name did not. *@
+                                            @if (account is not null)
+                                            {
+                                                <span class="so-session-account">@account</span>
+                                            }
+                                            @if (uid is not null)
+                                            {
+                                                <span class="so-session-account">Sicil No: @uid</span>
+                                            }
+                                        </span>
+                                    </th>
+                                    <td>@SessionView.Authentication(session)</td>
+                                    <td>@SessionView.Local(session.StartedAtUtc)</td>
+                                    <td>@SessionView.Local(session.LastSeenAtUtc)</td>
+                                    <td>
+                                        <span class="so-session-expiry">@SessionView.Local(session.AbsoluteExpiresAtUtc)</span>
+                                        <span class="so-session-remaining">@SessionView.Remaining(session, Now)</span>
+                                    </td>
+                                    <td>
+                                        @* isCurrent is server-authoritative. Marking the row the
+                                           administrator is sitting in prevents the single most
+                                           easily regretted click on this page. *@
+                                        @if (mine)
+                                        {
+                                            <SoStatusBadge Label="Bu oturum"
+                                                           Tone="SoStatusBadge.BadgeTone.Info"
+                                                           Icon="@Icons.Material.Filled.Person" />
+                                        }
+                                        else
+                                        {
+                                            <SoStatusBadge Label="Etkin"
+                                                           Tone="SoStatusBadge.BadgeTone.Positive" />
+                                        }
+                                    </td>
+                                    <td>
+                                        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                                                   Disabled="@_loading"
+                                                   StartIcon="@Icons.Material.Filled.Logout"
+                                                   OnClick="@(() => ConfirmRevokeAsync(captured))">
+                                            Oturumu Sonlandır
+                                        </MudButton>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @* Internal identifiers do exactly one job here: letting support correlate a row with
+                   an audit entry. They are kept, and kept out of the way. *@
+                <details class="so-technical">
+                    <summary>Teknik ayrıntılar</summary>
+                    <div class="so-table-scroll">
+                        <table class="so-plain-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Kullanıcı</th>
+                                    <th scope="col">Kurumsal Teknik Kimlik</th>
+                                    <th scope="col">Oturum kaydı</th>
+                                    <th scope="col">Kullanıcı kaydı</th>
+                                    <th scope="col" class="so-num">Erişim sürümü</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (ApplicationSessionResponse session in Listed)
+                                {
+                                    <tr>
+                                        <th scope="row">@SessionView.Name(session)</th>
+                                        <td><code class="so-code so-code--sm">@session.NormalizedPrincipal</code></td>
+                                        <td><code class="so-code so-code--sm">@session.SessionId</code></td>
+                                        <td><code class="so-code so-code--sm">@session.UserId</code></td>
+                                        <td class="so-num">@session.AccessVersion</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+
+                <div class="so-pager">
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.ChevronLeft"
+                               Disabled="@(_loading || _page.Page <= 1)"
+                               OnClick="@(() => GoToPageAsync(_page.Page - 1))">
+                        Önceki
+                    </MudButton>
+
+                    <span class="so-pager-state">Sayfa @_page.Page</span>
+
+                    @* The contract returns no total, so "there is a next page" can only be inferred
+                       from a full page. An empty next page is preferable to hiding a real one. *@
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                               EndIcon="@Icons.Material.Filled.ChevronRight"
+                               Disabled="@(_loading || _page.Items.Count < _page.PageSize)"
+                               OnClick="@(() => GoToPageAsync(_page.Page + 1))">
+                        Sonraki
+                    </MudButton>
+                </div>
+            }
+
+            <p class="so-panel-text so-panel-text--sm">
+                Bir oturumu sonlandırmak ilgili Active Directory hesabını devre dışı bırakmaz;
+                kullanıcı yeniden kimlik doğrularsa yeni bir oturum açılır. Çerez değeri, ağ adresi
+                ve cihaz bilgisi bu ekranda gösterilmez; API bu verileri hiç döndürmez.
+            </p>
+        </section>
+    }
+</div>
+
+@code {
+    private static readonly int[] _pageSizes = [25, 50, 100];
+
+    private AccessSnapshot? _access;
+    private ActiveApplicationSessionsResponse? _page;
+    private ApplicationSessionResponse? _current;
+    private ApplicationSessionEndedResponse? _revoked;
+    private UiProblem? _listProblem;
+    private UiProblem? _actionProblem;
+    private bool _loading;
+    private int _pageNumber = 1;
+    private int _pageSize = 50;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.AccessManageUsers))
+        {
+            await LoadCurrentAsync();
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync(CancellationToken.None);
+
+        if (_access.Can(Capabilities.AccessManageUsers))
+        {
+            await ReloadAsync();
+        }
+    }
+
+    // Marking the administrator's own row prevents the most easily regretted click on this page.
+    private async Task LoadCurrentAsync()
+    {
+        try
+        {
+            _current = await SessionsClient.GetCurrentAsync(CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            // Non-fatal: the list still works, the "this is you" marker is simply absent.
+            Logger.LogDebug("Current session unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+    }
+
+    private Task GoToPageAsync(int page)
+    {
+        _pageNumber = Math.Max(1, page);
+        return ReloadAsync();
+    }
+
+    private Task ChangePageSizeAsync(int pageSize)
+    {
+        _pageSize = pageSize;
+        _pageNumber = 1;
+        return ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        _listProblem = null;
+        StateHasChanged();
+
+        try
+        {
+            _page = await SessionsClient.GetActiveAsync(_pageNumber, _pageSize, CancellationToken.None);
+            _pageNumber = _page.Page;
+            Now = DateTimeOffset.UtcNow;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _page = null;
+            _listProblem = ex.Problem;
+            Logger.LogDebug("Active sessions unavailable. Code: {Code}.", ex.Problem.Code);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ConfirmRevokeAsync(ApplicationSessionResponse session)
+    {
+        DialogParameters parameters = new() { { nameof(SessionRevokeDialog.Session), session } };
+        DialogOptions options = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        IDialogReference dialog = await Dialogs.ShowAsync<SessionRevokeDialog>(
+            "Oturumu sonlandır", parameters, options);
+        DialogResult? result = await dialog.Result;
+
+        if (result is null || result.Canceled || result.Data is not string reason)
+        {
+            return;
+        }
+
+        await RevokeAsync(session, reason);
+    }
+
+    private async Task RevokeAsync(ApplicationSessionResponse session, string reason)
+    {
+        _loading = true;
+        _actionProblem = null;
+        _revoked = null;
+        StateHasChanged();
+
+        try
+        {
+            _revoked = await SessionsClient.RevokeAsync(session.SessionId, reason, CancellationToken.None);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _actionProblem = ex.Problem;
+            Logger.LogWarning(
+                "Session revoke failed. Code: {Code}. CorrelationId: {CorrelationId}.",
+                ex.Problem.Code,
+                ex.Problem.CorrelationId);
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        // Reloaded either way. After a success the row must disappear; after a conflict the list was
+        // stale, which is usually why the command failed.
+        await ReloadAsync();
+    }
+
+    // Evaluated once per render so every row on a page measures its remaining lifetime against the
+    // same instant. Reading the clock per row would let two rows disagree about "now".
+    private DateTimeOffset Now { get; set; } = DateTimeOffset.UtcNow;
+
+    // A session past its absolute expiry is not active, whatever the page says. The API marks
+    // expirations terminal before returning, so this should never remove a row; it is here so that
+    // if one ever does slip through, it is not offered with a "Sonlandır" button that can only fail.
+    private IEnumerable<ApplicationSessionResponse> Listed =>
+        _page is null
+            ? []
+            : _page.Items.Where(session => SessionView.IsActive(session, Now));
+
+    // Server-authoritative. isCurrent is resolved by the API against the request's own session; the
+    // identifier comparison stays as a fallback for a response that predates the field.
+    private bool IsMine(ApplicationSessionResponse session) =>
+        session.IsCurrent || (_current is not null && _current.SessionId == session.SessionId);
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

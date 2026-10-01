@@ -13,6 +13,7 @@ public sealed class IdentityLookupService : IIdentityLookupService
     private readonly IIdentityAccountNormalizer _normalizer;
     private readonly IPamAccountResolver _pamResolver;
     private readonly IIdentityDirectoryProvider _directoryProvider;
+    private readonly IIdentityReadThroughCache _readCache;
     private readonly IAuditWriter _auditWriter;
     private readonly ILogger<IdentityLookupService> _logger;
 
@@ -22,21 +23,27 @@ public sealed class IdentityLookupService : IIdentityLookupService
     /// <param name="normalizer">Account normalizer.</param>
     /// <param name="pamResolver">PAM resolver hook.</param>
     /// <param name="directoryProvider">Directory provider.</param>
+    /// <param name="readCache">Short-lived exact-account cache.</param>
     /// <param name="auditWriter">Audit writer.</param>
     /// <param name="logger">Logger.</param>
     public IdentityLookupService(
         IIdentityAccountNormalizer normalizer,
         IPamAccountResolver pamResolver,
         IIdentityDirectoryProvider directoryProvider,
+        IIdentityReadThroughCache readCache,
         IAuditWriter auditWriter,
         ILogger<IdentityLookupService> logger)
     {
         _normalizer = normalizer;
         _pamResolver = pamResolver;
         _directoryProvider = directoryProvider;
+        _readCache = readCache;
         _auditWriter = auditWriter;
         _logger = logger;
     }
+
+    /// <inheritdoc />
+    public bool SupportsUpnLookup => _directoryProvider.SupportsUpnLookup;
 
     /// <inheritdoc />
     public async Task<IdentityLookupResult> LookupAsync(
@@ -85,7 +92,33 @@ public sealed class IdentityLookupService : IIdentityLookupService
         try
         {
             PamAccountResolution pamResolution = await _pamResolver.ResolveAsync(normalized.NormalizedAccount, cancellationToken);
-            DirectoryUserRecord? user = await _directoryProvider.FindUserAsync(pamResolution.DirectoryAccount, cancellationToken);
+            IdentityReadCacheResult cached = await _readCache.GetOrCreateAsync(
+                normalized.NormalizedAccount,
+                async providerCancellationToken =>
+                {
+                    bool providerAuditWritten = await TryWriteAuditAsync(
+                        AuditActions.IdentityLookupProviderCall,
+                        context,
+                        request,
+                        normalized.NormalizedAccount,
+                        null,
+                        null,
+                        providerCancellationToken);
+                    if (!providerAuditWritten)
+                    {
+                        throw new AuditWriteUnavailableException("Identity lookup provider-call audit is unavailable.");
+                    }
+
+                    return await _directoryProvider.FindUserAsync(pamResolution.DirectoryAccount, providerCancellationToken);
+                },
+                cancellationToken);
+            if (cached.Disposition is IdentityReadCacheDisposition.CacheHit or IdentityReadCacheDisposition.Coalesced
+                && !await TryWriteAuditAsync(AuditActions.IdentityLookupCacheHit, context, request, normalized.NormalizedAccount, null, null, cancellationToken))
+            {
+                return AuditUnavailable();
+            }
+
+            DirectoryUserRecord? user = cached.User;
 
             if (user is null)
             {
@@ -143,6 +176,10 @@ public sealed class IdentityLookupService : IIdentityLookupService
 
             return new IdentityLookupResult(IdentityLookupResultStatus.Found, response, null, null);
         }
+        catch (AuditWriteUnavailableException)
+        {
+            return AuditUnavailable();
+        }
         catch (IdentityProviderInputRejectedException ex)
         {
             _logger.LogWarning(
@@ -171,8 +208,7 @@ public sealed class IdentityLookupService : IIdentityLookupService
         {
             _logger.LogError(
                 ex,
-                "Identity lookup directory provider timed out for normalized account {NormalizedAccount}. CorrelationId: {CorrelationId}",
-                normalized.NormalizedAccount,
+                "Identity lookup directory provider timed out. CorrelationId: {CorrelationId}",
                 context.CorrelationId);
 
             bool failedAuditWritten = await TryWriteAuditAsync(
@@ -199,8 +235,7 @@ public sealed class IdentityLookupService : IIdentityLookupService
         {
             _logger.LogError(
                 ex,
-                "Identity lookup failed for normalized account {NormalizedAccount}. CorrelationId: {CorrelationId}",
-                normalized.NormalizedAccount,
+                "Identity lookup failed. CorrelationId: {CorrelationId}",
                 context.CorrelationId);
 
             bool failedAuditWritten = await TryWriteAuditAsync(
@@ -246,12 +281,11 @@ public sealed class IdentityLookupService : IIdentityLookupService
                     SourceIp = context.SourceIp,
                     Details = new
                     {
-                        normalizedAccount,
-                        matchedAccount,
                         accountInputHash = AuditAccountHasher.HashAccountInput(request.Account),
                         accountLength = request.Account?.Trim().Length,
-                        request.Purpose,
-                        request.TuruncuhatEvtId,
+                        purposeHash = AuditAccountHasher.HashAccountInput(request.Purpose),
+                        purposeLength = request.Purpose?.Length,
+                        legacyEventReferencesProvided = request.AlertId is not null || !string.IsNullOrWhiteSpace(request.TuruncuhatEvtId),
                         resultStatus = ToResultStatus(action),
                         errorCode
                     }
@@ -289,6 +323,8 @@ public sealed class IdentityLookupService : IIdentityLookupService
             AuditActions.IdentityLookupNotFound => "NotFound",
             AuditActions.IdentityLookupRejected => "Rejected",
             AuditActions.IdentityLookupProviderTimeout => "ProviderTimeout",
+            AuditActions.IdentityLookupCacheHit => "CacheHit",
+            AuditActions.IdentityLookupProviderCall => "ProviderCall",
             _ => "Failed"
         };
     }

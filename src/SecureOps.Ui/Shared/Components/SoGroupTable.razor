@@ -1,0 +1,114 @@
+@*
+    A bounded list of groups.
+
+    Used for direct memberships, nested memberships, and search results alike, so the columns stay
+    the same wherever a group appears and an operator does not have to re-learn the table.
+
+    "Ayrıca iç içe" marks a group held directly that is also reachable through nesting. It is a badge
+    on the one row rather than a second row: the same group listed twice reads as two grants, which
+    is exactly the confusion this contract separates the two sets to avoid.
+*@
+
+@if (Items.Count == 0)
+{
+    <p class="so-panel-text so-panel-text--sm">@EmptyText</p>
+}
+else
+{
+    <div class="so-table-scroll">
+        <table class="so-plain-table so-group-table">
+            <thead>
+                <tr>
+                    <th scope="col">Grup</th>
+                    <th scope="col">Hesap adı</th>
+                    <th scope="col">Tür</th>
+                    <th scope="col">Kapsam</th>
+                    @if (ShowDepth)
+                    {
+                        <th scope="col" class="so-num">Derinlik</th>
+                    }
+                    <th scope="col">Açıklama</th>
+                    @if (OnInspect.HasDelegate)
+                    {
+                        <th scope="col"><span class="sr-only">İşlem</span></th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (DirectoryMembershipGroupDto item in Items)
+                {
+                    DirectoryMembershipGroupDto captured = item;
+                    <tr>
+                        <th scope="row">
+                            <span class="so-group-name">@DirectoryView.GroupName(item.Group)</span>
+                            @if (item.AlsoTransitivelyReachable)
+                            {
+                                <SoStatusBadge Label="Ayrıca iç içe"
+                                               Tone="SoStatusBadge.BadgeTone.Neutral"
+                                               Title="Bu grup doğrudan atanmış, ayrıca başka gruplar üzerinden de erişilebilir durumda." />
+                            }
+                        </th>
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(item.Group.SamAccountName))
+                            {
+                                <code class="so-code so-code--sm">@item.Group.SamAccountName</code>
+                            }
+                            else
+                            {
+                                <span class="so-unknown">@DirectoryView.UnknownText</span>
+                            }
+                        </td>
+                        <td>@DirectoryView.CategoryLabel(item.Group.Category)</td>
+                        <td>@DirectoryView.ScopeLabel(item.Group.Scope)</td>
+                        @if (ShowDepth)
+                        {
+                            <td class="so-num" title="Hedefe ulaşan en kısa zincirdeki adım sayısı">
+                                @item.MinimumDepth
+                            </td>
+                        }
+                        <td class="so-cell-wrap">
+                            @if (!string.IsNullOrWhiteSpace(item.Group.Description))
+                            {
+                                @item.Group.Description
+                            }
+                            else
+                            {
+                                <span class="so-unknown">—</span>
+                            }
+                        </td>
+                        @if (OnInspect.HasDelegate)
+                        {
+                            <td>
+                                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                           OnClick="@(() => OnInspect.InvokeAsync(captured.Group))">
+                                    Nasıl üye?
+                                </MudButton>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    /// <summary>Groups exactly as the API returned them, in the API's order.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DirectoryMembershipGroupDto> Items { get; set; } = [];
+
+    /// <summary>Shown when the list is empty.</summary>
+    [Parameter]
+    public string EmptyText { get; set; } = "Kayıt yok.";
+
+    /// <summary>
+    /// Whether to show the minimum depth column.
+    /// </summary>
+    /// <remarks>Meaningful for nested groups only; a direct group is always depth one.</remarks>
+    [Parameter]
+    public bool ShowDepth { get; set; }
+
+    /// <summary>Raised when the operator asks how the account reaches this group.</summary>
+    [Parameter]
+    public EventCallback<DirectoryGroupSummaryDto> OnInspect { get; set; }
+}

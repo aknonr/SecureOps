@@ -3,6 +3,10 @@
 **Duration:** 3–5 weeks
 **Goal:** Use accumulated audit and diagnostic data to produce useful periodic reports — without AI.
 
+## Bounded Pilot Checkpoint
+
+The backend-authoritative management reporting read model in ADR-0011 is an early pilot foundation only. It aggregates currently persisted identity, access, and Operational Record/Jira evidence through limited SQL views and protected API endpoints. It does not satisfy this phase's pre-conditions, rule engine, scheduled report delivery, UI, stakeholder approval, or exit criteria; those remain pending.
+
 ## Pre-Conditions
 
 - [ ] Phase 5 complete.
@@ -62,7 +66,7 @@
 
 **Total Phase 6 estimate:** ~85 hours, ~5 weeks at 18h/week.
 
-## Constraints (Reaffirm from `.cursor/rules/070-analysis-rules.mdc`)
+## Constraints (Reaffirm from `docs/agent-guides/070-analysis.md`)
 
 - All outputs deterministic.
 - No machine learning.

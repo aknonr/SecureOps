@@ -2,6 +2,29 @@
 
 This document captures the operational environment that shapes every design decision. The system is not built in a vacuum; it is built into the specific workflow described here.
 
+## SDM Foundation: Source Implementation
+
+The Resource Links and Shift Start Sets backend v1 is implemented in source under
+ADR-0019: shared catalogue/categories, explicit curator management, private
+favourites and ordered/default sets. SQL-backed deployment requires migrations
+001-010 and resource object grants. Catalogue changes then require no deployment.
+Claude's next resource UI task consumes the committed API/OpenAPI handoff in
+`docs/contracts/secureops-api-v1-ui-integration.md`. This is not a deployment or
+corporate TEST result; SDM positive rules and approval remain pending. Local
+isolated SQL execution evidence is recorded in the deployment-readiness document.
+
+The deterministic evaluation foundation `WASAS-SDM-2026.09-v1` is implemented
+in source (ADR-0018), with additive response evidence and offline migration 009.
+The verified TEST baseline remains four real records, zero malformed/ambiguous
+rows, all `NeedsManualReview`, `JiraEligible=false`, and no synthetic records.
+The new evaluator also returns `SdmCandidateRecommended=false`; positive SDM
+category policy and structured per-record group/DCC/category/server/IP evidence
+remain pending. No approval endpoint is implemented. External writes remain
+disabled (`ReadOnlyIntegrationMode=true`, `ControlledTestWritesEnabled=false`).
+The next UI milestone is the Action Center consuming the additive evaluation
+contract; backend approval/publication policy is a separate milestone. This
+source change is not a deployment or a new corporate smoke-test result.
+
 ## Organization Snapshot
 
 | Attribute | Value |

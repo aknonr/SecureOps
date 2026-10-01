@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    Application icon. Standalone (no external references) because a favicon is fetched outside the
+    page context and cannot resolve a <use href> into another file.
+
+    Red plate, white glyph. Red is the brand colour and appears nowhere in page content, so using it
+    here costs nothing operationally and makes the tab identifiable at a glance among a row of
+    internal tools. A rounded square rather than a bare shield: at 16 px a filled plate holds its
+    shape, while an outlined mark closes up into a blob.
+
+    Colours are baked in — favicons receive no CSS — and no prefers-color-scheme swap is needed,
+    because red on white keeps contrast against both light and dark browser chrome.
+  -->
+  <rect width="32" height="32" rx="7" fill="#B81D2B" />
+  <path d="M16 6.4 8.6 9.3v6.1c0 4.4 3 8 7.4 9.4 4.4-1.4 7.4-5 7.4-9.4V9.3L16 6.4Z"
+        fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linejoin="round" />
+  <path d="m12.9 15.7 2.4 2.4 4.4-4.7"
+        fill="none" stroke="#FFFFFF" stroke-width="2.1"
+        stroke-linecap="round" stroke-linejoin="round" />
+</svg>

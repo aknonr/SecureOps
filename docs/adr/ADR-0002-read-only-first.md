@@ -42,7 +42,7 @@ This is enforced at multiple layers:
 
 1. **JEA endpoint** — the service account literally cannot run write cmdlets.
 2. **Code layer** — application code does not construct write commands.
-3. **Documentation** — `.cursor/rules/050-security-audit-rules.mdc` makes the rule explicit for agents.
+3. **Documentation** — `docs/agent-guides/050-security-audit.md` makes the rule explicit for agents.
 4. **Tests** — security tests verify forbidden cmdlets are blocked.
 
 Write operations are introduced **only in Phase 8** through an approval-based workflow (see ADR-0006).
@@ -109,5 +109,5 @@ Rejected. Reasons:
 
 - `docs/05-security-model.md` (JEA section)
 - `docs/09-snapshot-change-safety.md` (Phase 8 design)
-- `.cursor/rules/050-security-audit-rules.mdc`
+- `docs/agent-guides/050-security-audit.md`
 - `ADR-0006-approval-based-remediation.md`

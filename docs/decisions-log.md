@@ -1,5 +1,43 @@
 # Decisions Log
 
+## 2026-09-07 - Original OR-to-Jira source review
+
+Original-script discovery is resolved by the externally supplied local file;
+the parity document records its exact provenance/hash and line-274 syntax defect.
+It was parsed only, never executed or committed raw. The script proves request
+construction, constant label and operator confirmation, not native watchers,
+explicit operator reporter, positive eligibility or a separate approver workflow.
+Existing safer policies remain. Malformed BPM results, contradictory update
+success and non-object provider JSON now fail safely, with sanitized regressions.
+The earlier local-only Git status below is historical: the browser milestone and
+four earlier commits were pushed and live remote HEAD was verified as `1665685`
+at this task's start. Current delivery and package association remain canonical
+in `src/SecureOps.Ui/README.md`.
+
+## 2026-09-07 - SDM workflow, management and read-only TEST delivery
+
+The task authorizes cross-layer implementation, coherent commits and normal push,
+plus a task-only size exception without changing the permanent cap. Source-bound
+drafts and uncertain-result handling are hardened; no positive SDM/approval policy,
+corporate writes, Jira reconciliation lookup or source-close activation is invented.
+The existing sanitized script parity/contract-gap documents remain the evidence
+boundary because no original script/access path exists in the repository.
+
+Paired API/UI package source is `de6e5381bd3d7e053f2e9c1c6b07e93283f55ca7`;
+release root is `C:\SecureOpsBuild\release\2026-09-07-pilot-rc6.10`, required
+schema 001-010. API/UI/DBA ZIP entries/hashes and source versions were verified.
+No migration file changed. Full local tests passed 1,020 unit + 242 integration,
+including eight isolated SQL tests; subsequent UI/client checks and browser
+limitations are recorded without double-counting or claiming corporate activation.
+
+No most-active-user ranking or new usage collection was added. Existing UTC
+event/session aggregates are adoption evidence, not productivity; review-age and
+resource-adoption metrics were not invented. Framework and Bitbucket follow-ups
+remain deferred. The normal push failed on unavailable non-interactive Git
+credentials; current remote SHA could not be verified. Canonical continuation:
+`src/SecureOps.Ui/README.md`, "SDM, Management and TEST Delivery Handoff, 2026-09-07".
+Operator runbook: `docs/24-api-test-deployment-readiness.md` and the release export.
+
 ## 2026-05-16 — PAM pre-review meeting focus
 
 **What we discussed:** Bilgi Güvenliği ve Siber Güvenlik ön incelemeleri politika, risk ve kontrol çerçevesi üretirken PAM görüşmesinin doğası daha operasyoneldir. PAM ekibi için asıl değer, servis hesabı, parola rotasyonu, secret retrieval yöntemi, Phase 4 read-only session correlation erişimi ve gelecek faz bağımlılıklarının somut ticket/request çıktısına dönüşmesidir.
@@ -49,3 +87,116 @@
 **Error taxonomy:** Directory provider timeout is separated from generic provider failure. Timeout returns `DirectoryProviderTimeout` and audits `IdentityLookupProviderTimeout`; generic provider exceptions remain `ProviderUnavailable` / `IdentityLookupFailed`.
 
 **What remains open:** Real AD smoke testing with an approved read-only account is still pending in Test/UAT. Phase 1 diagnostic MVP has not started.
+
+## 2026-09-06 - Resource catalogue and shift-start sets UI, with a scoped diff exception
+
+**What changed:** The UI for the committed resource backend was implemented: `/resources`
+(Bağlantılarım), `/resources/sets` (Mesai Setlerim) and `/admin/resources` (Katalog Yönetimi), plus
+a typed `IResourceApiClient`, presentation rules in `ResourceView`, four dialogs, capability-gated
+navigation, and `ResourceValidationFailed` / `ResourceNotFound` / `ResourceLimitExceeded` /
+`ResourceConcurrencyConflict` mappings in `UiProblemFactory`. No backend, API, Shared contract,
+SQL, migration, capability or authentication change was made.
+
+**Scoped diff exception:** The owner authorized exceeding the usual reviewable-diff guidance for
+this milestone only, so that implementation, tests and documentation could land together rather
+than being split into partially working slices. The change is 3,269 added lines across 19 files,
+all under `src/SecureOps.Ui/` and `tests/`. The permanent "implement small, keep diffs reviewable"
+rule in `AGENTS.md` is unchanged and this exception does not extend to any later task.
+
+**Link opening is UI-owned and deliberately conservative:** single links are plain anchors with
+`noopener noreferrer`; a set is resolved server-side on its own click and opened by a second
+explicit click so the browser user activation is not already spent. The UI reports that opening was
+attempted and keeps the individual links visible. It never claims a destination loaded or
+authenticated, and does not treat a missing window handle as reliable blocked-tab detection.
+
+**What remains open:** Migrations 009-010 and the reviewed grants are not applied to corporate SQL,
+and no API build containing `ResourcesController` is deployed to TEST, so these routes cannot work
+there yet.
+
+**2026-09-06 targeted correction and verification:** Started at
+`f5ed367d9e61ba0097e67a65d13bdb3508973fba`, branch
+`feature/sql-runtime-hardening-20260902`, clean tracked worktree; untracked `.vscode/` preserved.
+The owner explicitly overrode UI ownership for this task only. The correction remains below the
+1,000-line hard cap; the earlier implementation exception was not reused.
+
+- P1: batch interop expanded `string[]` into individual arguments; `openMany` received a string,
+  attempted zero opens, and the UI reported an attempt. A native browser activation handler now
+  dispatches the resolved array in order without a server round trip. Chrome showed activation on
+  the first attempt, opener isolation, and null handles without false popup-block assertions.
+- P2: set rereads retained old resolved links and erased concurrency errors. Refresh/mutations now
+  clear opening candidates, and conflict recovery retains the error. Failed forms now retain drafts
+  until confirmed success; stale/unknown outcomes require closing and inspecting the refreshed state.
+- P2: set-picker rows ignored Enter; inputs lacked accessible names and select attributes landed on
+  hidden inputs. Native choice buttons, field names and a resource-scoped MudBlazor label bridge fix
+  those cases. Long text wraps; catalogue navigation no longer highlights both resource routes.
+- P2: superseded searches used uncancelled requests; both resource searches now cancel and keep their
+  existing sequence guards. Personal/category load failures are visible; unavailable preferences
+  disable favourite actions. Client caller cancellation remains cancellation rather than a network error.
+
+Real Chrome 152 journeys and remaining limits are recorded in `src/SecureOps.Ui/README.md`.
+Evidence is local and ignored: `artifacts/resource-ui-20260906/` includes `browser-results.json`,
+`ordinary-results.json`, `manager-results.json`, screenshots and TRX results. The small replayable
+regression script is `tests/browser/resource-ui.cjs`; its driver/profile stays outside the repository.
+No HTTP page response was counted as browser interaction.
+
+Validation: full Debug solution build, zero warnings/errors; 987 unit and 233 integration tests passed,
+four opt-in LocalDB tests skipped. Final affected resource tests: 25 passed. Release UI build passed
+with zero warnings/errors. A full Release solution build was blocked by running local API DLL locks.
+Repository-wide format verification failed on existing whitespace/naming/encoding debt; scoped C#
+formatting was applied, with the pre-existing `ResourceApiClient.Root` naming diagnostic still reported.
+No corporate endpoints, SQL, IIS, deployment, packaging, framework/dependency or lockfile changes.
+
+Contract blockers: hidden membership cannot survive full replacement from a filtered personal
+projection; no environment-facet route supplies values beyond a returned page. Both need backend
+contract decisions. Injected 503/delayed-response browser cases remain pending because automatic
+approval review rejected the task-local API-proxy override. Corporate migrations/grants, resource API
+and UI deployment, actual authentication and managed-browser checks remain TEST gates.
+
+**2026-09-07 resource experience and integrity completion:** This supersedes the two contract
+blockers above, not the historical verification record. Starting SHA was
+`e05977d158bfd533aa71caa0ac60f276bbc9ef37`; verified implementation is
+`8ef13d45912a66abad6cc04242bc6608ef0e9ed4` on `feature/sql-runtime-hardening-20260902`.
+Integrity commit: `10fe8a47c98834390c273cedfe8ed0c6c5a0be2a`. The owner explicitly authorized
+Codex UI/backend work, a new milestone-only size exception and normal push to the existing origin
+branch. Integrity changed 24 files (+910/-28); UX changed 25 files (+1,772/-1,327), with shared files
+between those commits. This final documentation-only handoff is additional. No permanent rule changed.
+
+- P1 confirmed data loss: visibility-filtered personal projections previously replaced hidden saved
+  membership. Omission now always retains saved references, including legacy callers; explicit
+  `removeLinkIds` removes only currently visible members. Ordered merge preserves omitted slots,
+  including archive/restoration. Ownership, versions, limits and transactional audit remain intact;
+  no hidden IDs, names, counts or URLs are disclosed. No migration or SQL object change.
+- P2 confirmed filter defect: environment options came from one result page. A bounded, searchable,
+  authorization-aware environment endpoint now supplies them independently of paging.
+- The three screens now use Uygulama Bağlantıları, Bağlantı Gruplarım and Bağlantı Yönetimi. Personal
+  defaults use a pin, not the favourite star, and never open tabs automatically. The guide has a
+  non-blocking first-use invitation, persistent replay, keyboard/focus handling and server-side
+  dismissal only. Management navigation requires server View and Manage; Lead title is insufficient.
+- Confirmed accessibility defects found during the milestone: Mud 6 autocomplete semantics, numeric
+  stepper button names/keyboard access, muted-label/badge contrast, and closed popovers causing narrow
+  overflow. Scoped fixes passed keyboard checks and 16 resource/dialog axe scans, zero violations.
+  Fresh resolution followed by an explicit native opening gesture remains intact, with individual
+  fallback and no claim of loaded/authenticated destinations or reliable blocked-tab detection.
+
+Final full Release build: zero warnings/errors. Full Release tests: 1,009 unit + 240 integration
+passed, zero skipped, including six actual isolated LocalDB tests and separate migration 001-010
+upgrade evidence. Forty affected UI/client tests and six browser regression cases passed after the
+last accessibility fixes. OpenAPI/API checks preserve 52 operations and 478 existing schema properties
+with additive contracts. Scoped formatting, diff checks and vulnerability scan passed; repository-wide
+formatting was not repeated because of known unrelated debt. No corporate endpoints or operations.
+
+Chrome 152 ordinary/curator/denied journeys covered discovery, guide, groups, retention, opening,
+conflicts and real session revocation/reauthentication at desktop/narrow widths and light/dark themes.
+Automated axe checks are not screen-reader verification. Injected browser failures/delays, timed
+expiration and managed-browser popup variants remain explicit gaps; deterministic handler/state tests
+cover failure/delay paths without repeating the rejected proxy override. Corporate TEST deployment,
+SQL/grants and real authentication remain separate gates. MudBlazor 6.16.0 is retained; official
+9.9.0 migration spans shared theme, dialogs and account menu, so follow-up scope is recorded, not
+partially migrated. No dependency, lockfile or framework changes.
+
+Canonical handoff, permission matrix, before/after evidence paths, replay and next action:
+`src/SecureOps.Ui/README.md`, section "Resource Experience Handoff, 2026-09-07". Contract semantics:
+`docs/adr/ADR-0019-resource-catalogue-and-personal-shift-sets.md` and
+`docs/contracts/secureops-api-v1-ui-integration.md`, resource handoff section. Evidence remains local
+under `artifacts/resource-experience-20260906/`; durable summaries and both browser harnesses are
+committed. No temporary profiles, runtime data or large logs are included; `.vscode/` is preserved.

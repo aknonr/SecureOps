@@ -1,0 +1,4 @@
+.operation-history { margin-block: 1rem; overflow-wrap: anywhere; }
+.operation-history ol { padding-inline-start: 1.5rem; }
+.operation-history li { padding-block: .75rem; border-bottom: 1px solid var(--mud-palette-lines-default); }
+.operation-history p { margin-block: .35rem; }

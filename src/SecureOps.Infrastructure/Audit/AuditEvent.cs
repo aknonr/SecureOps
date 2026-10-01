@@ -44,4 +44,6 @@ public sealed class AuditEvent
     /// Structured action-specific details.
     /// </summary>
     public object? Details { get; init; }
+    /// <summary>Optional typed operational evidence committed with the same workflow transaction.</summary>
+    public SecureOps.Domain.Commands.OperationEvidence? Operation { get; init; }
 }

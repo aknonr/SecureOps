@@ -1,0 +1,55 @@
+﻿@page "/signed-out"
+@model SignedOutModel
+@{
+    Layout = "LoginLayout";
+    ViewData["Title"] = "Oturum kapatıldı";
+    string BrandMarkHref = Url.Content("~/brand/secureops-mark.svg") + "#mark";
+}
+
+@*
+    Confirms a completed sign-out.
+
+    Previously sign-out landed back on /login with no explanation, which reads as though the attempt
+    failed. Stating the outcome and offering the way back is the difference between a controlled exit
+    and an apparent error.
+*@
+
+<div class="so-auth">
+    <section class="so-auth-card" aria-labelledby="signed-out-heading">
+        <div class="so-auth-brand">
+            <span class="so-auth-mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="26" height="26" role="presentation">
+                    <use href="@BrandMarkHref" />
+                </svg>
+            </span>
+            <span class="so-auth-brand-text">
+                @WasasBrand.ShortName
+                <small>Operasyon Platformu</small>
+            </span>
+        </div>
+
+        <div class="so-auth-status so-auth-status--ok" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m20 6-11 11-5-5" />
+            </svg>
+        </div>
+
+        <h1 id="signed-out-heading" class="so-auth-title">Oturumunuz kapatıldı</h1>
+        <p class="so-auth-lead">
+            Bu tarayıcıdaki WASAS oturumu sonlandırıldı.
+            @if (Model.ProviderManaged)
+            {
+                <text>Kurumsal kimlik oturumunuz tarayıcınız tarafından yönetilir; tüm oturumları kapatmak için tarayıcınızı kapatın.</text>
+            }
+        </p>
+
+        <a class="so-auth-submit so-auth-submit--link" href="@Url.Content("~/login")">
+            <span class="so-auth-submit-label">Yeniden oturum aç</span>
+        </a>
+    </section>
+
+    @if (Model.ShowEnvironmentMarker)
+    {
+        <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
+    }
+</div>

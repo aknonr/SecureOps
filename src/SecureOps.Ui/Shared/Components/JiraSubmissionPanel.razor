@@ -1,0 +1,333 @@
+@using SecureOps.Shared.Contracts.Api
+@*
+    Where a Jira-only submission stands, next to the button that starts it.
+
+    Five outcomes must never look alike: ready, sending, created, refused and unknown. The phase is
+    resolved by JiraSubmissionView from the re-read record first, so a command response is shown as
+    an acknowledgement until the saved record carries the issue key.
+
+    Everything rendered is the server's: the preview mapping, the persisted key, the transfer key and
+    the support reference. No Jira address is composed here; the contract does not carry one.
+*@
+
+<section class="so-jira-submit so-jira-submit--@Phase.ToString().ToLowerInvariant()"
+         aria-labelledby="@_headingId" data-jira-submission="@Phase">
+    <div class="so-jira-submit-head" role="status" aria-live="polite" aria-atomic="true"
+         aria-busy="@(Phase == JiraSubmissionView.Phase.Submitting ? "true" : "false")">
+        <span class="so-jira-submit-icon" aria-hidden="true">
+            <MudIcon Icon="@PhaseIcon" Size="Size.Small" />
+        </span>
+        <div class="so-jira-submit-text">
+            <h3 id="@_headingId" class="so-jira-submit-title" tabindex="-1" @ref="_heading">@PhaseTitle</h3>
+            <p class="so-jira-submit-lead">@PhaseLead</p>
+        </div>
+    </div>
+
+    @switch (Phase)
+    {
+        case JiraSubmissionView.Phase.Created:
+            <SoFieldGrid MinColumnWidth="200px">
+                <SoField Label="Kayıtlı Jira anahtarı">
+                    @if (string.IsNullOrWhiteSpace(Record.JiraIssueKey))
+                    {
+                        <span class="so-field-empty">Sunucu kayıt olduğunu bildiriyor ancak anahtar döndürmedi</span>
+                    }
+                    else
+                    {
+                        <code class="so-code so-code--strong" data-jira-key>@Record.JiraIssueKey</code>
+                    }
+                </SoField>
+                <SoField Label="Jira bağlantısı">
+                    <span class="so-field-empty">Sunucu bağlantı adresi sağlamıyor; anahtarı Jira'da arayın.</span>
+                </SoField>
+                <SoField Label="Kaynak OR">
+                    <code class="so-code">@Record.OrCode</code>
+                    @(Record.SourceCloseRequested ? " · kapatma istendi" : " · açık bırakıldı")
+                </SoField>
+                @if (Attempt?.Transfer is { IdempotencyKey: { Length: > 0 } transferKey })
+                {
+                    <SoField Label="Sunucu aktarım anahtarı">
+                        <code class="so-code so-code--sm">@transferKey</code>
+                    </SoField>
+                }
+                @if (SupportReference is { Length: > 0 } reference)
+                {
+                    <SoField Label="Destek referansı">
+                        <code class="so-code so-code--sm">@reference</code>
+                    </SoField>
+                }
+            </SoFieldGrid>
+            <p class="so-jira-submit-guard" data-duplicate-guard>
+                <MudIcon Icon="@Icons.Material.Outlined.Shield" Size="Size.Small" aria-hidden="true" />
+                <span>
+                    Mükerrer koruma: bu kayıt için kayıtlı Jira anahtarı yeni bir oluşturmayı engeller.
+                    Aynı istek tekrarlanırsa sunucu mevcut anahtarı döndürür.
+                    @if (Attempt?.Problem?.Code == OperationalErrorCodes.JiraAlreadyCreated)
+                    {
+                        <strong> Son istek ikinci bir kayıt oluşturmadı; mevcut kayıt korundu.</strong>
+                    }
+                </span>
+            </p>
+            @if (JiraSubmissionView.IsUncertain(Attempt?.Problem))
+            {
+                <p class="so-jira-submit-note" data-resolved-uncertain>
+                    Gönderimin yanıtı alınamadı; bu anahtar kayıtlı durum yeniden okunarak doğrulandı. Yeni gönderim yapmayın.
+                </p>
+            }
+            @if (Record.SimulationMode)
+            {
+                <p class="so-jira-submit-note">Simülasyon: bu anahtar sentetiktir ve gerçek bir Jira kaydı değildir.</p>
+            }
+            break;
+
+        case JiraSubmissionView.Phase.Acknowledged when Attempt?.Transfer is { } transfer:
+            <SoFieldGrid MinColumnWidth="200px">
+                <SoField Label="Yanıttaki iş akışı durumu">@OperationalRecordView.StateLabel(transfer.WorkflowState)</SoField>
+                @if (!string.IsNullOrWhiteSpace(transfer.JiraIssueKey))
+                {
+                    <SoField Label="Yanıtta bildirilen anahtar (doğrulanmadı)">
+                        <code class="so-code">@transfer.JiraIssueKey</code>
+                    </SoField>
+                }
+                <SoField Label="Destek referansı">
+                    <code class="so-code so-code--sm">@transfer.CorrelationId</code>
+                </SoField>
+            </SoFieldGrid>
+            <ul class="so-jira-submit-steps">
+                <li>Kayıtlı durumu görmek için sayfanın üstündeki Yenile düğmesini kullanın. Yenileme yeni bir Jira isteği göndermez.</li>
+                <li>Anahtar kayıtlı durumda görünmüyorsa yeni gönderim yapmadan destek referansıyla platform yöneticisine bildirin.</li>
+            </ul>
+            break;
+
+        case JiraSubmissionView.Phase.Rejected when Attempt?.Problem is { } problem:
+            <p class="so-panel-text"><strong>@problem.Title.</strong> @problem.Explanation</p>
+            @if (SupportReference is { Length: > 0 } rejectedReference)
+            {
+                <p class="so-problem-reference">
+                    <span>Destek referansı</span>
+                    <code>@rejectedReference</code>
+                </p>
+            }
+            break;
+
+        case JiraSubmissionView.Phase.Uncertain:
+            <ol class="so-jira-submit-steps">
+                <li>Jira sahibiyle birlikte, Jira'nın onaylı arayüzünde <code class="so-code">@Record.OrCode</code> operasyonel kaydına ait bir kayıt olup olmadığını kontrol edin. Boş arama sonucu tek başına kaydın olmadığını kanıtlamaz.</li>
+                <li>Bulunan kayıt kimliğini veya belirsizliği destek referansıyla platform yöneticisine bildirin. Mutabakat kaydedilmeden yeni gönderim yapmayın.</li>
+                <li>Kayıtlı durumu görmek için Yenile düğmesini kullanın. Yenileme yeni bir Jira isteği göndermez.</li>
+            </ol>
+            @if (SupportReference is { Length: > 0 } uncertainReference)
+            {
+                <p class="so-problem-reference">
+                    <span>Destek referansı</span>
+                    <code>@uncertainReference</code>
+                </p>
+            }
+            break;
+    }
+
+    @if (Preview is not null && Phase is JiraSubmissionView.Phase.Ready or JiraSubmissionView.Phase.Submitting
+             or JiraSubmissionView.Phase.ReviewOnly or JiraSubmissionView.Phase.Unavailable)
+    {
+        @* The source outcome is stated before the field list: it is the one fact the operator must
+           not miss, and it is fixed by the server preview rather than by anything on this page. *@
+        <p class="so-jira-submit-source" data-source-outcome>
+            <MudIcon Icon="@(Preview.SourceCloseRequested ? Icons.Material.Outlined.WarningAmber : Icons.Material.Outlined.LockOpen)"
+                     Size="Size.Small" aria-hidden="true" />
+            <span><strong>Kaynak OR:</strong> @JiraSubmissionView.SourceOutcome(Preview.SourceCloseRequested)</span>
+        </p>
+
+        <h4 class="so-subhead">Aktarılacak içerik</h4>
+        @* The backend's mapping, rendered verbatim. No mapping rule is reproduced here. *@
+        <SoFieldGrid MinColumnWidth="200px">
+            <SoField Label="Seçili kaynak OR">
+                <code class="so-code">@Record.OrCode</code> · kaynak no <code class="so-code">@Record.SourceRecordId</code>
+            </SoField>
+            <SoField Label="Talep türü">@SdmEvidenceView.RequestTypeLabel(Preview.RequestType)</SoField>
+            <SoField Label="Türün dayanağı">@(Preview.ReviewOnly ? "Operatör beyanı; kaynak doğrulaması değil" : Record.SimulationMode ? "Yalıtılmış sentetik test" : "Kayıt değerlendirmesi")</SoField>
+            <SoField Label="Jira hedefi">
+                @Preview.ProjectKey · @Preview.IssueType
+                @if (!string.IsNullOrWhiteSpace(Preview.IssueTypeId))
+                {
+                    <span class="so-jira-submit-muted">(kimlik @Preview.IssueTypeId)</span>
+                }
+            </SoField>
+            <SoField Label="Raporlayıcı">@(Preview.ReporterUsername ?? "Proje varsayılanı")</SoField>
+            <SoField Label="Atanacak kişi">@(Preview.AssigneeUsername ?? "Proje varsayılanı")</SoField>
+            @if (!string.IsNullOrWhiteSpace(Preview.TeamValue))
+            {
+                <SoField Label="İlgili grup">@Preview.TeamValue (@Preview.TeamCustomField)</SoField>
+            }
+            @if (Preview.Labels is { Count: > 0 })
+            {
+                <SoField Label="Etiketler">@string.Join(", ", Preview.Labels)</SoField>
+            }
+            <SoField Label="Takip eden kişi (kaynak talep sahibi)">
+                @if (string.IsNullOrWhiteSpace(Preview.RequesterAccountId))
+                {
+                    <span class="so-field-empty">Çözümlenemedi</span>
+                }
+                else
+                {
+                    @Preview.RequesterAccountId
+                }
+            </SoField>
+            @if (!string.IsNullOrWhiteSpace(Preview.RequesterWatcherCustomField))
+            {
+                <SoField Label="Takip eden kişi alanı">@Preview.RequesterWatcherCustomField</SoField>
+            }
+            <SoField Label="Aktar ve kapat">
+                <span data-transfer-close>Kullanılamaz. @JiraSubmissionView.TransferAndCloseReason(Record)</span>
+            </SoField>
+            @if (!Preview.ReviewOnly && !string.IsNullOrWhiteSpace(Preview.IdempotencyKey))
+            {
+                <SoField Label="Mükerrer koruma (sunucu aktarım anahtarı)">
+                    <code class="so-code so-code--sm">@Preview.IdempotencyKey</code>
+                </SoField>
+            }
+        </SoFieldGrid>
+
+        <h4 class="so-subhead">Özet</h4>
+        <p class="so-panel-text">@Preview.Summary</p>
+
+        <h4 class="so-subhead">Açıklama</h4>
+        <pre class="so-preview-body">@Preview.Description</pre>
+
+        @if (Preview.Warnings.Count > 0)
+        {
+            <div class="so-panel-note so-panel-note--caution">
+                <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" />
+                <span>
+                    <strong>Sunucu uyarıları</strong>
+                    <ul class="so-warning-list">
+                        @foreach (string warning in Preview.Warnings)
+                        {
+                            <li>@warning</li>
+                        }
+                    </ul>
+                </span>
+            </div>
+        }
+    }
+
+    @if (Phase == JiraSubmissionView.Phase.ReviewOnly && Preview is not null)
+    {
+        <p class="so-jira-submit-blocked" role="note">Bu inceleme taslağı yayımlanamaz.</p>
+        <ul class="so-jira-submit-steps">
+            @foreach (string blocker in Preview.BlockingConditions.Except(Record.BlockingConditions, StringComparer.Ordinal))
+            {
+                <li>@SdmEvidenceView.Guidance(blocker)</li>
+            }
+        </ul>
+    }
+
+    @if (Phase == JiraSubmissionView.Phase.Unavailable
+         && JiraSubmissionView.UnsupportedTypeGuidance(Record, Preview) is { Count: > 0 } unsupported)
+    {
+        <h4 class="so-subhead">Desteklenmeyen talep türü</h4>
+        <ul class="so-jira-submit-steps" data-unsupported-type>
+            @foreach (string guidance in unsupported)
+            {
+                <li>@guidance</li>
+            }
+        </ul>
+    }
+
+    @if (Preview is null && Phase == JiraSubmissionView.Phase.Unavailable)
+    {
+        <p class="so-panel-text so-panel-text--sm" data-transfer-close>
+            Aktar ve kapat: kullanılamaz. @JiraSubmissionView.TransferAndCloseReason(Record)
+        </p>
+    }
+</section>
+
+@code {
+    private readonly string _headingId = "jira-submission-" + Guid.NewGuid().ToString("N");
+    private ElementReference _heading;
+    private int _focused;
+
+    /// <summary>Authoritative record, as last read.</summary>
+    [Parameter, EditorRequired]
+    public OperationalRecordResponse Record { get; set; } = default!;
+
+    /// <summary>Server preview held by the page, if any.</summary>
+    [Parameter]
+    public JiraPreviewResponse? Preview { get; set; }
+
+    /// <summary>Resolved submission phase.</summary>
+    [Parameter]
+    public JiraSubmissionView.Phase Phase { get; set; }
+
+    /// <summary>Outcome of the page's last create or retry command.</summary>
+    [Parameter]
+    public JiraSubmissionView.Attempt? Attempt { get; set; }
+
+    /// <summary>Why nothing can be submitted, when the phase is unavailable.</summary>
+    [Parameter]
+    public string? UnavailableReason { get; set; }
+
+    /// <summary>
+    /// Incremented by the page when a command settles; the heading then takes focus so keyboard and
+    /// screen-reader users land on the outcome instead of on a button that has just been disabled.
+    /// </summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
+    private string? SupportReference =>
+        Attempt?.Problem?.CorrelationId ?? Attempt?.Transfer?.CorrelationId ?? Record.CorrelationId;
+
+    private string PhaseTitle => Phase switch
+    {
+        JiraSubmissionView.Phase.Ready => "Gönderime hazır",
+        JiraSubmissionView.Phase.Submitting => "Gönderiliyor",
+        JiraSubmissionView.Phase.Created => OperationalRecordView.HasJira(Record) && !string.IsNullOrWhiteSpace(Record.JiraIssueKey)
+            ? "Jira kaydı oluşturuldu · " + Record.JiraIssueKey
+            : "Jira kaydı mevcut",
+        JiraSubmissionView.Phase.Acknowledged => "İstek yanıtlandı; Jira kaydı doğrulanmadı",
+        JiraSubmissionView.Phase.Rejected => "Gönderim reddedildi",
+        JiraSubmissionView.Phase.Uncertain => "Sonuç belirsiz; mutabakat gerekli",
+        JiraSubmissionView.Phase.ReviewOnly => "İnceleme taslağı; gönderilemez",
+        _ => "Gönderime hazır değil"
+    };
+
+    private string PhaseLead => Phase switch
+    {
+        JiraSubmissionView.Phase.Ready =>
+            "Aşağıdaki içerik sunucu önizlemesidir. Gönderim, onay penceresinde açık onay verildikten sonra başlar.",
+        JiraSubmissionView.Phase.Submitting =>
+            "İstek sunucuya iletildi. Sonuç doğrulanana kadar sayfadan ayrılmayın ve işlemi tekrarlamayın.",
+        JiraSubmissionView.Phase.Created => Record.WorkflowState == OperationalRecordWorkflowState.JiraCreated && !Record.SourceCloseRequested
+            ? "Jira oluşturuldu. Turuncu Hat kaydı açık bırakıldı."
+            : OperationalRecordView.StateDetail(Record) ?? OperationalRecordView.StateLabel(Record),
+        JiraSubmissionView.Phase.Acknowledged =>
+            "Sunucu isteği yanıtladı, ancak yeniden okunan kayıtta kayıtlı bir Jira anahtarı yok. Bu yanıt oluşturulmuş bir Jira kaydı olarak kabul edilmez.",
+        JiraSubmissionView.Phase.Rejected =>
+            "Yeniden okunan kayıtta Jira anahtarı yok ve sonuç belirsiz olarak işaretlenmedi.",
+        JiraSubmissionView.Phase.Uncertain =>
+            "Jira'da kayıt oluşup oluşmadığı doğrulanamadı. Yeni bir gönderim mükerrer kayıt oluşturabileceği için gönderim ve yeniden deneme bu ekranda kapalıdır.",
+        JiraSubmissionView.Phase.ReviewOnly =>
+            "Bu taslak operatör beyanına dayanır; yayımlama onayı veya uygunluk vermez.",
+        _ => UnavailableReason ?? "Jira kaydı oluşturmadan önce önizleme alın."
+    };
+
+    private string PhaseIcon => Phase switch
+    {
+        JiraSubmissionView.Phase.Ready => Icons.Material.Filled.PlaylistAddCheck,
+        JiraSubmissionView.Phase.Submitting => Icons.Material.Filled.Sync,
+        JiraSubmissionView.Phase.Created => Icons.Material.Filled.CheckCircle,
+        JiraSubmissionView.Phase.Acknowledged => Icons.Material.Filled.MarkEmailRead,
+        JiraSubmissionView.Phase.Rejected => Icons.Material.Filled.Block,
+        JiraSubmissionView.Phase.Uncertain => Icons.Material.Filled.HelpOutline,
+        JiraSubmissionView.Phase.ReviewOnly => Icons.Material.Filled.RateReview,
+        _ => Icons.Material.Outlined.Info
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (FocusRequest != _focused)
+        {
+            _focused = FocusRequest;
+            await _heading.FocusAsync();
+        }
+    }
+}

@@ -7,7 +7,7 @@
     Depends on: Domain, Shared.
     Does NOT contain: ASP.NET pipeline, Blazor components.
 
-    See: docs/03-architecture.md, .cursor/rules/010-architecture-rules.mdc
+    See: docs/03-architecture.md, docs/agent-guides/010-architecture.md
   -->
 
   <PropertyGroup>
@@ -22,6 +22,9 @@
 
   <ItemGroup>
     <!-- Data access -->
+    <PackageReference Include="MimeKit" />
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="SkiaSharp" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
@@ -33,7 +36,8 @@
     <PackageReference Include="Hangfire.SqlServer" />
 
     <!-- PowerShell / JEA -->
-    <PackageReference Include="System.Management.Automation" />
+    <PackageReference Include="Microsoft.PowerShell.SDK" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
 
     <!-- AD lookup -->
     <PackageReference Include="System.DirectoryServices" />

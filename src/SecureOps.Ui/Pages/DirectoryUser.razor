@@ -1,0 +1,626 @@
+@page "/directory/users"
+@page "/identity-lookup"
+@attribute [Authorize]
+@using Microsoft.Extensions.Logging
+@implements IDisposable
+@inject IIdentityLookupApiClient IdentityClient
+@inject ICurrentAccessProvider AccessProvider
+@inject NavigationManager Navigation
+@inject ILogger<DirectoryUser> Logger
+
+<PageTitle>AD Kullanıcı ve Hesap Sorgulama · @WasasBrand.Name</PageTitle>
+
+@*
+    Exact Active Directory account lookup.
+
+    One field. The read-only lookup no longer requires a stated reason, so the reason field, the
+    legacy alert and Turuncuhat event references, and the second prompt that used to gate the
+    identity fields are all gone — a screen that keeps asking for information the backend does not
+    want is a screen operators learn to fight.
+
+    Everything here is directory evidence about an object. SecureOps does not decide that an account
+    belongs to a person, to PAM, or to a service: those are all AD user objects, and the difference
+    is how the organisation uses them, not what the directory records.
+
+    Before a lookup the page is a search box. After one it becomes a result: the query collapses to
+    a compact header so the evidence gets the full width of the page.
+*@
+
+<div class="so-page so-page--wide">
+    @if (_access is null)
+    {
+        <SoPageHeader Title="AD Kullanıcı ve Hesap Sorgulama" />
+        <SoLoading Message="Yetkileriniz doğrulanıyor…" />
+    }
+    else if (!_access.IsResolved)
+    {
+        <SoPageHeader Title="AD Kullanıcı ve Hesap Sorgulama" />
+        <SoProblemPanel Problem="_access.Problem!" OnRetry="ReloadAccessAsync" />
+    }
+    else if (!_access.Can(Capabilities.IdentityLookup))
+    {
+        <SoPageHeader Title="AD Kullanıcı ve Hesap Sorgulama" />
+        @* A capability the operator lacks is explained here rather than redirected away, so they
+           learn what is missing and where to ask for it. *@
+        <SoProblemPanel Problem="_noCapabilityProblem">
+            <Actions>
+                <MudButton Href="access/me" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
+                    Erişimimi görüntüle
+                </MudButton>
+            </Actions>
+        </SoProblemPanel>
+    }
+    else if (_submittedAccount is null)
+    {
+        @* -- search state: nothing competes with the one thing to do here -------------------- *@
+        <SoPageHeader Title="AD Kullanıcı ve Hesap Sorgulama"
+                      Lead="Active Directory üzerindeki kullanıcı, PAM veya servis hesapları tam hesap adıyla sorgulanabilir." />
+
+        <section class="so-panel so-search-panel">
+            <EditForm Model="_model" OnValidSubmit="SubmitSearch">
+                <DataAnnotationsValidator />
+
+                <div class="so-search-row">
+                    <MudTextField @bind-Value="_model.Account"
+                                  @bind-Value:after="OnAccountChanged"
+                                  Label="Hesap"
+                                  Placeholder="kullanici01"
+                                  HelperText="@AccountHelperText"
+                                  Error="@(_accountError is not null)"
+                                  ErrorText="@_accountError"
+                                  Required="true"
+                                  Immediate="true"
+                                  MaxLength="@_maxAccountLength"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.PersonSearch"
+                                  Variant="Variant.Outlined"
+                                  Class="so-search-field" />
+
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@(_loading || _accountError is not null)"
+                               StartIcon="@Icons.Material.Filled.ManageSearch"
+                               Class="so-search-button">
+                        Sorgula
+                    </MudButton>
+                </div>
+            </EditForm>
+
+            @if (_accountAdvisory is not null)
+            {
+                <p class="so-input-note">@_accountAdvisory</p>
+            }
+
+            <div class="so-search-hints">
+                <span class="so-hint-label">Örnek biçimler</span>
+                <code class="so-code so-code--sm">kullanici01</code>
+                <code class="so-code so-code--sm">DOMAIN\kullanici01</code>
+                <code class="so-code so-code--sm">PAM12345</code>
+                <code class="so-code so-code--sm">SERVICE_APP01</code>
+            </div>
+
+            <p class="so-panel-text so-panel-text--sm">
+                Tam hesap adıyla sorgulanır. Joker karakter, LDAP filtresi veya birden fazla hesap
+                kabul edilmez. Sorgulanan hesap ve açık sekme adres çubuğunda taşınır; böylece
+                tarayıcının geri/ileri düğmeleri ve bağlantıyı yeni sekmede açma çalışır.
+            </p>
+        </section>
+    }
+    else
+    {
+        @* -- result state: compact query header, full-width evidence ------------------------- *@
+        <div class="so-result-head">
+            <div class="so-result-query">
+                <span class="so-result-query-label">AD Kullanıcı ve Hesap Sorgulama</span>
+                <code class="so-code so-result-query-value">@_submittedAccount</code>
+            </div>
+            <div class="so-result-actions">
+                <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                           Disabled="@_loading"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="@(() => RunLookupAsync(force: true))">
+                    Yenile
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Search"
+                           OnClick="StartNewQuery">
+                    Yeni Sorgu
+                </MudButton>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <SoLoading Message="Active Directory sorgulanıyor…" Variant="SoLoading.LoadingVariant.Block" />
+        }
+        else if (_problem is not null)
+        {
+            <SoProblemPanel Problem="_problem" OnRetry="@(() => RunLookupAsync(force: true))" />
+        }
+        else if (_result?.User is { } user)
+        {
+            <section class="so-panel so-principal">
+                <div class="so-principal-head">
+                    <span class="so-avatar so-avatar--xl" aria-hidden="true">
+                        @AccessIdentityDisplay.Initials(null, _result.NormalizedAccount)
+                    </span>
+                    <div class="so-principal-text">
+                        <h2 class="so-principal-name">@DisplayText(user.DisplayName)</h2>
+                        <code class="so-code so-principal-account">@_result.NormalizedAccount</code>
+                    </div>
+                    <div class="so-principal-badges">
+                        <SoStatusBadge Label="@EnabledText(user.Enabled)" Tone="@EnabledTone(user.Enabled)"
+                                       Icon="@Icons.Material.Filled.PowerSettingsNew" />
+                        <SoStatusBadge Label="@LockedText(user.Locked)" Tone="@LockedTone(user.Locked)"
+                                       Icon="@Icons.Material.Filled.Lock" />
+                        @if (_reusedResult)
+                        {
+                            <SoStatusBadge Label="Önceki sonuç"
+                                           Tone="SoStatusBadge.BadgeTone.Neutral"
+                                           Icon="@Icons.Material.Filled.History"
+                                           Title="Aynı sorgu az önce çalıştırıldı. Yeniden çalıştırmak için Yenile'yi kullanın." />
+                        }
+                    </div>
+                </div>
+            </section>
+
+            @* Sections load only when opened. Each is a separate audited, bounded, rate-limited
+               directory call, so fetching all of them on every lookup would spend an operator's
+               quota on evidence nobody asked to see. *@
+            <div class="so-tabs" role="tablist" aria-label="Hesap bölümü">
+                @foreach (DetailTab tab in AvailableTabs)
+                {
+                    DetailTab captured = tab;
+                    <button type="button"
+                            role="tab"
+                            class="so-tab @(tab == _tab ? "so-tab--active" : null)"
+                            aria-selected="@(tab == _tab)"
+                            @onclick="() => GoToTab(captured)">
+                        @TabLabel(tab)
+                    </button>
+                }
+            </div>
+
+            @if (_tab == DetailTab.General)
+            {
+                <section class="so-panel">
+                    <SoFieldGrid MinColumnWidth="260px">
+                        <SoField Label="@DirectoryView.UserNameLabel">@DisplayText(user.DisplayName)</SoField>
+                        <SoField Label="@DirectoryView.UserAccountLabel">
+                            <code class="so-code so-code--sm">@_result.NormalizedAccount</code>
+                        </SoField>
+                        <SoField Label="@DirectoryView.UpnLabel">
+                            @DisplayText(user.UserPrincipalName)
+                            <span class="so-field-help">@DirectoryView.UpnHelp</span>
+                        </SoField>
+                        <SoField Label="E-posta">@DisplayText(user.Mail)</SoField>
+                        <SoField Label="Departman">@DisplayText(user.Department)</SoField>
+                        <SoField Label="Ünvan">@DisplayText(user.Title)</SoField>
+                        <SoField Label="Yönetici">@DisplayText(user.ManagerDisplayName)</SoField>
+                        <SoField Label="Hesap Durumu">
+                            <div class="so-inline-badges">
+                                <SoStatusBadge Label="@EnabledText(user.Enabled)" Tone="@EnabledTone(user.Enabled)" />
+                                <SoStatusBadge Label="@LockedText(user.Locked)" Tone="@LockedTone(user.Locked)" />
+                            </div>
+                        </SoField>
+                    </SoFieldGrid>
+
+                    <p class="so-panel-text so-panel-text--sm">
+                        Bu bilgiler Active Directory nesnesinden okunur. WASAS bir hesabın kişiye,
+                        PAM'e veya bir servise ait olduğuna karar vermez; bu ayrım dizin kaydında yer almaz.
+                    </p>
+                </section>
+            }
+            else if (!_access.Can(Capabilities.DirectoryGroupsView))
+            {
+                <section class="so-panel so-panel--blocked">
+                    <h2 class="so-panel-title">Bu bilgi için yetkiniz bulunmuyor</h2>
+                    <p class="so-panel-text">
+                        Dizin ayrıntılarını görüntülemek için
+                        <code class="so-code">@Capabilities.DirectoryGroupsView</code> yetkisi gerekir.
+                    </p>
+                </section>
+            }
+            else
+            {
+                @* Keyed on the account so switching principals rebuilds each panel instead of
+                   showing the previous account's evidence under a new name. *@
+                @switch (_tab)
+                {
+                    case DetailTab.Groups:
+                        <SoDirectoryGroups @key="@($"groups:{DirectoryAccount}")" Account="@DirectoryAccount" />
+                        break;
+
+                    case DetailTab.Account:
+                        <SoDirectoryHealth @key="@($"health:{DirectoryAccount}")" Account="@DirectoryAccount" />
+                        break;
+
+                    case DetailTab.Service:
+                        <SoDirectoryService @key="@($"service:{DirectoryAccount}")" Account="@DirectoryAccount" />
+                        break;
+
+                    case DetailTab.Privileged:
+                        <SoDirectoryPrivileged @key="@($"priv:{DirectoryAccount}")" Account="@DirectoryAccount" />
+                        break;
+                }
+            }
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Sections of the account record, each backed by its own endpoint.</summary>
+    private enum DetailTab
+    {
+        /// <summary>Identity fields from the exact lookup already performed.</summary>
+        General,
+
+        /// <summary>Direct, primary, and nested group membership.</summary>
+        Groups,
+
+        /// <summary>Enablement, lockout, password, and last-seen evidence.</summary>
+        Account,
+
+        /// <summary>SPNs and directory account-type evidence.</summary>
+        Service,
+
+        /// <summary>Membership in the server-configured privileged groups.</summary>
+        Privileged
+    }
+
+    /// <summary>Account supplied by a link from the group analysis screen.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "account")]
+    public string? AccountQuery { get; set; }
+
+    /// <summary>Section to open, so Back returns to the tab the operator left.</summary>
+    /// <remarks>
+    /// The real TEST complaint this fixes: looking up a user, opening Grup Üyelikleri, following a
+    /// group, then pressing Back — and losing both the account and the tab. Neither survived in
+    /// component state, so the operator had to retype the lookup. Both live in the URL now.
+    /// </remarks>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? TabQuery { get; set; }
+
+    private readonly LookupModel _model = new();
+    private readonly IdentityLookupResultCache _cache = new();
+
+    private DetailTab _tab = DetailTab.General;
+
+    private AccessSnapshot? _access;
+    private string? _submittedAccount;
+    private bool _loading;
+    private bool _reusedResult;
+
+    private IdentityLookupResponse? _result;
+    private UiProblem? _problem;
+
+    private string? _accountError;
+    private string? _accountAdvisory;
+
+    // Server-declared limits, replaced by the capabilities endpoint once it answers. Until then the
+    // documented defaults apply, so the form is usable even if that call fails.
+    private int _maxAccountLength = AccountInputRules.DefaultMaxAccountLength;
+    private bool _supportsUpn = true;
+
+    private static readonly UiProblem _noCapabilityProblem = new(
+        UiProblemKind.Forbidden,
+        "AccessDenied",
+        "Bu bilgi için yetkiniz bulunmuyor",
+        "Hesabınız etkin, ancak Active Directory sorgulama yetkisi tanımlı değil.",
+        ["Erişimim sayfasından mevcut yetkilerinizi görebilirsiniz.",
+         "İhtiyacınız varsa yöneticinizden bu yetkiyi talep edin."],
+        Retryable: false,
+        RequiresRefresh: false,
+        CorrelationId: null,
+        Stage: null,
+        StatusCode: null);
+
+    private string AccountHelperText =>
+        $"Tek bir hesap. DOMAIN\\hesap biçimi kabul edilir. En fazla {_maxAccountLength} karakter.";
+
+    // Privileged evidence is a separate capability from ordinary group viewing, so the tab is absent
+    // rather than present-and-refusing for an operator who cannot use it.
+    private IEnumerable<DetailTab> AvailableTabs =>
+        _access?.Can(Capabilities.DirectoryPrivilegedGroupsView) == true
+            ? Enum.GetValues<DetailTab>()
+            : Enum.GetValues<DetailTab>().Where(tab => tab != DetailTab.Privileged);
+
+    // The account the server actually resolved, not what was typed. Directory calls must ask about
+    // the same principal the lookup returned, or the sections can describe a different object.
+    private string DirectoryAccount =>
+        !string.IsNullOrWhiteSpace(_result?.NormalizedAccount)
+            ? _result!.NormalizedAccount
+            : _submittedAccount ?? string.Empty;
+
+    private static string TabLabel(DetailTab tab) => tab switch
+    {
+        DetailTab.General => "Genel Bilgiler",
+        DetailTab.Groups => "Grup Üyelikleri",
+        DetailTab.Account => "Hesap ve Parola Bilgileri",
+        DetailTab.Service => "Servis Hesabı Göstergeleri",
+        _ => "Ayrıcalıklı Grup Üyelikleri"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _access = await AccessProvider.GetAsync();
+
+        if (!_access.Can(Capabilities.IdentityLookup))
+        {
+            return;
+        }
+
+        await LoadCapabilitiesAsync();
+    }
+
+    // The URL is the state. A member row on the group screen, the search form, browser Back, browser
+    // Forward, and a link opened in a new tab all arrive here, so all of them restore the same thing.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_access?.Can(Capabilities.IdentityLookup) != true)
+        {
+            return;
+        }
+
+        string? account = string.IsNullOrWhiteSpace(AccountQuery) ? null : AccountQuery.Trim();
+
+        if (account is null)
+        {
+            if (_submittedAccount is not null)
+            {
+                ResetToSearch();
+            }
+
+            return;
+        }
+
+        // The tab is applied before the lookup so a restored Grup Üyelikleri lands on the section the
+        // operator left rather than flashing the summary first.
+        _tab = ParseTab(TabQuery);
+
+        if (!string.Equals(_submittedAccount, account, StringComparison.OrdinalIgnoreCase))
+        {
+            _model.Account = account;
+            await RunLookupAsync(force: false);
+        }
+    }
+
+    private static DetailTab ParseTab(string? value) => value?.ToLowerInvariant() switch
+    {
+        "groups" => DetailTab.Groups,
+        "account" => DetailTab.Account,
+        "service" => DetailTab.Service,
+        "privileged" => DetailTab.Privileged,
+        _ => DetailTab.General
+    };
+
+    private static string TabSlug(DetailTab tab) => tab switch
+    {
+        DetailTab.Groups => "groups",
+        DetailTab.Account => "account",
+        DetailTab.Service => "service",
+        DetailTab.Privileged => "privileged",
+        _ => "general"
+    };
+
+    // Replaces rather than pushes. The tab belongs in the address so leaving and coming back returns
+    // to it, but every tab click becoming a history entry would bury the previous account under a
+    // stack of Back presses.
+    private void GoToTab(DetailTab tab)
+    {
+        _tab = tab;
+        Navigation.NavigateTo(DirectoryRoutes.User(_submittedAccount, TabSlug(tab)), replace: true);
+    }
+
+    // Validation limits come from the server rather than being hard-coded, so a configuration change
+    // does not silently leave the form stricter or looser than the endpoint it posts to.
+    private async Task LoadCapabilitiesAsync()
+    {
+        try
+        {
+            IdentityLookupCapabilitiesResponse capabilities =
+                await IdentityClient.GetCapabilitiesAsync(CancellationToken.None);
+
+            _maxAccountLength = capabilities.MaxAccountLength;
+            _supportsUpn = capabilities.SupportsUpnLookup;
+        }
+        catch (SecureOpsApiException ex)
+        {
+            // Non-fatal: the form still works on documented defaults, and the server re-validates.
+            Logger.LogWarning(
+                "Identity lookup capabilities unavailable; using defaults. Code: {Code}.",
+                ex.Problem.Code);
+        }
+    }
+
+    private async Task ReloadAccessAsync()
+    {
+        _access = await AccessProvider.RefreshAsync();
+
+        if (_access.Can(Capabilities.IdentityLookup))
+        {
+            await LoadCapabilitiesAsync();
+        }
+    }
+
+    private void OnAccountChanged()
+    {
+        AccountValidationResult validation =
+            AccountInputRules.Validate(_model.Account, _maxAccountLength, _supportsUpn);
+
+        // Nothing is flagged until there is something to flag: an untouched empty field is not an error.
+        _accountError = string.IsNullOrWhiteSpace(_model.Account) ? null : validation.Message;
+        _accountAdvisory = validation.IsValid ? validation.Advisory : null;
+    }
+
+    // Navigates to the bare page; the reset happens when the empty query string comes back through
+    // OnParametersSetAsync, so "Yeni Sorgu" is a history entry like every other move here.
+    private void StartNewQuery() => Navigation.NavigateTo(DirectoryRoutes.UsersPath);
+
+    // Validated before navigating so an invalid account is reported on the form rather than becoming
+    // a URL that resolves to a lookup failure.
+    private void SubmitSearch()
+    {
+        AccountValidationResult validation =
+            AccountInputRules.Validate(_model.Account, _maxAccountLength, _supportsUpn);
+
+        if (!validation.IsValid)
+        {
+            _accountError = validation.Message;
+            return;
+        }
+
+        Navigation.NavigateTo(DirectoryRoutes.User(_model.Account.Trim()));
+    }
+
+    private void ResetToSearch()
+    {
+        _result = null;
+        _problem = null;
+        _submittedAccount = null;
+        _reusedResult = false;
+        _tab = DetailTab.General;
+        _model.Account = string.Empty;
+        _accountError = null;
+        _accountAdvisory = null;
+        _cache.Invalidate();
+    }
+
+    private async Task RunLookupAsync(bool force)
+    {
+        AccountValidationResult validation =
+            AccountInputRules.Validate(_model.Account, _maxAccountLength, _supportsUpn);
+
+        if (!validation.IsValid)
+        {
+            _accountError = validation.Message;
+            return;
+        }
+
+        string account = _model.Account.Trim();
+
+        // A different account invalidates every section: the tabs would otherwise describe one
+        // principal under another's name.
+        if (!string.Equals(_submittedAccount, account, StringComparison.OrdinalIgnoreCase))
+        {
+            _tab = DetailTab.General;
+        }
+
+        _submittedAccount = account;
+
+        // No purpose is sent. The read-only lookup does not require one, and inventing a default
+        // would put a reason the operator never wrote into the audit trail.
+        IdentityLookupRequest request = new(account);
+
+        if (force)
+        {
+            _cache.Invalidate();
+        }
+        else if (_cache.TryReuse(request, DateTimeOffset.UtcNow, out IdentityLookupResponse? cached))
+        {
+            _result = cached;
+            _problem = null;
+            _reusedResult = true;
+            return;
+        }
+
+        _loading = true;
+        _problem = null;
+        _reusedResult = false;
+
+        try
+        {
+            IdentityLookupResponse response = await IdentityClient.LookupAsync(request, CancellationToken.None);
+
+            _result = response;
+            _cache.Store(request, response, DateTimeOffset.UtcNow);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _result = null;
+            _problem = ex.Problem;
+
+            // Only failures are dropped from the cache; a stale success is never shown as current.
+            _cache.Invalidate();
+
+            if (ex.Problem.RequiresSignIn)
+            {
+                Navigation.NavigateTo(SessionExpiredUrl(), forceLoad: true);
+                return;
+            }
+
+            Logger.LogWarning(
+                "Identity lookup failed. Code: {Code}. Status: {Status}. CorrelationId: {CorrelationId}.",
+                ex.Problem.Code,
+                ex.Problem.StatusCode,
+                ex.Problem.CorrelationId);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string SessionExpiredUrl()
+    {
+        string current = Navigation.ToBaseRelativePath(Navigation.Uri);
+        return $"session-expired?returnUrl={Uri.EscapeDataString(current)}";
+    }
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    // Absent directory evidence is stated, never blanked: an empty cell reads as a rendering bug.
+    private static RenderFragment DisplayText(string? value) => builder =>
+    {
+        bool missing = string.IsNullOrWhiteSpace(value);
+        builder.OpenElement(0, "span");
+        if (missing)
+        {
+            builder.AddAttribute(1, "class", "so-unknown");
+        }
+
+        builder.AddContent(2, missing ? DirectoryView.NotDefinedText : value);
+        builder.CloseElement();
+    };
+
+    private static string EnabledText(bool? enabled) => enabled switch
+    {
+        true => "Etkin",
+        false => "Devre dışı",
+        _ => "Durum bilinmiyor"
+    };
+
+    private static SoStatusBadge.BadgeTone EnabledTone(bool? enabled) => enabled switch
+    {
+        true => SoStatusBadge.BadgeTone.Positive,
+        false => SoStatusBadge.BadgeTone.Critical,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static string LockedText(bool? locked) => locked switch
+    {
+        true => "Kilitli",
+        false => "Kilitli değil",
+        _ => "Kilit durumu bilinmiyor"
+    };
+
+    private static SoStatusBadge.BadgeTone LockedTone(bool? locked) => locked switch
+    {
+        true => SoStatusBadge.BadgeTone.Critical,
+        false => SoStatusBadge.BadgeTone.Positive,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+
+    private sealed class LookupModel
+    {
+        [Required(ErrorMessage = "Hesap zorunludur.")]
+        [MaxLength(128)]
+        public string Account { get; set; } = string.Empty;
+    }
+}

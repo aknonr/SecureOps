@@ -1,0 +1,21 @@
+@if (Type == "datetime-local")
+{ <AnnouncementTimeField Key="@Key" Label="@Label" Value="@Value" ValueChanged="ValueChanged" Error="@Error" /> }
+else
+{
+<label class="so-announcement-field" for="@($"announcement-{Key}")">@Label
+    @if (Type == "textarea")
+    { <textarea id="@($"announcement-{Key}")" aria-describedby="@($"announcement-error-{Key}")" rows="3" maxlength="4000" value="@Value" @oninput="ChangeAsync"></textarea> }
+    else
+    { <input id="@($"announcement-{Key}")" aria-describedby="@($"announcement-error-{Key}")" type="@Type" maxlength="@(Key == "Subject" ? 200 : 4000)" value="@Value" @oninput="ChangeAsync" /> }
+    <span class="so-announcement-field-error" id="@($"announcement-error-{Key}")">@Error</span>
+</label>
+}
+@code {
+    [Parameter] public string Key { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Type { get; set; } = "text";
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    private Task ChangeAsync(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value?.ToString() ?? "");
+}

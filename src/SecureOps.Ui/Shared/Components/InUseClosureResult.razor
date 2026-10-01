@@ -1,0 +1,34 @@
+@using SecureOps.Shared.Contracts.InUse
+
+<div role="status" aria-live="polite">
+    <p><strong>OR: @(string.IsNullOrWhiteSpace(Operation.SourceCode) ? "Kayıtlı OR numarası yok" : Operation.SourceCode)</strong></p>
+    @if (InUseClosureVerification.ManualConfirmation(Operation) is { } manual)
+    {
+        <p>@(manual.Code == "OperatorAttestedWasasActivityCompleted" ? "Manuel doğrulama: operatör WASAS adımının tamamlandığını bildirdi. OR kapanışı değildir." : "Manuel doğrulama: operatör OR'nin kapalı olduğunu bildirdi.") Sistem doğrulaması değildir.</p>
+        <p>Onaylayan: @InUsePersonLabel.Format(manual.ConfirmedByLabel, null) · @manual.At.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'")</p>
+    }
+    else if (InUseClosureVerification.SourceVerified(Operation))
+    { <p>OR kapandı. Kaynak sistemin son durum kanıtıyla doğrulandı.</p> }
+    else if (InUseClosureVerification.ClosureUnknown(Operation))
+    { <p>@(Activity ? "WASAS onay sonucu doğrulanamadı. Tekrar denemeden önce kaynak sistemde WASAS aktivitesini kontrol edin." : "Kapatma sonucu doğrulanamadı. Tekrar denemeden önce kaynak sistemde OR durumunu kontrol edin.")</p> }
+    else if (InUseClosureVerification.ActivityVerified(Operation))
+    { <p>WASAS aktivitesinin tamamlandığı kaynak kanıtıyla doğrulandı. Genel OR kapanışı doğrulanmadı.</p> }
+    else if (InUseClosureVerification.Acknowledged(Operation))
+    { <p>@(Activity ? "WASAS onay isteği iletildi. Lütfen kaynak sistemde WASAS aktivitesini kontrol edin. OR'nin tamamının kapandığı doğrulanmadı." : "Kapatma isteği iletildi. Lütfen kaynak sistemde OR durumunu kontrol edin.")</p> }
+    else
+    { <p>@StateText</p> }
+</div>
+
+@code {
+    /// <summary>Authorized persisted execution, never a browser-supplied source outcome.</summary>
+    [Parameter, EditorRequired] public InUseExecution Operation { get; set; } = default!;
+    private bool Activity => Operation.VerificationMode == "WasasActivityManual";
+    private string StateText => Operation.State switch
+    {
+        "Queued" => "İş kuyruğunda; Worker bekleniyor.",
+        "Running" => "Kaynak adımı çalışıyor; yeniden başlatmayın.",
+        "Failed" => "İstek reddedildi; işlem başarısız. Önceki adımların etkilerini kontrol edin.",
+        "Blocked" => "Yetki, yapılandırma veya kaynak sürümü değişti; kalan adımlar durduruldu.",
+        _ => "Adım sonucu doğrulanamadı. Kayıtlı kanıtı inceleyin; dış işlemi tekrarlamayın."
+    };
+}

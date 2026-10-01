@@ -1,0 +1,258 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ISignedInUserService Users
+@inject IDemoModeState ShellMode
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+@inject IApiSessionContext ApiSession
+@inject IApiSessionStore ApiSessions
+
+<MudThemeProvider @ref="_themeProvider" Theme="@SecureOpsTheme.For(_mode)" IsDarkMode="@IsDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+
+@* Bound by MudHidden: true when the viewport is lg-and-up, where the drawer is docked. *@
+<MudHidden Breakpoint="Breakpoint.LgAndUp" @bind-IsHidden="_isDesktop" />
+
+<MudLayout>
+    <AuthorizeView>
+        <Authorized Context="auth">
+            @{
+                SignedInUser currentUser = Users.Describe(auth.User);
+            }
+
+            <MudAppBar Elevation="0" Class="so-appbar">
+                <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                               Color="Color.Inherit"
+                               Edge="Edge.Start"
+                               OnClick="ToggleDrawer"
+                               Class="so-menu-button"
+                               aria-label="Gezinme menüsünü aç veya kapat"
+                               title="Menü" />
+
+                <a class="so-brand" href="dashboard">
+                    @* Approved corporate emblem, restrained. The bird is knocked out of the
+                       artwork rather than painted, so it sits on a light plate to read against
+                       the dark app bar. *@
+                    <span class="so-brand-mark" aria-hidden="true">
+                        <img src="brand/approved/thy-emblem-256.png" width="24" height="24" alt="" />
+                    </span>
+                    <span class="so-brand-name">
+                        <span class="so-brand-name-primary">@WasasBrand.ShortName</span>
+                        <span class="so-brand-name-suffix">@WasasBrand.NameSuffix</span>
+                    </span>
+                </a>
+
+                <MudSpacer />
+
+                @* Non-production marker: present so nobody mistakes this host for production, but kept
+                   secondary and hidden on narrow widths where space belongs to the account menu. *@
+                @if (ShellMode.ShowEnvironmentMarker)
+                {
+                    <span class="so-env-chip d-none d-md-flex" title="Bu ortam üretim değildir">
+                        @ShellMode.EnvironmentName
+                    </span>
+                }
+
+                <UserMenu User="currentUser"
+                          Mode="_mode"
+                          OnSelectMode="SetModeAsync" />
+            </MudAppBar>
+
+            <div class="so-route-progress @(_routeNavigating ? "is-active" : null)"
+                 role="presentation" aria-hidden="true">
+                <span class="so-route-progress-line"></span>
+                <svg class="so-route-progress-plane" viewBox="-36 -25 72 50" focusable="false">
+                    <path d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
+                </svg>
+            </div>
+
+            <MudDrawer @bind-Open="_drawerOpen"
+                       Variant="DrawerVariant.Responsive"
+                       Breakpoint="Breakpoint.Lg"
+                       ClipMode="DrawerClipMode.Always"
+                       Elevation="0"
+                       Class="so-drawer">
+                <NavMenu />
+            </MudDrawer>
+
+            <MudMainContent Class="so-main">
+                <CascadingValue Value="@this" IsFixed="true">@Body</CascadingValue>
+            </MudMainContent>
+        </Authorized>
+
+        <NotAuthorized>
+            @* Unauthenticated routes render without the app shell so a signed-out user never sees
+               navigation for pages they cannot open. *@
+            <MudMainContent Class="so-main so-main--public">
+                @Body
+            </MudMainContent>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudLayout>
+
+@code {
+    private MudThemeProvider _themeProvider = null!;
+    private bool _drawerOpen = true;
+    private AppearanceMode _mode = AppearanceMode.Dark;
+    private bool _isDesktop = true;
+    private bool _routeNavigating;
+    private CancellationTokenRegistration _routeNavigation;
+    private int _redirectingForReauthentication;
+
+    // The dark choice drives MudBlazor's deep corporate palette.
+    private bool IsDarkMode => _mode != AppearanceMode.Light;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        ApiSessions.ReauthenticationRequired += OnReauthenticationRequired;
+
+        string? browserSessionKey = ApiSession.BrowserSessionKey;
+        if (browserSessionKey is not null
+            && ApiSessions.GetOrCreate(browserSessionKey).RequiresReauthentication)
+        {
+            OnReauthenticationRequired(browserSessionKey);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        // A stored choice wins; otherwise fall back to the operating system's preference so an
+        // operator on a dark desktop does not get a white flash on every sign-in and reconnect.
+        string? stored = await ReadStoredModeAsync();
+
+        _mode = stored switch
+        {
+            "light" => AppearanceMode.Light,
+            "dark" => AppearanceMode.Dark,
+            "night" => AppearanceMode.Dark,
+            _ => await _themeProvider.GetSystemPreference() ? AppearanceMode.Dark : AppearanceMode.Light
+        };
+
+        await SyncThemeClassAsync();
+        StateHasChanged();
+    }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        _routeNavigating = true;
+        _routeNavigation.Dispose();
+        _routeNavigation = context.CancellationToken.Register(() =>
+        {
+            _ = InvokeAsync(() => { _routeNavigating = false; StateHasChanged(); });
+        });
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public void CancelPendingNavigation()
+    {
+        _routeNavigating = false;
+        StateHasChanged();
+    }
+
+    private async Task SetModeAsync(AppearanceMode mode)
+    {
+        _mode = mode;
+        await SyncThemeClassAsync();
+        await StoreModeAsync(mode);
+    }
+
+    // Appearance is a presentation preference: no identity, no authorization, nothing the API is
+    // told about. It is read defensively because a browser with storage disabled or partitioned
+    // throws here, and an unavailable preference must degrade to the system default rather than
+    // break the shell.
+    private async Task<string?> ReadStoredModeAsync()
+    {
+        try
+        {
+            return await Js.InvokeAsync<string?>("secureOpsAppearance.read");
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+    }
+
+    private async Task StoreModeAsync(AppearanceMode mode)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("secureOpsAppearance.write", mode.ToString().ToLowerInvariant());
+        }
+        catch (JSException)
+        {
+            // The choice still applies for this circuit; only its persistence is lost.
+        }
+    }
+
+    /// <summary>
+    /// Mirrors the active palette onto the document element as <c>so-dark</c>.
+    /// </summary>
+    /// <remarks>
+    /// MudBlazor 6.16 signals dark mode only by rewriting the <c>--mud-palette-*</c> values on
+    /// <c>:root</c>; it adds no class, and CSS cannot branch on a variable's value. Custom rules that
+    /// must differ by more than a colour — tint strength and shadow depth, which both need to be
+    /// stronger on a dark ground — therefore have nothing to hook onto. This supplies that hook.
+    /// <para>
+    /// It goes on the document element rather than on <c>MudLayout</c> because MudBlazor renders
+    /// popovers into a container at the end of <c>body</c>, outside the layout tree; a class further
+    /// down would leave the account menu on light-mode tints.
+    /// </para>
+    /// </remarks>
+    private async Task SyncThemeClassAsync()
+    {
+        await Js.InvokeVoidAsync("document.documentElement.classList.toggle", "so-dark", IsDarkMode);
+        await Js.InvokeVoidAsync(
+            "document.documentElement.classList.toggle", "so-night", _mode == AppearanceMode.Dark);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _routeNavigating = false;
+
+        // Below lg the drawer is a temporary overlay; close it after navigating so it does not cover
+        // the destination. Docked on desktop, it stays open.
+        if (!_isDesktop && _drawerOpen)
+        {
+            _drawerOpen = false;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnReauthenticationRequired(string browserSessionKey)
+    {
+        if (!string.Equals(browserSessionKey, ApiSession.BrowserSessionKey, StringComparison.Ordinal)
+            || Interlocked.Exchange(ref _redirectingForReauthentication, 1) != 0)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            string current = Navigation.ToBaseRelativePath(Navigation.Uri);
+            string returnUrl = string.IsNullOrWhiteSpace(current) ? "dashboard" : current;
+            Navigation.NavigateTo(
+                $"session-expired?returnUrl={Uri.EscapeDataString(returnUrl)}",
+                forceLoad: true,
+                replace: true);
+        });
+    }
+
+    public void Dispose()
+    {
+        _routeNavigation.Dispose();
+        Navigation.LocationChanged -= OnLocationChanged;
+        ApiSessions.ReauthenticationRequired -= OnReauthenticationRequired;
+    }
+}

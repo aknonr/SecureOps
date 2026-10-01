@@ -1,0 +1,456 @@
+using System.Text.Json;
+using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using SecureOps.Infrastructure.Audit;
+using SecureOps.Infrastructure.DirectoryExplorer;
+using SecureOps.Infrastructure.Identity;
+using SecureOps.Shared.Configuration;
+using SecureOps.Shared.Contracts.Api;
+using SecureOps.Shared.Contracts.Directory;
+
+namespace SecureOps.Tests.Unit.DirectoryExplorer;
+
+public sealed class DirectoryEnrichmentQueryServiceTests
+{
+    [Fact]
+    public async Task Memberships_SeparatesDirectTransitiveAndReportsCycleEvidence()
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out _);
+
+        DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> result = await service.GetMembershipsAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", _purpose), _context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.Success);
+        result.Value!.DirectGroups.Select(item => item.Group.SamAccountName)
+            .Should().Equal("ops-read", "dist-universal", "primary-domain-users");
+        result.Value.DirectGroups.Single(item => item.Group.SamAccountName == "primary-domain-users")
+            .Group.MembershipKind.Should().Be("Primary");
+        result.Value.TransitiveGroups.Select(item => item.Group.SamAccountName)
+            .Should().Equal("nested-ops", "platform-privileged");
+        result.Value.DirectGroups.Single(item => item.Group.SamAccountName == "ops-read")
+            .AlsoTransitivelyReachable.Should().BeTrue();
+        result.Value.Traversal.CycleDetected.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task MembershipPaths_ReturnsMultipleProvenPathsAndSafeNonMembership()
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out _);
+
+        DirectoryQueryResult<DirectoryMembershipPathResponse> member = await service.GetMembershipPathsAsync(
+            new DirectoryMembershipPathRequest("pam12356", "nested-ops", _purpose), _context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryMembershipPathResponse> notMember = await service.GetMembershipPathsAsync(
+            new DirectoryMembershipPathRequest("pam12356", "unrelated-group", _purpose), _context, CancellationToken.None);
+
+        member.Value!.IsMember.Should().BeTrue();
+        member.Value.IsDirect.Should().BeFalse();
+        member.Value.Paths.Should().HaveCount(2);
+        member.Value.Paths.Select(path => path.Groups.Select(group => group.SamAccountName)).Should().BeEquivalentTo(
+            new[] { new[] { "ops-read", "nested-ops" }, new[] { "dist-universal", "nested-ops" } },
+            options => options.WithStrictOrdering());
+        notMember.Value!.IsMember.Should().BeFalse();
+        notMember.Value.Paths.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task MembershipPaths_UnknownPrincipalAndTargetRemainDistinctNotFoundResults()
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out _);
+
+        DirectoryQueryResult<DirectoryMembershipPathResponse> principal = await service.GetMembershipPathsAsync(
+            new DirectoryMembershipPathRequest("missing.user", "ops-read", _purpose), _context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryMembershipPathResponse> target = await service.GetMembershipPathsAsync(
+            new DirectoryMembershipPathRequest("pam12356", "missing-group", _purpose), _context, CancellationToken.None);
+
+        principal.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryPrincipalNotFound);
+        target.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryGroupNotFound);
+    }
+
+    [Fact]
+    public async Task AccountHealth_UsesNullableEvidenceAndCalculatesPasswordAgeWithoutExtendingMeaning()
+    {
+        DateTimeOffset now = new(2026, 8, 23, 12, 0, 0, TimeSpan.Zero);
+        DirectoryPrincipalEnrichmentRecord evidence = Principal(
+            passwordLastSet: now.AddDays(-10),
+            enabled: true,
+            locked: true,
+            passwordNeverExpires: true,
+            accountExpires: now.AddDays(30),
+            mustChangePassword: false,
+            lastLogonTimestamp: now.AddDays(-2));
+        DirectoryEnrichmentQueryService service = CreateService(new RecordProvider(evidence), Options(), now, out _);
+
+        DirectoryQueryResult<DirectoryAccountHealthResponse> result = await service.GetAccountHealthAsync(
+            new DirectoryPrincipalEnrichmentRequest("sample.user", _purpose), _context, CancellationToken.None);
+
+        result.Value!.Enabled.Should().BeTrue();
+        result.Value.Locked.Should().BeTrue();
+        result.Value.PasswordAgeDays.Should().Be(10);
+        result.Value.PasswordNeverExpires.Should().BeTrue();
+        result.Value.AccountExpiresUtc.Should().Be(now.AddDays(30));
+        result.Value.MustChangePassword.Should().BeFalse();
+        result.Value.LastLogonTimestampUtc.Should().Be(now.AddDays(-2));
+        result.Value.LastLogonTimestampIsApproximate.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AccountHealth_MissingTimestampsRemainNull()
+    {
+        DirectoryEnrichmentQueryService service = CreateService(
+            new RecordProvider(Principal()), Options(), _now, out _);
+
+        DirectoryQueryResult<DirectoryAccountHealthResponse> result = await service.GetAccountHealthAsync(
+            new DirectoryPrincipalEnrichmentRequest("sample.user", _purpose), _context, CancellationToken.None);
+
+        result.Value!.PasswordLastSetUtc.Should().BeNull();
+        result.Value.PasswordAgeDays.Should().BeNull();
+        result.Value.AccountExpiresUtc.Should().BeNull();
+        result.Value.MustChangePassword.Should().BeNull();
+        result.Value.LastLogonTimestampUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AccountHealth_ProviderTimeoutCancelsWorkAndReturnsSafeUnavailableResult()
+    {
+        DirectoryExplorerOptions options = Options();
+        options.ProviderTimeoutSeconds = 1;
+        var provider = new BlockingProvider();
+        DirectoryEnrichmentQueryService service = CreateService(provider, options, _now, out _);
+
+        DirectoryQueryResult<DirectoryAccountHealthResponse> result = await service.GetAccountHealthAsync(
+            new DirectoryPrincipalEnrichmentRequest("sample.user", _purpose), _context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.ProviderTimeout);
+        result.ErrorCode.Should().Be(OperationalErrorCodes.DirectoryProviderTimeout);
+        provider.CancellationObserved.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(0, 2, 0, false)]
+    [InlineData(1, 2, 1, false)]
+    [InlineData(3, 2, 2, true)]
+    public async Task ServiceEvidence_HandlesZeroOneMultipleAndBoundedSpns(
+        int available,
+        int maximum,
+        int returned,
+        bool truncated)
+    {
+        string[] spns = Enumerable.Range(1, available).Select(index => $"HTTP/service-{index}.example.invalid").ToArray();
+        DirectoryExplorerOptions options = Options();
+        options.MaxSpnsPerPrincipal = maximum;
+        DirectoryEnrichmentQueryService service = CreateService(
+            new RecordProvider(Principal(spns: spns)), options, _now, out _);
+
+        DirectoryQueryResult<DirectoryServiceEvidenceResponse> result = await service.GetServiceEvidenceAsync(
+            new DirectoryPrincipalEnrichmentRequest("sample.user", _purpose), _context, CancellationToken.None);
+
+        result.Value!.ServicePrincipalNameCount.Should().Be(available);
+        result.Value.ServicePrincipalNames.Should().HaveCount(returned);
+        result.Value.ServicePrincipalNamesTruncated.Should().Be(truncated);
+        result.Value.AccountTypeEvidence.Should().Be("User");
+        result.Value.MembershipEvidenceAvailable.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("normal.user", false)]
+    [InlineData("pam.zero", false)]
+    [InlineData("service.zero", true)]
+    public async Task ServiceEvidence_ZeroSpnsRemainSuccessfulUserEvidence(
+        string account,
+        bool passwordNeverExpires)
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out _);
+
+        DirectoryQueryResult<DirectoryServiceEvidenceResponse> evidence = await service.GetServiceEvidenceAsync(
+            new DirectoryPrincipalEnrichmentRequest(account), _context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryAccountHealthResponse> health = await service.GetAccountHealthAsync(
+            new DirectoryPrincipalEnrichmentRequest(account), _context, CancellationToken.None);
+
+        evidence.Status.Should().Be(DirectoryQueryStatus.Success);
+        evidence.Value!.ServicePrincipalNames.Should().BeEmpty();
+        evidence.Value.ServicePrincipalNameCount.Should().Be(0);
+        evidence.Value.ServicePrincipalNamesTruncated.Should().BeFalse();
+        evidence.Value.AccountTypeEvidence.Should().Be("User");
+        health.Value!.PasswordNeverExpires.Should().Be(passwordNeverExpires);
+    }
+
+    [Fact]
+    public async Task ServiceEvidence_PrincipalReadSurvivesIndependentMembershipFailure()
+    {
+        DirectoryEnrichmentQueryService service = CreateService(
+            new PrincipalOnlyProvider(Principal()), Options(), _now, out _);
+
+        DirectoryQueryResult<DirectoryServiceEvidenceResponse> result = await service.GetServiceEvidenceAsync(
+            new DirectoryPrincipalEnrichmentRequest("sample.user"), _context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.Success);
+        result.Value!.ServicePrincipalNames.Should().BeEmpty();
+        result.Value.ServicePrincipalNameCount.Should().Be(0);
+        result.Value.MembershipEvidenceAvailable.Should().BeFalse();
+        result.Value.DirectGroupCount.Should().BeNull();
+        result.Value.TransitiveGroupCount.Should().BeNull();
+        result.Value.Traversal.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PrivilegedMemberships_ReturnsDirectTransitiveAndMissingConfiguredEvidence()
+    {
+        DirectoryExplorerOptions options = Options();
+        options.PrivilegedGroupIdentifiers = ["ops-read", "platform-privileged", "missing-group"];
+        DirectoryEnrichmentQueryService service = CreateMockService(out _, options);
+
+        DirectoryQueryResult<DirectoryPrivilegedMembershipResponse> result = await service.GetPrivilegedMembershipsAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", _purpose), _context, CancellationToken.None);
+
+        result.Value!.Groups.Single(item => item.ConfiguredIdentifier == "ops-read").Direct.Should().BeTrue();
+        result.Value.Groups.Single(item => item.ConfiguredIdentifier == "ops-read").Transitive.Should().BeTrue();
+        result.Value.Groups.Single(item => item.ConfiguredIdentifier == "platform-privileged").Transitive.Should().BeTrue();
+        result.Value.Groups.Single(item => item.ConfiguredIdentifier == "missing-group").GroupFound.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Audit_ContainsCountsAndLimitsButNoGraphHealthOrSpnPayload()
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out InMemoryAuditWriter audit);
+
+        _ = await service.GetServiceEvidenceAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", _purpose), _context, CancellationToken.None);
+
+        string json = JsonSerializer.Serialize(audit.Events);
+        json.Should().Contain("DirectCount").And.Contain("EdgesVisited").And.Contain("limitReached");
+        json.Should().NotContain("pam12356").And.NotContain("nested-ops").And.NotContain("MSSQLSvc")
+            .And.NotContain("PasswordLastSetUtc").And.NotContain(_purpose);
+    }
+
+    [Fact]
+    public async Task Enrichment_AcceptsMissingBlankAndTrimmedPurpose()
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out InMemoryAuditWriter audit);
+
+        DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> missing = await service.GetMembershipsAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356"), _context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryAccountHealthResponse> blank = await service.GetAccountHealthAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", "  "), _context, CancellationToken.None);
+        DirectoryQueryResult<DirectoryServiceEvidenceResponse> supplied = await service.GetServiceEvidenceAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", "  optional context  "), _context, CancellationToken.None);
+
+        missing.Status.Should().Be(DirectoryQueryStatus.Success);
+        blank.Status.Should().Be(DirectoryQueryStatus.Success);
+        supplied.Status.Should().Be(DirectoryQueryStatus.Success);
+        string json = JsonSerializer.Serialize(audit.Events);
+        json.Should().Contain("\"purposeLength\":16").And.NotContain("optional context");
+    }
+
+    [Theory]
+    [InlineData("oversized")]
+    [InlineData("control")]
+    public async Task Enrichment_RejectsUnsafeSuppliedPurpose(string inputKind)
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out _);
+        string purpose = inputKind == "oversized" ? new string('x', 257) : "context\u0001continuation";
+
+        DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> result = await service.GetMembershipsAsync(
+            new DirectoryPrincipalEnrichmentRequest("pam12356", purpose), _context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.Invalid);
+    }
+
+    [Theory]
+    [InlineData("pam*")]
+    [InlineData("CN=User,DC=example")]
+    public async Task Enrichment_RejectsSearchAndRawDirectoryInput(string account)
+    {
+        DirectoryEnrichmentQueryService service = CreateMockService(out _);
+
+        DirectoryQueryResult<DirectoryPrincipalMembershipsResponse> result = await service.GetMembershipsAsync(
+            new DirectoryPrincipalEnrichmentRequest(account, _purpose), _context, CancellationToken.None);
+
+        result.Status.Should().Be(DirectoryQueryStatus.Invalid);
+    }
+
+    private static DirectoryEnrichmentQueryService CreateMockService(
+        out InMemoryAuditWriter audit,
+        DirectoryExplorerOptions? directoryOptions = null)
+    {
+        IOptions<IdentityLookupOptions> identity = Microsoft.Extensions.Options.Options.Create(
+            new IdentityLookupOptions { EnableUpnLookup = true });
+        return CreateService(new MockDirectoryEnrichmentProvider(identity), directoryOptions ?? Options(), _now, out audit);
+    }
+
+    private static DirectoryEnrichmentQueryService CreateService(
+        IDirectoryEnrichmentProvider provider,
+        DirectoryExplorerOptions directoryOptions,
+        DateTimeOffset now,
+        out InMemoryAuditWriter audit)
+    {
+        audit = new InMemoryAuditWriter();
+        IOptions<DirectoryExplorerOptions> options = Microsoft.Extensions.Options.Options.Create(directoryOptions);
+        return new DirectoryEnrichmentQueryService(
+            new IdentityAccountNormalizer(Microsoft.Extensions.Options.Options.Create(new IdentityLookupOptions { EnableUpnLookup = true })),
+            new DirectoryExactInputNormalizer(options),
+            provider,
+            new DirectoryMembershipGraphBuilder(provider, options),
+            new DirectoryQueryCache(options, new FixedTimeProvider(now)),
+            audit,
+            options,
+            new FixedTimeProvider(now),
+            NullLogger<DirectoryEnrichmentQueryService>.Instance);
+    }
+
+    private static DirectoryExplorerOptions Options() => new()
+    {
+        Cache = new DirectoryExplorerCacheOptions { Enabled = false },
+        MaxTraversalDepth = 8,
+        MaxTraversalNodes = 50,
+        MaxTraversalEdges = 100,
+        MaxMembershipPaths = 5,
+        MaxSpnsPerPrincipal = 50
+    };
+
+    private static DirectoryPrincipalEnrichmentRecord Principal(
+        DateTimeOffset? passwordLastSet = null,
+        bool? enabled = true,
+        bool? locked = false,
+        bool? passwordNeverExpires = null,
+        DateTimeOffset? accountExpires = null,
+        bool? mustChangePassword = null,
+        DateTimeOffset? lastLogonTimestamp = null,
+        IReadOnlyList<string>? spns = null) => new(
+            "principal-id",
+            "Sample User",
+            "sample.user",
+            "sample.user@example.invalid",
+            enabled,
+            locked,
+            passwordLastSet,
+            passwordNeverExpires,
+            accountExpires,
+            mustChangePassword,
+            lastLogonTimestamp,
+            null,
+            spns ?? [],
+            spns?.Count ?? 0,
+            false,
+            "User");
+
+    private const string _purpose = "Approved synthetic directory verification";
+    private static readonly DateTimeOffset _now = new(2026, 8, 23, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DirectoryQueryExecutionContext _context = new(
+        "CONTOSO\\lead.user", "10.0.0.5", "phase2-test");
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class RecordProvider(DirectoryPrincipalEnrichmentRecord? principal) : IDirectoryEnrichmentProvider
+    {
+        public string ProviderName => "Record";
+
+        public Task<DirectoryPrincipalEnrichmentRecord?> FindPrincipalAsync(
+            string normalizedAccount,
+            int maxSpns,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (principal is null)
+            {
+                return Task.FromResult<DirectoryPrincipalEnrichmentRecord?>(null);
+            }
+
+            IReadOnlyList<string> all = principal.ServicePrincipalNames;
+            return Task.FromResult<DirectoryPrincipalEnrichmentRecord?>(principal with
+            {
+                ServicePrincipalNames = all.Take(maxSpns).ToArray(),
+                ServicePrincipalNameCount = all.Count,
+                ServicePrincipalNamesTruncated = all.Count > maxSpns
+            });
+        }
+
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectMembershipGroupsAsync(
+            string normalizedAccount,
+            int maxResults,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(
+                principal is null ? null : new DirectoryProviderPage<DirectoryGroupRecord>([], false));
+
+        public Task<DirectoryGroupRecord?> FindGroupAsync(string normalizedGroup, CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryGroupRecord?>(null);
+
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetParentGroupsAsync(
+            DirectoryGroupRecord group,
+            int maxResults,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(
+                new DirectoryProviderPage<DirectoryGroupRecord>([], false));
+    }
+
+    private sealed class BlockingProvider : IDirectoryEnrichmentProvider
+    {
+        public string ProviderName => "Blocking";
+        public bool CancellationObserved { get; private set; }
+
+        public async Task<DirectoryPrincipalEnrichmentRecord?> FindPrincipalAsync(
+            string normalizedAccount,
+            int maxSpns,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return null;
+            }
+            catch (OperationCanceledException)
+            {
+                CancellationObserved = true;
+                throw;
+            }
+        }
+
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectMembershipGroupsAsync(
+            string normalizedAccount,
+            int maxResults,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(null);
+
+        public Task<DirectoryGroupRecord?> FindGroupAsync(
+            string normalizedGroup,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryGroupRecord?>(null);
+
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetParentGroupsAsync(
+            DirectoryGroupRecord group,
+            int maxResults,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(null);
+    }
+
+    private sealed class PrincipalOnlyProvider(DirectoryPrincipalEnrichmentRecord principal) : IDirectoryEnrichmentProvider
+    {
+        public string ProviderName => "PrincipalOnly";
+
+        public Task<DirectoryPrincipalEnrichmentRecord?> FindPrincipalAsync(
+            string normalizedAccount,
+            int maxSpns,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryPrincipalEnrichmentRecord?>(principal);
+
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetPrincipalDirectMembershipGroupsAsync(
+            string normalizedAccount,
+            int maxResults,
+            CancellationToken cancellationToken) =>
+            throw new DirectoryProviderUnavailableException();
+
+        public Task<DirectoryGroupRecord?> FindGroupAsync(
+            string normalizedGroup,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryGroupRecord?>(null);
+
+        public Task<DirectoryProviderPage<DirectoryGroupRecord>?> GetParentGroupsAsync(
+            DirectoryGroupRecord group,
+            int maxResults,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<DirectoryProviderPage<DirectoryGroupRecord>?>(new([], false));
+    }
+}

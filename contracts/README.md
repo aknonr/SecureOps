@@ -48,17 +48,19 @@ Endpoints:
 - `GET /api/v1/identity/me` returns current caller metadata.
 - `GET /api/v1/identity/lookup/capabilities` returns lookup limits and returned-field metadata.
 - `GET /api/v1/health/audit-store` returns safe audit-store status.
+- `GET /api/v1/health/persistence` separately reports configured SQL readiness without returning connection or exception details.
 - `GET /api/v1/health/identity-provider` returns safe identity-provider status.
+- `GET /api/v1/health/enterprise-integrations` returns Admin-only provider selection and safe status without endpoint or credential detail.
 
 No endpoint accepts an account value in a URL path or query string.
 
-Error responses use:
+Current API errors use RFC ProblemDetails with stable extensions:
 
 ```json
-{ "errorCode": "AuditUnavailable", "message": "Identity lookup audit is unavailable.", "correlationId": "trace-id" }
+{ "title": "Identity lookup could not be completed.", "status": 503, "code": "AuditStoreUnavailable", "stage": "audit", "retryable": true, "correlationId": "trace-id" }
 ```
 
-Known lookup `errorCode` values are `InvalidRequestBody`, `PurposeRequired`, `InvalidIdentityLookupRequest`, `EmptyAccount`, `AccountTooLong`, `BulkLookupRejected`, `SearchPatternRejected`, `AccountPatternRejected`, `AuditUnavailable`, `DirectoryProviderTimeout`, `ProviderUnavailable`, `RateLimitExceeded`, and `IdentityLookupUnavailable`.
+Read-only identity/directory `purpose` is optional; omitted, null, empty, and whitespace values are valid. Current stable `code` values include `InvalidIdentityInput`, `IdentityNotFound`, `IdentityProviderTimeout`, `IdentityProviderUnavailable`, `DirectoryInvalidInput`, `DirectoryPrincipalNotFound`, `DirectoryGroupNotFound`, `DirectoryQueryLimitExceeded`, `DirectoryTraversalPartial`, `DirectoryProviderTimeout`, `DirectoryProviderUnavailable`, `AuditStoreUnavailable`, and `RateLimitExceeded`. The OpenAPI snapshot and `docs/contracts/secureops-api-v1-ui-integration.md` are authoritative for the current HTTP contract.
 
 `GET /api/v1/health/audit-store` returns safe status only. If a queued persistent audit write fails in the background, the response may show `status: "Unhealthy"` and `lastErrorCode: "AuditSinkUnavailable"`; it must not expose file paths, connection strings, account names, or personal data.
 

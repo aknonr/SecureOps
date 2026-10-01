@@ -1,0 +1,172 @@
+// Guarded synthetic SQL fixture from ResourceSqlTests.InUse_ReporterRefresh only.
+const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
+const { chromium, request } = require(process.argv[2]);
+const { loopback, navigate, signIn, capture, apiContext, json } = require('./journey-support.cjs');
+const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = path.resolve(process.argv[5]);
+const code = process.argv[6] || 'OR-91000', before = process.argv[7] === 'before';
+const statsUrl = process.argv[8] ? loopback(process.argv[8]) : null;
+(async () => {
+    fs.mkdirSync(out, { recursive: true });
+    const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+    const client = await apiContext(request, api), errors = [];
+    const probe = statsUrl ? await request.newContext({ ignoreHTTPSErrors: true }) : null;
+    const initialStats = probe ? await (await probe.get(statsUrl.href)).json() : null;
+    try {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', r => ['localhost', '127.0.0.1'].includes(new URL(r.request().url()).hostname) ? r.continue() : r.abort());
+        const page = await context.newPage();
+        page.on('pageerror', e => errors.push(e.message));
+        page.on('dialog', async d => { errors.push(d.message()); await d.dismiss(); });
+        await signIn(page, ui);
+        const stored = await json(client, '/api/v1/in-use?search=' + encodeURIComponent(code));
+        assert.equal(stored.total, 1);
+        const record = stored.items[0];
+        assert.equal(record.source.title, 'Synthetic RFC reporter acceptance');
+        assert.equal(record.source.servers.length, 4);
+        if (before) {
+            await navigate(page, ui, `in-use/${record.id}`);
+            const table = page.getByLabel('Servis öğesi tablosu', { exact: true });
+            await table.waitFor();
+            await page.evaluate(() => document.fonts.ready);
+            await page.screenshot({ path: path.join(out, 'baseline-desktop.png'), fullPage: true, animations: 'disabled' });
+            const metrics = await table.evaluate(el => ({ rows: el.querySelectorAll('tbody tr').length,
+                clientHeight: el.clientHeight, scrollHeight: el.scrollHeight, maxHeight: getComputedStyle(el).maxHeight,
+                overflow: getComputedStyle(el).overflow, lastRowBelowRegion: el.querySelector('tbody tr:last-child').getBoundingClientRect().bottom > el.getBoundingClientRect().bottom }));
+            assert.equal(metrics.rows, 4);
+            fs.writeFileSync(path.join(out, 'baseline.json'), JSON.stringify(metrics, null, 2));
+            assert.ok(metrics.scrollHeight > metrics.clientHeight && metrics.lastRowBelowRegion);
+            await capture(page, out, 'baseline-internal-scroll');
+            await table.focus(); await page.keyboard.press('End');
+            await page.waitForFunction(el => el.scrollTop > 0, await table.elementHandle());
+            metrics.keyboardScrollTop = await table.evaluate(el => el.scrollTop);
+            assert.equal(await page.getByLabel('Yanıtlanacak sunucu', { exact: true }).locator('option').count(), 4);
+            fs.writeFileSync(path.join(out, 'baseline.json'), JSON.stringify(metrics, null, 2));
+            return;
+        }
+        await navigate(page, ui, 'in-use');
+        await page.getByLabel('In Use kayıt ara', { exact: true }).fill(code);
+        await page.getByLabel('In Use görünüm', { exact: true }).focus();
+        await page.waitForFunction(() => document.querySelectorAll('.so-inuse-records > li').length === 1);
+        await page.locator('.so-inuse-records summary').click();
+        assert.match(await page.locator('.so-inuse-records').innerText(), /RFC talep eden/);
+        assert.equal(await page.locator('.so-inuse-records .so-inuse-reporter').count(), 3);
+        await capture(page, out, 'reporter-list');
+        await page.locator(`.so-inuse-records a[href*="in-use/${record.id}"]`).last().click();
+        const table = page.getByLabel('Servis öğesi tablosu', { exact: true });
+        await table.waitFor();
+        const rows = table.locator('tbody tr');
+        assert.equal(await rows.count(), 4);
+        const ids = record.source.servers.map(s => s.id);
+        assert.deepEqual(await rows.evaluateAll(rs => rs.map(r => r.dataset.serverId)), ids);
+        assert.match(await rows.nth(0).innerText(), /OR-200.*RFC eşleşti/s);
+        assert.match(await rows.nth(0).innerText(), /Sentetik Şahıs 200 <b>/);
+        assert.doesNotMatch(await table.innerText(), /Kişi referansı:|92001|800/);
+        assert.match(await rows.nth(2).innerText(), /OR-201.*Erişim reddedildi.*Önceki kanıt: Sentetik Şahıs 201 &lt;b&gt;/s);
+        assert.match(await rows.nth(3).innerText(), /RFC boş/);
+        assert.equal(await page.locator('.so-inuse-reporter b, .so-inuse-reporter script').count(), 0);
+        assert.match(await page.getByRole('region', { name: 'İnceleme durumu', exact: true }).innerText(), /Sentetik İnceleyici/);
+        const options = page.getByLabel('Yanıtlanacak sunucu', { exact: true }).locator('option');
+        assert.deepEqual(await options.evaluateAll(os => os.map(o => o.value)), ids);
+        const metrics = [];
+        for (const width of [1440, 390]) {
+            await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+            const m = await table.evaluate(el => ({ height: el.clientHeight, scrollHeight: el.scrollHeight,
+                maxHeight: getComputedStyle(el).maxHeight, rows: [...el.querySelectorAll('tbody tr')].map(r => r.getBoundingClientRect().height),
+                pageOverflow: document.documentElement.scrollWidth > innerWidth }));
+            assert.equal(m.maxHeight, 'none'); assert.ok(m.scrollHeight <= m.height + 1);
+            assert.ok(m.rows.every(h => h > 0)); assert.equal(m.pageOverflow, false); metrics.push({ width, ...m });
+            for (let i = 0; i < 4; i++) {
+                const button = rows.nth(i).getByRole('button');
+                await button.focus(); await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab');
+                assert.equal(await button.evaluate(el => el === document.activeElement), true);
+                await page.keyboard.press('Enter');
+                await page.waitForFunction(id => document.activeElement?.getAttribute('aria-label') === `${id} InternetOut`, ids[i]);
+                assert.equal(await page.getByLabel('Yanıtlanacak sunucu', { exact: true }).inputValue(), ids[i]);
+            }
+        }
+        await capture(page, out, 'reporter-detail');
+        await page.getByText('Kaynak kanıtı ve geçmiş notlar', { exact: true }).click();
+        const evidence = page.locator('details').filter({ has: page.locator('summary', { hasText: 'Kaynak kanıtı ve geçmiş notlar' }) });
+        assert.match(await evidence.innerText(), /Kişi referansı: 800/);
+        assert.match(await evidence.innerText(), /Son doğrulama:.*\d{2}\.\d{2}\.\d{4}/s);
+        await capture(page, out, 'reporter-retained-evidence');
+        await page.getByText('Kaynak kanıtı ve geçmiş notlar', { exact: true }).click();
+        await page.getByText('İnceleyici ata / değiştir (isteğe bağlı)', { exact: true }).click();
+        const reviewers = page.getByLabel('In Use inceleyicisi', { exact: true });
+        const labels = await reviewers.locator('option').allTextContents();
+        assert.ok(labels.some(l => l.startsWith('Sentetik İnceleyici')));
+        const duplicates = labels.filter(l => l.startsWith('Örnek Gözlemci'));
+        assert.ok(duplicates.length >= 2); assert.equal(new Set(duplicates).size, duplicates.length);
+        assert.ok(labels.some(l => l.startsWith('Profil adı bekleniyor')));
+        await capture(page, out, 'reporter-reviewer-labels');
+        const reread = await json(client, `/api/v1/in-use/${record.id}`);
+        assert.equal(reread.version, record.version);
+        assert.deepEqual(reread.source, record.source);
+        await reviewers.selectOption('');
+        await page.getByLabel('Atama gerekçesi', { exact: true }).fill('Synthetic optional assignment acceptance');
+        await page.getByRole('button', { name: 'Atamayı kaydet', exact: true }).click();
+        await page.getByRole('region', { name: 'İnceleme durumu', exact: true }).getByText('Atanmamış', { exact: true }).waitFor();
+        await rows.nth(0).getByRole('button').click();
+        for (const check of ['InternetOut', 'InternetIn', 'Microsegmented']) await page.getByLabel(`${ids[0]} ${check}`, { exact: true }).selectOption('No');
+        await page.getByText('Bu üç cevabı seçili sunuculara uygula', { exact: true }).click();
+        const bulk = page.locator('.so-inuse-bulk');
+        await bulk.locator('label').filter({ hasText: ids[1] }).getByRole('checkbox').check();
+        await bulk.locator('label').filter({ hasText: ids[3] }).getByRole('checkbox').check();
+        await page.getByRole('button', { name: 'Değişiklikleri göster', exact: true }).click();
+        await bulk.locator('li').first().waitFor();
+        assert.equal(await bulk.locator('li').count(), 6);
+        assert.doesNotMatch(await bulk.locator('ul').innerText(), new RegExp(ids[2]));
+        await page.getByText('1 / 4 sunucunun üç cevabı tamamlandı.', { exact: true }).waitFor();
+        await capture(page, out, 'reporter-bulk-differences');
+        await page.getByRole('button', { name: 'Gösterilen değişiklikleri onayla', exact: true }).click();
+        await page.getByText('3 / 4 sunucunun üç cevabı tamamlandı.', { exact: true }).waitFor();
+        await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
+        await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
+        let saved = await json(client, `/api/v1/in-use/${record.id}`);
+        assert.equal(saved.assigneeId, null); assert.equal(saved.sourceHash, record.sourceHash);
+        assert.deepEqual(saved.source, record.source);
+        assert.ok(saved.draft.answers.filter(a => a.serverId === ids[2]).every(a => a.value === 'Unknown'));
+        await page.getByRole('button', { name: 'Excel önizleme', exact: true }).click();
+        await page.getByLabel('Excel sayfası', { exact: true }).selectOption({ label: 'ReviewEvidence' });
+        await page.getByLabel('Excel hücre önizlemesi', { exact: true }).getByText('Sentetik Şahıs 200 <b>', { exact: true }).first().waitFor();
+        assert.match(await page.getByLabel('Excel hücre önizlemesi', { exact: true }).innerText(), /Sentetik Şahıs 200 <b>/);
+        assert.match(await page.getByLabel('Excel hücre önizlemesi', { exact: true }).innerText(), /Sentetik Şahıs 201 &lt;b&gt;/);
+        await page.getByRole('button', { name: "WASAS'a arşivle ve indir", exact: true }).click();
+        await page.getByRole('button', { name: 'Alana git', exact: true }).click();
+        await page.waitForFunction(id => document.activeElement?.getAttribute('aria-label') === `${id} InternetOut`, ids[2]);
+        await page.getByLabel(`${ids[2]} InternetOut`, { exact: true }).selectOption('Yes');
+        await json(client, `/api/v1/in-use/${record.id}/assignment`, { method: 'PUT', data: { expectedVersion: saved.version, assigneeId: null, reason: 'Synthetic concurrent edit' } });
+        await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
+        await page.getByRole('button', { name: 'Cevapları koru ve güncel kayıtla karşılaştır', exact: true }).click();
+        await page.getByText('Kaydedilmemiş cevaplarınız korunuyor', { exact: true }).waitFor();
+        assert.equal(await page.getByLabel(`${ids[2]} InternetOut`, { exact: true }).inputValue(), 'Yes');
+        await capture(page, out, 'reporter-conflict');
+        await page.getByRole('button', { name: 'Farkları inceledim; yerel cevaplarla devam et', exact: true }).click();
+        await page.getByLabel('Yanıtlanacak sunucu', { exact: true }).selectOption(ids[2]);
+        assert.equal(await page.getByLabel(`${ids[2]} InternetOut`, { exact: true }).inputValue(), 'Yes');
+        for (const check of ['InternetIn', 'Microsegmented']) await page.getByLabel(`${ids[2]} ${check}`, { exact: true }).selectOption('No');
+        await page.getByRole('button', { name: 'Cevapları kaydet', exact: true }).click();
+        await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor();
+        saved = await json(client, `/api/v1/in-use/${record.id}`);
+        assert.equal(saved.draft.answers.filter(a => a.value !== 'Unknown').length, 12);
+        assert.deepEqual(saved.source, record.source); assert.equal(saved.sourceHash, record.sourceHash);
+        await navigate(page, ui, `in-use/${record.id}`);
+        await page.getByText('4 / 4 sunucunun üç cevabı tamamlandı.', { exact: true }).waitFor();
+        await page.getByRole('button', { name: 'Excel önizleme', exact: true }).click();
+        const downloadEvent = page.waitForEvent('download');
+        await page.getByRole('button', { name: "WASAS'a arşivle ve indir", exact: true }).click();
+        const download = await downloadEvent;
+        await download.saveAs(path.join(out, download.suggestedFilename()));
+        assert.ok(fs.statSync(path.join(out, download.suggestedFilename())).size > 1000);
+        assert.ok((await json(client, `/api/v1/in-use/${record.id}`)).archivedVersions.includes(saved.version));
+        const denied = await apiContext(request, api, 'team-lead');
+        try {
+            assert.equal((await denied.get(`/api/v1/in-use/${record.id}`)).status(), 403);
+            assert.equal((await denied.post('/api/v1/in-use/refresh', { data: { commandId: '11111111-1111-4111-8111-111111111111' } })).status(), 403);
+        } finally { await denied.dispose(); }
+        assert.deepEqual(errors, []);
+        const finalStats = probe ? await (await probe.get(statsUrl.href)).json() : null;
+        if (probe) assert.deepEqual(finalStats, initialStats, 'DB-backed journey must not call source or Jira');
+        fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify({ passed: true, metrics, sourceCallsDuringDisplay: probe ? 0 : 'Not instrumented', initialStats, finalStats, checks: ['four keyboard-selectable servers', 'shared/different RFC', 'single-pass UI/Excel', 'retained denied evidence', 'null RFC', 'trusted persisted profiles', 'optional assignment', 'selected identity differences', 'missing-answer focus', 'conflict recovery persists edits', 'four-server reopened workbook download/archive', 'authorization', 'unchanged source hash'] }, null, 2));
+    } finally { if (probe) await probe.dispose(); await client.dispose(); await browser.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

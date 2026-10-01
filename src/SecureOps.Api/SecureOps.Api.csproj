@@ -7,7 +7,7 @@
     Accepts monitoring webhooks, exposes REST endpoints for the UI.
     Does NOT execute PowerShell directly (jobs enqueue via Hangfire).
 
-    See: docs/03-architecture.md, .cursor/rules/020-backend-dotnet-rules.mdc
+    See: docs/03-architecture.md, docs/agent-guides/020-backend-dotnet.md
   -->
 
   <PropertyGroup>
@@ -29,6 +29,7 @@
 
     <!-- Auth -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
 
     <!-- Hangfire client (enqueue from controllers) -->
     <PackageReference Include="Hangfire.AspNetCore" />

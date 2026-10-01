@@ -1,0 +1,53 @@
+@*
+    What bounded the directory graph walk.
+
+    A truncated traversal is the difference between "this is the answer" and "this is as far as we
+    got". Every screen that shows membership evidence has to say which one it is, because an operator
+    troubleshooting authorization will otherwise read a partial result as a complete one and conclude
+    the wrong thing about a permission.
+
+    Silent when the walk completed. There is nothing to warn about, and a permanent banner would
+    teach people to ignore it.
+*@
+
+@if (_limits.Count > 0)
+{
+    <div class="so-traversal" role="status">
+        <span class="so-traversal-icon" aria-hidden="true">
+            <MudIcon Icon="@Icons.Material.Filled.AltRoute" Size="Size.Small" />
+        </span>
+        <div>
+            <p class="so-traversal-title">@Title</p>
+            <ul class="so-traversal-list">
+                @foreach (string limit in _limits)
+                {
+                    <li>@limit</li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Traversal metadata exactly as the API returned it.</summary>
+    [Parameter, EditorRequired]
+    public DirectoryTraversalMetadataDto Traversal { get; set; } = default!;
+
+    /// <summary>
+    /// Whether the result being shown is a membership verdict rather than a listing.
+    /// </summary>
+    /// <remarks>
+    /// Changes the headline only. For a verdict the consequence is sharper — an incomplete walk
+    /// cannot rule membership out — and the wording says so.
+    /// </remarks>
+    [Parameter]
+    public bool IsVerdict { get; set; }
+
+    private IReadOnlyList<string> _limits = [];
+
+    protected override void OnParametersSet() => _limits = DirectoryView.TraversalLimits(Traversal);
+
+    private string Title => IsVerdict
+        ? "Tarama tamamlanmadı; bu sonuç kesin değildir"
+        : "Tarama sınırlara takıldı; liste eksik olabilir";
+}

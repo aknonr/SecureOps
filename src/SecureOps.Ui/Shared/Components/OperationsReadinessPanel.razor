@@ -1,0 +1,109 @@
+@using System.Text.Json
+@using SecureOps.Shared.Contracts.Announcements
+@implements IDisposable
+@inject OperationsDiagnosticsApiClient Diagnostics
+@inject IJSRuntime Js
+
+<section class="so-panel so-operations" aria-labelledby="workflow-checks-title" aria-busy="@_busy.ToString().ToLowerInvariant()">
+    <div class="so-panel-head"><h2 id="workflow-checks-title" class="so-panel-title">İş akışı kontrolleri</h2></div>
+    <p class="so-panel-text">OCO kaynakları, mail gönderimi ve rapor arşivinin durumunu kontrol edin.</p>
+    <p class="so-panel-text so-panel-text--sm">Bu kontrol ayarları değiştirmez; mail göndermez ve kayıt kapatmaz.</p>
+    <div class="so-inline-actions">
+        <MudButton Class="so-operations-action" OnClick="ReadAsync" Disabled="RefreshBusy"
+                   aria-disabled="@_busy.ToString().ToLowerInvariant()"
+                   Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.FactCheck">
+            @(_busy ? "Kontrol ediliyor…" : "Durumu kontrol et")
+        </MudButton>
+        @if (_busy) { <MudProgressCircular Indeterminate="true" Size="Size.Small" aria-label="Kontrol ediliyor" /> }
+    </div>
+    <p role="status" aria-live="polite" aria-atomic="true" class="so-panel-text so-panel-text--sm">
+        @(_busy ? "Kontrol ediliyor…" : _problem is not null ? "Kontrol başarısız. Durumu kontrol et ile yeniden deneyin." : _result is null ? "Henüz kontrol edilmedi" : "Kontrol tamamlandı. Sonuçlar aşağıda.")
+    </p>
+    @if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    @if (_downloadProblem is not null) { <SoProblemPanel Problem="_downloadProblem" /> }
+    @if (_result is { } result)
+    {
+        @if (_problem is not null)
+        { <p class="so-panel-text"><strong>Son başarılı rapor gösteriliyor; yeni kontrol başarısız oldu.</strong></p> }
+        <p class="so-panel-text so-panel-text--sm">Son kontrol: @OperationsReadinessPresentation.Time(result.Source.CheckedAt)<br />
+            Yapılandırma kaydı: @OperationsReadinessPresentation.Time(result.CapturedAt)</p>
+        <ul class="so-operations-results">
+            @foreach (var row in OperationsReadinessPresentation.Rows(result))
+            {
+                <li>
+                    <div><h3>@row.Label</h3><span class="so-operations-state"><MudIcon Icon="@StatusIcon(row.Status)" Size="Size.Small" /> @row.Status</span></div>
+                    <div><p>@row.Reason</p><p class="so-panel-text so-panel-text--sm">@row.Next</p></div>
+                </li>
+            }
+        </ul>
+        <div class="so-inline-actions">
+            <MudButton Class="so-operations-action" OnClick="DownloadAsync" Disabled="@(_busy || _downloading)" StartIcon="@Icons.Material.Filled.Download"
+                       aria-describedby="operations-download-help">Tanılama raporunu indir</MudButton>
+            <span id="operations-download-help" class="so-panel-text so-panel-text--sm">Destek incelemesi için JSON raporu</span>
+        </div>
+        <details class="so-operations-details"><summary>Teknik ayrıntılar</summary>
+            <dl>
+                <dt>API çalışma kimliği / işlem</dt><dd>@result.RuntimeIdentity · @result.ProcessId</dd>
+                <dt>Kaynak ayar kontrolü</dt><dd>@(result.Source.State == "Disabled" ? "Kaynak kapalı; eksik anahtar listesi tamamlanmış yapılandırma kanıtı değildir." : result.Source.Missing.Length == 0 ? "Eksik anahtar bildirilmedi; kaynak bağlantısı sınanmadı." : string.Join(", ", result.Source.Missing))</dd>
+                <dt>Son Worker heartbeat</dt><dd>@(result.Source.LastHeartbeat is { } heartbeat ? OperationsReadinessPresentation.Time(heartbeat) : "Bildirilmedi")</dd>
+                <dt>Görsel dizini</dt><dd>@result.AssetDirectory</dd>
+                <dt>Özel rapor arşivi</dt><dd>@result.ReportDirectory</dd>
+                @foreach (var setting in result.Settings) { <dt>@setting.Key</dt><dd>@setting.Value · @setting.Provider</dd> }
+            </dl>
+            <p class="so-panel-text so-panel-text--sm">Default, bildirilen varsayılan sağlayıcıdır; operatörün açıkça kapatma ayarı yaptığı anlamına gelmez. Profil girdilerinin görünmemesi profil listesinin boş veya tamamlanmış olduğunu kanıtlamaz.</p>
+            <ul>@foreach (var asset in result.Assets) { <li>@asset.Revision: @asset.State · @asset.Format</li> }
+                @foreach (var bundle in result.Bundles) { <li>@bundle.Label: @bundle.State</li> }</ul>
+            <p class="so-panel-text so-panel-text--sm">Destek yapılandırma referansı: @result.ConfigurationFingerprint</p>
+        </details>
+    }
+</section>
+
+@code {
+    /// <summary>Coordinates the separate page refresh without starting another diagnostic request.</summary>
+    [Parameter] public bool RefreshBusy { get; set; }
+    /// <summary>Disables the page refresh while the explicit diagnostic is running.</summary>
+    [Parameter] public EventCallback<bool> BusyChanged { get; set; }
+    private OperationsReadiness? _result;
+    private UiProblem? _problem;
+    private UiProblem? _downloadProblem;
+    private bool _busy, _downloading;
+    private readonly CancellationTokenSource _lifetime = new();
+    private async Task ReadAsync()
+    {
+        // Keep the busy action focusable; aria-disabled plus this guard prevents duplicate requests.
+        if (_busy || RefreshBusy) { return; }
+        _busy = true; _problem = null;
+        try
+        {
+            await BusyChanged.InvokeAsync(true);
+            _result = await Diagnostics.ReadAsync(_lifetime.Token);
+        }
+        catch (SecureOpsApiException exception)
+        {
+            _problem = exception.Problem;
+            if (_problem.Kind is UiProblemKind.Forbidden or UiProblemKind.SessionExpired or UiProblemKind.AccessDisabled) { _result = null; }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { _busy = false; await BusyChanged.InvokeAsync(false); }
+    }
+    private async Task DownloadAsync()
+    {
+        if (_result is null || _busy || _downloading) { return; }
+        _downloading = true; _downloadProblem = null;
+        try { await Js.InvokeVoidAsync("secureOpsDownload", _lifetime.Token, "wasas-api-operations.json", "application/json",
+            Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(_result, new JsonSerializerOptions { WriteIndented = true }))); }
+        catch (JSException) { _downloadProblem = UiProblemFactory.FromResponse(0, null); }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { _downloading = false; }
+    }
+    private static string StatusIcon(string status) => status switch
+    {
+        "Kapalı" => Icons.Material.Filled.PauseCircleOutline,
+        "Doğrulandı" => Icons.Material.Filled.CheckCircleOutline,
+        "Kısmen doğrulandı" => Icons.Material.Filled.Info,
+        "Yapılandırma eksik" => Icons.Material.Filled.Settings,
+        "Kontrol başarısız" => Icons.Material.Filled.ErrorOutline,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+    public void Dispose() { _lifetime.Cancel(); _lifetime.Dispose(); }
+}

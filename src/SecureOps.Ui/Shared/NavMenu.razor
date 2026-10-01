@@ -1,0 +1,181 @@
+@*
+    Primary navigation, grouped by what the operator is doing rather than by which team built it.
+
+    Every entry is gated on a capability returned by GET /api/v1/access/me — never on a role name,
+    and never on "looks like an administrator". An account with an Admin-sounding role but without
+    Access.ManageUsers gets no administration group, because the API would refuse those screens
+    anyway and offering them is a dead end that reads as a permissions bug.
+
+    A group heading appears only when at least one of its entries does, so the menu never shows an
+    empty section. Planned capabilities stay listed but visibly inert, because "what is coming next"
+    is part of what this navigation is meant to communicate.
+*@
+
+@implements IDisposable
+@inject ICurrentAccessProvider AccessProvider
+
+<MudNavMenu Dense="true" Class="so-nav">
+    <AuthorizeView>
+        <Authorized Context="signedIn">
+            @* Management users receive the same route under RAPORLAMA below. Rendering it twice
+               makes two entries appear selected, so the ungrouped overview is for operators whose
+               dashboard is the operational board. *@
+            @if (!Can(Capabilities.ManagementReportingView))
+            {
+                <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.SpaceDashboard">
+                    Genel Bakış
+                </MudNavLink>
+            }
+
+            @if (Can(Capabilities.OperationalRecordsView))
+            {
+                <div class="so-nav-group">OPERASYON</div>
+
+                <MudNavLink Href="operational-records" Icon="@Icons.Material.Filled.Assignment">
+                    Operasyonel Kayıtlar
+                </MudNavLink>
+            }
+
+            @* Every operator with Resources.View gets the catalogue; management is a separate
+               capability the API grants only to Admin and the assigned curator role. *@
+            @if (Can(Capabilities.InUseView))
+            {
+                <MudNavLink Href="in-use" Icon="@Icons.Material.Filled.FactCheck">In Use</MudNavLink>
+            }
+
+            @if (Can(Capabilities.AnnouncementDrafts))
+            { <MudNavLink Href="announcements" Icon="@Icons.Material.Filled.Email">Planlı Çalışma Duyuruları</MudNavLink> }
+
+            @if (Can(Capabilities.ResourcesView))
+            {
+                <div class="so-nav-group">KAYNAKLAR</div>
+
+                <MudNavLink Href="resources" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Link">
+                    Uygulama Bağlantıları
+                </MudNavLink>
+
+                <MudNavLink Href="resources/sets" Icon="@Icons.Material.Filled.PlaylistPlay">
+                    Kişisel bağlantı gruplarım
+                </MudNavLink>
+
+            }
+
+            @if (CanAnyDirectory)
+            {
+                <div class="so-nav-group" lang="en">ACTIVE DIRECTORY</div>
+
+                @if (Can(Capabilities.IdentityLookup))
+                {
+                    <MudNavLink Href="directory/users" Icon="@Icons.Material.Filled.ManageSearch">
+                        AD Kullanıcı ve Hesap Sorgulama
+                    </MudNavLink>
+                }
+
+                @if (Can(Capabilities.DirectoryGroupsView))
+                {
+                    <MudNavLink Href="directory/groups" Icon="@Icons.Material.Filled.Groups">
+                        AD Grup Analizi
+                    </MudNavLink>
+                }
+            }
+
+            @* Cross-user analytics is a separate privilege from doing the work. An operator who can
+               run lookups or move records to Jira has no entry here. *@
+            @* Operatör Raporu is deliberately absent. The route, the capability, and the backend
+               endpoint are all unchanged — it is reached as a drill-down from the Yönetim Panosu,
+               where the coverage and limitation context that makes those counts readable already
+               sits. As a top-level destination beside the dashboard it read as a per-person
+               scoreboard, which is precisely what the anti-ranking semantics exist to prevent, and
+               no current product evidence asks for it at that level. *@
+            @if (Can(Capabilities.ManagementReportingView))
+            {
+                <div class="so-nav-group">RAPORLAMA</div>
+
+                <MudNavLink Href="dashboard" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Insights">
+                    Yönetim Panosu
+                </MudNavLink>
+            }
+
+            @if (CanAnyAdministration)
+            {
+                <div class="so-nav-group">YÖNETİM</div>
+
+                @if (Can(Capabilities.ResourcesView) && Can(Capabilities.ResourcesManage))
+                {
+                    <MudNavLink Href="admin/resources" Icon="@Icons.Material.Filled.FolderSpecial" data-guide="management-link">
+                        Bağlantı Yönetimi
+                    </MudNavLink>
+                }
+
+                @if (Can(Capabilities.AccessApproveRequests))
+                {
+                    <MudNavLink Href="access/requests" Icon="@Icons.Material.Filled.AdminPanelSettings">
+                        Erişim Talepleri
+                    </MudNavLink>
+                }
+
+                @* Gated on ManageUsers rather than ApproveRequests: the users read model is a
+                   different capability, and an approver without it would get a blocked page. *@
+                @if (Can(Capabilities.AccessManageUsers))
+                {
+                    <MudNavLink Href="access/users" Icon="@Icons.Material.Filled.Group">
+                        Kullanıcılar
+                    </MudNavLink>
+
+                    <MudNavLink Href="admin/sessions" Icon="@Icons.Material.Filled.Devices">
+                        Aktif Oturumlar
+                    </MudNavLink>
+
+                    <MudNavLink Href="admin/system-status" Icon="@Icons.Material.Filled.MonitorHeart">
+                        Sistem Durumu
+                    </MudNavLink>
+                }
+            }
+
+            <div class="so-nav-group">HESABIM</div>
+
+            <MudNavLink Href="access/me" Icon="@Icons.Material.Filled.VerifiedUser">
+                Erişimim
+            </MudNavLink>
+
+            <div class="so-nav-group">SONRAKİ FAZLAR</div>
+
+            <MudNavLink Href="audit-compliance" Icon="@Icons.Material.Filled.FactCheck">
+                Denetim ve Uyum
+                <span class="so-nav-tag">Planlandı</span>
+            </MudNavLink>
+
+            <MudNavLink Href="diagnostics-readonly" Icon="@Icons.Material.Filled.Terminal">
+                Salt Okunur Tanılama
+                <span class="so-nav-tag">Planlandı</span>
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>
+
+@code {
+    private AccessSnapshot? _snapshot;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += OnAccessChanged;
+        _snapshot = await AccessProvider.GetAsync();
+    }
+
+    private void OnAccessChanged() => InvokeAsync(async () =>
+    {
+        _snapshot = await AccessProvider.GetAsync();
+        StateHasChanged();
+    });
+
+    private bool Can(string capability) => _snapshot?.Can(capability) == true;
+
+    private bool CanAnyDirectory =>
+        Can(Capabilities.IdentityLookup) || Can(Capabilities.DirectoryGroupsView);
+
+    private bool CanAnyAdministration =>
+        Can(Capabilities.AccessApproveRequests) || Can(Capabilities.AccessManageUsers)
+        || Can(Capabilities.ResourcesView) && Can(Capabilities.ResourcesManage);
+
+    public void Dispose() => AccessProvider.Changed -= OnAccessChanged;
+}

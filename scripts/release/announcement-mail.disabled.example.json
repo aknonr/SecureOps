@@ -1,0 +1,41 @@
+{
+  "AnnouncementMail": {
+    "Enabled": false,
+    "SelfTestEnabled": false,
+    "SendEnabled": false,
+    "Host": "",
+    "Port": 587,
+    "Security": "StartTls",
+    "PolicyRevision": "",
+    "EnvelopeMode": "",
+    "EnvelopeSender": "",
+    "AllowedRecipientDomains": [],
+    "MaxRecipients": 100,
+    "TimeoutSeconds": 30
+  },
+  "Announcements": {
+    "AssetDirectory": "",
+    "Banners": {
+      "header": "planlimail_duyuru_header.jpg",
+      "main": "planlimail_duyuru_main.jpg",
+      "logo": "turkish_technology_logo.jpg",
+      "linkedin": "planlimail_duyuru_linkedin.png",
+      "instagram": "planlimail_duyuru_instagram.png",
+      "youtube": "planlimail_duyuru_youtube.png"
+    },
+    "Bundles": {
+      "original-v1": {
+        "Label": "Onayli ozgun gorseller",
+        "Footer": "",
+        "Assets": {
+          "header": "header",
+          "main": "main",
+          "logo": "logo",
+          "linkedin": "linkedin",
+          "instagram": "instagram",
+          "youtube": "youtube"
+        }
+      }
+    }
+  }
+}

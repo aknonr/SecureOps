@@ -1,0 +1,106 @@
+@*
+    Renders a UiProblem: what went wrong, what to do about it, and the support reference.
+
+    Every screen shows backend failures through this component, so an operator sees the same structure
+    whether a lookup, an access decision, or a Jira transfer failed. Raw technical detail is never
+    rendered here — UiProblemFactory has already reduced the failure to safe wording.
+*@
+
+@* A readiness state is not an alert. Announcing "raporlama henüz etkin değil" with
+   role="alert" interrupts a screen reader for a condition that is working as
+   configured, so only real failures get the assertive role. *@
+<div class="so-problem so-problem--@Kind" role="@Role">
+    <div class="so-problem-icon" aria-hidden="true">
+        <MudIcon Icon="@Icon" Size="Size.Small" />
+    </div>
+
+    <div class="so-problem-body">
+        <p class="so-problem-title">@Problem.Title</p>
+        <p class="so-problem-text">@Problem.Explanation</p>
+
+        @if (Problem.NextSteps.Count > 0)
+        {
+            <ul class="so-problem-steps">
+                @foreach (string step in Problem.NextSteps)
+                {
+                    <li>@step</li>
+                }
+            </ul>
+        }
+
+        @if (Actions is not null || ShowRetry)
+        {
+            <div class="so-problem-actions">
+                @if (ShowRetry)
+                {
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="OnRetry">
+                        @RetryLabel
+                    </MudButton>
+                }
+                @Actions
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Problem.CorrelationId))
+        {
+            @* Kept visually quiet: needed only when the operator escalates, never part of the fix. *@
+            <p class="so-problem-reference">
+                <span>Destek referansı</span>
+                <code>@Problem.CorrelationId</code>
+            </p>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>Problem to present.</summary>
+    [Parameter, EditorRequired]
+    public UiProblem Problem { get; set; } = default!;
+
+    /// <summary>Invoked when the operator chooses to retry.</summary>
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+
+    /// <summary>Label for the retry action.</summary>
+    [Parameter]
+    public string RetryLabel { get; set; } = "Tekrar dene";
+
+    /// <summary>Extra actions rendered beside retry.</summary>
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    // Retry is offered only when the API says the operation can succeed on a second attempt and the
+    // page supplied a handler. Offering it otherwise invites an operator to hammer a dead end.
+    private bool ShowRetry => Problem.Retryable && OnRetry.HasDelegate;
+
+    private string Role => Problem.Kind == UiProblemKind.NotConfigured ? "status" : "alert";
+
+    private string Kind => Problem.Severity switch
+    {
+        Severity.Error => "error",
+        Severity.Warning => "warning",
+        Severity.Success => "success",
+        _ => "info"
+    };
+
+    private string Icon => Problem.Kind switch
+    {
+        UiProblemKind.SessionExpired => Icons.Material.Filled.LockClock,
+        UiProblemKind.AccessPending => Icons.Material.Filled.HourglassTop,
+        UiProblemKind.AccessDisabled => Icons.Material.Filled.NoAccounts,
+        UiProblemKind.Forbidden => Icons.Material.Filled.Block,
+        UiProblemKind.NotFound => Icons.Material.Filled.SearchOff,
+        UiProblemKind.Validation => Icons.Material.Filled.EditNote,
+        UiProblemKind.RateLimited => Icons.Material.Filled.Speed,
+        UiProblemKind.Conflict => Icons.Material.Filled.SyncProblem,
+        UiProblemKind.UpstreamUnavailable => Icons.Material.Filled.CloudOff,
+        UiProblemKind.NotConfigured => Icons.Material.Filled.Settings,
+        UiProblemKind.Network => Icons.Material.Filled.WifiOff,
+        UiProblemKind.Timeout => Icons.Material.Filled.Timer,
+        _ => Icons.Material.Filled.ErrorOutline
+    };
+}

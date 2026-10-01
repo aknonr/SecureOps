@@ -1,0 +1,32 @@
+@*
+    Sets the HTTP status code for a Blazor page that is being prerendered.
+
+    MapFallbackToPage("/_Host") answers every unmatched path with 200, and the router then decides
+    client-side what to show. That is right for navigation but wrong for the first server response:
+    a genuinely unknown URL would return "200 OK" carrying a Not Found page, which misreports the
+    outcome to browsers, proxies, monitoring and crawlers alike.
+
+    Placing this in a router state fixes the status without changing what the operator sees.
+*@
+
+@inject IHttpContextAccessor HttpContextAccessor
+
+@code {
+    /// <summary>Status code to report for the prerendered response.</summary>
+    [Parameter, EditorRequired]
+    public int Code { get; set; }
+
+    protected override void OnInitialized()
+    {
+        HttpContext? httpContext = HttpContextAccessor.HttpContext;
+
+        // Only meaningful while prerendering. Once the circuit is interactive the response is long
+        // gone, and after headers are flushed the status can no longer be changed — in both cases
+        // this is a no-op rather than an error, because client-side navigation to a missing route
+        // is not an HTTP event at all.
+        if (httpContext is not null && !httpContext.Response.HasStarted)
+        {
+            httpContext.Response.StatusCode = Code;
+        }
+    }
+}

@@ -1,0 +1,7 @@
+.mail-command { margin-block: 1.5rem; border-block: 1px solid var(--mud-palette-lines-default); padding-block: 1rem; }
+.mail-review { border-inline-start: 3px solid var(--mud-palette-primary); padding: 1rem; margin-block: 1rem; }
+.mail-review dl { display: grid; grid-template-columns: 9rem minmax(0,1fr); gap: .5rem 1rem; }
+.mail-review dd { margin: 0; overflow-wrap: anywhere; }
+.mail-result { padding-block: 1rem; border-top: 1px solid var(--mud-palette-lines-default); }
+.mail-result p { margin-block: .4rem; }
+@media(max-width: 600px) { .mail-review dl { grid-template-columns: 1fr; gap: .2rem; } .mail-review dd { margin-bottom: .5rem; } }

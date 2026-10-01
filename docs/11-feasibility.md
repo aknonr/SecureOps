@@ -75,7 +75,7 @@ If any assumption breaks, dates slide accordingly. The schedule is **honest**, n
 | R13 | Test environment unavailable or shared with other projects | Medium | High | Request dedicated in Phase 0; develop on mocks if needed |
 | R14 | Phase 7 AI hardware budget rejected | Medium | Low | Project is valuable without AI; surface this in management communication |
 | R15 | Phase 8 remediation approval gets misused | Low | High | Bounded catalog; ADR-gated extension; meta-audit |
-| R16 | Identity lookup is perceived as people search | Medium | Medium | TeamLead/Admin only; purpose required; exact lookup only; no GET account URLs; rate limit; audit every query; no broad search |
+| R16 | Identity lookup is perceived as people search | Medium | Medium | TeamLead/Admin only; exact lookup only; no GET account URLs; bounded rate; audit every query with target hash; no broad search |
 
 ## Bus Factor Mitigations
 

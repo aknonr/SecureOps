@@ -1,0 +1,376 @@
+@page "/in-use"
+@page "/in-use/{Id:guid}"
+@attribute [Authorize]
+@using SecureOps.Shared.Contracts.InUse
+@implements IDisposable
+@inject InUseApiClient Api
+@inject ICurrentAccessProvider AccessProvider
+@inject IJSRuntime Js
+@inject IDialogService Dialogs
+@inject NavigationManager Navigation
+
+<NavigationLock ConfirmExternalNavigation="HasUnsaved" OnBeforeInternalNavigation="BeforeNavigationAsync" />
+
+<PageTitle>Sunucu Kullanıma Alma Kontrolleri · @WasasBrand.Name</PageTitle>
+<div class="so-page so-page--wide so-inuse">
+    <SoPageHeader Title="Sunucu Kullanıma Alma Kontrolleri">
+        <Actions>
+            @if (Can(Capabilities.InUseReview)) { <MudButton Href="/in-use/reports" StartIcon="@Icons.Material.Filled.History">Rapor geçmişi</MudButton> }
+            @if (Id.HasValue) { <MudButton Href="@ListUrl" StartIcon="@Icons.Material.Filled.ArrowBack">Listeye dön</MudButton> }
+            @if (Can(Capabilities.InUseView)) { <ResourceHelp Surface="@(Id.HasValue ? "inuse-review" : "inuse-list")" Disabled="_busy" /> }
+        </Actions>
+    </SoPageHeader>
+    @if (_access is null) { <SoLoading Message="Yetkiler doğrulanıyor" /> }
+    else if (!_access.IsResolved) { <SoProblemPanel Problem="_access.Problem!" OnRetry="InitializeAsync" /> }
+    else if (!Can(Capabilities.InUseView))
+    { <SoEmptyState Title="In Use erişimi gerekli" Description="Uygulama yöneticisinden In Use yetkisi isteyin." /> }
+    else
+    {
+        @if (_problem is not null) { <SoProblemPanel Problem="_problem" />
+            @if (HasUnsaved && _record is not null)
+            { <MudButton OnClick="CompareAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.CompareArrows">Cevapları koru ve güncel kayıtla karşılaştır</MudButton> }
+            else { <MudButton OnClick="LoadAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Refresh">Kayıtlı veriyi yeniden oku</MudButton> } }
+        @if (_comparison is { } current && _record is { } previous)
+        {
+            <section class="so-inuse-band" aria-label="Güncel kayıt karşılaştırması">
+                <h3>Kaydedilmemiş cevaplarınız korunuyor</h3>
+                <p>Kayıt sürümü: @previous.Version → @current.Version · Kaynak sürümü: @previous.SourceVersion → @current.SourceVersion</p>
+                <p>Güncel inceleyici: @(current.AssigneeLabel ?? "Atanmamış")</p>
+                <ul>@foreach (var answer in _answers.Where(a => (current.Draft?.Answers.FirstOrDefault(s => s.ServerId == a.ServerId && s.Check == a.Check)?.Value ?? "Unknown") != a.Value))
+                { <li>@answer.ServerId · @Check(answer.Check): kayıtlı @Answer(current.Draft?.Answers.FirstOrDefault(s => s.ServerId == answer.ServerId && s.Check == answer.Check)?.Value ?? "Unknown") → yerel @Answer(answer.Value)</li> }</ul>
+                @if (current.SourceVersion != previous.SourceVersion)
+                {
+                    <p>Kaynak değişti: @current.Source.Title · @InUseDisplayText.Decode(current.Source.Requester.Value)</p>
+                    <details><summary>Değişen kaynak kanıtı</summary>
+                    <ul>@foreach (var change in SourceChanges(previous, current))
+                    { <li>@change.Server · @change.Field: @change.Before → @change.After</li> }</ul></details>
+                    <p>Yalnız aynı kaynak kimliğine sahip sunucuların cevapları korunur. Yeni sunucular Bilinmiyor ile başlar; kaydetmeden önce doğrulayın.</p>
+                }
+                <MudButton OnClick="AcceptComparison" Disabled="_busy" StartIcon="@Icons.Material.Filled.Check">Farkları inceledim; yerel cevaplarla devam et</MudButton>
+            </section>
+        }
+        @if (_notice is not null) { <p role="status">@_notice</p> }
+        @if (_busy) { <SoLoading Message="İşlem sürüyor" /> }
+        @if (!Id.HasValue)
+        {
+            <div class="so-inuse-filters" data-guide="inuse-filter">
+                <div><MudTextField T="string" Label="OR, sunucu veya bildiren ara" aria-label="In Use kayıt ara" MaxLength="100" Value="_search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Margin="Margin.Dense" /></div>
+                <label>Görünüm<select aria-label="In Use görünüm" @bind="_view" @bind:after="FilterAsync">
+                    <option value="all">Tümü</option><option value="review">İnceleme</option><option value="pending">WASAS adımı bekleyen</option><option value="verification">Doğrulama bekleyen</option><option value="tracking">Tamamlanan / takip</option><option value="mine">Bana atanan</option><option value="unassigned">Atanmamış</option>
+                </select></label>
+                <label>İnceleme durumu<select aria-label="In Use durum" @bind="_status" @bind:after="FilterAsync">
+                    <option value="">Aktif incelemeler</option><option value="Unreviewed">İncelenmedi</option><option value="Draft">Taslak</option><option value="Stale">Yeniden inceleme</option><option value="Discarded">Kaldırılmış taslaklar</option>
+                </select></label>
+                <label>Sıralama<select aria-label="In Use sıralaması" aria-describedby="inuse-date-order-note" @bind="_sort" @bind:after="FilterAsync">
+                    <option value="code">OR numarasına göre</option><option value="oldest" disabled>En eski talep (kullanılamıyor)</option><option value="newest" disabled>En yeni talep (kullanılamıyor)</option>
+                </select></label>
+            </div>
+            <p id="inuse-date-order-note">Ana OR oluşturulma tarihi kaynaktan doğrulanmadığı için tarihe göre sıralama kullanılamıyor. İnceleme ve WASAS adımı onayının ön koşulu değildir.</p>
+            <section data-guide="inuse-refresh" class="so-inuse-band">
+                <p>Kaynak yenileme kayıtları, sunucu ilişkilerini ve bildirenleri okur; güvenlik kontrollerini yapmaz, kaydı kapatmaz.</p>
+                @if (Can(Capabilities.InUseRefresh))
+                { <MudButton OnClick="RefreshAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Outlined">In Use kaynağını yenile</MudButton> }
+                @if (_page is not null)
+                {
+                    <p>Son başarılı okuma: @Time(_page.Refresh.LastSuccessfulAt)</p>
+                    @if (_page.Refresh.Stale) { <MudAlert Severity="@(_page.Refresh.Issue == "SourceCompletenessUnverified" && _page.Refresh.LastSuccessfulAt >= DateTimeOffset.UtcNow.AddHours(-24) ? Severity.Info : Severity.Warning)">@RefreshIssue(_page.Refresh.Issue) Kayıtlı veriler korunur.</MudAlert> }
+                    else if (_page.Items.Any(r => r.Source.ServiceItemsState == "Observed"))
+                    { <p>Gözlenen servis öğeleri gösteriliyor; ilişkilerin tamlığı doğrulanmadı.</p> }
+                    <p>@_page.Total kayıtlı eşleşme</p>
+                }
+            </section>
+            <section data-guide="inuse-list" aria-label="In Use kayıtları">
+                @if (_page is { Items.Count: 0 }) { <SoEmptyState Title="Kayıtlı eşleşme yok" Description="Filtreleri kontrol edin veya yetkinizle kaynağı yenileyin." /> }
+                @if (_page is not null)
+                {
+                    <ul class="so-inuse-records">
+                    @foreach (InUseRecord record in _page.Items)
+                    {
+                        <li><div><a href="@RecordUrl(record.Id)">@record.Source.Code</a><h2>@record.Source.Title</h2>
+                            @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }</div>
+                            <div class="inuse-request-date"><strong>Talep tarihi</strong>
+                                @if (InUseProgress.Created(record.Source, DateTimeOffset.UtcNow) is { } created)
+                                { <time datetime="@created.ToString("O")">@created.ToUniversalTime().ToString("dd.MM.yyyy HH:mm:ss") UTC</time> }
+                                else { <span>Tarih alınmadı / doğrulanmadı</span> }
+                            </div>
+                            <div class="inuse-row-state"><strong class="inuse-assignee">Atanan inceleyici: @(record.AssigneeLabel ?? "Atanmamış")</strong>
+                                <p>@SavedCompleted(record) / @record.Source.Servers.Count sunucu kaydedildi · @(record.Discarded ? "Yerel taslak kaldırılmış" : Status(record.Status))</p>
+                                <p class="inuse-next">@RowNext(record)</p><small>Son okuma: @Time(record.LastSeenAt)</small>
+                                <p><strong>OR talep eden:</strong> @InUseDisplayText.Decode(record.Source.Requester.Value)</p>
+                                <div class="so-inuse-server-table"><table><thead><tr><th>RFC talep eden · Ad soyad</th><th>Sunucu - RFC eşleşmesi</th></tr></thead><tbody>
+                                @foreach (var server in record.Source.Servers)
+                                { <tr><td><span class="so-inuse-mobile-label">RFC talep eden · Ad soyad</span><InUseReporter Value="server.RelatedRequestReporter" /></td><td><span class="so-inuse-mobile-label">Sunucu - RFC eşleşmesi</span>@Field(server, "HOSTNAME") · @(server.RelatedRequestReporter?.RequestCode ?? server.RelatedRequestReporter?.RfcReference ?? "RFC alınmadı")</td></tr> }
+                                </tbody></table></div>
+                                <p><strong>WASAS aktivitesi:</strong> @SourceActivity(record) · <strong>Genel OR:</strong> @SourceLifecycle(record)</p>
+                                @if (record.SourceObservationMissing) { <p>Son yenilemede görülmedi; önceki kaynak gözlemi korunuyor.</p> }
+                                @if (record.Source.ServiceItemsState is "Partial" or "Failed" or "Forbidden" or "Ambiguous")
+                                { <p>@Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p> }</div>
+                            <MudButton Href="@RecordUrl(record.Id)" EndIcon="@Icons.Material.Filled.ArrowForward">@(record.TrackingOnly ? "Takip et" : "İncele")</MudButton></li>
+                    }
+                    </ul>
+                    <footer class="so-inuse-pager">
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki In Use sayfası" Disabled="@(_busy || _number == 1)" OnClick="PreviousAsync" />
+                        <span>Sayfa @_number / @Math.Max(1, (int)Math.Ceiling((double)_page.Total / _size))</span>
+                        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki In Use sayfası" Disabled="@(_busy || _number * _size >= _page.Total)" OnClick="NextAsync" />
+                        <label>Sayfa boyutu<select aria-label="In Use sayfa boyutu" @bind="_size" @bind:after="FilterAsync"><option>10</option><option>25</option><option>50</option></select></label>
+                    </footer>
+                }
+            </section>
+        }
+        else if (_record is { } record)
+        {
+            <h2>@record.Source.Code · @record.Source.Title</h2>
+            <section class="inuse-ticket-summary" aria-label="İnceleme durumu">
+                <div><span>Atanan inceleyici</span><strong>@(record.AssigneeLabel ?? "Atanmamış")</strong></div>
+                <div><span>Kaydedilen ilerleme</span><strong>@SavedCompleted(record) / @record.Source.Servers.Count sunucu · @(record.Discarded ? "Yerel taslak kaldırılmış" : Status(record.Status))</strong></div>
+                @if (record.Discarded && Can(Capabilities.InUseReview))
+                { <p role="status">Bu yerel taslak aktif işten kaldırıldı. Kaynak OR ve geçmiş arşivler korunuyor.</p><MudButton OnClick='() => ChangeDraftAsync("Restart")' Disabled="_busy" StartIcon="@Icons.Material.Filled.RestartAlt">Yeniden başla</MudButton> }
+                <div><span>Kaynak okuma zamanı</span><strong>@Time(record.LastSeenAt)</strong></div>
+                <div><span>RFC talep eden · Ad soyad</span><strong>@ReporterSummary(record)</strong></div>
+                @if (Can(Capabilities.InUseAssign))
+                { <MudButton OnClick="OpenAssignmentAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Outlined" aria-haspopup="dialog">İnceleyici ata/değiştir</MudButton> }
+                <p class="inuse-next" role="status">Sonraki adım: @NextAction</p>
+                @if (_dirty) { <p role="status">Yerel cevaplar değişti; henüz kaydedilmedi. Formdaki ilerleme: @CompletedServers / @record.Source.Servers.Count.</p> }
+                @if (record.Draft is { } saved) { <p>İnceleyen / son kaydeden: @InUsePersonLabel.Format(saved.ReviewedByLabel, saved.ReviewedByAccount) · @Time(saved.ReviewedAt)</p> }
+                <p>WASAS aktivitesi: @SourceActivity(record) · Genel OR: @SourceLifecycle(record)</p>
+                @if (record.SourceObservationMissing) { <p>Son yenilemede görülmedi; önceki kaynak gözlemi korunuyor.</p> }
+            </section>
+            @if (record.Source.Synthetic) { <MudAlert Severity="Severity.Info">Sentetik yerel veri; kurumsal doğrulama değildir.</MudAlert> }
+            @if (record.Status == "Stale") { <MudAlert Severity="Severity.Warning">İncelemeyi etkileyen kaynak bilgisi değişti. Cevaplarınız korunuyor; aşağıdaki farkları inceleyip kaydedin.</MudAlert> }
+            @if (record.SourceChanges.Count > 0 || record.Source.Servers.Any(s => InUseSourceChanges.Fields(s, record.Draft)?.Count > 0))
+            {
+                <section class="so-inuse-band" aria-label="Kaynak değişiklikleri"><h3>Değişen kaynak bilgileri</h3>
+                    <p>İnceleme alanı değişiklikleri yeniden inceleme gerektirir. Süreç ilerlemesi ve envanter STATUS değişikliği aynı sunucu cevaplarını silmez; gönderim uygunluğu ayrıca kontrol edilir.</p>
+                    <div class="so-inuse-server-table"><table><thead><tr><th>Kapsam / alan</th><th>Önceki</th><th>Güncel</th></tr></thead><tbody>
+                    @foreach (var change in record.SourceChanges)
+                    { <tr><td>@(change.Category == "Review" ? "İnceleme" : change.Category == "Workflow" ? "Süreç" : "Gönderim bağlamı") · @change.Field</td><td>@(change.Before ?? "Alınmadı")</td><td>@(change.After ?? "Alınmadı")</td></tr> }
+                    @foreach (var server in record.Source.Servers)
+                    { @foreach (string field in InUseSourceChanges.Fields(server, record.Draft) ?? [])
+                      { <tr><td>@Field(server, "HOSTNAME") · @field</td><td>@InUseDisplayText.Decode(record.Draft?.ReviewedServers?.FirstOrDefault(s => s.Id == server.Id)?.Fields.GetValueOrDefault(field)?.Value)<small> @record.Draft?.ReviewedServers?.FirstOrDefault(s => s.Id == server.Id)?.Fields.GetValueOrDefault(field)?.Source</small></td><td>@Field(server, field)<small> @server.Fields.GetValueOrDefault(field)?.Source</small></td></tr> } }
+                    @foreach (var removed in record.Draft?.ReviewedServers?.Where(s => !record.Source.Servers.Any(n => n.Id == s.Id)) ?? [])
+                    { <tr><td>Sunucu ilişkisi</td><td>@Field(removed, "HOSTNAME")</td><td>Güncel kaynakta kaldırıldı; eski cevaplar geçmişte korunur</td></tr> }
+                    </tbody></table></div>
+                </section>
+            }
+            <section class="so-inuse-band" data-guide="inuse-owner">
+                <h3>Talep ve sorumlular</h3><dl class="so-inuse-evidence">
+                    <dt>In Use kaydındaki talep eden</dt><dd>@InUseDisplayText.Decode(record.Source.Requester.Value)</dd>
+                    <dt>Servis / uygulama sahibi</dt><dd>@BusinessEvidence(record.Source.ServiceOwner)</dd>
+                    <dt>Kurulum operatörü / ekibi</dt><dd>@BusinessEvidence(record.Source.ProvisioningTeam)</dd>
+                    <dt>Kaynak yaşı</dt><dd>@Waiting(record)</dd>
+                </dl>
+                <h4>Son atama</h4>
+                <p>Son değişiklik: @(record.AssignedByLabel ?? "Henüz kayıtlı atama yok") · @Time(record.AssignedAt). WASAS inceleyicisi, kaynak sahibi değildir.</p>
+                @if (Can(Capabilities.SystemDiagnostics))
+                { <details><summary>Teknik kaynak ayrıntıları</summary>
+                <dl class="so-inuse-evidence">
+                    <dt>Teknik kayıt oluşturucusu</dt><dd>@Evidence(record.Source.Creator ?? new(null, "Kaynak sözleşmesi doğrulanmadı"))</dd>
+                    <dt>Servis / uygulama sahibi</dt><dd>@Evidence(record.Source.ServiceOwner)</dd>
+                    <dt>Kurulum operatörü / ekibi</dt><dd>@Evidence(record.Source.ProvisioningTeam)</dd>
+                </dl></details> }
+            </section>
+            <section class="so-inuse-band" data-guide="inuse-servers">
+                <h3 id="inuse-review">1. Sunucuları incele</h3>
+                <p>Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p>
+                @if (_validation is not null) { <p role="alert">@_validation</p><MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">Alana git</MudButton> }
+                @if (record.Source.Servers.Count > 0)
+                {
+                    <div class="so-inuse-server-table" aria-label="Servis öğesi tablosu"><table><thead><tr><th scope="col">Sunucu</th><th scope="col">Ortam · Servis / uygulama</th><th scope="col">@InUseRelatedRequestReporter.Label · RFC Kaydı</th></tr></thead><tbody>
+                        @foreach (InUseServer server in record.Source.Servers)
+                        { <tr data-server-id="@server.Id"><td><MudButton OnClick="() => ReviewServer(server.Id)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Edit" aria-label="@($"{Field(server, "HOSTNAME")} sunucusunu yanıtla")">@Field(server, "HOSTNAME")</MudButton></td>
+                            <td>@Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</td>
+                            <td><span class="so-inuse-mobile-label">@InUseRelatedRequestReporter.Label</span><InUseReporter Value="server.RelatedRequestReporter" /></td></tr> }
+                    </tbody></table></div>
+                }
+                @if (record.Source.Servers.Count == 0) { <MudAlert Severity="Severity.Warning">Doğrulanmış sunucu ilişkisi yok. Kaynak ilişki kanıtı gerekli.</MudAlert> }
+                @if (record.Source.Servers.Count > 0)
+                {
+                    <h3 id="inuse-answers">2. Cevapları tamamla ve kaydet</h3>
+                    <p role="status">Kaydedilen: @SavedCompleted(record) / @record.Source.Servers.Count sunucu. Ekrandaki cevaplar: @CompletedServers / @record.Source.Servers.Count sunucu; @_answers.Count(a => a.Value is not ("Yes" or "No")) cevap eksik.</p>
+                    <p>Mikrosegmentasyon, sunucular arasındaki ağ erişiminin ayrı güvenlik kurallarıyla sınırlandırılmasıdır. Kanıtınız yoksa Bilinmiyor bırakın.</p>
+                    <label>Cevap görünümü<select aria-label="Cevap görünümü" @bind="_answerView"><option value="all">Tümü</option><option value="missing">Eksik cevaplar</option><option value="changed">Kaynak bilgisi değişenler</option></select></label>
+                    @if (_answerView == "changed" && record.Draft?.ReviewedServers is null)
+                    { <p>Önceki alan karşılaştırması kaydedilmemiş. Tümü görünümünden kaynak bilgilerini inceleyin; değişmediği varsayılmaz.</p> }
+                    @if (CanEdit && CompletedServers < record.Source.Servers.Count) { <MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">İlk eksik cevaba git</MudButton> }
+                    <div class="inuse-answer-table"><table><thead><tr><th>Sunucu / ortam</th><th>Sunucudan internete</th><th>İnternetten sunucuya</th><th>Mikrosegmentasyon</th><th>İlerleme / geçmiş</th></tr></thead><tbody>
+                        @foreach (InUseServer server in AnswerServers)
+                        {
+                            <tr @key="server.Id"><th scope="row"><strong>@Field(server, "HOSTNAME")</strong><p>@Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</p></th>
+                            @foreach (string code in InUseChecks.OperatorCodes)
+                            {
+                                if (Edit(server.Id, code) is { } answer)
+                                { <td><label><span class="inuse-answer-label">@Check(code)</span><select @ref="_rowElements[(server.Id, code)]" data-answer-server="@server.Id" data-answer-check="@(code)" aria-label="@($"{ServerName(server.Id)}: {Check(code)}")" disabled="@(!CanEdit || _busy)" @bind="answer.Value" @bind:after="() => AnswerChanged(answer)"><option value="Unknown">Bilinmiyor</option><option value="Yes">Evet</option><option value="No">Hayır</option></select></label><small>@(answer.Value == "Unknown" && answer.Origin is null ? "Henüz yanıtlanmadı" : OriginText(answer.Origin))</small></td> }
+                            }
+                            <td><p>@(3 - Remaining(server.Id)) / 3 cevap</p><MudButton OnClick="() => OpenHistoryAsync(server.Id)" Disabled="@(_busy || !Can(Capabilities.InUseReview))" StartIcon="@Icons.Material.Filled.History">İnceleme geçmişi</MudButton></td></tr>
+                        }
+                    </tbody></table></div>
+                    @if (!AnswerServers.Any()) { <p>Bu görünümde sunucu yok. Tümü görünümünde @record.Source.Servers.Count sunucu bulunuyor.</p> }
+                    <details class="inuse-focused"><summary>Tek sunucu ayrıntısı ve toplu cevap kaynağı</summary>
+                    <label>Yanıtlanacak sunucu<select aria-label="Yanıtlanacak sunucu" @bind="_editingServer" @bind:after="() => _changes = null">
+                        @foreach (InUseServer server in record.Source.Servers) { <option value="@server.Id">@Field(server, "HOSTNAME") · @server.Id · @_answers.Count(a => a.ServerId == server.Id && a.Value == "Unknown") eksik</option> }
+                    </select></label>
+                    @if (record.Source.Servers.FirstOrDefault(s => s.Id == _editingServer) is { } activeServer)
+                    {
+                        <p><strong>Kaynak ortamı:</strong> @Field(activeServer, "SI_ENVIRONMENT") · Gözlem: @Time(record.LastSeenAt) · <strong>Servis:</strong> @Field(activeServer, "SERVICE NAME (ÜRÜN/UYGULAMA)")</p>
+                        <p><strong>Bu sunucu için NMS önerisi:</strong> @(record.PolicyProposal?.Fields.SingleOrDefault(f => f.ServerId == activeServer.Id && f.Field == "check:NmsRequested")?.Value ?? "Ortam doğrulanmalı") · Kaynak ortamına dayalı öneri; alarm kurulumu kanıtı değildir.</p>
+                    }
+                    <div class="so-inuse-filters">
+                        @for (int i = 0; i < InUseChecks.OperatorCodes.Count; i++)
+                        {
+                            int index = i;
+                            if (Edit(_editingServer, InUseChecks.OperatorCodes[index]) is { } answer)
+                            { <label>@Check(answer.Check)<select @ref="_answerElements[index]" aria-label="@($"{answer.ServerId} {answer.Check} ayrıntı")" disabled="@(!CanEdit || _busy)" @bind="answer.Value" @bind:after="() => AnswerChanged(answer)">
+                                @foreach (string value in InUseChecks.Values.Where(v => v != "NotApplicable")) { <option value="@value">@Answer(value)</option> }
+                            </select></label> }
+                        }
+                    </div>
+                    </details>
+                    @if (record.PolicyProposal is { } proposal)
+                    {
+                        <section class="inuse-policy" aria-label="İzleme ve organizasyon önerileri">
+                            <h4>Ortam ve NMS incelemesi · @proposal.Revision</h4>
+                            <p>PROD için NMS kapsamı ve bellek/CPU/disk alarmı önerilir; DEV, TEST, UAT ve NonProd için önerilmez. Ham ortam adı korunur. Erişilebilirlik alarmı ayrıca önerilir. Bunlar kurulum kanıtı değildir. Bilinmeyen ortam NonProd sayılmaz.</p>
+                            @if (record.Draft?.Policy is { } accepted)
+                            { <p>Kaydedilmiş öneri: @accepted.Revision @(accepted.Fingerprint == proposal.Fingerprint ? "(güncel)" : "(yeni öneri ayrıca incelenmeli)")</p> }
+                            <h4>Tüm sunucuların önerileri ve istisnalar</h4>
+                            @if (CanEdit)
+                            { <label class="so-inuse-check"><input type="checkbox" disabled="@_busy" @bind="_acceptPolicy" @bind:after="Dirty" />Aşağıdaki tüm sunucu önerilerini inceledim; cevaplarla birlikte kaydet</label> }
+                            <div class="inuse-policy-table"><table><thead><tr><th>Alan</th><th>Öneri / dayanak</th><th>Etkilenen sunucular</th></tr></thead><tbody>
+                            @foreach (var group in proposal.Fields.GroupBy(f => (f.Field, f.Value, f.Origin)))
+                            { <tr><th scope="row">@PolicyField(group.Key.Field)</th><td><strong>@(group.Key.Value ?? "Eksik bilgi")</strong><br />@PolicyOrigin(group.Key.Origin)</td><td>@group.Count() sunucu<br />@string.Join(", ", group.Select(f => ServerName(f.ServerId)))</td></tr> }
+                            </tbody></table></div>
+                        </section>
+                    }
+                    @if (CanEdit) { <p>Cevaplar ve işaretlediğiniz öneri incelemesi aynı yerel kayıtta saklanır. Kaydetmek kaynak aktivitesini onaylamaz.</p> }
+                    @if (CanEdit) { <MudButton OnClick="UndoUnsavedAsync" Disabled="@(_busy || !_dirty)" StartIcon="@Icons.Material.Filled.Undo">Kaydedilmemiş değişiklikleri geri al</MudButton> }
+                    @if (CanEdit)
+                    {
+                        <MudButton OnClick='() => ChangeDraftAsync("Reset")' Disabled="_busy" StartIcon="@Icons.Material.Filled.RestartAlt">Kayıtlı cevapları sıfırla</MudButton>
+                        <MudButton OnClick='() => ChangeDraftAsync("Discard")' Disabled="_busy" StartIcon="@Icons.Material.Filled.DeleteOutline">Taslağı kaldır</MudButton>
+                    }
+                    @if (CanEdit && record.Source.Servers.Count > 1)
+                    {
+                        <section class="so-inuse-bulk" aria-label="Seçili sunuculara uygula"><h4>Cevapları seçili sunuculara kopyala · @_selected.Count sunucu seçili</h4>
+                            <label>Cevapların alınacağı sunucu<select aria-label="Toplu cevap kaynağı" @bind="_editingServer" @bind:after="() => _changes = null">@foreach (var server in record.Source.Servers) { <option value="@server.Id">@Field(server, "HOSTNAME")</option> }</select></label>
+                            <p>@string.Join(" · ", _answers.Where(a => a.ServerId == _editingServer).Select(a => Check(a.Check) + ": " + Answer(a.Value)))</p>
+                            @foreach (InUseServer server in record.Source.Servers.Where(s => s.Id != _editingServer))
+                            { <label class="so-inuse-check"><input type="checkbox" disabled="@_busy" checked="@_selected.Contains(server.Id)" @onchange="e => SelectServer(server.Id, e)" />@Field(server, "HOSTNAME") · @server.Id · @Field(server, "SI_ENVIRONMENT") · @Field(server, "SERVICE NAME (ÜRÜN/UYGULAMA)")</label> }
+                            <MudButton OnClick="PreviewBulk" Disabled="@(_busy || _selected.Count == 0 || Remaining(_editingServer) > 0)" StartIcon="@Icons.Material.Filled.CompareArrows">Değişiklikleri göster</MudButton>
+                            @if (_changes is not null)
+                            {
+                                <ul>@foreach (var change in _changes) { <li>@ServerName(change.Target.ServerId) · @Check(change.Target.Check): @Answer(change.Before) → @Answer(change.After)</li> }</ul>
+                                <MudButton OnClick="ApplyBulk" Disabled="@(_busy || _changes.Length == 0)" StartIcon="@Icons.Material.Filled.DoneAll">Gösterilen değişiklikleri onayla</MudButton>
+                            }
+                        </section>
+                    }
+                    @if (_history is { } history)
+                    {
+                        <section class="inuse-history" aria-label="Sunucu inceleme geçmişi"><h4>@Field(history.Current, "HOSTNAME") · Sunucu inceleme geçmişi</h4>
+                        <p>Son kaynak gözlemi: @Time(history.ObservedAt). @history.Total geçmiş inceleme. Kaynak envanterinin sahibi Turuncu Hat'tır.</p>
+                        @if (history.IdentityKey is null) { <p>Kaynak/tenant kimliği eski kayıtta yok. Önceki cevaplar otomatik eşleştirilmez; yetkili kaynak yenilemesi gerekir.</p> }
+                        <label>Geçmişte OR, sunucu veya bildiren ara<input @bind="_historySearch" maxlength="100" /></label><MudButton OnClick="() => HistoryPageAsync(1)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Search">Geçmişte ara</MudButton>
+                        @foreach (var review in history.Items)
+                        {
+                            var reuse = history.Proposals.Single(p => p.ReviewId == review.Id);
+                            <article><h4>@review.OrCode · @Time(review.ReviewedAt)</h4><p>@(review.ReviewerLabel ?? "Geçmiş profil adı yok") · Kaynak sürümü @review.SourceVersion · Politika @(review.Policy?.Revision ?? "Kabul edilmemiş")</p><p>@reuse.Reason</p>
+                            @if (reuse.ChangedFields.Count > 0) { <ul>@foreach (string field in reuse.ChangedFields) { <li>@field: @Field(review.Server, field) → @Field(history.Current, field)</li> }</ul> }
+                            @foreach (var answer in review.Answers.Where(a => InUseChecks.OperatorCodes.Contains(a.Check)))
+                            { <label class="so-inuse-check"><input type="checkbox" disabled="@(!reuse.CanReuse || _busy || answer.Value is not ("Yes" or "No"))" checked="@_reuseSelection.Contains(review.Id + ":" + answer.Check)" @onchange="e => SelectReuse(review.Id, answer.Check, e)" />@Check(answer.Check): @Answer(answer.Value) · @OriginText(answer.Origin)</label> }
+                            <MudButton OnClick="() => ReuseAsync(review)" Disabled="@(_busy || !reuse.CanReuse)" StartIcon="@Icons.Material.Filled.ContentCopy">Seçili önceki cevapları al</MudButton>
+                            <MudButton Href="@RecordUrl(review.RecordId)" StartIcon="@Icons.Material.Filled.OpenInNew">İlgili OR ve raporlar</MudButton></article>
+                        }
+                        <div class="so-inuse-pager"><MudButton OnClick="() => HistoryPageAsync(history.Page - 1)" Disabled="@(_busy || history.Page <= 1)" StartIcon="@Icons.Material.Filled.ChevronLeft">Önceki</MudButton><span>Sayfa @history.Page</span><MudButton OnClick="() => HistoryPageAsync(history.Page + 1)" Disabled="@(_busy || history.Page * history.PageSize >= history.Total)" EndIcon="@Icons.Material.Filled.ChevronRight">Sonraki</MudButton></div>
+                        </section>
+                    }
+                    <details><summary>İşlem geçmişi ve kaynak ayrıntıları</summary>
+                        <p>Veri sürümü @record.SourceVersion · Kayıt sürümü @record.Version</p>
+                        <p>@record.Source.RelationshipEvidence</p>
+                        <p>Etkilenen varlıklar: @Relationship(record.Source.AffectedAssetsState, record.Source.AffectedAssetCount)</p>
+                        <p>Talep eden: @Evidence(record.Source.Requester)</p>
+                        <p>@_notes</p>
+                        @foreach (InUseServer server in record.Source.Servers)
+                        { <h4>@Field(server, "HOSTNAME") · @server.Id</h4><InUseReporter Value="server.RelatedRequestReporter" Detailed="true" /><dl class="so-inuse-evidence">
+                            <dt>Durum</dt><dd>@FieldState(server, "STATUS")</dd><dt>Virtual PC User</dt><dd>@FieldState(server, "Virtual PC User")</dd>
+                            @foreach (var field in server.Fields) { <dt>@field.Key</dt><dd>@Evidence(field.Value)</dd> }</dl> }
+                        @foreach (InUseAnswer old in record.Draft?.Answers.Where(a => !string.IsNullOrEmpty(a.Evidence)) ?? [])
+                        { <p>@old.ServerId · @Check(old.Check): @old.Evidence</p> }
+                    </details>
+                }
+            </section>
+            <section class="so-inuse-band" data-guide="inuse-report">
+                <h3 id="inuse-excel">3. Excel'i kontrol et</h3>
+                <OperationHistoryPanel RecordType="InUse" RecordId="record.Id" />
+                <div class="so-inline-actions">
+                    @if (Can(Capabilities.InUseReview)) { <MudButton OnClick="PreviewAsync" Disabled="@(_busy || _dirty || record.Draft is null || record.Status == "Stale")" StartIcon="@Icons.Material.Filled.TableView">Excel önizleme</MudButton> }
+                </div>
+                @if (_dirty) { <p role="status">Kaydedilmemiş değişiklikler var.</p> }
+                @if (_report is { } report)
+                {
+                    <p>Yerel rapor · Sürüm @report.Version · Kaynak sürümü @report.SourceVersion · Kaynak işlemlerinin sonucu aşağıda ayrı gösterilir.</p>
+                    <p>İndirme adı (UTC): @report.FileName</p>
+                    @if (!report.Archived) { <MudButton OnClick="() => DownloadAsync()" Disabled="@(_busy || _dirty)" StartIcon="@Icons.Material.Filled.Archive">WASAS'a arşivle ve indir</MudButton> }
+                    else { <MudButton OnClick="() => DownloadAsync(report.Version)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Arşivi indir</MudButton> }
+                    @if (report.Archived) { <p>WASAS arşivi: @report.FileName · @Time(report.PreparedAt) · @report.Size bayt · Raporu hazırlayan: @InUsePersonLabel.Format(report.PreparedByLabel, report.PreparedByAccount) · Arşiv tek başına kaynak eki veya WASAS onayı kanıtı değildir.</p> }
+                    @if (report.Archived && report.Version == record.Version && CanEdit)
+                    {
+                        <details><summary>Rapor doğrulama bilgisi</summary><p>Arşiv SHA-256: @report.Sha256</p></details>
+                    }
+                    <label>Çalışma sayfası<select aria-label="Excel sayfası" @bind="_sheet">@for (int i = 0; i < report.Sheets.Count; i++) { <option value="@i">@report.Sheets[i].Name</option> }</select></label>
+                    <div class="so-inuse-workbook" tabindex="0" aria-label="Excel hücre önizlemesi"><table><tbody>
+                        @foreach (var row in report.Sheets[_sheet].Rows) { <tr>@foreach (string cell in row) { <td>@cell</td> }</tr> }
+                    </tbody></table></div>
+                    @if (report.Sheets[_sheet].Rows.Count == 0) { <p>Orijinal script bu sayfaya veri yazmıyor. Onaylı şablon gereksinimi bekleniyor.</p> }
+                    @if (report.EvidenceSheets.Count > 0)
+                    {
+                        <details><summary>Raporun kaynak ve inceleme kanıtları</summary>
+                        @foreach (var evidenceSheet in report.EvidenceSheets)
+                        {
+                            <h4>@evidenceSheet.Name</h4>
+                            <div class="so-inuse-workbook"><table><tbody>
+                            @foreach (var row in evidenceSheet.Rows) { <tr>@foreach (string cell in row) { <td>@cell</td> }</tr> }
+                            </tbody></table></div>
+                        }
+                        </details>
+                    }
+                }
+                @if (Can(Capabilities.InUseReview) && record.ArchivedVersions.Count > 0)
+                { <details><summary>Önceki WASAS raporları</summary>@foreach (long version in record.ArchivedVersions) { <p>Sürüm @version · @(version <= record.InvalidatedReviewsThrough ? "Sıfırlanmış / kaldırılmış inceleme" : version < record.Version ? "Önceki sürüm" : "Güncel sürüm")<MudButton OnClick="() => DownloadAsync(version)" aria-label="@($"Sürüm {version} (arşiv)")" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Arşivden indir</MudButton><MudButton OnClick="() => IndexReportAsync(version)" Disabled="_busy" StartIcon="@Icons.Material.Filled.ManageSearch">Rapor kataloğuna indeksle</MudButton></p> }</details> }
+                @if (record.Completion is { } intent)
+                {
+                    <p role="status">@CompletionStatus(intent)</p>
+                    <details><summary>Tamamlama kanıtı</summary><p>Komut @intent.CommandId · WASAS aktörü @intent.ActorId · Rapor sürümü @intent.ReportVersion · @Time(intent.ConfirmedAt)</p>
+                    <p>Ek kimliği: @(intent.AttachmentId ?? "Doğrulanmadı") · Görev kimliği: @(intent.TaskId ?? "Doğrulanmadı")</p></details>
+                    @if (Can(Capabilities.InUseReview)) { <MudButton OnClick="() => DownloadAsync(intent.ReportVersion)" Disabled="_busy" StartIcon="@Icons.Material.Filled.Download">Bağlı arşivi indir</MudButton> }
+                    @if (record.Draft?.ReviewedAt > intent.ConfirmedAt || record.SourceVersion != intent.SourceVersion)
+                    { <p>Bu niyet önceki incelemeye aittir; güncel veri için yeniden doğrulama gerekir.</p> }
+                }
+            </section>
+            <section class="so-inuse-band" aria-label="WASAS adımını onayla">
+                <h3 id="inuse-complete">4. Raporu ekle ve WASAS adımını onayla</h3>
+                @if (_execution is { } execution)
+                {
+                    <p>@execution.Readiness.Explanation</p>
+                    <p><strong>İşlem yapılacak OR: @record.Source.Code</strong> · @SavedCompleted(record) / @record.Source.Servers.Count sunucu kaydedildi · Sürüm @record.Version</p>
+                    <p>Sunucu tipi: Application Server · Gerekli ortam: @RequiredEnvironment(record)</p>
+                    <p role="status">@(_dirty ? "Kaydedilmemiş cevaplar var. Önce cevapları kaydedin." : NextAction)</p>
+                    @if (record.PolicyProposal is { } pendingPolicy && record.Draft?.Policy?.Fingerprint != pendingPolicy.Fingerprint)
+                    { <p role="status">Ortam ve NMS önerileri henüz bu sürüm için kaydedilmedi. 2. bölümde önerileri inceleyip onay kutusunu işaretleyin, ardından cevapları kaydedin.</p> }
+                    <p>Yalnız WASAS aktivitesi onaylanır. Sonraki ekip beklerken genel OR açık kalabilir.</p>
+                    <MudButton OnClick="StartExecutionAsync" Disabled="@(_busy || _dirty || record.TrackingOnly || !InUseProgress.Ready(record) || record.Draft?.Policy?.Fingerprint != record.PolicyProposal?.Fingerprint || !execution.Readiness.Available || !MayStartExecution)" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FactCheck">Raporu ekle ve WASAS adımını onayla</MudButton>
+                    <MudButton OnClick="RefreshExecutionAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Refresh">İşlem durumunu yenile</MudButton>
+                    @if (execution.Operation is { } operation)
+                    { <InUseClosureResult Operation="operation" /><p>Başlatan: @operation.InitiatorLabel · @Time(operation.CreatedAt) · Rapor sürümü @operation.ReportVersion</p>
+                        <ol>@foreach (var evidence in operation.Evidence.GroupBy(e => e.Step).Select(g => g.Last())) { <li>@ExecutionStep(evidence.Step): @ExecutionOutcome(evidence.Outcome) · @Time(evidence.At)</li> }</ol>
+                        @if (Can(Capabilities.InUseComplete) && InUseClosureVerification.CanConfirm(operation))
+                        { <MudButton OnClick="ConfirmClosureAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.FactCheck">Kaynakta kontrol ettim</MudButton> }
+                        @if (operation.State is "Unknown" or "Failed" or "Blocked" or "Unconfirmed" && !InUseClosureVerification.Acknowledged(operation) && InUseClosureVerification.ManualConfirmation(operation) is null)
+                        { <p role="alert">@ExecutionReason(operation.Evidence.LastOrDefault()?.Code ?? "Unknown")</p> }
+                        @if (Can(Capabilities.SystemDiagnostics)) { <details><summary>Teknik işlem kanıtı</summary><p>@operation.OperationId · @operation.ReportSha256</p>@foreach (var evidence in operation.Evidence) { <p>@evidence.Code · @evidence.RemoteId · @evidence.Executor</p> }</details> }
+                    }
+                }
+                else { <p>Tamamlama durumu henüz alınamadı. Yerel cevaplarınız korunuyor.</p> }
+            </section>
+            @if (CanEdit) { <div class="inuse-action-area" aria-label="Taslak işlemleri"><span role="status">@(_dirty ? "Kaydedilmemiş cevaplar var" : "Kaydedilen sürüm gösteriliyor")</span><MudButton OnClick="SaveAsync" Disabled="_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save">Cevapları kaydet</MudButton><MudButton OnClick="() => Ready()" Disabled="_busy" StartIcon="@Icons.Material.Filled.MyLocation">İlk eksik cevaba git</MudButton></div> }
+        }
+    }
+</div>

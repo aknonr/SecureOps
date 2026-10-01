@@ -1,0 +1,103 @@
+@*
+    Confirmation for "Yeniden Dene".
+
+    A retry is not a harmless refresh. With no persisted key the server rebuilds the draft and asks
+    Jira to create the issue again; with a key it resumes only the source step. Either is an
+    external write, so it gets the same explicit statement gate as the first create.
+
+    The reviewed fields cannot be shown again here: the retry route has no preview, and a new
+    preview is not available in a failed stage. What is shown comes from the record alone.
+*@
+
+<MudDialog Class="so-dialog" DefaultFocus="DefaultFocus.None">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon so-dialog--grant" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.RestartAlt" />
+            </span>
+            <span data-sdm-dialog-title>Aktarımı Yeniden Dene</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="so-dialog-subject">
+            <span class="so-dialog-subject-label">İlgili operasyonel kayıt</span>
+            <span class="so-dialog-subject-value">@Record.OrCode</span>
+            <span class="so-dialog-subject-meta">Kaynak: @Record.SourceRecordId</span>
+        </div>
+
+        <SoSimulationBanner Active="@Record.SimulationMode" Notice="@Record.SimulationNotice" />
+
+        <p class="so-dialog-consequence so-dialog--grant">@Consequence</p>
+        <p class="so-dialog-source"><strong>@SourceStatement</strong></p>
+
+        @if (!OperationalRecordView.HasJira(Record))
+        {
+            <p class="so-dialog-note">
+                Aktarılacak alanlar bu pencerede yeniden gösterilemez. Sunucu, kayıt için sabitlenmiş
+                eşleme parmak izini doğrular; eşleme veya çözümlenen kimlikler değiştiyse yeniden
+                deneme reddedilir ve yeni inceleme gerekir.
+            </p>
+        }
+
+        <SoFieldGrid MinColumnWidth="180px">
+            <SoField Label="İş akışı durumu">@OperationalRecordView.StateLabel(Record)</SoField>
+            @if (!string.IsNullOrWhiteSpace(Record.LastErrorCode))
+            {
+                <SoField Label="Son hata kodu"><code class="so-code so-code--sm">@Record.LastErrorCode</code></SoField>
+            }
+            <SoField Label="Deneme sayısı">@Record.RetryCount</SoField>
+        </SoFieldGrid>
+
+        <SoConfirmStatement Text="@Statement" @bind-Checked="_acknowledged" DescribedBy="@_hintId" AutoFocus="true" />
+        <p id="@_hintId" class="so-dialog-ack-hint">
+            @(_acknowledged ? "Onay verildi. Yeniden Dene düğmesi etkin." : "Yeniden Dene düğmesi, yukarıdaki beyan işaretlenene kadar kapalıdır.")
+        </p>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="@(!_acknowledged)" aria-describedby="@_hintId"
+                   StartIcon="@Icons.Material.Filled.RestartAlt">
+            Yeniden Dene
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly string _hintId = "jira-retry-ack-" + Guid.NewGuid().ToString("N");
+    private bool _acknowledged;
+
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = null!;
+
+    /// <summary>Authoritative record the retry acts on.</summary>
+    [Parameter, EditorRequired]
+    public OperationalRecordResponse Record { get; set; } = default!;
+
+    private string Consequence => OperationalRecordView.HasJira(Record)
+        ? $"Jira kaydı ({Record.JiraIssueKey}) yeniden oluşturulmaz; yalnız kaynak aşaması yeniden denenir."
+        : Record.SimulationMode
+            ? "Kayıtlı Jira anahtarı yok. Simülasyonda Jira oluşturma yeniden denenir; gerçek kayıt oluşturulmaz."
+            : "Kayıtlı Jira anahtarı yok. Sunucu Jira'da tek bir kaydın oluşturulmasını yeniden deneyecek.";
+
+    private string SourceStatement => Record.SourceCloseRequested
+        ? "Jira kaydından sonra Turuncu Hat kaydının kapatılması denenecek."
+        : "Turuncu Hat kaydı açık kalacak.";
+
+    private string Statement => OperationalRecordView.HasJira(Record)
+        ? $"{Record.OrCode} için Jira yeniden oluşturulmadan kaynak aşamasının yeniden deneneceğini onaylıyorum."
+        : Record.SourceCloseRequested
+            ? $"{Record.OrCode} için tek bir Jira kaydının yeniden deneneceğini ve ardından Turuncu Hat kaydının kapatılmasının deneneceğini onaylıyorum."
+            : $"{Record.OrCode} için tek bir Jira kaydının yeniden deneneceğini ve Turuncu Hat kaydının açık kalacağını onaylıyorum.";
+
+    private void Confirm()
+    {
+        // The disabled button is the visible gate; this guards a stale or scripted click.
+        if (!_acknowledged) return;
+        Dialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

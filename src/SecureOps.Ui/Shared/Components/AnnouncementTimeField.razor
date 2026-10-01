@@ -1,0 +1,41 @@
+@inject Microsoft.Extensions.Options.IOptions<SecureOps.Shared.Configuration.AnnouncementOptions> Options
+<div class="so-announcement-field so-announcement-time" role="group" aria-label="@Label" aria-describedby="@($"announcement-error-{Key}")" aria-invalid="@(Error is not null)">
+    <label for="@($"announcement-{Key}")">@Label <small>(UTC @_time.Offset)</small></label>
+    <input id="@($"announcement-{Key}")" type="date" value="@_time.Day" @oninput="DayAsync" />
+    <div class="so-announcement-clock">
+        <label>Saat<select aria-label="@(Label + " saat")" @bind="_time.Hour" @bind:after="EmitAsync"><option value="">--</option>
+            @foreach (int h in Enumerable.Range(0, 24)) { <option value="@(h.ToString("00"))">@h.ToString("00")</option> }</select></label>
+        <label>Dakika<select aria-label="@(Label + " dakika")" @bind="_time.Minute" @bind:after="EmitAsync"><option value="">--</option>
+            @foreach (int m in Enumerable.Range(0, 60)) { <option value="@(m.ToString("00"))">@m.ToString("00")</option> }</select></label>
+    </div>
+    <div class="so-announcement-clock">
+        <label>Saniye<input aria-label="@(Label + " saniye")" type="number" min="0" max="59" step="1" value="@_time.Second" @onchange="SecondsAsync" /></label>
+        <label>Gösterim saat dilimi<select aria-label="@(Label + " gösterim saat dilimi")" value="@_time.Offset" @onchange="OffsetAsync">
+            @foreach (string offset in Offsets) { <option value="@offset">UTC @offset</option> }
+        </select></label>
+        @if (_offsetError) { <span role="alert">Önce tarih ve saati tamamlayın.</span> }
+    </div>
+    <small>Saat dilimi değişikliği aynı anı farklı saatte gösterir; çalışma anını değiştirmez.</small>
+    @if (!AnnouncementTime.ValidOffset(_time.Offset)) { <span role="alert">Varsayılan saat dilimi yapılandırılmalı.</span> }
+    <span class="so-announcement-field-error" id="@($"announcement-error-{Key}")">@Error</span>
+</div>
+@code {
+    [Parameter] public string Key { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    private readonly AnnouncementTime _time = new();
+    private string? _loaded;
+    private bool _offsetError;
+    private IEnumerable<string> Offsets => Enumerable.Range(-48, 105).Select(i =>
+        (i < 0 ? "-" : "+") + $"{Math.Abs(i) / 4:00}:{Math.Abs(i) % 4 * 15:00}").Append(_time.Offset).Distinct();
+    protected override void OnParametersSet()
+    { if (_loaded != Value) { _time.Load(Value, Options.Value.DefaultDisplayOffset); _loaded = Value; } }
+    private Task EmitAsync() { _loaded = _time.Value; return ValueChanged.InvokeAsync(_loaded); }
+    private Task DayAsync(ChangeEventArgs args) { _time.Day = args.Value?.ToString() ?? ""; return EmitAsync(); }
+    private Task SecondsAsync(ChangeEventArgs args)
+    { _time.Second = int.TryParse(args.Value?.ToString(), out int second) ? second.ToString("00") : ""; return EmitAsync(); }
+    private async Task OffsetAsync(ChangeEventArgs args)
+    { _offsetError = !_time.ConvertOffset(args.Value?.ToString() ?? ""); if (!_offsetError) { await EmitAsync(); } }
+}

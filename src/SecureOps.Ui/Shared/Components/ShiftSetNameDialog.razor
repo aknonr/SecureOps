@@ -1,0 +1,73 @@
+@*
+    Names a personal set.
+
+    Bounds mirror the contract (1-80 characters) so the common mistake is reported next to the field
+    rather than arriving as a 400 after a round trip. The server stays authoritative: uniqueness is
+    per owner and case-insensitive there, and this dialog does not attempt to prove it.
+*@
+
+<MudDialog Class="so-dialog" DefaultFocus="DefaultFocus.FirstChild">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.PlaylistPlay" />
+            </span>
+            <span>@Title</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <MudTextField @bind-Value="_name"
+                      Label="Grup adı"
+                      aria-label="Grup adı"
+                      HelperText="En fazla 80 karakter. Yalnızca siz görürsünüz."
+                      Required="true"
+                      Immediate="true"
+                      MaxLength="80"
+                      Error="@(_error is not null)"
+                      ErrorText="@_error"
+                      Variant="Variant.Outlined"
+                      AutoFocus="true" />
+    </DialogContent>
+
+    <DialogActions>
+        <ResourceSaveActions Save="ConfirmAsync" />
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>Dialog heading.</summary>
+    [Parameter]
+    public string Title { get; set; } = "Grup";
+
+    /// <summary>Current name when renaming; empty when creating.</summary>
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Validates and saves the personal set without dismissing a failed edit.</summary>
+    [Parameter, EditorRequired] public Func<string, Task<UiProblem?>> Save { get; set; } = default!;
+
+    private string _name = string.Empty;
+    private string? _error;
+
+    protected override void OnInitialized() => _name = Name;
+
+    private Task<UiProblem?> ConfirmAsync()
+    {
+        string trimmed = _name.Trim();
+
+        if (trimmed.Length == 0)
+        {
+            _error = "Grup adı zorunludur.";
+            return Task.FromResult<UiProblem?>(UiProblemFactory.FromResponse(400, null) with { Explanation = _error });
+        }
+
+        _error = null;
+        return Save(trimmed);
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

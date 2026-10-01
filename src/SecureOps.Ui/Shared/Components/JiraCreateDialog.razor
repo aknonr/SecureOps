@@ -1,0 +1,160 @@
+@*
+    Confirmation for the one irreversible action in this workflow.
+
+    Creating a Jira issue cannot be undone from SecureOps, and a duplicate is expensive to clean up,
+    so the dialog restates enough authoritative context that an operator cannot confirm against the
+    wrong record: the OR code, the source record id, and the exact summary the server intends to
+    send. All of it comes from the record and the server's own preview — nothing is re-derived here.
+
+    Like AccessActionDialog, this captures intent only. The page owns the call and disables its
+    actions before the first await, which is what makes a double submission unexpressible.
+
+    Confirmation is explicit: the create button stays disabled until the operator ticks a statement
+    naming the OR and what happens to the source record. Escape and Vazgeç always cancel.
+*@
+
+<MudDialog Class="so-dialog" DefaultFocus="DefaultFocus.None">
+    <TitleContent>
+        <div class="so-dialog-title">
+            <span class="so-dialog-icon so-dialog--grant" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Filled.AddTask" />
+            </span>
+            <span id="@_titleId" data-sdm-dialog-title>Jira Kaydı Oluştur</span>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div class="so-dialog-subject">
+            <span class="so-dialog-subject-label">İlgili operasyonel kayıt</span>
+            <span class="so-dialog-subject-value">@Record.OrCode</span>
+            <span class="so-dialog-subject-meta">Kaynak: @Record.SourceRecordId</span>
+        </div>
+
+        @* Repeated here, at the point of no return. An operator who scrolled past the banner on the
+           page must still know whether this button writes to the real Jira. *@
+        <SoSimulationBanner Active="@Preview.SimulationMode" Notice="@Preview.SimulationNotice" />
+
+        @if (Preview.SimulationMode)
+        {
+            <p class="so-dialog-consequence">
+                Bu bir test simülasyonudur. Jira'da veya Turuncu Hat'ta gerçek bir kayıt
+                oluşturulmaz; iş akışının sonucu WASAS üzerinde gösterilir.
+            </p>
+        }
+        else
+        {
+            <p class="so-dialog-consequence so-dialog--grant">
+                Seçilen kayıt için Jira'da <strong>gerçek bir kayıt oluşturulacak</strong>.
+                <strong>Bu işlem WASAS üzerinden geri alınamaz.</strong>
+                Sonuç doğrulanana kadar işlemi tekrarlamayın.
+            </p>
+        }
+
+        <fieldset class="so-role-picker">
+            <legend>Aktarılacak içerik</legend>
+
+            <p class="so-dialog-source"><strong>@(Preview.SourceCloseRequested ? "Jira oluşturulduktan sonra Turuncu Hat kaydının kapatılması denenecek." : "Turuncu Hat kaydı açık bırakılacak.")</strong></p>
+
+            <SoFieldGrid MinColumnWidth="180px">
+                <SoField Label="Proje">@Preview.ProjectKey</SoField>
+                <SoField Label="Talep türü">@SdmEvidenceView.RequestTypeLabel(Preview.RequestType)</SoField>
+                <SoField Label="Kayıt tipi">@Preview.IssueType</SoField>
+                @if (!string.IsNullOrWhiteSpace(Preview.IssueTypeId))
+                {
+                    <SoField Label="Kayıt tipi kimliği">@Preview.IssueTypeId</SoField>
+                }
+                <SoField Label="Raporlayıcı">@(Preview.ReporterUsername ?? "Proje varsayılanı")</SoField>
+                <SoField Label="Atanacak kişi">@(Preview.AssigneeUsername ?? "Proje varsayılanı")</SoField>
+                <SoField Label="Takip eden kişi">@(Preview.RequesterAccountId ?? "Eşleme yok")</SoField>
+                @if (!string.IsNullOrWhiteSpace(Preview.TeamValue))
+                {
+                    <SoField Label="İlgili grup">@Preview.TeamValue</SoField>
+                }
+                @if (Preview.Labels is { Count: > 0 })
+                {
+                    <SoField Label="Etiketler">@string.Join(", ", Preview.Labels)</SoField>
+                }
+            </SoFieldGrid>
+
+            <p class="so-dialog-summary-label">Özet</p>
+            <p class="so-dialog-summary">@Preview.Summary</p>
+            <details class="so-technical">
+                <summary>Aktarılacak açıklama</summary>
+                <pre class="so-preview-body">@Preview.Description</pre>
+            </details>
+
+            @if (string.IsNullOrWhiteSpace(Preview.RequesterAccountId))
+            {
+                <p class="so-dialog-error" role="alert">
+                    Talep eden hesabı çözümlenemedi. Sunucu bu durumda kaydı reddedebilir.
+                </p>
+            }
+
+            @if (Preview.Warnings.Count > 0)
+            {
+                <p class="so-role-picker-caveat">
+                    <strong>Sunucu uyarıları:</strong>
+                </p>
+                <ul class="so-warning-list">
+                    @foreach (string warning in Preview.Warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            }
+        </fieldset>
+
+        @* Initial focus lands here rather than on a dialog button: ticking it is harmless on its
+           own, and with Oluştur disabled the focus trap would otherwise leave forward Tab unable
+           to reach it. *@
+        <SoConfirmStatement Text="@AcknowledgementText" @bind-Checked="_acknowledged"
+                            DescribedBy="@_ackHintId" AutoFocus="true" />
+        <p id="@_ackHintId" class="so-dialog-ack-hint">
+            @(_acknowledged ? "Onay verildi. Oluştur düğmesi etkin." : "Oluştur düğmesi, yukarıdaki beyan işaretlenene kadar kapalıdır.")
+        </p>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" data-sdm-cancel>Vazgeç</MudButton>
+        <MudButton OnClick="Confirm"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@(!_acknowledged)"
+                   aria-describedby="@_ackHintId"
+                   StartIcon="@Icons.Material.Filled.AddTask">
+            Oluştur
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly string _titleId = "jira-confirm-" + Guid.NewGuid().ToString("N");
+    private readonly string _ackHintId = "jira-confirm-ack-" + Guid.NewGuid().ToString("N");
+    private bool _acknowledged;
+
+    // Names the OR and the source outcome the server preview fixed, so ticking it is a statement
+    // about this record rather than a generic "I agree".
+    private string AcknowledgementText => Preview.SourceCloseRequested
+        ? $"{Record.OrCode} için tek bir Jira kaydı isteneceğini ve ardından Turuncu Hat kaydının kapatılmasının deneneceğini onaylıyorum."
+        : $"{Record.OrCode} için tek bir Jira kaydı isteneceğini ve Turuncu Hat kaydının açık kalacağını onaylıyorum.";
+
+    [CascadingParameter]
+    private MudDialogInstance Dialog { get; set; } = null!;
+
+    /// <summary>Authoritative record the operator is acting on.</summary>
+    [Parameter, EditorRequired]
+    public OperationalRecordResponse Record { get; set; } = default!;
+
+    /// <summary>The server's proposed mapping, shown verbatim.</summary>
+    [Parameter, EditorRequired]
+    public JiraPreviewResponse Preview { get; set; } = default!;
+
+    private void Confirm()
+    {
+        // The disabled button is the visible gate; this guards a stale or scripted click.
+        if (!_acknowledged) return;
+        Dialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => Dialog.Cancel();
+}

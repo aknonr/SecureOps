@@ -1,0 +1,141 @@
+# Enterprise Turuncu Hat and Jira Adapters
+
+## Provider Selection
+
+- `OperationalRecords:SourceProvider=Disabled|Fake|TuruncuHat`
+- `Jira:Provider=Disabled|Fake|Corporate`
+- `OperationalRecords:ReadOnlyIntegrationMode=true` for the TEST real-data/no-write gate
+- `OperationalRecords:ControlledTestWritesEnabled=true` only for a separately approved TEST write smoke
+
+`Fake` is permitted only in Development, Demo, or Test. Real provider selection is explicit and never falls back to synthetic behavior. Application defaults remain `Disabled`.
+
+In `Test`, selecting either corporate provider without `ReadOnlyIntegrationMode=true` fails startup unless the separate disabled-by-default `ControlledTestWritesEnabled=true` gate is explicitly approved. Both modes require the complete `TuruncuHat` + `Corporate` pair. Read-only mode requires the complete future Jira field mapping so preview is exact, permits source authentication/query and exact Jira requester/operator-resolution reads, but rejects API create/retry before local workflow mutation and rejects Jira create/Turuncu Hat completion again inside the adapters before HTTP dispatch. The controlled-write gate is rejected outside `Test`, while read-only mode is active, or with an incomplete provider pair.
+
+## Verified TEST Read-Only Activation
+
+At source `0ec037632e44c84f65c813c611486b1f4cc67f56`, an authorized operator deployed the API-only package to TEST and verified the real Turuncu Hat read-only path. Four seven-cell corporate rows parsed successfully with `Records: 4` and `MalformedOrAmbiguous: 0`; the UI displayed four real records, all remained `NeedsManualReview`, `JiraEligible=false`, the Jira-transferable count remained zero, and synthetic records were absent. External writes remained disabled and no Jira create, Turuncu Hat update, or BPM close was performed. The canonical sanitized deployment evidence and release-directory uncertainty are recorded in `docs/24-api-test-deployment-readiness.md`.
+
+## Turuncu Hat Configuration
+
+Server-owned non-secret business configuration:
+
+- `TuruncuHat__BaseUrl`
+- `TuruncuHat__TenantId`
+- `TuruncuHat__SourceBaseObject`
+- `TuruncuHat__RelatedGroupId`
+- `TuruncuHat__ExcludedDccIds__N`
+- `TuruncuHat__ActivityBaseObject`
+- `TuruncuHat__ActivityTaskModelId`
+- `TuruncuHat__ActivityGroupId`
+- `TuruncuHat__ActivityMainObjectTypeId`
+- `TuruncuHat__CompletedStatusId`
+- `TuruncuHat__CompletionCommentTemplate` (must contain `{JiraKey}`)
+- `TuruncuHat__SessionIdSegmentIndex`
+- `TuruncuHat__SessionLifetimeSeconds`
+- `TuruncuHat__ConnectTimeoutSeconds`
+- `TuruncuHat__RequestTimeoutSeconds`
+- `TuruncuHat__MaxResponseBytes`
+- `TuruncuHat__MaxDescriptionLength`
+- `TuruncuHat__DiagnosticContractLogging` (defaults `false`; temporary secret-free contract metadata logging, accepted only in `Test`)
+
+Runtime secrets, supplied only through controlled server configuration or an approved secret store:
+
+- `TuruncuHat__Authorization`
+- `TuruncuHat__Username`
+- `TuruncuHat__Password`
+
+## Jira Configuration
+
+Server-owned non-secret business configuration:
+
+- `Jira__BaseUrl`
+- `Jira__AuthenticationMode` (`Basic`)
+- `Jira__ProjectKey`
+- `Jira__IssueTypeId`
+- `Jira__MappingVersion`
+- `Jira__TeamCustomField`
+- `Jira__TeamValue`
+- `Jira__RequesterWatcherCustomField`
+- `Jira__AssignmentMode` (`ProjectDefault` or `VerifiedOperatorMapping`)
+- `Jira__OperatorAssigneeMappings__N__SecureOpsActor`
+- `Jira__OperatorAssigneeMappings__N__JiraUsername`
+- `Jira__ReporterMode` (`ProjectDefault` or `AuthenticatedOperator`)
+- `Jira__Labels__N`
+- `Jira__SummarySeparator`
+- `Jira__SummaryMaxLength`
+- `Jira__UnresolvedRequesterPolicy`
+- `Jira__ConnectTimeoutSeconds`
+- `Jira__RequestTimeoutSeconds`
+- `Jira__MaxResponseBytes`
+- `Jira__UserSearchMaxAttempts`
+- `Jira__UserSearchRetryDelayMilliseconds`
+
+Runtime secret:
+
+- `Jira__Authorization`
+
+The Turuncu Hat Authorization value remains a complete runtime header because its scheme is not proven. Controlled Jira evidence proves Basic authentication through `GET /rest/api/2/myself`; `Jira__Authorization` is therefore a complete runtime Basic header and `Jira__AuthenticationMode=Basic` is startup-validated. Header values must never be logged or returned.
+
+## Reviewed Jira Contract
+
+The original script is now located and reviewed without execution; provenance,
+its syntax defect and request-only conclusions are in the legacy parity document.
+The table below also uses earlier controlled metadata, not just that script.
+`customfield_11500` is a multi-user custom field, not proven native watchers.
+Neither a successful create nor a configured comment proves watcher addition.
+
+| Jira field | Reviewed create behavior |
+|---|---|
+| Project | Configured key; controlled evidence is SDM |
+| Issue type | ID `3`, Task |
+| `summary` | Required |
+| `description` | Optional |
+| `customfield_12700` (`İlgili Grup`) | Required cascading select; create operation `set`; parent value `WASAS` |
+| `customfield_11500` (`Takip Eden Kişiler`) | Optional multi-user picker; create operations `add`, `set`, `remove`; exact Turuncu Hat requester maps to `[{ "name": "<verified-jira-username>" }]` |
+| `labels` | Optional array containing `SunucuTalep` |
+| `assignee` | Optional; omitted in `ProjectDefault`; emitted only for one exact deployment-verified operator mapping |
+| `reporter` | Omitted in `ProjectDefault`; in `AuthenticatedOperator`, emitted as the exact Jira username resolved from the server-authenticated SecureOps actor |
+
+The authenticated Jira API identity, SecureOps actor, Turuncu Hat requester, assignee, and reporter are separate identities. `VerifiedOperatorMapping` uses exact configured actor keys only; a missing mapping falls back visibly to project default. `AuthenticatedOperator` never accepts a browser-provided reporter and never falls back to the integration account or project default after resolution failure. Every emitted mapping field and the effective requester, assignee, and reporter participate in the draft fingerprint, so a payload change after preview fails as a mapping conflict instead of changing the reviewed create payload. No fuzzy match or first-result assignment is allowed.
+
+The preview returns every field above, including the custom-field identifiers. Jira create consumes that validated draft mapping; it does not take issue type, team, labels, or requester/watcher field from a second configuration snapshot. `Jira__MappingVersion` must change whenever an approved business mapping changes.
+
+The controlled `/myself` response exposed `self`, `key`, `name`, `emailAddress`, `avatarUrls`, `displayName`, `active`, `deleted`, `timeZone`, `locale`, `groups`, `applicationRoles`, and `expand`. In one inspected existing issue, assignee and reporter both matched that authenticated API identity, but this is observation only: it does not prove either business-actor mapping or reporter create permission.
+
+Framework HTTP-client request logging is removed for both real providers so base URLs, requester query values, headers, and payloads do not enter application logs. Redirects and unproven cookie state are disabled; connection pooling and concurrency are bounded. Provider telemetry contains only fixed provider/operation/outcome tags, aggregate counts, and duration.
+
+## Safe Runtime Behavior
+
+The source client owns all query grammar. Real TEST evidence confirms `POST /query` accepts the configured base object, one legacy filter string, the five reviewed selects, `SessionID`, and numeric `TenantId` without pagination or limit fields. The session manager validates the configured non-empty `LoginResult` segment but preserves the complete pipe-delimited `LoginResult` unchanged as `req.SessionID`. `QueryResult.Items` is required. `ErrorDescription`, `ErrorDetails`, `ErrorNo`, `TenantId`, `MaxPages`, `PageNO`, and `RecordCount` are independently optional metadata: absent, null, or empty/zero error fields are successful, while a non-empty description/details or non-zero error number fails closed without logging the returned text. Tenant and pagination metadata are informational only and are never compared to request values or used as authorization evidence.
+
+The corporate API may expand the five selects into a seven-cell direct `{ "Key", "Value" }` row. Source mapping is semantic and exact: `SET.id` -> source ID, `SET.p_code` -> OR code, `SET.p_name` -> title, `SET.p_description` -> description, and optional `KEY.p_rel_requester` -> requester display value. `SET.p_rel_requester` is the internal relation representation and `num` is row metadata; both are ignored and can never override the display requester. If `KEY.p_rel_requester` is absent, requester remains unresolved even when `SET.p_rel_requester` exists. Required semantic keys must occur exactly once. Bounded, non-conflicting unknown cells are ignored; conflicting duplicates, missing/duplicated required keys, mixed keyed/keyless cells, more than 32 cells, or mapped values outside existing field/response limits make only that row malformed. Key order does not control mapping. Legacy one-element nested keyless cells and empty optional cells remain supported only with the exact five-value positional shape. The client HTML-decodes bounded content, excludes malformed/duplicate records, applies the configured import count after response validation, and computes the existing deterministic source fingerprint because no source ETag is proven. Imported real records remain manual-review-only until a separate deterministic eligibility rule is approved, and persisted synthetic rows are unavailable through corporate-provider reads or workflow commands.
+
+`TuruncuHat__DiagnosticContractLogging=true` is a temporary TEST-only diagnostic. It logs the endpoint path, configured query grammar, select names, tenant, request/response byte counts, session presence and length structure, and sanitized `QueryResult` metadata. It never logs the session value, authorization, username, password, record descriptions, or returned error text. Startup rejects the switch outside `Test`; it should return to `false` after the controlled comparison is captured.
+
+Jira user search uses the evidenced `/rest/api/2/user/search?username=...` endpoint for both requester and authenticated-operator resolution and accepts only one exact `name`, then one exact display-name fallback. Controlled success returned `name`, `key`, and `displayName`. No fuzzy match or first-result selection exists. Jira create is never automatically retried. Any ambiguous submission outcome enters existing reconciliation-required state. Jira rejection of an explicit reporter returns `JiraReporterRejected`; SecureOps never silently retries with the integration identity.
+
+Source completion runs only after the Jira key is persisted. It requires exactly
+one activity with a valid exact projection; a malformed row cannot be dropped to
+manufacture uniqueness. An explicit boolean update success is required, with no
+non-empty error description/details or non-zero error number. Invalid JSON roots
+fail safely. These are conservative local validations, not invented remote
+response fixtures. A failure leaves `JiraExists=true` and permits only source-stage
+recovery; it never creates Jira again. A source re-read plus activity query is not
+an atomic conditional update. Remote response-loss reconciliation remains open.
+
+`GET /api/v1/health/enterprise-integrations` is Admin-only and returns provider selection plus `Configured`, `Disabled`, or `Unavailable`. It also returns `readOnlyIntegrationMode` and the safe operator notice when that gate is active. It returns no URL, credential, session, username, or remote response.
+
+## Sanitized Fixtures Required Before Real TEST Writes
+
+Provide property names, nesting, HTTP status, and relevant non-secret header names for:
+
+1. Turuncu Hat invalid credentials and expired-session responses; empty, application-error, HTTP-error, zero/multiple BPM, and pagination samples.
+2. BPM update success and failure responses.
+3. Jira user-search no-match, ambiguity, authentication failure, and rate limit.
+4. Jira create success, validation failure, authentication failure, rate limit, server failure, and timeout behavior.
+5. Source version/ETag or conditional-update semantics.
+6. Correlation-header support for both providers.
+7. Jira remote idempotency support and reconciliation lookup contract.
+8. Confirmation that Jira `name` is an approved durable identity field for assignment and watcher use.
+
+Exact sample templates are tracked in `docs/integrations/turuncu-hat-jira-contract-gaps.md`. The real read-only source/query path is verified in TEST. Real external writes remain blocked until the outstanding write fixtures, deterministic eligibility rules, and separate activation approval are complete.

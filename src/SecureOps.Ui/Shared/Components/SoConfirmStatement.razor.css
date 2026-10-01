@@ -1,0 +1,27 @@
+/* The statement is the gate for an irreversible action; give it a full-width, 44px target. */
+.so-confirm-statement {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--so-space-3);
+    margin-top: var(--so-space-4);
+    padding: var(--so-space-3);
+    min-height: 44px;
+    border: 1px solid var(--so-border);
+    border-radius: 4px;
+    cursor: pointer;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.so-confirm-statement input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 2px 0 0;
+    accent-color: var(--mud-palette-primary);
+}
+
+.so-confirm-statement:focus-within {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 2px;
+}

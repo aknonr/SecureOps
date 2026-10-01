@@ -1,0 +1,80 @@
+# API Release Packaging
+
+Current integrated continuation requires schema 001-024. Use `-UpgradeFromRc626`
+only with verified installed 023 for a 024-only delta. `-UpgradeFromRc624`
+requires verified 022 for a 023-024 delta; `-UpgradeFromRc622` includes
+022-024 for verified installed 001-021. The canonical current operator entry is
+`docs/post-rc626-continuation-tr.md`. `scripts/powershell/Export-CompletionGuidance.ps1` exports that
+entry, the single register, retained product evidence and supporting procedures
+with their relative paths into a fresh operator directory. The top-level runbook
+links to that tree; the same tree accompanies the DBA delta. Operator files are
+hashed in release metadata. No corporate samples or server values are included.
+`integrated-activation-tr.md` is historical rc6.26/023 guidance, no longer exported.
+Matching InUseEvidence (including completion
+mode) is built, scanned and hashed in `diagnostics/` by the same source commit.
+Earlier 001-022/022-only descriptions below document old rc6.24 packaging, not
+instructions to replay installed migrations. The tool does not deploy or enable
+corporate effects. Prepare one successor only after applicable gates.
+
+`New-PairedTestRelease.ps1 -ReleaseName <reviewed-next-name>` requires a clean
+committed feature branch (pre-existing `.vscode/` is excluded), publishes matching
+API/UI/Worker on the combined delivery branch, reuses the payload scanners/validators,
+exports the current Turkish entry and packages the exact DBA 001-024 inventory
+with per-file sizes/hashes and source metadata. Hangfire.SqlServer 1.8.6's original
+schema-9 installation script is included separately for reviewed DBA provisioning;
+runtime DDL stays disabled. New source supports native Windows Service and console
+hosting. The exported worker-service-operations-tr.md procedure and service/runtime
+dependency validation accompany the candidate; packaging never installs a service.
+SCM/logoff/recovery acceptance remains required. The external In Use contract gate
+does not indefinitely block a scoped Worker/fixes release, but unsupported In Use
+completion stays disabled and UI/process/MIME release gates are not waived.
+It refuses an existing release directory. Determine the next name from actual
+release metadata first. It does not deploy, activate writes or certify TEST acceptance.
+Payload success is not release approval: `readyForInstallation` stays false;
+the release owner records required gates in `evidence/validation.json`. DoD still
+requires repository-wide format success; historical scoped passes are not a waiver.
+The top-level runbook binds the actual release name/build SHA. DBA 001-024
+inclusion is a reference artifact, never an instruction to replay unchanged SQL.
+
+For a verified rc6.22 with 001-021/Hangfire 9, `-UpgradeFromRc622`
+exports the same current entry and emits only the additive 022-024 DBA delta.
+The previous `-UpgradeFromRc621` no-delta switch is rejected by this source.
+Original installed Branding can be retained; omit `-BrandingDirectory` when no
+artwork changed. The effective-configuration comparator is included and hashed
+under configuration/. None of these files overwrites server-owned settings.
+
+`New-InUseEvidencePackage.ps1 -OutputDirectory <new-absolute-directory>` builds
+only the standalone diagnostic on the development machine from committed HEAD.
+It uses the shared payload/secret scanner, publishes framework-dependent win-x64,
+smoke-checks the no-network usage path, creates per-file size/SHA256 and runtime/
+source metadata, and verifies every ZIP entry. It refuses existing destinations;
+it does not replace rc6.14, publish API/UI, deploy, or collect corporate evidence.
+The target needs both .NET 8 shared runtimes, not an SDK or repository. Operator
+instructions, the legacy `{}` dictionary, DOM candidate dictionary and unfilled
+RFC representation template are in `scripts/diagnostics/InUseEvidence`. Current
+A/B commands are in `operator-reporter-tr.md`; only Evidence may be shared.
+
+`New-ApiDeploymentPackage.ps1` creates a path-preserving API ZIP and SHA256 payload manifest from a completed publish directory. It excludes controlled deployment configuration (`web.config` and `appsettings*.json`) and refuses to overwrite existing artifacts.
+
+Before packaging, `Test-ApiReleasePayload.ps1` rejects PDB, source, project, test, log, `bin`, and `obj` payloads. It scans text files for credential-like assignments and can scan every publish file for caller-supplied ASCII and UTF-16 personal-path markers through `-ForbiddenText`.
+
+`Validate-ApiAdRuntimeDependencies.ps1` then verifies that the manifest exactly represents the publish tree, ZIP paths and hashes match the manifest, required API/runtime files are present, API and Infrastructure assemblies share the expected dependency graph, and the complete `System.DirectoryServices.AccountManagement` runtime dependency closure is represented by the `.deps.json` and package assets.
+
+These scripts do not publish, deploy, or modify server configuration. A package is not release-ready unless validation succeeds.
+
+`New-UiDeploymentPackage.ps1` applies the same payload/secret scan and configuration
+exclusions to a completed UI publish. It validates the UI runtime/dependency and
+static-asset presence, preserves relative paths, verifies every ZIP entry hash,
+writes a per-file SHA256 manifest, and refuses existing output files. It does not
+claim API AD-runtime validation for UI binaries. API and UI packages for a paired
+release must name the same exact build source SHA and required schema level in
+the existing release-directory readiness manifest.
+
+`New-UiDeploymentPackage.ps1 -Component Worker` reuses the same path-preserving
+ZIP/hash/configuration exclusion logic for the console/service-capable Worker. It checks
+the Worker identity/runtime manifest, Hangfire/SQL dependencies and every declared
+runtime/native/resource asset before packaging. The default remains Ui. Shared
+scanning additionally rejects private key/certificate/database and fixture files.
+It also requires the matching PowerShell SDK Management/Utility dependencies and
+Windows module manifests; engine-only presence is insufficient for SCCM hosting.
+The packaging script never installs a service or changes target configuration.

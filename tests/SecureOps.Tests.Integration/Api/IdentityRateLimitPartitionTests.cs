@@ -8,13 +8,13 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class IdentityRateLimitPartitionTests
 {
     [Fact]
-    public void GetPartitionKey_UsesAuthenticatedUserAndEndpoint()
+    public void GetPartitionKey_UsesAuthenticatedUserAndOperation()
     {
         DefaultHttpContext context = CreateContext("CONTOSO\\lead.one", "10.0.0.10");
 
         string partitionKey = IdentityLookupRateLimits.GetPartitionKey(context);
 
-        partitionKey.Should().Be("CONTOSO\\lead.one|post:/api/v1/identity/lookup");
+        partitionKey.Should().Be("contoso\\lead.one|IdentityLookup");
         partitionKey.Should().NotContain("10.0.0.10");
     }
 

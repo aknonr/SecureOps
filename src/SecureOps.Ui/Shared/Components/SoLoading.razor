@@ -1,0 +1,73 @@
+@*
+    The one way this UI says "waiting for the server".
+
+    Loading was previously written inline on every page, which drifted in size, wording, and whether
+    aria-busy was set at all. Consolidating it means a screen reader announces a pending region the
+    same way everywhere, and the spinner never competes with the content it is standing in for.
+
+    Two variants, chosen by how much is unknown:
+      Inline — one region of a rendered page is still resolving; sits in the flow at text size.
+      Block  — the whole panel has nothing to show yet; centred, with room around it.
+
+    Always indeterminate. A determinate bar would have to invent a percentage, and no call this UI
+    makes reports progress. See docs/20 §3 on not faking progress.
+*@
+
+@*
+    The Block variant carries the product's flight treatment; Inline keeps the compact spinner.
+    That split is deliberate: a route drawing itself inside a one-line region would be noise, while
+    a panel with nothing in it yet is exactly where the product's own visual language belongs.
+
+    Both announce identically, so the choice is presentation only. SoFlightLoading owns its own
+    role/aria-live, so this wrapper does not add a second live region around it.
+*@
+@if (Variant == LoadingVariant.Block)
+{
+    <div class="@CssClass">
+        <SoFlightLoading Message="@Message" Bare="true" />
+    </div>
+}
+else
+{
+    <div class="@CssClass" role="status" aria-busy="true" aria-live="polite">
+        <MudProgressCircular Indeterminate="true" Size="@SpinnerSize" />
+        <span class="so-loading-text">@Message</span>
+    </div>
+}
+
+@code {
+    /// <summary>How much of the surface is pending.</summary>
+    public enum LoadingVariant
+    {
+        /// <summary>A region inside an otherwise rendered page.</summary>
+        Inline,
+
+        /// <summary>The whole panel, with nothing else to show yet.</summary>
+        Block
+    }
+
+    /// <summary>
+    /// What is being waited for, in the operator's terms ("Yetkileriniz doğrulanıyor…"), not the
+    /// mechanism. This is announced to assistive technology, so it must stand alone.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>Layout to use. Defaults to the in-flow form.</summary>
+    [Parameter]
+    public LoadingVariant Variant { get; set; } = LoadingVariant.Inline;
+
+    /// <summary>
+    /// Set when the element already sits inside a panel, to avoid drawing a second border around it.
+    /// </summary>
+    [Parameter]
+    public bool Bare { get; set; }
+
+    private Size SpinnerSize => Variant == LoadingVariant.Block ? Size.Medium : Size.Small;
+
+    private string CssClass => Variant switch
+    {
+        LoadingVariant.Block => "so-loading so-loading--block",
+        _ => Bare ? "so-loading" : "so-panel so-loading"
+    };
+}

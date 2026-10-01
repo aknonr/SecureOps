@@ -1,19 +1,30 @@
-# AGENTS.md — Entry Point for AI Coding Agents
+# AGENTS.md — WASAS Automation Management / SecureOps Agent Entry Point
 
-**Project:** Secure Ops Automation & AI Analysis Hub
+**Project:** WASAS Automation Management / SecureOps
 **Owner organization placeholder:** CONTOSO Turkish Technology
-**Status:** Phase 1A backend IdentityLookup implemented and hardened; Phase 1 read-only diagnostic MVP not started.
-**Last updated:** 2026-05
+**Status:** IdentityLookup works in TEST; the real Turuncu Hat read-only import is deployed and verified in TEST at source `0ec0376`; external writes, deterministic SDM classification, and the broader controlled pilot remain pending.
+**Last updated:** 2026-09
 
 ---
 
 ## What This File Is
 
-This file is the universal entry point for every AI coding agent working on this repository — Cursor, Claude Code, GitHub Copilot, Codex, Aider, or any other.
+This file is the canonical repository-wide entry point for Codex, Claude, Zed, and other coding agents.
 
 **Read this file first. Then read the files it points to. Do not skip steps.**
 
-This file is intentionally short. Detailed rules live in `.cursor/rules/`, `docs/`, and `plans/`. Treat those as the source of truth; this file is just the index.
+## Local Development and Ownership
+
+- Read the project README and mandatory context documents before implementation; backend changes update relevant documentation in the same task.
+- Codex owns backend, API, domain, infrastructure, hosting, middleware, security, SQL, integrations, contracts, release engineering, and backend tests. For Planned OCO Announcements, explicit user authorization also assigns Codex UI/UX and UI tests; no Claude handoff is required.
+- Claude owns UI/UX, Razor, CSS, layout, theme, navigation, and visual UI files. Claude must report backend contract needs instead of changing backend-owned layers.
+- Never put real corporate identities, PAM accounts, employee details, secrets, or runtime configuration values in source, fixtures, examples, or documentation.
+- Security-sensitive behavior must fail closed when validation, authorization, audit, identity, configuration, or integration state is missing, ambiguous, or unavailable.
+- Local development cannot validate corporate AD, PAM, LDAP, SQL, IIS, or load-balancer behavior. Use deterministic fakes locally; controlled runtime validation needs explicit authorization.
+- Do not modify Git state, IIS, App Pools, services, bindings, load balancers, databases, or live configuration unless the task explicitly authorizes it. Never hard-code configuration values or secrets.
+- Before an authorized change, verify the branch, HEAD, and worktree. Never reset, clean, stash, rebase, delete, or overwrite unrelated work. Never push or deploy unless the user explicitly authorizes that exact operation.
+
+This file is intentionally concise. Detailed portable guidance lives in `docs/agent-guides/` and is loaded through the routing below; do not assume editor auto-discovery. Project decisions remain authoritative in `docs/`, `plans/`, contracts, ADRs, and layer README files.
 
 ---
 
@@ -27,11 +38,28 @@ Before producing **any** output (code, design, suggestion, file edit), read thes
 4. **`docs/03-architecture.md`** — system architecture and component boundaries.
 5. **`docs/05-security-model.md`** — security boundaries that cannot be crossed.
 6. **`docs/15-system-landscape.md`** — real system names, roles, and open integration questions.
-7. **`.cursor/rules/000-project-context.mdc`** — authoritative project decisions.
-8. **`.cursor/rules/050-security-audit-rules.mdc`** — non-negotiable security rules.
-9. The specific phase plan in `plans/` for whichever phase the user references.
+7. **`docs/agent-guides/000-project-context.md`** — authoritative project decisions.
+8. **`docs/agent-guides/050-security-audit.md`** — non-negotiable security rules.
+9. **`docs/agent-guides/090-testing-quality.md`** — verification and quality requirements.
+10. The specific phase plan in `plans/` for whichever phase the user references.
 
-If the user request touches a specific area, also read the matching rule file (`.cursor/rules/0XX-*.mdc`) and matching doc (`docs/0X-*.md`).
+For platform access or Operational Record/Jira work, also read `docs/22-operational-record-jira-workflow.md`, `docs/23-platform-access-concurrency-and-release-safety.md`, ADR-0009, and ADR-0010. Do not enable real source/Jira adapters, add classification rules, configure OIDC, or assume remote idempotency without approved contracts.
+
+For every task, use `docs/agent-guides/README.md` to select the relevant detailed guides and read every applicable README from the repository root down to the target path. If instructions conflict, stop and report the conflict before editing.
+
+## Task Routing
+
+| Task area | Required routing |
+|---|---|
+| Architecture or source changes | `docs/agent-guides/010-architecture.md` plus affected layer README files |
+| Backend/API/domain/infrastructure/integrations | `docs/agent-guides/020-backend-dotnet.md` plus affected project README files |
+| Worker/Hangfire | `docs/agent-guides/030-worker-service.md` and `src/SecureOps.Worker/README.md` |
+| PowerShell/JEA/automation | `docs/agent-guides/040-automation-ansible-powershell.md` and `scripts/README.md` |
+| UI/UX | `CLAUDE.md`, `docs/agent-guides/060-ui.md`, and `src/SecureOps.Ui/README.md` |
+| Analysis or AI | `docs/agent-guides/070-analysis.md` or `080-ai-rag-future-phase.md`, as applicable |
+| SQL | `sql/README.md` and applicable deployment documentation |
+| Contracts | `contracts/README.md` and `docs/contracts/` |
+| Release work | `scripts/release/README.md`, `docs/24-api-test-deployment-readiness.md`, and applicable `docs/release-candidates/` evidence |
 
 ---
 
@@ -67,12 +95,14 @@ These decisions are final and binding. Do not re-litigate them in code or propos
 | Integration approach | **Mock-first**, interface-based, real adapter later | ADR-0004 |
 | Read-only first | MVP performs no write operations | ADR-0002 |
 | Identity lookup | **Phase 1A backend-only exact PAM/AD account lookup**, TeamLead/Admin only, read-only AD provider, no broad search | ADR-0008 |
+| Operational Record to Jira | **Preview-first, explicit authorized creation, durable SQL idempotency, fake external adapters until approved** | ADR-0009 |
+| Application access | **Authentication source -> corporate principal -> approval status -> application role -> capability** | ADR-0010 |
 | Remediation | Approval-based only, Phase 8 | ADR-0006 |
 | Hosting | IIS on Windows Server, in-process | ADR-0007 |
 | Pilot scale | **10–15 low-criticality Windows servers**, prefer non-production | docs/02-roadmap.md |
 | MVP timeline | **6–8 weeks** end-to-end, then demo + management review | docs/02-roadmap.md |
 | Authentication | Windows Authentication via AD | docs/05-security-model.md |
-| RBAC | AD-group-based: Operator, TeamLead, Admin, Auditor | docs/05-security-model.md |
+| Authorization | Persisted application approval and capability policies; authentication claims do not directly grant access | ADR-0010 |
 | Placeholder names | **CONTOSO** for company, generic names for systems | docs/00-project-brief.md |
 
 ---
@@ -97,9 +127,9 @@ See `docs/15-system-landscape.md`, `docs/05-security-model.md`, and `docs/06-int
 ├── AGENTS.md                    # this file
 ├── CLAUDE.md                    # Claude Code-specific instructions
 ├── README.md                    # human-facing project intro
-├── .cursor/rules/               # Cursor agent rules (.mdc, also useful for any agent)
 ├── .github/copilot-instructions.md  # GitHub Copilot context
 ├── docs/                        # project memory (the source of truth)
+│   ├── agent-guides/             # portable detailed guidance, routed from this file
 │   ├── 00-project-brief.md
 │   ├── 01-current-operations-context.md
 │   ├── 02-roadmap.md
@@ -148,7 +178,7 @@ When you receive a user request:
 
 1. **Identify the phase.** Match it to `plans/PHASE-X-*.md`. If unclear, ask.
 2. **Read the relevant docs.** See "Mandatory Reading Order" above.
-3. **Check the rules.** Especially `050-security-audit-rules.mdc`.
+3. **Check the guides.** Start with `docs/agent-guides/README.md` and `050-security-audit.md`.
 4. **Check ADRs.** Has a decision already been made?
 5. **Propose before you code.** For non-trivial changes, write a short plan first and confirm with the user.
 6. **Implement small.** One concern per change. Keep diffs reviewable.

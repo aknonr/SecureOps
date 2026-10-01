@@ -1,0 +1,52 @@
+/* In Use workspace layout; all colors follow the established semantic theme. */
+.so-inuse { overflow-wrap: anywhere; }
+.so-inuse h2 { font-size: 1.1rem; margin: .35rem 0; }
+.so-inuse h3 { font-size: 1rem; margin-bottom: .75rem; }
+.so-inuse-band { padding: 1.25rem 0; border-bottom: 1px solid var(--so-border); }
+.so-inuse-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: end; }
+.so-inuse label { display: grid; gap: .35rem; font-size: .875rem; min-width: 0; }
+.so-inuse input:not([type=checkbox]), .so-inuse select, .so-inuse textarea {
+    width: 100%; min-width: 0; padding: .6rem; border: 1px solid var(--so-border-input);
+    border-radius: 4px; color: var(--so-text); background: var(--so-surface); font: inherit;
+}
+.so-inuse-records { list-style: none; padding: 0; }
+.so-inuse-records li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: center; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--so-border); }
+.so-inuse-pager { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; padding: 1rem 0; }
+.so-inuse-pager label { display: flex; align-items: center; gap: .5rem; }
+.so-inuse-pager select { width: 5rem; }
+.so-inuse-evidence { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr); gap: .5rem 1rem; margin: 1rem 0; }
+.so-inuse-evidence dt { font-weight: 600; }
+.so-inuse-evidence dd { margin: 0; }
+.so-inuse-server, .so-inuse-bulk { border-bottom: 1px solid var(--so-border); padding: 1rem 0; }
+.so-inuse summary { cursor: pointer; font-weight: 600; padding: .5rem 0; }
+.so-inuse-answer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 1rem; margin: .75rem 0; }
+.so-inuse .so-inuse-check { display: flex; align-items: center; gap: .6rem; margin: .75rem 0; }
+.so-inuse-workbook { overflow: auto; max-height: 28rem; border: 1px solid var(--so-border); margin-top: 1rem; }
+.so-inuse-workbook table { border-collapse: collapse; }
+.so-inuse-workbook th { text-align: left; padding: .65rem .5rem; background: var(--so-surface); }
+.so-inuse-records p { margin: .35rem 0; }
+.so-inuse [data-guide=inuse-owner] { padding-top: .25rem; }
+.so-inuse select:focus-visible, .so-inuse summary:focus-visible { outline: 2px solid var(--so-text); outline-offset: 2px; }
+.so-inuse-workbook td { border: 1px solid var(--so-border); padding: .5rem; min-width: 10rem; max-width: 24rem; }
+.so-inuse-server-table table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.so-inuse-server-table th, .so-inuse-server-table td { text-align: left; vertical-align: top; padding: .7rem .5rem; border-bottom: 1px solid var(--so-border); }
+.so-inuse-server-table th { background: var(--so-surface); }
+.so-inuse-server-table .mud-button-root { max-width: 100%; text-align: left; white-space: normal; scroll-margin-top: 5rem; }
+.so-inuse-server-table button:focus-visible { outline: 2px solid var(--so-text); outline-offset: 2px; }
+.so-inuse-mobile-label { display: none; }
+.so-inuse-assignment-dialog { font-size: 16px; line-height: 1.5; max-width: min(560px, calc(100vw - 32px)); }
+.so-inuse-assignment-dialog h2 { font-size: 20px; margin: 0; }
+.so-inuse-assignment-dialog p, .so-inuse-assignment-dialog .mud-input, .so-inuse-assignment-dialog .mud-input-label { font-size: 16px; }
+.so-inuse-assignment-dialog .mud-button-root { min-height: 44px; }
+.so-inuse-assignment-dialog .mud-button-label { font-size: 15px; text-transform: none; }
+.so-inuse-assignment-dialog .mud-dialog-content { overflow-wrap: anywhere; }
+.so-inuse-assignment-dialog .mud-dialog-actions { flex-wrap: wrap; }
+@media (max-width: 700px) {
+    .so-inuse-server-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .so-inuse-server-table table, .so-inuse-server-table tbody, .so-inuse-server-table tr, .so-inuse-server-table td { display: block; width: 100%; }
+    .so-inuse-server-table tr { padding: .75rem 0; border-bottom: 1px solid var(--so-border); }
+    .so-inuse-server-table td { border: 0; padding: .25rem 0; }
+    .so-inuse-mobile-label { display: block; font-weight: 600; margin-bottom: .25rem; }
+    .so-inuse-filters, .so-inuse-answer, .so-inuse-records li, .so-inuse-evidence { grid-template-columns: minmax(0, 1fr); }
+    .so-inuse-evidence dd { margin-bottom: .6rem; }
+}

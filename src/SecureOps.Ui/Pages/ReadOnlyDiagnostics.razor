@@ -1,0 +1,10 @@
+@page "/diagnostics-readonly"
+@attribute [Authorize]
+
+<PageTitle>Salt Okunur Tanılama · @WasasBrand.Name</PageTitle>
+
+<FuturePhasePlaceholder Title="Salt Okunur Tanılama"
+                        Description="Hedef sunuculardan yalnızca okuma yapan tanılama görünümü; sistem üzerinde değişiklik uygulamaz."
+                        CurrentStatus="Tasarım aşamasında; bu sürümde kullanıma kapalıdır."
+                        SafetyBoundary="Yalnızca okuma yapılır. Hizmet durdurma, yeniden başlatma, silme veya yapılandırma değişikliği kapsam dışıdır."
+                        NextPrerequisite="JEA kısıtlı uç noktası ve salt okunur cmdlet beyaz listesinin güvenlik incelemesinden geçmesi." />
