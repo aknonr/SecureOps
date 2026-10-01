@@ -13,6 +13,7 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         ignoreHTTPSErrors: true, reducedMotion: 'reduce', viewport: null, args: ['--window-size=1440,900']
     });
     const page = await context.newPage(), errors = [], checks = [], measurements = [];
+    const cdp = await context.newCDPSession(page);
     page.on('pageerror', e => errors.push(e.message));
     page.on('dialog', dialog => dialog.accept());
     const denied = await apiContext(request, api, 'team-lead');
@@ -31,7 +32,17 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         await page.keyboard.press('Tab');
         assert.equal(await page.evaluate(() => document.activeElement === document.body), false);
         measurements.push({ route, name, zoom, ...metric });
-        await page.screenshot({ path: path.join(out, name + '.png'), fullPage: true, animations: 'disabled' });
+        if (zoom === 2) {
+            // Native zoom requires physical metrics; CSS-sized full-page screenshots crop the right half.
+            const layout = await cdp.send('Page.getLayoutMetrics');
+            const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true,
+                clip: { ...layout.contentSize, scale: 1 } });
+            const bytes = Buffer.from(screenshot.data, 'base64');
+            assert.ok(bytes.readUInt32BE(16) >= metric.outer - 40, 'Capture must include physical width');
+            fs.writeFileSync(path.join(out, name + '.png'), bytes);
+        } else {
+            await page.screenshot({ path: path.join(out, name + '.png'), fullPage: true, animations: 'disabled' });
+        }
     }
     try {
         await page.goto(new URL('login', ui).href);
@@ -83,7 +94,6 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         const zoomResult = await page.evaluate(() => new Promise(resolve =>
             chrome.settingsPrivate.setDefaultZoom(2, () => resolve({ error: chrome.runtime.lastError?.message ?? null }))));
         assert.equal(zoomResult.error, null);
-        const cdp = await context.newCDPSession(page);
         await cdp.send('Emulation.clearDeviceMetricsOverride');
         for (const route of routes) {
             await navigate(page, ui, route); await ready();

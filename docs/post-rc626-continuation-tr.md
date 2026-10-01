@@ -2,6 +2,25 @@
 
 ## Durum ve kapsam
 
+### Guncel UI / G-30 devam kaydi, 2 Ekim 2026
+
+PR #3 yeni UI ve deterministik build politikasini birlestirir: SDK 9.0.317
+tam pin, C# 12.0, degismeyen net8.0 runtime. Windows kanitlari ve ayri SQL/browser
+sonuclari [tek register](integrated-test-activation.md) icindedir. Asagidaki
+a457 paket kimligi tarihsel incelemedir; yeni UI'yi icermez ve kullanilmaz.
+Yeni eslesmis inceleme ancak tam merged kaynak/version/hash manifestiyle
+hazirlanir; numarali release veya kurulum onayi degildir. TEST kurulu kaynak
+son verilen API/UI gozleminde rc6.26/028cbd2e olarak kalir.
+
+Sinirli pilotta is kapsam ve bagimsiz grantor once onaylanir. 025 yalniz
+tablolari olusturur: is Organization/Team ID'lerini kendiliginden olusturmaz.
+025 sonrasinda onayli API SQL haklari ve API/UI kurulumu tamamlaninca, mevcut
+sozluk veya onayli API sozluk kurulumu gercek ID/hiyerarsiyi dogrular; kisiye
+scope vermeden once bu ID'ler kayda girer. Screenshot'tan ID/bundle uretme.
+Gerekirse gecici setup Assign/Organization/Administer yetkileri ayri onaylidir;
+bagimsiz yonetici acik revoke yapar, otomatik expiry varsayilmaz.
+Worker/reminders kapali; normal OIDC pilotu, Jira-only, In Use ve Falcon ayri.
+
 Bu belge tek guncel Turkce operator girisidir. Son durum: 1 Ekim 2026.
 Onceki snapshot'lar asagida tarihsel kanit olarak korunur.
 

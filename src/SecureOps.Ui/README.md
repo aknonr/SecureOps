@@ -1,5 +1,24 @@
 # SecureOps.Ui
 
+## PR #3 Windows Verification, 2026-10-02
+
+The original UI tip 77a59dc is combined with the G-30 deterministic toolchain
+repair. SDK 9.0.317 is exact; C# 12.0/analyzers 9.0 target net8.0 without a
+command-line language override. Runtime inputs c7ff942 passed Windows solution
+build, 1,597 unit and 322 integration (61 opt-in skips); 663 UI/render cases
+are part of the unit total. Native DPAPI cases run on Windows, never skipped.
+See the single docs/integrated-test-activation.md register for TRX paths and
+separate isolated SQL/browser evidence, retained failures and limitations.
+The access browser now matches the explanatory queue/impact text while retaining
+exact count, preview, concurrency and denied-actor assertions. The PR3 usability
+runner checks both themes/mobile/keyboard and actual Chrome 200% zoom with
+physical-width screenshots. These are synthetic local composition journeys,
+not normal corporate OIDC, IIS, SQL permissions or installation acceptance.
+G-19 through G-25 fallbacks remain; G-26 gMSA is a separate supported-directory
+repair/real TEST check, not silently fixed. G-27 through G-29 are not implemented.
+The older a457 review packages lack this UI. A new exact-source matched review
+is required; neither source merge nor this evidence authorizes deployment.
+
 In Use closure now confirms the exact OR and archived report before submission,
 and distinguishes acknowledged, unknown, rejected, source-verified and manually
 confirmed results. Manual confirmation is explicit and capability-gated; its time

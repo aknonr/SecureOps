@@ -2,6 +2,66 @@
 
 ## Owner exception and baseline
 
+### PR #3 combined UI / G-30 verification, 2026-10-02
+
+This supersedes the unchanged-product statement in the 2026-10-01 readiness
+snapshot below: PR #3 changes the UI and G-30 changes build inputs, so a457
+review ZIPs do NOT contain this product and must not be reused for it.
+Installed TEST API/UI remain at the supplied rc6.26/028cbd2e observation; no
+deployment, SQL, flag, role, mail, Jira/source write or Worker start occurred.
+
+PR base: `214690efeb9d61c22f605022e04390d01bae9b77`; original UI tip:
+`77a59dcbadc8b8ebac0d6067c72207192515830c`. Windows runtime/test input source:
+`c7ff9428fd39ae9f2d8e3b959e05aac494d9718e`; later browser/guidance commits
+do not alter src/contracts/build inputs. A final matched review must publish
+from the exact merged source SHA, not stamp these staged journey DLLs as master.
+
+G-30: SDK 9.0.317 exact, no SDK roll-forward/prerelease; C# 12.0,
+analyzers 9.0, unchanged net8.0. Explicit Jira read-only labels and Enumerable
+Reverse remove SDK-dependent binding. Five DPAPI data cases require Windows;
+ephemeral/portable validation still runs everywhere. No unrelated Linux failure
+was reclassified as a skip. G-26 remains separate: supported exact gMSA/MSA
+directory contract repair plus real TEST gMSA validation, no broad directory
+search. It is NOT required by the selected scoped account CRUD/report pilot;
+a pilot explicitly selecting gMSA lookup/transition must reassess that dependency.
+G-27 through G-29 are not implemented; G-19 through G-25 honest UI fallbacks remain.
+
+Fresh Windows evidence (private root
+`C:\SecureOpsBuild\validation\pr3-g30-20261002`):
+- Baseline SDK9 build passed, 0 warnings/errors; retained SDK8/10 Linux
+  reproductions remain historical, not locally rerun or claimed reproduced.
+- Repaired clean Release build passed. First new toolchain test failed enforced
+  IDE0007 (2 errors); fixed without suppressing analyzers. Final build 0 warnings/errors.
+- First normal unit: 1,596 pass / 1 fail / 0 skip. Failure was an obsolete literal
+  `requiredSchema='001-024'` assertion after the reviewed 024/025 selector split.
+  Corrected to assert delegated selector result, explicit 025 opt-in and exact
+  chain guard; release scripts unchanged. Final: **1,597 pass / 0 fail / 0 skip**.
+- Focused final: **700 pass / 0 fail / 0 skip**, includes **663 UI unit/render**,
+  20 Jira draft, 12 parser, 4 release and 1 toolchain test. Overlaps normal unit.
+- Normal integration with fresh SA opt-in: **322 pass / 0 fail / 61 skip**;
+  **39 SA cases included**, not additional. Initial no-opt-in run 286/0/97 retained.
+- Separate ResourceSQL/SA/DPAPI/composition run: **75 pass / 0 fail / 0 skip**,
+  includes **49 ResourceSqlTests**; overlaps integration for enabled cases.
+  Fresh test-owned databases only, through 024 and through 025 + restricted roles.
+- Existing Jira-only SQL/Simulation browser: five checks passed, one persisted
+  synthetic key, explicit source-open intent, concurrency/uncertainty protected.
+- Existing access browser passed with 30 viewport/theme observations, persisted
+  versioned roles, mandatory preview/conflict preservation and denied actor.
+  Earlier attempts retained: missing fixture, changed explanatory count text,
+  and transient initial-refresh count. Fixture/selector/eventual-count checks
+  corrected, no weaker count or authorization assertion.
+- PR3 usability runner covers six routes, both themes, desktop/mobile, keyboard
+  checkbox/preview focus and locked proposal, reduced-motion login, denied API
+  preview and native Chrome 200% zoom. Physical CDP content captures are required
+  at native zoom; DPR=2 alone is not acceptance. Routine fixture/mock login is
+  **local browser evidence, not corporate normal-OIDC acceptance**.
+
+Retain failed logs/TRX/screenshots and private profiles outside Git/payloads.
+No installation approval follows from source merge or passing local gates.
+Required target sequence remains separately reviewed 024, verify/stop, 025,
+separate API rights, final approved matched API/UI, normal-OIDC bounded pilot.
+Worker/reminders remain off; Jira-only, In Use and SCCM/Falcon remain separate.
+
 ### Release readiness and minimal pilot, 2026-10-01
 
 **NO-GO for deployment.** The retained a457 review has readyForInstallation=false;
