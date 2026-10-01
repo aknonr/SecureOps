@@ -63,15 +63,20 @@ public sealed class ServiceAccountInsightsTests
             new(Guid.NewGuid(), against.Id, UsageKind.ScheduledTask, null, null, false),
             new(Guid.NewGuid(), planned.Id, UsageKind.Database, DatabaseEngine.Oracle, null, false)
         ];
-        RequestFact deletion = new(Guid.NewGuid(), planned.Id, ServiceAccountActionType.Deletion, ServiceAccountRequestStatus.Open, _teamA, null, null, null, "1");
+        AccountFact oracle = Account("SYN_ORACLE", _teamB);
+        usages = [.. usages, new(Guid.NewGuid(), oracle.Id, UsageKind.Database, DatabaseEngine.Oracle, null, false)];
+        RequestFact review = new(Guid.NewGuid(), planned.Id, ServiceAccountActionType.Review, ServiceAccountRequestStatus.Open, _teamA, null, null, null, "1");
 
-        ServiceAccountReport report = Compute(new([against, planned, none], [deletion], [], [], [], [], [], Teams(), Insight(usages)));
+        ServiceAccountReport report = Compute(new([against, planned, none, oracle], [review], [], [], [], [], [], Teams(), Insight(usages)));
 
-        report.Rules!.Assessed.Should().Be(2);
-        report.Rules.AgainstRule.Should().Be(1);
-        report.Rules.Lines.Should().ContainSingle().Which.Should().Match<RuleLine>(l =>
+        report.Rules!.Assessed.Should().Be(3);
+        report.Rules.AgainstRule.Should().Be(1, "a manual review without an approved rule is not against the rule");
+        report.Rules.Lines.Select(l => l.Account).Should().Equal("SYN_AGAINST", "SYN_ORACLE");
+        report.Rules.Lines[0].Should().Match<RuleLine>(l =>
             l.Account == "SYN_AGAINST" && l.RuleCodes == "KB-GOREV" && l.OwnerTeam == "SYN TEAM A" && l.Reason.Length > 0);
-        report.Rules.ByConformance.Sum(c => c.Count).Should().Be(3);
+        report.Rules.Lines[1].Conformance.Should().Be("Manuel inceleme bekliyor");
+        report.Rules.ByPath.Single(p => p.Label == "Servis hesabı gerekmez").Count.Should().Be(0, "no approved rule produces removal");
+        report.Rules.ByConformance.Sum(c => c.Count).Should().Be(4);
         report.Directorate!.Single(r => r.Team == "SYN TEAM A").AgainstRule.Should().Be(1);
     }
 

@@ -74,6 +74,10 @@ public static class ServiceAccountInsights
     public const int TrendWeeks = 12;
 
     private const int _maxLines = 500;
+
+    /// <summary>Order of the rule list: against the rule first, then missing information, then manual review.</summary>
+    private static readonly RuleConformance[] _listedConformance =
+        [RuleConformance.Unplanned, RuleConformance.IncompleteInformation, RuleConformance.ManualReviewPending];
     private const string _noTeam = "Ekip belirlenmedi";
 
     private static readonly (string Code, string Label, string Expected)[] _stages =
@@ -120,9 +124,9 @@ public static class ServiceAccountInsights
         AccountRuleEvaluation[] assessed = [.. all.Where(r => r.Conformance != RuleConformance.NotAssessed)];
         var accounts = facts.Accounts.ToDictionary(a => a.Id);
         RuleLine[] lines = [.. assessed
-            .Where(r => r.Conformance is RuleConformance.Unplanned or RuleConformance.IncompleteInformation)
+            .Where(r => r.Conformance is RuleConformance.Unplanned or RuleConformance.IncompleteInformation or RuleConformance.ManualReviewPending)
             .Select(r => (Rule: r, Account: accounts[r.AccountId]))
-            .OrderByDescending(x => x.Rule.Conformance).ThenBy(x => Team(facts, x.Account.OwnerTeamId) ?? "￿", StringComparer.Ordinal)
+            .OrderBy(x => Array.IndexOf(_listedConformance, x.Rule.Conformance)).ThenBy(x => Team(facts, x.Account.OwnerTeamId) ?? "￿", StringComparer.Ordinal)
             .ThenBy(x => x.Account.Label, StringComparer.Ordinal)
             .Take(_maxLines)
             .Select(x => new RuleLine(x.Account.Label, Team(facts, x.Account.OwnerTeamId), ServiceAccountUsageRules.PathLabel(x.Rule.Path!.Value),

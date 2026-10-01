@@ -42,7 +42,7 @@
             <p class="so-panel-text--sm mt-1">Kullanım girildiğinde bilgi bankası kuralları burada açıklanır.</p>
         }
 
-        @if (Detail.Permissions.Work && Rule.Conformance == nameof(RuleConformance.Unplanned) && Suggested is { } suggestion)
+        @if (Detail.Permissions.Work && Rule.Conformance is nameof(RuleConformance.Unplanned) or nameof(RuleConformance.ManualReviewPending) && Suggested is { } suggestion)
         {
             <div class="d-flex flex-wrap align-center gap-2 mt-2">
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="Busy" StartIcon="@Icons.Material.Filled.PlaylistAdd" OnClick="CreateSuggestedAsync">
@@ -217,7 +217,7 @@
         nameof(RuleConformance.Completed) => SoStatusBadge.BadgeTone.Positive,
         nameof(RuleConformance.Unplanned) => SoStatusBadge.BadgeTone.Critical,
         nameof(RuleConformance.Planned) or nameof(RuleConformance.Exception) => SoStatusBadge.BadgeTone.Info,
-        nameof(RuleConformance.IncompleteInformation) => SoStatusBadge.BadgeTone.Caution,
+        nameof(RuleConformance.IncompleteInformation) or nameof(RuleConformance.ManualReviewPending) => SoStatusBadge.BadgeTone.Caution,
         _ => SoStatusBadge.BadgeTone.Neutral
     };
 
@@ -228,6 +228,7 @@
         nameof(RuleConformance.Planned) => Icons.Material.Filled.EventNote,
         nameof(RuleConformance.Exception) => Icons.Material.Filled.Gavel,
         nameof(RuleConformance.IncompleteInformation) => Icons.Material.Filled.HelpOutline,
+        nameof(RuleConformance.ManualReviewPending) => Icons.Material.Filled.ManageSearch,
         _ => Icons.Material.Filled.RemoveCircleOutline
     };
 

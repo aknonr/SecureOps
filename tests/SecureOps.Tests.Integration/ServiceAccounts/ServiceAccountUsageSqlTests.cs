@@ -53,7 +53,8 @@ public sealed class ServiceAccountUsageSqlTests
 
         AccountDetail oracle = Ok(await fx.Service.UpdateUsageAsync(coordinator.Principal, fx.Context, database.Id,
             new UpdateUsageRequest(database.Version, DatabaseEngine: "Oracle"), _token));
-        oracle.Rule!.Path.Should().Be(nameof(RecommendedPath.SplitAccount), "solution team and removal are different targets");
+        oracle.Rule!.Path.Should().Be(nameof(RecommendedPath.SolutionTeamHandover), "Oracle has no approved rule, so it adds no second target");
+        oracle.Rule.Items.Should().Contain(i => i.RuleCode == "KB-VT-ORACLE" && i.Path == nameof(RecommendedPath.ManualDecision));
         (await fx.Service.UpdateUsageAsync(coordinator.Principal, fx.Context, database.Id, new UpdateUsageRequest(database.Version, Notes: "eski sürüm"), _token))
             .ErrorCode.Should().Be(SaErrors.Conflict);
 
@@ -62,7 +63,8 @@ public sealed class ServiceAccountUsageSqlTests
             .ErrorCode.Should().Be(SaErrors.Forbidden, "an exception is a verifier decision");
         AccountDetail excepted = Ok(await fx.Service.SetUsageExceptionAsync(verifier.Principal, fx.Context, share.Id,
             new UsageExceptionRequest(share.Version, "Sentetik gerekçe: paylaşım uygulama tarafından zorunlu"), _token));
-        excepted.Rule!.Path.Should().Be(nameof(RecommendedPath.NoServiceAccountNeeded));
+        excepted.Rule!.Path.Should().Be(nameof(RecommendedPath.ManualDecision), "Oracle is a manual review, never an established removal");
+        excepted.Rule.Conformance.Should().Be(nameof(RuleConformance.ManualReviewPending));
         excepted.Rule.Items.Should().Contain(i => i.RuleCode == "KB-DOSYA" && i.Excepted);
 
         UsageView oracleUsage = excepted.Usages!.Single(u => u.Kind == "Database");

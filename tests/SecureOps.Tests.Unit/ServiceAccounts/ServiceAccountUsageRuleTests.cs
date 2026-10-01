@@ -20,7 +20,7 @@ public sealed class ServiceAccountUsageRuleTests
     [InlineData(UsageKind.IisVirtualDirectory, null, RecommendedPath.RemoveVirtualDirectoryDependency, "KB-IIS-SANAL")]
     [InlineData(UsageKind.IisAppPool, null, RecommendedPath.ManualDecision, "KB-YOK")]
     [InlineData(UsageKind.Database, DatabaseEngine.SqlServer, RecommendedPath.GmsaEvaluation, "KB-VT-SQL")]
-    [InlineData(UsageKind.Database, DatabaseEngine.Oracle, RecommendedPath.NoServiceAccountNeeded, "KB-VT-ORACLE")]
+    [InlineData(UsageKind.Database, DatabaseEngine.Oracle, RecommendedPath.ManualDecision, "KB-VT-ORACLE")]
     [InlineData(UsageKind.Database, DatabaseEngine.Unknown, RecommendedPath.NeedsInformation, "KB-VT-MOTOR")]
     [InlineData(UsageKind.WindowsService, null, RecommendedPath.VerifyNeed, "KB-SERVIS")]
     public void EachKnowledgeBaseRule_ExplainsItsPath(UsageKind kind, DatabaseEngine? engine, RecommendedPath path, string code)
@@ -30,7 +30,12 @@ public sealed class ServiceAccountUsageRuleTests
         result.Path.Should().Be(path);
         result.Items.Should().ContainSingle().Which.RuleCode.Should().Be(code);
         result.Items[0].Reason.Should().NotBeNullOrWhiteSpace();
-        result.Conformance.Should().Be(path == RecommendedPath.NeedsInformation ? RuleConformance.IncompleteInformation : RuleConformance.Unplanned);
+        result.Conformance.Should().Be(path switch
+        {
+            RecommendedPath.NeedsInformation => RuleConformance.IncompleteInformation,
+            RecommendedPath.ManualDecision => RuleConformance.ManualReviewPending,
+            _ => RuleConformance.Unplanned
+        });
     }
 
     [Fact]
@@ -42,6 +47,23 @@ public sealed class ServiceAccountUsageRuleTests
         result.Items[0].Reason.Should().Contain("SYN EXEC").And.Contain("öneri uygunluk değildir");
         ServiceAccountUsageRules.Evaluate(_account, [Usage(UsageKind.Database, DatabaseEngine.SqlServer)], false, null, AccountWorkState.None)
             .Items[0].Reason.Should().Contain("ayar bekleniyor");
+    }
+
+    [Fact]
+    public void Oracle_IsAnUnverifiedManualReview_NeverAnEstablishedRemoval()
+    {
+        AccountRuleEvaluation result = ServiceAccountUsageRules.Evaluate(_account, [Usage(UsageKind.Database, DatabaseEngine.Oracle)], false, "SYN EXEC",
+            AccountWorkState.None);
+
+        result.Path.Should().Be(RecommendedPath.ManualDecision);
+        result.Conformance.Should().Be(RuleConformance.ManualReviewPending);
+        result.Items[0].Reason.Should().Contain("onaylı bir iş kuralı yok").And.Contain("Kaldırma veya silme önerilmez");
+        result.Items.Should().NotContain(i => i.Path == RecommendedPath.NoServiceAccountNeeded);
+        ServiceAccountUsageRules.Conformance(RecommendedPath.ManualDecision, Work(ServiceAccountActionType.Review)).Should().Be(RuleConformance.Planned);
+        ServiceAccountUsageRules.Conformance(RecommendedPath.ManualDecision, Work(ServiceAccountActionType.Deletion))
+            .Should().Be(RuleConformance.ManualReviewPending, "a deletion request does not answer the review");
+        ServiceAccountUsageRules.Evaluate(_account, [Usage(UsageKind.Database, DatabaseEngine.Oracle), Usage(UsageKind.FileShare)], false, null,
+            AccountWorkState.None).Path.Should().Be(RecommendedPath.SolutionTeamHandover, "Oracle adds no handover target, so no split");
     }
 
     [Fact]

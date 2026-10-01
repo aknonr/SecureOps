@@ -122,10 +122,11 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
                 Row("Kural sürümü", rules.RuleSetVersion),
                 Row("Değerlendirilen hesap", rules.Assessed),
                 Row("Kurala aykırı (plansız) hesap", rules.AgainstRule),
+                Row("Listede: kurala aykırı, bilgi eksik ve manuel inceleme bekleyen hesaplar", rules.Lines.Count),
                 .. rules.ByPath.Where(p => p.Count > 0).Select(p => Row("  Önerilen yol: " + p.Label, p.Count)),
                 .. rules.ByConformance.Select(c => Row("  Durum: " + c.Label, c.Count))
             ]);
-            yield return new("Kurala aykırı hesaplar", ["Hesap", "Sahip ekip", "Önerilen yol", "Durum", "Kural", "Neden"],
+            yield return new("İncelenecek hesaplar", ["Hesap", "Sahip ekip", "Önerilen yol", "Durum", "Kural", "Neden"],
                 [.. rules.Lines.Select(l => Row(l.Account, l.OwnerTeam ?? "—", l.Path, l.Conformance, l.RuleCodes, l.Reason))]);
         }
 

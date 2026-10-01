@@ -26,10 +26,10 @@ public sealed class ServiceAccountReportV2ExportTests
     {
         var document = ReportDocument.From(Report(true), Guid.NewGuid(), new string('a', 64), "SYN", _created, "Sentetik");
 
-        document.Sections.Select(s => s.Title).Should().ContainInOrder("Direktörlük görünümü", "Bilgi bankası kuralları", "Kurala aykırı hesaplar", "gMSA hunisi",
+        document.Sections.Select(s => s.Title).Should().ContainInOrder("Direktörlük görünümü", "Bilgi bankası kuralları", "İncelenecek hesaplar", "gMSA hunisi",
             "Trend (son haftalar)", "Risk adayları", "Tanımlar ve notlar");
         IReadOnlyList<SheetData> sheets = SpreadsheetReader.Read(ReportWorkbookWriter.Write(document), new SpreadsheetLimits(), null, out _);
-        sheets.Single(s => s.Name == "Kurala aykırı hesaplar").Rows[1].Cells["E"].Text.Should().Be("KB-GOREV");
+        sheets.Single(s => s.Name == "İncelenecek hesaplar").Rows[1].Cells["E"].Text.Should().Be("KB-GOREV");
         sheets.Single(s => s.Name == "Risk adayları").Rows[1].Cells["C"].Text.Should().Be("Oturum tarihi yok");
         sheets.Single(s => s.Name == "Trend (son haftalar)").Rows.Should().HaveCount(1 + ServiceAccountInsights.TrendWeeks + 2);
         ReportPdfWriter.Write(document).Length.Should().BeGreaterThan(0);

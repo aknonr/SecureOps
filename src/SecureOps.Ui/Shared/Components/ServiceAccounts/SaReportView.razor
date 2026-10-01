@@ -138,6 +138,7 @@ else
         <p class="so-panel-text--sm mt-1">Durum: @string.Join(" · ", rules.ByConformance.Select(c => $"{c.Label} {c.Count}")) · kural sürümü @rules.RuleSetVersion</p>
         @if (rules.Lines.Count > 0)
         {
+            <h3 class="so-panel-text mt-2">İncelenecek hesaplar (kurala aykırı, bilgi eksik, manuel inceleme bekleyen)</h3>
             <MudTable Items="rules.Lines" Dense="true" Breakpoint="Breakpoint.Sm" T="RuleLine" Class="mt-2">
                 <HeaderContent><MudTh>Hesap</MudTh><MudTh>Sahip ekip</MudTh><MudTh>Önerilen yol</MudTh><MudTh>Durum</MudTh><MudTh>Neden</MudTh></HeaderContent>
                 <RowTemplate>

@@ -47,7 +47,10 @@ public enum RecommendedPath
     GmsaEvaluation,
     /// <summary>The solution team takes the account (normal/domain service account).</summary>
     SolutionTeamHandover,
-    /// <summary>No service account is needed; evaluate removal.</summary>
+    /// <summary>
+    /// No service account is needed; evaluate removal. Reserved for an explicitly approved business rule: no current rule
+    /// produces it (the Oracle note of the knowledge base is not an approved rule).
+    /// </summary>
     NoServiceAccountNeeded,
     /// <summary>Move the application files to the server's local disk.</summary>
     MoveToLocalDisk,
@@ -73,7 +76,9 @@ public enum RuleConformance
     /// <summary>The expected work is completed and verified.</summary>
     Completed,
     /// <summary>Every rule item is covered by a reasoned, authorized exception.</summary>
-    Exception
+    Exception,
+    /// <summary>No approved rule decides the path; a person must review. Not counted as against the rule.</summary>
+    ManualReviewPending
 }
 
 /// <summary>One active usage of an account.</summary>
@@ -129,7 +134,7 @@ public sealed record AccountRuleEvaluation(Guid AccountId, RecommendedPath? Path
 public static class ServiceAccountUsageRules
 {
     /// <summary>Rule set version stamped on reports.</summary>
-    public const string RuleSetVersion = "kb-2026-08-11+karar-2026-10-01";
+    public const string RuleSetVersion = "kb-2026-08-11+karar-2026-10-01+r2";
 
     /// <summary>Primary path precedence: preconditions first, then a single handover target, then dependency removals.</summary>
     private static readonly RecommendedPath[] _precedence =
@@ -213,6 +218,8 @@ public static class ServiceAccountUsageRules
                 : work.OpenRequestTypes.Contains(ServiceAccountActionType.Deletion) || review ? RuleConformance.Planned : RuleConformance.Unplanned,
             RecommendedPath.SolutionTeamHandover => work.HandoverAccepted ? RuleConformance.Completed
                 : work.HandoverProposed || review ? RuleConformance.Planned : RuleConformance.Unplanned,
+            // Without an approved rule nothing can be "against the rule": the account waits for a person's review.
+            RecommendedPath.ManualDecision => review ? RuleConformance.Planned : RuleConformance.ManualReviewPending,
             _ => review ? RuleConformance.Planned : RuleConformance.Unplanned
         };
     }
@@ -224,8 +231,8 @@ public static class ServiceAccountUsageRules
             DatabaseEngine.SqlServer => new RuleItem("KB-VT-SQL", RecommendedPath.GmsaEvaluation,
                 $"SQL Server veritabanı erişimi: mümkünse gMSA değerlendirilir. 1 Ekim 2026 kararıyla değerlendirme {Executor(executorTeam)} atanır. Uygunluk ayrıca karar ister; öneri uygunluk değildir.",
                 usage.Id, usage.HasException),
-            DatabaseEngine.Oracle => new RuleItem("KB-VT-ORACLE", RecommendedPath.NoServiceAccountNeeded,
-                "Oracle veritabanı erişimi için servis hesabına gerek yok (bilgi bankası). Hesabın kaldırılması değerlendirilir; kaldırma kanıtlı silme kaydıyla kapanır.",
+            DatabaseEngine.Oracle => new RuleItem("KB-VT-ORACLE", RecommendedPath.ManualDecision,
+                "Oracle veritabanı erişimi: onaylı bir iş kuralı yok (doğrulanmamış öneri). Bilgi bankasındaki \"Oracle ise servis hesabına gerek yok\" notu onaylı kural olarak uygulanmaz; hesap manuel incelenir. Kaldırma veya silme önerilmez.",
                 usage.Id, usage.HasException),
             _ => new RuleItem("KB-VT-MOTOR", RecommendedPath.NeedsInformation,
                 "Veritabanı motoru (SQL Server / Oracle) bilinmeden yol seçilemez.", usage.Id, usage.HasException)
@@ -274,6 +281,7 @@ public static class ServiceAccountUsageRules
         RuleConformance.Unplanned => "Kurala aykırı (plansız)",
         RuleConformance.Planned => "Planlı",
         RuleConformance.Completed => "Tamamlandı",
+        RuleConformance.ManualReviewPending => "Manuel inceleme bekliyor",
         _ => "Gerekçeli istisna"
     };
 
