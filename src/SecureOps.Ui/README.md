@@ -1,5 +1,29 @@
 # SecureOps.Ui
 
+## PR #4 Windows Verification, 2026-10-02
+
+The Resources/personal shift-group source from 286fac7 was verified on Windows
+with the committed SDK 9.0.317/C#12/net8.0 policy, not a substituted SDK10.
+Clean Release builds pass with no warnings/errors. Normal unit: 1,610/0/0;
+focused UI/render: 676/0/0, Resources: 125/0/0 (overlapping unit). Normal final
+integration: 322/0/61, including 39 Service Accounts cases for a naming-only
+correction; separate isolated ResourceSQL: 49/0/0.
+The real resource-shift Chrome journey passes against combined API/UI and
+synthetic InMemory data. WASAS_CHROME selects an installed browser; search
+awaits the interactive input and asserted filter state. Archived links are
+excluded by name only, returning to editing refreshes before reorder, and
+feedback only says an opening request was sent. Desktop/mobile overflow checks
+pass; DPR2 captures are not native zoom or managed popup-policy acceptance.
+
+**Merge NO-GO:** repository-wide format verification still reports 313 baseline
+whitespace/import-order diagnostics in 13 files. Scoped Resources formatting
+passes but is not a waiver. Two private identifiers were renamed without
+changing Service Accounts behavior; no module/API/SQL/Worker or external write
+contract changed. See the single `docs/integrated-test-activation.md` register
+for exact source identities, retained failures and structured baseline comparison.
+G31/G32 stay deferred and do not block this bounded journey. No PR4 master
+merge, installation approval or new review package is claimed at this checkpoint.
+
 ## PR #3 Windows Verification, 2026-10-02
 
 The original UI tip 77a59dc is combined with the G-30 deterministic toolchain

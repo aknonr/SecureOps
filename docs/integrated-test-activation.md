@@ -2,6 +2,64 @@
 
 ## Owner exception and baseline
 
+### PR #4 Resources Windows verification, 2026-10-02
+
+**NO-GO for source merge at this checkpoint:** repository-wide
+`dotnet format --verify-no-changes` remains a required, FAILED gate. Do not
+claim the scoped Resources format pass waives it, merge, or package PR4 until
+the remaining baseline formatting debt is repaired or explicitly adjudicated.
+
+Original PR4 source `286fac7b088a088058d813f5dd831d206260b0d8` is based directly
+on merged master `e670617cbf7dece973b6a052a6da1195ea7a525d`; PR3 was not replayed.
+Windows .NET runtime/test source:
+`81e1d07ed1c0e49531c4dd68c8eb97275773408b`. Browser repair source:
+`e90a824467d1cc59f27fa3dafb08955c843b5c32`; subsequent guidance changes do
+not alter product inputs. The two private Service Accounts identifier changes
+are naming ONLY (`ObservationFields` -> `_observationFields`, `MaxBytes` ->
+`_maxBytes`), with all references and values preserved. No module logic, SQL,
+DTO, permissions, Jira/In Use/SCCM or Worker behavior changed.
+
+Fresh Windows evidence, not Claude's historical substituted SDK10 run:
+`C:\SecureOpsBuild\validation\pr4-resources-20261002`.
+- Pinned SDK **9.0.317**, C# **12.0**, net8.0; clean Release solution build:
+  **0 warnings / 0 errors** before and after the naming correction.
+- Normal final unit: **1,610 pass / 0 fail / 0 skip**. Initial focused
+  Resources: **125/0/0** and UI/render: **676/0/0** overlap that total.
+- Normal final integration: **322 pass / 0 fail / 61 skip**, including
+  **39 Service Accounts opt-in cases**, enabled to verify the naming-only change.
+  Initial no-opt-in normal integration **286/0/97** retained separately.
+- Separate fresh-database **49 ResourceSqlTests passed / 0 fail / 0 skip**;
+  bounded per-user LocalDB only, not target SQL or new migration verification.
+- Real Chrome resource-shift journey against combined API/UI and synthetic
+  InMemory providers passed: server page/range and active filter, favourite,
+  single/batch group save, selected group navigation, archived link excluded
+  without URL/anchor, ordered open request, keyboard activation and refreshed
+  reorder/remove feedback. Desktop/mobile captures passed overflow assertions.
+  The 720px/DPR2 captures are **emulated**, not native 200% zoom acceptance;
+  automation popup counts do NOT establish managed browser policy.
+- Resources C# scoped format verification passed. Full final format report:
+  **313 diagnostics / 13 files**, **310 WHITESPACE + 3 IMPORTS**. Each remaining
+  path/line/column/diagnostic matches master. Baseline report has 317 diagnostics:
+  the two fixed IDE1006 findings were each reported twice. The required full
+  repository gate is still failed, not waived because it predates PR4.
+
+Retain all failed evidence: missing bundled browser, initial host-start
+ECONNREFUSED, search input before its Blazor event binding, initial format
+failures and transient mixed EOL findings corrected by normalization. Browser
+now supports the existing WASAS_CHROME executable option and awaits the bound
+input plus asserted filter, not sleeps or weaker outcome checks. Earlier
+short-log summaries understated the format debt; the structured reports above
+are authoritative.
+
+Review found owner/capability authorization, version guards and hidden-member
+projection preserved. Unresolved previously visible names carry no URL or batch
+opening marker; hidden members remain unnamed/uncounted. Opening feedback is
+an attempt, never confirmation of a tab, successful load or login. G31/G32 remain
+future contract decisions; neither is a dependency for this bounded UI release.
+No master merge or new matched review candidate was created at this blocked
+checkpoint. The e670617 review lacks PR4 and must not be reused for its UI.
+Existing installation NO-GO and separate pilot/SQL/security/Worker gates remain.
+
 ### PR #3 combined UI / G-30 verification, 2026-10-02
 
 This supersedes the unchanged-product statement in the 2026-10-01 readiness
