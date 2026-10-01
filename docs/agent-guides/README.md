@@ -2,7 +2,7 @@
 
 Short, area-specific guidance for coding agents, routed from `AGENTS.md`. Each guide records only what is specific to this project or easy to get wrong here; general good engineering practice is assumed.
 
-Authority order when sources disagree: code and ADRs (what is true) → `AGENTS.md` hard rules → layer `README.md` → these guides. Report a disagreement rather than silently following stale text.
+When sources disagree: `AGENTS.md` hard rules and approved decisions (ADRs, recorded owner decisions) bind; code shows what is implemented and does not override them; layer `README.md` files and these guides describe and may be stale. Report the disagreement rather than silently following either side.
 
 | Guide | Read when |
 |---|---|

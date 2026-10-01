@@ -1,6 +1,8 @@
 # AGENTS.md — WASAS Automation Management / SecureOps
 
-Canonical entry point for every coding agent (Codex, Claude, others). `CLAUDE.md` adds Claude-specific UI guidance; it never overrides this file. When this file, a guide and the code disagree, the code and the ADRs describe what is true today — report the mismatch instead of following stale text.
+Canonical entry point for every coding agent (Codex, Claude, others). `CLAUDE.md` adds Claude-specific UI guidance; it never overrides this file.
+
+**Sources of truth.** The hard rules below and approved decisions (ADRs, recorded owner decisions) are binding. Code shows what is implemented today; it does not override a hard rule or an approved decision. When code, a guide and a decision disagree, report the mismatch — as a defect if the code breaks a rule or decision, as a stale document otherwise — instead of silently following either.
 
 ## The project in one paragraph
 
@@ -28,15 +30,16 @@ These are business and security constraints, not style preferences. They hold ev
 
 - **Codex:** backend, API, domain, infrastructure, Worker, hosting/middleware, security, SQL, integrations, contracts, release engineering and their tests. By explicit owner decision Codex also owns the Planned OCO Announcements UI.
 - **Claude:** UI/UX — Razor, CSS, layout, theme, navigation, accessibility, visual behaviour under `src/SecureOps.Ui/` — and its tests.
-- Crossing a boundary: report the exact need (route, field, permission, behaviour) to the owner instead of changing their layer or inventing data in yours.
+- These are defaults. The owner may approve a scoped exception for a task or module — for example the 2026-09-28 Service Accounts exception in `docs/service-accounts/README.md`, under which Claude implements that module's backend, SQL candidate, UI and tests while Codex keeps final integration. An exception covers only its stated scope and does not change the defaults.
+- Outside your ownership or an approved exception: report the exact need (route, field, permission, behaviour) to the owner instead of changing their layer or inventing data in yours.
 
 ## Working agreement
 
-- **Git.** Check branch, HEAD and worktree before changing anything. Never reset, clean, stash, rebase or overwrite work you did not create. Push, open PRs, merge or deploy only when the owner explicitly asked for that operation in the current task.
+- **Git.** Check branch, HEAD and worktree before changing anything. Never reset, clean, stash, rebase or overwrite work you did not create. Push, open or update PRs, merge or deploy only with the owner's explicit authorization. An authorization stays valid while its scope is unchanged (same branch, PR and kind of operation); a new target, merge, deploy or corporate action needs a new one.
 - **Live systems.** Do not touch IIS, app pools, services, bindings, load balancers, databases or live configuration unless the task explicitly authorizes it. Local work cannot validate corporate AD/PAM/LDAP/SQL/IIS/F5 behaviour; use the deterministic fakes and say what remains unverified.
 - **Decisions.** A change to an architectural or security decision needs a new or amended ADR in `docs/adr/` first. Behaviour changes update the matching doc in the same change.
 - **Verification.** Run the build and the relevant tests (`docs/agent-guides/090-testing-quality.md`). Report exactly what ran and what did not; never claim an unrun pass. Prefer small, reviewable diffs.
-- **When to ask.** Ask when the choice is genuinely the owner's — scope, security trade-off, conflicting sources of truth, anything hard to reverse or outward-facing. Otherwise decide, state the assumption, and proceed.
+- **When to ask.** Ask only for a genuinely new owner decision — new scope, a security trade-off, conflicting sources of truth, or an irreversible or outward-facing action not already authorized. Do not re-ask for something already decided or authorized; otherwise decide, state the assumption, and proceed.
 
 ## Fixed decisions (details in `docs/adr/`)
 

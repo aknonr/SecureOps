@@ -4,7 +4,7 @@ Extends `AGENTS.md` (read it first; its hard rules and ownership win). This file
 
 ## Scope
 
-Claude owns UI/UX under `src/SecureOps.Ui/` (Razor, CSS, layout, theme, navigation, accessibility, visual behaviour) and its tests — except Planned OCO Announcements, which Codex owns. Do not change backend, API, DTOs, SQL, auth, integrations or contracts. When the UI needs data or behaviour the API does not provide, say exactly what is missing (route, field, permission, semantics) and record it in `docs/26-ui-backend-contract-gaps.md`; the UI shows an honest state instead of inventing data.
+By default Claude owns UI/UX under `src/SecureOps.Ui/` (Razor, CSS, layout, theme, navigation, accessibility, visual behaviour) and its tests — except Planned OCO Announcements, which Codex owns. Owner-approved scoped exceptions extend this for their stated scope only (currently Service Accounts: `docs/service-accounts/README.md`). Outside those, do not change backend, API, DTOs, SQL, auth, integrations or contracts. When the UI needs data or behaviour the API does not provide, say exactly what is missing (route, field, permission, semantics) and record it in `docs/26-ui-backend-contract-gaps.md`; the UI shows an honest state instead of inventing data.
 
 ## UI quality bar
 

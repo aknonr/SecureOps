@@ -12,16 +12,18 @@ xUnit, FluentAssertions, NSubstitute. Blazor components are render-tested with `
 dotnet build SecureOps.sln                                   # 0 warnings, 0 errors (warnings are errors)
 dotnet test tests/SecureOps.Tests.Unit/SecureOps.Tests.Unit.csproj
 dotnet test SecureOps.sln
-dotnet format --verify-no-changes                            # scope with --include when the repo has known debt
+dotnet format --verify-no-changes                            # repository-wide: required gate
 ```
 
 `global.json` pins the SDK with roll-forward disabled; if that SDK is unavailable, say so. A run with a substituted SDK or language version is diagnostic evidence only and must be labelled as such.
+
+The repository-wide format check is a required gate. A run scoped with `--include` (or limited to `style`/`analyzers`) is partial evidence: report it as such and never as passing the gate. As of 2026-10-01 the repository-wide check fails on pre-existing baseline debt (313 diagnostics in 13 files); PR #4 (Resources) records a merge NO-GO against it in its own branch documentation. Do not describe that debt as resolved until the full command passes.
 
 ## Expectations
 
 - New or changed behaviour has tests; security-sensitive paths have tests proving forbidden operations fail and audit is written. Test behaviour, not lines.
 - Names: `Method_Condition_ExpectedResult`. No sleeps waiting for state, no shared mutable state, no real external services, no assertions on log text.
-- Done means: builds clean, relevant tests pass, docs and (if a decision changed) ADRs updated, public APIs documented, diff reviewable (aim < 400 changed lines; split above ~1000).
+- Done means: builds clean, relevant tests pass, repository-wide format check passes (or the failure is reported as an open gate), docs and (if a decision changed) ADRs updated, public APIs documented, diff reviewable (aim < 400 changed lines; split above ~1000).
 - Commits: meaningful subject, area/phase prefix such as `[UI]`, `[Docs]`, `[Phase 1]`; never break the build.
 
 ## Reporting
