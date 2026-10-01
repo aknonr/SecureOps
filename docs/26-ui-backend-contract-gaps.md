@@ -961,10 +961,27 @@ would show a link to the record.
 With SDK 8, `JiraIssueDraftService.cs` does not compile (C# 14 collection-expression conversion). With
 SDK 10 and `LangVersion=latest` (C# 14), `InUseServiceItemParserTests` does not compile
 (`Reverse()` binds to the span overload). `global.json` pins `8.0.100` with
-`rollForward: latestMajor`, so the result depends on the machine. Verification in this pass used
-SDK 10 with `-p:LangVersion=13`. Three `UiPersistentDataProtectionTests` fail rather than skip off
-Windows. **What would resolve it.** Pin one SDK and language version, fix the two sources, and skip
-the DPAPI tests on non-Windows.
+`rollForward: latestMajor`, so the result depends on the machine. Three `UiPersistentDataProtectionTests`
+fail rather than skip off Windows. **What would resolve it.** Pin one SDK and language version, fix
+the two sources, and skip the DPAPI tests on non-Windows.
+
+**Reproduction, 2026-10-01 (Linux, Ubuntu-packaged SDKs, no `LangVersion` override).** Both failures
+are in files the UI branch does not change; they reproduce identically on master `214690e`.
+
+- SDK 8.0.131 (`global.json` pinned to it with `rollForward: disable`), `dotnet build SecureOps.sln`:
+  `src/SecureOps.Infrastructure/OperationalRecords/JiraIssueDraftService.cs(204,80): error CS7036:
+  There is no argument given that corresponds to the required parameter 'list' of
+  'ReadOnlyCollection<string>.ReadOnlyCollection(IList<string>)'`.
+- SDK 10.0.112 (selected by the committed `global.json`), `dotnet build SecureOps.sln`:
+  `tests/SecureOps.Tests.Unit/InUse/InUseServiceItemParserTests.cs(43,68): error CS0023: Operator '.'
+  cannot be applied to operand of type 'void'`. All `src/` projects, including `SecureOps.Ui`, build
+  with 0 warnings and 0 errors.
+- Off-Windows test failures, identical on master and the UI branch once line 43 is changed (in a
+  throw-away copy only) to `Enumerable.Reverse(rows)`: unit 4 (`ApiReleasePackagingContractTests` x2,
+  missing `src/SecureOps.Api/obj/project.assets.json`; `SccmFailureEvidenceTests`, PowerShell
+  execution policy unsupported; `AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`,
+  publish-directory message precedes the expected one); integration 12 (DPAPI "requires Windows" x5,
+  SkiaSharp native library x7). These are Codex-owned.
 
 ---
 

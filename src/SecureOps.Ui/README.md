@@ -55,6 +55,10 @@ Missing contract data is recorded as G-19 to G-30 in `docs/26-ui-backend-contrac
 Verification: targeted unit/render tests and a local Playwright run against a synthetic stub API
 (390px, emulated 200% zoom at 683px CSS width, light/dark, keyboard, denial, loading/error/empty).
 The stub is not committed. Windows/IIS/LocalDB, native browser zoom and corporate data remain unverified.
+Handoff check (Linux, SDK 10.0.112, no `LangVersion` override): `SecureOps.Ui` builds clean, but the
+solution does not build as committed (G-30). With the G-30 test line changed in a throw-away copy only,
+the 663 `SecureOps.Tests.Unit.Ui` tests pass; the remaining unit and integration failures match master
+exactly and are platform-dependent (recorded under G-30).
 
 ## System Status Presentation Continuation, 2026-09-20
 
