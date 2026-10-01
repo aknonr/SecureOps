@@ -1,0 +1,96 @@
+@* Records one mail once and links it to every listed account. Nothing is sent from here; a draft is recorded
+   as a draft and never counted as a sent mail. An unknown date stays unknown. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<EditForm Model="_model" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+    @if (AccountLabels.Count > 0)
+    {
+        <p class="so-panel-text">Bağlanacak hesaplar: @string.Join(", ", AccountLabels)</p>
+    }
+    <MudGrid Spacing="2">
+        <MudItem xs="6" md="3">
+            <MudSelect T="string" @bind-Value="_model.Direction" Label="Yön" Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@("Outgoing")">Giden</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Incoming")">Gelen</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <MudSelect T="string" @bind-Value="_model.Kind" Label="Tür" Variant="Variant.Outlined">
+                @foreach ((string value, string label) in ServiceAccountUiText.CommunicationKinds) { <MudSelectItem T="string" Value="@value">@label</MudSelectItem> }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudDatePicker Editable="true" @bind-Date="_model.OccurredOn" Label="Tarih (bilinmiyorsa boş)" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="Guid?" @bind-Value="_model.ContactTeamId" Label="Muhatap ekip" Clearable="true" Variant="Variant.Outlined">
+                @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4"><SaPersonPicker Label="Muhatap kişi" @bind-Value="_model.ContactPersonId" /></MudItem>
+        <MudItem xs="12" md="8">
+            <MudTextField @bind-Value="_model.Subject" Label="Konu" MaxLength="400" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12">
+            <MudTextField @bind-Value="_model.Summary" Label="Özet" MaxLength="4000" Lines="3" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudTextField @bind-Value="_model.Link" Label="Bağlantı (isteğe bağlı)" MaxLength="1000" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudTextField @bind-Value="_model.ProviderMessageId" Label="E-posta mesaj kimliği (aynı e-postayı tekilleştirir)" MaxLength="400" Variant="Variant.Outlined" />
+        </MudItem>
+        @if (_model.Direction == "Incoming")
+        {
+            <MudItem xs="12">
+                <MudCheckBox T="bool" @bind-Value="_model.MeaningfulReply" Label="Anlamlı yanıt (plan, tarih veya karar içeriyor)" />
+            </MudItem>
+        }
+    </MudGrid>
+    @if (_model.Kind == "Draft")
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">Taslak kaydı gönderilmiş e-posta sayılmaz ve raporlarda ayrı gösterilir.</MudAlert>
+    }
+    <MudButton ButtonType="ButtonType.Submit" Disabled="@(Busy || AccountIds.Count == 0)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">E-posta kaydını ekle</MudButton>
+</EditForm>
+
+@code {
+    private readonly Model _model = new();
+
+    /// <summary>Accounts the mail is linked to.</summary>
+    [Parameter] public IReadOnlyList<Guid> AccountIds { get; set; } = [];
+
+    /// <summary>Account labels shown to the operator.</summary>
+    [Parameter] public IReadOnlyList<string> AccountLabels { get; set; } = [];
+
+    /// <summary>Teams for the contact picker.</summary>
+    [Parameter] public IReadOnlyList<TeamView> Teams { get; set; } = [];
+
+    /// <summary>Disables submit while a call is in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Submit handler.</summary>
+    [Parameter] public EventCallback<CreateCommunicationRequest> OnSubmit { get; set; }
+
+    private Task SubmitAsync() => OnSubmit.InvokeAsync(new CreateCommunicationRequest(_model.Direction, _model.Kind, AccountIds,
+        ServiceAccountUiText.ToDate(_model.OccurredOn), null, _model.ContactTeamId, _model.ContactPersonId, Blank(_model.Subject), Blank(_model.Summary),
+        Blank(_model.Link), Blank(_model.ProviderMessageId), _model.Direction == "Incoming" ? _model.MeaningfulReply : null));
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class Model
+    {
+        public string Direction { get; set; } = "Outgoing";
+        public string Kind { get; set; } = "FirstRequest";
+        public DateTime? OccurredOn { get; set; }
+        public Guid? ContactTeamId { get; set; }
+        public Guid? ContactPersonId { get; set; }
+        public string? Subject { get; set; }
+        public string? Summary { get; set; }
+        public string? Link { get; set; }
+        public string? ProviderMessageId { get; set; }
+        public bool MeaningfulReply { get; set; }
+    }
+}

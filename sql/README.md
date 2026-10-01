@@ -8,10 +8,12 @@ index; it neither backfills from current records nor rewrites existing receipts,
 envelopes or XLSX bytes. Runtime delta is SELECT/INSERT on
 `reporting.InUseReportCatalogue` for the existing approved API principal only;
 no user/role assignment, UPDATE, DELETE, DDL or Worker archive ACL is added.
-DBA reviews this new object through the existing deployment procedure. Do not
+The SQL execution operator reviews this new object through the approved change
+procedure. Do not
 replay operator-reported installed 022/023, 001-021, or Hangfire schema 9.
 There is no migration ledger in this repository: verify object/column/index/
-trigger definitions and the target's retained DBA execution evidence read-only.
+trigger definitions and effective API permissions read-only. Retain historical
+execution logs/change notes if they exist; otherwise mark them unavailable.
 The isolated harness now creates a fresh 001-024 test database. Existing 023
 installations use only the separately reviewed 024 delta in a matched successor.
 Older writers are not proven compatible with lifecycle/EvidenceSheets and reporter
@@ -29,6 +31,15 @@ sql/
 ```
 
 ## Current Reviewed Migrations
+
+The local combined review candidate additionally reserves **025-service-accounts**.
+Its SQLCMD wrapper requires 023/024 and includes the unchanged reviewed
+`pending/service-accounts/SA-001-service-accounts.sql` from the migrations working
+directory. Ship that include file with the wrapper; never execute only the wrapper
+without its dependency. API/Worker permission scripts remain separate and assign
+no principal. Observed TEST 022/023 is not replayed: the conditional sequence is
+024, verify/stop, then separately approved 025 and reviewed role scripts.
+Number reservation is local, not a target installation or shared-branch promotion.
 
 | Order | Description |
 |---|---|
@@ -108,7 +119,7 @@ scheduler grants. Role seeds assign no users; role-ID collisions fail closed.
 The existing isolated LocalDB harness now upgrades through 012 and includes
 In Use round-trip, version conflict and transactional audit rollback tests.
 
-The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded; 004-007 guard or replace their objects. No down scripts or migration-history table exists. See `docs/24-api-test-deployment-readiness.md` before DBA execution.
+The files are SQLCMD entrypoints and must run in exact order. Migrations 001 and 002 are not idempotent; 003 is only partially guarded; 004-007 guard or replace their objects. No down scripts or migration-history table exists. See the current operator guide before approved SQL execution.
 
 Current reviewed offline assets additionally include `002-operational-record-jira-workflow.sql`, which creates `ops.OperationalRecords`, `ops.JiraTransfers`, and append-only workflow history.
 
@@ -125,7 +136,7 @@ Current reviewed offline assets additionally include `002-operational-record-jir
 
 ## Migration Tool
 
-No application startup migration or EF migration is currently enabled. Corporate SQLCMD execution belongs to the approved DBA process; the isolated local test harness below is separate.
+No application startup migration or EF migration is currently enabled. Corporate SQLCMD execution belongs to the named SQL execution operator under the approved change process; the isolated local test harness below is separate.
 
 Audit triggers and append-only enforcement live in `sql/schema/` and are applied as part of the same migration that creates the table.
 

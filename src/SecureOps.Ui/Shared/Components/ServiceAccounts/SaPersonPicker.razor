@@ -1,0 +1,54 @@
+@* Module person reference picker (label prefix search of module records, not a directory lookup).
+   Choosing a person never grants access; unverified people are labelled. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+@inject ServiceAccountApiClient Api
+@inject ILogger<SaPersonPicker> Logger
+
+<MudAutocomplete T="PersonView" Label="@Label" Value="_value" ValueChanged="ChangedAsync" SearchFuncWithCancel="SearchAsync" ToStringFunc="@(p => p?.DisplayName)"
+                 Clearable="true" ResetValueOnEmptyText="true" MinCharacters="2" DebounceInterval="300" Variant="Variant.Outlined" MaxItems="20">
+    <ItemTemplate>
+        @context.DisplayName
+        @if (context.VerificationState != "Verified") { <span class="so-panel-text--sm"> · doğrulanmamış kişi</span> }
+    </ItemTemplate>
+    <NoItemsTemplate><span class="so-panel-text--sm">Eşleşen kişi kaydı yok.</span></NoItemsTemplate>
+</MudAutocomplete>
+
+@code {
+    private PersonView? _value;
+
+    /// <summary>Field label.</summary>
+    [Parameter] public string Label { get; set; } = "Kişi";
+
+    /// <summary>Selected person id.</summary>
+    [Parameter] public Guid? Value { get; set; }
+
+    /// <summary>Selection change.</summary>
+    [Parameter] public EventCallback<Guid?> ValueChanged { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Value is null) { _value = null; }
+    }
+
+    private async Task<IEnumerable<PersonView>> SearchAsync(string text, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 2) { return []; }
+        try
+        {
+            return await Api.GetAsync<IReadOnlyList<PersonView>>("/people?search=" + Uri.EscapeDataString(text.Trim()), token);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            // The picker offers no suggestions; the command itself reports any access problem.
+            Logger.LogInformation("Service account person suggestions unavailable. Code: {Code}", ex.Problem.Code);
+            return [];
+        }
+    }
+
+    private Task ChangedAsync(PersonView? person)
+    {
+        _value = person;
+        return ValueChanged.InvokeAsync(person?.Id);
+    }
+}

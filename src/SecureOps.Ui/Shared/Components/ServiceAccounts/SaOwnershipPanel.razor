@@ -1,0 +1,119 @@
+@* Ownership: a proposal is never a confirmation. Confirming needs Assign within scope; changing the owner team needs
+   organization-level scope. A follow-up person is shown as follow-up, never as owner. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-ownership">
+    <div class="so-panel-head"><h2 id="sa-ownership" class="so-panel-title">Sahiplik</h2></div>
+    @if (Detail.Ownership.Count == 0)
+    {
+        <SoEmptyState Title="Sahiplik kaydı yok" Description="Teyitli sahip ekip veya kişi bulunmuyor." />
+    }
+    else
+    {
+        <MudTable Items="Detail.Ownership" Dense="true" Breakpoint="Breakpoint.Sm" T="OwnershipView">
+            <HeaderContent><MudTh>Ekip / kişi</MudTh><MudTh>Durum</MudTh><MudTh>Kaynak</MudTh><MudTh>Geçerlilik</MudTh><MudTh>Karar</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Ekip / kişi">@(context.Team?.Label ?? "Ekip yok")<div class="so-panel-text--sm">@(context.Person?.Label ?? "Kişi yok")</div></MudTd>
+                <MudTd DataLabel="Durum">
+                    <SoStatusBadge Label="@ServiceAccountUiText.Ownership(context.State)" Tone="@(context.State switch { "Confirmed" => SoStatusBadge.BadgeTone.Positive, "Proposed" => SoStatusBadge.BadgeTone.Caution, _ => SoStatusBadge.BadgeTone.Neutral })" />
+                </MudTd>
+                <MudTd DataLabel="Kaynak">@context.Source<div class="so-panel-text--sm">@(context.EvidenceNote ?? "")</div></MudTd>
+                <MudTd DataLabel="Geçerlilik">@ServiceAccountUiText.Date(context.EffectiveFrom, "?") – @ServiceAccountUiText.Date(context.EffectiveTo, "devam ediyor")</MudTd>
+                <MudTd DataLabel="Karar">
+                    @if (context.State == "Proposed" && Detail.Permissions.AssignPerson)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => _decide = context)">Karar ver</MudButton>
+                    }
+                    else if (context.DecisionReason is not null) { @context.DecisionReason }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+    @if (_decide is { } proposal)
+    {
+        <section class="so-panel mt-2" aria-label="Sahiplik önerisine karar ver">
+            <h3 class="so-panel-title">Öneri: @(proposal.Team?.Label ?? "ekip yok") / @(proposal.Person?.Label ?? "kişi yok")</h3>
+            <MudTextField @bind-Value="_decisionReason" Label="Karar gerekçesi" MaxLength="1000" Variant="Variant.Outlined" />
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <MudButton OnClick="@(() => DecideAsync(proposal, "Confirm"))" Disabled="@(Busy || string.IsNullOrWhiteSpace(_decisionReason))" Variant="Variant.Filled" Color="Color.Primary">Teyit et</MudButton>
+                <MudButton OnClick="@(() => DecideAsync(proposal, "Reject"))" Disabled="@(Busy || string.IsNullOrWhiteSpace(_decisionReason))" Variant="Variant.Outlined">Reddet</MudButton>
+                <MudButton OnClick="@(() => _decide = null)" Variant="Variant.Text">Vazgeç</MudButton>
+            </div>
+        </section>
+    }
+
+    @if (Detail.Permissions.Work)
+    {
+        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Sahiplik öner veya teyit et">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4">
+                    <MudSelect T="Guid?" @bind-Value="_team" Label="Ekip" Clearable="true" Variant="Variant.Outlined">
+                        @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4"><SaPersonPicker Label="Sorumlu kişi" @bind-Value="_person" /></MudItem>
+                <MudItem xs="12" md="4"><MudDatePicker Editable="true" @bind-Date="_effectiveFrom" Label="Geçerlilik başlangıcı" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_reason" Label="Gerekçe" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_evidence" Label="Kanıt notu (yazışma, toplantı vb.)" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <MudButton OnClick="@(() => ChangeAsync("Propose"))" Disabled="@(!CanSubmit)" Variant="Variant.Outlined" Color="Color.Primary">Öneri olarak kaydet</MudButton>
+                @if (Detail.Permissions.AssignPerson)
+                {
+                    <MudButton OnClick="@(() => ChangeAsync("Confirm"))" Disabled="@(!CanSubmit)" Variant="Variant.Filled" Color="Color.Primary">Teyitli sahiplik olarak kaydet</MudButton>
+                }
+            </div>
+            @if (!Detail.Permissions.AssignTeam)
+            {
+                <p class="so-panel-text--sm mt-1">Sahip ekibi değiştirmek kurum düzeyinde kapsam gerektirir; ekip kapsamıyla yalnız mevcut ekipte kişi teyit edilebilir.</p>
+            }
+        </MudExpansionPanel></MudExpansionPanels>
+    }
+</section>
+
+@code {
+    private OwnershipView? _decide;
+    private string? _decisionReason, _reason, _evidence;
+    private Guid? _team, _person;
+    private DateTime? _effectiveFrom;
+    private int _seenRevision = -1;
+
+    /// <summary>Account detail.</summary>
+    [Parameter] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Team choices.</summary>
+    [Parameter] public IReadOnlyList<TeamView> Teams { get; set; } = [];
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last command was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Command sink.</summary>
+    [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    private bool CanSubmit => !Busy && (_team is not null || _person is not null) && !string.IsNullOrWhiteSpace(_reason);
+
+    protected override void OnParametersSet()
+    {
+        if (_seenRevision != Revision)
+        {
+            _seenRevision = Revision;
+            (_decide, _decisionReason, _reason, _evidence, _team, _person, _effectiveFrom) = (null, null, null, null, null, null, null);
+        }
+        else if (_decide is not null)
+        {
+            _decide = Detail.Ownership.FirstOrDefault(o => o.Id == _decide.Id && o.State == "Proposed");
+        }
+    }
+
+    private Task ChangeAsync(string mode) => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/accounts/{Detail.Summary.Id}/ownership",
+        new OwnershipChangeRequest(Detail.Summary.Version, _team, _person, mode, _reason!.Trim(), ServiceAccountUiText.ToDate(_effectiveFrom),
+            string.IsNullOrWhiteSpace(_evidence) ? null : _evidence.Trim())));
+
+    private Task DecideAsync(OwnershipView proposal, string decision) => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post,
+        $"/accounts/{Detail.Summary.Id}/ownership/{proposal.Id}/decision", new OwnershipDecisionRequest(proposal.Version, decision, _decisionReason!.Trim())));
+}

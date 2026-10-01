@@ -11,6 +11,7 @@
     is part of what this navigation is meant to communicate.
 *@
 
+@using SecureOps.Shared.Contracts.ServiceAccounts
 @implements IDisposable
 @inject ICurrentAccessProvider AccessProvider
 
@@ -45,6 +46,13 @@
 
             @if (Can(Capabilities.AnnouncementDrafts))
             { <MudNavLink Href="announcements" Icon="@Icons.Material.Filled.Email">Planlı Çalışma Duyuruları</MudNavLink> }
+
+            @* Service Accounts: gated on the module's own View capability; import, reports and module administration
+               are reached from the module pages, each behind its own capability. *@
+            @if (Can(ServiceAccountCapabilities.View))
+            {
+                <MudNavLink Href="service-accounts" Icon="@Icons.Material.Filled.ManageAccounts">Servis Hesapları</MudNavLink>
+            }
 
             @if (Can(Capabilities.ResourcesView))
             {

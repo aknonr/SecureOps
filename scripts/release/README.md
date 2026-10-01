@@ -1,6 +1,57 @@
 # API Release Packaging
 
-Current integrated continuation requires schema 001-024. Use `-UpgradeFromRc626`
+`New-ServiceAccountsTestReview.ps1` prepares a separate matched review candidate,
+NOT a numbered successor. It requires the clean pinned integration branch and
+product-input equality to the supplied tested source. Entry versions retain that
+tested source; candidate metadata separately identifies SQL/docs preparation.
+It reuses the existing payload scanners and ZIP/dependency validators. Only the
+024/025 SQL dependency closure and unassigned role scripts are exported; no
+target configuration or private/local test evidence is packaged. The numbered
+release guard still requires the combined branch and clean exact source. Its
+explicit 025 selection is described below; an existing review ZIP is never
+promoted or relabelled by this change. No installation readiness is claimed.
+
+## Reviewed 023 -> 024 -> 025 Selection
+
+`New-PairedTestRelease.ps1` now requires `-ExpectedSource <full reviewed HEAD>`.
+The branch remains exactly `feature/combined-test-delivery-20260915`, clean-tree
+and assembly source checks remain enforced, and failures occur before publishing.
+Do not rename an active/dirty worktree to evade the branch guard. A later authorized
+promotion can use an independent clone of the complete reviewed local source,
+then create that branch at the exact approved commit. Preserve every original
+worktree; do not merge master, push or recreate packages as part of preparation.
+
+025 is opt-in ONLY with `-UpgradeFromRc626 -IncludeServiceAccounts
+-SqlUpgradeReview <private review.json>`. `Get-ReleaseSqlPlan.ps1` is read-only:
+it validates exact 001-025 inventories, selects only 024/025 (not installed
+022/023), verifies the SQLCMD include dependency and exports role scripts
+separately. Without this opt-in, an inventory containing 025 fails closed.
+The private review has schema `wasas.sql-upgrade-review.v1`, `Source` equal to
+ExpectedSource, boolean `Baseline023Verified`, `Delta024Reviewed` and
+`ServiceAccounts025Reviewed` all true, and nonempty `BaselineEvidenceReference`,
+`Delta024ReviewReference`, `ServiceAccounts025ReviewReference`. `Files` contains
+exact Path/Sha256 entries for the two 024 files, two 025 files, included SA-001
+DDL and both role scripts (seven files). No SQL connection or credentials belong
+in this record. Typed false/missing values, changed hashes and source drift refuse
+selection. This is evidence-bound packaging selection, NOT target execution
+authorization, live permissions verification or proof of applied 024/025.
+
+SQLCMD working directory is the delivered `sql/migrations`; nested `:r` resolves
+from there. Keep `sql/schema/025-service-accounts.sql` AND
+`sql/pending/service-accounts/SA-001-service-accounts.sql`. Execute 024 using
+`-I -b`, verify its reviewed contract and STOP on differences before separately
+approved 025. Role scripts create roles without members; their execution and
+principal membership need their own change approval. Full 001-025 is reference
+material, not an upgrade command. Backup/stop/recovery gates remain in the
+current operator entry; readyForInstallation remains false.
+
+Focused Windows selector/include/failure coverage (no packaging):
+`tests/release/Test-PairedReleaseSqlSelection.ps1 -EvidenceDirectory <new private
+directory> -VerifySqlCmd -DatabaseSuffix <new local suffix>`. It uses ONLY the
+hard-coded per-user LocalDB instance and refuses existing databases. Earlier
+001-024 descriptions below are historical for pre-025 product sources.
+
+Historical pre-025 continuation required schema 001-024. Use `-UpgradeFromRc626`
 only with verified installed 023 for a 024-only delta. `-UpgradeFromRc624`
 requires verified 022 for a 023-024 delta; `-UpgradeFromRc622` includes
 022-024 for verified installed 001-021. The canonical current operator entry is
@@ -16,10 +67,10 @@ Earlier 001-022/022-only descriptions below document old rc6.24 packaging, not
 instructions to replay installed migrations. The tool does not deploy or enable
 corporate effects. Prepare one successor only after applicable gates.
 
-`New-PairedTestRelease.ps1 -ReleaseName <reviewed-next-name>` requires a clean
+`New-PairedTestRelease.ps1 -ReleaseName <reviewed-next-name> -ExpectedSource <full reviewed HEAD>` requires a clean
 committed feature branch (pre-existing `.vscode/` is excluded), publishes matching
 API/UI/Worker on the combined delivery branch, reuses the payload scanners/validators,
-exports the current Turkish entry and packages the exact DBA 001-024 inventory
+exports the current Turkish entry and packages the exact reviewed SQL inventory
 with per-file sizes/hashes and source metadata. Hangfire.SqlServer 1.8.6's original
 schema-9 installation script is included separately for reviewed DBA provisioning;
 runtime DDL stays disabled. New source supports native Windows Service and console

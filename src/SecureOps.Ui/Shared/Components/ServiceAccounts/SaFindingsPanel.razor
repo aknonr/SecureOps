@@ -1,0 +1,114 @@
+@* Technical findings recorded by an operator. No automatic scanning is started from here; an unreachable or failed
+   scan is recorded as such and never read as "not used". *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-findings">
+    <div class="so-panel-head"><h2 id="sa-findings" class="so-panel-title">Teknik bulgular</h2></div>
+    @if (Detail.Findings.Count == 0)
+    {
+        <SoEmptyState Title="Bulgu kaydı yok" />
+    }
+    else
+    {
+        <MudTable Items="Detail.Findings" Dense="true" Breakpoint="Breakpoint.Sm" T="FindingView">
+            <HeaderContent><MudTh>Bileşen</MudTh><MudTh>Tarama</MudTh><MudTh>Eşleşme</MudTh><MudTh>Durum</MudTh><MudTh>Eksikler</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Bileşen">@(context.Server ?? "Sunucu bilinmiyor")<div class="so-panel-text--sm">@context.ComponentType @context.ComponentName @context.Environment</div></MudTd>
+                <MudTd DataLabel="Tarama">@Scan(context.ScanResult)<div class="so-panel-text--sm">@(context.ScanAt is not null ? ServiceAccountUiText.Instant(context.ScanAt) : ServiceAccountUiText.Date(context.ScanOn))</div></MudTd>
+                <MudTd DataLabel="Eşleşme">@Match(context.MatchResult)</MudTd>
+                <MudTd DataLabel="Durum">
+                    @ServiceAccountUiText.Finding(context.Status)
+                    @if (Detail.Permissions.Work && context.Status != "Closed")
+                    {
+                        <div class="d-flex gap-1 mt-1">
+                            @if (context.Status == "Open") { <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="Busy" OnClick="@(() => SetStatusAsync(context, "InReview"))">İncelemeye al</MudButton> }
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="Busy" OnClick="@(() => SetStatusAsync(context, "Closed"))">Kapat</MudButton>
+                        </div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Eksikler">@(context.Gaps.Count == 0 ? "Yok" : string.Join(", ", context.Gaps))</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+    @if (Detail.Permissions.Work)
+    {
+        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Bulgu ekle">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_m.Server" Label="Sunucu" MaxLength="256" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="6" md="4"><MudTextField @bind-Value="_m.ComponentType" Label="Bileşen türü (servis, görev, IIS...)" MaxLength="64" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="6" md="4"><MudTextField @bind-Value="_m.ComponentName" Label="Bileşen adı" MaxLength="256" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSelect T="string" @bind-Value="_m.ScanResult" Label="Tarama sonucu" Variant="Variant.Outlined">
+                        @foreach (string value in _scans) { <MudSelectItem T="string" Value="@value">@Scan(value)</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudSelect T="string" @bind-Value="_m.MatchResult" Label="Eşleşme" Variant="Variant.Outlined">
+                        @foreach (string value in _matches) { <MudSelectItem T="string" Value="@value">@Match(value)</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="6" md="3"><MudDatePicker Editable="true" @bind-Date="_m.ScanOn" Label="Tarama günü" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="6" md="3"><MudTextField @bind-Value="_m.Environment" Label="Ortam" MaxLength="32" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12"><MudTextField @bind-Value="_m.EvidenceNote" Label="Kanıt notu" MaxLength="2000" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <MudButton OnClick="CreateAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Bulguyu kaydet</MudButton>
+        </MudExpansionPanel></MudExpansionPanels>
+    }
+</section>
+
+@code {
+    private static readonly string[] _scans = ["Success", "Partial", "Unreachable", "Failed", "Unknown"];
+    private static readonly string[] _matches = ["Match", "NoMatch", "Uncertain"];
+    private Model _m = new();
+    private int _seenRevision = -1;
+
+    /// <summary>Account detail.</summary>
+    [Parameter] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Team choices.</summary>
+    [Parameter] public IReadOnlyList<TeamView> Teams { get; set; } = [];
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last command was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Command sink.</summary>
+    [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (_seenRevision != Revision) { _seenRevision = Revision; _m = new Model(); }
+    }
+
+    private static string Scan(string value) => value switch
+    {
+        "Success" => "Başarılı", "Partial" => "Kısmi", "Unreachable" => "Erişilemedi", "Failed" => "Başarısız", _ => "Bilinmiyor"
+    };
+
+    private static string Match(string value) => value switch { "Match" => "Hesap bulundu", "NoMatch" => "Hesap bulunmadı", _ => "Belirsiz" };
+
+    private Task SetStatusAsync(FindingView finding, string status) =>
+        OnCommand.InvokeAsync(new SaCommand(HttpMethod.Patch, $"/findings/{finding.Id}", new UpdateFindingRequest(finding.Version, status)));
+
+    private Task CreateAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, "/findings", new CreateFindingRequest(Detail.Summary.Id, _m.ScanResult,
+        _m.MatchResult, "Open", Blank(_m.Server), Blank(_m.ComponentType), Blank(_m.ComponentName), Blank(_m.Environment), null,
+        ServiceAccountUiText.ToDate(_m.ScanOn), null, Blank(_m.EvidenceNote))));
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class Model
+    {
+        public string? Server { get; set; }
+        public string? ComponentType { get; set; }
+        public string? ComponentName { get; set; }
+        public string? Environment { get; set; }
+        public string ScanResult { get; set; } = "Success";
+        public string MatchResult { get; set; } = "Match";
+        public DateTime? ScanOn { get; set; }
+        public string? EvidenceNote { get; set; }
+    }
+}

@@ -1,0 +1,127 @@
+@* Evidence files: bounded size, allowed types only (the server also checks the file signature). Downloads are
+   authorized and audited by the API. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-evidence">
+    <div class="so-panel-head"><h2 id="sa-evidence" class="so-panel-title">Kanıt dosyaları</h2></div>
+    @if (Detail.Evidence.Count == 0) { <SoEmptyState Title="Kanıt dosyası yok" /> }
+    else
+    {
+        <MudTable Items="Detail.Evidence" Dense="true" Breakpoint="Breakpoint.Sm" T="EvidenceView">
+            <HeaderContent><MudTh>Dosya</MudTh><MudTh>Bağlı olduğu kayıt</MudTh><MudTh>Boyut</MudTh><MudTh>Eklenme</MudTh><MudTh>İndir</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Dosya">@context.FileName<div class="so-panel-text--sm">@(context.Label ?? "")</div></MudTd>
+                <MudTd DataLabel="Bağlı olduğu kayıt">@OwnerLabel(context.OwnerEntityType, context.OwnerEntityId)</MudTd>
+                <MudTd DataLabel="Boyut">@($"{context.SizeBytes / 1024.0:0.#} KB")</MudTd>
+                <MudTd DataLabel="Eklenme">@ServiceAccountUiText.Instant(context.CreatedAt)</MudTd>
+                <MudTd DataLabel="İndir"><MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Download" Disabled="Busy" OnClick="@(() => OnDownload.InvokeAsync(context.Id))">İndir</MudButton></MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+    @if (Detail.Permissions.UploadEvidence)
+    {
+        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Kanıt dosyası ekle">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string" @bind-Value="_owner" Label="Bağlanacak kayıt" Variant="Variant.Outlined">
+                        @foreach ((string key, string label) in UploadOwners()) { <MudSelectItem T="string" Value="@key">@label</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_label" Label="Açıklama" MaxLength="200" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4">
+                    <label class="so-panel-text" for="sa-evidence-file">Dosya (PDF, PNG, JPEG, TXT, EML, XLSX, DOCX; en çok 10 MB)</label>
+                    <InputFile id="sa-evidence-file" OnChange="ChooseAsync" accept=".pdf,.png,.jpg,.jpeg,.txt,.eml,.xlsx,.docx" />
+                </MudItem>
+            </MudGrid>
+            @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
+            <MudButton OnClick="UploadAsync" Disabled="@(Busy || _file is null)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Dosyayı yükle</MudButton>
+        </MudExpansionPanel></MudExpansionPanels>
+    }
+</section>
+
+@code {
+    private const long MaxBytes = 10L * 1024 * 1024;
+    private static readonly Dictionary<string, string> _types = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".pdf"] = "application/pdf", [".png"] = "image/png", [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".txt"] = "text/plain",
+        [".eml"] = "message/rfc822", [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    };
+
+    private (string Name, string Type, byte[] Content)? _file;
+    private string _owner = "Account";
+    private string? _label, _fileError;
+    private int _seenRevision = -1;
+
+    /// <summary>Account detail.</summary>
+    [Parameter] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last upload was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Upload sink.</summary>
+    [Parameter] public EventCallback<SaEvidenceUpload> OnUpload { get; set; }
+
+    /// <summary>Download sink.</summary>
+    [Parameter] public EventCallback<Guid> OnDownload { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (_seenRevision != Revision) { (_seenRevision, _file, _label, _fileError, _owner) = (Revision, null, null, null, UploadOwners().FirstOrDefault().Key ?? "Account"); }
+    }
+
+    /// <summary>Attachable records: everything for the responsible team; a participant only its own requests and their unverified actions.</summary>
+    private IEnumerable<(string Key, string Label)> UploadOwners() => Detail.Permissions.Work
+        ? Owners()
+        : Owners().Where(o => o.Key.Split(':') is [var type, var id] && Guid.TryParse(id, out Guid ownerId)
+            && (type == "Request" && Detail.Permissions.CanWorkRequest(ownerId)
+                || type == "Action" && Detail.Actions.Any(a => a.Id == ownerId && !a.Voided && a.Result != "Verified"
+                    && a.RequestId is { } request && Detail.Permissions.CanWorkRequest(request))));
+
+    private IEnumerable<(string Key, string Label)> Owners()
+    {
+        yield return ("Account", "Hesap");
+        foreach (RequestView r in Detail.Requests) { yield return ($"Request:{r.Id}", $"Talep · {r.ActionLabel}"); }
+        foreach (ActionView a in Detail.Actions) { yield return ($"Action:{a.Id}", $"İşlem · {a.ActionLabel} · {ServiceAccountUiText.Date(a.ActualOn)}"); }
+        foreach (CommunicationView c in Detail.Communications) { yield return ($"Communication:{c.Id}", $"Yazışma · {c.Subject ?? ServiceAccountUiText.Date(c.OccurredOn)}"); }
+        foreach (FindingView f in Detail.Findings) { yield return ($"Finding:{f.Id}", $"Bulgu · {f.Server ?? "sunucu bilinmiyor"}"); }
+        foreach (HandoverView h in Detail.Handovers) { yield return ($"Handover:{h.Id}", $"Devir · {h.TargetTeam.Label}"); }
+    }
+
+    private string OwnerLabel(string type, Guid id) => Owners().FirstOrDefault(o => o.Key == (type == "Account" ? "Account" : $"{type}:{id}")).Label ?? type;
+
+    private async Task ChooseAsync(InputFileChangeEventArgs args)
+    {
+        (_file, _fileError) = (null, null);
+        IBrowserFile file = args.File;
+        if (!_types.TryGetValue(Path.GetExtension(file.Name), out string? type))
+        {
+            _fileError = "Bu dosya türü kabul edilmiyor.";
+            return;
+        }
+
+        if (file.Size is 0 or > MaxBytes)
+        {
+            _fileError = "Dosya boş veya 10 MB sınırını aşıyor.";
+            return;
+        }
+
+        using MemoryStream buffer = new();
+        await using Stream stream = file.OpenReadStream(MaxBytes);
+        await stream.CopyToAsync(buffer);
+        _file = (file.Name, type, buffer.ToArray());
+    }
+
+    private Task UploadAsync()
+    {
+        (string name, string type, byte[] content) = _file!.Value;
+        string[] owner = _owner.Split(':');
+        Guid ownerId = owner.Length == 2 ? Guid.Parse(owner[1]) : Detail.Summary.Id;
+        return OnUpload.InvokeAsync(new SaEvidenceUpload(owner[0], ownerId, name, type, content, string.IsNullOrWhiteSpace(_label) ? null : _label.Trim()));
+    }
+}

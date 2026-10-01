@@ -1,0 +1,68 @@
+@* Column mapping. Profiles with a known layout are read-only; the generic profile can be re-staged with an edited
+   mapping. Formula cells are read as stored values and never evaluated. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+
+@if (Mapping.Count == 0)
+{
+    <SoEmptyState Title="Sütun bilgisi yok" />
+}
+else
+{
+    <MudTable Items="_rows" Dense="true" Breakpoint="Breakpoint.Sm" T="Row">
+        <HeaderContent><MudTh>Kaynak sütun</MudTh><MudTh>Alan</MudTh><MudTh>Not</MudTh></HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Kaynak sütun">@context.Source</MudTd>
+            <MudTd DataLabel="Alan">
+                @if (Editable)
+                {
+                    <MudSelect T="string" @bind-Value="context.Target" Label="Alan" Dense="true" Clearable="true" Variant="Variant.Outlined" aria-label="@($"{context.Source} sütununun alanı")">
+                        @foreach (string field in ServiceAccountImportFields.All) { <MudSelectItem T="string" Value="@field">@field</MudSelectItem> }
+                    </MudSelect>
+                }
+                else { @(context.Target ?? (context.Ignored ? "Yok sayıldı" : "Eşlenmedi")) }
+            </MudTd>
+            <MudTd DataLabel="Not">@(context.Formula ? "Formül (değer okundu) " : "")@context.Note</MudTd>
+        </RowTemplate>
+    </MudTable>
+    @if (Editable)
+    {
+        <MudButton OnClick="RestageAsync" Disabled="Busy" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">Bu eşlemeyle yeniden önizle</MudButton>
+    }
+}
+
+@code {
+    private List<Row> _rows = [];
+    private IReadOnlyList<ImportColumnMapping>? _source;
+
+    /// <summary>Server mapping.</summary>
+    [Parameter] public IReadOnlyList<ImportColumnMapping> Mapping { get; set; } = [];
+
+    /// <summary>Whether the mapping may be edited (generic profile, file still in this session).</summary>
+    [Parameter] public bool Editable { get; set; }
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Re-stage sink.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<ImportColumnMapping>> OnRestage { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_source, Mapping))
+        {
+            _source = Mapping;
+            _rows = [.. Mapping.Select(m => new Row { Source = m.SourceHeader, Target = m.TargetField, Formula = m.Formula, Ignored = m.Ignored, Note = m.Note })];
+        }
+    }
+
+    private Task RestageAsync() => OnRestage.InvokeAsync([.. _rows.Select(r => new ImportColumnMapping(r.Source, r.Target, r.Formula, r.Target is null, r.Note))]);
+
+    private sealed class Row
+    {
+        public string Source { get; set; } = string.Empty;
+        public string? Target { get; set; }
+        public bool Formula { get; set; }
+        public bool Ignored { get; set; }
+        public string? Note { get; set; }
+    }
+}

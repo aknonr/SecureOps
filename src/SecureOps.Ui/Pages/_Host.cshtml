@@ -145,7 +145,23 @@
 
         // MudBlazor 6 puts select attributes on a hidden input, not its keyboard target.
         // Transfer resource field names to that target without replacing its keyboard behavior.
+        var saLabelSequence = 0;
         function labelResourceSelects() {
+            // Service Accounts pages: MudBlazor 6 regenerates label[for] on every render without an input id, so fields
+            // had no accessible name. Give the label a stable id and reference it from the input or select slot.
+            document.querySelectorAll('.sa-page .mud-input-control').forEach(function (control) {
+                var label = control.querySelector('label.mud-input-label');
+                if (!label) { return; }
+                if (!label.id) { label.id = 'sa-label-' + (++saLabelSequence); }
+                var input = control.querySelector('input:not([type="hidden"]), textarea');
+                var slot = control.querySelector('div.mud-input-slot[tabindex="0"]');
+                if (input && input.getAttribute('aria-labelledby') !== label.id) { input.setAttribute('aria-labelledby', label.id); }
+                if (slot && slot.getAttribute('aria-labelledby') !== label.id) {
+                    slot.setAttribute('aria-labelledby', label.id);
+                    slot.setAttribute('role', 'button');
+                    slot.setAttribute('aria-haspopup', 'listbox');
+                }
+            });
             // MudBlazor 6 does not forward dialog attributes to its outer dialog container.
             document.querySelectorAll('[data-sdm-dialog-title]').forEach(function (title) {
                 var dialog = title.closest('[role="dialog"]');

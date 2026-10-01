@@ -1,0 +1,19 @@
+@* The shared failure panel plus the business rule or field the Service Accounts API named. *@
+@using SecureOps.Ui.Services.ServiceAccounts
+
+@if (Problem is not null)
+{
+    <SoProblemPanel Problem="Problem" OnRetry="OnRetry" />
+    @if (ServiceAccountProblems.FieldMessage(Problem) is { } message)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" role="alert">@message</MudAlert>
+    }
+}
+
+@code {
+    /// <summary>Current problem.</summary>
+    [Parameter] public UiProblem? Problem { get; set; }
+
+    /// <summary>Retry handler.</summary>
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

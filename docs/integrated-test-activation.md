@@ -2,6 +2,349 @@
 
 ## Owner exception and baseline
 
+### Release readiness and minimal pilot, 2026-10-01
+
+**NO-GO for deployment.** The retained a457 review has readyForInstallation=false;
+no new package, target action, flag or grant was produced by this readiness work.
+This section supersedes older instructions that treated four newly provisioned
+identities or enabled Worker reminders as prerequisites for a limited API/UI pilot.
+The full four-role matrix remains a later acceptance gate, not silently waived.
+
+Identity reconciliation: tested C# product `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`,
+candidate preparation `20356b542803f9cc14deb7e84cf57e351780f6a6`, previous docs-only
+closeout `52df5d3d40ec9c25f41ef0687e677a2d02f726ab`. Release-readiness preparation
+commit `5d0c293316764937edab9674967b876fd927488b` preserves the exact executed
+script/test edits; runs reported HEAD52 plus those then-uncommitted changes,
+not a new tested C# product SHA. Current readiness changes touch
+release selection, tests and guidance ONLY; src/contracts/build-input comparison
+with a457 is empty. No new product build is required by a runtime source change.
+The three existing ZIP identities/manifests below are retained, not rehashed or
+recreated; their embedded guidance reflects preparation203 and is historical
+where this current entry supersedes it. A later authorized numbered release must
+still publish and validate its EXACT approved source/version; this is not permission
+to relabel existing a457 binaries as that later SHA or to deploy review ZIPs.
+
+Numbered release guard still requires the original combined branch, clean source,
+now explicit ExpectedSource equality and existing per-assembly source checks.
+Get-ReleaseSqlPlan selects 025 ONLY with rc6.26/023, typed true verification/review
+flags, nonempty evidence references and matching hashes for all seven 024/025 DDL/
+dependency/role files. Exact numbered inventory and SQLCMD include closure are
+checked before any publish/directory creation. This records the supplied functional
+023 comparison, NOT an imaginary ledger or full historical installation receipt.
+Packaging review never authorizes target SQL. Old 001-024 releases stay immutable.
+
+New Windows checks on preparation HEAD52 plus the readiness working changes:
+18/18 selector/guard/include/SQLCMD checks; 10/10 SqlAssetContractTests (0 failures,
+0 skips). The latter updates the obsolete 24-file assertion to exact 25 and the
+new 025 filename, without weakening contract checks. The copied selected SQL
+tree installed in fresh LocalDB SecureOps_SaUpgradeRelease1001A: missing024
+refused with51300, injected51399 rolled back the entire module, then024/025 and
+unassigned roles installed with baseline rows/definitions retained. After adding
+the ordinary-file check for role scripts, the 17 selector checks passed again
+(overlap, NOT additional counts). Five modified PowerShell files parsed without
+errors. Calling the actual numbered-release entry on the current integration
+branch was refused before any directory/publish/package, as required. No unchanged
+full suite was repeated.
+Private evidence: C:\SecureOpsBuild\validation\sa-release-readiness-20261001
+(results.json, sql-assets.trx, selected-tree, failure fixture) and sibling.log;
+final selector evidence at sa-release-readiness-selector-final-20261001;
+branch refusal at sa-release-readiness-branch-20261001.log.
+The synthetic review.json used in tests is NOT corporate review/authorization.
+
+| Go/No-Go gate | Observed state | Prepare now | Separate approval / owner and closing evidence |
+|---|---|---|---|
+| SA-SQL-025: target024/025/roles | NO-GO: inspected022/023 match;024 NotVisibleOrAbsent;025/roles not target-verified; normal API rights unknown | Retain comparison; review024 then025/include and API-role script; do not repeat inventory | SQL execution operator (owner): approved change + backup, verified DB/principal mapping; apply024, compare/stop, separately approve025/API role/membership and normal-runtime evidence. Worker-role execution/membership deferred while Worker SA disabled |
+| Backup/recovery point | NO-GO: no current recovery evidence supplied | Plan full DB and coordinated config/API/UI/Worker backups; archive/audit preservation | Operator/change owner: named recoverable point, tested recovery procedure and approved writer/consumer stop |
+| Current runtime identities | NO-GO: older API/console evidence is not current SQL-principal proof; no Windows Service installed | Identify existing IIS AppPool identities and any running console PID/identity/queue read-only; no Worker execution | Runtime/access owner: normal API SQL identity and rights; UI separate ring/identity; console stop/handover if active. No mixed-version consumer or guessed principal |
+| Final payload/security decision | NO-GO: a457 is review-only; no numbered delivery approval | Review retained API/UI/Worker hashes, exclusion/manifests and pinned source; prepare evidence-bound promotion in independent clone | Release/change + security owners: approve exact final payload scope/hash and target operation. Worker execution needs its own binary permission; held SCCM diagnostic approval does not transfer |
+| SA-MIN-PILOT: OIDC/scope | NO-GO: selected existing approved users/bundles/scopes not recorded | Nominate existing TEST access/module administrator and distinct pilot operator; no four-account creation | Access owner: normal OIDC + persisted approval, reviewed View/Work/Report pilot bundle and selected Organization/Team scope; administrator grants another user, not self. No bridge/imported-person authorization |
+| Deployment window / Worker | NO-GO: window and active-console handover unknown | API SA SqlServer/remindersfalse; Worker SA Disabled/remindersfalse; stage matched Worker offline in the future approved plan, no service required for API/UI | Operations/change owner: explicit coordinated stop/install/start window. Do not leave rc6.26 consumer active with new writes; running Worker must be final matched/approved binary. This task starts/stops nothing |
+| Minimum smoke checks | NOT RUN on target | Prepare normal OIDC login, synthetic account/request, allowed scoped read/write/report/XLSX and401/403/hidden-ID denial; desktop Excel | Authorized TEST operator: execute ONLY after release/change, SQL/runtime and scope approvals; retain HTTP/UI/audit/export evidence. No manual reminders/run, mail, SCCM, Jira or In Use source writes |
+| Rollback owner | NO-GO: named rollback/window decision missing | Prepare stop/reconcile, coordinated binary/config restoration; retain024/025/data/outbox/snapshots/audit | Operator/change owner: designate recovery owner and decision point; no DROP/down; old serializers must not write new data; restore only with approved new-data/audit preservation |
+| SA-AUTH-MATRIX / later Worker acceptance | DEFERRED, not passed | Reuse existing approved users for the four-role matrix below; retain reminder/SCM/Excel journeys | Access/runtime owners: distinct role/scope observations; separately authorized Worker schedule/restart and security acceptance. Not required to create four new accounts or enable reminders for minimum API/UI pilot |
+
+Code confirms API ServiceAccountsModule is independent of Hangfire/Worker and UI
+uses the normal API client. Worker registration with ProviderDisabled or
+RemindersEnabled=false adds no schedule/store and makes stale jobs no-op.
+However API reminders/run (Administer) can still explicitly evaluate when the API
+module is enabled: false is a SCHEDULING switch, not an all-execution fence. This
+endpoint is excluded from the first pilot. No code change to this contract.
+Jira-only, IU-05 and SCCM/Falcon remain separate unchanged gates; SA approval is
+not source/Jira/mail activation. The next operator action is a scoped change
+request for the minimum API/UI pilot using existing approved users and the gates
+above, NOT execution of SQL or deployment of these review ZIPs.
+
+### Service Accounts TEST review preparation, 2026-10-01
+
+**Prepared, not installed:** candidate `candidate.json` SHA-256
+`EB7DFB230CBA929957D2FD8A3FDF2856AB12AB3791727D3F508BB86A238D6E14`.
+
+Preparation source: `20356b542803f9cc14deb7e84cf57e351780f6a6`; all three entry
+ProductVersions identify a457a33. Seventeen SQL/guidance files match the support
+manifest; ZIP hashes, entries and dependency closures passed validation.
+
+| Payload | ZIP SHA-256 | Files |
+|---|---|---|
+| API/secureops-api-TEST-a457a33.zip | 467F28C267801391BAF9ED026A090535D306CAAB67C4B8906645F622B5FBF500 | 525 |
+| UI/secureops-ui-TEST-a457a33.zip | 35306E998E8232A8DAD1A2854C646DACFDD5A95ED5AC753FBCA1D58B439E8968 | 542 |
+| WORKER/secureops-worker-TEST-a457a33.zip | 04BA2BAF51595ED6826EF8233D10A8EAFE973060DE7928936CC60112F322FAAB | 531 |
+
+The first publish scanner rejected a NuGet native PDB before ZIP creation.
+Raw staging was preserved, and a separate symbol-free payload view passed the
+UNCHANGED scanner. No runtime configuration, private samples, test outputs or
+security-held diagnostic is in these ZIPs. The generator was explicitly tracked
+despite the repository's broad release-directory ignore; no ignore/scan guard
+was changed. Its later console hash-projection fix does not alter the packages.
+
+Product remains tested `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`; the later
+preparation adds SQLCMD 025/harnesses and delivery guidance, not C# behavior.
+No 025 conflict exists in the inspected local branch/remote-reference inventory.
+Number reservation is LOCAL, not a promise that another writer cannot reserve it.
+024 remains a separate approved delta over observed 022/023. New 025 requires
+024 and includes the unchanged `sql/pending/service-accounts/SA-001-service-accounts.sql`;
+ship that dependency and the separate unassigned API/Worker role scripts.
+
+New disposable Windows evidence: `validation/sa-delivery-20261001` under the
+private build root; sibling `sa-delivery-*-20261001.log` files. Fresh numbered
+001-025 installation passed and replay was refused. Upgrade baseline 001-023
+retained synthetic user/OR/audit rows and column/trigger fingerprints through
+024 then 025. Missing 024 refused 025 before schema creation; injected 51399
+before COMMIT rolled back ALL module tables/triggers/schema. Both fresh and
+upgrade module runs passed 39/39 separately (not summed with previous suites).
+Initial harness attempts failed on an incorrect synthetic seed column and XML
+fingerprint aliases, not product behavior; their logs/databases are retained.
+Harnesses never target existing/shared databases. Linux harness change is not
+Windows-executed Linux evidence. Full a457 regression is reused, not rerun.
+
+| Gate | Current status / exact next evidence |
+|---|---|
+| SA-DELIVERY | Separate matched review destination `C:\SecureOpsBuild\delivery-review\2026-10-01-service-accounts-combined\a457a33`; candidate.json records tested product vs preparation source, ZIP/payload/support hashes. Not numbered or installation-ready; sealed deda848 candidate remains untouched |
+| SA-SQL-025 | Local fresh/upgrade/atomicity gates passed; target execution NOT approved. Operator must approve 024 then 025 and role scripts with backup, verified principal mapping and the stop/rollback procedure in the current operator entry |
+| SA-AUTH-MATRIX | Later full four-role acceptance uses existing approved OIDC TEST identities where available; reviewed bundles/scopes pending. Minimum two-user API/UI pilot is separate above; no accounts/grants created |
+| SA-WINDOWS-ACCEPTANCE | Normal OIDC minimum API/UI/Excel smoke remains unexecuted; full roles/reminder hosting are later gates, not minimum-pilot prerequisites. Synthetic bridge/SQL execution tokens are NOT acceptance |
+| SDM/IU/FALCON | Jira-only one-OR/effective API rights, IU-05 transport and SCCM/Falcon binary permission remain separate; no change to those target gates |
+
+Four-user matrix (bundle names are review proposals, NOT seeded roles):
+
+| User role | Module bundle / persisted scope | Allow | Deny / evidence |
+|---|---|---|---|
+| Administrator | `sa-pilot-admin`: View, Administer; no business scope needed for dictionaries/grants. Existing platform access-management capabilities are separately required for role preview/approval | Organization/team dictionaries, grant another approved user with reason/version | No Work/Assign/Verify/Import/Report; no self-grant. Capture pre-bundle 403, bundle version, reasoned grant audit, denied business call |
+| Coordinator | `sa-pilot-coord`: View, Work, Assign, Verify, Import, Report; Organization scope expands descendants/placed teams | Scoped requests/actions/evidence, ownership, imports and replay, reports/immutable snapshots/XLSX/PDF | No Administer; other organization detail/evidence/export excluded. Capture reviewed preview, commit/replay IDs, saved scope, audit, 8 plans + 2 review outcomes, Review Closure rejection |
+| Assigned member | `sa-pilot-member`: View, Work; Team scope | Confirmed owner-team work; participant works ONLY on its own open targeted request/action and associated evidence | No Verify/Assign/Import/Report/Administer; participant cannot change account ownership or another team's action. Capture request link, UI controls, direct API denials and access loss after participant request ends |
+| Out-of-scope user | Same View/Work bundle; DIFFERENT Team with no owner/request/handover link to tested account | Empty scoped list/summary; global picker labels remain visible by design | Hidden account/evidence inaccessible (404), business writes rejected, capability-only routes 403. Capture list + direct guessed-ID requests, not merely hidden buttons. Before bundle assignment also verify module 403 |
+
+Capability strings are `ServiceAccounts.<name>`. Source: Shared capability/policy
+catalog, Infrastructure ServiceAccountAccessActions, RunAsync/Permissions/
+MutateAccountAsync and Domain ServiceAccountScope. Administer is global module
+administration, not business verification. Visibility via participant/handover
+does not confer ownership authority. Application bundles are distinct from SQL
+runtime roles; no module data or imported person grants access.
+
+Exact conditional SQL/install/acceptance and recovery steps are in the single
+[Turkish operator entry](post-rc626-continuation-tr.md). Existing target evidence
+and unknown normal API permissions remain unchanged; no target call was made.
+
+### Combined follow-up and capability-specific SQL gates, 2026-10-01
+
+Current combined tested source is `a457a33d4fb34a6c21e675b81eed5f23b6ad470f`
+on `feature/service-accounts-pinned-integration-20260929`. The verified
+`b4fdf8d..7e227ed` module delta was integrated ONCE over clean `12027da`;
+the published SDM delivery and original Claude worktrees remain unchanged.
+Review-tagged Closure is fixed; scenario 4 retains eight plans and two review
+requests without inventing performed deletion or verified account closure.
+Two captured SQL deadlocks were addressed separately: synthetic user seeding
+now respects the existing access administration lock; concurrent repository
+scope-grant duplicate reads use UPDLOCK/HOLDLOCK. No retry/sleep was added.
+
+Windows build: 0 warnings/errors. Full unit: 1575 passed. Full normal integration:
+322 passed, 61 opt-ins skipped, 0 failed. Module 39 passes are INCLUDED in 322.
+Separate fresh ResourceSql: 49/49. These are NEW final-source results, not b4
+counts. Earlier 37/1 module and 366/9/7 integration runs, their diagnostics and
+deadlock graphs are preserved; eight of the latter failures were OCO fixture
+prerequisite mismatches and one exposed the scope-grant defect now fixed.
+Full evidence/limitations: [follow-up integration](service-accounts/INTEGRATION-FOLLOWUP-20261001.md).
+Directory index: [build workspace](build-workspace-index.md).
+
+**Correction of the earlier blanket SQL gate below:** the prepared 13-right
+probe covers separate In Use/reporting operations, not Jira-only issue creation.
+Installed rc6.26 and sealed deda848 have no approved executor. No endpoint is
+added; operator SQL, SELECT 1, similar account names and local role tests are
+NOT normal-API permission evidence. All effective target API rights remain unknown.
+
+| Capability / stable ID | Actual dependency and status | Owner / next evidence |
+|---|---|---|
+| Jira-only ServerRequest / SDM-01-SQL | Core requires OperationalRecords, JiraTransfers and CommandExecutions SELECT/INSERT/UPDATE; OperationalRecordWorkflowHistory SELECT/INSERT; OperationEvents SELECT/INSERT for evidence/history; AuditLog INSERT. These are outside the 13-right probe. Inspected 022/023 definitions still match; 024 is NOT a core dependency | API/change owner: retain existing approved runtime-access/configuration evidence, or separately approve a safe normal-process observation method; no executor presently available, no identity/grant changes |
+| Existing authentication/session baseline / ACCESS-SQL | Persisted Users, Roles/RoleAssignments and access-request checks are still required; configured SQL ApplicationSessions needs SELECT/INSERT/UPDATE. No module/pilot role is inferred from claims or SQL session labels | Access/API owner: approved actor and normal configured access/session flow; effective target rights unknown |
+| In Use lifecycle / IU-SQL-022 | Seven probe rights: ServerReviews SELECT/INSERT, Executions SELECT/INSERT/UPDATE, ExecutionEvents SELECT/INSERT. NOT a Jira-only gate | API/source owners: normal-process rights remain unknown; IU-05's three transport contracts remain separate |
+| Management reporting / REPORT-SQL-023 | Six probe rights: WorkflowSnapshots, WorkflowFacts, InUseArchiveReceipts SELECT/INSERT. Snapshot/dashboard/archive-receipt capabilities, NOT core persisted Jira-key verification | API/reporting owner: normal-process rights and later dashboard reconciliation remain pending |
+| In Use catalogue / DB-01-024 | Four scoped objects remain NotVisibleOrAbsent; catalogue SELECT/INSERT would be needed after separately approved 024, not for Jira-only creation | SQL execution operator + release/change owners: existing conditional 024-only procedure; no replay or inferred approval |
+| Service Accounts / SA-INTEGRATION | Follow-up/closure guard integrated, fresh module/role/scenario/report tests pass locally | Integration owner: current source above, separate from sealed SDM candidate; no new package/push |
+| Service Accounts / SA-FIRST-RUN | Captured local deadlocks fixed and tested; older lost-error first-run failures remain unresolved | Module owner: do not equate new passing runs with diagnosis of lost historical output |
+| Service Accounts / SA-PILOT | NOT accepted: approved normal-auth TEST identities, bundles/scopes, allowed authenticated HTTP/browser, restricted Windows principal connections and IIS remain pending | Access/TEST/module owners: WINDOWS-ACCEPTANCE.md; local synthetic SQL tokens and challenge/denial tests are limited evidence |
+
+Core dependency trace: `SqlOperationalRecordRepository` (browsing, evaluation,
+transfer and Evidence partials), `SqlCommandIdempotencyStore`,
+`SqlOperationEvidence`, plus configured persisted access/session repositories.
+No DDL, broad grant or DELETE is justified by this trace. Required permissions
+alone do not prove a corporate write succeeds. Unknown outcomes remain blocked
+across reloads, with no automatic retry; first one-OR acceptance excludes retry.
+024 approval still requires its exact reviewed script/grants, accepted matching
+payload, backup/recovery point and stopped writes. It does not authorize SDM,
+Service Accounts, In Use or Falcon activation. No target operation was performed.
+
+### Independent SQL gate and pinned Service Accounts integration, 2026-09-30
+
+Historical b4-only snapshot; current follow-up and SQL capability split above
+supersede its all-13-as-SDM requirement, not its retained test/target observations.
+
+The approved local integration branch is
+`feature/service-accounts-pinned-integration-20260929`, worktree
+`C:\SecureOpsBuild\secure-ops-sa-pinned-integration-20260929`.
+It starts at published platform `e997c5b68cebcd23716860a9b06fdc25ebbb4493`
+and fast-forwards to pinned Claude handoff
+`b4fdf8d439990032fb5f4c21486030bdb903a27c` (measured module code
+`b8aad7edd68e6e35438ba0b8516ea25dc4e2ad3b`). The new recovery bundle
+contains this ancestor; only that ancestor was integrated. The subsequent
+`bae78b9..7e227ed` follow-up is NOT incorporated. No old `a3037175` Jira
+UI delta was reapplied. Published delivery, original dirty worktrees and
+sealed packages are unchanged. Retained SDM preflight documentation is
+carried forward here without changing either original worktree.
+
+New Windows evidence at the pinned product content: Release build 0 warnings /
+0 errors; unit 1568 passed; normal integration with the fresh module database
+316 passed / 61 opt-ins skipped / 0 failed. The 33 module integration results
+(30 SQL + 3 HTTP composition) are INCLUDED in 316, not added to it. The first
+fresh-database run passed; its safe diagnostics contain only the intentional
+audit-rollback error 51091. A separate new platform database ran ResourceSql
+49/49, including Jira-only and In Use regression. OpenAPI regeneration passed
+1/1; semantic comparison preserves every existing platform path/schema and
+adds 44 module paths, with no semantic change versus the pinned snapshot.
+These results are not corporate/IIS/browser acceptance. Details and bounded
+shared-file review: [Service Accounts integration evidence](service-accounts/INTEGRATION-20260930.md).
+
+The remaining target SQL gate is effective rights in the **normal API SQL
+session**: SELECT/INSERT on the six inspected 022/023 objects and UPDATE on
+`ops.InUseExecutions`. The prepared permission-only query is
+[`Read-SdmApiEffectivePermissions.sql`](../scripts/diagnostics/Read-SdmApiEffectivePermissions.sql).
+It has two metadata result sets and never reads corporate records or probes
+writes. Do not repeat the completed inventory/contract queries. Neither the
+operator session nor `health/persistence` (only SELECT 1) closes this gate.
+Inspected rc6.26/current API diagnostics have no in-process permission executor;
+the query is prepared, not an available endpoint. An approved, separately
+reviewed read-only API-process support operation using the unchanged existing
+connection is required before execution. No runas, EXECUTE AS, new credential,
+identity/permission change, target helper installation or security-held package
+is authorized here. Retain both result sets privately with process/configuration
+provenance; all 13 rights must be 1, and NULL/0 leaves the gate open.
+
+| ID | Status / owner | Exact next action and evidence |
+|---|---|---|
+| SDM-01-SQL | Inspected 022/023 match retained; normal API rights pending / operator + API support owner | Approve the bounded API-process permission query execution path; capture normal-process provenance and two sanitized result sets. No operator impersonation or DML probe |
+| DB-01-024 | Conditional change prepared, NOT authorized/executed / SQL execution operator (owner) + change/release owners | API rights gate, accepted matched payload and separate 024-only change approval; verified backup/recovery point, reviewed 024 DDL/narrow API grants, stopped writes. Any 023 drift or partial/existing 024 stops the change |
+| SA-INTEGRATION | Pinned module integrated and Windows tests passed locally / integration owner | Review pinned-source limitations and remaining allowed HTTP/UI acceptance; no subsequent follow-up, migration number or pilot activation included |
+| SA-FIRST-RUN | Two older isolated failures remain unexplained / Claude | Preserve original missing-message/Unavailable evidence. New first run passed; do not claim that resolves old failures |
+| SA-PILOT | Not accepted / module, access and TEST owners | Approved bundles/scope grants, restricted-runtime Windows execution and real authenticated HTTP/UI journey. Temporary access-wrapper browser evidence remains historical limited evidence |
+
+024 execution is authorized only by a later explicit approved change naming
+the exact reviewed 024 script/grants and accepted matching component payload,
+after the above prerequisites. This task and the read-only results do not
+authorize it. In Use IU-05, Service Accounts pilot and SCCM/Falcon remain
+independent gates; no flags, installation, corporate writes or new package.
+
+### SDM-01 target inventory and read-only SQL result, 2026-09-29
+
+Operator-supplied read-only IIS output captured `2026-09-29T17:19:02.7571230Z`
+identified one started API and one started UI site on the selected TEST host.
+The exact site paths and entry-DLL hashes are retained outside this public
+repository in the private local evidence record
+`C:\SecureOpsBuild\validation\sdm-target-preflight-20260929\iis-entry-evidence.json`.
+Their entry DLLs both report
+`0.1.0+028cbd2e4ec7068d71a33088d7c651e4df21644a` (rc6.26), not the
+matched `deda8486b57c04a23aba203c0e79f96b746102e9` review candidate.
+These are two entry-file observations, not full installed-payload hashes.
+The IIS script initially could not locate `Microsoft.Web.Administration` by
+`Add-Type -AssemblyName`; loading that DLL from its full `inetsrv` path produced
+the successful read-only output. No IIS state was changed.
+
+The Worker has no Windows Service registration in the supplied target check and
+has historically run in a PowerShell console. An empty `Win32_Service` result
+is not a Worker-failure observation. Its current executable/version, console
+owner, active process and handover window are not verified by this IIS result;
+do not start it for this preflight. Jira-only creation runs in the API, so
+Worker service installation is not a prerequisite for the one-OR Jira-only gate.
+
+The operator then supplied screenshots of the three result sets from the
+**read-only** `scripts/diagnostics/Read-SdmTargetSqlPreflight.sql`
+on the reported TEST database (`CapturedAtUtc=2026-09-29T18:51:01.8521670Z`).
+The SQL execution operator confirmed the queried database is the approved TEST
+target. `CanViewDatabaseDefinition=1`. All nine
+022 and ten 023 expected metadata rows
+were `Visible`; the relevant indexes and triggers were enabled. The 022 active
+execution index was unique and filtered on `Active=1`; the 023
+`SourceSynthetic` column was nullable `bit`. All four 024 catalogue rows were
+`NotVisibleOrAbsent`. No possible ledger table appeared in the third result.
+The full server/database identifiers and screenshot transcription remain outside
+this public repository in the private local evidence record
+`C:\SecureOpsBuild\validation\sdm-target-preflight-20260929\sql-object-evidence.json`.
+This is operator-supplied screenshot evidence, not verified original-file
+integrity or a live query by this agent.
+
+Thus 022/023 object presence is observed in the operator-confirmed TEST
+database, while 024 objects are not visible despite database-level definition
+visibility. This is not a migration execution record or proof of runtime
+permissions. The repository has no migration ledger; historical 022/023 logs
+or change notes have not been supplied. Retain them if they exist, otherwise
+record unavailable, not a blocking presumed DBA receipt. No migration may be
+replayed or applied from this evidence.
+
+The operator then supplied pasted result sets 1-5 from
+`scripts/diagnostics/Read-SdmContractDetails.sql` against the approved TEST
+database. Compared with the reviewed `sql/schema/022` and `023` files, the
+queried columns/types/nullability, PK/UQ/CHECK/FK relationships, index key
+order and filters, six trigger definitions and enabled/trusted state match
+semantically. SQL Server-generated names for unnamed constraints, normalized
+CHECK term order and trigger whitespace differ textually but do not change
+the predicates or trigger behavior. No required 022/023 metadata was NULL or
+invisible; NULL defaults, non-applicable definitions and unfiltered-index
+filters were expected. No 024 catalogue metadata appeared in result sets 1-5,
+consistent with the earlier four `NotVisibleOrAbsent` rows. Result set 6 is
+explicitly the operator's SQL session, **not API runtime permission evidence**,
+even though its account label may resemble an API account. The private summary
+is `C:\SecureOpsBuild\validation\sdm-target-preflight-20260929\sql-contract-022-023-evidence.json`;
+the pasted text has no original-file integrity verification and was not queried
+by this agent. The query did not report collations, identity seed/increment,
+FK referential actions or index storage options; no byte-for-byte/full DDL
+equivalence is asserted. The match does not prove the scripts ran verbatim or
+that the API has effective object rights.
+
+The reviewed 022 contract covers unique server reviews, a filtered unique
+active-execution index, state/step checks and immutable review/intent/event
+triggers. The reviewed 023 contract adds nullable `bit` `SourceSynthetic` and
+immutable workflow snapshots, facts and archive receipts. Current API code
+uses SELECT/INSERT on reviews, events and the three reporting tables, plus
+UPDATE on executions. The same read-only contract script can check the 024
+catalogue after a separately approved change. Its permission result is always
+for the current SQL session only. Local syntax/result-shape testing used a
+disposable 001-024 database, not the corporate target.
+
+| ID | Status / owner | Exact next input and gate |
+|---|---|---|
+| SDM-01-IIS | Target entry DLLs verified / TEST IIS operator | Preserve the pasted site/version/hash output; later compare approved full payload, not just entry files |
+| SDM-01-SQL | Approved TEST DB confirmed by operator; queried 022/023 contract semantically matched; 024 absent in scoped metadata; API rights unresolved / SQL execution operator | Obtain effective 022/023 SELECT/INSERT and executions UPDATE rights in the normal API SQL context through an approved read-only method. Result set 6 from the operator session does not close this. Retain historical logs if available, otherwise mark unavailable. Only then review a separately approved 024-only change; no replay |
+| SDM-01-CONFIG | Effective Jira/pilot settings unknown / API + Jira owners | Redacted effective-value/source comparison in the normal API environment; `diagnostics/operations` does not expose these keys. Keep write gates closed and secrets out of evidence |
+| SDM-01-WORKER | Console operating model reported, not service failure / Worker operator | Identify current console owner/process and later handover/rollback responsibility; do not execute Worker or SCCM diagnostics in this preflight |
+| SDM-01-TARGET | Corporate one-OR acceptance unexecuted / business + Jira + platform owners | Select one open TEST ServerRequest OR, exact source ID/fingerprint, approved destination/mapping, actor and Jira-only intent; retain one reviewed preview and controlled outcome |
+| IU-05 | Separate source-contract blocker / source owner | Retain the three existing In Use transport requests; no inference from SDM SQL or IIS evidence |
+| SCCM-SECURITY | Separate Falcon permission gate / Cyber Defense | Exact binary approval and later source journey, not implied by queue or Worker inventory |
+| SA-OWNERSHIP | Separate Claude worktree / Claude + integration owner | No Service Accounts merge, migration numbering or activation in this SDM preflight |
+
+The 2026-09-28 public-visibility/push paragraph below is historical: the owner
+subsequently authorized a normal public push and reported remote tip
+`e997c5b68cebcd23716860a9b06fdc25ebbb4493`. This read-only target work
+does not push or change the published product. Conditional deployment and the
+first one-OR acceptance remain in `docs/post-rc626-continuation-tr.md`; the
+sealed review ZIPs remain review-only, not installation-ready.
+
 ### SDM-01 source handoff and target preflight, 2026-09-28
 
 The integration worktree was clean at `9f4f57d00cdb759ac0be888b9727e0baa34e1246`.
@@ -61,7 +404,9 @@ or Jira pilot/mapping keys. File/web.config inspection is source-layer evidence,
 not an effective-runtime readback when other providers/overrides exist. The
 normal API owner must reconcile these layers without exposing Authorization,
 connection strings or credentials. A NULL SQL metadata result can reflect
-insufficient metadata visibility; DBA uses the authorized inspection identity.
+insufficient metadata visibility; the SQL execution operator uses the authorized
+read-only inspection identity. Historical execution evidence is recorded only
+when actually available; it is not a separate DBA approval prerequisite.
 No current Jira destination or selected
 ServerRequest OR has been inferred.
 
@@ -177,7 +522,7 @@ credentials, key rings and test databases are not deployment ZIP members.
 | SDM-01-COMBINED | Implemented and locally verified / delivery owner | Final source and exact payload evidence above; not installed |
 | SDM-01-TARGET | Unexecuted corporate acceptance / business + Jira + platform owners | Supply one approved open ServerRequest OR code/source ID/current fingerprint, Jira project/issue-type/mapping, actor and explicit Jira-only approval; review live preview before the single create |
 | SDM-01-RELEASE | Matched review ZIPs prepared; promotion not approved / release owner | Resolve exact-branch guard in the existing release procedure through reviewed promotion, without resetting dirty inputs or weakening the rule; obtain target SQL/payload/security review |
-| SDM-01-ROLLBACK | Conditional procedure prepared / operator + DBA + Jira owner | Use current Turkish entry; stop writes and reconcile unknown outcomes, coordinate component versions, retain audit/intents/keys and additive schema |
+| SDM-01-ROLLBACK | Conditional procedure prepared / SQL execution operator + Jira owner | Use current Turkish entry; stop writes and reconcile unknown outcomes, coordinate component versions, retain audit/intents/keys and additive schema |
 
 No selected corporate OR or real preview was fabricated. The existing API
 write gates remain the explicit read-only/controlled-write pair with
@@ -509,7 +854,7 @@ service start or flag change. E-05/E-06/E-07/E-08 remain sealed; no new package.
 | OCO-01 / E-06-SEC-01 | Corporate execution permission; Cyber Defense + SCCM owner | Falcon stop before JSON remains unexplained. Need detection details and reviewed binary-specific permission, then one selected device/service/date journey. No false-positive claim or bypass; queue readiness not retested as connectivity. |
 | MAIL-01 / QA-02 | Unexecuted payload journey and target inputs; authorized runner + messaging owner | Existing preparation/restart safeguards and separate maintenance-end/restart fields retained. Source/MIME/process/SMTP gates remain separate; approved relay, selected immutable self-test and inbox observation still pending. Sending stays disabled. |
 | SDM-01 / RPT-01 | Corporate acceptance/input gap; source/Jira owners + operator | Retain implemented ServerRequest Jira-only guards and persisted-outcome reporting. Select exact destination/actor/intent and compare the same reporting cut. Local intent/manual attestation is not remote closure; no corporate transfer performed. |
-| DB-01 / REL-01 | Target schema and release gate; DBA/release owner | Catalogue 024 still not target-verified installed. 022/023 not replayed. Keep E-08 as the sealed review set; include the narrow correction in the eventual accepted successor, not another ZIP for unchanged blockers. |
+| DB-01 / REL-01 | Target schema and release gate; SQL execution operator/release owner | Catalogue 024 objects are not visible in the approved TEST DB; queried 022/023 contract matched semantically. Effective API rights remain open. 022/023 not replayed. Keep E-08 sealed; do not make another ZIP for unchanged blockers. |
 
 Private evidence: `C:\SecureOpsBuild\validation\inuse-archive-20260922`.
 `archive-comparison.json` records original/raw/XLSX hashes and sheet-level checks;
@@ -1318,7 +1663,7 @@ their full journeys remain unexecuted wherever the next column says pending.
 | E-04 Target version/config/queue / received, limited verification | API/Worker operator | Full payload hashes, selected terminal workflow and new raw paired reports at service handover | Owner-supplied entry ProductVersions 028cbd2, Test Worker identity/path, repaired profile parity, ready queue/one Worker; no new raw capture timestamp |
 | UI-01 System-status usability / local source correction | Developer / authorized test runner | Current payload visual/keyboard/touch/themes/200% evidence under QA-01; no release for this change alone | Narrow Razor/scoped style/presentation tests; installed UI unchanged |
 | QA-02 Process/MIME/SMTP / runner restriction | Authorized test operator | Matching staged publish, fresh synthetic DB/Hangfire 9; run distinct procedures in current Turkish entry; return payload hashes, TRX, browser/zoom/source/SMTP evidence | 54/56 skipped names matched to separate passes; source process and browser MIME still pending |
-| DB-01 Catalogue upgrade / target prerequisite | DBA + release owner | Accepted successor, verified 023 definitions/DBA record, backup and stopped writes; review only packaged 024 and API SELECT/INSERT delta | 024 source and packaging switches inspected; target not accessed |
+| DB-01 Catalogue upgrade / target prerequisite | SQL execution operator + release owner | Accepted successor, effective API 022/023 rights, backup and stopped writes; review only packaged 024 and API SELECT/INSERT delta. Keep historical execution notes if available, otherwise record unavailable | Operator confirmed approved TEST DB; 022/023 queried metadata matches reviewed DDL semantically; 024 not visible; result set 6 is operator-only permissions, not API evidence |
 | REL-01 Scoped matched successor / E-06 review artifacts prepared; final gated | Developer + release owner | Review four matched application/024 ZIPs and manifests; close SEC-01, OPS-02, QA-01/02 and final committed-source gates before numbering/install approval | IU-05 stays disabled without indefinitely blocking independent delivery. rc6.26 and E-05 diagnostic remain immutable |
 | OPS-02 Persistent Worker / implemented locally, SCM acceptance pending | Developer / authorized Windows runner / operations owner | Approved data directory and service-account rights; isolated SCM start/stop/logoff/crash and exact-payload recovery, then controlled console handover | Native service source with unchanged durable effect guards; local non-elevated token, no SCM installation or target change |
 
