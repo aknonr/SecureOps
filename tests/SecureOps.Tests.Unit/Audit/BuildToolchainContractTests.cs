@@ -17,11 +17,11 @@ public sealed class BuildToolchainContractTests
         root.Should().NotBeNull();
         using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(root!.FullName, "global.json")));
         JsonElement sdk = json.RootElement.GetProperty("sdk");
-        sdk.GetProperty("version").GetString().Should().Be("9.0.317");
+        sdk.GetProperty("version").GetString().Should().Be("10.0.112");
         sdk.GetProperty("rollForward").GetString().Should().Be("disable");
         sdk.GetProperty("allowPrerelease").GetBoolean().Should().BeFalse();
         var props = XElement.Load(Path.Combine(root.FullName, "Directory.Build.props"));
-        props.Descendants("TargetFramework").Single().Value.Should().Be("net8.0");
+        props.Descendants("TargetFramework").Single().Value.Should().Be("net10.0");
         props.Descendants("LangVersion").Single().Value.Should().Be("12.0");
         props.Descendants("AnalysisLevel").Single().Value.Should().Be("9.0");
     }

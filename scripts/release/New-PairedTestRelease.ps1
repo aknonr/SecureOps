@@ -148,7 +148,7 @@ try {
     $collector = @(Get-ChildItem -LiteralPath "$destination/diagnostics" -File -Filter '*.zip')
     if ($collector.Count -ne 1) { throw 'Expected one matching collector archive.' }
     $packages += [ordered]@{ component='InUseEvidence'; path="diagnostics/$($collector[0].Name)"; bytes=$collector[0].Length; sha256=(Get-FileHash -LiteralPath $collector[0].FullName).Hash; manifest='diagnostics/payload.sha256'; manifestSha256=(Get-FileHash -LiteralPath "$destination/diagnostics/payload.sha256").Hash }
-    $metadata = [ordered]@{ release=$ReleaseName; branch=$branch; buildSource=$sha; requiredSchema=$sqlPlan.RequiredSchema; upgradeFromVerified018='019-024'; productVersion="0.1.0+$sha"; fileVersion='0.1.0.0'; targetFramework='net8.0'; selfContained=$false; packages=$packages; corporateCallsPerformed=$false; deploymentPerformed=$false; requiredFences=@{ ReadOnlyIntegrationMode=$true; ControlledTestWritesEnabled=$false; SourceCloseEnabled=$false; AnnouncementMailEnabled=$false; InUseCompletionEnabled=$false; InUseAspectLookupEnabled=$false } }
+    $metadata = [ordered]@{ release=$ReleaseName; branch=$branch; buildSource=$sha; requiredSchema=$sqlPlan.RequiredSchema; upgradeFromVerified018='019-024'; productVersion="0.1.0+$sha"; fileVersion='0.1.0.0'; targetFramework='net10.0'; selfContained=$false; packages=$packages; corporateCallsPerformed=$false; deploymentPerformed=$false; requiredFences=@{ ReadOnlyIntegrationMode=$true; ControlledTestWritesEnabled=$false; SourceCloseEnabled=$false; AnnouncementMailEnabled=$false; InUseCompletionEnabled=$false; InUseAspectLookupEnabled=$false } }
     $metadata.sqlUpgradeReview = $sqlPlan.Review
     $metadata.sqlWorkingDirectory = 'DBA delta/sql/migrations; sqlcmd -I -b; verify 024 before separately approved 025; roles separate, no principal assigned'
     $metadata.workerHosting = 'Native Windows Service or console; service installation and acceptance are separate operator gates'
@@ -170,7 +170,7 @@ try {
     }
     $metadata.hangfire = @{ packageVersion=$hangfireVersion; schemaVersion=9; runtimePrepareSchema=$false; installationScriptSha256=(Get-FileHash -LiteralPath $install[0]).Hash }
     $metadata.assemblies = $assemblies
-    $metadata.requiredHost = 'API/UI: Windows x64 IIS Hosting Bundle, NETCore.App 8.0 and AspNetCore.App 8.0; Worker: NETCore.App 8.0, explicit environment, service-owned data directory; no SDK'
+    $metadata.requiredHost = 'API/UI: Windows x64 IIS Hosting Bundle, NETCore.App 10.0 and AspNetCore.App 10.0; Worker: NETCore.App 10.0, explicit environment, service-owned data directory; no SDK'
     $metadata.payloadValidated = $true
     $metadata.readyForInstallation = $false
     $metadata.validationEvidence = 'evidence/validation.json'

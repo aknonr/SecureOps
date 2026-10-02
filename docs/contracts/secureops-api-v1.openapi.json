@@ -10941,7 +10941,7 @@
         "operationId": "Health",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Success"
           }
         }
       }
@@ -10954,7 +10954,7 @@
         "operationId": "AuditStoreHealth",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Success"
           }
         }
       }
@@ -10967,7 +10967,7 @@
         "operationId": "PersistenceHealth",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -10977,7 +10977,7 @@
             }
           },
           "503": {
-            "description": "Service Unavailable",
+            "description": "Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -10997,7 +10997,7 @@
         "operationId": "IdentityProviderHealth",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Success"
           }
         }
       }
@@ -11010,7 +11010,7 @@
         "operationId": "EnterpriseIntegrationHealth",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Success"
           }
         }
       }

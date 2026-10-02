@@ -219,13 +219,11 @@ if (swaggerEnabled)
 
 app.MapControllers();
 RouteHandlerBuilder healthEndpoint = app.MapGet("/api/v1/health", () => Results.Ok(new { status = "Healthy" }))
-    .WithName("Health")
-    .WithOpenApi();
+    .WithName("Health");
 RouteHandlerBuilder auditStoreHealthEndpoint = app.MapGet(
         "/api/v1/health/audit-store",
         (AuditHealthReporter reporter) => Results.Ok(reporter.GetHealth()))
-    .WithName("AuditStoreHealth")
-    .WithOpenApi();
+    .WithName("AuditStoreHealth");
 RouteHandlerBuilder persistenceHealthEndpoint = app.MapGet(
         "/api/v1/health/persistence",
         async (SqlPersistenceHealthReporter reporter, CancellationToken cancellationToken) =>
@@ -237,8 +235,7 @@ RouteHandlerBuilder persistenceHealthEndpoint = app.MapGet(
         })
     .WithName("PersistenceHealth")
     .Produces<SqlPersistenceHealthResponse>(StatusCodes.Status200OK)
-    .Produces<SqlPersistenceHealthResponse>(StatusCodes.Status503ServiceUnavailable)
-    .WithOpenApi();
+    .Produces<SqlPersistenceHealthResponse>(StatusCodes.Status503ServiceUnavailable);
 RouteHandlerBuilder identityProviderHealthEndpoint = app.MapGet(
         "/api/v1/health/identity-provider",
         (Microsoft.Extensions.Options.IOptions<IdentityLookupOptions> options) =>
@@ -249,13 +246,11 @@ RouteHandlerBuilder identityProviderHealthEndpoint = app.MapGet(
                 identityOptions.Provider,
                 string.Equals(identityOptions.Provider, "ActiveDirectory", StringComparison.OrdinalIgnoreCase)));
         })
-    .WithName("IdentityProviderHealth")
-    .WithOpenApi();
+    .WithName("IdentityProviderHealth");
 RouteHandlerBuilder enterpriseIntegrationHealthEndpoint = app.MapGet(
         "/api/v1/health/enterprise-integrations",
         (EnterpriseIntegrationDiagnostics diagnostics) => Results.Ok(diagnostics.Get()))
     .WithName("EnterpriseIntegrationHealth")
-    .WithOpenApi()
     .RequireAuthorization(Policies.AdminOnly);
 
 if (!app.Environment.IsDevelopment())

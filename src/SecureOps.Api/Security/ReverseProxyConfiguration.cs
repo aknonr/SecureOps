@@ -42,7 +42,7 @@ public static class ReverseProxyConfiguration
         options.ForwardedHeaders = settings.ForwardedHeaders.Enabled
             ? ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
             : ForwardedHeaders.None;
-        options.KnownNetworks.Clear();
+        options.KnownIPNetworks.Clear();
         options.KnownProxies.Clear();
 
         foreach (string value in settings.ForwardedHeaders.TrustedProxyIps)
