@@ -2,7 +2,12 @@
 
 ## Combined Source 026 Delta, 2026-10-02
 
-The current inventory is 001-026. **026-service-account-usage-rules** requires reviewed 025 and
+The current inventory is 001-027. **027-admin-service-account-navigation** extends only the
+protected Admin application bundle with module View/Administer, advances role/access versions
+and commits required audit atomically. It changes no SQL runtime grants or module scopes.
+Apply only after separate owner approval; do not replay an already matching bundle.
+
+**026-service-account-usage-rules** requires reviewed 025 and
 includes the retained `pending/service-accounts/SA-002-usage-rules.sql`. It atomically creates
 `svcacct.AccountUsages` and `svcacct.TeamRoles` and their delete-protection triggers; replay is refused.
 The separate `SA-002-API-permissions.sql` grants only SELECT/INSERT/UPDATE on those two tables to

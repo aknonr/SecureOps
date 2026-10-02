@@ -16,12 +16,79 @@ namespace SecureOps.Tests.Integration.ServiceAccounts;
 /// <summary>
 /// Persisted-access composition: the production infrastructure registrations (SQL access repository, SQL audit, the real
 /// <see cref="ApplicationAccessService"/>) and the module registration, against the disposable database. Capabilities come
-/// only from versioned role bundles an administrator creates, and data scope only from module grants. Nothing wraps or
+/// only from versioned role bundles (including amended protected Admin), and data scope only from module grants. Nothing wraps or
 /// substitutes access. Not covered here: the HTTP pipeline and Integrated Security, which the API host enforces at startup.
 /// </summary>
 public sealed class ServiceAccountPersistedAccessSqlTests
 {
     private static readonly CancellationToken _token = CancellationToken.None;
+
+    [ServiceAccountSqlFact]
+    public async Task ProtectedAdmin_OpensModuleAdministration_ButNeedsExplicitScopeAndSeparateOperationalActions()
+    {
+        string connectionString = Environment.GetEnvironmentVariable(ServiceAccountSqlFactAttribute.Variable)!;
+        new SqlConnectionStringBuilder(connectionString).InitialCatalog.Should().StartWith("SecureOps_Sa");
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:SecureOpsDb"] = connectionString,
+            ["Access:RepositoryProvider"] = "SqlServer",
+            ["Audit:Provider"] = "SqlServer",
+            ["Audit:Queue:Enabled"] = "false",
+            ["OperationalRecords:SourceProvider"] = "Disabled",
+            ["Jira:Provider"] = "Disabled",
+            ["ServiceAccounts:Provider"] = "SqlServer"
+        }).Build();
+        ServiceCollection registrations = new();
+        registrations.AddSingleton(configuration);
+        registrations.AddLogging();
+        registrations.AddSecureOpsInfrastructure(configuration);
+        registrations.AddServiceAccounts(configuration);
+        await using ServiceProvider services = registrations.BuildServiceProvider();
+        await using AsyncServiceScope scope = services.CreateAsyncScope();
+        var users = (SqlAccessRepository)scope.ServiceProvider.GetRequiredService<IAccessRepository>();
+        ServiceAccountService module = scope.ServiceProvider.GetRequiredService<ServiceAccountService>();
+        string prefix = "sa-admin-" + Guid.NewGuid().ToString("N")[..10];
+        AccessOperationContext context = new("synthetic", prefix, null);
+        string admin = await PlatformAdminAsync(connectionString, prefix);
+        string secondAdmin = await PlatformAdminAsync(connectionString, prefix + "-second");
+        ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim(ClaimTypes.Name, admin)], "test"));
+        ClaimsPrincipal second = new(new ClaimsIdentity([new Claim(ClaimTypes.Name, secondAdmin)], "test"));
+        ApplicationUser persisted = (await users.GetUserAsync(admin, _token))!;
+        persisted.Capabilities.Intersect(ServiceAccountCapabilities.All).Should()
+            .BeEquivalentTo(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Administer);
+        ServiceAccountMe me = Ok(await module.MeAsync(principal, context, _token));
+        (me.ScopeKind, me.HasScope).Should().Be(("None", false));
+        Ok(await module.GrantsAsync(principal, context, _token));
+        (await module.CreateGrantAsync(principal, context, new CreateScopeGrantRequest(admin, "All", null, null, "Self grant"), users, _token))
+            .Field.Should().Be("selfGrant");
+        (await module.CreateAccountAsync(principal, context, new CreateAccountRequest("SYN-NO-ACTION-" + prefix, null, null, "Synthetic"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden);
+
+        string creatorRole = await BundleAsync(users, admin, prefix + "-creator",
+            [ServiceAccountCapabilities.View, ServiceAccountCapabilities.Assign, ServiceAccountCapabilities.Work]);
+        IReadOnlyList<AccessRoleDefinition> definitions = await users.GetRoleDefinitionsAsync(_token);
+        (string identity, ClaimsPrincipal creator) = await ApprovedAsync(users, admin, prefix + "-creator-user", creatorRole, definitions);
+        Guid org = Ok(await module.SaveOrganizationAsync(principal, context, null, new SaveOrganizationRequest("SYN ADMIN " + prefix, "Department", null), _token));
+        Ok(await module.CreateGrantAsync(principal, context, new CreateScopeGrantRequest(identity, "Organization", org, null, "Synthetic scope"), users, _token));
+        AccountDetail account = Ok(await module.CreateAccountAsync(creator, context, new CreateAccountRequest("SYN-" + prefix, null, org, "Synthetic"), _token));
+        (await module.AccountAsync(principal, context, account.Summary.Id, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
+        Ok(await module.CreateGrantAsync(second, context, new CreateScopeGrantRequest(admin, "All", null, null, "Reviewed synthetic scope"), users, _token));
+        Ok(await module.MeAsync(principal, context, _token)).ScopeKind.Should().Be("All");
+        Ok(await module.AccountAsync(principal, context, account.Summary.Id, _token));
+        (await module.CreateAccountAsync(principal, context, new CreateAccountRequest("SYN-STILL-NO-ACTION-" + prefix, null, org, "Synthetic"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden, "All scope does not grant Assign");
+
+        (string _, ClaimsPrincipal ordinary) = await ApprovedAsync(users, admin, prefix + "-ordinary", "ReadOnly", definitions);
+        ((ClaimsIdentity)ordinary.Identity!).AddClaim(new Claim(ClaimTypes.Role, "Admin"));
+        ((ClaimsIdentity)ordinary.Identity!).AddClaim(new Claim("display_name", "System administrator"));
+        (await module.MeAsync(ordinary, context, _token)).ErrorCode.Should().Be(SaErrors.Forbidden);
+        (await module.GrantsAsync(ordinary, context, _token)).ErrorCode.Should().Be(SaErrors.Forbidden);
+        await using SqlConnection sql = new(connectionString);
+        (await sql.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM svcacct.ScopeGrants WHERE UserId=@id AND GrantedBy=@id", new { id = persisted.Id }))
+            .Should().Be(0);
+        (await sql.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM audit.AuditLog WHERE CorrelationId=@prefix AND Action='ServiceAccount.ScopeGranted'", new { prefix }))
+            .Should().Be(2);
+    }
 
     [ServiceAccountSqlFact]
     public async Task PersistedRoleBundlesAndScopeGrants_DriveTheModule_WithoutAnyAccessWrapper()

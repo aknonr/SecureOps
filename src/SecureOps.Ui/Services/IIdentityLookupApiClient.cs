@@ -1,4 +1,5 @@
 using SecureOps.Shared.Contracts.Identity;
+using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Ui.Services;
 
@@ -7,6 +8,9 @@ namespace SecureOps.Ui.Services;
 /// </summary>
 public interface IIdentityLookupApiClient
 {
+    /// <summary>Searches bounded first/full names without requiring Service Accounts access.</summary>
+    public Task<DirectoryNameSearchResponse> NameSearchAsync(DirectoryNameSearchRequest request, CancellationToken cancellationToken);
+
     /// <summary>
     /// Gets safe metadata about the current API caller.
     /// </summary>

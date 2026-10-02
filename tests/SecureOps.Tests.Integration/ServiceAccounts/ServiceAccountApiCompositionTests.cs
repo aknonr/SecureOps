@@ -16,8 +16,8 @@ namespace SecureOps.Tests.Integration.ServiceAccounts;
 /// <summary>
 /// The module through the application's own API composition (<c>Program</c>): real authentication selection, the
 /// platform capability authorization handler, the real access service and the module registration. The Test-environment
-/// identity bridge only authenticates two fixed identities; module rights come solely from access role bundles, which no
-/// platform role contains. Allowed journeys need the SQL access store, which the host only accepts with Integrated Security
+/// identity bridge only authenticates two fixed identities; module rights come solely from access role bundles. Protected
+/// Admin has navigation/administration only. Allowed data journeys need the SQL access store and explicit scope, with Integrated Security
 /// (Windows runner procedure in docs/service-accounts/WINDOWS-ACCEPTANCE.md). No SQL is touched here.
 /// </summary>
 public sealed class ServiceAccountApiCompositionTests
@@ -41,7 +41,7 @@ public sealed class ServiceAccountApiCompositionTests
     }
 
     [Fact]
-    public async Task PlatformRoles_WithoutModuleBundles_AreForbiddenEverywhere_IncludingAdmin()
+    public async Task AdminNavigation_DoesNotActivateDisabledModuleOrGrantOperationalActions_LeadRemainsForbidden()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
         await ApproveAsync(factory, "demo:platform-admin", "Admin");
@@ -57,11 +57,16 @@ public sealed class ServiceAccountApiCompositionTests
 
             foreach (string route in _moduleReads)
             {
-                (await client.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Forbidden, $"{actor} {route}");
+                bool navigation = route is "/api/v1/service-accounts/me" or "/api/v1/service-accounts/work-summary"
+                    or "/api/v1/service-accounts/accounts" or "/api/v1/service-accounts/reminders";
+                HttpStatusCode expected = actor == DemoApiAuthentication.PlatformAdminActor && navigation
+                    ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden;
+                (await client.GetAsync(route)).StatusCode.Should().Be(expected, $"{actor} {route}");
             }
 
             (await client.PostAsync("/api/v1/service-accounts/scope-grants", JsonContent.Create(new { corporateIdentity = "x", scopeKind = "All", reason = "x" })))
-                .StatusCode.Should().Be(HttpStatusCode.Forbidden, $"{actor} cannot create module scope");
+                .StatusCode.Should().Be(actor == DemoApiAuthentication.PlatformAdminActor ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden,
+                    $"{actor}: page access does not activate the module");
         }
     }
 
@@ -82,7 +87,8 @@ public sealed class ServiceAccountApiCompositionTests
             using HttpClient client = factory.CreateClient();
             client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
             (await client.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode
-                .Should().Be(HttpStatusCode.Forbidden, $"{actor}: identity lookup alone does not open the module search");
+                .Should().Be(actor == DemoApiAuthentication.PlatformAdminActor ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden,
+                    $"{actor}: module search still requires View and activation");
         }
 
         RouteEndpoint endpoint = factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
@@ -120,9 +126,7 @@ public sealed class ServiceAccountApiCompositionTests
             builder.UseSetting("Access:DemoCompatibilityEnabled", "false");
             builder.UseSetting("Audit:Provider", "InMemory");
             builder.UseSetting("IdentityLookup:Provider", "Mock");
-            builder.UseSetting("ServiceAccounts:Provider", "SqlServer");
-            // Module enabled with an unreachable server: every request here is decided before any SQL call.
-            builder.UseSetting("ConnectionStrings:SecureOpsDb", "Server=sql.invalid;Database=SecureOps;Integrated Security=True;Connect Timeout=5");
+            builder.UseSetting("ServiceAccounts:Provider", "Disabled");
         });
 
     /// <summary>Approves a fixed identity with a platform role (same fixture pattern as the platform's API access tests).</summary>

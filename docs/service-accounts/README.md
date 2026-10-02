@@ -1,6 +1,11 @@
 # Service Accounts Module — Design Note
 
-Current combined review (2026-10-02): PR #4 and final PR #6 are integrated with current master/PR #5.
+Owner-approved local correction (2026-10-02): protected Admin navigation and independent
+general AD name search, with explicit scope and no target changes:
+[ADMIN-ACCESS-AND-GENERAL-LOOKUP-20261002.md](ADMIN-ACCESS-AND-GENERAL-LOOKUP-20261002.md).
+Source inventory is now 001-027; the sealed 5264635 packages and prior evidence are unchanged.
+
+Previous combined review (2026-10-02): PR #4 and final PR #6 are integrated with current master/PR #5.
 SQL discovery is 001-026: numbered 025/026 include the retained SA-001/SA-002 payloads;
 grants remain separate and unassigned. See [COMBINED-INTEGRATION-20261002.md](COMBINED-INTEGRATION-20261002.md).
 This is local source verification, not installation or corporate acceptance.

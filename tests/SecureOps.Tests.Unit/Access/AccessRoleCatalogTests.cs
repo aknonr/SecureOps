@@ -1,12 +1,24 @@
 using FluentAssertions;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Shared.Auth;
+using SecureOps.Shared.Contracts.ServiceAccounts;
 using SecureOps.Ui.Auth;
 
 namespace SecureOps.Tests.Unit.Access;
 
 public sealed class AccessRoleCatalogTests
 {
+    [Fact]
+    public void Admin_ModuleNavigationAndAdministration_DoNotGrantOperationalActionsOrScope()
+    {
+        AccessRoleCatalog.GetCapabilities(["Admin"]).Intersect(ServiceAccountCapabilities.All)
+            .Should().BeEquivalentTo(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Administer);
+        foreach (string role in AccessRoleCatalog.RoleCodes.Where(role => role != "Admin"))
+        {
+            AccessRoleCatalog.GetCapabilities([role]).Intersect(ServiceAccountCapabilities.All).Should().BeEmpty();
+        }
+    }
+
     [Fact]
     public void OperationalRoleLabels_AreDisplayOnlyAndMatchReviewedVocabulary()
     {

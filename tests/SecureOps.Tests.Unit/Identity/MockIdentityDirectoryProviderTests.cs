@@ -7,6 +7,20 @@ namespace SecureOps.Tests.Unit.Identity;
 
 public sealed class MockIdentityDirectoryProviderTests
 {
+    [Fact]
+    public async Task NameSearchCandidates_CanBeSelectedForExactLookup_WithTheSameSyntheticProvider()
+    {
+        DirectoryNameSearchResult names = await new MockDirectoryNameSearchProvider()
+            .SearchAsync(DirectoryNameQuery.TryCreate("ayse", out _)!, 10, CancellationToken.None);
+        MockIdentityDirectoryProvider exact = Create(enableUpnLookup: true);
+        foreach (DirectoryNameCandidate candidate in names.Candidates)
+        {
+            DirectoryUserRecord? found = await exact.FindUserAsync(candidate.SamAccountName, CancellationToken.None);
+            found.Should().NotBeNull();
+            found!.DisplayName.Should().Be(candidate.DisplayName);
+        }
+    }
+
     [Theory]
     [InlineData("pam12356")]
     [InlineData("PAM12356")]

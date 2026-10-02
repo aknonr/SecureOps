@@ -3,6 +3,8 @@ param([Parameter(Mandatory)][ValidatePattern('^[A-Za-z]:[\\/]')][string]$OutputD
     [Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{40}$')][string]$TestedProductSource,
     [switch]$ResumeFailedReview,
     [switch]$FromVerifiedMaster,
+    [switch]$ApiUiOnly,
+    [switch]$UpgradeFromInstalled026,
     [Parameter(Mandatory)][string]$SqlUpgradeReview)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -28,14 +30,19 @@ try {
     if (!(& git ls-files -- scripts/release/New-ServiceAccountsTestReview.ps1)) { throw 'Review generator must be tracked.' }
     & git diff --quiet $TestedProductSource HEAD -- src contracts Directory.Build.props Directory.Build.targets Directory.Packages.props global.json NuGet.config
     if ($LASTEXITCODE -ne 0) { throw 'Product inputs differ from tested source; new verification is required.' }
-    $sqlPlan = & "$PSScriptRoot/Get-ReleaseSqlPlan.ps1" -RepositoryRoot $repo -UpgradeFromRc626 -IncludeServiceAccounts `
+    if ($UpgradeFromInstalled026 -and (!$FromVerifiedMaster -or !$ApiUiOnly)) { throw '027 review requires exact master and API/UI-only selection.' }
+    $baseline = if ($UpgradeFromInstalled026) { @{ UpgradeFromInstalled026=$true } } else { @{ UpgradeFromRc626=$true } }
+    $sqlPlan = & "$PSScriptRoot/Get-ReleaseSqlPlan.ps1" -RepositoryRoot $repo @baseline -IncludeServiceAccounts `
         -ExpectedSource $preparation -SqlUpgradeReview $SqlUpgradeReview
-    foreach ($directory in @('API','UI','Worker','manifests','staging/api','staging/ui','staging/worker','payload/api','payload/ui','payload/worker','DBA/sql/migrations','DBA/sql/schema','DBA/sql/pending/service-accounts')) {
+    $directories = @('API','UI','manifests','staging/api','staging/ui','payload/api','payload/ui','DBA/sql/migrations','DBA/sql/schema','DBA/sql/pending/service-accounts','configuration')
+    if (!$ApiUiOnly) { $directories += @('Worker','staging/worker','payload/worker') }
+    foreach ($directory in $directories) {
         $folder = Join-Path $destination $directory
         if (!(Test-Path $folder)) { New-Item -ItemType Directory $folder | Out-Null }
     }
     $payloads = @()
-    foreach ($component in @('Api','Ui','Worker')) {
+    $components = if ($ApiUiOnly) { @('Api','Ui') } else { @('Api','Ui','Worker') }
+    foreach ($component in $components) {
         $lower = $component.ToLowerInvariant()
         $raw = Join-Path $destination "staging/$lower"
         if (!(Test-Path (Join-Path $raw "SecureOps.$component.dll"))) {
@@ -76,19 +83,25 @@ try {
         Copy-Item -LiteralPath "sql/$relative" -Destination (Join-Path $destination "DBA/sql/$relative")
     }
     Copy-Item sql/README.md (Join-Path $destination 'DBA/README.md')
+    Copy-Item "$PSScriptRoot/configuration/AdminLookupRecovery.delta.xml" (Join-Path $destination 'configuration/recovery.delta.xml')
     & "$PSScriptRoot/../powershell/Export-CompletionGuidance.ps1" -OutputDirectory (Join-Path $destination 'operator')
     foreach ($relative in @('docs/service-accounts/WINDOWS-ACCEPTANCE.md','docs/service-accounts/SPEC.md','docs/service-accounts/INTEGRATION-FOLLOWUP-20261001.md',
-        'docs/service-accounts/COMBINED-INTEGRATION-20261002.md')) {
+        'docs/service-accounts/COMBINED-INTEGRATION-20261002.md',
+        'docs/service-accounts/ADMIN-ACCESS-AND-GENERAL-LOOKUP-20261002.md',
+        'docs/service-accounts/ADMIN-LOOKUP-DELIVERY-20261003.md',
+        'docs/service-accounts/ADMIN-LOOKUP-OPERATOR-CHECKLIST-20261003.md')) {
         $target = Join-Path $destination "operator/$relative"
         New-Item -ItemType Directory (Split-Path $target -Parent) -Force | Out-Null
         Copy-Item $relative $target
     }
-    $support = @(Get-ChildItem (Join-Path $destination 'DBA'),(Join-Path $destination 'operator') -File -Recurse | Sort-Object FullName | ForEach-Object {
+    $support = @(Get-ChildItem (Join-Path $destination 'DBA'),(Join-Path $destination 'operator'),(Join-Path $destination 'configuration') -File -Recurse | Sort-Object FullName | ForEach-Object {
         [ordered]@{path=$_.FullName.Substring($destination.Length+1).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash}
     })
+    $sequence = if ($UpgradeFromInstalled026) { @('preserve installed 024-026; verify baseline','027 only if not already satisfied','API grant scripts are existing references, not replay or membership commands') } else { @('024 after verified 023','025 if missing','026 after 025','separate reviewed API/Worker roles and 026 API grants') }
     $record = [ordered]@{kind='Matched TEST review candidate, not a numbered release';readyForInstallation=$false;
         testedProductSource=$TestedProductSource;preparationSource=$preparation;requiredSchema=$sqlPlan.RequiredSchema;
-        sqlReview=$sqlPlan.Review;sqlSequence=@('024 after verified 023','025 if missing','026 after 025','separate reviewed API/Worker roles and 026 API grants');
+        sqlReview=$sqlPlan.Review;sqlSequence=$sequence;components=$components;
+        operatorEntry='operator/docs/service-accounts/ADMIN-LOOKUP-OPERATOR-CHECKLIST-20261003.md';
         targetChanged=$false;corporateAcceptance='Not executed';payloads=$payloads;supportingFiles=$support;
         exclusions=@('appsettings*.json','web.config','secrets','private evidence','local test outputs','diagnostic package');
         releaseGuard='Numbered release requires the existing combined branch, clean exact ExpectedSource and explicit source-bound 023/024/025/026 SQL review; not run'}

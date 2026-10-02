@@ -3,12 +3,14 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix,
+    [ValidateRange(26, 27)]
+    [int]$ThroughMigration = 27,
     [switch]$SkipRoleScripts
 )
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-026), verifies module replay refusal, and
+# numbered migrations in order (now 001-027), verifies module replay refusal, and
 # (unless -SkipRoleScripts) the two unnumbered role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
@@ -30,7 +32,7 @@ function Invoke-SaSql {
 Invoke-SaSql -Database master -Query "IF DB_ID(N'$database') IS NOT NULL THROW 51000, 'Refuse existing database.', 1; CREATE DATABASE [$database];"
 Push-Location (Join-Path $root 'sql\migrations')
 try {
-    Get-ChildItem -File -Filter '*.sql' | Sort-Object Name | ForEach-Object {
+    Get-ChildItem -File -Filter '*.sql' | Where-Object { [int]$_.Name.Substring(0, 3) -le $ThroughMigration } | Sort-Object Name | ForEach-Object {
         Invoke-SaSql -Database $database -File $_.Name
         Write-Host "applied $($_.Name)"
     }

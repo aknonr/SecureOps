@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using SecureOps.Shared.Contracts.Identity;
+using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Ui.Services;
 
@@ -32,6 +33,25 @@ public sealed class IdentityLookupApiClient : IIdentityLookupApiClient
     /// <inheritdoc />
     public Task<IdentityProviderHealthResponse> GetProviderHealthAsync(CancellationToken cancellationToken) =>
         GetAsync<IdentityProviderHealthResponse>("api/v1/health/identity-provider", cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<DirectoryNameSearchResponse> NameSearchAsync(DirectoryNameSearchRequest request, CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsJsonAsync("api/v1/identity/name-search", request, ApiResponseReader.JsonOptions, cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        {
+            throw ApiResponseReader.ToTransportException(exception, cancellationToken);
+        }
+
+        using (response)
+        {
+            return await ApiResponseReader.ReadOrThrowAsync<DirectoryNameSearchResponse>(response, cancellationToken);
+        }
+    }
 
     /// <inheritdoc />
     public async Task<IdentityLookupResponse> LookupAsync(

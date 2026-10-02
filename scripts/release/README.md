@@ -1,5 +1,23 @@
 # API Release Packaging
 
+## Admin / Lookup 027 API/UI Review
+
+For this correction, `New-ServiceAccountsTestReview.ps1 -FromVerifiedMaster
+-ApiUiOnly -UpgradeFromInstalled026 -TestedProductSource <verified-master-SHA>
+-SqlUpgradeReview <private-source-bound-review.json> -OutputDirectory <new-directory>`
+retains exact/clean master, source identity, dependency/payload/hash and destination
+guards. It exports only migration/schema 027 plus existing API grant references;
+installed 024-026 are never replayed. No Worker is built or packaged. The review
+uses `wasas.sql-upgrade-review.v1`, the exact source, typed-true
+`Baseline026Verified` / `AdminNavigation027Reviewed`, nonempty
+`Baseline026EvidenceReference` / `AdminNavigation027ReviewReference`, and exact
+hashes for the two 027 files plus SA-API-permissions and SA-002-API-permissions.
+Baseline evidence can be isolated local proof for a NOT-installation-approved
+candidate; it never asserts target SQL was observed/applied. Legacy selection
+still refuses a 027 inventory. Missing, false, stale or changed inputs fail closed.
+The candidate includes the reviewed recovery fragment (no full runtime config)
+and one current operator checklist. `readyForInstallation` remains false.
+
 ## Combined 026 Review Candidate
 
 The current SQL closure is 001-026. Explicit Service Accounts selection requires source-bound

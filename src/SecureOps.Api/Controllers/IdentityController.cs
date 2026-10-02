@@ -21,7 +21,7 @@ namespace SecureOps.Api.Controllers;
 [ApiController]
 [Route("api/v1/identity")]
 [Authorize]
-public sealed class IdentityController : ControllerBase
+public sealed partial class IdentityController : ControllerBase
 {
     private static readonly string[] _returnedFields =
     [

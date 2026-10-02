@@ -88,7 +88,10 @@ public sealed class MockIdentityDirectoryProvider : IIdentityDirectoryProvider
                 "Example Manager",
                 true,
                 false,
-                "Mock")
+                "Mock"),
+            .. MockDirectoryNameSearchProvider.DefaultUsers().Select(user => new DirectoryUserRecord(
+                user.DisplayName, user.SamAccountName, user.SamAccountName + "@example.invalid", null,
+                user.Department, null, null, null, null, "Mock"))
         ];
     }
 }

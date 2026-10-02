@@ -1,0 +1,7 @@
+<!-- Reviewed replacement fragment, not a deployable web.config. Replace existing entries; never append duplicates. -->
+<!-- Recovery is handled by the operator separately. Preserve all other runtime-owned settings. -->
+<environmentVariables>
+  <environmentVariable name="OperationalRecords__ReadOnlyIntegrationMode" value="true" />
+  <environmentVariable name="OperationalRecords__ControlledTestWritesEnabled" value="false" />
+  <environmentVariable name="OperationalRecords__SourceCloseEnabled" value="false" />
+</environmentVariables>
