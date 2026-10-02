@@ -12,6 +12,9 @@ public sealed class ServiceAccountUsageUiTests
     [InlineData("databaseEngine", "Veritabanı motoru")]
     [InlineData("needVerified", "Windows servisi")]
     [InlineData("role", "yürütücü ekip")]
+    [InlineData("NameQueryTooShort", "en az 3 harf")]
+    [InlineData("NameQueryCharacters", "joker karakter kabul edilmez")]
+    [InlineData("identityLookup", "kimlik sorgulama yetkisi")]
     public void UsageAndTeamRoleFields_AreExplainedInTurkish(string field, string expected)
     {
         UiProblem problem = UiProblemFactory.FromResponse(400, new ProblemDetailsPayload { Code = "ServiceAccountValidationFailed", Fields = [field] });
@@ -42,6 +45,20 @@ public sealed class ServiceAccountUsageUiTests
         view.Should().Contain("bölümleri bu sürümde yoktur");
         Ui("Pages", "ServiceAccounts", "ServiceAccountReports.razor").Should().Contain("Nüsha karşılaştırma");
         Ui("Pages", "ServiceAccounts", "ServiceAccountAdmin.razor").Should().Contain("gMSA yönlendirme ayarı").And.Contain("Bu ayar erişim vermez");
+    }
+
+    [Fact]
+    public void DirectoryNameSearch_IsGated_ExplainsItsLimits_AndKeepsExactLookup()
+    {
+        string panel = Ui("Shared", "Components", "ServiceAccounts", "SaDirectoryNameSearch.razor");
+        string list = Ui("Pages", "ServiceAccounts", "ServiceAccountList.razor");
+
+        list.Should().Contain("@if (Can(Capabilities.IdentityLookup))").And.Contain("HttpMethod.Post, \"/directory/name-search\"");
+        panel.Should().Contain("Seçim yetki vermez, hesap sahipliğini onaylamaz ve dizinde değişiklik yapmaz");
+        panel.Should().Contain("href=\"identity-lookup\"", "exact account lookup stays available");
+        panel.Should().Contain("context.ServiceAccountId is { } id").And.Contain("Kapsamınızda kayıt yok");
+        panel.Should().NotContain("UserPrincipalName").And.NotContain("Mail").And.NotContain("Manager");
+        UiProblemFactory.FromResponse(503, new ProblemDetailsPayload { Code = "ServiceAccountDirectoryUnavailable" }).Title.Should().Be("Dizine şu an ulaşılamıyor");
     }
 
     private static string Ui(params string[] path) => File.ReadAllText(Path.Combine([Root(), "src", "SecureOps.Ui", .. path]));
