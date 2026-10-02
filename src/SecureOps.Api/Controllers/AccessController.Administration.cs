@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using SecureOps.Api.Security;
 using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Audit;
@@ -76,6 +78,7 @@ public sealed partial class AccessController
 
     /// <summary>Previews the current effective impact of a proposed definition.</summary>
     [HttpPost("roles/preview")]
+    [EnableRateLimiting(ApiRateLimits.AccessAdministration)]
     [Authorize(Policy = Policies.CanManageUsers)]
     [Authorize(Policy = Policies.CanAssignRoles)]
     [ProducesResponseType(typeof(AccessRoleImpact), StatusCodes.Status200OK)]
@@ -84,6 +87,7 @@ public sealed partial class AccessController
 
     /// <summary>Applies only the exact reviewed definition/assignment impact.</summary>
     [HttpPut("roles")]
+    [EnableRateLimiting(ApiRateLimits.AccessAdministration)]
     [Authorize(Policy = Policies.CanManageUsers)]
     [Authorize(Policy = Policies.CanAssignRoles)]
     [ProducesResponseType(typeof(AccessRoleImpact), StatusCodes.Status200OK)]

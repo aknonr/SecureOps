@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SecureOps.Api.Middleware;
 using SecureOps.Api.Security;
 using SecureOps.Domain.Access;
@@ -81,6 +82,7 @@ public sealed class SessionsController : ControllerBase
 
     /// <summary>Revokes one exact active application session.</summary>
     [HttpPost("revoke")]
+    [EnableRateLimiting(ApiRateLimits.AccessAdministration)]
     [Authorize(Policy = Policies.CanManageUsers)]
     [ProducesResponseType(typeof(ApplicationSessionEndedResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]

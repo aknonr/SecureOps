@@ -34,6 +34,36 @@ public static class ApiRateLimits
     public const string JiraCreate = "JiraCreate";
     /// <summary>Failed workflow retry command.</summary>
     public const string WorkflowRetry = "WorkflowRetry";
+    /// <summary>Session revocation and access decisions.</summary>
+    public const string AccessAdministration = "AccessAdministration";
+
+    /// <summary>Rejects missing or non-positive limits at startup instead of failing per request.</summary>
+    public static void Validate(RateLimitingOptions options)
+    {
+        foreach (System.Reflection.PropertyInfo property in typeof(RateLimitingOptions).GetProperties())
+        {
+            if (property.GetValue(options) is OperationRateLimitOptions limit
+                && (limit.PermitLimit < 1 || limit.WindowSeconds < 1))
+            {
+                throw new InvalidOperationException($"RateLimiting:{property.Name} needs a positive PermitLimit and WindowSeconds.");
+            }
+        }
+    }
+
+    /// <summary>Per-actor partition for the global limiter; anonymous callers are partitioned by remote address.</summary>
+    public static RateLimitPartition<string> GlobalPartition(HttpContext context, OperationRateLimitOptions options)
+    {
+        string key = context.User.Identity?.IsAuthenticated == true
+            ? "actor|" + (context.User.Identity.Name ?? "authenticated-unknown").ToLowerInvariant()
+            : "anonymous|" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = options.PermitLimit,
+            Window = TimeSpan.FromSeconds(options.WindowSeconds),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        });
+    }
 
     /// <summary>Builds an authenticated actor and operation partition.</summary>
     public static RateLimitPartition<string> Partition(HttpContext context, string operation, OperationRateLimitOptions options)
