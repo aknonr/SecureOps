@@ -39,7 +39,7 @@ function Assert-Refusal([string]$Name, [scriptblock]$Action, [string]$Expected) 
 $args025 = @{RepositoryRoot=$root; ExpectedSource=$source; UpgradeFromRc626=$true; IncludeServiceAccounts=$true; SqlUpgradeReview=$reviewPath}
 Save-Review
 $plan = & $helper @args025
-Assert-Case 'Explicit reviewed 024/025 selection excludes installed 022/023' {
+Assert-Case 'Explicit reviewed 024/025/026 selection excludes installed 022/023' {
     if ($plan.RequiredSchema -cne '001-026' -or $plan.DeltaRange -cne '024-026' -or $plan.DeltaFiles.Count -ne 8 -or
         @($plan.DeltaFiles | Where-Object { $_ -match '/02[23]-' }).Count -ne 0 -or $plan.RoleFiles.Count -ne 3) { throw 'Wrong upgrade selection.' }
 }
@@ -90,7 +90,7 @@ Assert-Case 'Release branch, source and clean-tree guards retained before publis
 if ($VerifySqlCmd) {
     & (Join-Path $root 'tests/sql/service-accounts/sa-upgrade-harness.ps1') -DatabaseSuffix $DatabaseSuffix `
         -EvidenceDirectory $evidence -SqlAssetRoot (Join-Path $fixture 'sql')
-    $results.Add([pscustomobject]@{Case='Selected-tree SQLCMD: missing 024, atomic rollback, successful 024 then 025';Result='PASS'})
+    $results.Add([pscustomobject]@{Case='Selected-tree SQLCMD: 024/025/026 dependencies, atomic rollback, upgrade, replay and restricted roles';Result='PASS'})
 }
 [IO.File]::WriteAllText((Join-Path $evidence 'results.json'), ($results | ConvertTo-Json -Depth 5))
 $results

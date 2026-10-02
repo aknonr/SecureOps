@@ -8,6 +8,7 @@ using SecureOps.Shared.Contracts.ServiceAccounts;
 namespace SecureOps.Tests.Integration.ServiceAccounts;
 
 /// <summary>Bounded directory name search (ADR-0025) with a synthetic directory and the real module repository and audit.</summary>
+[Collection(ServiceAccountTeamRoleCollection.Name)]
 public sealed class ServiceAccountDirectorySearchSqlTests
 {
     private static readonly CancellationToken _token = CancellationToken.None;

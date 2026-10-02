@@ -91,7 +91,7 @@ try {
         sqlReview=$sqlPlan.Review;sqlSequence=@('024 after verified 023','025 if missing','026 after 025','separate reviewed API/Worker roles and 026 API grants');
         targetChanged=$false;corporateAcceptance='Not executed';payloads=$payloads;supportingFiles=$support;
         exclusions=@('appsettings*.json','web.config','secrets','private evidence','local test outputs','diagnostic package');
-        releaseGuard='Numbered release requires the existing combined branch, clean exact ExpectedSource and explicit source-bound 023/024/025 SQL review; not run'}
+        releaseGuard='Numbered release requires the existing combined branch, clean exact ExpectedSource and explicit source-bound 023/024/025/026 SQL review; not run'}
     [IO.File]::WriteAllText((Join-Path $destination 'candidate.json'), ($record | ConvertTo-Json -Depth 9), [Text.UTF8Encoding]::new($false))
     Write-Output ($payloads | ForEach-Object { [pscustomobject]$_ } | Select-Object component,path,sha256,entrySha256 | ConvertTo-Json)
 } finally { Pop-Location }
