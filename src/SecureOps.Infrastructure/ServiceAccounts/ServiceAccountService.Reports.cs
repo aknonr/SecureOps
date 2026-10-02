@@ -139,8 +139,15 @@ public sealed partial class ServiceAccountService
                         a.OpenRequests, new ReportCell(Date: a.NearestDue), a.Status, new ReportCell(Date: a.LastObservedOn),
                         a.LastPresence == "NotPresent" ? "Yok" : a.LastPresence is null ? "" : "Var"])])
             ], now);
-            await repository.AuditReadAsync("AccountsExported", new { Rows = page.Total, query.Status, query.OrganizationId, query.TeamId, query.MyTeam,
-                Search = query.Search is not null }, caller.Actor, cancellationToken);
+            await repository.AuditReadAsync("AccountsExported", new
+            {
+                Rows = page.Total,
+                query.Status,
+                query.OrganizationId,
+                query.TeamId,
+                query.MyTeam,
+                Search = query.Search is not null
+            }, caller.Actor, cancellationToken);
             return new ReportExport($"servis-hesaplari-liste-{ReportCalendar.LocalDate(now):yyyy-MM-dd}.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ReportWorkbookWriter.Write(document));
         }, cancellationToken);

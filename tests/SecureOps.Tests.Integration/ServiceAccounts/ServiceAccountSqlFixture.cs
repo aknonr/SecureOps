@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using System.Collections.Concurrent;
+using System.Security.Claims;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using SecureOps.Domain.Access;

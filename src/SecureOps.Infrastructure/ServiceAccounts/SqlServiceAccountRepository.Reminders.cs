@@ -42,7 +42,14 @@ public sealed partial class SqlServiceAccountRepository
                 WHERE NOT EXISTS (SELECT 1 FROM svcacct.ReminderOutbox WITH (UPDLOCK, HOLDLOCK) WHERE IdempotencyKey = @key);
                 """, new
             {
-                request.RequestId, request.AccountId, due.RuleCode, due.DueDate, Channel = due.Channel.ToString(), key, request.TargetTeamId, now,
+                request.RequestId,
+                request.AccountId,
+                due.RuleCode,
+                due.DueDate,
+                Channel = due.Channel.ToString(),
+                key,
+                request.TargetTeamId,
+                now,
                 payload = JsonSerializer.Serialize(new { due.Message, Rule = ReminderRules.Label(due.RuleCode), Account = request.AccountName })
             }, transaction, cancellationToken));
         }

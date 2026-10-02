@@ -35,10 +35,22 @@ public sealed partial class SqlServiceAccountRepository
                     @Scope, @MeaningfulReply, @now, @UserId, @now, @UserId);
                 """, new
             {
-                id, provider, Direction = direction.ToString(), Kind = kind.ToString(),
-                OccurredOn = request.OccurredAt is { } at ? ReportCalendar.LocalDate(at) : request.OccurredOn, request.OccurredAt, precision,
-                request.ContactTeamId, request.ContactPersonId, Subject = ServiceAccountText.Clean(request.Subject), Summary = ServiceAccountText.Clean(request.Summary),
-                Link = ServiceAccountText.Clean(request.Link), Scope = request.AccountIds.Count == 0 ? "Team" : "Account", request.MeaningfulReply, now, actor.UserId
+                id,
+                provider,
+                Direction = direction.ToString(),
+                Kind = kind.ToString(),
+                OccurredOn = request.OccurredAt is { } at ? ReportCalendar.LocalDate(at) : request.OccurredOn,
+                request.OccurredAt,
+                precision,
+                request.ContactTeamId,
+                request.ContactPersonId,
+                Subject = ServiceAccountText.Clean(request.Subject),
+                Summary = ServiceAccountText.Clean(request.Summary),
+                Link = ServiceAccountText.Clean(request.Link),
+                Scope = request.AccountIds.Count == 0 ? "Team" : "Account",
+                request.MeaningfulReply,
+                now,
+                actor.UserId
             }, transaction, cancellationToken));
         }
 
@@ -85,11 +97,24 @@ public sealed partial class SqlServiceAccountRepository
                 WHERE EXISTS (SELECT 1 FROM svcacct.Accounts WHERE Id = @AccountId);
                 """, new
             {
-                id, request.AccountId, Server = ServiceAccountText.Clean(request.Server), ComponentType = ServiceAccountText.Clean(request.ComponentType),
-                ComponentName = ServiceAccountText.Clean(request.ComponentName), Environment = ServiceAccountText.Clean(request.Environment), request.ScanAt,
-                ScanOn = request.ScanAt is { } at ? ReportCalendar.LocalDate(at) : request.ScanOn, request.ScanResult, request.MatchResult,
-                CoverageWindow = ServiceAccountText.Clean(request.CoverageWindow), EvidenceNote = ServiceAccountText.Clean(request.EvidenceNote), request.OwningTeamId,
-                request.Status, JobReference = ServiceAccountText.Clean(request.JobReference), Notes = ServiceAccountText.Clean(request.Notes), now, actor.UserId
+                id,
+                request.AccountId,
+                Server = ServiceAccountText.Clean(request.Server),
+                ComponentType = ServiceAccountText.Clean(request.ComponentType),
+                ComponentName = ServiceAccountText.Clean(request.ComponentName),
+                Environment = ServiceAccountText.Clean(request.Environment),
+                request.ScanAt,
+                ScanOn = request.ScanAt is { } at ? ReportCalendar.LocalDate(at) : request.ScanOn,
+                request.ScanResult,
+                request.MatchResult,
+                CoverageWindow = ServiceAccountText.Clean(request.CoverageWindow),
+                EvidenceNote = ServiceAccountText.Clean(request.EvidenceNote),
+                request.OwningTeamId,
+                request.Status,
+                JobReference = ServiceAccountText.Clean(request.JobReference),
+                Notes = ServiceAccountText.Clean(request.Notes),
+                now,
+                actor.UserId
             }, transaction, cancellationToken)), cancellationToken);
     }
 
@@ -115,8 +140,20 @@ public sealed partial class SqlServiceAccountRepository
                         CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
                     SELECT @id, @accountId, @SourceTeamId, @TargetTeamId, @ConsumerTeamId, @CohortLabel, @ProposedOn, 'Proposed', @Note, @sourceKey, @now, @UserId, @now, @UserId
                     WHERE EXISTS (SELECT 1 FROM svcacct.Accounts WHERE Id = @accountId);
-                    """, new { id, accountId, request.SourceTeamId, request.TargetTeamId, request.ConsumerTeamId, CohortLabel = ServiceAccountText.Clean(request.CohortLabel),
-                    request.ProposedOn, Note = ServiceAccountText.Clean(request.Note), sourceKey, now, actor.UserId }, transaction, cancellationToken));
+                    """, new
+                {
+                    id,
+                    accountId,
+                    request.SourceTeamId,
+                    request.TargetTeamId,
+                    request.ConsumerTeamId,
+                    CohortLabel = ServiceAccountText.Clean(request.CohortLabel),
+                    request.ProposedOn,
+                    Note = ServiceAccountText.Clean(request.Note),
+                    sourceKey,
+                    now,
+                    actor.UserId
+                }, transaction, cancellationToken));
                 if (inserted == 1 && request.TrackGmsa)
                 {
                     await connection.ExecuteAsync(Cmd("""
@@ -136,8 +173,17 @@ public sealed partial class SqlServiceAccountRepository
             connection.ExecuteAsync(Cmd("""
                 UPDATE svcacct.Handovers SET Status = @Status, DecidedOn = @DecidedOn, DecidedBy = @UserId, DecisionNote = @Note, UpdatedAt = @now, UpdatedBy = @UserId
                 WHERE Id = @id AND AccountId = @accountId AND Status = 'Proposed' AND RowVer = @RowVer;
-                """, new { Status = accept ? "Accepted" : "Rejected", request.DecidedOn, actor.UserId, Note = request.Note.Trim(), now, id, accountId,
-                RowVer = Version(request.ExpectedVersion) }, transaction, cancellationToken)), cancellationToken);
+                """, new
+            {
+                Status = accept ? "Accepted" : "Rejected",
+                request.DecidedOn,
+                actor.UserId,
+                Note = request.Note.Trim(),
+                now,
+                id,
+                accountId,
+                RowVer = Version(request.ExpectedVersion)
+            }, transaction, cancellationToken)), cancellationToken);
 
     /// <summary>Updates gMSA suitability/plan/completion; completion must reference a valid gMSA conversion action.</summary>
     public Task<SaResult<Guid>> UpdateTransitionAsync(Guid accountId, Guid id, TransitionUpdateRequest request, SaActor actor, CancellationToken cancellationToken) =>
@@ -150,8 +196,18 @@ public sealed partial class SqlServiceAccountRepository
                 WHERE Id = @id AND AccountId = @accountId AND RowVer = @RowVer
                   AND (@CompletedActionId IS NULL OR EXISTS (SELECT 1 FROM svcacct.ActionEvents e WHERE e.Id = @CompletedActionId AND e.AccountId = @accountId
                         AND e.ActionType = 'GmsaConversion' AND e.Result IN ('Performed','Verified') AND e.VoidedAt IS NULL));
-                """, new { request.Suitability, DecisionNote = ServiceAccountText.Clean(request.DecisionNote), actor.UserId, now, request.PlannedOn, request.CompletedActionId,
-                id, accountId, RowVer = Version(request.ExpectedVersion) }, transaction, cancellationToken)), cancellationToken);
+                """, new
+            {
+                request.Suitability,
+                DecisionNote = ServiceAccountText.Clean(request.DecisionNote),
+                actor.UserId,
+                now,
+                request.PlannedOn,
+                request.CompletedActionId,
+                id,
+                accountId,
+                RowVer = Version(request.ExpectedVersion)
+            }, transaction, cancellationToken)), cancellationToken);
 
     /// <summary>Stores immutable evidence bytes anchored to an account (or a team for team-scope communications).</summary>
     public Task<SaResult<Guid>> AddEvidenceAsync(string ownerType, Guid ownerId, Guid? accountId, Guid? scopeTeamId, string fileName, string contentType,

@@ -61,8 +61,20 @@ public sealed partial class SqlServiceAccountRepository
                     @LegacyReference, @LegacyDisplayId, @MigrationKey, @now, @UserId, @now, @UserId);
                 """, new
             {
-                account.Id, account.Name, account.NameKey, account.Domain, account.DomainKey, account.IdentityKey, account.OrganizationId, account.ConsumerTeamId,
-                account.Notes, account.LegacyReference, LegacyDisplayId = Truncate(account.LegacyDisplayId, 32), account.MigrationKey, now, actor.UserId
+                account.Id,
+                account.Name,
+                account.NameKey,
+                account.Domain,
+                account.DomainKey,
+                account.IdentityKey,
+                account.OrganizationId,
+                account.ConsumerTeamId,
+                account.Notes,
+                account.LegacyReference,
+                LegacyDisplayId = Truncate(account.LegacyDisplayId, 32),
+                account.MigrationKey,
+                now,
+                actor.UserId
             });
         }
 
@@ -101,9 +113,19 @@ public sealed partial class SqlServiceAccountRepository
                     WHERE Id = @AccountId AND CurrentOwnerTeamId IS NULL AND CurrentOwnerPersonId IS NULL;
                 """, new
             {
-                ownership.Id, ownership.AccountId, ownership.TeamId, ownership.PersonId, State = ownership.State.ToString(), Source = Truncate(ownership.Source, 300),
-                actor.UserId, now, DecidedBy = confirm ? actor.UserId : (Guid?)null, DecidedAt = confirm ? now : (DateTimeOffset?)null,
-                Reason = confirm ? "İçe aktarma kararında yetkili onay" : null, ownership.SourceKey, confirm
+                ownership.Id,
+                ownership.AccountId,
+                ownership.TeamId,
+                ownership.PersonId,
+                State = ownership.State.ToString(),
+                Source = Truncate(ownership.Source, 300),
+                actor.UserId,
+                now,
+                DecidedBy = confirm ? actor.UserId : (Guid?)null,
+                DecidedAt = confirm ? now : (DateTimeOffset?)null,
+                Reason = confirm ? "İçe aktarma kararında yetkili onay" : null,
+                ownership.SourceKey,
+                confirm
             });
         }
 
@@ -119,9 +141,20 @@ public sealed partial class SqlServiceAccountRepository
                     VALUES(NEWID(), @AccountId, @Id, 'gMSA', 'Unknown', @now, @UserId, @now, @UserId);
                 """, new
             {
-                handover.Id, handover.AccountId, handover.SourceTeamId, handover.TargetTeamId, handover.ConsumerTeamId, BatchId = batch.Id,
-                CohortLabel = Truncate(handover.CohortLabel, 200), handover.ProposedOn, SourceNote = Truncate(handover.SourceNote, 1000), handover.SourceKey,
-                handover.LegacyReference, handover.TrackGmsa, now, actor.UserId
+                handover.Id,
+                handover.AccountId,
+                handover.SourceTeamId,
+                handover.TargetTeamId,
+                handover.ConsumerTeamId,
+                BatchId = batch.Id,
+                CohortLabel = Truncate(handover.CohortLabel, 200),
+                handover.ProposedOn,
+                SourceNote = Truncate(handover.SourceNote, 1000),
+                handover.SourceKey,
+                handover.LegacyReference,
+                handover.TrackGmsa,
+                now,
+                actor.UserId
             });
         }
 
@@ -146,11 +179,28 @@ public sealed partial class SqlServiceAccountRepository
                     @CloseReason, @now, @UserId, @now, @UserId);
                 """, new
             {
-                request.Id, request.AccountId, ActionType = request.ActionType.ToString(), Status = request.Status.ToString(),
-                CloseOutcome = closed ? "Completed" : null, request.TargetTeamId, request.FollowupPersonId, request.ContactPersonId, request.PlanStart,
-                request.PlanEnd, request.PlanAnnouncedOn, request.NextFollowupOn, request.FirstSentOn, request.LastReplyOn, Notes = Truncate(request.Notes, 4000),
-                request.SourceKey, request.LegacyReference, LegacyDisplayId = Truncate(request.LegacyDisplayId, 32), request.MigrationKey,
-                CloseReason = closed ? "Eski takip dosyasında kapalı; doğrulanmış kapanış kanıtı değildir." : null, now, actor.UserId
+                request.Id,
+                request.AccountId,
+                ActionType = request.ActionType.ToString(),
+                Status = request.Status.ToString(),
+                CloseOutcome = closed ? "Completed" : null,
+                request.TargetTeamId,
+                request.FollowupPersonId,
+                request.ContactPersonId,
+                request.PlanStart,
+                request.PlanEnd,
+                request.PlanAnnouncedOn,
+                request.NextFollowupOn,
+                request.FirstSentOn,
+                request.LastReplyOn,
+                Notes = Truncate(request.Notes, 4000),
+                request.SourceKey,
+                request.LegacyReference,
+                LegacyDisplayId = Truncate(request.LegacyDisplayId, 32),
+                request.MigrationKey,
+                CloseReason = closed ? "Eski takip dosyasında kapalı; doğrulanmış kapanış kanıtı değildir." : null,
+                now,
+                actor.UserId
             });
         }
 
@@ -163,10 +213,24 @@ public sealed partial class SqlServiceAccountRepository
                     @VerifiedByPersonId, @SourceNote, @LegacyReference, @LegacyDisplayId, @MigrationKey, @now, @UserId, @now, @UserId);
                 """, new
             {
-                action.Id, action.AccountId, ActionType = action.ActionType.ToString(), Result = action.Result.ToString(), Kind = action.Kind.ToString(),
-                action.ActualOn, Precision = action.ActualOn is null ? "Unknown" : "DateOnly", action.PerformerTeamId, action.PerformerPersonId,
-                EvidenceNote = Truncate(action.EvidenceNote, 2000), action.VerifiedOn, action.VerifiedByPersonId, SourceNote = Truncate(action.SourceNote, 2000),
-                action.LegacyReference, LegacyDisplayId = Truncate(action.LegacyDisplayId, 32), action.MigrationKey, now, actor.UserId
+                action.Id,
+                action.AccountId,
+                ActionType = action.ActionType.ToString(),
+                Result = action.Result.ToString(),
+                Kind = action.Kind.ToString(),
+                action.ActualOn,
+                Precision = action.ActualOn is null ? "Unknown" : "DateOnly",
+                action.PerformerTeamId,
+                action.PerformerPersonId,
+                EvidenceNote = Truncate(action.EvidenceNote, 2000),
+                action.VerifiedOn,
+                action.VerifiedByPersonId,
+                SourceNote = Truncate(action.SourceNote, 2000),
+                action.LegacyReference,
+                LegacyDisplayId = Truncate(action.LegacyDisplayId, 32),
+                action.MigrationKey,
+                now,
+                actor.UserId
             });
         }
 
@@ -180,10 +244,21 @@ public sealed partial class SqlServiceAccountRepository
                     @LegacyReference, @MigrationKey, @now, @UserId, @now, @UserId);
                 """, new
             {
-                communication.Id, Direction = communication.Direction.ToString(), Kind = communication.Kind.ToString(), communication.OccurredOn,
-                Precision = communication.OccurredOn is null ? "Unknown" : "DateOnly", communication.ContactTeamId, Subject = Truncate(communication.Subject, 400),
-                Summary = Truncate(communication.Summary, 4000), Link = Truncate(communication.Link, 400), communication.RecordScope, communication.MeaningfulReply,
-                communication.LegacyReference, communication.MigrationKey, now, actor.UserId
+                communication.Id,
+                Direction = communication.Direction.ToString(),
+                Kind = communication.Kind.ToString(),
+                communication.OccurredOn,
+                Precision = communication.OccurredOn is null ? "Unknown" : "DateOnly",
+                communication.ContactTeamId,
+                Subject = Truncate(communication.Subject, 400),
+                Summary = Truncate(communication.Summary, 4000),
+                Link = Truncate(communication.Link, 400),
+                communication.RecordScope,
+                communication.MeaningfulReply,
+                communication.LegacyReference,
+                communication.MigrationKey,
+                now,
+                actor.UserId
             });
             links += await LinkAsync(connection, transaction, communication.Id, communication.Accounts, actor, now, cancellationToken);
         }
@@ -202,11 +277,24 @@ public sealed partial class SqlServiceAccountRepository
                     @OwningTeamId, @Status, @JobReference, @Notes, @LegacyReference, @now, @UserId, @now, @UserId);
                 """, new
             {
-                finding.Id, finding.AccountId, Server = Truncate(finding.Server, 256), ComponentType = Truncate(finding.ComponentType, 64),
-                ComponentName = Truncate(finding.ComponentName, 256), Environment = Truncate(finding.Environment, 64), finding.ScanOn,
-                ScanResult = finding.ScanResult.ToString(), MatchResult = finding.MatchResult.ToString(), Coverage = Truncate(finding.Coverage, 400),
-                Evidence = Truncate(finding.Evidence, 2000), finding.OwningTeamId, Status = finding.Status.ToString(), JobReference = Truncate(finding.JobReference, 128),
-                Notes = Truncate(finding.Notes, 2000), finding.LegacyReference, now, actor.UserId
+                finding.Id,
+                finding.AccountId,
+                Server = Truncate(finding.Server, 256),
+                ComponentType = Truncate(finding.ComponentType, 64),
+                ComponentName = Truncate(finding.ComponentName, 256),
+                Environment = Truncate(finding.Environment, 64),
+                finding.ScanOn,
+                ScanResult = finding.ScanResult.ToString(),
+                MatchResult = finding.MatchResult.ToString(),
+                Coverage = Truncate(finding.Coverage, 400),
+                Evidence = Truncate(finding.Evidence, 2000),
+                finding.OwningTeamId,
+                Status = finding.Status.ToString(),
+                JobReference = Truncate(finding.JobReference, 128),
+                Notes = Truncate(finding.Notes, 2000),
+                finding.LegacyReference,
+                now,
+                actor.UserId
             });
         }
 

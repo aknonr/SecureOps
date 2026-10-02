@@ -60,15 +60,33 @@ public sealed partial class SqlServiceAccountRepository
                     INSERT INTO svcacct.Accounts(Id, AccountName, NormalizedName, Domain, NormalizedDomain, IdentityKey, IdentityState, ReportOrganizationId,
                         LifecycleState, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
                     VALUES(@id, @name, @nameKey, @domain, @domainKey, @identity, 'Provisional', @organizationId, 'Active', @now, @UserId, @now, @UserId);
-                    """, new { id, name = ServiceAccountText.Clean(name), nameKey, domain = ServiceAccountText.Clean(domain), domainKey, identity,
-                    organizationId, now, actor.UserId }, transaction, cancellationToken));
+                    """, new
+                {
+                    id,
+                    name = ServiceAccountText.Clean(name),
+                    nameKey,
+                    domain = ServiceAccountText.Clean(domain),
+                    domainKey,
+                    identity,
+                    organizationId,
+                    now,
+                    actor.UserId
+                }, transaction, cancellationToken));
             }, cancellationToken, duplicateField: "accountName");
     }
 
     /// <summary>Updates account attributes; blanks never erase, clearing is explicit with a reason.</summary>
     public Task<SaResult<Guid>> UpdateAccountAsync(Guid id, AccountChange change, SaActor actor, CancellationToken cancellationToken) =>
-        MutateAsync(id, "Account", id, "Updated", new { change.Notes, change.ConsumerTeamId, change.ReportOrganizationId, change.Domain, change.ClearNotes,
-            change.ClearConsumerTeam, References = change.References.Count }, change.Reason, actor, async (connection, transaction, now) =>
+        MutateAsync(id, "Account", id, "Updated", new
+        {
+            change.Notes,
+            change.ConsumerTeamId,
+            change.ReportOrganizationId,
+            change.Domain,
+            change.ClearNotes,
+            change.ClearConsumerTeam,
+            References = change.References.Count
+        }, change.Reason, actor, async (connection, transaction, now) =>
         {
             string? domainKey = ServiceAccountText.DomainKey(change.Domain);
             int updated = await connection.ExecuteAsync(Cmd("""
@@ -81,8 +99,20 @@ public sealed partial class SqlServiceAccountRepository
                     IdentityKey = CASE WHEN NormalizedDomain IS NULL AND @domainKey IS NOT NULL THEN 'D:' + @domainKey + '|' + NormalizedName ELSE IdentityKey END,
                     UpdatedAt = @now, UpdatedBy = @UserId
                 WHERE Id = @id AND RowVer = @RowVer;
-                """, new { change.ClearNotes, change.Notes, change.ClearConsumerTeam, change.ConsumerTeamId, change.ReportOrganizationId,
-                Domain = ServiceAccountText.Clean(change.Domain), domainKey, now, actor.UserId, id, RowVer = Version(change.ExpectedVersion) }, transaction, cancellationToken));
+                """, new
+            {
+                change.ClearNotes,
+                change.Notes,
+                change.ClearConsumerTeam,
+                change.ConsumerTeamId,
+                change.ReportOrganizationId,
+                Domain = ServiceAccountText.Clean(change.Domain),
+                domainKey,
+                now,
+                actor.UserId,
+                id,
+                RowVer = Version(change.ExpectedVersion)
+            }, transaction, cancellationToken));
             await ReferencesAsync(connection, transaction, change.References, "Account", id, id, actor, now, cancellationToken);
             return updated;
         }, cancellationToken, duplicateField: "domain");
@@ -115,8 +145,21 @@ public sealed partial class SqlServiceAccountRepository
                     INSERT INTO svcacct.OwnershipAssignments(Id, AccountId, TeamId, PersonId, State, Source, EffectiveFrom, EvidenceNote, ProposedBy, ProposedAt,
                         DecidedBy, DecidedAt, DecisionReason)
                     VALUES(@id, @accountId, @teamId, @personId, @State, N'Uygulama içi karar', @effectiveFrom, @evidence, @UserId, @now, @DecidedBy, @DecidedAt, @reason);
-                    """, new { id, accountId, teamId, personId, State = confirm ? "Confirmed" : "Proposed", effectiveFrom = effectiveFrom ?? (confirm ? today : null),
-                    evidence, actor.UserId, now, DecidedBy = confirm ? actor.UserId : (Guid?)null, DecidedAt = confirm ? now : (DateTimeOffset?)null, reason },
+                    """, new
+                {
+                    id,
+                    accountId,
+                    teamId,
+                    personId,
+                    State = confirm ? "Confirmed" : "Proposed",
+                    effectiveFrom = effectiveFrom ?? (confirm ? today : null),
+                    evidence,
+                    actor.UserId,
+                    now,
+                    DecidedBy = confirm ? actor.UserId : (Guid?)null,
+                    DecidedAt = confirm ? now : (DateTimeOffset?)null,
+                    reason
+                },
                     transaction, cancellationToken));
             }, cancellationToken);
     }
@@ -170,9 +213,24 @@ public sealed partial class SqlServiceAccountRepository
                 SELECT @id, @accountId, @Type, 'Open', @TargetTeamId, @FollowupPersonId, @ContactPersonId, @PlanStart, @PlanEnd, @PlanAnnouncedOn,
                     @NextFollowupOn, @FirstSentOn, @LastReplyOn, @Notes, @now, @UserId, @now, @UserId
                 WHERE EXISTS (SELECT 1 FROM svcacct.Accounts WHERE Id = @accountId);
-                """, new { id, accountId, Type = type.ToString(), request.TargetTeamId, request.FollowupPersonId, request.ContactPersonId, request.PlanStart,
-                request.PlanEnd, request.PlanAnnouncedOn, request.NextFollowupOn, request.FirstSentOn, request.LastReplyOn, Notes = ServiceAccountText.Clean(request.Notes),
-                now, actor.UserId }, transaction, cancellationToken));
+                """, new
+            {
+                id,
+                accountId,
+                Type = type.ToString(),
+                request.TargetTeamId,
+                request.FollowupPersonId,
+                request.ContactPersonId,
+                request.PlanStart,
+                request.PlanEnd,
+                request.PlanAnnouncedOn,
+                request.NextFollowupOn,
+                request.FirstSentOn,
+                request.LastReplyOn,
+                Notes = ServiceAccountText.Clean(request.Notes),
+                now,
+                actor.UserId
+            }, transaction, cancellationToken));
             await ReferencesAsync(connection, transaction, request.References ?? [], "Request", id, accountId, actor, now, cancellationToken);
             return inserted;
         }, cancellationToken);
@@ -180,8 +238,16 @@ public sealed partial class SqlServiceAccountRepository
 
     /// <summary>Partial request update at the expected version.</summary>
     public Task<SaResult<Guid>> UpdateRequestAsync(Guid accountId, Guid requestId, RequestChange change, SaActor actor, CancellationToken cancellationToken) =>
-        MutateAsync(accountId, "Request", requestId, "RequestUpdated", new { change.ActionType, change.TargetTeamId, change.PlanStart, change.PlanEnd,
-            change.NextFollowupOn, change.LastReplyOn, Cleared = change.Clear }, change.Reason, actor, async (connection, transaction, now) =>
+        MutateAsync(accountId, "Request", requestId, "RequestUpdated", new
+        {
+            change.ActionType,
+            change.TargetTeamId,
+            change.PlanStart,
+            change.PlanEnd,
+            change.NextFollowupOn,
+            change.LastReplyOn,
+            Cleared = change.Clear
+        }, change.Reason, actor, async (connection, transaction, now) =>
         {
             int updated = await connection.ExecuteAsync(Cmd("""
                 UPDATE svcacct.WorkRequests SET
@@ -201,11 +267,29 @@ public sealed partial class SqlServiceAccountRepository
                   AND (COALESCE(@PlanEnd, PlanEnd) IS NULL OR COALESCE(@PlanStart, PlanStart) IS NULL OR @cPlan = 1 OR COALESCE(@PlanEnd, PlanEnd) >= COALESCE(@PlanStart, PlanStart));
                 """, new
             {
-                ActionType = change.ActionType?.ToString(), change.TargetTeamId, change.FollowupPersonId, change.ContactPersonId, change.PlanStart, change.PlanEnd,
-                change.PlanAnnouncedOn, change.NextFollowupOn, change.FirstSentOn, change.LastReplyOn, Notes = ServiceAccountText.Clean(change.Notes),
-                cTarget = change.Clear.Contains("targetTeam"), cFollowup = change.Clear.Contains("followupPerson"), cContact = change.Clear.Contains("contactPerson"),
-                cPlan = change.Clear.Contains("plan"), cAnnounced = change.Clear.Contains("planAnnouncedOn"), cNext = change.Clear.Contains("nextFollowupOn"),
-                cNotes = change.Clear.Contains("notes"), now, actor.UserId, requestId, accountId, RowVer = Version(change.ExpectedVersion)
+                ActionType = change.ActionType?.ToString(),
+                change.TargetTeamId,
+                change.FollowupPersonId,
+                change.ContactPersonId,
+                change.PlanStart,
+                change.PlanEnd,
+                change.PlanAnnouncedOn,
+                change.NextFollowupOn,
+                change.FirstSentOn,
+                change.LastReplyOn,
+                Notes = ServiceAccountText.Clean(change.Notes),
+                cTarget = change.Clear.Contains("targetTeam"),
+                cFollowup = change.Clear.Contains("followupPerson"),
+                cContact = change.Clear.Contains("contactPerson"),
+                cPlan = change.Clear.Contains("plan"),
+                cAnnounced = change.Clear.Contains("planAnnouncedOn"),
+                cNext = change.Clear.Contains("nextFollowupOn"),
+                cNotes = change.Clear.Contains("notes"),
+                now,
+                actor.UserId,
+                requestId,
+                accountId,
+                RowVer = Version(change.ExpectedVersion)
             }, transaction, cancellationToken));
             await ReferencesAsync(connection, transaction, change.References, "Request", requestId, accountId, actor, now, cancellationToken);
             return updated;
@@ -266,8 +350,23 @@ public sealed partial class SqlServiceAccountRepository
                     SELECT @id, @accountId, @RequestId, @Type, @Result, @Kind, @actualOn, @ActualAt, @precision, @PerformerTeamId, @PerformerPersonId, @EvidenceNote,
                         @now, @UserId, @now, @UserId
                     WHERE @RequestId IS NULL OR EXISTS (SELECT 1 FROM svcacct.WorkRequests WHERE Id = @RequestId AND AccountId = @accountId);
-                    """, new { id, accountId, request.RequestId, Type = type.ToString(), Result = result.ToString(), Kind = kind.ToString(), actualOn, request.ActualAt,
-                    precision, request.PerformerTeamId, request.PerformerPersonId, EvidenceNote = ServiceAccountText.Clean(request.EvidenceNote), now, actor.UserId },
+                    """, new
+                {
+                    id,
+                    accountId,
+                    request.RequestId,
+                    Type = type.ToString(),
+                    Result = result.ToString(),
+                    Kind = kind.ToString(),
+                    actualOn,
+                    request.ActualAt,
+                    precision,
+                    request.PerformerTeamId,
+                    request.PerformerPersonId,
+                    EvidenceNote = ServiceAccountText.Clean(request.EvidenceNote),
+                    now,
+                    actor.UserId
+                },
                     transaction, cancellationToken));
                 await ReferencesAsync(connection, transaction, request.References ?? [], "Action", id, accountId, actor, now, cancellationToken);
                 return inserted;
@@ -293,8 +392,21 @@ public sealed partial class SqlServiceAccountRepository
                         EvidenceNote = COALESCE(@EvidenceNote, EvidenceNote),
                         UpdatedAt = @now, UpdatedBy = @UserId
                     WHERE Id = @actionId AND AccountId = @accountId AND VoidedAt IS NULL AND Result <> 'Verified' AND RowVer = @RowVer;
-                    """, new { Result = result?.ToString(), Kind = kind?.ToString(), actualOn, request.ActualAt, request.PerformerTeamId, request.PerformerPersonId,
-                    EvidenceNote = ServiceAccountText.Clean(request.EvidenceNote), now, actor.UserId, actionId, accountId, RowVer = Version(request.ExpectedVersion) },
+                    """, new
+                {
+                    Result = result?.ToString(),
+                    Kind = kind?.ToString(),
+                    actualOn,
+                    request.ActualAt,
+                    request.PerformerTeamId,
+                    request.PerformerPersonId,
+                    EvidenceNote = ServiceAccountText.Clean(request.EvidenceNote),
+                    now,
+                    actor.UserId,
+                    actionId,
+                    accountId,
+                    RowVer = Version(request.ExpectedVersion)
+                },
                     transaction, cancellationToken));
                 await ReferencesAsync(connection, transaction, request.AddReferences ?? [], "Action", actionId, accountId, actor, now, cancellationToken);
                 return updated;
@@ -309,8 +421,18 @@ public sealed partial class SqlServiceAccountRepository
                     UPDATE svcacct.ActionEvents SET Result = 'Verified', VerifiedOn = @VerifiedOn, VerifiedByUserId = @UserId, VerifiedByPersonId = @VerifierPersonId,
                         VerificationNote = @VerificationNote, VerificationEvidenceId = @EvidenceId, UpdatedAt = @now, UpdatedBy = @UserId
                     WHERE Id = @actionId AND AccountId = @accountId AND Result = 'Performed' AND VoidedAt IS NULL AND RowVer = @RowVer;
-                    """, new { request.VerifiedOn, actor.UserId, request.VerifierPersonId, VerificationNote = ServiceAccountText.Clean(request.VerificationNote),
-                    request.EvidenceId, now, actionId, accountId, RowVer = Version(request.ExpectedVersion) }, transaction, cancellationToken));
+                    """, new
+                {
+                    request.VerifiedOn,
+                    actor.UserId,
+                    request.VerifierPersonId,
+                    VerificationNote = ServiceAccountText.Clean(request.VerificationNote),
+                    request.EvidenceId,
+                    now,
+                    actionId,
+                    accountId,
+                    RowVer = Version(request.ExpectedVersion)
+                }, transaction, cancellationToken));
                 if (updated == 1 && closure)
                 {
                     await connection.ExecuteAsync(Cmd("""
@@ -380,8 +502,18 @@ public sealed partial class SqlServiceAccountRepository
                 IF NOT EXISTS (SELECT 1 FROM svcacct.ExternalRecordLinks WHERE ExternalRecordId = @recordId AND EntityType = @entityType AND EntityId = @entityId)
                     INSERT INTO svcacct.ExternalRecordLinks(ExternalRecordId, EntityType, EntityId, AccountId, LinkedAt, LinkedBy)
                     VALUES(@recordId, @entityType, @entityId, @accountId, @now, @UserId);
-                """, new { reference.Type, Number = ServiceAccountText.RecordNumber(reference.Number), Display = ServiceAccountText.Clean(reference.Number), reference.Url,
-                entityType, entityId, accountId, now, actor.UserId }, transaction, cancellationToken));
+                """, new
+            {
+                reference.Type,
+                Number = ServiceAccountText.RecordNumber(reference.Number),
+                Display = ServiceAccountText.Clean(reference.Number),
+                reference.Url,
+                entityType,
+                entityId,
+                accountId,
+                now,
+                actor.UserId
+            }, transaction, cancellationToken));
         }
     }
 }

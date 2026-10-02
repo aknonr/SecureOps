@@ -213,7 +213,12 @@ public static class DirectoryNameMatching
         {
             string choices = c switch
             {
-                'i' => "iı", 's' => "sş", 'g' => "gğ", 'c' => "cç", 'o' => "oö", 'u' => "uü",
+                'i' => "iı",
+                's' => "sş",
+                'g' => "gğ",
+                'c' => "cç",
+                'o' => "oö",
+                'u' => "uü",
                 _ => c.ToString()
             };
             variants = [.. variants.SelectMany(prefix => choices.Select(choice => prefix + choice)).Take(limit)];

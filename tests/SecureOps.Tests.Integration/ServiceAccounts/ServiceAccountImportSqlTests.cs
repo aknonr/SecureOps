@@ -213,7 +213,8 @@ public sealed class ServiceAccountImportSqlTests
                 SELECT COUNT(*) FROM sys.dm_os_waiting_tasks w JOIN sys.dm_tran_locks l ON l.lock_owner_address = w.resource_address
                 WHERE w.blocking_session_id = @writerSession AND l.resource_type = 'APPLICATION' AND l.request_status = 'WAIT';
                 """, new { writerSession });
-            if (waitingOnGate == 0) { await Task.Delay(TimeSpan.FromMilliseconds(100)); }
+            if (waitingOnGate == 0)
+            { await Task.Delay(TimeSpan.FromMilliseconds(100)); }
         }
 
         waitingOnGate.Should().Be(1, "the commit must queue on the application lock while a module write is in flight");

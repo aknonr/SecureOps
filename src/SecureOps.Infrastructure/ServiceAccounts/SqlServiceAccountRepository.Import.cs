@@ -305,8 +305,18 @@ public sealed partial class SqlServiceAccountRepository
                 CommittedBy = @UserId, CommittedAt = @now WHERE Id = @batchId;
             """, new { ResultJson = JsonSerializer.Serialize(view), idempotencyKey, actor.UserId, now, batchId }, transaction, cancellationToken));
         await HistoryAsync(connection, transaction, "Import", batchId, null, "Committed", view, null, actor, now, cancellationToken);
-        await AuditAsync(connection, transaction, "ImportCommitted", new { BatchId = batchId, batch.Profile, batch.Sha256, view.AccountsCreated,
-            view.ObservationsRecorded, view.RequestsCreated, view.ActionsCreated, view.CommunicationsCreated, view.HandoversCreated }, actor, now, cancellationToken);
+        await AuditAsync(connection, transaction, "ImportCommitted", new
+        {
+            BatchId = batchId,
+            batch.Profile,
+            batch.Sha256,
+            view.AccountsCreated,
+            view.ObservationsRecorded,
+            view.RequestsCreated,
+            view.ActionsCreated,
+            view.CommunicationsCreated,
+            view.HandoversCreated
+        }, actor, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new ImportCommitOutcome(view, false);
     }

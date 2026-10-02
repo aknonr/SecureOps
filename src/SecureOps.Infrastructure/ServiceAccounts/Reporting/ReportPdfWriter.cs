@@ -20,7 +20,12 @@ public static class ReportPdfWriter
 
     private static readonly Dictionary<char, byte> _turkish = new()
     {
-        ['Ğ'] = 0x80, ['ğ'] = 0x81, ['İ'] = 0x82, ['ı'] = 0x83, ['Ş'] = 0x84, ['ş'] = 0x85
+        ['Ğ'] = 0x80,
+        ['ğ'] = 0x81,
+        ['İ'] = 0x82,
+        ['ı'] = 0x83,
+        ['Ş'] = 0x84,
+        ['ş'] = 0x85
     };
 
     /// <summary>Renders all header lines and sections as fixed-width text tables.</summary>

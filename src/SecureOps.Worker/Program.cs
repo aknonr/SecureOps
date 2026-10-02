@@ -5,8 +5,8 @@ using Microsoft.Extensions.Logging;
 using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Announcements;
 using SecureOps.Infrastructure.Announcements.Sources;
-using SecureOps.Worker.ServiceAccounts;
 using SecureOps.Worker;
+using SecureOps.Worker.ServiceAccounts;
 
 // The Worker hosts the Hangfire job server per ADR-0003. It serves no HTTP traffic and never calls
 // into the API or UI: coordination is only the shared SQL database and the Hangfire queue.

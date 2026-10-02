@@ -126,9 +126,12 @@ public partial class ServiceAccountImports
         }
 
         List<string> query = [$"page={_rowQuery.Page}", "pageSize=50"];
-        if (_rowQuery.Classification is { } c) { query.Add("classification=" + c); }
-        if (_rowQuery.Kind is { } k) { query.Add("kind=" + k); }
-        if (_rowQuery.DecisionsOnly) { query.Add("decisionsOnly=true"); }
+        if (_rowQuery.Classification is { } c)
+        { query.Add("classification=" + c); }
+        if (_rowQuery.Kind is { } k)
+        { query.Add("kind=" + k); }
+        if (_rowQuery.DecisionsOnly)
+        { query.Add("decisionsOnly=true"); }
         _rows = await Api.GetAsync<ImportRowPage>($"/imports/{_batch.Id}/rows?" + string.Join('&', query), token);
     }
 
