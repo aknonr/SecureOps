@@ -1,6 +1,6 @@
 # ADR-0001 — Technology Stack
 
-**Status:** Accepted; amended 2026-10-01 (data access — see Amendment 1)
+**Status:** Accepted; amended 2026-10-01 (data access, Amendment 1) and 2026-10-02 (.NET 10, Amendment 2)
 **Date:** 2026-05
 **Decision makers:** Project owner
 
@@ -24,7 +24,7 @@ The stack is:
 | Layer | Choice |
 |---|---|
 | Language | C# |
-| Framework | .NET 8 (LTS) |
+| Framework | .NET 10 (LTS) — *amended 2026-10-02; originally .NET 8 (LTS) (Amendment 2)* |
 | API | ASP.NET Core Web API |
 | Worker | .NET Worker Service (Windows Service) |
 | UI | **Blazor Server + MudBlazor** |
@@ -132,7 +132,7 @@ Rejected for MVP because:
 
 ## Implementation Notes
 
-- All projects target `net8.0`.
+- All projects target `net10.0` (Amendment 2).
 - Solution projects are `SecureOps.Api`, `SecureOps.Worker`, `SecureOps.Ui`, `SecureOps.Domain`, `SecureOps.Infrastructure`, and `SecureOps.Shared`.
 - `SecureOps.Shared` is an accepted shared/common layer for cross-process contracts, authorization policy constants, and strongly typed configuration options. It may depend on `SecureOps.Domain` only.
 - `SecureOps.Shared` must not contain ASP.NET pipeline code, data-access mappings, SQL access, PowerShell execution, file audit IO, external integration clients, or Blazor components.
@@ -166,6 +166,21 @@ EF Core adoption is no longer a planned requirement.
 marked superseded, not implemented. The EF Core package references still present in `SecureOps.Infrastructure`
 are unused; removing them is a separate code change and not part of this amendment. Introducing an ORM later
 requires a new ADR.
+
+## Amendment 2 — .NET 10 (2026-10-02)
+
+**Why:** .NET 8 (and 9) support ends 2026-11-10. .NET 10 is the current LTS, supported to 2028-11. .NET 11 (STS,
+November 2026) would not extend support and is not yet released.
+
+**Decision (owner):** all projects target `net10.0`. The exact-SDK policy from G-30 stays: `global.json` pins SDK
+10.0.112 with roll-forward disabled; C# 14 and analyzer level 10.0. Microsoft packages follow one 10.0.x servicing
+patch; PowerShell hosting moves to the 7.6 line.
+
+**Consequences:** API/UI servers need the .NET 10 IIS Hosting Bundle and the Worker the .NET 10 runtime; servers take
+runtime security patches through that bundle independently of the SDK pin. The OIDC handler's automatic Pushed
+Authorization Requests (default since .NET 9) is kept off until tested against the corporate IdP
+(`Oidc:PushedAuthorization`). The unused EF Core references noted in Amendment 1 were removed. Rollback is the previous .NET 8 release package on hosts that still have the .NET 8
+bundle. MudBlazor 6 still runs but is unsupported; its migration remains separate UI work.
 
 ## References
 

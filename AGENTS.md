@@ -45,7 +45,7 @@ These are business and security constraints, not style preferences. They hold ev
 
 | Area | Decision |
 |---|---|
-| Stack | .NET 8 (`net8.0`, C# 12, SDK pinned in `global.json`), ASP.NET Core API, Worker Service — ADR-0001. .NET 8 support ends 2026-11-10; moving to .NET 10 needs an ADR. |
+| Stack | .NET 10 LTS (`net10.0`, C# 14, SDK pinned in `global.json`), ASP.NET Core API, Worker Service — ADR-0001 |
 | UI | Blazor Server + MudBlazor 6.16 (not React/Angular) — ADR-0001, ADR-0007 |
 | Data | SQL Server via Dapper (parameterized SQL) and numbered scripts in `sql/schema/` / `sql/migrations/`; append-only audit — ADR-0001 (amended 2026-10-01) |
 | Jobs | Hangfire on SQL Server, hosted by the Worker — ADR-0003 |

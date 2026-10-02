@@ -1,5 +1,13 @@
 # Decisions Log
 
+## 2026-10-02 - .NET 10 migration (ADR-0001 Amendment 2), done by Claude by owner decision
+
+The owner assigned the backend .NET 10 migration to Claude for this change (scoped exception to the default
+Codex ownership). Branch `claude/dotnet10-backend-migration`: SDK 10.0.112 pinned, `net10.0`, C# 14,
+analyzer level 10.0; unused EF Core/Polly/OpenApi packages removed; OIDC PAR kept off by default; per-actor
+global and access-administration rate limits added. Windows/IIS, Negotiate, DPAPI and PowerShell runspace gates
+still need a Windows run before release.
+
 ## 2026-10-01 - Data access: Dapper and numbered SQL scripts retained
 
 Owner decision recorded as ADR-0001 Amendment 1: Dapper with parameterized SQL and numbered, DBA-reviewed scripts
