@@ -392,7 +392,7 @@ have to be invented.
 | `/error` | Unhandled server error, request reference only | anonymous |
 | `/`, `/dashboard` | Genel Bakış | authenticated |
 | `/identity-lookup` | PAM / AD lookup | `Identity.Lookup` |
-| `/directory/users` | Read-only AD user view with group context | `Identity.Lookup`; group panels `Identity.Groups.View` / `Identity.PrivilegedGroups.View` |
+| `/directory/users` / `/identity-lookup` | Exact-account lookup and bounded first/full-name search; no module dependency or general-search inventory links | `Identity.Lookup`; group panels `Identity.Groups.View` / `Identity.PrivilegedGroups.View` |
 | `/directory/groups` | Read-only AD group analysis | `Identity.Groups.View`; members and export need their own capability |
 | `/account` | Identity and session security | authenticated |
 | `/access/me` | Status, roles, grouped capabilities | authenticated |

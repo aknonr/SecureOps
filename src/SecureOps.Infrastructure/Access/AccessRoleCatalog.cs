@@ -1,4 +1,5 @@
 using SecureOps.Shared.Auth;
+using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Infrastructure.Access;
 
@@ -37,7 +38,9 @@ public static class AccessRoleCatalog
                 Capabilities.AccessApproveRequests,
                 Capabilities.AccessAssignRoles,
                 Capabilities.AccessViewAudit,
-                Capabilities.ManagementReportingView
+                Capabilities.ManagementReportingView,
+                ServiceAccountCapabilities.View,
+                ServiceAccountCapabilities.Administer
             ],
             ["Lead"] =
             [

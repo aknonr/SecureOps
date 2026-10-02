@@ -2,6 +2,8 @@
 @page "/identity-lookup"
 @attribute [Authorize]
 @using Microsoft.Extensions.Logging
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Shared.Components.ServiceAccounts
 @implements IDisposable
 @inject IIdentityLookupApiClient IdentityClient
 @inject ICurrentAccessProvider AccessProvider
@@ -27,6 +29,19 @@
 *@
 
 <div class="so-page so-page--wide">
+    @if (_access?.Can(Capabilities.IdentityLookup) == true)
+    {
+        <div class="so-tabs mb-4" role="tablist" aria-label="Sorgu türü">
+            <button type="button" role="tab" class="so-tab @(_lookupMode == 0 ? "so-tab--active" : null)"
+                    aria-selected="@(_lookupMode == 0)" @onclick="@(() => _lookupMode = 0)">
+                <MudIcon Icon="@Icons.Material.Filled.ManageSearch" Size="Size.Small" /> Tam hesap
+            </button>
+            <button type="button" role="tab" class="so-tab @(_lookupMode == 1 ? "so-tab--active" : null)"
+                    aria-selected="@(_lookupMode == 1)" @onclick="@(() => _lookupMode = 1)">
+                <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Size="Size.Small" /> Ad / ad soyad
+            </button>
+        </div>
+    }
     @if (_access is null)
     {
         <SoPageHeader Title="AD Kullanıcı ve Hesap Sorgulama" />
@@ -50,6 +65,16 @@
             </Actions>
         </SoProblemPanel>
     }
+    else if (_lookupMode == 1)
+    {
+        <SoPageHeader Title="AD Kullanıcı ve Hesap Sorgulama" />
+        <SaDirectoryNameSearch Result="_nameResult" Busy="_nameBusy" OnSearch="SearchNameAsync"
+                               ShowInventoryLinks="false" OnExactLookup="ChooseExactAccount" />
+        @if (_nameProblem is { } nameProblem)
+        {
+            <SoProblemPanel Problem="nameProblem" />
+        }
+    }
     else if (_submittedAccount is null)
     {
         @* -- search state: nothing competes with the one thing to do here -------------------- *@
@@ -64,6 +89,7 @@
                     <MudTextField @bind-Value="_model.Account"
                                   @bind-Value:after="OnAccountChanged"
                                   Label="Hesap"
+                                  aria-label="Hesap"
                                   Placeholder="kullanici01"
                                   HelperText="@AccountHelperText"
                                   Error="@(_accountError is not null)"
@@ -290,6 +316,10 @@
     private DetailTab _tab = DetailTab.General;
 
     private AccessSnapshot? _access;
+    private int _lookupMode;
+    private bool _nameBusy;
+    private DirectoryNameSearchResponse? _nameResult;
+    private UiProblem? _nameProblem;
     private string? _submittedAccount;
     private bool _loading;
     private bool _reusedResult;
@@ -455,6 +485,41 @@
         // Nothing is flagged until there is something to flag: an untouched empty field is not an error.
         _accountError = string.IsNullOrWhiteSpace(_model.Account) ? null : validation.Message;
         _accountAdvisory = validation.IsValid ? validation.Advisory : null;
+    }
+
+    private async Task SearchNameAsync(string query)
+    {
+        if (_nameBusy || _access?.Can(Capabilities.IdentityLookup) != true)
+        {
+            return;
+        }
+
+        _nameBusy = true;
+        _nameResult = null;
+        _nameProblem = null;
+        try
+        {
+            _nameResult = await IdentityClient.NameSearchAsync(new DirectoryNameSearchRequest(query), CancellationToken.None);
+        }
+        catch (SecureOpsApiException exception)
+        {
+            _nameProblem = exception.Problem;
+            if (exception.Problem.RequiresSignIn)
+            {
+                Navigation.NavigateTo(SessionExpiredUrl(), forceLoad: true);
+            }
+        }
+        finally
+        {
+            _nameBusy = false;
+        }
+    }
+
+    private void ChooseExactAccount(string account)
+    {
+        _lookupMode = 0;
+        _model.Account = account;
+        SubmitSearch();
     }
 
     // Navigates to the bare page; the reset happens when the empty query string comes back through

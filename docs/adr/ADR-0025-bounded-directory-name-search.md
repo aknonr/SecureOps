@@ -9,6 +9,21 @@ gates and is validated on Windows by the platform owner (Codex) before any live 
 
 ## Context
 
+### Owner Amendment, 2026-10-02
+
+Expose the same bounded first/full-name query on the general AD lookup page,
+alongside exact-account lookup, through `POST /api/v1/identity/name-search`.
+This route requires only the approved persisted `Identity.Lookup` capability,
+the existing IdentityLookup rate limit and fail-closed, name-free audit. It does
+not depend on Service Accounts activation, View or data scope, and returns no
+inventory ids or links. The existing module route retains both capability gates
+and links only uniquely matching records within explicit Service Accounts scope.
+The general UI may select a returned exact account; that selection grants nothing.
+All query bounds, Turkish/multipart matching, LDAP escaping, provider limits and
+minimal fields below remain unchanged. This amendment supersedes the rejection of
+the general page placement, not the rejection of broad people/directory browsing.
+Corporate AD reads and target installation are not authorized by this source task.
+
 Service account coordinators often know a person by name ("Ayşe Yılmaz, altyapı") but not the account name, and must
 leave the tool to find it before they can use exact lookup (ADR-0008) or open the account record. ADR-0008 rejected a
 broad wildcard search because it would turn the platform into a people-browsing tool.

@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.Configure<RateLimitingOptions>(configuration.GetSection(RateLimitingOptions.SectionName));
         services.Configure<CommandIdempotencyOptions>(configuration.GetSection(CommandIdempotencyOptions.SectionName));
         services.AddSingleton<IAuditStoreHealthState, AuditStoreHealthState>();
+        services.AddSingleton<DirectAuditWriter>();
         services.AddSingleton<EnterpriseIntegrationHealthState>();
         services.AddSingleton<EnterpriseIntegrationTelemetry>();
         services.AddSingleton<EnterpriseIntegrationDiagnostics>();

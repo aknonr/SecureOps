@@ -1,4 +1,18 @@
 ::deep .sa-directory-query {
-    min-width: 18rem;
+    min-width: 0;
+    flex: 1 1 18rem;
+    width: min(32rem, 100%);
     max-width: 32rem;
+}
+
+@media (max-width: 600px) {
+    ::deep .sa-directory-results .mud-table-cell::before {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .sa-directory-name-text {
+        min-width: 0;
+        text-align: right;
+    }
 }

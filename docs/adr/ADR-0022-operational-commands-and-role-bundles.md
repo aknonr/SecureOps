@@ -2,6 +2,27 @@
 
 Status: approved for local implementation by owner continuation, 2026-09-15.
 
+## Owner Amendment: Administrative Page Access, 2026-10-02
+
+The genuine system-administrator is an Approved application user with an active
+persisted assignment to the protected `Admin` bundle, not a login claim or display
+name. That bundle includes `ServiceAccounts.View` and `ServiceAccounts.Administer`
+so administrators can open the module and its administration page. The reviewed
+027 data migration extends the existing protected bundle without removing prior
+capabilities, advances its version and affected access versions, and commits the
+required audit atomically. No startup repair or claim-based capability fallback.
+
+Module data still requires an explicit All/Organization/Team grant from another
+authorized administrator. An administrator without scope may open administration
+and the module's empty/no-scope view, but cannot read an ungranted account or grant
+scope to themself. Work, Import, Assign, Verify and Report remain separate
+capabilities. Page access never activates a provider, integration or scheduler;
+the existing manual reminder evaluation is an explicit Administer command and
+must not be invoked as a page-access check. Worker/reminders remain outside this task.
+SQL runtime grants and application capabilities are independent. Target changes
+and installation remain separately approved; this amendment authorizes local
+source implementation only.
+
 Preserve the nine existing role identities and permissions. Store versioned business
 role definitions as registered capability bundles, with Turkish action descriptions.
 Preview effective differences and affected users before definition changes. Serialize

@@ -13,7 +13,7 @@
     </p>
     <div class="d-flex flex-wrap align-center gap-2">
         <MudTextField T="string" @bind-Value="_query" Label="Ad veya ad soyad" MaxLength="64" Variant="Variant.Outlined" Immediate="true"
-                      OnKeyDown="EnterAsync" Class="sa-directory-query" aria-describedby="sa-directory-hint" />
+                      OnKeyDown="EnterAsync" Class="sa-directory-query" aria-label="Ad veya ad soyad" aria-describedby="sa-directory-hint" />
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonSearch" Disabled="@(Busy || !Searchable)"
                    OnClick="SearchAsync">Dizinde ara</MudButton>
     </div>
@@ -27,19 +27,34 @@
         }
         else
         {
-            <MudTable Items="result.Matches" Dense="true" Breakpoint="Breakpoint.Sm" T="DirectoryNameMatch" Class="mt-2">
-                <HeaderContent><MudTh>Ad</MudTh><MudTh>Hesap</MudTh><MudTh>Birim</MudTh><MudTh>Servis hesabı kaydı</MudTh></HeaderContent>
+            <MudTable Items="result.Matches" Dense="true" Breakpoint="Breakpoint.Sm" T="DirectoryNameMatch" Class="mt-2 sa-directory-results">
+                <HeaderContent>
+                    <MudTh>Ad</MudTh><MudTh>Hesap</MudTh><MudTh>Birim</MudTh>
+                    @if (ShowInventoryLinks) { <MudTh>Servis hesabı kaydı</MudTh> }
+                </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Ad">
-                        @context.DisplayName
-                        @if (context.SameNameAsAnother) { <div class="so-panel-text--sm">Aynı adlı başka sonuç var; hesap ve birime bakın.</div> }
+                        <div class="sa-directory-name-text">
+                            @context.DisplayName
+                            @if (context.SameNameAsAnother) { <div class="so-panel-text--sm">Aynı adlı başka sonuç var; hesap ve birime bakın.</div> }
+                        </div>
                     </MudTd>
-                    <MudTd DataLabel="Hesap"><code>@context.Account</code></MudTd>
+                    <MudTd DataLabel="Hesap">
+                        @if (OnExactLookup.HasDelegate)
+                        {
+                            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.ManageSearch"
+                                       OnClick="@(() => OnExactLookup.InvokeAsync(context.Account))">@context.Account</MudButton>
+                        }
+                        else { <code>@context.Account</code> }
+                    </MudTd>
                     <MudTd DataLabel="Birim">@(context.Department ?? "Bilinmiyor")</MudTd>
-                    <MudTd DataLabel="Servis hesabı kaydı">
-                        @if (context.ServiceAccountId is { } id) { <a href="@($"service-accounts/{id}")">Kaydı aç</a> }
-                        else { <span class="so-panel-text--sm">Kapsamınızda kayıt yok</span> }
-                    </MudTd>
+                    @if (ShowInventoryLinks)
+                    {
+                        <MudTd DataLabel="Servis hesabı kaydı">
+                            @if (context.ServiceAccountId is { } id) { <a href="@($"service-accounts/{id}")">Kaydı aç</a> }
+                            else { <span class="so-panel-text--sm">Kapsamınızda kayıt yok</span> }
+                        </MudTd>
+                    }
                 </RowTemplate>
             </MudTable>
         }
@@ -62,6 +77,12 @@
 
     /// <summary>Raised with the trimmed query.</summary>
     [Parameter] public EventCallback<string> OnSearch { get; set; }
+
+    /// <summary>Whether the scoped module endpoint supplies inventory links.</summary>
+    [Parameter] public bool ShowInventoryLinks { get; set; } = true;
+
+    /// <summary>Optional transition to an exact account lookup; grants no access.</summary>
+    [Parameter] public EventCallback<string> OnExactLookup { get; set; }
 
     /// <summary>Minimum letters (mirrors the server rule; the server decides).</summary>
     [Parameter] public int MinimumLetters { get; set; } = 3;
