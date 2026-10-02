@@ -17,7 +17,7 @@ public sealed class BuildToolchainContractTests
         root.Should().NotBeNull();
         using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(root!.FullName, "global.json")));
         JsonElement sdk = json.RootElement.GetProperty("sdk");
-        sdk.GetProperty("version").GetString().Should().Be("10.0.112");
+        sdk.GetProperty("version").GetString().Should().Be("10.0.401");
         sdk.GetProperty("rollForward").GetString().Should().Be("disable");
         sdk.GetProperty("allowPrerelease").GetBoolean().Should().BeFalse();
         var props = XElement.Load(Path.Combine(root.FullName, "Directory.Build.props"));

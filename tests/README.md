@@ -1,6 +1,6 @@
 # tests/
 
-Build policy (G-30, moved to .NET 10 on 2026-10-02): exact SDK 10.0.112 (`global.json`, no roll-forward),
+Build policy (G-30, moved to .NET 10 on 2026-10-02): exact SDK 10.0.401 (`global.json`, no roll-forward),
 C# 14.0, analyzer level 10.0, `net10.0`. Build/test without a LangVersion command-line override. DPAPI key persistence uses WindowsFact/WindowsTheory;
 Windows runs must execute these cases, not skip them. Portable ephemeral and
 configuration rejection cases run everywhere. No other platform failures are

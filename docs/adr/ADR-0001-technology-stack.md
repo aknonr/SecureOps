@@ -173,7 +173,7 @@ requires a new ADR.
 November 2026) would not extend support and is not yet released.
 
 **Decision (owner):** all projects target `net10.0`. The exact-SDK policy from G-30 stays: `global.json` pins SDK
-10.0.112 with roll-forward disabled; C# 14 and analyzer level 10.0. Microsoft packages follow one 10.0.x servicing
+10.0.401 with roll-forward disabled (10.0.112 until 2026-10-03; same 10.0.12 runtime); C# 14 and analyzer level 10.0. Microsoft packages follow one 10.0.x servicing
 patch; PowerShell hosting moves to the 7.6 line.
 
 **Consequences:** API/UI servers need the .NET 10 IIS Hosting Bundle and the Worker the .NET 10 runtime; servers take
