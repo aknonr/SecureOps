@@ -1,0 +1,3 @@
+/* The link count sits on its own line under the group's kind, at every width. */
+::deep .so-set-option-meta { flex-wrap: wrap; }
+::deep .so-set-option-count { flex-basis: 100%; }

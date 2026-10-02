@@ -39,6 +39,30 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## PR #4 Windows Verification, 2026-10-02
+
+The Resources/personal shift-group source from 286fac7 was verified on Windows
+with the committed SDK 9.0.317/C#12/net8.0 policy, not a substituted SDK10.
+Clean Release builds pass with no warnings/errors. Normal unit: 1,610/0/0;
+focused UI/render: 676/0/0, Resources: 125/0/0 (overlapping unit). Normal final
+integration: 322/0/61, including 39 Service Accounts cases for a naming-only
+correction; separate isolated ResourceSQL: 49/0/0.
+The real resource-shift Chrome journey passes against combined API/UI and
+synthetic InMemory data. WASAS_CHROME selects an installed browser; search
+awaits the interactive input and asserted filter state. Archived links are
+excluded by name only, returning to editing refreshes before reorder, and
+feedback only says an opening request was sent. Desktop/mobile overflow checks
+pass; DPR2 captures are not native zoom or managed popup-policy acceptance.
+
+**Merge NO-GO:** repository-wide format verification still reports 313 baseline
+whitespace/import-order diagnostics in 13 files. Scoped Resources formatting
+passes but is not a waiver. Two private identifiers were renamed without
+changing Service Accounts behavior; no module/API/SQL/Worker or external write
+contract changed. See the single `docs/integrated-test-activation.md` register
+for exact source identities, retained failures and structured baseline comparison.
+G31/G32 stay deferred and do not block this bounded journey. No PR4 master
+merge, installation approval or new review package is claimed at this checkpoint.
+
 ## PR #3 Windows Verification, 2026-10-02
 
 The original UI tip 77a59dc is combined with the G-30 deterministic toolchain
@@ -876,6 +900,52 @@ the operator must inspect the actual deployed source/version and effective site
 popup policy without reopening all already-open tabs. In Use waiting age/dashboard,
 persisted RFC ownership and controlled upload/completion/reconciliation remain
 active LOCAL work; the combined milestone is NOT complete.
+
+### Shift Set Journey Pass, 2026-10-01
+
+UI-only (Claude), branch `claude/quirky-goldberg-1uxpt7` from master `e670617`. Files: `Pages/Resources.razor`,
+`Pages/ShiftSets.razor`, `Shared/Components/ResolvedResourceLinks.razor` (each with a new scoped `.razor.css`) and
+`Services/ResourceView.cs`. No API, DTO, SQL, Worker, policy, NavMenu, theme or `_Host` opener change.
+
+- **Find.** The result head states total, visible range and page (`30 bağlantı · 1–25 / 30 gösteriliyor ·
+  Sayfa 1 / 2`) from the server's own paging, and a "Listeyi daraltan" line names each active filter. An empty
+  filtered result offers Filtreleri temizle as well as Tüm bağlantılara dön. Favouriting reports what changed.
+- **Add to a personal group.** The confirmation names the link (or counts several) and the group the server
+  confirmed, with a **Grubu aç** link to `/resources/sets?set={id}`; that page selects the group on arrival
+  (`?set=` is only a selection hint; an unknown id falls back to the usual default).
+- **Understand what will open.** Each group shows its link count. Before preparing, the page says how many links
+  are saved and that tabs open only on the operator's own click. The prepared list is numbered in opening order
+  with each destination host. Saved links the operator could see but the resolution did not return are named
+  under `PartialSetNotice`, without address or anchor, so they can never be part of the batch. Hidden members
+  remain unnamed and uncounted, as the contract requires.
+- **Open.** Unchanged: one native `N bağlantıyı aç` click through `window.secureOpsLinks.openMany`; the status
+  says opening was *requested*, never that a tab or destination opened.
+- **Feedback.** Create, rename, delete, default, reorder and remove each leave a `role=status` sentence. Preparing
+  reads "Erişim denetleniyor…". Returning to editing after a resolution that left links out re-reads the group,
+  so a reorder is not built from a link that is no longer visible (previously the server correctly rejected it
+  with 404 and the page recovered with an error).
+
+**Verification (Linux).** The committed `global.json` pins SDK 9.0.317, which this host could not install, so a
+throw-away copy changed only `global.json` to the installed SDK 10.0.112; `LangVersion` stays 12.0 and no source
+was edited. There the full solution builds with zero warnings/errors. `ResourceViewTests`, `ResourceWorkspaceTests`,
+`ResourceExperienceTests` and `ResourceApiClientTests` pass 62/62 (13 new) and all `SecureOps.Tests.Unit.Ui` tests
+pass. Full unit: 1,607 passed, 3 failed; master in the same setup: 1,594 passed, the same 3 failed (the toolchain
+contract, which rejects the substituted SDK, plus two platform-dependent tests). Integration: the same 7 failures
+as master (Windows DPAPI/SkiaSharp). No result is a Windows or corporate TEST pass.
+
+`tests/browser/resource-shift-journey.cjs` passes against the local Demo API with synthetic InMemory data (real API
+code, not a stub) and Playwright's bundled Chromium: search, favourite, create-and-save, save-by-selection, Grubu aç,
+archive-then-prepare with the left-out link named, keyboard activation of prepare, one-click batch open (attempt
+message only), reorder/remove feedback, 1440/390 widths and a 720 CSS-pixel viewport at device scale 2 as a 200% zoom
+approximation, with no horizontal overflow and no page errors; a dark-appearance capture was checked by eye.
+Playwright's default popup handling is used, so its popup count is not evidence of browser policy.
+`workspace-usability.cjs` and `resource-experience.cjs` now read only the total from the richer status line; on this
+Linux host they, and `resource-ui.cjs`, stop at the same step on master as on this branch (selection text, first-use
+guide and a removed page-size button respectively), so they were not usable as regression gates here. Windows/IIS,
+native browser zoom, managed popup policy and screen readers were not tested.
+
+**Backend contract notes (recorded, not implemented):** G-31 (no usage signal for frequently used links) and
+G-32 (favourites view has no server-side paging) in `docs/26-ui-backend-contract-gaps.md`.
 
 ### In Use V1 Canonical Handoff, 2026-09-08
 

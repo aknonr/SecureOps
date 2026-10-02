@@ -1,0 +1,17 @@
+/* Opening order and destination host; shared list styling stays in the theme. */
+.so-open-order { list-style: none; padding: 0; }
+.so-open-order .so-resource-item { gap: var(--so-space-3); }
+.so-open-position {
+    flex: 0 0 auto; min-width: 28px; height: 28px; display: inline-grid; place-items: center;
+    border-radius: var(--so-radius-sm); background: var(--so-bg-sunken); color: var(--so-text-muted);
+    font-size: 0.85rem; font-variant-numeric: tabular-nums;
+}
+.so-open-choice { flex: 1 1 auto; display: flex; flex-direction: column; }
+.so-open-name { font-weight: 600; color: var(--so-text); }
+.so-open-choice .so-resource-host { font-size: 0.85rem; color: var(--so-text-muted); overflow-wrap: anywhere; }
+.so-open-excluded {
+    margin-block: var(--so-space-3); padding: var(--so-space-3) var(--so-space-4);
+    border-left: 3px solid var(--so-warning); background: var(--so-bg-sunken); border-radius: var(--so-radius-sm);
+}
+.so-open-excluded p { margin: 0 0 var(--so-space-2); }
+.so-open-excluded-list { margin: 0; padding-left: 1.25rem; color: var(--so-text); overflow-wrap: anywhere; }

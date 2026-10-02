@@ -73,6 +73,54 @@ public sealed class ResourceWorkspaceTests
     }
 
     [Fact]
+    public async Task ResolvedOpening_ShowsOrderAndHost_AndNeverMakesALeftOutLinkOpenable()
+    {
+        await using ServiceProvider services = new ServiceCollection().AddLogging().BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        ResourceLink first = SyntheticLink("Birinci", "https://first.example.invalid/a");
+        ResourceLink second = SyntheticLink("İkinci", "https://second.example.invalid/b");
+        ResourceLink leftOut = SyntheticLink("Arşivlenen", "https://left-out.example.invalid/c");
+        string html = await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            Microsoft.AspNetCore.Components.Web.HtmlRendering.HtmlRootComponent result = await renderer.RenderComponentAsync<ResolvedResourceLinks>(ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(ResolvedResourceLinks.Links)] = new[] { first, second },
+                [nameof(ResolvedResourceLinks.NotOpening)] = new[] { leftOut }
+            }));
+            return System.Net.WebUtility.HtmlDecode(result.ToHtmlString());
+        });
+
+        System.Text.RegularExpressions.Regex.Matches(html, "data-so-open-url").Count.Should().Be(2);
+        html.Should().Contain("<ol").And.Contain("first.example.invalid").And.Contain("second.example.invalid");
+        html.IndexOf("Birinci", StringComparison.Ordinal).Should().BeLessThan(html.IndexOf("İkinci", StringComparison.Ordinal));
+        html.Should().Contain("Arşivlenen").And.Contain(ResourceView.PartialSetNotice).And.Contain("açılmayacak 1 bağlantı");
+        html.Should().NotContain("left-out.example.invalid");
+        html.Should().Contain("2 bağlantıyı aç").And.Contain("açma isteği gönderildi");
+    }
+
+    [Fact]
+    public async Task ResolvedOpening_WithNothingOpenableOffersNoBatchButton()
+    {
+        await using ServiceProvider services = new ServiceCollection().AddLogging().BuildServiceProvider();
+        await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        string html = await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            Microsoft.AspNetCore.Components.Web.HtmlRendering.HtmlRootComponent result = await renderer.RenderComponentAsync<ResolvedResourceLinks>(ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(ResolvedResourceLinks.Links)] = Array.Empty<ResourceLink>(),
+                [nameof(ResolvedResourceLinks.NotOpening)] = new[] { SyntheticLink("Kapsam dışı", "https://out.example.invalid/") }
+            }));
+            return System.Net.WebUtility.HtmlDecode(result.ToHtmlString());
+        });
+
+        html.Should().NotContain("data-so-open-links").And.NotContain("data-so-open-url");
+        html.Should().Contain("açılabilecek bağlantı yok").And.Contain("Kapsam dışı");
+    }
+
+    private static ResourceLink SyntheticLink(string name, string url) => new(Guid.NewGuid(), Guid.NewGuid(), name, url, "Synthetic",
+        null, null, null, [], 0, true, false, 1, DateTimeOffset.UnixEpoch);
+
+    [Fact]
     public void Resolution_ContextChangeRejectsLateSuccessAndErrors()
     {
         var state = new ResourceResolutionState<string[]>();

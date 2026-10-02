@@ -1,20 +1,39 @@
 @using SecureOps.Domain.Resources
 
+@* Only entries marked data-so-open-url are opened by the native batch handler in _Host. Entries that will
+   not open are listed by name only, with no address or anchor, so they can never be part of a batch. *@
 <section class="so-set-resolved" aria-label="Açılmaya hazır bağlantılar" data-guide="open-resolved">
     <h3 class="so-panel-title">Açılmaya hazır bağlantılar</h3>
     @if (Links.Count == 0) { <p role="status">Seçiminizde şu anda açılabilecek bağlantı yok. Seçimi veya güncel erişiminizi kontrol edin.</p> }
     else
     {
-        <p role="status">@Links.Count bağlantı güncel erişiminizle doğrulandı.</p>
-        <ul class="so-resource-list so-resource-list--compact">
-            @foreach (ResourceLink link in Links)
+        <p role="status">@Links.Count bağlantı güncel erişiminizle doğrulandı. Düğmeye bastığınızda bu sırayla açılması istenir.</p>
+        <ol class="so-resource-list so-resource-list--compact so-open-order">
+            @for (int index = 0; index < Links.Count; index++)
             {
+                ResourceLink link = Links[index];
                 <li class="so-resource-item" @key="link.Id">
-                    <span class="so-open-choice">@link.Name</span>
+                    <span class="so-open-position" aria-hidden="true">@(index + 1)</span>
+                    <span class="so-open-choice"><span class="so-open-name">@link.Name</span>
+                        @if (ResourceView.Host(link) is { } host) { <span class="so-resource-host">@host</span> }
+                    </span>
                     <a data-so-open-url href="@link.Url" target="_blank" rel="noopener noreferrer" aria-label="@($"{link.Name}: Tek başına aç")">Aç <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /></a>
                 </li>
             }
-        </ul>
+        </ol>
+    }
+    @if (NotOpening.Count > 0)
+    {
+        <div class="so-open-excluded" role="note" aria-label="Açılmayacak bağlantılar">
+            <p class="so-panel-text">@ResourceView.PartialSetNotice</p>
+            <p class="so-panel-text so-panel-text--sm">Bu grupta kayıtlı olup açılmayacak @NotOpening.Count bağlantı:</p>
+            <ul class="so-open-excluded-list">
+                @foreach (ResourceLink link in NotOpening) { <li @key="link.Id">@link.Name</li> }
+            </ul>
+        </div>
+    }
+    @if (Links.Count > 0)
+    {
         <button type="button" data-so-open-links class="mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-medium">
             <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" /> @Links.Count bağlantıyı aç
         </button>
@@ -23,4 +42,10 @@
     }
 </section>
 
-@code { [Parameter, EditorRequired] public IReadOnlyList<ResourceLink> Links { get; set; } = []; }
+@code {
+    /// <summary>Links the server resolved as openable now, in opening order.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<ResourceLink> Links { get; set; } = [];
+
+    /// <summary>Saved links the operator could see that the server did not return; shown by name only.</summary>
+    [Parameter] public IReadOnlyList<ResourceLink> NotOpening { get; set; } = [];
+}

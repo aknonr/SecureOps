@@ -168,7 +168,7 @@ public sealed partial class ImportPlanner
             warnings.Add("OlderThanLatestObservation");
         }
 
-        List<ImportFieldDiff> diff = [.. ObservationFields.Select(f => new ImportFieldDiff(f.Label,
+        List<ImportFieldDiff> diff = [.. _observationFields.Select(f => new ImportFieldDiff(f.Label,
             latest?.Values.GetValueOrDefault(f.Field), row[f.Field] ?? row[f.Field + "Text"], "Gözlem"))
             .Where(d => d.Proposed is not null || d.Current is not null)];
         string decision = DecisionFor(key, account.OwnsCreation ? ImportDecisions.Create : ImportDecisions.Apply,
@@ -216,7 +216,7 @@ public sealed partial class ImportPlanner
             Team(row[StagedFields.ConsumerTeam])?.Id, _input.SourceLabel, null, "Kaynak devir işareti: OK (" + _input.SourceLabel + ")", sourceKey, null, false));
     }
 
-    private static readonly (string Field, string Label)[] ObservationFields =
+    private static readonly (string Field, string Label)[] _observationFields =
     [
         (StagedFields.PasswordLastSet, "Son parola değişikliği (gözlem)"),
         (StagedFields.LastLogonAdOrLdap, "AD/LDAP son oturum (gözlem)"),
