@@ -2,7 +2,12 @@
 
 ## MVP position
 
-PowerShell Remoting through a JEA constrained endpoint is the only automation path until Phase 6. Existing Ansible/AWX is not modified or extended; Ansible may be reconsidered in Phase 6 for idempotent, approval-gated remediation.
+Two different things, kept apart:
+
+- **Read-only automation** (diagnostics and evidence collection): PowerShell Remoting through a JEA constrained endpoint is the only path until Phase 6; Ansible is not used for it.
+- **State-changing remediation** on managed servers: **Phase 8 only** (ADR-0006), always through the approval workflow, and never added earlier. Ansible is not used before Phase 6; if it is reconsidered then, any state-changing use is still remediation and stays restricted to Phase 8 and its approval workflow.
+
+Existing Ansible/AWX is not modified or extended.
 
 ## Target-server scripts
 
