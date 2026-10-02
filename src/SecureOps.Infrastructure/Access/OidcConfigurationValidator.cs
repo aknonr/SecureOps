@@ -46,6 +46,12 @@ public static class OidcConfigurationValidator
             throw new InvalidOperationException("Oidc:TokenEndpointRequestFormat must be Json or FormUrlEncoded.");
         }
 
+        if (!Enum.TryParse(options.PushedAuthorization, ignoreCase: true, out PushedAuthorizationMode _)
+            || int.TryParse(options.PushedAuthorization, out _))
+        {
+            throw new InvalidOperationException("Oidc:PushedAuthorization must be Disable, UseIfAvailable or Require.");
+        }
+
         string[] scopes = options.Scopes ?? [];
         if (scopes.Length == 0 || scopes.Length > 16
             || scopes.Any(scope => string.IsNullOrWhiteSpace(scope) || !_safeScope.IsMatch(scope))
@@ -146,4 +152,15 @@ public static class OidcConfigurationValidator
         string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase)
         || string.Equals(environmentName, "Demo", StringComparison.OrdinalIgnoreCase)
         || string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase);
+}
+
+/// <summary>Accepted <c>Oidc:PushedAuthorization</c> values; mirrors the ASP.NET Core OIDC handler setting.</summary>
+public enum PushedAuthorizationMode
+{
+    /// <summary>Never use PAR (behaviour before .NET 9).</summary>
+    Disable,
+    /// <summary>Use PAR when the IdP metadata advertises a PAR endpoint.</summary>
+    UseIfAvailable,
+    /// <summary>Fail the challenge unless the IdP supports PAR.</summary>
+    Require
 }

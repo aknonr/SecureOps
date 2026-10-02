@@ -119,6 +119,7 @@ public static class UiOidcAuthentication
         options.ResponseType = OpenIdConnectResponseType.Code;
         options.ResponseMode = OpenIdConnectResponseMode.Query;
         options.UsePkce = configured.UsePkce;
+        options.PushedAuthorizationBehavior = Enum.Parse<PushedAuthorizationBehavior>(configured.PushedAuthorization, ignoreCase: true);
         options.ProtocolValidator = new CorporateNonceProtocolValidator();
         options.MapInboundClaims = false;
         options.GetClaimsFromUserInfoEndpoint = false;

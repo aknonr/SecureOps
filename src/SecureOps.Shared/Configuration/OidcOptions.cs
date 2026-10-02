@@ -46,6 +46,12 @@ public sealed class OidcOptions
     /// <summary>Whether authorization-code redemption uses PKCE.</summary>
     public bool UsePkce { get; set; } = true;
 
+    /// <summary>
+    /// Pushed Authorization Requests: <c>Disable</c> (default, the pre-.NET 9 behaviour), <c>UseIfAvailable</c> or
+    /// <c>Require</c>. .NET 9+ would otherwise use PAR automatically whenever the IdP metadata advertises it.
+    /// </summary>
+    public string PushedAuthorization { get; set; } = "Disable";
+
     /// <summary>Whether missing configured profile claims may be retrieved from UserInfo.</summary>
     public bool GetClaimsFromUserInfoEndpoint { get; set; }
 

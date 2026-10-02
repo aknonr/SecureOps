@@ -63,6 +63,8 @@ public sealed partial class UiOidcAuthenticationTests
 
         options.ResponseType.Should().Be(OpenIdConnectResponseType.Code);
         options.UsePkce.Should().BeTrue();
+        // .NET 9+ defaults to UseIfAvailable; the corporate IdP flow keeps the pre-migration behaviour until enabled.
+        options.PushedAuthorizationBehavior.Should().Be(PushedAuthorizationBehavior.Disable);
         options.SaveTokens.Should().BeFalse();
         options.MetadataAddress.Should().EndWith("/.well-known/openid-configurations");
         options.CorrelationCookie.HttpOnly.Should().BeTrue();
