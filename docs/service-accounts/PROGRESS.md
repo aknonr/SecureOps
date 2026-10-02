@@ -9,6 +9,16 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Continuation on master and directory name search (2026-10-02)
+
+Branch `feature/service-accounts-continuation-20261002`, cut from master `e670617` (SDK 9.0.317/C# 12, migration 025,
+concurrency and authorization fixes unchanged); the knowledge-base delta `7e227ed..4e6a4ef` (delivery checkpoint,
+bundle unchanged) is applied exactly once. Harness conflict resolved on master's harness; no textual conflict with
+the open PR branches for Resources UI and agent guidance (`git merge-tree`). Added the bounded directory name search
+(ADR-0025, ADR-0008 amendment): API `POST .../directory/name-search`, AD and synthetic providers, scoped record links,
+name-free audit, UI panel, unit/SQL/composition/UI tests. SA-002 stays unnumbered; the LocalDB role tests now cover
+its two tables. Windows rows 29–38 in `WINDOWS-ACCEPTANCE.md`.
+
 ## Knowledge-base rules and report v2 (2026-10-01)
 
 On top of the follow-up line: usage records and the explained knowledge-base rule engine, owner decision 2026-10-01

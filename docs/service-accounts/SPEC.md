@@ -192,6 +192,14 @@ exists. A team label never creates a team for this purpose; nothing routes witho
 
 Version 1 snapshots are never recomputed; they render without these sections.
 
+## Directory name search (ADR-0025)
+
+Coordinators with module View and `Identity.Lookup` may search the directory by first name or full name: at least 3
+letters, at most 4 words, prefix only, Turkish İ/ı and accents equated, at most 10 results (display name, account,
+department, same-name flag, truncation flag). A result links to a Service Accounts record only when exactly one record
+with that account name is in the caller's scope. Selecting a result grants nothing, confirms no ownership and changes
+nothing in the directory. The audit keeps a query hash and counts, never the name. Exact lookup is unchanged.
+
 ## Reminders
 
 In-app notifications and coordinator message drafts only. Automatic mail requires a configured

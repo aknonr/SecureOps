@@ -12,8 +12,9 @@ is used; all business data is synthetic. The only non-local input is the set of 
 identities of section 4.
 
 Source: the pinned handoff `b4fdf8d` (`HANDOFF.md`), the follow-up `7e227ed` (`FOLLOWUP-20260930.md`) and the
-knowledge-base/report branch `feature/service-accounts-kb-rules-reports-20261001` (`KB-RULES-20261001.md`); run this
-procedure at that branch's HEAD. **That code requires SQL candidate 2 (`SA-002-usage-rules.sql` and
+knowledge-base/report branch `feature/service-accounts-kb-rules-reports-20261001` (`KB-RULES-20261001.md`, delivery
+checkpoint `4e6a4ef`) and its continuation on current master, `feature/service-accounts-continuation-20261002`
+(adds the bounded directory name search, ADR-0025); run this procedure at the continuation branch's HEAD. **That code requires SQL candidate 2 (`SA-002-usage-rules.sql` and
 `SA-002-API-permissions.sql`)**: account detail, reports and import read `svcacct.AccountUsages` and `svcacct.TeamRoles`.
 
 ## Why a Windows runner
@@ -38,12 +39,11 @@ procedure at that branch's HEAD. **That code requires SQL candidate 2 (`SA-002-u
 
 ## 2. Build and non-SQL tests
 
-Use the repository's pinned SDK (`global.json`: 8.0.100, `rollForward: latestMajor`, `LangVersion=latest`) with **no
-`LangVersion` override**; record `dotnet --version`. Known before this branch: on Linux with SDK 8.0.131 (Ubuntu
-source build) the solution does not compile at the base `7e227ed` either — `CS7036` at
-`src/SecureOps.Infrastructure/OperationalRecords/JiraIssueDraftService.cs:204` and then `CS0121` at
-`src/SecureOps.Ui/Services/SignedInUser.cs:33` (platform code). Linux results in the handoff notes were measured with SDK
-10.0.112 and `-p:LangVersion=13` and do **not** pass the pinned toolchain gate. Record the Windows result as it is.
+Use the repository's pinned SDK (master's G-30 gate: `global.json` 9.0.317, `rollForward: disable`,
+`Directory.Build.props` `LangVersion` 12.0) with **no `LangVersion` override**; record `dotnet --version`. The continuation
+branch keeps these files identical to master. On Linux it was built and tested with the Microsoft SDK 9.0.317 and no
+override (results in `PROGRESS.md`); the Windows G-30 gate itself is still to be run by Codex. Older notes measured with
+SDK 10.0.112 and `-p:LangVersion=13` do **not** count for the gate.
 
 ```powershell
 git rev-parse HEAD            # must equal the HEAD in HANDOFF.md
@@ -65,8 +65,10 @@ $env:SECUREOPS_SA_SQL_DIAGNOSTICS = "$PWD\evidence\sa-diagnostics.log"
 dotnet test tests\SecureOps.Tests.Integration -c Release --no-build --filter "FullyQualifiedName~ServiceAccounts" --logger "trx;LogFileName=sa-sql.trx" --results-directory .\evidence
 ```
 
-Expected: all module tests pass on the first run (39 at the knowledge-base HEAD: 36 SQL tests plus the three
-HTTP composition tests that need no database). The diagnostics file should contain only the
+Expected: all module tests pass on the first run (43 at the continuation HEAD, including the two LocalDB-only
+`ServiceAccountRoleSqlTests`, which now also check `svcacct.AccountUsages` and `svcacct.TeamRoles` from SA-002: API role
+SELECT/INSERT/UPDATE only, no DELETE/ALTER/CONTROL; Worker role no permission. These two cannot run on Linux; record
+their Windows result). The diagnostics file should contain only the
 intentional `Number=51091` entry of the audit-rollback test. Any other entry is the evidence that
 was missing for the two unexplained first-run failures: keep the TRX and the log.
 
@@ -169,6 +171,25 @@ coordinator, or a fifth TEST identity as verifier). Setup: the module administra
 | 27 | coordinator | snapshot A XLSX and PDF | sheets include "Direktörlük görünümü", "Bilgi bankası kuralları", "İncelenecek hesaplar", "gMSA hunisi", "Trend (son haftalar)", "Risk adayları"; **desktop Excel opens without a repair prompt**; PDF opens |
 | 28 | coordinator | a snapshot created with the pre-branch build (`7e227ed`) before upgrading, after upgrading | opens with the "bu sürümde yoktur" notice; XLSX/PDF without the new sheets; hash unchanged |
 
+Bounded directory name search (ADR-0025). Needs the real Active Directory provider (`IdentityLookup:Provider=ActiveDirectory`,
+TEST domain), a module bundle with View and a platform bundle with `Identity.Lookup` for the coordinator only. Pick two
+TEST users that share a first name (or note "no same-named pair available").
+
+| # | Caller | Call / screen | Expected |
+|---|---|---|---|
+| 29 | team member (no `Identity.Lookup`) | `/service-accounts` / `POST .../directory/name-search` | panel absent / 403 |
+| 30 | coordinator | panel "Dizinde ada göre ara": `ay`, `ay*`, `*)(cn=*` | button disabled for `ay`; API 400 `NameQueryTooShort` / `NameQueryCharacters`; no provider call (Requested audit absent) |
+| 31 | coordinator | a TEST first name in lower case, ASCII form and Turkish form (İ/ı) | same people each time; at most 10 rows; only name, account, department |
+| 32 | coordinator | the shared first name plus surname | both people listed with the "aynı adlı" note, distinguished by account and department |
+| 33 | coordinator | a name whose account has a module record in scope / out of scope | "Kaydı aç" opens the record / "Kapsamınızda kayıt yok", no id in the response |
+| 34 | coordinator | an over-broad prefix (e.g. a common first name) | 10 rows and the "daha fazla eşleşme" notice |
+| 35 | coordinator | `RateLimiting:IdentityLookup:PermitLimit` + 1 searches within its window | 429 on the call over the limit |
+| 36 | coordinator | stop network access to the DC (or point `IdentityLookup:DomainName` at an unreachable TEST name) | 503 `ServiceAccountDirectoryUnavailable`, audit `DirectoryNameSearchFailed`; no partial answer |
+| 37 | auditor | `SELECT Action, DetailsJson FROM audit.AuditLog WHERE Action LIKE 'ServiceAccount.DirectoryNameSearch%'` | Requested/Completed/Failed rows with hash, length, word and result counts; **no name or account text** |
+| 38 | coordinator | `/identity-lookup` exact account | unchanged behaviour (ADR-0008) |
+
+Row 35 uses the configured `IdentityLookup` rate-limit window; record the configured value with the result.
+
 UI (same identities): the team member opens `/service-accounts` and sees "Takibinizdeki işler"
 first; the account detail shows the participant notice and only the allowed controls.
 
@@ -199,5 +220,5 @@ recurring job is not removed automatically; removing it is an operator decision.
   (module sessions use their own pool.)
 - `SELECT Role, COUNT(*) FROM svcacct.TeamRoles WHERE RevokedAt IS NULL GROUP BY Role;` and
   `SELECT UsageKind, COUNT(*) FROM svcacct.AccountUsages GROUP BY UsageKind;`
-- Screenshots of rows 18–27 at 1440 px and 390 px.
+- Screenshots of rows 18–27 and 30–34 at 1440 px and 390 px (TEST directory names only; never commit them to the repository).
 - A short list of anything that differed from the expected column.
