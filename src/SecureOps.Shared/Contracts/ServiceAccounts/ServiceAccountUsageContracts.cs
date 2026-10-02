@@ -42,3 +42,15 @@ public sealed record CreateTeamRoleRequest(Guid TeamId, string Role, string Reas
 
 /// <summary>Revokes a team role with a reason.</summary>
 public sealed record RevokeTeamRoleRequest(string Reason);
+
+/// <summary>Bounded first-name or full-name directory search (ADR-0025). The query travels in the body, never in the URL.</summary>
+public sealed record DirectoryNameSearchRequest(string Query);
+
+/// <summary>
+/// One directory result with only the fields needed to tell people apart. A Service Accounts link is present only when
+/// exactly one record with that account name is inside the caller's scope; selecting a result grants and changes nothing.
+/// </summary>
+public sealed record DirectoryNameMatch(string DisplayName, string Account, string? Department, bool SameNameAsAnother, Guid? ServiceAccountId);
+
+/// <summary>Search answer; <c>Truncated</c> asks the caller to refine the query instead of paging the directory.</summary>
+public sealed record DirectoryNameSearchResponse(IReadOnlyList<DirectoryNameMatch> Matches, bool Truncated, int MinimumLetters, int MaximumResults);

@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using SecureOps.Api.Security;
 using SecureOps.Api.ServiceAccounts;
 using SecureOps.Infrastructure.ServiceAccounts;
+using SecureOps.Shared.Auth;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Api.Controllers.ServiceAccounts;
@@ -9,7 +12,7 @@ namespace SecureOps.Api.Controllers.ServiceAccounts;
 /// <summary>
 /// Scoped account list/detail and explicit workflow commands. Every command revalidates capability and data scope;
 /// stale versions return 409 with the caller's current view. Nothing here deletes accounts, rotates passwords,
-/// converts to gMSA or contacts a directory/source system.
+/// converts to gMSA or contacts a source system; the only directory access is the bounded read-only name search.
 /// </summary>
 [ApiController]
 [Route("api/v1/service-accounts")]
@@ -163,6 +166,18 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
     public async Task<ActionResult<AccountDetail>> DecideHandoverAsync(Guid id, HandoverDecisionRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.DecideHandoverAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>
+    /// Bounded read-only directory search by first name or full name (ADR-0025): at least three letters, at most ten results,
+    /// minimal fields, scope-checked Service Accounts links. Uses the platform identity-lookup capability and rate limit.
+    /// </summary>
+    [HttpPost("directory/name-search")]
+    [Authorize(Policy = Policies.CanIdentityLookup)]
+    [EnableRateLimiting(ApiRateLimits.IdentityLookup)]
+    [ProducesResponseType(typeof(DirectoryNameSearchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<DirectoryNameSearchResponse>> DirectoryNameSearchAsync(DirectoryNameSearchRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.DirectoryNameSearchAsync(User, Context(), request, cancellationToken));
 
     /// <summary>Records where the account is used (knowledge-base rule input).</summary>
     [HttpPost("accounts/{id:guid}/usages")]

@@ -31,8 +31,19 @@ public sealed partial class SqlServiceAccountRepository
                     UpdatedAt, UpdatedBy)
                 SELECT @id, @accountId, @Kind, @Engine, @needVerified, @Server, @Component, @Notes, 'Manual', @now, @UserId, @now, @UserId
                 WHERE EXISTS (SELECT 1 FROM svcacct.Accounts WHERE Id = @accountId);
-                """, new { id, accountId, Kind = kind.ToString(), Engine = engine?.ToString(), needVerified, Server = ServiceAccountText.Clean(request.Server),
-                Component = ServiceAccountText.Clean(request.Component), Notes = ServiceAccountText.Clean(request.Notes), now, actor.UserId }, transaction,
+                """, new
+            {
+                id,
+                accountId,
+                Kind = kind.ToString(),
+                Engine = engine?.ToString(),
+                needVerified,
+                Server = ServiceAccountText.Clean(request.Server),
+                Component = ServiceAccountText.Clean(request.Component),
+                Notes = ServiceAccountText.Clean(request.Notes),
+                now,
+                actor.UserId
+            }, transaction,
                 cancellationToken)), cancellationToken);
     }
 
@@ -46,9 +57,19 @@ public sealed partial class SqlServiceAccountRepository
                     Server = COALESCE(@Server, Server), Component = COALESCE(@Component, Component), Notes = COALESCE(@Notes, Notes),
                     UpdatedAt = @now, UpdatedBy = @UserId
                 WHERE Id = @id AND AccountId = @accountId AND RemovedAt IS NULL AND RowVer = @RowVer;
-                """, new { Engine = engine?.ToString(), request.NeedVerified, Server = ServiceAccountText.Clean(request.Server),
-                Component = ServiceAccountText.Clean(request.Component), Notes = ServiceAccountText.Clean(request.Notes), now, actor.UserId, id, accountId,
-                RowVer = Version(request.ExpectedVersion) }, transaction, cancellationToken)), cancellationToken);
+                """, new
+            {
+                Engine = engine?.ToString(),
+                request.NeedVerified,
+                Server = ServiceAccountText.Clean(request.Server),
+                Component = ServiceAccountText.Clean(request.Component),
+                Notes = ServiceAccountText.Clean(request.Notes),
+                now,
+                actor.UserId,
+                id,
+                accountId,
+                RowVer = Version(request.ExpectedVersion)
+            }, transaction, cancellationToken)), cancellationToken);
 
     /// <summary>Removes an active usage with a reason; the row is kept.</summary>
     public Task<SaResult<Guid>> RemoveUsageAsync(Guid accountId, Guid id, RemoveUsageRequest request, SaActor actor, CancellationToken cancellationToken) =>
@@ -98,6 +119,26 @@ public sealed partial class SqlServiceAccountRepository
         MutateAsync(null, "TeamRole", id, "TeamRoleRevoked", null, reason.Trim(), actor, (connection, transaction, now) => connection.ExecuteAsync(Cmd("""
             UPDATE svcacct.TeamRoles SET RevokedAt = @now, RevokedBy = @UserId, RevokedReason = @Reason WHERE Id = @id AND RevokedAt IS NULL;
             """, new { now, actor.UserId, Reason = reason.Trim(), id }, transaction, cancellationToken)), cancellationToken);
+
+    /// <summary>
+    /// Accounts with one of the given account keys that are inside the caller's scope (same predicate as every list).
+    /// Records outside the scope are never returned, so their existence is not revealed.
+    /// </summary>
+    public async Task<IReadOnlyList<(Guid Id, string NameKey)>> AccessibleAccountsByNameAsync(ServiceAccountScope scope, IReadOnlyCollection<string> nameKeys,
+        CancellationToken cancellationToken)
+    {
+        if (nameKeys.Count == 0 || scope.IsEmpty)
+        {
+            return [];
+        }
+
+        DynamicParameters parameters = ScopeParameters(scope, new { names = System.Text.Json.JsonSerializer.Serialize(nameKeys) });
+        await using SqlConnection connection = await OpenAsync(cancellationToken);
+        return [.. await connection.QueryAsync<(Guid, string)>(Cmd($"""
+            SELECT a.Id, a.NormalizedName FROM svcacct.Accounts a
+            WHERE a.NormalizedName IN (SELECT value FROM OPENJSON(@names)) AND {ScopePredicate};
+            """, parameters, null, cancellationToken))];
+    }
 
     private sealed record UsageRow(Guid Id, string UsageKind, string? DatabaseEngine, bool? NeedVerified, string? Server, string? Component, string? Notes,
         string? ExceptionReason, DateTimeOffset? ExceptionAt, DateTimeOffset? RemovedAt, string? RemovedReason, DateTimeOffset CreatedAt, byte[] RowVer);
