@@ -1,7 +1,7 @@
 # SecureOps.Ui
 ## Start here
 
-Blazor Server UI for WASAS SecureOps: `net10.0`, C# 12, SDK pinned in `global.json`, MudBlazor 6.16. It talks
+Blazor Server UI for WASAS SecureOps: `net10.0`, C# 14, SDK pinned in `global.json`, MudBlazor 6.16. It talks
 only to the SecureOps API; the API decides every permission ([the one rule](#the-one-rule-that-shapes-everything)).
 Agent rules: `AGENTS.md`, `CLAUDE.md`, `docs/agent-guides/060-ui.md`.
 

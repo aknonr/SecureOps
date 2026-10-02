@@ -22,7 +22,7 @@ public sealed class BuildToolchainContractTests
         sdk.GetProperty("allowPrerelease").GetBoolean().Should().BeFalse();
         var props = XElement.Load(Path.Combine(root.FullName, "Directory.Build.props"));
         props.Descendants("TargetFramework").Single().Value.Should().Be("net10.0");
-        props.Descendants("LangVersion").Single().Value.Should().Be("12.0");
-        props.Descendants("AnalysisLevel").Single().Value.Should().Be("9.0");
+        props.Descendants("LangVersion").Single().Value.Should().Be("14.0");
+        props.Descendants("AnalysisLevel").Single().Value.Should().Be("10.0");
     }
 }
