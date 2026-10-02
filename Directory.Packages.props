@@ -36,9 +36,9 @@
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="5.2.3" />
 
     <!-- Hangfire -->
-    <PackageVersion Include="Hangfire.Core" Version="1.8.6" />
-    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.6" />
-    <PackageVersion Include="Hangfire.SqlServer" Version="1.8.6" />
+    <PackageVersion Include="Hangfire.Core" Version="1.8.25" />
+    <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.25" />
+    <PackageVersion Include="Hangfire.SqlServer" Version="1.8.25" />
 
     <!-- PowerShell / JEA -->
     <PackageVersion Include="Microsoft.PowerShell.SDK" Version="7.6.6" />
