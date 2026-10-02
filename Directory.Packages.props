@@ -44,8 +44,7 @@
     <PackageVersion Include="Microsoft.PowerShell.SDK" Version="7.6.6" />
 
     <!-- Validation -->
-    <PackageVersion Include="FluentValidation" Version="11.12.0" />
-    <PackageVersion Include="FluentValidation.AspNetCore" Version="11.3.1" />
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <!-- Pinned so the generated OpenAPI document stays byte-stable after Microsoft.AspNetCore.OpenApi was removed. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="1.4.3" />

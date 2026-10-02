@@ -36,7 +36,6 @@
 
     <!-- Validation -->
     <PackageReference Include="FluentValidation" />
-    <PackageReference Include="FluentValidation.AspNetCore" />
 
     <!-- Logging -->
     <PackageReference Include="Serilog.AspNetCore" />
