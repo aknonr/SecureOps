@@ -105,6 +105,7 @@ public static class DependencyInjection
             services.AddSingleton<IActiveDirectoryEnrichmentClient, ActiveDirectoryGroupClient>();
             services.AddScoped<IDirectoryGroupProvider, ActiveDirectoryDirectoryGroupProvider>();
             services.AddScoped<IDirectoryEnrichmentProvider, ActiveDirectoryDirectoryEnrichmentProvider>();
+            services.AddSingleton<IDirectoryNameSearchProvider, ActiveDirectoryNameSearchProvider>();
         }
         else
         {
@@ -113,6 +114,7 @@ public static class DependencyInjection
                     serviceProvider.GetRequiredService<IOptions<IdentityLookupOptions>>()));
             services.AddSingleton<IDirectoryGroupProvider, MockDirectoryGroupProvider>();
             services.AddSingleton<IDirectoryEnrichmentProvider, MockDirectoryEnrichmentProvider>();
+            services.AddSingleton<IDirectoryNameSearchProvider>(_ => new MockDirectoryNameSearchProvider());
         }
 
         string? auditProvider = configuration[$"{AuditOptions.SectionName}:Provider"];

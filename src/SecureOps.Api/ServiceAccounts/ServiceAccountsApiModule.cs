@@ -54,6 +54,7 @@ public static class ServiceAccountReplies
             SaErrors.DecisionsRequired => (409, "import-decisions", false, "Karar bekleyen satırlar var."),
             SaErrors.AlreadyImported => (409, "import-replay", false, "Bu dosya aynı dönem ve kapsam için zaten aktarıldı."),
             SaErrors.NotConfigured => (503, "configuration", false, "Servis hesapları modülü bu ortamda etkin değil."),
+            SaErrors.DirectoryUnavailable => (503, "directory", true, "Dizin sağlayıcısına şu an ulaşılamıyor."),
             _ => (503, "persistence", true, "Kayıt deposuna şu an ulaşılamıyor.")
         };
         ObjectResult problem = OperationalProblemDetails.Create(status, result.ErrorCode!, title, controller.HttpContext.TraceIdentifier, stage, retryable);

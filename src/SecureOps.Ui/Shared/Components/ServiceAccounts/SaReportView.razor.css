@@ -1,0 +1,44 @@
+.sa-bars {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.sa-bars th,
+.sa-bars td {
+    padding: 0.25rem 0.5rem;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.sa-bars thead th {
+    font-weight: 600;
+}
+
+.sa-bars td:nth-child(2) {
+    min-width: 12rem;
+    white-space: nowrap;
+}
+
+/* Single-series magnitude: one hue, thin rounded bar; the value is always printed beside it. */
+.sa-bar {
+    display: inline-block;
+    width: calc(var(--sa-bar) * 0.7);
+    min-width: 2px;
+    max-width: 70%;
+    height: 0.6rem;
+    margin-right: 0.5rem;
+    border-radius: 0 4px 4px 0;
+    background: var(--mud-palette-primary);
+    vertical-align: middle;
+}
+
+.sa-bar-value {
+    font-variant-numeric: tabular-nums;
+}
+
+@media (forced-colors: active) {
+    .sa-bar {
+        background: CanvasText;
+    }
+}

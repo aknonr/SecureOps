@@ -66,6 +66,34 @@ public sealed class ServiceAccountApiCompositionTests
     }
 
     [Fact]
+    public async Task DirectoryNameSearch_NeedsTheModuleAndIdentityLookup_AndIsRateLimited()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        await ApproveAsync(factory, "demo:platform-admin", "Admin");
+        await ApproveAsync(factory, "demo:team-lead", "Lead");
+        const string route = "/api/v1/service-accounts/directory/name-search";
+        using (HttpClient anonymous = factory.CreateClient())
+        {
+            (await anonymous.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+
+        foreach (string actor in new[] { DemoApiAuthentication.PlatformAdminActor, DemoApiAuthentication.TeamLeadActor })
+        {
+            using HttpClient client = factory.CreateClient();
+            client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
+            (await client.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode
+                .Should().Be(HttpStatusCode.Forbidden, $"{actor}: identity lookup alone does not open the module search");
+        }
+
+        RouteEndpoint endpoint = factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
+            .Single(e => e.RoutePattern.RawText == "api/v1/service-accounts/directory/name-search");
+        endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should()
+            .Contain([ServiceAccountPolicies.View, SecureOps.Shared.Auth.Policies.CanIdentityLookup]);
+        endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()!.PolicyName
+            .Should().Be(SecureOps.Api.Security.ApiRateLimits.IdentityLookup);
+    }
+
+    [Fact]
     public void EveryModuleEndpoint_RequiresAModuleCapabilityPolicy()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();

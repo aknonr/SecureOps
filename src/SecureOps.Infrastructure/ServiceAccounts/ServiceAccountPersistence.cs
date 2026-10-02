@@ -36,6 +36,8 @@ public static class SaErrors
     public const string NotConfigured = "ServiceAccountsNotConfigured";
     /// <summary>Persistence unavailable.</summary>
     public const string Unavailable = "ServiceAccountPersistenceUnavailable";
+    /// <summary>The identity directory is not configured, timed out or failed.</summary>
+    public const string DirectoryUnavailable = "ServiceAccountDirectoryUnavailable";
     /// <summary>Import file rejected.</summary>
     public const string ImportFile = "ServiceAccountImportFileRejected";
     /// <summary>Import preview is stale.</summary>

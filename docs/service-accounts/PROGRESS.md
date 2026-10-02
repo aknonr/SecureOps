@@ -9,6 +9,26 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Continuation on master and directory name search (2026-10-02)
+
+Branch `feature/service-accounts-continuation-20261002`, cut from master `e670617` (SDK 9.0.317/C# 12, migration 025,
+concurrency and authorization fixes unchanged); the knowledge-base delta `7e227ed..4e6a4ef` (delivery checkpoint,
+bundle unchanged) is applied exactly once. Harness conflict resolved on master's harness; no textual conflict with
+the open PR branches for Resources UI and agent guidance (`git merge-tree`). Added the bounded directory name search
+(ADR-0025, ADR-0008 amendment): API `POST .../directory/name-search`, AD and synthetic providers, scoped record links,
+name-free audit, UI panel, unit/SQL/composition/UI tests. SA-002 stays unnumbered; the LocalDB role tests now cover
+its two tables. Windows rows 29–38 in `WINDOWS-ACCEPTANCE.md`.
+
+## Knowledge-base rules and report v2 (2026-10-01)
+
+On top of the follow-up line: usage records and the explained knowledge-base rule engine, owner decision 2026-10-01
+(SQL-team accounts are evaluated as gMSA by the configured executing team, routed automatically on import), gMSA funnel,
+12-week trend, risk candidates, directorate view, snapshot comparison, SQL candidate SA-002 and ADR-0024 (proposed,
+read-only discovery). Completed 2026-10-02: Oracle corrected to an unverified manual review, duplicate gMSA routing
+fixed, persisted-access verification, browser boundary journey on the real composition (allowed journeys blocked on
+Linux, see Windows rows 17–28), master conflict analysis. Details, hashes and results:
+[KB-RULES-20261001.md](KB-RULES-20261001.md). Module integration 39/39 under the restricted role (SDK 9.0.317, no override).
+
 ## Follow-up 2026-09-30 (after the pinned handoff)
 
 The Codex handoff stays pinned at `b4fdf8d`. Module-only follow-up changes, results and what to

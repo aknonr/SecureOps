@@ -1,0 +1,46 @@
+diff --git a/tests/sql/service-accounts/sa-sql-harness.ps1 b/tests/sql/service-accounts/sa-sql-harness.ps1
+index 75ccd33..6f611b5 100644
+--- a/tests/sql/service-accounts/sa-sql-harness.ps1
++++ b/tests/sql/service-accounts/sa-sql-harness.ps1
+@@ -45,10 +45,16 @@ try {
+     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-001-service-accounts.sql' | Out-Null
+     if ($LASTEXITCODE -eq 0) { throw 'Candidate replay was not refused.' }
+     Write-Host 'replay refused as expected'
++    Invoke-SaSql -Database $database -File 'SA-002-usage-rules.sql'
++    Write-Host 'applied SA-002-usage-rules.sql (candidate 2)'
++    & $sqlcmd -S $server -d $database -E -I -b -i 'SA-002-usage-rules.sql' | Out-Null
++    if ($LASTEXITCODE -eq 0) { throw 'Candidate 2 replay was not refused.' }
++    Write-Host 'candidate 2 replay refused as expected'
+     if (-not $SkipRoleScripts) {
+         Invoke-SaSql -Database $database -File 'SA-API-permissions.sql'
+         Invoke-SaSql -Database $database -File 'SA-Worker-permissions.sql'
+-        Write-Host 'applied SA-API-permissions.sql and SA-Worker-permissions.sql (no role member assigned)'
++        Invoke-SaSql -Database $database -File 'SA-002-API-permissions.sql'
++        Write-Host 'applied SA-API-permissions.sql, SA-Worker-permissions.sql and SA-002-API-permissions.sql (no role member assigned)'
+     }
+ } finally { Pop-Location }
+ 
+diff --git a/tests/sql/service-accounts/sa-sql-harness.sh b/tests/sql/service-accounts/sa-sql-harness.sh
+index b8519de..1bd4562 100644
+--- a/tests/sql/service-accounts/sa-sql-harness.sh
++++ b/tests/sql/service-accounts/sa-sql-harness.sh
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env bash
+ # Isolated Service Accounts SQL harness for a disposable SQL Server container (Linux/cloud runners).
+ # Creates a NEW database, applies numbered migrations (now 001-025) in order,
+-# verifies replay refusal and prints the connection string for SECUREOPS_SA_SQL_TEST_CONNECTION.
++# then candidate 2 (SA-002), verifies replay refusal and prints the connection string for SECUREOPS_SA_SQL_TEST_CONNECTION.
+ # It never targets an existing database and never runs against corporate servers.
+ # Usage: SA_PASSWORD=... sa-sql-harness.sh <container> <new-database-name> [host-port]
+ set -euo pipefail
+@@ -30,4 +30,10 @@ if sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-001-service-
+   echo "Candidate replay was not refused." >&2; exit 1
+ fi
+ echo "replay refused as expected"
++sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-002-usage-rules.sql > /dev/null
++echo "applied SA-002-usage-rules.sql (candidate 2)"
++if sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-002-usage-rules.sql > /dev/null 2>&1; then
++  echo "Candidate 2 replay was not refused." >&2; exit 1
++fi
++echo "candidate 2 replay refused as expected"
+ echo "SECUREOPS_SA_SQL_TEST_CONNECTION=Server=127.0.0.1,$port;Database=$database;User Id=sa;Password=<SA_PASSWORD>;TrustServerCertificate=True;Encrypt=False"

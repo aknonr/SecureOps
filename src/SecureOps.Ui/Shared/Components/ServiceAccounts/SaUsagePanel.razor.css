@@ -1,0 +1,14 @@
+.sa-rule-items {
+    margin: 0;
+    padding-left: 1.25rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+::deep .sa-usage-engine {
+    min-width: 10rem;
+}
+
+.sa-usage-reason {
+    max-width: 48rem;
+}

@@ -65,3 +65,9 @@ Rejected. It creates unnecessary directory browsing risk and conflicts with the 
 - `docs/06-integrations.md`
 - `docs/08-audit-model.md`
 - `plans/PHASE-1A-identity-lookup-mvp.md`
+
+## Amendment (2026-10-01)
+
+ADR-0025 adds one bounded, prefix-only name search inside the Service Accounts module (3+ letters, at most 10 results,
+three returned fields, `Identity.Lookup` plus module View, same rate limit, name-free audit). Exact lookup described
+above is unchanged and remains the only platform-wide identity endpoint. Broad wildcard search stays rejected.

@@ -45,10 +45,16 @@ try {
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-001-service-accounts.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate replay was not refused.' }
     Write-Host 'replay refused as expected'
+    Invoke-SaSql -Database $database -File 'SA-002-usage-rules.sql'
+    Write-Host 'applied SA-002-usage-rules.sql (candidate 2)'
+    & $sqlcmd -S $server -d $database -E -I -b -i 'SA-002-usage-rules.sql' | Out-Null
+    if ($LASTEXITCODE -eq 0) { throw 'Candidate 2 replay was not refused.' }
+    Write-Host 'candidate 2 replay refused as expected'
     if (-not $SkipRoleScripts) {
         Invoke-SaSql -Database $database -File 'SA-API-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-Worker-permissions.sql'
-        Write-Host 'applied SA-API-permissions.sql and SA-Worker-permissions.sql (no role member assigned)'
+        Invoke-SaSql -Database $database -File 'SA-002-API-permissions.sql'
+        Write-Host 'applied SA-API-permissions.sql, SA-Worker-permissions.sql and SA-002-API-permissions.sql (no role member assigned)'
     }
 } finally { Pop-Location }
 

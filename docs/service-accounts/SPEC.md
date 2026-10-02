@@ -143,6 +143,63 @@ selected total. Events after the cutoff never enter a past report. A late histor
 updates the live report; a sent snapshot never changes. The organization filter applies equally
 to summary, detail, export and job queries.
 
+## Knowledge-base usage rules (rule set `kb-2026-08-11+karar-2026-10-01+r2`)
+
+Source: the team's knowledge-base page on service account requests (last modified 2026-08-11), sanitized here, plus
+the owner decision of 2026-10-01. Usages are recorded per account (several per account); the rule engine explains every
+recommendation ("neden bu öneri") and never changes ownership, suitability, request state or closure.
+
+| Usage | Rule code | Recommended path |
+|---|---|---|
+| Database, SQL Server | KB-VT-SQL | gMSA evaluation by the configured gMSA executing team (decision 2026-10-01 replaces "the database team takes it") |
+| Database, Oracle | KB-VT-ORACLE | **Manual review, unverified.** No approved Oracle business rule exists; the knowledge-base note "Oracle ise servis hesabına gerek yok" is not applied as an established rule (the 2026-10-01 decision covers SQL teams only). Removal or deletion is never recommended automatically |
+| Database, engine unknown | KB-VT-MOTOR | Information missing |
+| File server / share | KB-DOSYA | The solution team takes the account; ours is deleted after confirmation with the solution team/SRE |
+| Scheduled task | KB-GOREV | Not preferred; research an alternative |
+| Windows service, need not verified | KB-SERVIS | Verify the real need and dependency first |
+| Windows service, need verified, no resource recorded | KB-SERVIS-KAYNAK | Information missing (record what it accesses) |
+| Application runs from a UNC path | KB-UNC | Move the application to the server's local disk |
+| IIS virtual directory to a share | KB-IIS-SANAL | Remove the dependency; reach the resource from code/configuration |
+| IIS application pool, other | KB-YOK | No rule; manual review |
+| Account of a team tagged as SQL team | SQL-EKIP | gMSA evaluation by the executing team (decision 2026-10-01) |
+| Two different handover targets on one account | KB-BOLUNME | Splitting the account must be evaluated |
+
+Primary path precedence: information missing → verify need → split → gMSA → solution team → no account needed → local
+disk → virtual directory → alternative → manual. Conformance: *unplanned* (= against the rule) when no matching work
+exists; *planned* when matching open work exists (gMSA: transition record or GmsaHandover/GmsaConversion request;
+removal: deletion request; solution team: proposed handover; others: open review/evaluation); *completed* only with a
+verified gMSA or deletion closure or an accepted handover with evidence; *exception* only when every rule item carries a
+reasoned exception recorded by a verifier; *manual review pending* when no approved rule decides the path (Oracle,
+IIS application pool, other) and no review/evaluation request is open — this is listed for review but is **not** counted
+as against the rule. "No account needed" is reserved for a future approved rule; no current rule produces it. A
+recommendation is never gMSA suitability (rule 10).
+
+**Automatic gMSA routing on import (decision 2026-10-01).** When an account's confirmed owner team, or the existing team
+named as the source team in the row (DBA list "Ekip"), is tagged as an SQL team and a gMSA executing team is configured,
+the preview shows a "gMSA yönlendirme (SQL-EKIP)" line and the commit opens one open GmsaHandover request targeted at the
+executing team (idempotent source key per account and team) plus a gMSA transition with unknown suitability if none
+exists. A team label never creates a team for this purpose; nothing routes without a configured executing team.
+
+## Metric version 2 sections (`sa-metrics-v2`)
+
+| Section | Definition |
+|---|---|
+| Rules | Accounts assessed, against-rule (unplanned) count, review list (against the rule, missing information, manual review pending), counts per path and per conformance |
+| gMSA funnel | Population: accounts with a gMSA transition, a gMSA request, a performed conversion or a gMSA rule item. Each account once at its highest stage: Unknown → Review → Eligible → HandedOver (accepted handover with evidence) → Converted (performed conversion) → Verified (verified gMSA closure); Ineligible counted separately |
+| Trend | 12 Istanbul weeks ending with the report week: open requests and overdue requests at each week end (recomputed from current records and current plan dates; legacy closes without a time are excluded and counted), verified closures and performed actions in the week |
+| Risk candidates | From the latest coordination-list observation, measured from its source report date: last logon ≥ 90 days (later of the two logon values), no logon value, password unchanged ≥ 365 days, absent from the latest list. Thresholds configurable; closure-verified accounts excluded; candidates are never closures |
+| Directorate view | One row per owner/target team in scope plus "no owner team": owned accounts, open requests as target, overdue, awaiting date, against-rule, pending gMSA, risk candidates. No person-level figures or ranking |
+
+Version 1 snapshots are never recomputed; they render without these sections.
+
+## Directory name search (ADR-0025)
+
+Coordinators with module View and `Identity.Lookup` may search the directory by first name or full name: at least 3
+letters, at most 4 words, prefix only, Turkish İ/ı and accents equated, at most 10 results (display name, account,
+department, same-name flag, truncation flag). A result links to a Service Accounts record only when exactly one record
+with that account name is in the caller's scope. Selecting a result grants nothing, confirms no ownership and changes
+nothing in the directory. The audit keeps a query hash and counts, never the name. Exact lookup is unchanged.
+
 ## Reminders
 
 In-app notifications and coordinator message drafts only. Automatic mail requires a configured

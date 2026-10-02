@@ -30,7 +30,8 @@ public sealed partial class ServiceAccountService
         }
 
         AccountDetail? detail = await repository.AccountDetailAsync(id, Today, cancellationToken);
-        return detail is null ? SaResult<AccountDetail>.Fail(SaErrors.NotFound) : detail with { Permissions = Permissions(caller, anchor.Anchor, detail.Requests) };
+        return detail is null ? SaResult<AccountDetail>.Fail(SaErrors.NotFound)
+            : await WithRulesAsync(detail with { Permissions = Permissions(caller, anchor.Anchor, detail.Requests) }, cancellationToken);
     }
 
     /// <summary>

@@ -192,7 +192,8 @@ public sealed partial class ServiceAccountService
         }
 
         string label = await ScopeLabelAsync(caller.Scope, query.OrganizationId, query.TeamId, cancellationToken);
-        (ReportFacts facts, string watermark) = await repository!.ReportFactsAsync(caller.Scope, query.OrganizationId, query.TeamId, cancellationToken);
+        (ReportFacts facts, string watermark) = await repository!.ReportFactsAsync(caller.Scope, query.OrganizationId, query.TeamId, Thresholds, null,
+            cancellationToken);
         ServiceAccountReport report = ServiceAccountMetrics.Compute(facts, period.Start, period.EndExclusive, asOf, label, query.Period ?? ReportPeriods.Week);
         SnapshotScope scope = new(caller.Scope.All, [.. caller.Scope.Organizations.Order()], [.. caller.Scope.Teams.Order()], query.OrganizationId, query.TeamId, label);
         return (report, scope, watermark);

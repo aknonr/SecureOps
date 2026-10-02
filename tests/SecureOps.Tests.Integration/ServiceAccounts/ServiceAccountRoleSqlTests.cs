@@ -31,10 +31,18 @@ public sealed class ServiceAccountRoleSqlTests
             await RightsAsync(connection, transaction, "audit.AuditLog", false, "SELECT", "UPDATE", "DELETE");
             await RightsAsync(connection, transaction, "svcacct.Accounts", false, "DELETE", "ALTER", "CONTROL");
             await RightsAsync(connection, transaction, "svcacct.TeamMemberships", false, "SELECT", "INSERT", "UPDATE", "DELETE");
+            // SA-002 (unnumbered candidate 2): usages and team roles are mutable but never deleted.
+            foreach (string table in new[] { "AccountUsages", "TeamRoles" })
+            {
+                await RightsAsync(connection, transaction, "svcacct." + table, true, "SELECT", "INSERT", "UPDATE");
+                await RightsAsync(connection, transaction, "svcacct." + table, false, "DELETE", "ALTER", "CONTROL");
+            }
             await connection.ExecuteAsync("SELECT TOP (0) Id FROM svcacct.Accounts; UPDATE svcacct.Accounts SET Notes = Notes WHERE 1 = 0;",
                 transaction: transaction);
             Func<Task> delete = async () => await connection.ExecuteAsync("DELETE FROM svcacct.Accounts WHERE 1 = 0;", transaction: transaction);
             (await delete.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(229);
+            Func<Task> deleteUsage = async () => await connection.ExecuteAsync("DELETE FROM svcacct.AccountUsages WHERE 1 = 0;", transaction: transaction);
+            (await deleteUsage.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(229);
         });
     }
 
@@ -51,6 +59,8 @@ public sealed class ServiceAccountRoleSqlTests
             await RightsAsync(connection, transaction, "svcacct.History", false, "SELECT", "INSERT", "UPDATE", "DELETE");
             await RightsAsync(connection, transaction, "svcacct.Evidence", false, "SELECT", "INSERT");
             await RightsAsync(connection, transaction, "audit.AuditLog", false, "INSERT");
+            await RightsAsync(connection, transaction, "svcacct.AccountUsages", false, "SELECT", "INSERT", "UPDATE", "DELETE");
+            await RightsAsync(connection, transaction, "svcacct.TeamRoles", false, "SELECT", "INSERT", "UPDATE", "DELETE");
             await connection.ExecuteAsync("SELECT TOP (0) Id FROM svcacct.Accounts; SELECT TOP (0) Id FROM svcacct.WorkRequests; "
                 + "UPDATE svcacct.ReminderOutbox SET LeaseOwner = LeaseOwner WHERE 1 = 0;", transaction: transaction);
             Func<Task> readHistory = async () => await connection.ExecuteAsync("SELECT TOP (0) Id FROM svcacct.History;", transaction: transaction);

@@ -53,6 +53,8 @@ public sealed partial class SqlServiceAccountRepository
             FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY AccountId, SourceProfile ORDER BY SourceReportDate DESC, RecordedAt DESC) AS Rn
                   FROM svcacct.AccountObservations) o WHERE Rn = 1;
             SELECT AccountId FROM svcacct.IdentityTransitions WHERE Target = 'gMSA';
+            SELECT TeamId, Role FROM svcacct.TeamRoles WHERE RevokedAt IS NULL;
+            SELECT DISTINCT AccountId FROM svcacct.WorkRequests WHERE ActionType IN ('GmsaHandover','GmsaConversion');
             """, null, transaction, cancellationToken, _commitTimeoutSeconds));
         var accounts = (await grid.ReadAsync<AccountContextRow>()).ToList();
         ILookup<Guid, Guid> requestTeams = (await grid.ReadAsync<(Guid AccountId, Guid TeamId)>()).ToLookup(r => r.AccountId, r => r.TeamId);
@@ -69,13 +71,17 @@ public sealed partial class SqlServiceAccountRepository
                 StringComparer.Ordinal);
         ContextObservation[] observations = [.. (await grid.ReadAsync<ObservationContextRow>()).Select(o => o.ToContext())];
         HashSet<Guid> gmsa = [.. await grid.ReadAsync<Guid>()];
+        var roles = (await grid.ReadAsync<(Guid TeamId, string Role)>()).ToList();
+        HashSet<Guid> gmsaRequests = [.. await grid.ReadAsync<Guid>()];
         return new ImportContext(
             [.. accounts.Select(a => new ContextAccount(a.Id, a.IdentityKey, a.NormalizedName, a.NormalizedDomain, a.AccountName, a.ReportOrganizationId,
                 a.CurrentOwnerTeamId, a.CurrentOwnerPersonId, a.ConsumerTeamId, a.Notes, Version(a.RowVer), a.LastObservedOn,
                 [.. requestTeams[a.Id]], [.. handoverTeams[a.Id]]))],
             teams, orgs,
             [.. people.Select(p => new ContextPerson(p.Id, p.Key, p.Name, [.. aliases[p.Id]], p.State == "Verified"))],
-            legacy, sourceKeys, communications, observations, gmsa, scope);
+            legacy, sourceKeys, communications, observations, gmsa, scope,
+            roles.Where(r => r.Role == ServiceAccountTeamRoles.SqlTeam).Select(r => r.TeamId).ToHashSet(),
+            roles.Where(r => r.Role == ServiceAccountTeamRoles.GmsaExecutor).Select(r => (Guid?)r.TeamId).FirstOrDefault(), gmsaRequests);
     }
 
     /// <summary>Finds a committed batch with the same replay key.</summary>

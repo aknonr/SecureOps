@@ -29,6 +29,7 @@ public sealed partial class SqlServiceAccountRepository
             "Transition" => "svcacct.IdentityTransitions",
             "Ownership" => "svcacct.OwnershipAssignments",
             "Evidence" => "svcacct.Evidence",
+            "Usage" => "svcacct.AccountUsages",
             _ => throw new InvalidOperationException("Unsupported entity.")
         };
         await using SqlConnection connection = await OpenAsync(cancellationToken);

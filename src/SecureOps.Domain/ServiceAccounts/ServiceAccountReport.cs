@@ -18,8 +18,11 @@ public sealed record AccountFact(Guid Id, string Label, Guid? OwnerTeamId, Guid?
 /// <param name="PlanEnd">Plan end.</param>
 /// <param name="FollowupPersonId">Follow-up person; never an owner.</param>
 /// <param name="OrderKey">Deterministic ordering key (creation time, legacy row) for the legacy projection.</param>
+/// <param name="CreatedAt">Record creation instant (trend).</param>
+/// <param name="ClosedAt">Close instant; null for an open request or a legacy close without a time (trend).</param>
 public sealed record RequestFact(Guid Id, Guid AccountId, ServiceAccountActionType ActionType, ServiceAccountRequestStatus Status,
-    Guid? TargetTeamId, DateOnly? PlanStart, DateOnly? PlanEnd, Guid? FollowupPersonId, string OrderKey);
+    Guid? TargetTeamId, DateOnly? PlanStart, DateOnly? PlanEnd, Guid? FollowupPersonId, string OrderKey, DateTimeOffset? CreatedAt = null,
+    DateTimeOffset? ClosedAt = null);
 
 /// <summary>Scoped action fact; one row per action identity.</summary>
 /// <param name="Id">Action.</param>
@@ -67,9 +70,10 @@ public sealed record FindingFact(Guid AccountId, FindingStatus Status);
 /// <param name="Transitions">gMSA transitions.</param>
 /// <param name="Findings">Findings.</param>
 /// <param name="TeamNames">Team labels.</param>
+/// <param name="Insights">Metric version 2 inputs; without them only the version 1 sections are computed.</param>
 public sealed record ReportFacts(IReadOnlyList<AccountFact> Accounts, IReadOnlyList<RequestFact> Requests, IReadOnlyList<ActionFact> Actions,
     IReadOnlyList<CommunicationFact> Communications, IReadOnlyList<HandoverFact> Handovers, IReadOnlyList<TransitionFact> Transitions,
-    IReadOnlyList<FindingFact> Findings, IReadOnlyDictionary<Guid, string> TeamNames);
+    IReadOnlyList<FindingFact> Findings, IReadOnlyDictionary<Guid, string> TeamNames, InsightFacts? Insights = null);
 
 /// <summary>Reconciled weekly category counts: the parts always add up to the total.</summary>
 /// <param name="InPeriod">In the report week.</param>
@@ -128,7 +132,10 @@ public sealed record NamedCount(string Label, int Count);
 /// </summary>
 public sealed record LegacyOwnershipProjection(int NamedAccounts, int FollowupFallbackAccounts, int CombinedAccounts, int CombinedPeople, string Label);
 
-/// <summary>Immutable report payload; live views, snapshots, XLSX and PDF all use this one shape.</summary>
+/// <summary>
+/// Immutable report payload; live views, snapshots, XLSX and PDF all use this one shape. The version 2 sections are
+/// null in snapshots stored under version 1 (those snapshots are never recomputed).
+/// </summary>
 public sealed record ServiceAccountReport(
     string MetricDefinitionVersion,
     DateOnly WeekStart,
@@ -142,7 +149,12 @@ public sealed record ServiceAccountReport(
     HandoverSummary Handover,
     LegacyOwnershipProjection Legacy,
     IReadOnlyList<string> Notes,
-    string Period = ReportPeriods.Week);
+    string Period = ReportPeriods.Week,
+    RuleSummary? Rules = null,
+    GmsaFunnel? Funnel = null,
+    ReportTrend? Trend = null,
+    RiskSummary? Risk = null,
+    IReadOnlyList<DirectorateRow>? Directorate = null);
 
 /// <summary>Report period kinds. The week stays the default; a month or a custom range uses the same metric rules.</summary>
 public static class ReportPeriods
