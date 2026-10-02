@@ -41,8 +41,8 @@ public sealed class ApiReleasePackagingContractTests
             .And.Contain("Test-ApiReleasePayload.ps1");
         // Schema selection moved to the reviewed 024/025 selector; the publisher must consume its result.
         string selector = File.ReadAllText(Path.Combine(root, "scripts", "release", "Get-ReleaseSqlPlan.ps1"));
-        selector.Should().Contain("$last = if ($IncludeServiceAccounts) { 25 } else { 24 }")
-            .And.Contain("Expected the exact complete 001-$last SQL chain; 025 must be explicitly reviewed.");
+        selector.Should().Contain("$last = if ($IncludeServiceAccounts) { 26 } else { 24 }")
+            .And.Contain("Expected the exact complete 001-$last SQL chain; 025/026 must be explicitly reviewed.");
         paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema=$sqlPlan.RequiredSchema")
             .And.Contain("Get-ReleaseSqlPlan.ps1").And.Contain("-IncludeServiceAccounts:$IncludeServiceAccounts")
             .And.Contain("upgradeFromVerified018='019-024'").And.Contain("database-delta")

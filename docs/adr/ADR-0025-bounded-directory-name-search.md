@@ -22,8 +22,10 @@ broad wildcard search because it would turn the platform into a people-browsing 
 - **Input:** first name or full name, 3–64 characters, at least 3 letters, at most 4 words; only letters, combining
   marks, space, apostrophe, hyphen and period. Wildcards and LDAP filter characters are rejected before any provider
   call and escaped again (RFC 4515) when the filter is built. Only a trailing wildcard is added by the server.
-- **Turkish names:** the directory filter asks for the typed, Turkish (tr-TR) and invariant title/upper/lower spellings
-  so İ/ı/I/i match; results are re-checked and ordered with a Turkish- and accent-insensitive key.
+- **Turkish names:** the filter and result check use the same Turkish/ASCII equivalence (İ/ı/I/i, ş/s, ğ/g,
+  ç/c, ö/o, ü/u). All given-name words before the last surname token must match; middle words are never dropped.
+  Spelling expansion is capped at 256 alternatives; an excessive query returns `NameQueryTooComplex` before
+  provider access. Each alternative remains a prefix, never a substring or caller-provided wildcard.
 - **Output:** at most 10 results, with only display name, account name and department, plus a `SameNameAsAnother`
   flag so same-named people can be told apart, and a `Truncated` flag that tells the caller to narrow the query.
   No e-mail, phone, manager, group, SID or distinguished name.

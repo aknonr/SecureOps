@@ -53,7 +53,7 @@ public sealed class DirectoryNameSearchTests
         single.Replace("*)", string.Empty, StringComparison.Ordinal).Should().NotContain("*", "only the trailing wildcard is added");
 
         string full = DirectoryNameFilter.Build(Query("ayşe yılmaz"));
-        full.Should().Contain("(&(givenName=Ayşe*)(sn=Yılmaz*))").And.Contain("(displayName=Ayşe Yılmaz*)");
+        full.Should().Contain("(givenName=Ayşe*)").And.Contain("(sn=Yılmaz*)").And.Contain("(displayName=Ayşe Yılmaz*)");
         full.Should().NotContain("(givenName=ayşe yılmaz*)", "a multi-word query does not search given names with the whole text");
     }
 
@@ -88,6 +88,30 @@ public sealed class DirectoryNameSearchTests
 
         result.Candidates.Select(c => c.SamAccountName).Should().Equal("syn.ayse.yilmaz", "syn.ayse.yilmaz2");
         result.Candidates.Select(c => c.Department).Should().Equal("SYN Altyapı", "SYN Uygulama");
+    }
+
+    [Fact]
+    public async Task MultipartQuery_DoesNotIgnoreMiddleGivenNames()
+    {
+        DirectoryNameQuery query = Query("Ali Kemal Yılmaz");
+        DirectoryNameCandidate wrong = new("Ali Veli Yılmaz", "Ali Veli", "Yılmaz", "syn.wrong", null);
+        DirectoryNameCandidate right = new("Yılmaz, Ali Kemal", "Ali Kemal", "Yılmaz", "syn.right", null);
+        DirectoryNameMatching.Matches(query, wrong).Should().BeFalse();
+        DirectoryNameMatching.Matches(query, right).Should().BeTrue();
+        DirectoryNameFilter.Build(query).Should().Contain("(givenName=Ali Kemal*)").And.NotContain("(givenName=Ali*)");
+        (await new MockDirectoryNameSearchProvider([wrong, right]).SearchAsync(query, 10, CancellationToken.None))
+            .Candidates.Should().ContainSingle().Which.Should().Be(right);
+    }
+
+    [Fact]
+    public void LdapAlternatives_IncludeAsciiTurkishSpellingsWithoutPairingUnrelatedVariantIndexes()
+    {
+        string filter = DirectoryNameFilter.Build(Query("sukru ozturk"));
+        filter.Should().Contain("(displayName=şükrü öztürk*)").And.Contain("(givenName=şükrü*)").And.Contain("(sn=öztürk*)");
+        DirectoryNameMatching.Spellings("ismail", 256).Should().Contain("ısmaıl");
+        DirectoryNameMatching.Fold("Émile").Should().NotBe(DirectoryNameMatching.Fold("Emile"), "only the approved Turkish character alternatives are folded");
+        DirectoryNameQuery.TryCreate("isisisisis", out string? error).Should().BeNull();
+        error.Should().Be("NameQueryTooComplex");
     }
 
     [Fact]

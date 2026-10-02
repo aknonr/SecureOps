@@ -70,6 +70,7 @@ public static class ServiceAccountProblems
         "NameQueryCharacters" => "Ad aramasında yalnız harf, boşluk, kesme işareti, tire ve nokta kullanılabilir; joker karakter kabul edilmez.",
         "NameQueryTooLong" => "Ad araması en çok 64 karakter olabilir.",
         "NameQueryTooManyWords" => "Ad araması en çok 4 kelime olabilir.",
+        "NameQueryTooComplex" => "Ad aramasını daha kısa bir ad veya soyad ile daraltın.",
         "identityLookup" => "Dizinde ad araması için kimlik sorgulama yetkisi gerekir.",
         "kind" => "Kullanım türünü listeden seçin.",
         "databaseEngine" => "Veritabanı motoru yalnız veritabanı kullanımında seçilir.",

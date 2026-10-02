@@ -1,5 +1,16 @@
 # API Release Packaging
 
+## Combined 026 Review Candidate
+
+The current SQL closure is 001-026. Explicit Service Accounts selection requires source-bound
+`ServiceAccounts026Reviewed=true`, `ServiceAccounts026ReviewReference`, and all eleven 024/025/026
+DDL-wrapper/include/grant hashes. It exports 024-026 and three unassigned role scripts; installed
+schemas are not replayed. Existing release branch, clean-source and product guards remain.
+`New-ServiceAccountsTestReview.ps1 -FromVerifiedMaster -TestedProductSource <remote-master-SHA>
+-SqlUpgradeReview <private-review.json> -OutputDirectory <new-directory>` additionally requires
+clean local master equal to origin/master and the verified source. It prepares a matched review
+candidate, never installation approval. Previous 025-only descriptions below are historical.
+
 `New-ServiceAccountsTestReview.ps1` prepares a separate matched review candidate,
 NOT a numbered successor. It requires the clean pinned integration branch and
 product-input equality to the supplied tested source. Entry versions retain that

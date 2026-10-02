@@ -8,7 +8,7 @@ param(
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-025), verifies module replay refusal, and
+# numbered migrations in order (now 001-026), verifies module replay refusal, and
 # (unless -SkipRoleScripts) the two unnumbered role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
@@ -45,8 +45,10 @@ try {
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-001-service-accounts.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate replay was not refused.' }
     Write-Host 'replay refused as expected'
-    Invoke-SaSql -Database $database -File 'SA-002-usage-rules.sql'
-    Write-Host 'applied SA-002-usage-rules.sql (candidate 2)'
+    if (-not (Test-Path (Join-Path $root 'sql/migrations/026-service-account-usage-rules.sql'))) {
+        Invoke-SaSql -Database $database -File 'SA-002-usage-rules.sql'
+        Write-Host 'applied SA-002-usage-rules.sql (candidate 2)'
+    } else { Write-Host 'Service account usage rules installed through numbered 026' }
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-002-usage-rules.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate 2 replay was not refused.' }
     Write-Host 'candidate 2 replay refused as expected'

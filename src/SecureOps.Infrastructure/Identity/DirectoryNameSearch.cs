@@ -22,6 +22,9 @@ public sealed class DirectoryNameQuery
     /// <summary>Maximum results returned to a caller.</summary>
     public const int MaximumResults = 10;
 
+    /// <summary>Maximum spelling alternatives per query; prevents excessive LDAP filter expansion.</summary>
+    public const int MaximumVariants = 256;
+
     private static readonly CultureInfo _turkish = CultureInfo.GetCultureInfo("tr-TR");
 
     private DirectoryNameQuery(string text, IReadOnlyList<string> tokens)
@@ -73,6 +76,12 @@ public sealed class DirectoryNameQuery
             return null;
         }
 
+        if (DirectoryNameMatching.Spellings(text, MaximumVariants + 1).Count > MaximumVariants)
+        {
+            error = "NameQueryTooComplex";
+            return null;
+        }
+
         error = null;
         return new DirectoryNameQuery(text.Normalize(NormalizationForm.FormC), [.. tokens.Select(t => t.Normalize(NormalizationForm.FormC))]);
     }
@@ -91,7 +100,7 @@ public sealed class DirectoryNameQuery
             value.ToLower(_turkish),
             Title(value, CultureInfo.InvariantCulture),
             value.ToUpperInvariant()
-        }.Distinct(StringComparer.Ordinal)
+        }.Concat(DirectoryNameMatching.Spellings(value, MaximumVariants)).Distinct(StringComparer.Ordinal)
     ];
 
     private static string Title(string value, CultureInfo culture) => string.Join(' ', value.Split(' ').Select(word =>
@@ -123,7 +132,7 @@ public static class DirectoryNameFilter
 
     /// <summary>
     /// Enabled and disabled user objects whose display name or given name starts with the query, or (several words) whose
-    /// given name starts with the first word and surname with the last word. Only a trailing wildcard is ever added.
+    /// given name starts with every word except the surname and surname with the last word. Only trailing wildcards are added.
     /// </summary>
     public static string Build(DirectoryNameQuery query)
     {
@@ -140,11 +149,18 @@ public static class DirectoryNameFilter
 
         if (query.Tokens.Count > 1)
         {
-            IReadOnlyList<string> first = query.Variants(query.Tokens[0]), last = query.Variants(query.Tokens[^1]);
-            for (int i = 0; i < Math.Min(first.Count, last.Count); i++)
+            string given = string.Join(' ', query.Tokens.Take(query.Tokens.Count - 1));
+            any.Append("(&(|");
+            foreach (string variant in query.Variants(given))
             {
-                any.Append("(&(givenName=").Append(Escape(first[i])).Append("*)(sn=").Append(Escape(last[i])).Append("*))");
+                any.Append("(givenName=").Append(Escape(variant)).Append("*)");
             }
+            any.Append(")(|");
+            foreach (string variant in query.Variants(query.Tokens[^1]))
+            {
+                any.Append("(sn=").Append(Escape(variant)).Append("*)");
+            }
+            any.Append("))");
         }
 
         return $"(&(objectCategory=person)(objectClass=user)(|{any}))";
@@ -176,7 +192,7 @@ public static class DirectoryNameMatching
 {
     private static readonly CultureInfo _turkish = CultureInfo.GetCultureInfo("tr-TR");
 
-    /// <summary>Turkish- and accent-insensitive key: İ/I/ı/i equal, ş/ğ/ç/ö/ü fold to their base letters.</summary>
+    /// <summary>Turkish comparison key: İ/I/ı/i equal, ş/ğ/ç/ö/ü fold to their base letters.</summary>
     public static string Fold(string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -184,17 +200,25 @@ public static class DirectoryNameMatching
             return string.Empty;
         }
 
-        string lower = value.Normalize(NormalizationForm.FormC).ToLower(_turkish).Replace('ı', 'i');
-        StringBuilder folded = new(lower.Length);
-        foreach (char c in lower.Normalize(NormalizationForm.FormD))
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
-            {
-                folded.Append(c);
-            }
-        }
+        string lower = value.Normalize(NormalizationForm.FormC).ToLower(_turkish).Replace('ı', 'i')
+            .Replace('ş', 's').Replace('ğ', 'g').Replace('ç', 'c').Replace('ö', 'o').Replace('ü', 'u');
+        return string.Join(' ', lower.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    }
 
-        return string.Join(' ', folded.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    /// <summary>Bounded Turkish/ASCII alternatives, using the same character equivalence as <see cref="Fold"/>.</summary>
+    public static IReadOnlyList<string> Spellings(string value, int limit)
+    {
+        List<string> variants = [string.Empty];
+        foreach (char c in Fold(value))
+        {
+            string choices = c switch
+            {
+                'i' => "iı", 's' => "sş", 'g' => "gğ", 'c' => "cç", 'o' => "oö", 'u' => "uü",
+                _ => c.ToString()
+            };
+            variants = [.. variants.SelectMany(prefix => choices.Select(choice => prefix + choice)).Take(limit)];
+        }
+        return variants;
     }
 
     /// <summary>Whether a candidate really matches (also guards against a provider returning more than asked).</summary>
@@ -203,7 +227,7 @@ public static class DirectoryNameMatching
         string display = Fold(candidate.DisplayName), given = Fold(candidate.GivenName), surname = Fold(candidate.Surname);
         return display.StartsWith(query.Key, StringComparison.Ordinal)
             || query.TokenKeys.Count == 1 && given.StartsWith(query.Key, StringComparison.Ordinal)
-            || query.TokenKeys.Count > 1 && given.StartsWith(query.TokenKeys[0], StringComparison.Ordinal)
+            || query.TokenKeys.Count > 1 && given.StartsWith(string.Join(' ', query.TokenKeys.Take(query.TokenKeys.Count - 1)), StringComparison.Ordinal)
                 && surname.StartsWith(query.TokenKeys[^1], StringComparison.Ordinal);
     }
 

@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][ValidatePattern('^[A-Za-z]:[\\/]')][string]$OutputDirectory,
     [Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{40}$')][string]$TestedProductSource,
-    [switch]$ResumeFailedReview)
+    [switch]$ResumeFailedReview,
+    [switch]$FromVerifiedMaster,
+    [Parameter(Mandatory)][string]$SqlUpgradeReview)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -15,13 +17,19 @@ if (Test-Path $destination) {
 Push-Location $repo
 try {
     $preparation = (& git rev-parse HEAD).Trim()
-    if ((& git branch --show-current).Trim() -ne 'feature/service-accounts-pinned-integration-20260929') {
+    $branch = (& git branch --show-current).Trim()
+    if ($FromVerifiedMaster) {
+        if ($branch -cne 'master' -or $preparation -cne $TestedProductSource -or
+            $preparation -cne (& git rev-parse origin/master).Trim()) { throw 'Expected clean exact verified remote master.' }
+    } elseif ($branch -ne 'feature/service-accounts-pinned-integration-20260929') {
         throw 'Unexpected review source branch.'
     }
     if (@(& git status --porcelain).Count -ne 0) { throw 'Commit the scoped preparation before publishing.' }
     if (!(& git ls-files -- scripts/release/New-ServiceAccountsTestReview.ps1)) { throw 'Review generator must be tracked.' }
     & git diff --quiet $TestedProductSource HEAD -- src contracts Directory.Build.props Directory.Build.targets Directory.Packages.props global.json NuGet.config
     if ($LASTEXITCODE -ne 0) { throw 'Product inputs differ from tested source; new verification is required.' }
+    $sqlPlan = & "$PSScriptRoot/Get-ReleaseSqlPlan.ps1" -RepositoryRoot $repo -UpgradeFromRc626 -IncludeServiceAccounts `
+        -ExpectedSource $preparation -SqlUpgradeReview $SqlUpgradeReview
     foreach ($directory in @('API','UI','Worker','manifests','staging/api','staging/ui','staging/worker','payload/api','payload/ui','payload/worker','DBA/sql/migrations','DBA/sql/schema','DBA/sql/pending/service-accounts')) {
         $folder = Join-Path $destination $directory
         if (!(Test-Path $folder)) { New-Item -ItemType Directory $folder | Out-Null }
@@ -63,16 +71,14 @@ try {
             path=$zip.Substring($destination.Length+1).Replace('\','/');sha256=(Get-FileHash $zip).Hash;
             entrySha256=(Get-FileHash $dll).Hash;manifest="manifests/$component.sha256";files=$files}
     }
-    $sql = @('migrations/024-in-use-report-catalogue.sql','schema/024-in-use-report-catalogue.sql',
-        'migrations/025-service-accounts.sql','schema/025-service-accounts.sql',
-        'pending/service-accounts/SA-001-service-accounts.sql','pending/service-accounts/SA-API-permissions.sql',
-        'pending/service-accounts/SA-Worker-permissions.sql')
+    $sql = @($sqlPlan.DeltaFiles + $sqlPlan.RoleFiles | ForEach-Object { $_.Substring(4) })
     foreach ($relative in $sql) {
         Copy-Item -LiteralPath "sql/$relative" -Destination (Join-Path $destination "DBA/sql/$relative")
     }
     Copy-Item sql/README.md (Join-Path $destination 'DBA/README.md')
     & "$PSScriptRoot/../powershell/Export-CompletionGuidance.ps1" -OutputDirectory (Join-Path $destination 'operator')
-    foreach ($relative in @('docs/service-accounts/WINDOWS-ACCEPTANCE.md','docs/service-accounts/SPEC.md','docs/service-accounts/INTEGRATION-FOLLOWUP-20261001.md')) {
+    foreach ($relative in @('docs/service-accounts/WINDOWS-ACCEPTANCE.md','docs/service-accounts/SPEC.md','docs/service-accounts/INTEGRATION-FOLLOWUP-20261001.md',
+        'docs/service-accounts/COMBINED-INTEGRATION-20261002.md')) {
         $target = Join-Path $destination "operator/$relative"
         New-Item -ItemType Directory (Split-Path $target -Parent) -Force | Out-Null
         Copy-Item $relative $target
@@ -81,7 +87,8 @@ try {
         [ordered]@{path=$_.FullName.Substring($destination.Length+1).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash}
     })
     $record = [ordered]@{kind='Matched TEST review candidate, not a numbered release';readyForInstallation=$false;
-        testedProductSource=$TestedProductSource;preparationSource=$preparation;sqlSequence=@('024 after verified 023','025','separate reviewed API/Worker roles');
+        testedProductSource=$TestedProductSource;preparationSource=$preparation;requiredSchema=$sqlPlan.RequiredSchema;
+        sqlReview=$sqlPlan.Review;sqlSequence=@('024 after verified 023','025 if missing','026 after 025','separate reviewed API/Worker roles and 026 API grants');
         targetChanged=$false;corporateAcceptance='Not executed';payloads=$payloads;supportingFiles=$support;
         exclusions=@('appsettings*.json','web.config','secrets','private evidence','local test outputs','diagnostic package');
         releaseGuard='Numbered release requires the existing combined branch, clean exact ExpectedSource and explicit source-bound 023/024/025 SQL review; not run'}

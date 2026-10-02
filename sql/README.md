@@ -1,5 +1,16 @@
 # sql/
 
+## Combined Source 026 Delta, 2026-10-02
+
+The current inventory is 001-026. **026-service-account-usage-rules** requires reviewed 025 and
+includes the retained `pending/service-accounts/SA-002-usage-rules.sql`. It atomically creates
+`svcacct.AccountUsages` and `svcacct.TeamRoles` and their delete-protection triggers; replay is refused.
+The separate `SA-002-API-permissions.sql` grants only SELECT/INSERT/UPDATE on those two tables to
+`svcacct_api_runtime`; no new Worker grant or role member is assigned. SQLCMD working directory
+is `sql/migrations`. Apply only missing, individually approved scripts, never replay installed 001-025.
+Source promotion is not target execution approval. On rollback retain 026 objects/data and audit;
+stop module writes and coordinate matching binaries before restoring a prior version. No down script.
+
 ## Post-03b0c04 Catalogue Delta
 
 Current successor source additionally requires **024-in-use-report-catalogue**

@@ -15,11 +15,14 @@ $reviewPath = Join-Path $evidence 'synthetic-review.json'
 $paths = @('sql/migrations/024-in-use-report-catalogue.sql','sql/schema/024-in-use-report-catalogue.sql',
     'sql/migrations/025-service-accounts.sql','sql/schema/025-service-accounts.sql',
     'sql/pending/service-accounts/SA-001-service-accounts.sql',
-    'sql/pending/service-accounts/SA-API-permissions.sql','sql/pending/service-accounts/SA-Worker-permissions.sql')
+    'sql/pending/service-accounts/SA-API-permissions.sql','sql/pending/service-accounts/SA-Worker-permissions.sql',
+    'sql/migrations/026-service-account-usage-rules.sql','sql/schema/026-service-account-usage-rules.sql',
+    'sql/pending/service-accounts/SA-002-usage-rules.sql','sql/pending/service-accounts/SA-002-API-permissions.sql')
 $review = [ordered]@{ Schema='wasas.sql-upgrade-review.v1'; Source=$source;
-    Baseline023Verified=$true; Delta024Reviewed=$true; ServiceAccounts025Reviewed=$true;
+    Baseline023Verified=$true; Delta024Reviewed=$true; ServiceAccounts025Reviewed=$true; ServiceAccounts026Reviewed=$true;
     BaselineEvidenceReference='SYNTHETIC local test, not target acceptance';
     Delta024ReviewReference='SYNTHETIC local file review'; ServiceAccounts025ReviewReference='SYNTHETIC local file review';
+    ServiceAccounts026ReviewReference='SYNTHETIC local 026 atomic/upgrade/role review';
     Files=@($paths | ForEach-Object { [ordered]@{Path=$_;Sha256=(Get-FileHash -LiteralPath (Join-Path $root $_)).Hash} }) }
 function Save-Review { [IO.File]::WriteAllText($reviewPath, ($review | ConvertTo-Json -Depth 6)) }
 $results = [Collections.Generic.List[object]]::new()
@@ -37,14 +40,14 @@ $args025 = @{RepositoryRoot=$root; ExpectedSource=$source; UpgradeFromRc626=$tru
 Save-Review
 $plan = & $helper @args025
 Assert-Case 'Explicit reviewed 024/025 selection excludes installed 022/023' {
-    if ($plan.RequiredSchema -cne '001-025' -or $plan.DeltaRange -cne '024-025' -or $plan.DeltaFiles.Count -ne 5 -or
-        @($plan.DeltaFiles | Where-Object { $_ -match '/02[23]-' }).Count -ne 0 -or $plan.RoleFiles.Count -ne 2) { throw 'Wrong upgrade selection.' }
+    if ($plan.RequiredSchema -cne '001-026' -or $plan.DeltaRange -cne '024-026' -or $plan.DeltaFiles.Count -ne 8 -or
+        @($plan.DeltaFiles | Where-Object { $_ -match '/02[23]-' }).Count -ne 0 -or $plan.RoleFiles.Count -ne 3) { throw 'Wrong upgrade selection.' }
 }
 Assert-Refusal 'No implicit 025' { & $helper -RepositoryRoot $root -ExpectedSource $source -UpgradeFromRc626 } 'exact complete'
 Assert-Refusal 'No missing review' { & $helper -RepositoryRoot $root -ExpectedSource $source -UpgradeFromRc626 -IncludeServiceAccounts } '025 requires'
 Assert-Refusal 'No older baseline for 025' { & $helper -RepositoryRoot $root -ExpectedSource $source -UpgradeFromRc624 -IncludeServiceAccounts } 'rc6.26/023'
 Assert-Refusal 'No conflicting baselines' { & $helper -RepositoryRoot $root -ExpectedSource $source -UpgradeFromRc624 -UpgradeFromRc626 } 'exactly one'
-foreach ($flag in @('Baseline023Verified','Delta024Reviewed','ServiceAccounts025Reviewed')) {
+foreach ($flag in @('Baseline023Verified','Delta024Reviewed','ServiceAccounts025Reviewed','ServiceAccounts026Reviewed')) {
     $review[$flag] = $false; Save-Review
     Assert-Refusal "False $flag" { & $helper @args025 } 'not verified'
     $review[$flag] = 'true'; Save-Review
