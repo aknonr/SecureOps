@@ -3,6 +3,9 @@
 Status: **corporate authentication acceptance not executed.** The original Linux
 runner and baseline counts in sections2/3 below are historical; actual combined
 Windows build/SQL evidence is in the canonical `../integrated-test-activation.md`.
+Combined 2026-10-02 source review is [COMBINED-INTEGRATION-20261002.md](COMBINED-INTEGRATION-20261002.md).
+The current local harness installs numbered 001-026 (retained SA-002 is included by 026,
+not separately applied). It does not assign runtime principals or establish target acceptance.
 The current `../post-rc626-continuation-tr.md` distinguishes a minimum API/UI
 pilot with EXISTING approved TEST users and reminders/Worker module disabled from
 the later full four-role acceptance in section4. No four new accounts are required.
@@ -65,12 +68,12 @@ $env:SECUREOPS_SA_SQL_DIAGNOSTICS = "$PWD\evidence\sa-diagnostics.log"
 dotnet test tests\SecureOps.Tests.Integration -c Release --no-build --filter "FullyQualifiedName~ServiceAccounts" --logger "trx;LogFileName=sa-sql.trx" --results-directory .\evidence
 ```
 
-Expected: all module tests pass on the first run (43 at the continuation HEAD, including the two LocalDB-only
+Expected: all module tests pass (45 at the combined source, including the two LocalDB-only
 `ServiceAccountRoleSqlTests`, which now also check `svcacct.AccountUsages` and `svcacct.TeamRoles` from SA-002: API role
 SELECT/INSERT/UPDATE only, no DELETE/ALTER/CONTROL; Worker role no permission. These two cannot run on Linux; record
 their Windows result). The diagnostics file should contain only the
-intentional `Number=51091` entry of the audit-rollback test. Any other entry is the evidence that
-was missing for the two unexplained first-run failures: keep the TRX and the log.
+intentional fault-probe entries (`Number=51091`, plus synthetic unavailable/timeout provider failures).
+Unexpected SQL diagnostics are failures to investigate; keep every TRX and the log.
 
 Optional least-privilege rerun: map a second local Windows principal to a database user that is only
 a member of `svcacct_api_runtime` (role scripts SA-API, then SA-002-API), set `SECUREOPS_SA_SQL_RUNTIME_CONNECTION` to a connection that runs

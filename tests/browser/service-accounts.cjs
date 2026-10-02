@@ -35,7 +35,7 @@ async function step(name, action) {
 }
 
 async function field(scope, label, value) {
-    const input = scope.getByLabel(label, { exact: true });
+    const input = scope.getByLabel(label, { exact: true }).locator('visible=true');
     await input.fill(value);
     await input.press('Tab');
 }
@@ -82,7 +82,7 @@ async function problem(page) {
     try {
         await step('navigation offers the module', async () => {
             await signIn(page, adminUi);
-            await page.getByRole('link', { name: 'Servis Hesapları', exact: true }).waitFor();
+            await page.getByRole('link', { name: 'Servis Hesapları', exact: true }).first().waitFor();
         });
 
         await step('administration: organization, team, person and team-lead scope', async () => {
