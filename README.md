@@ -44,7 +44,7 @@ This repo contains documentation, agent rules, a .NET solution, working Phase 1A
 
 ### For AI coding agents
 
-**Start here:** [`AGENTS.md`](./AGENTS.md). Then follow the mandatory reading order.
+**Start here:** [`AGENTS.md`](./AGENTS.md). It states the hard rules and routes each task to the guides it needs.
 
 ### For human developers
 

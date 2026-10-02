@@ -1,5 +1,24 @@
 # Decisions Log
 
+## 2026-10-01 - Data access: Dapper and numbered SQL scripts retained
+
+Owner decision recorded as ADR-0001 Amendment 1: Dapper with parameterized SQL and numbered, DBA-reviewed scripts
+in `sql/schema/` and `sql/migrations/` is the approved data-access approach; EF Core adoption is no longer planned.
+The original 2026-05 decision text is preserved in the ADR. Tasks that required an EF Core `DbContext` (P1-05,
+P1-T05) are marked superseded, not implemented. No package, repository, SQL or product behaviour changed; the
+unused EF Core package references are left for a separate code change.
+
+## 2026-10-01 - Agent guidance rewritten for current models
+
+Owner decision: `AGENTS.md`, `CLAUDE.md` and `docs/agent-guides/` keep every hard rule and the
+Codex/Claude ownership split, but drop scaffolding written for weaker models (a 10-document
+mandatory reading order before any output, generic code samples, duplicated rule lists, fixed
+plan/confirm thresholds). Reading is now routed by task; each hard rule states its reason.
+Statements that contradicted the code were corrected: capability-based authorization (ADR-0010,
+ADR-0022) instead of AD-group roles, Dapper-only data access (settled by the owner the same day, see the entry above), `HtmlRenderer`
+render tests instead of bUnit, pinned C# 12 / SDK, and a single canonical JEA allow-list in
+`docs/05-security-model.md`. No architectural decision changed. Code is treated as the observed implementation; it never overrides a hard rule or an approved decision.
+
 ## 2026-09-07 - Original OR-to-Jira source review
 
 Original-script discovery is resolved by the externally supplied local file;

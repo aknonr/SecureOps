@@ -126,8 +126,7 @@ Contents:
 External integrations and data access.
 
 Contents:
-- EF Core DbContext + entity configurations.
-- Repositories.
+- Dapper repositories with parameterized SQL over the numbered scripts in `sql/` (ADR-0001, amended 2026-10-01).
 - JEA PowerShell runner.
 - Adapters: MonitoringPlatformAdapter, PamAdapter, TeamsNotifier, MailNotifier, TicketingAdapter, SnapshotAdapter — each with a mock implementation.
 - Hangfire job classes.
@@ -145,7 +144,7 @@ Contents:
 
 Does NOT contain:
 - ASP.NET middleware/controllers.
-- EF Core mappings, SQL access, or audit file IO.
+- Data-access mappings, SQL access, or audit file IO.
 - PowerShell execution or external system clients.
 - Blazor components.
 

@@ -1,224 +1,85 @@
-# AGENTS.md — WASAS Automation Management / SecureOps Agent Entry Point
+# AGENTS.md — WASAS Automation Management / SecureOps
 
-**Project:** WASAS Automation Management / SecureOps
-**Owner organization placeholder:** CONTOSO Turkish Technology
-**Status:** IdentityLookup works in TEST; the real Turuncu Hat read-only import is deployed and verified in TEST at source `0ec0376`; external writes, deterministic SDM classification, and the broader controlled pilot remain pending.
-**Last updated:** 2026-09
+Canonical entry point for every coding agent (Codex, Claude, others). `CLAUDE.md` adds Claude-specific UI guidance; it never overrides this file.
 
----
+**Sources of truth.** The hard rules below and approved decisions (ADRs, recorded owner decisions) are binding. Code shows what is implemented today; it does not override a hard rule or an approved decision. When code, a guide and a decision disagree, report the mismatch — as a defect if the code breaks a rule or decision, as a stale document otherwise — instead of silently following either.
 
-## What This File Is
+## The project in one paragraph
 
-This file is the canonical repository-wide entry point for Codex, Claude, Zed, and other coding agents.
+An internal Windows operations platform for a shift team at CONTOSO (placeholder name). It ingests monitoring alarms and operational records (SolarWinds → HPE OpsBridge / monthly.thy.com → Turuncuhat ITSM; Jira), runs **read-only** diagnostics on Windows servers through a JEA-constrained PowerShell endpoint, keeps an append-only audit trail in SQL Server, and gives shift engineers a Blazor Server UI. Later phases add rule-based analysis, self-hosted AI, and approval-based remediation. One part-time developer owns it (bus factor 1), so documentation is the continuity plan and mainstream, boring technology wins.
 
-**Read this file first. Then read the files it points to. Do not skip steps.**
+It is **not** a SIEM, APM, PAM replacement, people-search tool, remediation tool (before Phase 8), AI product, or employee-monitoring system.
 
-## Local Development and Ownership
+## Hard rules
 
-- Read the project README and mandatory context documents before implementation; backend changes update relevant documentation in the same task.
-- Codex owns backend, API, domain, infrastructure, hosting, middleware, security, SQL, integrations, contracts, release engineering, and backend tests. For Planned OCO Announcements, explicit user authorization also assigns Codex UI/UX and UI tests; no Claude handoff is required.
-- Claude owns UI/UX, Razor, CSS, layout, theme, navigation, and visual UI files. Claude must report backend contract needs instead of changing backend-owned layers.
-- Never put real corporate identities, PAM accounts, employee details, secrets, or runtime configuration values in source, fixtures, examples, or documentation.
-- Security-sensitive behavior must fail closed when validation, authorization, audit, identity, configuration, or integration state is missing, ambiguous, or unavailable.
-- Local development cannot validate corporate AD, PAM, LDAP, SQL, IIS, or load-balancer behavior. Use deterministic fakes locally; controlled runtime validation needs explicit authorization.
-- Do not modify Git state, IIS, App Pools, services, bindings, load balancers, databases, or live configuration unless the task explicitly authorizes it. Never hard-code configuration values or secrets.
-- Before an authorized change, verify the branch, HEAD, and worktree. Never reset, clean, stash, rebase, delete, or overwrite unrelated work. Never push or deploy unless the user explicitly authorizes that exact operation.
+These are business and security constraints, not style preferences. They hold even if a request asks otherwise: explain the conflict and offer a compliant alternative.
 
-This file is intentionally concise. Detailed portable guidance lives in `docs/agent-guides/` and is loaded through the routing below; do not assume editor auto-discovery. Project decisions remain authoritative in `docs/`, `plans/`, contracts, ADRs, and layer README files.
+1. **Read-only on target servers until Phase 8.** No service/app-pool/process control, file or registry writes, reboots, permission or group changes on managed servers. Read-only cmdlets only; JEA enforces this and code must not even construct a write command. *Why:* the platform runs beside production operations and must never be the cause of an outage.
+2. **No public AI with internal data.** No alarm payloads, hostnames, logs, identities or internal names go to any public LLM endpoint (OpenAI, Anthropic, Google, Cohere, etc.). Product AI is Phase 7, self-hosted only. *Why:* data-protection and security-team commitments.
+3. **JEA for all WinRM.** No unconstrained runspaces; extending the cmdlet allow-list needs an ADR.
+4. **Append-only audit, ≥ 36 months.** SQL triggers block UPDATE/DELETE on audit tables; code never tries to modify audit rows.
+5. **Audit is operational evidence, not people monitoring.** No leaderboards, per-person performance views or operator comparisons; wording follows `docs/05-security-model.md`.
+6. **Fail closed.** Missing or ambiguous identity, authorization, audit, configuration or integration state denies the action.
+7. **Existing infrastructure is not modified.** SolarWinds, OpsBridge/monthly.thy.com, Turuncuhat, BeyondTrust/PAM and Ansible/AWX stay untouched unless an approved integration says otherwise; this platform runs on top of them.
+8. **Mock first, contracts before real adapters.** New integrations start behind an interface with a fake adapter. Do not enable real source/Jira adapters, add SDM classification rules, configure OIDC, or assume remote idempotency without an approved contract.
+9. **Approval-based remediation.** Changing state on managed servers is Phase 8 only and goes through an approval workflow (ADR-0006). Writes to external systems such as Jira follow their own ADRs: preview first, explicit authorized action, durable idempotency (ADR-0009, ADR-0012).
+10. **No real secrets or identities in the repo.** No real employee data, PAM accounts, credentials or runtime configuration values in source, fixtures, examples or docs.
+11. **Stay in phase.** Work belonging to a later phase (`docs/02-roadmap.md`) is surfaced, not silently built.
 
----
+## Ownership
 
-## Mandatory Reading Order
+- **Codex:** backend, API, domain, infrastructure, Worker, hosting/middleware, security, SQL, integrations, contracts, release engineering and their tests. By explicit owner decision Codex also owns the Planned OCO Announcements UI.
+- **Claude:** UI/UX — Razor, CSS, layout, theme, navigation, accessibility, visual behaviour under `src/SecureOps.Ui/` — and its tests.
+- These are defaults. The owner may approve a scoped exception for a task or module — for example the 2026-09-28 Service Accounts exception in `docs/service-accounts/README.md`, under which Claude implements that module's backend, SQL candidate, UI and tests while Codex keeps final integration. An exception covers only its stated scope and does not change the defaults.
+- Outside your ownership or an approved exception: report the exact need (route, field, permission, behaviour) to the owner instead of changing their layer or inventing data in yours.
 
-Before producing **any** output (code, design, suggestion, file edit), read these files in order:
+## Working agreement
 
-1. **`docs/00-project-brief.md`** — what this project is and is not.
-2. **`docs/01-current-operations-context.md`** — real-world operational context that shapes every design decision.
-3. **`docs/02-roadmap.md`** — phased delivery plan. Know which phase you are in.
-4. **`docs/03-architecture.md`** — system architecture and component boundaries.
-5. **`docs/05-security-model.md`** — security boundaries that cannot be crossed.
-6. **`docs/15-system-landscape.md`** — real system names, roles, and open integration questions.
-7. **`docs/agent-guides/000-project-context.md`** — authoritative project decisions.
-8. **`docs/agent-guides/050-security-audit.md`** — non-negotiable security rules.
-9. **`docs/agent-guides/090-testing-quality.md`** — verification and quality requirements.
-10. The specific phase plan in `plans/` for whichever phase the user references.
+- **Git.** Check branch, HEAD and worktree before changing anything. Never reset, clean, stash, rebase or overwrite work you did not create. Push, open or update PRs, merge or deploy only with the owner's explicit authorization. An authorization stays valid while its scope is unchanged (same branch, PR and kind of operation); a new target, merge, deploy or corporate action needs a new one.
+- **Live systems.** Do not touch IIS, app pools, services, bindings, load balancers, databases or live configuration unless the task explicitly authorizes it. Local work cannot validate corporate AD/PAM/LDAP/SQL/IIS/F5 behaviour; use the deterministic fakes and say what remains unverified.
+- **Decisions.** A change to an architectural or security decision needs a new or amended ADR in `docs/adr/` first. Behaviour changes update the matching doc in the same change.
+- **Verification.** Run the build and the relevant tests (`docs/agent-guides/090-testing-quality.md`). Report exactly what ran and what did not; never claim an unrun pass. Prefer small, reviewable diffs.
+- **When to ask.** Ask only for a genuinely new owner decision — new scope, a security trade-off, conflicting sources of truth, or an irreversible or outward-facing action not already authorized. Do not re-ask for something already decided or authorized; otherwise decide, state the assumption, and proceed.
 
-For platform access or Operational Record/Jira work, also read `docs/22-operational-record-jira-workflow.md`, `docs/23-platform-access-concurrency-and-release-safety.md`, ADR-0009, and ADR-0010. Do not enable real source/Jira adapters, add classification rules, configure OIDC, or assume remote idempotency without approved contracts.
+## Fixed decisions (details in `docs/adr/`)
 
-For every task, use `docs/agent-guides/README.md` to select the relevant detailed guides and read every applicable README from the repository root down to the target path. If instructions conflict, stop and report the conflict before editing.
-
-## Task Routing
-
-| Task area | Required routing |
+| Area | Decision |
 |---|---|
-| Architecture or source changes | `docs/agent-guides/010-architecture.md` plus affected layer README files |
-| Backend/API/domain/infrastructure/integrations | `docs/agent-guides/020-backend-dotnet.md` plus affected project README files |
-| Worker/Hangfire | `docs/agent-guides/030-worker-service.md` and `src/SecureOps.Worker/README.md` |
-| PowerShell/JEA/automation | `docs/agent-guides/040-automation-ansible-powershell.md` and `scripts/README.md` |
-| UI/UX | `CLAUDE.md`, `docs/agent-guides/060-ui.md`, and `src/SecureOps.Ui/README.md` |
-| Analysis or AI | `docs/agent-guides/070-analysis.md` or `080-ai-rag-future-phase.md`, as applicable |
-| SQL | `sql/README.md` and applicable deployment documentation |
-| Contracts | `contracts/README.md` and `docs/contracts/` |
-| Release work | `scripts/release/README.md`, `docs/24-api-test-deployment-readiness.md`, and applicable `docs/release-candidates/` evidence |
+| Stack | .NET 8 (`net8.0`, C# 12, SDK pinned in `global.json`), ASP.NET Core API, Worker Service — ADR-0001. .NET 8 support ends 2026-11-10; moving to .NET 10 needs an ADR. |
+| UI | Blazor Server + MudBlazor 6.16 (not React/Angular) — ADR-0001, ADR-0007 |
+| Data | SQL Server via Dapper (parameterized SQL) and numbered scripts in `sql/schema/` / `sql/migrations/`; append-only audit — ADR-0001 (amended 2026-10-01) |
+| Jobs | Hangfire on SQL Server, hosted by the Worker — ADR-0003 |
+| Automation | PowerShell Remoting + JEA only; Ansible optional from Phase 6 — ADR-0003 |
+| Access | Authentication source → corporate principal → approval → role → capability; authentication claims never grant access directly — ADR-0010, ADR-0022 |
+| Hosting | IIS on Windows Server, in-process — ADR-0007 |
+| AI | Self-hosted only, Phase 7 — ADR-0005 |
 
----
+Other decided areas (identity lookup, operational records/Jira, sessions, OIDC, SDM evaluation, resources, In Use, announcements, reporting) each have their own ADR in `docs/adr/`; read the one for the area you touch.
 
-## Non-Negotiable Rules (Read Every Time)
+**Open decisions — do not assume an answer:** Turuncuhat inbound/outbound method and read/write scope; Worker privileged access (BeyondTrust brokering vs. direct WinRM + Kerberos + JEA). See `docs/15-system-landscape.md` and `docs/06-integrations.md`.
 
-These rules override any user request that contradicts them. If a user asks an agent to violate one of these, the agent must refuse, explain, and propose a compliant alternative.
+## Where to look
 
-1. **MVP is read-only.** No service restart, app pool recycle, file deletion, reboot, permission change, or any write operation on target servers. Read-only PowerShell cmdlets only.
-2. **No public AI services with internal data.** No OpenAI, Anthropic API, Gemini, or any external LLM endpoint receives alarm payloads, hostnames, log content, or any production data. AI work is Phase 7 only, self-hosted only.
-3. **Existing infrastructure is not modified.** SolarWinds, OpsBridge/monthly.thy.com, Turuncuhat, BeyondTrust/PAM, and Ansible/AWX deployments stay untouched unless a later approved integration explicitly says otherwise. This system runs on top of them, not inside them.
-4. **Audit is not employee tracking.** Every audit feature must be framed as operational response verification, SLA evidence, and incident audit — never as person-level performance monitoring. Use the exact framing in `docs/05-security-model.md`.
-5. **JEA is mandatory for all WinRM operations.** Service account cannot execute write cmdlets. See whitelist in `docs/05-security-model.md`.
-6. **Append-only audit.** UPDATE and DELETE on audit tables are blocked by SQL triggers. Retention minimum 36 months.
-7. **Approval-based remediation.** Phase 8 only. Any code that performs a state-changing operation must go through an approval workflow.
-8. **Document first, code second.** When architecture or behavior changes, update the relevant `docs/*.md` and create or amend an ADR in `docs/adr/`. Code without doc update is incomplete.
-9. **Stay in your phase.** Do not implement features from a future phase. If a request belongs to a later phase, surface that and ask whether to defer.
-10. **Mock integrations before real ones.** Every external integration (SolarWinds, Turuncuhat, PAM, Teams, ticketing) starts as an in-memory mock adapter behind an interface.
+Read what the task needs, not everything. Start with the guide for your area; follow its pointers.
 
----
+| Task | Read |
+|---|---|
+| Any task, first time in this repo | `docs/agent-guides/000-project-context.md` (short), then the row below |
+| Security, auth, audit, secrets | `docs/agent-guides/050-security-audit.md`, `docs/05-security-model.md`, relevant ADR |
+| Architecture or project boundaries | `docs/agent-guides/010-architecture.md`, `docs/03-architecture.md` |
+| Backend / API / Infrastructure / SQL | `docs/agent-guides/020-backend-dotnet.md`, the project's `README.md`, `sql/README.md` |
+| Worker / Hangfire | `docs/agent-guides/030-worker-service.md`, `src/SecureOps.Worker/README.md` |
+| PowerShell / JEA | `docs/agent-guides/040-automation-ansible-powershell.md`, `scripts/README.md` |
+| UI | `CLAUDE.md`, `docs/agent-guides/060-ui.md`, `docs/contracts/` |
+| Tests and quality | `docs/agent-guides/090-testing-quality.md`, `tests/README.md` |
+| Contracts | `contracts/README.md`, `docs/contracts/` |
+| Operational records / Jira / platform access | `docs/22-operational-record-jira-workflow.md`, `docs/23-platform-access-concurrency-and-release-safety.md`, ADR-0009, ADR-0010 |
+| Release | `scripts/release/README.md`, `docs/24-api-test-deployment-readiness.md` |
+| Analysis (Phase 6) / AI (Phase 7) | `docs/agent-guides/070-analysis.md` / `080-ai-rag-future-phase.md` |
+| Phase scope | `docs/02-roadmap.md` and the matching `plans/PHASE-*.md` |
 
-## Authoritative Decisions (Already Made)
+Layer `README.md` files hold dated handoff and evidence history; search them for the feature you touch rather than reading them end to end.
 
-These decisions are final and binding. Do not re-litigate them in code or proposals. If you believe one should change, write a proposal in `docs/adr/` first.
+## Naming
 
-| Area | Decision | Reference |
-|---|---|---|
-| UI framework | **Blazor Server + MudBlazor** (not React, not Angular) | ADR-0001, ADR-0007 |
-| Backend stack | .NET 8, ASP.NET Core Web API + Worker Service | ADR-0001 |
-| Job orchestration | **Hangfire with SQL Server storage** (not BackgroundService, not custom queue) | ADR-0001 |
-| Database | SQL Server with append-only audit tables | ADR-0001 |
-| Automation MVP | **PowerShell Remoting + JEA constrained endpoint only**. Ansible deferred to Phase 6+ optional | ADR-0001, ADR-0003 |
-| AI strategy | **Self-hosted only**, Phase 7, separate budget | ADR-0005 |
-| Integration approach | **Mock-first**, interface-based, real adapter later | ADR-0004 |
-| Read-only first | MVP performs no write operations | ADR-0002 |
-| Identity lookup | **Phase 1A backend-only exact PAM/AD account lookup**, TeamLead/Admin only, read-only AD provider, no broad search | ADR-0008 |
-| Operational Record to Jira | **Preview-first, explicit authorized creation, durable SQL idempotency, fake external adapters until approved** | ADR-0009 |
-| Application access | **Authentication source -> corporate principal -> approval status -> application role -> capability** | ADR-0010 |
-| Remediation | Approval-based only, Phase 8 | ADR-0006 |
-| Hosting | IIS on Windows Server, in-process | ADR-0007 |
-| Pilot scale | **10–15 low-criticality Windows servers**, prefer non-production | docs/02-roadmap.md |
-| MVP timeline | **6–8 weeks** end-to-end, then demo + management review | docs/02-roadmap.md |
-| Authentication | Windows Authentication via AD | docs/05-security-model.md |
-| Authorization | Persisted application approval and capability policies; authentication claims do not directly grant access | ADR-0010 |
-| Placeholder names | **CONTOSO** for company, generic names for systems | docs/00-project-brief.md |
-
----
-
-## Open Decisions (Pending Input)
-
-These items affect architecture but are **not yet decided**. Do not assume an answer until stakeholder input is recorded in the docs.
-
-| Area | Open decision | Pending input |
-|---|---|---|
-| Turuncuhat integration | Inbound method and outbound capability: webhook vs. API, and read-only vs. read-write | Turuncuhat stakeholders |
-| Worker privileged access | Whether the Worker uses BeyondTrust brokering, direct WinRM + Kerberos + JEA, or the existing documented direct-JEA model with explicit acceptance | PAM team, Bilgi Güvenliği, team lead |
-
-See `docs/15-system-landscape.md`, `docs/05-security-model.md`, and `docs/06-integrations.md`.
-
----
-
-## Directory Map
-
-```
-.
-├── AGENTS.md                    # this file
-├── CLAUDE.md                    # Claude Code-specific instructions
-├── README.md                    # human-facing project intro
-├── .github/copilot-instructions.md  # GitHub Copilot context
-├── docs/                        # project memory (the source of truth)
-│   ├── agent-guides/             # portable detailed guidance, routed from this file
-│   ├── 00-project-brief.md
-│   ├── 01-current-operations-context.md
-│   ├── 02-roadmap.md
-│   ├── 03-architecture.md
-│   ├── 04-domain-model.md
-│   ├── 05-security-model.md
-│   ├── 06-integrations.md
-│   ├── 07-diagnostic-modules.md
-│   ├── 08-audit-model.md
-│   ├── 09-snapshot-change-safety.md
-│   ├── 10-ai-rag-strategy.md
-│   ├── 11-feasibility.md
-│   ├── 12-mvp-backlog.md
-│   ├── 13-definition-of-done.md
-│   ├── 14-management-summary-tr.md      # the only Turkish doc
-│   ├── 15-system-landscape.md
-│   └── adr/                              # architecture decision records
-├── plans/                       # phase plans with task breakdown
-│   └── PHASE-0..8-*.md
-├── contracts/                   # data contracts
-│   ├── schemas/                 # JSON Schema files
-│   └── examples/                # sample payloads
-├── src/                         # .NET solution
-│   ├── SecureOps.Api/
-│   ├── SecureOps.Worker/
-│   ├── SecureOps.Domain/
-│   ├── SecureOps.Infrastructure/
-│   ├── SecureOps.Ui/
-│   └── SecureOps.Shared/
-├── tests/                       # unit and integration test projects
-│   ├── SecureOps.Tests.Unit/
-│   └── SecureOps.Tests.Integration/
-├── scripts/powershell/          # diagnostic and JEA script folders (Phase 1 placeholders)
-│   ├── diagnostic/
-│   └── jea/
-└── sql/                         # schema and migration folders (Phase 1 placeholders)
-    ├── schema/
-    └── migrations/
-```
-
----
-
-## How to Approach a Task
-
-When you receive a user request:
-
-1. **Identify the phase.** Match it to `plans/PHASE-X-*.md`. If unclear, ask.
-2. **Read the relevant docs.** See "Mandatory Reading Order" above.
-3. **Check the guides.** Start with `docs/agent-guides/README.md` and `050-security-audit.md`.
-4. **Check ADRs.** Has a decision already been made?
-5. **Propose before you code.** For non-trivial changes, write a short plan first and confirm with the user.
-6. **Implement small.** One concern per change. Keep diffs reviewable.
-7. **Update documentation.** Any change to architecture, behavior, or external contract requires an update to the matching `docs/*.md` and possibly an ADR.
-8. **Verify.** Run `dotnet build`, then `dotnet test`. If you cannot run them, say so explicitly.
-9. **Summarize.** End with: what changed, what tests cover it, what docs were updated, what is still pending.
-
----
-
-## What This Project Is NOT
-
-- Not an AI product. AI is a Phase 7 capability layer on top of an operations platform.
-- Not a SIEM or APM tool. We complement existing monitoring, we do not replace it.
-- Not a replacement for BeyondTrust/PAM session management. We add operational audit on top.
-- Not a remediation tool in MVP. Remediation is Phase 8, approval-based, manually scoped.
-- Not an employee surveillance system. Audit is process-level, not person-performance-level.
-- Not a people search tool. Phase 1A identity lookup is exact-account, purpose-bound, TeamLead/Admin-only, and audited.
-
----
-
-## Single Developer Reality
-
-This project is being built by **one developer** working part-time around shift operations duties. Effort budget is approximately **16–20 hours per week**. Bus factor is 1.
-
-This shapes every decision:
-
-- **Documentation is not optional.** It is the project's continuity insurance.
-- **Boring technology wins.** No exotic frameworks. Stick to mainstream Microsoft stack.
-- **Small, reviewable changes.** A pull request that is too big to review will not be reviewed.
-- **No heroic features.** If a feature requires deep tribal knowledge to maintain, it is the wrong feature.
-
-When you generate code, optimize for the next maintainer's understanding, not for cleverness.
-
----
-
-## Quick Links
-
-- **Current phase status:** see top of `plans/PHASE-0-discovery-and-project-setup.md`
-- **Open ADRs:** see `docs/adr/`
-- **Definition of Done:** `docs/13-definition-of-done.md`
-- **MVP backlog:** `docs/12-mvp-backlog.md`
-- **Turkish management summary:** `docs/14-management-summary-tr.md`
-- **System landscape:** `docs/15-system-landscape.md`
+Use **CONTOSO** where a company name is needed. Real system names that are already documented in `docs/15-system-landscape.md` may be used; nothing else that identifies the real organisation or its people.

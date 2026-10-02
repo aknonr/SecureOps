@@ -4,6 +4,11 @@ PowerShell artifacts. Production diagnostic and JEA scripts are not implemented 
 
 ## Structure
 
+Present today: `powershell/` (local harnesses and TEST smoke/readiness checks), `diagnostics/` (read-only SQL and
+evidence helpers) and `release/` (packaging and validation; see `release/README.md`).
+
+Planned for Phase 1, **not yet present**:
+
 ```
 scripts/
 └── powershell/

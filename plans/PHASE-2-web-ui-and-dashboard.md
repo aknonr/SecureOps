@@ -20,6 +20,7 @@
 6. MudBlazor theme with the SecureOps color palette.
 7. Operator onboarding guide.
 8. bUnit tests for key components.
+   *Implementation note (2026-10-01): planned, not implemented as written — component render tests use `HtmlRenderer` in `tests/SecureOps.Tests.Unit/Ui/`; bUnit is pinned centrally but not referenced.*
 
 ## Task Breakdown
 

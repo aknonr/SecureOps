@@ -14,7 +14,7 @@ favourite/shift-set aggregate. It stores references, not browser execution state
 
 ## What does NOT go here
 
-- EF Core mappings or DbContext (see `SecureOps.Infrastructure`).
+- Persistence code or SQL (see `SecureOps.Infrastructure`).
 - ASP.NET Core types (`HttpContext`, controllers).
 - HTTP clients.
 - PowerShell invocation.

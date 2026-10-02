@@ -1,137 +1,26 @@
-# 050 — Security and Audit Rules (Always Apply)
+# 050 — Security and Audit
 
-## Applicability
+The hard rules are in `AGENTS.md`; the full model is `docs/05-security-model.md` and `docs/08-audit-model.md`. This guide adds the operational detail.
 
-- **Purpose:** Non-negotiable security and audit rules. Read every time.
-- **Applies to:** Every task.
-- **Loading:** Routed explicitly from `AGENTS.md`; do not assume automatic discovery.
+## Boundaries
 
-## Hard Boundaries
+- **Target servers.** Read-only until Phase 8, enforced twice: by the JEA endpoint and by code that refuses to build write commands. Allow-list: JEA section of `docs/05-security-model.md` (changing it needs an ADR).
+- **Public AI.** No production data — alarm payloads, hostnames, logs, user identifiers, internal application or people names — to public LLM endpoints (`api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.cohere.ai`, any other). Product AI is Phase 7, self-hosted (`080-ai-rag-future-phase.md`).
+- **Audit store.** Append-only, enforced by `INSTEAD OF UPDATE, DELETE` triggers in `sql/schema/`; retention at least 36 months, configurable only upward. State-changing actions and privileged reads write audit events; failures to audit fail the action.
+- **Audit framing.** Records what was done, when and by which process — not who performed best. No "operator performance", leaderboards or operator comparisons in UI, reports or names.
 
-These rules are non-negotiable. If a user request appears to violate them, refuse, explain, and propose a compliant alternative.
+## Identity and access
 
-### 1. Read-Only on Target Servers
+- Authentication (Windows/Negotiate, or OIDC per ADR-0016/0017) establishes a principal only. Access comes from persisted approval → role bundle → capability (ADR-0010, ADR-0022); authorization is evaluated server-side on every request.
+- Use the capability policies in `SecureOps.Shared.Auth.Policies` (and module policy classes); never inline group or role-name checks. UI visibility is a courtesy, never a boundary.
+- Sessions are server-governed with idle and absolute limits (ADR-0014). Monitoring webhooks use HMAC-signed shared secrets; service-to-service uses Windows auth or mTLS — no static API keys or custom schemes.
 
-In MVP (Phase 1–6), no code on this platform may:
+## Secrets and data
 
-- Stop, start, or restart any Windows service.
-- Recycle, stop, or start any IIS application pool.
-- Delete, modify, or create any file on target servers.
-- Reboot, shutdown, or suspend any server.
-- Modify local administrators, AD groups, file permissions, or registry.
-- Push configuration changes, patches, or installers.
-- Execute arbitrary `Invoke-Command` script blocks not in the JEA whitelist.
+- Credentials come from PAM or a secret store at runtime; connection strings prefer integrated authentication. Nothing secret in source, config committed to the repo, logs or exception text.
+- Network: internal only; Worker → servers over WinRM HTTPS (5986) with Kerberos; SQL over TLS; no application traffic to the public internet.
+- Before data reaches any AI layer or external log sink, mask hostnames (stable hash), usernames (role), IPs (subnet), user paths and connection fragments — at the data layer, before serialization.
 
-The JEA constrained endpoint enforces this at the PowerShell layer. The code layer must also refuse to construct any command that would attempt these operations.
+## When implementing
 
-### 2. No Public AI
-
-Forbidden destinations for any production data:
-
-- `api.openai.com`
-- `api.anthropic.com`
-- `generativelanguage.googleapis.com`
-- `api.cohere.ai`
-- Any other public LLM inference endpoint
-
-This applies to:
-- Alarm payloads
-- Hostnames
-- Log content
-- User identifiers
-- Any text containing names of internal servers, applications, or people
-
-AI work is Phase 7, self-hosted only. See `docs/10-ai-rag-strategy.md`.
-
-### 3. JEA Mandatory
-
-All PowerShell Remoting to target servers must go through the JEA constrained endpoint defined in `scripts/jea/`. Code that bypasses JEA — for example, opening an unconstrained runspace — is a security violation.
-
-The cmdlet whitelist is in `docs/05-security-model.md`. To extend the whitelist, write an ADR.
-
-### 4. Append-Only Audit
-
-The `audit.AuditLog` table is append-only. UPDATE and DELETE are blocked by SQL triggers. Any code that attempts to modify audit rows must fail.
-
-```sql
-CREATE TRIGGER audit.tr_AuditLog_BlockUpdateDelete
-ON audit.AuditLog
-INSTEAD OF UPDATE, DELETE
-AS
-BEGIN
-    THROW 51000, 'Audit log is append-only.', 1;
-END;
-```
-
-Retention: minimum 36 months. Configurable upward only, never downward.
-
-### 5. Authentication
-
-- Web UI: Windows Authentication via Active Directory.
-- API (called from internal): Windows Authentication.
-- Webhook from monitoring: HMAC-signed shared secret in header.
-- Service-to-service: Windows Authentication or mTLS — never plain API keys.
-
-No custom auth schemes. No bearer tokens for production endpoints.
-
-### 6. Authorization (RBAC)
-
-Roles map to AD groups. Group names are configurable; placeholders below.
-
-| Role | AD Group (placeholder) | Permissions |
-|---|---|---|
-| Operator | `CONTOSO\SecureOps-Operators` | View alerts, view diagnostics, view own audit |
-| TeamLead | `CONTOSO\SecureOps-Leads` | Operator + trigger manual diagnostic, view team audit |
-| Admin | `CONTOSO\SecureOps-Admins` | All operational features + config |
-| Auditor | `CONTOSO\SecureOps-Auditors` | Read-only access to all audit data |
-
-Use ASP.NET Core authorization policies named in `SecureOps.Shared.Auth.Policies`. Never check group names inline.
-
-### 7. Secrets Management
-
-- Service account credentials stored in PAM (BeyondTrust-style), retrieved at runtime.
-- Webhook shared secrets in `secrets.json` outside source control, or in a secret store.
-- Connection strings: integrated Windows authentication preferred; if password required, stored in PAM.
-- Never log secrets. Never include secrets in stack traces. Use Serilog destructuring filters.
-
-### 8. Network Boundaries
-
-- API and UI exposed only on the internal network. No public ingress.
-- Worker → Target Server: WinRM HTTPS (port 5986), Kerberos auth.
-- Worker → SolarWinds: HTTPS, mutual auth if available.
-- Worker → SQL Server: TCP 1433 with TLS.
-- Outbound to public internet: blocked at firewall except for explicit allow-list (Windows Update, etc., not application traffic).
-
-### 9. Data Masking
-
-Before any data reaches the AI layer (Phase 7) or any external log aggregator, the following must be masked:
-
-- Hostnames (replace with consistent hash)
-- Usernames (replace with role)
-- IP addresses (replace with subnet)
-- File paths containing user names (`C:\Users\<name>` → `C:\Users\<masked>`)
-- Connection strings, tokens, password fragments
-
-Masking happens at the data layer, before serialization.
-
-### 10. Audit Is Not Surveillance
-
-The framing of all audit features is **operational response verification**, not person-level performance monitoring. Use language from `docs/05-security-model.md`:
-
-> Audit records what was done, when, and by what process — not who performed best.
-
-UI labels, dashboards, and reports must use this framing. Phrases like "operator performance", "individual response time leaderboard", or "comparison of operators" are forbidden.
-
-## What an Agent Must Do
-
-When implementing any feature, an agent must:
-
-1. Confirm the feature does not violate any rule above.
-2. If unclear, ask the user before coding.
-3. Add audit calls at every state-changing point and every privileged read.
-4. Verify the JEA whitelist covers any cmdlets the feature requires; if not, surface this for ADR review before extending.
-5. Add tests that verify forbidden operations fail.
-
-## Reference
-
-Read `docs/05-security-model.md` and `docs/08-audit-model.md` for the full specification.
+Check the change against these boundaries first; if it might cross one, stop and raise it with the owner. Add tests proving forbidden operations fail and that audit is written.

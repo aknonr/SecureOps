@@ -244,7 +244,7 @@ The SecureOps database lives on the existing enterprise SQL Server.
 - Separate database, separate login.
 - Integrated Windows auth from the service account.
 - Backup managed by the SQL Server team's existing process.
-- Schema migrations via EF Core or Flyway-style SQL scripts in `sql/migrations/`.
+- Schema changes are numbered, DBA-reviewed SQL scripts in `sql/schema/` and `sql/migrations/`, never applied by application startup.
 
 ## Configuration Surface
 

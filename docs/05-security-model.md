@@ -7,7 +7,7 @@ Security is the defining constraint of this project. This document is the canoni
 | Threat | Impact | Likelihood | Mitigation |
 |---|---|---|---|
 | Compromised service account → write operations on target servers | High | Low | JEA constrained endpoint blocks all writes at the PowerShell layer |
-| SQL injection in API | High | Low | Parameterized queries, EF Core, FluentValidation |
+| SQL injection in API | High | Low | Parameterized Dapper queries only, request validation |
 | Webhook spoofing | Medium | Medium | HMAC-signed payloads, source IP allowlist |
 | Audit tampering | High | Low | Append-only triggers, separate DB role for audit writes |
 | Privilege escalation through UI | High | Low | Server-side authorization on every endpoint |
