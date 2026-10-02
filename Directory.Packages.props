@@ -32,7 +32,7 @@
 
 
     <!-- Data access: Dapper over numbered SQL scripts (ADR-0001) -->
-    <PackageVersion Include="Dapper" Version="2.1.86" />
+    <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="5.2.3" />
 
     <!-- Hangfire -->
