@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using SecureOps.Api.Security;
 using SecureOps.Api.ServiceAccounts;
 using SecureOps.Infrastructure.ServiceAccounts;
+using SecureOps.Shared.Auth;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Api.Controllers.ServiceAccounts;
@@ -9,7 +12,7 @@ namespace SecureOps.Api.Controllers.ServiceAccounts;
 /// <summary>
 /// Scoped account list/detail and explicit workflow commands. Every command revalidates capability and data scope;
 /// stale versions return 409 with the caller's current view. Nothing here deletes accounts, rotates passwords,
-/// converts to gMSA or contacts a directory/source system.
+/// converts to gMSA or contacts a source system; the only directory access is the bounded read-only name search.
 /// </summary>
 [ApiController]
 [Route("api/v1/service-accounts")]
@@ -163,6 +166,46 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
     public async Task<ActionResult<AccountDetail>> DecideHandoverAsync(Guid id, HandoverDecisionRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.DecideHandoverAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>
+    /// Bounded read-only directory search by first name or full name (ADR-0025): at least three letters, at most ten results,
+    /// minimal fields, scope-checked Service Accounts links. Uses the platform identity-lookup capability and rate limit.
+    /// </summary>
+    [HttpPost("directory/name-search")]
+    [Authorize(Policy = Policies.CanIdentityLookup)]
+    [EnableRateLimiting(ApiRateLimits.IdentityLookup)]
+    [ProducesResponseType(typeof(DirectoryNameSearchResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<DirectoryNameSearchResponse>> DirectoryNameSearchAsync(DirectoryNameSearchRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.DirectoryNameSearchAsync(User, Context(), request, cancellationToken));
+
+    /// <summary>Records where the account is used (knowledge-base rule input).</summary>
+    [HttpPost("accounts/{id:guid}/usages")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> CreateUsageAsync(Guid id, CreateUsageRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.CreateUsageAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>Updates an active usage at the expected version.</summary>
+    [HttpPatch("usages/{id:guid}")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> UpdateUsageAsync(Guid id, UpdateUsageRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.UpdateUsageAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>Removes a usage with a reason (kept for history).</summary>
+    [HttpPost("usages/{id:guid}/remove")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> RemoveUsageAsync(Guid id, RemoveUsageRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.RemoveUsageAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>Records or clears a reasoned rule exception (verifier).</summary>
+    [HttpPost("usages/{id:guid}/exception")]
+    [Authorize(Policy = ServiceAccountPolicies.Verify)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> UsageExceptionAsync(Guid id, UsageExceptionRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.SetUsageExceptionAsync(User, Context(), id, request, cancellationToken));
 
     /// <summary>Updates gMSA suitability, plan or completion reference.</summary>
     [HttpPatch("transitions/{id:guid}")]

@@ -25,7 +25,8 @@ public static class ServiceAccountsModule
             provider.GetRequiredService<IApplicationAccessService>(),
             provider.GetRequiredService<IOptions<ServiceAccountOptions>>(),
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<ILogger<ServiceAccountService>>()));
+            provider.GetRequiredService<ILogger<ServiceAccountService>>(),
+            provider.GetService<SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider>()));
         services.AddScoped(provider => new ServiceAccountReminderJob(
             enabled ? provider.GetRequiredService<SqlServiceAccountRepository>() : null,
             provider.GetRequiredService<IOptions<ServiceAccountOptions>>(),

@@ -37,6 +37,6 @@ public sealed class ServiceAccountPersistenceSqlTests
         (await next.ExecuteScalarAsync<short>("SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID;"))
             .Should().Be(2, "the next platform connection from the pool must be READ COMMITTED");
         SqlServiceAccountRepository.ModuleConnectionString(platform).Should().NotBe(platform, "the module uses its own pool");
-        
+
     }
 }

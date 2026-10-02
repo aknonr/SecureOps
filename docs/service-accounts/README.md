@@ -1,6 +1,11 @@
 # Service Accounts Module — Design Note
 
-Current integration status (2026-10-01): pinned `b4fdf8d` plus `7e227ed` delta is integrated locally
+Current combined review (2026-10-02): PR #4 and final PR #6 are integrated with current master/PR #5.
+SQL discovery is 001-026: numbered 025/026 include the retained SA-001/SA-002 payloads;
+grants remain separate and unassigned. See [COMBINED-INTEGRATION-20261002.md](COMBINED-INTEGRATION-20261002.md).
+This is local source verification, not installation or corporate acceptance.
+
+Previous integration status (2026-10-01): pinned `b4fdf8d` plus `7e227ed` delta is integrated locally
 on `feature/service-accounts-pinned-integration-20260929`, based on `e997c5b`.
 Not deployed or corporately accepted. Combined Windows evidence and limitations:
 [INTEGRATION-FOLLOWUP-20261001.md](INTEGRATION-FOLLOWUP-20261001.md).
@@ -40,8 +45,10 @@ not the current integration state.
 | UI shell | `MainLayout`, `NavMenu`, MudBlazor 6.16, `so-` design tokens | `src/SecureOps.Ui/Shared/` |
 
 Not reused, with reason:
-- Identity/directory lookup services: exact privileged lookup is not a personnel search; the
+- Original identity/directory reuse decision: exact privileged lookup is not a personnel search; the
   module keeps its own **business-person references** that grant nothing.
+  The later approved ADR-0025 adds a separate bounded name-search provider behind module View
+  plus Identity.Lookup; it does not change exact lookup or turn person references into authority.
 - OCO mail pipeline: reminders never reuse announcement send intents; outbound mail is disabled.
 - No PDF library exists and SkiaSharp has no Linux/managed PDF path in this solution; a small
   managed text-only PDF writer (standard Courier font, Turkish glyphs via encoding
@@ -57,7 +64,7 @@ Not reused, with reason:
 | API | `src/SecureOps.Api/Controllers/ServiceAccounts/`, module wiring `src/SecureOps.Api/ServiceAccounts/` |
 | Worker | `src/SecureOps.Worker/ServiceAccounts/` (recurring reminder schedule only) |
 | UI | `src/SecureOps.Ui/Pages/ServiceAccounts/`, `src/SecureOps.Ui/Services/ServiceAccounts/`, `src/SecureOps.Ui/Shared/Components/ServiceAccounts/` |
-| SQL candidate | `sql/pending/service-accounts/` (outside `sql/migrations` and `sql/schema` release discovery) |
+| SQL payloads | `sql/pending/service-accounts/` retained includes; numbered discovery through `sql/schema/025-*.sql`, `026-*.sql` and matching migrations; separate grants |
 | Tests | `tests/SecureOps.Tests.Unit/ServiceAccounts/`, `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUiTests.cs`, `tests/SecureOps.Tests.Integration/ServiceAccounts/`, `tests/sql/service-accounts/`, `tests/browser/service-accounts.cjs` |
 
 All routes are under `/api/v1/service-accounts/…`.
@@ -108,6 +115,8 @@ type+number) and links, Communications and account links, Findings, Handovers,
 IdentityTransitions, ImportBatches (server-held bytes + hash), ImportRows (raw/normalized,
 classification, decision), AccountObservations, Evidence (bytes in SQL, scoped download),
 ReportSnapshots (immutable payload + exports), ReminderOutbox, History.
+Candidate 2 (`SA-002`): AccountUsages (where an account is used; reasoned exception and removal, never deleted) and
+TeamRoles (SQL teams and the single gMSA executing team; configuration, never access).
 
 Dates: plan/business dates are `date`; events carry `datetimeoffset` only when a real instant is
 known; `TimePrecision` records DateOnly/Instant/Unknown. Source timestamps without a timezone

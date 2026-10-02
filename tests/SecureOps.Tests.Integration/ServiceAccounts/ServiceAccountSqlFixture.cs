@@ -1,10 +1,10 @@
-using System.Security.Claims;
 using System.Collections.Concurrent;
+using System.Security.Claims;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using SecureOps.Domain.Access;
@@ -67,10 +67,18 @@ internal sealed class ServiceAccountSqlFixture
                     ? AccessServiceResult<EnsureAccessUserResult>.Success(new EnsureAccessUserResult(user, null, false, false))
                     : AccessServiceResult<EnsureAccessUserResult>.Fail("AccessDenied");
             });
+        _access = access;
         Service = new ServiceAccountService(Repository, access, Options.Create(new ServiceAccountOptions { Provider = "SqlServer" }),
             TimeProvider.System, new SafeSqlLogger(SqlDiagnostics));
         Suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
     }
+
+    private readonly IApplicationAccessService _access;
+
+    /// <summary>The same service wired to a (synthetic) directory name-search provider.</summary>
+    public ServiceAccountService WithDirectory(SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider? directory) =>
+        new(Repository, _access, Options.Create(new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System, new SafeSqlLogger(SqlDiagnostics),
+            directory);
 
     public IConfiguration Configuration { get; }
 

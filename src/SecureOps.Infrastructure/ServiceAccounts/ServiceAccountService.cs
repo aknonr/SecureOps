@@ -25,7 +25,8 @@ public sealed record SaCaller(ApplicationUser User, ServiceAccountScope Scope, S
 /// people/teams never grant access and no second login store exists.
 /// </summary>
 public sealed partial class ServiceAccountService(SqlServiceAccountRepository? repository, IApplicationAccessService access,
-    IOptions<ServiceAccountOptions> options, TimeProvider clock, ILogger<ServiceAccountService> logger)
+    IOptions<ServiceAccountOptions> options, TimeProvider clock, ILogger<ServiceAccountService> logger,
+    SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider? directory = null)
 {
     private readonly ServiceAccountOptions _options = options.Value;
 

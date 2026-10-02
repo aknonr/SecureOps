@@ -28,6 +28,40 @@ public partial class ServiceAccountAdmin
         _grants = await Api.GetAsync<IReadOnlyList<ScopeGrantView>>("/scope-grants", token);
         _organizations = await Api.GetAsync<IReadOnlyList<OrganizationView>>("/organizations", token);
         _teams = await Api.GetAsync<IReadOnlyList<TeamView>>("/teams", token);
+        _roles = await Api.GetAsync<IReadOnlyList<TeamRoleView>>("/team-roles", token);
+    }
+
+    private IReadOnlyList<TeamRoleView> _roles = [];
+    private Guid? _roleTeam;
+    private string _roleKind = ServiceAccountTeamRoles.SqlTeam;
+    private string? _roleReason;
+    private TeamRoleView? _roleRevoke;
+    private string? _roleRevokeReason;
+
+    private static string RoleLabel(string role) => role == ServiceAccountTeamRoles.GmsaExecutor ? "gMSA yürütücü ekip" : "SQL ekibi";
+
+    private async Task AddRoleAsync()
+    {
+        if (await RunAsync(async token =>
+        {
+            await Api.SendAsync<Guid>(HttpMethod.Post, "/team-roles", new CreateTeamRoleRequest(_roleTeam!.Value, _roleKind, _roleReason!.Trim()), token);
+            await ReloadAsync(token);
+        }))
+        {
+            (_roleTeam, _roleReason) = (null, null);
+        }
+    }
+
+    private async Task RevokeRoleAsync()
+    {
+        if (await RunAsync(async token =>
+        {
+            await Api.SendAsync<Guid>(HttpMethod.Post, $"/team-roles/{_roleRevoke!.Id}/revoke", new RevokeTeamRoleRequest(_roleRevokeReason!.Trim()), token);
+            await ReloadAsync(token);
+        }))
+        {
+            (_roleRevoke, _roleRevokeReason) = (null, null);
+        }
     }
 
     private async Task GrantAsync()

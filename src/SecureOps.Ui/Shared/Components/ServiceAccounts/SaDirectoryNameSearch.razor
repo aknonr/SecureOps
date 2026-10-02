@@ -1,0 +1,81 @@
+@* Bounded read-only directory search by first name or full name (ADR-0025). The page sends the query in the request body;
+   results carry only the fields needed to tell people apart. A Service Accounts link appears only when the server found
+   exactly one record in the caller's scope. Choosing a result grants nothing, confirms no ownership and changes nothing in
+   the directory; exact account lookup stays on its own page. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-directory-search">
+    <h2 id="sa-directory-search" class="so-panel-title">Dizinde ada göre ara</h2>
+    <p class="so-panel-text--sm">
+        Ad veya ad soyad yazın (en az @MinimumLetters harf). En çok @MaximumResults sonuç gösterilir; daha fazlası varsa aramayı daraltın.
+        Seçim yetki vermez, hesap sahipliğini onaylamaz ve dizinde değişiklik yapmaz. Hesap adını biliyorsanız
+        <a href="identity-lookup">tam hesap sorgusunu</a> kullanın.
+    </p>
+    <div class="d-flex flex-wrap align-center gap-2">
+        <MudTextField T="string" @bind-Value="_query" Label="Ad veya ad soyad" MaxLength="64" Variant="Variant.Outlined" Immediate="true"
+                      OnKeyDown="EnterAsync" Class="sa-directory-query" aria-describedby="sa-directory-hint" />
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonSearch" Disabled="@(Busy || !Searchable)"
+                   OnClick="SearchAsync">Dizinde ara</MudButton>
+    </div>
+    <p id="sa-directory-hint" class="so-panel-text--sm mt-1">@Hint</p>
+
+    @if (Result is { } result)
+    {
+        @if (result.Matches.Count == 0)
+        {
+            <SoEmptyState Title="Eşleşen kişi bulunamadı" Description="Yazımı kontrol edin; Türkçe karakterler (İ/ı, ş, ğ) aynen veya ASCII yazılabilir." />
+        }
+        else
+        {
+            <MudTable Items="result.Matches" Dense="true" Breakpoint="Breakpoint.Sm" T="DirectoryNameMatch" Class="mt-2">
+                <HeaderContent><MudTh>Ad</MudTh><MudTh>Hesap</MudTh><MudTh>Birim</MudTh><MudTh>Servis hesabı kaydı</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Ad">
+                        @context.DisplayName
+                        @if (context.SameNameAsAnother) { <div class="so-panel-text--sm">Aynı adlı başka sonuç var; hesap ve birime bakın.</div> }
+                    </MudTd>
+                    <MudTd DataLabel="Hesap"><code>@context.Account</code></MudTd>
+                    <MudTd DataLabel="Birim">@(context.Department ?? "Bilinmiyor")</MudTd>
+                    <MudTd DataLabel="Servis hesabı kaydı">
+                        @if (context.ServiceAccountId is { } id) { <a href="@($"service-accounts/{id}")">Kaydı aç</a> }
+                        else { <span class="so-panel-text--sm">Kapsamınızda kayıt yok</span> }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+
+        @if (result.Truncated)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">Daha fazla eşleşme var; ilk @result.MaximumResults gösterildi. Soyadını ekleyerek daraltın.</MudAlert>
+        }
+    }
+</section>
+
+@code {
+    private string? _query;
+
+    /// <summary>Last answer, or null before the first search.</summary>
+    [Parameter] public DirectoryNameSearchResponse? Result { get; set; }
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Raised with the trimmed query.</summary>
+    [Parameter] public EventCallback<string> OnSearch { get; set; }
+
+    /// <summary>Minimum letters (mirrors the server rule; the server decides).</summary>
+    [Parameter] public int MinimumLetters { get; set; } = 3;
+
+    /// <summary>Maximum results (mirrors the server rule).</summary>
+    [Parameter] public int MaximumResults { get; set; } = 10;
+
+    private int Letters => (_query ?? string.Empty).Count(char.IsLetter);
+
+    private bool Searchable => Letters >= MinimumLetters;
+
+    private string Hint => Searchable ? "Aramaya hazır." : $"Aramak için en az {MinimumLetters} harf yazın ({Letters}/{MinimumLetters}).";
+
+    private Task SearchAsync() => Searchable ? OnSearch.InvokeAsync(_query!.Trim()) : Task.CompletedTask;
+
+    private Task EnterAsync(KeyboardEventArgs args) => args.Key == "Enter" ? SearchAsync() : Task.CompletedTask;
+}

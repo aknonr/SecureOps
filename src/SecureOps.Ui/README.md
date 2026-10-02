@@ -407,12 +407,12 @@ have to be invented.
 | `/resources` | Uygulama Bağlantıları: search, favourites, add to a personal group | `Resources.View` |
 | `/resources/sets` | Bağlantı Gruplarım: personal ordered groups, preferred group, opening | `Resources.View` |
 | `/admin/resources` | Bağlantı Yönetimi: shared categories and links | `Resources.View` and `Resources.Manage` |
-| `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters | `ServiceAccounts.View` and scope grant |
-| `/service-accounts/{id}` | Account detail, work, evidence and history | `ServiceAccounts.View`; commands require their own capability |
+| `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters; bounded directory name search panel (ADR-0025) | `ServiceAccounts.View` and scope grant; the name search also needs `Identity.Lookup` |
+| `/service-accounts/{id}` | Account detail, work, usages with the explained knowledge-base rule, evidence and history | `ServiceAccounts.View`; commands require their own capability (rule exception: `ServiceAccounts.Verify`) |
 | `/service-accounts/work` | Entry work summary, in-app reminders and unsent coordinator drafts | `ServiceAccounts.View` |
 | `/service-accounts/imports` | Import preview, decisions and idempotent commit | `ServiceAccounts.Import` and organization scope |
-| `/service-accounts/reports` | Live report, immutable snapshots, XLSX/PDF | `ServiceAccounts.Report` |
-| `/service-accounts/admin` | Scope grants and dictionaries | `ServiceAccounts.Administer` |
+| `/service-accounts/reports` | Live report (directorate view, rules, gMSA funnel, trend, risk candidates), immutable snapshots, snapshot comparison, XLSX/PDF | `ServiceAccounts.Report` |
+| `/service-accounts/admin` | Scope grants, dictionaries and gMSA routing team roles | `ServiceAccounts.Administer` |
 | `/in-use`, `/in-use/{id}` | In Use local review workspace | `InUse.View`; review, assign, refresh and completion need their own capability |
 | `/in-use/reports` | In Use report catalogue | `InUse.View` |
 | `/announcements`, `/announcements/preparations` | Planned announcement drafts and preparations (Codex-owned) | `Announcements.Drafts` / `Announcements.Prepare` per the contract |

@@ -47,6 +47,8 @@ SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(nvarchar(max),(
     $before = @(& sqlcmd -S $server -E -I -b -d $database -h -1 -W -Q $definitions) -join "`n"
     if ($LASTEXITCODE -ne 0) { Write-Output $before; throw 'Baseline fingerprint failed.' }
     # 025 must fail without 024, before creating any module object.
+    & sqlcmd -S $server -E -I -b -d $database -i '026-service-account-usage-rules.sql'
+    if ($LASTEXITCODE -eq 0) { throw 'Missing 025 prerequisite was accepted.' }
     & sqlcmd -S $server -E -I -b -d $database -i '025-service-accounts.sql'
     if ($LASTEXITCODE -eq 0) { throw 'Missing 024 prerequisite was accepted.' }
     Invoke-LocalSql -Query "IF SCHEMA_ID(N'svcacct') IS NOT NULL THROW 51000,'Partial module after prerequisite refusal.',1;"
@@ -58,8 +60,20 @@ SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(nvarchar(max),(
     if ($LASTEXITCODE -eq 0) { throw 'Failure injection did not fail.' }
     Invoke-LocalSql -Query "IF SCHEMA_ID(N'svcacct') IS NOT NULL THROW 51000,'Partial module survived failed transaction.',1;"
     Invoke-LocalSql -File '025-service-accounts.sql'
+    $usageFailure = Join-Path $evidence '026-failure-injection.sql'
+    if (Test-Path $usageFailure) { throw 'Refuse existing 026 failure evidence.' }
+    $usage = [IO.File]::ReadAllText((Join-Path $sql 'pending/service-accounts/SA-002-usage-rules.sql'))
+    if (($usage.Split(@('COMMIT TRANSACTION;'),[StringSplitOptions]::None)).Length -ne 2) { throw 'Unexpected 026 commit boundary.' }
+    [IO.File]::WriteAllText($usageFailure, $usage.Replace('COMMIT TRANSACTION;', "THROW 51399, 'Synthetic 026 failure before commit.', 1;`nCOMMIT TRANSACTION;"))
+    & sqlcmd -S $server -E -I -b -d $database -i $usageFailure
+    if ($LASTEXITCODE -eq 0) { throw '026 failure injection did not fail.' }
+    Invoke-LocalSql -Query "IF OBJECT_ID('svcacct.AccountUsages') IS NOT NULL OR OBJECT_ID('svcacct.TeamRoles') IS NOT NULL THROW 51000,'Partial 026 survived.',1; IF OBJECT_ID('svcacct.Accounts') IS NULL THROW 51000,'025 baseline lost.',1;"
+    Invoke-LocalSql -File '026-service-account-usage-rules.sql'
+    & sqlcmd -S $server -E -I -b -d $database -i '026-service-account-usage-rules.sql'
+    if ($LASTEXITCODE -eq 0) { throw '026 replay was accepted.' }
     Invoke-LocalSql -File '../pending/service-accounts/SA-API-permissions.sql'
     Invoke-LocalSql -File '../pending/service-accounts/SA-Worker-permissions.sql'
+    Invoke-LocalSql -File '../pending/service-accounts/SA-002-API-permissions.sql'
     $after = @(& sqlcmd -S $server -E -I -b -d $database -h -1 -W -Q $definitions) -join "`n"
     if ($LASTEXITCODE -ne 0 -or $before -cne $after) { throw 'Baseline column/trigger definitions changed.' }
     Invoke-LocalSql -Query @'
@@ -67,11 +81,11 @@ IF NOT EXISTS(SELECT 1 FROM security.Users WHERE CorporateIdentity='synthetic:sa
  OR NOT EXISTS(SELECT 1 FROM ops.OperationalRecords WHERE SourceRecordId='synthetic-sa-upgrade' AND JiraEligible=0 AND SourceSynthetic IS NULL)
  OR NOT EXISTS(SELECT 1 FROM audit.AuditLog WHERE CorrelationId='synthetic-sa-upgrade')
  THROW 51000,'Existing synthetic data changed.',1;
-IF (SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID('svcacct')) <> 25
+IF (SELECT COUNT(*) FROM sys.tables WHERE schema_id=SCHEMA_ID('svcacct')) <> 27
  THROW 51000,'Module table inventory differs.',1;
 IF EXISTS(SELECT 1 FROM sys.triggers WHERE parent_id IN(SELECT object_id FROM sys.tables WHERE schema_id=SCHEMA_ID('svcacct')) AND is_disabled=1)
  THROW 51000,'Protective trigger disabled.',1;
-SELECT 'Baseline retained; prerequisite and atomicity refusals passed; 024 then 025 installed' AS Outcome;
+SELECT 'Baseline retained; atomicity and replay refusals passed; 024 then 025 then 026 installed' AS Outcome;
 '@
 } finally { Pop-Location }
-[pscustomobject]@{Database=$database;Baseline='001-023';Delta='024 then 025';Retained=$true}
+[pscustomobject]@{Database=$database;Baseline='001-023';Delta='024 then 025 then 026';Retained=$true}

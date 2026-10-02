@@ -1,0 +1,281 @@
+@* Where the account is used and what the knowledge-base rules recommend. The evaluation comes from the server (same
+   implementation as the reports); a recommendation never changes ownership, suitability or closure. Creating a request
+   from it is an explicit, audited user action through the normal request command. *@
+@using SecureOps.Domain.ServiceAccounts
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-rule">
+    <div class="so-panel-head">
+        <h2 id="sa-rule" class="so-panel-title">Kural önerisi</h2>
+        @if (Rule is not null)
+        {
+            <SoStatusBadge Label="@Rule.ConformanceLabel" Tone="@Tone(Rule.Conformance)" Icon="@Icon(Rule.Conformance)" />
+        }
+    </div>
+    @if (Rule is null)
+    {
+        <SoEmptyState Title="Kural değerlendirmesi okunamadı" />
+    }
+    else
+    {
+        <SoFieldGrid>
+            <SoField Label="Önerilen yol" Value="@(Rule.PathLabel ?? "Kullanım bilgisi yok")" />
+            <SoField Label="gMSA aşaması" Value="@(Rule.GmsaStage ?? "gMSA kapsamında değil")" />
+            <SoField Label="gMSA yürütücü ekip" Value="@(Rule.GmsaExecutorTeam ?? "Ayarlanmadı")" />
+            <SoField Label="SQL ekibi hesabı" Value="@(Rule.SqlTeamAccount ? "Evet (ekip ayarından)" : "Hayır")" />
+        </SoFieldGrid>
+        @if (Rule.Items.Count > 0)
+        {
+            <ul class="sa-rule-items mt-2" aria-label="Neden bu öneri">
+                @foreach (RuleItemView item in Rule.Items)
+                {
+                    <li>
+                        <strong>@item.PathLabel</strong> <span class="so-panel-text--sm">(@item.RuleCode@(item.Excepted ? " · gerekçeli istisna" : ""))</span>
+                        <div class="so-panel-text--sm">@item.Reason</div>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="so-panel-text--sm mt-1">Kullanım girildiğinde bilgi bankası kuralları burada açıklanır.</p>
+        }
+
+        @if (Detail.Permissions.Work && Rule.Conformance is nameof(RuleConformance.Unplanned) or nameof(RuleConformance.ManualReviewPending) && Suggested is { } suggestion)
+        {
+            <div class="d-flex flex-wrap align-center gap-2 mt-2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="Busy" StartIcon="@Icons.Material.Filled.PlaylistAdd" OnClick="CreateSuggestedAsync">
+                    Öneriden talep aç: @ServiceAccountUiText.Action(suggestion.ActionType)@(suggestion.Team is null ? "" : $" → {suggestion.Team.Label}")
+                </MudButton>
+                <span class="so-panel-text--sm">Talep normal talep olarak açılır; plan tarihi ve takip sonra girilir.</span>
+            </div>
+        }
+        <p class="so-panel-text--sm mt-2">Kural sürümü @Rule.RuleSetVersion. Öneri, gMSA uygunluğu, sahiplik veya kapanış değildir.</p>
+    }
+</section>
+
+<section class="so-panel" aria-labelledby="sa-usages">
+    <div class="so-panel-head"><h2 id="sa-usages" class="so-panel-title">Kullanım yerleri</h2></div>
+    @if (Active.Count == 0)
+    {
+        <SoEmptyState Title="Kullanım kaydı yok" />
+    }
+    else
+    {
+        <MudTable Items="Active" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageView">
+            <HeaderContent><MudTh>Kullanım</MudTh><MudTh>Sunucu / bileşen</MudTh><MudTh>Not</MudTh><MudTh>İstisna</MudTh><MudTh>İşlem</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Kullanım">@context.KindLabel<div class="so-panel-text--sm">@UsageDetail(context)</div></MudTd>
+                <MudTd DataLabel="Sunucu / bileşen">@(context.Server ?? "—")<div class="so-panel-text--sm">@context.Component</div></MudTd>
+                <MudTd DataLabel="Not">@(context.Notes ?? "")</MudTd>
+                <MudTd DataLabel="İstisna">@(context.ExceptionReason ?? "Yok")</MudTd>
+                <MudTd DataLabel="İşlem">
+                    <div class="d-flex flex-wrap gap-1">
+                        @if (Detail.Permissions.Work && context.Kind == nameof(UsageKind.Database))
+                        {
+                            <MudSelect T="string" Value="@context.DatabaseEngine" ValueChanged="@(v => SetEngineAsync(context, v))" Label="Motor" Dense="true"
+                                Variant="Variant.Outlined" Disabled="Busy" Class="sa-usage-engine">
+                                @foreach (DatabaseEngine engine in Enum.GetValues<DatabaseEngine>())
+                                {
+                                    <MudSelectItem T="string" Value="@engine.ToString()">@ServiceAccountUsageRules.EngineLabel(engine)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                        @if (Detail.Permissions.Work && context.Kind == nameof(UsageKind.WindowsService) && context.NeedVerified != true)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="Busy" OnClick="@(() => VerifyNeedAsync(context))">İhtiyaç doğrulandı</MudButton>
+                        }
+                        @if (Detail.Permissions.Work)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="Busy" OnClick="@(() => Select(context, Mode.Remove))">Kaldır</MudButton>
+                        }
+                        @if (Detail.Permissions.Verify)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="Busy" OnClick="@(() => Select(context, Mode.Exception))">
+                                @(context.ExceptionReason is null ? "İstisna kaydet" : "İstisnayı kaldır")
+                            </MudButton>
+                        }
+                    </div>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+    @if (_selected is not null)
+    {
+        <div class="sa-usage-reason mt-2" role="group" aria-label="Gerekçe">
+            <MudTextField @bind-Value="_reason" Label="@ReasonLabel" MaxLength="1000" Required="true" Variant="Variant.Outlined" />
+            <div class="d-flex gap-2 mt-1">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(Busy || string.IsNullOrWhiteSpace(_reason))" OnClick="ConfirmAsync">Kaydet</MudButton>
+                <MudButton Variant="Variant.Text" Disabled="Busy" OnClick="@(() => _selected = null)">Vazgeç</MudButton>
+            </div>
+        </div>
+    }
+
+    @if (Removed.Count > 0)
+    {
+        <p class="so-panel-text--sm mt-2">Kaldırılan kullanım: @string.Join("; ", Removed.Select(u => $"{u.KindLabel} ({u.RemovedReason})"))</p>
+    }
+
+    @if (Detail.Permissions.Work)
+    {
+        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Kullanım ekle">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string" @bind-Value="_m.Kind" Label="Kullanım türü" Variant="Variant.Outlined">
+                        @foreach (UsageKind kind in Enum.GetValues<UsageKind>())
+                        {
+                            <MudSelectItem T="string" Value="@kind.ToString()">@ServiceAccountUsageRules.UsageLabel(kind)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                @if (_m.Kind == nameof(UsageKind.Database))
+                {
+                    <MudItem xs="12" md="3">
+                        <MudSelect T="string" @bind-Value="_m.Engine" Label="Veritabanı motoru" Variant="Variant.Outlined">
+                            @foreach (DatabaseEngine engine in Enum.GetValues<DatabaseEngine>())
+                            {
+                                <MudSelectItem T="string" Value="@engine.ToString()">@ServiceAccountUsageRules.EngineLabel(engine)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+                @if (_m.Kind == nameof(UsageKind.WindowsService))
+                {
+                    <MudItem xs="12" md="3" Class="d-flex align-center">
+                        <MudCheckBox T="bool" @bind-Value="_m.NeedVerified" Label="Gerçek ihtiyaç ve bağımlılık doğrulandı" />
+                    </MudItem>
+                }
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_m.Server" Label="Sunucu" MaxLength="256" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_m.Component" Label="Bileşen (uygulama havuzu, servis, görev, paylaşım...)" MaxLength="256" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_m.Notes" Label="Not" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <p class="so-panel-text--sm mt-1">Kullanım bilgisi ekipten veya incelemeden gelir; sistem sunuculara bağlanıp otomatik tarama yapmaz.</p>
+            <MudButton OnClick="CreateAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Kullanımı kaydet</MudButton>
+        </MudExpansionPanel></MudExpansionPanels>
+    }
+</section>
+
+@code {
+    private enum Mode { Remove, Exception }
+
+    private Model _m = new();
+    private UsageView? _selected;
+    private Mode _mode;
+    private string? _reason;
+    private int _seenRevision = -1;
+
+    /// <summary>Account detail.</summary>
+    [Parameter] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Team choices (to resolve the executing team for a suggested request).</summary>
+    [Parameter] public IReadOnlyList<TeamView> Teams { get; set; } = [];
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last command was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Command sink.</summary>
+    [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    private RuleEvaluationView? Rule => Detail.Rule;
+
+    private IReadOnlyList<UsageView> Active => [.. (Detail.Usages ?? []).Where(u => !u.Removed)];
+
+    private IReadOnlyList<UsageView> Removed => [.. (Detail.Usages ?? []).Where(u => u.Removed)];
+
+    private string ReasonLabel => _mode == Mode.Remove ? "Kaldırma gerekçesi"
+        : _selected?.ExceptionReason is null ? "İstisna gerekçesi (doğrulayıcı kararı)" : "İstisnayı kaldırma gerekçesi";
+
+    /// <summary>Request type (and target team) matching the primary recommended path.</summary>
+    private (string ActionType, SaRef? Team)? Suggested => Rule?.Path switch
+    {
+        nameof(RecommendedPath.GmsaEvaluation) => (nameof(ServiceAccountActionType.GmsaHandover),
+            Teams.Where(t => t.Name == Rule.GmsaExecutorTeam).Select(t => new SaRef(t.Id, t.Name)).FirstOrDefault()),
+        nameof(RecommendedPath.NoServiceAccountNeeded) => (nameof(ServiceAccountActionType.Deletion), null),
+        null or nameof(RecommendedPath.NeedsInformation) => null,
+        _ => (nameof(ServiceAccountActionType.Review), null)
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (_seenRevision != Revision) { _seenRevision = Revision; _m = new Model(); _selected = null; _reason = null; }
+    }
+
+    private static string UsageDetail(UsageView usage) => usage.Kind switch
+    {
+        nameof(UsageKind.Database) => "Motor: " + (Enum.TryParse(usage.DatabaseEngine, out DatabaseEngine engine) ? ServiceAccountUsageRules.EngineLabel(engine) : "Bilinmiyor"),
+        nameof(UsageKind.WindowsService) => usage.NeedVerified == true ? "İhtiyaç doğrulandı" : "İhtiyaç doğrulanmadı",
+        _ => string.Empty
+    };
+
+    private static SoStatusBadge.BadgeTone Tone(string conformance) => conformance switch
+    {
+        nameof(RuleConformance.Completed) => SoStatusBadge.BadgeTone.Positive,
+        nameof(RuleConformance.Unplanned) => SoStatusBadge.BadgeTone.Critical,
+        nameof(RuleConformance.Planned) or nameof(RuleConformance.Exception) => SoStatusBadge.BadgeTone.Info,
+        nameof(RuleConformance.IncompleteInformation) or nameof(RuleConformance.ManualReviewPending) => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static string Icon(string conformance) => conformance switch
+    {
+        nameof(RuleConformance.Completed) => Icons.Material.Filled.Verified,
+        nameof(RuleConformance.Unplanned) => Icons.Material.Filled.ReportProblem,
+        nameof(RuleConformance.Planned) => Icons.Material.Filled.EventNote,
+        nameof(RuleConformance.Exception) => Icons.Material.Filled.Gavel,
+        nameof(RuleConformance.IncompleteInformation) => Icons.Material.Filled.HelpOutline,
+        nameof(RuleConformance.ManualReviewPending) => Icons.Material.Filled.ManageSearch,
+        _ => Icons.Material.Filled.RemoveCircleOutline
+    };
+
+    private void Select(UsageView usage, Mode mode)
+    {
+        _selected = usage;
+        _mode = mode;
+        _reason = null;
+    }
+
+    private Task ConfirmAsync()
+    {
+        UsageView usage = _selected!;
+        string reason = _reason!.Trim();
+        return _mode == Mode.Remove
+            ? OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/usages/{usage.Id}/remove", new RemoveUsageRequest(usage.Version, reason)))
+            : OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/usages/{usage.Id}/exception",
+                new UsageExceptionRequest(usage.Version, reason, usage.ExceptionReason is not null)));
+    }
+
+    private Task SetEngineAsync(UsageView usage, string engine) =>
+        OnCommand.InvokeAsync(new SaCommand(HttpMethod.Patch, $"/usages/{usage.Id}", new UpdateUsageRequest(usage.Version, DatabaseEngine: engine)));
+
+    private Task VerifyNeedAsync(UsageView usage) =>
+        OnCommand.InvokeAsync(new SaCommand(HttpMethod.Patch, $"/usages/{usage.Id}", new UpdateUsageRequest(usage.Version, NeedVerified: true)));
+
+    private Task CreateAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/accounts/{Detail.Summary.Id}/usages", new CreateUsageRequest(_m.Kind,
+        _m.Kind == nameof(UsageKind.Database) ? _m.Engine : null, _m.Kind == nameof(UsageKind.WindowsService) ? _m.NeedVerified : null,
+        Blank(_m.Server), Blank(_m.Component), Blank(_m.Notes))));
+
+    private Task CreateSuggestedAsync()
+    {
+        (string type, SaRef? team) = Suggested!.Value;
+        string codes = string.Join(", ", Rule!.Items.Where(i => !i.Excepted).Select(i => i.RuleCode).Distinct());
+        return OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/accounts/{Detail.Summary.Id}/requests",
+            new CreateWorkRequest(type, TargetTeamId: team?.Id, Notes: $"Kural önerisinden açıldı ({codes}; {Rule.RuleSetVersion}).")));
+    }
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class Model
+    {
+        public string Kind { get; set; } = nameof(UsageKind.Database);
+        public string Engine { get; set; } = nameof(DatabaseEngine.SqlServer);
+        public bool NeedVerified { get; set; }
+        public string? Server { get; set; }
+        public string? Component { get; set; }
+        public string? Notes { get; set; }
+    }
+}

@@ -81,8 +81,9 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
                 Row("Eski birleşik görünüm kişi", report.Legacy.CombinedPeople),
                 Row(report.Legacy.Label, "")
             ]),
-            new("Tanımlar ve notlar", ["Not"], [.. report.Notes.Select(n => Row(n))])
         ];
+        sections.AddRange(VersionTwo(report));
+        sections.Add(new("Tanımlar ve notlar", ["Not"], [.. report.Notes.Select(n => Row(n))]));
         return new ReportDocument(report.Period switch
         {
             ReportPeriods.Month => "Servis Hesapları Aylık Rapor",
@@ -99,5 +100,63 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
             ("Oluşturan / zaman", createdBy + " / " + createdAt.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture)),
             ("Yük özeti (SHA-256)", payloadSha256)
         ], sections, createdAt);
+    }
+
+    /// <summary>Metric version 2 sections; a version 1 snapshot has none and renders exactly as before.</summary>
+    private static IEnumerable<ReportSection> VersionTwo(ServiceAccountReport report)
+    {
+        static IReadOnlyList<ReportCell> Row(params ReportCell[] cells) => cells;
+        static ReportCell Date(DateOnly? value) => value is { } d ? new ReportCell(Date: d) : "—";
+        if (report.Directorate is { } directorate)
+        {
+            yield return new("Direktörlük görünümü", ["Organizasyon", "Ekip", "Sahip olduğu hesap", "Muhatap açık talep", "Geciken", "Tarih bekleyen", "Kurala aykırı",
+                "Bekleyen gMSA", "Risk adayı"],
+                [.. directorate.Select(r => Row(r.Organization, r.Team, r.OwnedAccounts, r.OpenRequestsAsTarget, r.OverdueAsTarget, r.AwaitingDateAsTarget, r.AgainstRule,
+                    r.GmsaPending, r.RiskCandidates))]);
+        }
+
+        if (report.Rules is { } rules)
+        {
+            yield return new("Bilgi bankası kuralları", ["Gösterge", "Değer"],
+            [
+                Row("Kural sürümü", rules.RuleSetVersion),
+                Row("Değerlendirilen hesap", rules.Assessed),
+                Row("Kurala aykırı (plansız) hesap", rules.AgainstRule),
+                Row("Listede: kurala aykırı, bilgi eksik ve manuel inceleme bekleyen hesaplar", rules.Lines.Count),
+                .. rules.ByPath.Where(p => p.Count > 0).Select(p => Row("  Önerilen yol: " + p.Label, p.Count)),
+                .. rules.ByConformance.Select(c => Row("  Durum: " + c.Label, c.Count))
+            ]);
+            yield return new("İncelenecek hesaplar", ["Hesap", "Sahip ekip", "Önerilen yol", "Durum", "Kural", "Neden"],
+                [.. rules.Lines.Select(l => Row(l.Account, l.OwnerTeam ?? "—", l.Path, l.Conformance, l.RuleCodes, l.Reason))]);
+        }
+
+        if (report.Funnel is { } funnel)
+        {
+            yield return new("gMSA hunisi", ["Aşama", "Hesap", "Beklenen"],
+            [
+                .. funnel.Stages.Select(st => Row(st.Label, st.Count, st.Expected)),
+                Row("Uygun değil (huniden çıkış)", funnel.Ineligible, ""),
+                Row("Toplam", funnel.Population, funnel.Note)
+            ]);
+        }
+
+        if (report.Trend is { } trend)
+        {
+            yield return new("Trend (son haftalar)", ["Hafta başı", "Hafta sonu açık talep", "Hafta sonu geciken", "Doğrulanmış kapanış", "Gerçekleşen işlem"],
+            [
+                .. trend.Points.Select(p => Row(new ReportCell(Date: p.WeekStart), p.OpenAtWeekEnd, p.OverdueAtWeekEnd, p.VerifiedClosures, p.PerformedActions)),
+                Row("Kapanış zamanı bilinmeyen talep (trende girmez)", trend.UnknownCloseTime, "", "", ""),
+                Row(trend.Note, "", "", "", "")
+            ]);
+        }
+
+        if (report.Risk is { } risk)
+        {
+            yield return new("Risk adayları", ["Hesap", "Sahip ekip", "Neden", "Kaynak tarihi", "Son oturum", "Son parola", "Açık talep"],
+            [
+                .. risk.Lines.Select(l => Row(l.Account, l.OwnerTeam ?? "—", l.Categories, Date(l.SourceDate), Date(l.LastLogon), Date(l.PasswordLastSet), l.OpenRequests)),
+                Row(risk.Note, "", "", "", "", "", "")
+            ]);
+        }
     }
 }

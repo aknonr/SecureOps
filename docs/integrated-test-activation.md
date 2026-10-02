@@ -1,5 +1,17 @@
 # Integrated TEST activation continuation
 
+## Combined Source Review, 2026-10-02
+
+The PR #4 source NO-GO checkpoint below is retained as history. Its format blocker is resolved
+in the combined PR #4/PR #6 source by separate behavior-preserving commit `1487107`: the full
+repository gate now passes without a product exception. Pinned Windows build, relevant tests,
+isolated 001-026 SQL upgrade/replay/role checks and real local API/UI/report journeys passed.
+See [combined integration evidence](service-accounts/COMBINED-INTEGRATION-20261002.md) for exact
+counts, reused evidence and retained failures. 026 includes SA-002 after 025; three grant scripts
+remain separate and unassigned. Current source approval does not approve installation, target
+SQL, corporate OIDC/AD, desktop Excel acceptance, deployment, activation or Worker execution.
+Existing packages and target/release guards are preserved.
+
 ## Owner exception and baseline
 
 ### PR #4 Resources Windows verification, 2026-10-02

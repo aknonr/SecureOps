@@ -13,15 +13,17 @@ public sealed partial class SqlServiceAccountRepository
 {
     /// <summary>
     /// Loads report inputs with the same scope predicate as every other query, plus optional organization/team
-    /// filters applied in SQL. One communication is one row regardless of how many accounts it links.
+    /// filters applied in SQL. One communication is one row regardless of how many accounts it links. An account filter
+    /// narrows the same facts to one account so the account detail evaluates rules with the report implementation.
     /// </summary>
     public async Task<(ReportFacts Facts, string Watermark)> ReportFactsAsync(ServiceAccountScope scope, Guid? organizationId, Guid? teamId,
-        CancellationToken cancellationToken)
+        RiskThresholds thresholds, Guid? accountId, CancellationToken cancellationToken)
     {
-        DynamicParameters parameters = ScopeParameters(scope, new { organizationId, teamId });
+        DynamicParameters parameters = ScopeParameters(scope, new { organizationId, teamId, accountId, coordination = ServiceAccountImportProfiles.CoordinationList });
         string accounts = $"""
             SELECT a.Id FROM svcacct.Accounts a WHERE {ScopePredicate}
               AND (@organizationId IS NULL OR a.ReportOrganizationId = @organizationId)
+              AND (@accountId IS NULL OR a.Id = @accountId)
               AND (@teamId IS NULL OR a.CurrentOwnerTeamId = @teamId OR EXISTS (SELECT 1 FROM svcacct.WorkRequests tr WHERE tr.AccountId = a.Id AND tr.TargetTeamId = @teamId))
             """;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
@@ -32,7 +34,8 @@ public sealed partial class SqlServiceAccountRepository
                     ORDER BY o.ProposedAt DESC, o.Id) AS NamedPersonId
             FROM svcacct.Accounts a JOIN #scoped s ON s.Id = a.Id;
             SELECT r.Id, r.AccountId, r.ActionType, r.Status, r.TargetTeamId, r.PlanStart, r.PlanEnd, r.FollowupPersonId,
-                CONCAT(COALESCE(r.LegacyDisplayId, N''), N'|', CONVERT(nvarchar(40), r.CreatedAt, 126), N'|', CONVERT(nvarchar(36), r.Id)) AS OrderKey
+                CONCAT(COALESCE(r.LegacyDisplayId, N''), N'|', CONVERT(nvarchar(40), r.CreatedAt, 126), N'|', CONVERT(nvarchar(36), r.Id)) AS OrderKey,
+                r.CreatedAt, r.ClosedAt
             FROM svcacct.WorkRequests r JOIN #scoped s ON s.Id = r.AccountId;
             SELECT e.Id, e.AccountId, e.ActionType, e.Result, e.RecordKind, e.ActualOn, e.VerifiedOn,
                 CAST(CASE WHEN e.VerifiedByUserId IS NOT NULL OR e.VerifiedByPersonId IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasVerifier,
@@ -59,12 +62,26 @@ public sealed partial class SqlServiceAccountRepository
             SELECT f.AccountId, f.Status FROM svcacct.Findings f JOIN #scoped s ON s.Id = f.AccountId;
             SELECT Id, Name FROM svcacct.Teams;
             SELECT CONCAT(N'h', COALESCE(MAX(Id), 0)) FROM svcacct.History;
+            SELECT u.Id, u.AccountId, u.UsageKind, u.DatabaseEngine, u.NeedVerified, CAST(CASE WHEN u.ExceptionReason IS NULL THEN 0 ELSE 1 END AS bit)
+            FROM svcacct.AccountUsages u JOIN #scoped s ON s.Id = u.AccountId WHERE u.RemovedAt IS NULL;
+            SELECT a.Id FROM svcacct.Accounts a JOIN #scoped s ON s.Id = a.Id
+            WHERE a.CurrentOwnerTeamId IN (SELECT TeamId FROM svcacct.TeamRoles WHERE Role = 'SqlTeam' AND RevokedAt IS NULL)
+               OR EXISTS (SELECT 1 FROM svcacct.Handovers h WHERE h.AccountId = a.Id AND h.Status IN ('Proposed','Accepted')
+                          AND h.SourceTeamId IN (SELECT TeamId FROM svcacct.TeamRoles WHERE Role = 'SqlTeam' AND RevokedAt IS NULL));
+            SELECT TOP (1) t.Name FROM svcacct.TeamRoles r JOIN svcacct.Teams t ON t.Id = r.TeamId WHERE r.Role = 'GmsaExecutor' AND r.RevokedAt IS NULL;
+            SELECT o.AccountId, o.SourceReportDate, CAST(CASE WHEN o.Presence = 'Present' THEN 1 ELSE 0 END AS bit), o.PasswordLastSet, o.LastLogonAdOrLdap, o.LastLogonAd
+            FROM (SELECT x.*, ROW_NUMBER() OVER (PARTITION BY x.AccountId ORDER BY CASE WHEN x.SourceReportDate IS NULL THEN 1 ELSE 0 END, x.SourceReportDate DESC,
+                    x.RecordedAt DESC, x.Id) AS n
+                  FROM svcacct.AccountObservations x JOIN #scoped s ON s.Id = x.AccountId WHERE x.SourceProfile = @coordination) o
+            WHERE o.n = 1;
+            SELECT a.Id FROM svcacct.Accounts a JOIN #scoped s ON s.Id = a.Id WHERE a.LifecycleState = 'ClosureVerified';
+            SELECT t.Id, o.Name FROM svcacct.Teams t JOIN svcacct.Organizations o ON o.Id = t.OrganizationId;
             DROP TABLE #scoped;
             """, parameters, null, cancellationToken, _commitTimeoutSeconds));
         AccountFact[] accountFacts = [.. await grid.ReadAsync<AccountFact>()];
-        RequestFact[] requests = [.. (await grid.ReadAsync<(Guid Id, Guid AccountId, string Type, string Status, Guid? Target, DateOnly? Start, DateOnly? End, Guid? Followup, string Order)>())
-            .Select(r => new RequestFact(r.Id, r.AccountId, Enum.Parse<ServiceAccountActionType>(r.Type), Enum.Parse<ServiceAccountRequestStatus>(r.Status), r.Target,
-                r.Start, r.End, r.Followup, r.Order))];
+        RequestFact[] requests = [.. (await grid.ReadAsync<RequestFactRow>())
+            .Select(r => new RequestFact(r.Id, r.AccountId, Enum.Parse<ServiceAccountActionType>(r.ActionType), Enum.Parse<ServiceAccountRequestStatus>(r.Status),
+                r.TargetTeamId, r.PlanStart, r.PlanEnd, r.FollowupPersonId, r.OrderKey, r.CreatedAt, r.ClosedAt))];
         ActionFact[] actions = [.. (await grid.ReadAsync<ActionFactRow>()).Select(a => new ActionFact(a.Id, a.AccountId,
             new ActionFacts(Enum.Parse<ServiceAccountActionType>(a.ActionType), Enum.Parse<ServiceAccountActionResult>(a.Result),
                 Enum.Parse<ServiceAccountRecordKind>(a.RecordKind), a.ActualOn, a.VerifiedOn, a.HasVerifier, a.HasEvidence, a.HasOr, a.Voided),
@@ -79,8 +96,21 @@ public sealed partial class SqlServiceAccountRepository
         FindingFact[] findings = [.. (await grid.ReadAsync<(Guid AccountId, string Status)>()).Select(f => new FindingFact(f.AccountId, Enum.Parse<FindingStatus>(f.Status)))];
         var teams = (await grid.ReadAsync<(Guid Id, string Name)>()).ToDictionary(t => t.Id, t => t.Name);
         string watermark = await grid.ReadSingleAsync<string>();
-        return (new ReportFacts(accountFacts, requests, actions, communications, handovers, transitions, findings, teams), watermark);
+        UsageFact[] usages = [.. (await grid.ReadAsync<(Guid Id, Guid AccountId, string Kind, string? Engine, bool? NeedVerified, bool Excepted)>())
+            .Select(u => new UsageFact(u.Id, u.AccountId, Enum.Parse<UsageKind>(u.Kind), u.Engine is null ? null : Enum.Parse<DatabaseEngine>(u.Engine), u.NeedVerified,
+                u.Excepted))];
+        HashSet<Guid> sqlTeamAccounts = [.. await grid.ReadAsync<Guid>()];
+        string? executor = await grid.ReadSingleOrDefaultAsync<string>();
+        ObservationFact[] observations = [.. (await grid.ReadAsync<(Guid AccountId, DateOnly? Source, bool Present, DateTime? Password, DateTime? LogonAny, DateTime? LogonAd)>())
+            .Select(o => new ObservationFact(o.AccountId, o.Source, o.Present, o.Password, o.LogonAny, o.LogonAd))];
+        HashSet<Guid> closed = [.. await grid.ReadAsync<Guid>()];
+        var organizations = (await grid.ReadAsync<(Guid Id, string Name)>()).ToDictionary(t => t.Id, t => t.Name);
+        InsightFacts insight = new(usages, sqlTeamAccounts, executor, observations, closed, organizations, thresholds);
+        return (new ReportFacts(accountFacts, requests, actions, communications, handovers, transitions, findings, teams, insight), watermark);
     }
+
+    private sealed record RequestFactRow(Guid Id, Guid AccountId, string ActionType, string Status, Guid? TargetTeamId, DateOnly? PlanStart, DateOnly? PlanEnd,
+        Guid? FollowupPersonId, string OrderKey, DateTimeOffset CreatedAt, DateTimeOffset? ClosedAt);
 
     private sealed record ActionFactRow(Guid Id, Guid AccountId, string ActionType, string Result, string RecordKind, DateOnly? ActualOn, DateOnly? VerifiedOn,
         bool HasVerifier, bool HasEvidence, bool HasOr, bool Voided, string ActualPrecision, DateTimeOffset? ActualAt, Guid? PerformerTeamId);
