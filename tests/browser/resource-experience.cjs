@@ -131,7 +131,7 @@ async function ordinary(page, fixture) {
     assert.equal(await page.locator('.so-nav a[href="admin/resources"]').count(), 0);
     await guide(page, false);
     await page.getByLabel('Bağlantı ara', { exact: true }).fill(fixture.label);
-    await eventually(() => page.locator('.so-resource-results-head [role="status"]').innerText(), '28 bağlantı');
+    await eventually(() => page.locator('.so-resource-results-head [role="status"]').innerText().then(text => text.split(' · ')[0].trim()), '28 bağlantı');
     await eventually(() => page.locator('.so-resource-results .so-resource-item').count(), 25);
     await page.getByRole('button', { name: 'Sonraki', exact: true }).click();
     await eventually(() => page.locator('.so-resource-results .so-resource-item').count(), 3);
@@ -166,7 +166,7 @@ async function ordinary(page, fixture) {
     await page.getByRole('button', { name: 'Tüm bağlantılara dön', exact: true }).click();
     await eventually(() => page.getByLabel('Bağlantı ara', { exact: true }).inputValue(), '');
     await page.getByLabel('Bağlantı ara', { exact: true }).fill('(SYN)');
-    await eventually(() => page.locator('.so-resource-results-head [role="status"]').innerText(), '4 bağlantı');
+    await eventually(() => page.locator('.so-resource-results-head [role="status"]').innerText().then(text => text.split(' · ')[0].trim()), '4 bağlantı');
     await layouts(page, 'after-links');
 
     const groupName = 'Günlük Kontroller ' + fixture.suffix;
@@ -332,7 +332,7 @@ async function manager(page, fixture) {
     await dialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
     await dialog.waitFor({ state: 'hidden' });
     await page.getByLabel('Bağlantı ara', { exact: true }).fill('Yönetilen bağlantı ' + fixture.suffix);
-    await eventually(() => page.locator('.so-resource-results-head [role="status"]').innerText(), '1 bağlantı');
+    await eventually(() => page.locator('.so-resource-results-head [role="status"]').innerText().then(text => text.split(' · ')[0].trim()), '1 bağlantı');
     const linkRow = page.locator('tr').filter({ hasText: 'Yönetilen bağlantı ' + fixture.suffix });
     await linkRow.getByRole('button').click();
     await dialog.getByLabel('Erişim notu', { exact: true }).fill('Sadece yerel ve sentetik içerik.');

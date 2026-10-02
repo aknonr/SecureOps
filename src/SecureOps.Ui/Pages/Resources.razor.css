@@ -1,0 +1,4 @@
+/* Page-local additions; shared resource styling stays in the theme. */
+.so-resource-filter-summary { margin: var(--so-space-2) 0 0; font-size: 0.875rem; color: var(--so-text-muted); overflow-wrap: anywhere; }
+.so-resource-filter-summary strong { color: var(--so-text); font-weight: 600; }
+::deep .so-notice-action { margin-left: var(--so-space-2); font-weight: 600; white-space: nowrap; }

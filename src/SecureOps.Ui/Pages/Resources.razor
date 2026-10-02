@@ -61,11 +61,20 @@
                 </div>
                 @if (HasFilters) { <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterAltOff" OnClick="ClearFiltersAsync">Filtreleri temizle</MudButton> }
             </div>
+            @if (ActiveFilters.Count > 0)
+            {
+                <p class="so-resource-filter-summary"><strong>Listeyi daraltan:</strong> @string.Join(" · ", ActiveFilters)</p>
+            }
         </section>
 
         @if (_actionProblem is not null) { <SoProblemPanel Problem="_actionProblem" /> }
         @if (_reloading) { <SoLoading Message="Bağlantılar ve kişisel tercihler yenileniyor…" /> }
-        @if (_actionNotice is not null) { <p class="so-workspace-notice" role="status">@_actionNotice</p> }
+        @if (_actionNotice is not null)
+        {
+            <p class="so-workspace-notice" role="status">@_actionNotice
+                @if (_savedGroupId is { } savedGroup) { <MudLink Href="@($"resources/sets?set={savedGroup}")" Class="so-notice-action">Grubu aç</MudLink> }
+            </p>
+        }
         @if (_preferencesProblem is not null) { <SoProblemPanel Problem="_preferencesProblem" OnRetry="LoadPreferencesAsync" /> }
         @if (_categoriesProblem is not null) { <SoProblemPanel Problem="_categoriesProblem" OnRetry="LoadCategoriesAsync" /> }
 
@@ -75,7 +84,7 @@
             else
             {
                 <div class="so-resource-results-head">
-                    <span role="status">@result.Total bağlantı @(_query.Loading ? "· Güncelleniyor…" : null)</span>
+                    <span role="status">@result.Total bağlantı@(ResourceView.Range(result) is { } range ? $" · {range} gösteriliyor · Sayfa {result.Page} / {ResourceView.PageCount(result.Total, result.PageSize)}" : null) @(_query.Loading ? "· Güncelleniyor…" : null)</span>
                     <label class="so-selection-choice"><input type="checkbox" checked="@_selection.All" disabled="@(_query.Loading || result.Items.Count == 0 || _busy)"
                         @onchange="e => SelectPage(e.Value is true)" />Bu sayfadakileri seç</label>
                 </div>
@@ -95,8 +104,9 @@
                 @if (result.Items.Count == 0)
                 {
                     <SoEmptyState Title="@(_favouritesOnly && !HasFilters ? "Henüz favoriniz yok" : HasFilters ? "Eşleşen bağlantı yok" : "Henüz yayımlanmış bağlantı yok")"
-                                  Description="@(_favouritesOnly ? "Tek bir bağlantıyı hızlı bulmak için Favorilere ekle eylemini kullanın." : "Aramanızı değiştirebilir veya daha sonra tekrar kontrol edebilirsiniz.")"
+                                  Description="@(HasFilters ? "Bu filtrelerle eşleşen bağlantı yok. Filtreleri temizleyin veya aramanızı değiştirin." : _favouritesOnly ? "Sık kullandığınız bir bağlantıyı hızlı bulmak için Favorilere ekle eylemini kullanın." : "Aramanızı değiştirebilir veya daha sonra tekrar kontrol edebilirsiniz.")"
                                   Icon="@Icons.Material.Outlined.LinkOff" />
+                    @if (HasFilters) { <MudButton OnClick="ClearFiltersAsync" StartIcon="@Icons.Material.Filled.FilterAltOff">Filtreleri temizle</MudButton> }
                     <MudButton OnClick="DiscoverAsync" StartIcon="@Icons.Material.Filled.Search">Tüm bağlantılara dön</MudButton>
                 }
                 else if (_resolvedLinks is null)
@@ -118,7 +128,7 @@
                         </select></label>
                         <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki" title="Önceki" Disabled="@(_query.Loading || result.Page <= 1)"
                                    OnClick="@(() => GoToPageAsync(result.Page - 1))" />
-                        <span class="so-pager-state">Sayfa @result.Page / @Math.Max(1, (int)Math.Ceiling(result.Total / (double)_pageSize))</span>
+                        <span class="so-pager-state">Sayfa @result.Page / @ResourceView.PageCount(result.Total, result.PageSize)</span>
                         <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki" title="Sonraki" Disabled="@(_query.Loading || result.Page * _pageSize >= result.Total)"
                                    OnClick="@(() => GoToPageAsync(result.Page + 1))" />
                     </div>
@@ -138,10 +148,14 @@
     private readonly ResourceResolutionState<IReadOnlyList<ResourceLink>> _opening = new();
     private IReadOnlyList<ResourceLink>? _resolvedLinks => _opening.Value;
     private string? _actionNotice;
+    private Guid? _savedGroupId;
+    private IReadOnlyList<ResourceLink> _pendingLinks = [];
     private ResourceWorkspaceLayout Layout => _preferences?.WorkspaceLayout ?? ResourceWorkspaceLayout.Default;
     private string _search = string.Empty, _environment = string.Empty;
     private Guid? _categoryId;
     private int _pageSize = 25, _pageNumber = 1;
+    private IReadOnlyList<string> ActiveFilters => ResourceView.ActiveFilters(_favouritesOnly, _search,
+        _categories.FirstOrDefault(c => c.Id == _categoryId)?.Name, _environment);
     private bool HasFilters => !string.IsNullOrWhiteSpace(_search) || _categoryId is not null || !string.IsNullOrWhiteSpace(_environment);
     private ResourceQuery Query => new(Search: _search, CategoryId: _categoryId, Environment: _environment, Page: _pageNumber, PageSize: _pageSize);
     private ResourcePage? CurrentPage => _favouritesOnly ? ResourceView.FavouritePage(_preferences, Query) : _query.Page;
@@ -215,7 +229,7 @@
         if (!_query.Loading && _query.Problem is null) _selection.SetPage(CurrentPage?.Items.Select(link => link.Id) ?? []);
     }
 
-    private void ClearResolved() { _opening.Clear(); _actionNotice = null; }
+    private void ClearResolved() { _opening.Clear(); _actionNotice = null; _savedGroupId = null; }
     private void SelectLink(Guid id, bool value) { _selection.Toggle(id, value); ClearResolved(); }
     private void SelectPage(bool value) { _selection.SelectPage(value); ClearResolved(); }
 
@@ -274,9 +288,12 @@
         _actionProblem = null;
         try
         {
-            _preferences = await ResourceApi.SetFavouriteAsync(link.Id, !ResourceView.IsFavourite(_preferences, link.Id), _preferences.Version, CancellationToken.None);
+            bool favourite = !ResourceView.IsFavourite(_preferences, link.Id);
+            _preferences = await ResourceApi.SetFavouriteAsync(link.Id, favourite, _preferences.Version, CancellationToken.None);
             if (_favouritesOnly && CurrentPage is { Items.Count: 0, Page: > 1 }) _pageNumber--;
             if (_favouritesOnly) await SearchAsync();
+            _savedGroupId = null;
+            _actionNotice = favourite ? $"“{link.Name}” favorilerinize eklendi." : $"“{link.Name}” favorilerinizden çıkarıldı.";
         }
         catch (SecureOpsApiException exception) { _actionProblem = exception.Problem; await LoadPreferencesAsync(); }
         finally { _busy = false; }
@@ -287,6 +304,7 @@
     private async Task AddLinksAsync(IReadOnlyList<ResourceLink> links)
     {
         if (_preferences is null || _busy || links.Count == 0) return;
+        _pendingLinks = links;
         DialogParameters parameters = new()
         {
             { nameof(ResourceSetPickerDialog.Links), links },
@@ -315,7 +333,9 @@
         {
             _preferences = id is { } groupId ? await ResourceApi.SaveSetAsync(groupId, request, CancellationToken.None)
                 : await ResourceApi.CreateSetAsync(request, CancellationToken.None);
-            _actionNotice = $"Seçtiğiniz bağlantılar kişisel grubunuza kaydedildi: {request.Name}.";
+            ShiftSetResponse? saved = ResourceView.SavedGroup(_preferences, id, request.Name);
+            _actionNotice = ResourceView.SavedToGroupNotice(_pendingLinks, saved?.Name ?? request.Name);
+            _savedGroupId = saved?.Id;
             return null;
         }
         catch (SecureOpsApiException exception) { _actionProblem = exception.Problem; await LoadPreferencesAsync(); return exception.Problem; }

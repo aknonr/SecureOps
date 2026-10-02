@@ -12,7 +12,7 @@ namespace SecureOps.Ui.Pages.ServiceAccounts;
 /// </summary>
 public partial class ServiceAccountImports
 {
-    private const long MaxBytes = 20L * 1024 * 1024;
+    private const long _maxBytes = 20L * 1024 * 1024;
     private static readonly (int Number, string Title)[] _steps = [(1, "Dosya ve kaynak bilgisi"), (2, "Önizleme ve kararlar"), (3, "Onay ve sonuç")];
     private static readonly (string Value, string Label)[] _profiles =
     [
@@ -66,14 +66,14 @@ public partial class ServiceAccountImports
     {
         (_file, _fileError) = (null, null);
         IBrowserFile file = args.File;
-        if (file.Size is 0 or > MaxBytes)
+        if (file.Size is 0 or > _maxBytes)
         {
             _fileError = "Dosya boş veya 20 MB sınırını aşıyor.";
             return;
         }
 
         using MemoryStream buffer = new();
-        await using Stream stream = file.OpenReadStream(MaxBytes);
+        await using Stream stream = file.OpenReadStream(_maxBytes);
         await stream.CopyToAsync(buffer);
         _file = (file.Name, buffer.ToArray());
     }
