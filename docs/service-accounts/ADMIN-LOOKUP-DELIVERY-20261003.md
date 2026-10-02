@@ -50,6 +50,26 @@ Turkish/multipart matching and desktop/mobile layout. No corporate acceptance
 is claimed. Publication adds diff, documentation-link and outgoing-content checks,
 not a repeat product suite.
 
+Delivery completion adds only release scripts/configuration fragment/checklist,
+not application sources. The explicit 027-only selector passed 15 guard checks.
+Additional real loopback API proof used a fresh isolated SQL database with exactly
+ONE persisted Admin and demo compatibility disabled: 12 supported authorization
+checks passed. That unscoped Admin approved the distinct ordinary user, previewed/
+applied a finite View/Assign/Work/Report/Identity.Lookup bundle, preserved ReadOnly
+on assignment, granted Organization scope, and the pilot created/edited an
+account, created/updated work and obtained the current-week report. Ordinary,
+out-of-scope, self-grant and implicit-Admin-action denials, scope revocation and
+durable audit were checked. No second Admin, All scope or Verify/Import/Administer
+capability was supplied to the pilot. A first harness report call omitted its
+weekStart query; the supported UI-style dated request passed. Failed local fixture/
+harness evidence is retained, not promoted as acceptance. This establishes a
+viable initial path for a DIFFERENT pilot, not self-scope for a sole Admin/pilot.
+
+The matched master candidate uses the tracked `-FromVerifiedMaster -ApiUiOnly
+-UpgradeFromInstalled026` workflow with source-bound reviewed hashes and all
+existing clean-source/payload/dependency/version/destination guards. Its single
+[operator checklist](ADMIN-LOOKUP-OPERATOR-CHECKLIST-20261003.md) is the current entry.
+
 ## Migration 027 Only
 
 Deliver together:
