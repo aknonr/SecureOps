@@ -2,7 +2,7 @@ using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using SecureOps.Api.Middleware;
 using SecureOps.Api.OpenApi;
 using SecureOps.Api.Security;
@@ -115,19 +115,9 @@ builder.Services.AddSwaggerGen(options =>
             Scheme = "negotiate",
             Description = "Windows Integrated Authentication / Negotiate. Non-development environments require authentication for Swagger and API endpoints."
         });
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "WindowsAuth"
-                    }
-                },
-                Array.Empty<string>()
-            }
+            [new OpenApiSecuritySchemeReference("WindowsAuth", document)] = []
         });
     }
     if (demoAuthEnabled)
@@ -139,15 +129,9 @@ builder.Services.AddSwaggerGen(options =>
             Name = builder.Configuration["DemoAuth:HeaderName"] ?? "X-SecureOps-Demo-Actor",
             Description = "Demo/Test only. Enter an approved demo actor key; no actor is prefilled."
         });
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "DemoActor" }
-                },
-                Array.Empty<string>()
-            }
+            [new OpenApiSecuritySchemeReference("DemoActor", document)] = []
         });
     }
     if (oidcEnabled)
@@ -159,15 +143,9 @@ builder.Services.AddSwaggerGen(options =>
             BearerFormat = "JWT",
             Description = "Corporate OIDC access token. SecureOps persisted access remains authoritative."
         });
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "OidcBearer" }
-                },
-                Array.Empty<string>()
-            }
+            [new OpenApiSecuritySchemeReference("OidcBearer", document)] = []
         });
     }
 });
