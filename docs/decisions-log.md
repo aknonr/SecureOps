@@ -1,5 +1,15 @@
 # Decisions Log
 
+## 2026-10-02 - Owner direction for the next work (session management, redesigns)
+
+- Session policy becomes admin-adjustable within fixed lower and upper bounds (idle and absolute), audited.
+- When an administrator ends someone's session, that person is signed out: today the API session ends but the UI
+  cookie survives and the next request silently starts a new API session. The UI must drop its cookie and session
+  store on `SessionRevoked`, and the API must not silently restart a session for that browser.
+- ADRs must not block redesign: Jira/SDM, In Use, per-module permission sections and page layouts may be redesigned
+  on .NET 10, amending or superseding their ADRs in the same change.
+- Next steps run in local Claude Code on Windows, which can execute the Windows-only gates.
+
 ## 2026-10-02 - .NET 10 migration (ADR-0001 Amendment 2), done by Claude by owner decision
 
 The owner assigned the backend .NET 10 migration to Claude for this change (scoped exception to the default
