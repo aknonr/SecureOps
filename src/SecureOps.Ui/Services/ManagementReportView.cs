@@ -331,6 +331,10 @@ public static class ManagementReportView
             => "İstenen aralığın bir bölümü, kalıcı kayıt tutulmaya başlanmadan öncesine denk geliyor; "
                + "o bölüm için kanıt yok.",
 
+        "NonDurableReportingSource"
+            => "Bu özetin bir kısmı bellek içi (InMemory) kayıttan üretildi; sunucu yeniden başlayınca silinir "
+               + "ve kalıcı geçmiş kanıtı değildir. SQL'e bağlı kaynaklar kalıcıdır.",
+
         _ => string.IsNullOrWhiteSpace(limitation.Message) ? limitation.Code : limitation.Message
     };
 

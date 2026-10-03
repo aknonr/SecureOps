@@ -1,4 +1,5 @@
 using SecureOps.Domain.OperationalRecords;
+using SecureOps.Infrastructure.Reporting;
 
 namespace SecureOps.Infrastructure.OperationalRecords;
 
@@ -29,8 +30,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
             }
 
             await auditWriter.WriteAsync(SdmEvaluationEvidence.Audit(evaluated, context), cancellationToken);
-            _records[id] = evaluated;
-            return evaluated;
+            return Commit(evaluated, evaluated.WorkflowState);
         }
         finally { _gate.Release(); }
     }
@@ -38,7 +38,43 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<Guid, OperationalRecord> _records = [];
     private readonly Dictionary<string, Guid> _sourceIds = new(StringComparer.OrdinalIgnoreCase);
+    // Mirrors ops.OperationalRecordWorkflowHistory and the existence of ops.JiraTransfers rows, so
+    // management reporting reads the same transitions SQL would have persisted.
+    private readonly List<ReportingWorkflowFact> _history = [];
+    private readonly HashSet<Guid> _transfers = [];
     private readonly TimeProvider _timeProvider;
+
+    /// <summary>Workflow transitions recorded before <paramref name="toExclusive"/>.</summary>
+    public async Task<IReadOnlyList<ReportingWorkflowFact>> ReadWorkflowHistoryAsync(DateTimeOffset toExclusive, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        { return [.. _history.Where(entry => entry.OccurredAt < toExclusive)]; }
+        finally { _gate.Release(); }
+    }
+
+    /// <summary>Current transfer status for every record that reached Jira creation.</summary>
+    public async Task<IReadOnlyList<ReportingTransferFact>> ReadTransfersAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            return [.. _transfers.Select(id => _records[id]).Select(record => new ReportingTransferFact(record.Id, record.ReconciliationRequired, record.UpdatedAt))];
+        }
+        finally { _gate.Release(); }
+    }
+
+    // Stores the new state and appends the transitions SqlOperationalRecordRepository writes for the same call.
+    private OperationalRecord Commit(OperationalRecord record, params ReadOnlySpan<OperationalRecordWorkflowState> transitions)
+    {
+        _records[record.Id] = record;
+        foreach (OperationalRecordWorkflowState state in transitions)
+        {
+            _history.Add(new ReportingWorkflowFact(record.Id, state.ToString(), record.UpdatedAt));
+        }
+
+        return record;
+    }
 
     /// <summary>Initializes the local repository with an injectable clock.</summary>
     public InMemoryOperationalRecordRepository(TimeProvider? timeProvider = null)
@@ -132,9 +168,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 LastSourceValidationAt = now,
                 Version = 1
             };
-            _records[imported.Id] = imported;
             _sourceIds[imported.SourceRecordId] = imported.Id;
-            return imported;
+            return Commit(imported, OperationalRecordWorkflowState.Imported);
         }
         finally
         {
@@ -166,8 +201,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _records[id] = updated;
-            return updated;
+            return Commit(updated, OperationalRecordWorkflowState.Classified, updated.WorkflowState);
         }
         finally
         {
@@ -294,8 +328,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _records[id] = updated;
-            return new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, updated);
+            return new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, Commit(updated, OperationalRecordWorkflowState.Previewed));
         });
 
     /// <inheritdoc />
@@ -348,8 +381,10 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _records[id] = updated;
-            return new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, updated);
+            _transfers.Add(id);
+            return new WorkflowAcquireResult(
+                WorkflowAcquireDisposition.Acquired,
+                Commit(updated, OperationalRecordWorkflowState.CreateRequested, OperationalRecordWorkflowState.CreatingJira));
         });
 
     /// <inheritdoc />
@@ -379,8 +414,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _records[id] = updated;
-            return updated;
+            return Commit(updated, OperationalRecordWorkflowState.JiraCreated);
         }
         finally
         {
@@ -427,8 +461,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _records[id] = updated;
-            return new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, updated);
+            return new WorkflowAcquireResult(WorkflowAcquireDisposition.Acquired, Commit(updated, OperationalRecordWorkflowState.ClosingOperationalRecord));
         });
 
     /// <inheritdoc />
@@ -455,8 +488,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _records[id] = updated;
-            return updated;
+            return Commit(updated, OperationalRecordWorkflowState.Completed);
         }
         finally
         {
@@ -482,8 +514,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _records[id] = updated;
-            return updated;
+            return Commit(updated, updated.WorkflowState);
         }
         finally
         {
@@ -509,8 +540,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _records[id] = updated;
-            return updated;
+            return Commit(updated, updated.WorkflowState);
         }
         finally
         {

@@ -77,17 +77,17 @@ public sealed class ManagementReportingHostedTests
     }
 
     [Fact]
-    public async Task Summary_WhenSqlPersistenceIsNotConfigured_ReturnsPreciseNonRetryableProblem()
+    public async Task Summary_WhenEvidenceIsInMemory_ReturnsSummaryMarkedNonDurable()
     {
         using WebApplicationFactory<Program> factory = CreateUnconfiguredFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
         HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/summary?window=7d");
-        JsonNode problem = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
+        JsonNode report = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
 
-        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        problem["code"]!.GetValue<string>().Should().Be("ReportingPersistenceNotConfigured");
-        problem["retryable"]!.GetValue<bool>().Should().BeFalse();
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        report["limitations"]!.AsArray().Select(item => item!["code"]!.GetValue<string>())
+            .Should().Contain("NonDurableReportingSource");
     }
 
     private static WebApplicationFactory<Program> CreateFactory() =>
