@@ -2217,7 +2217,7 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
    one without a breakpoint, and a short panel never stretches to match a tall one. */
 .so-detail-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
     gap: var(--so-space-4);
     align-items: start;
 }

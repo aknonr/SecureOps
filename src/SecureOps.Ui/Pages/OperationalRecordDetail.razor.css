@@ -1,0 +1,31 @@
+/* What to do now: one line, tone by state, never colour alone (icon + text carry it too). */
+.or-next {
+    display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; padding: 14px 16px;
+    border-radius: 12px; border: 1px solid var(--so-border); border-left-width: 5px;
+    background: var(--so-surface);
+}
+.or-next > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.or-next strong { font-size: 1.02rem; line-height: 1.4; color: var(--so-text); overflow-wrap: anywhere; }
+.or-next--act { border-left-color: var(--so-accent); background: color-mix(in srgb, var(--so-accent) 7%, var(--so-surface)); }
+.or-next--warn { border-left-color: var(--mud-palette-warning); background: color-mix(in srgb, var(--mud-palette-warning) 9%, var(--so-surface)); }
+.or-next--done { border-left-color: var(--mud-palette-success); background: color-mix(in srgb, var(--mud-palette-success) 8%, var(--so-surface)); }
+.or-next--wait { border-left-color: var(--so-text-muted); }
+.or-next ::deep .mud-icon-root { flex: none; color: var(--so-text-muted); }
+.or-next--act ::deep .mud-icon-root { color: var(--so-accent); }
+.or-next--warn ::deep .mud-icon-root { color: var(--mud-palette-warning); }
+.or-next--done ::deep .mud-icon-root { color: var(--mud-palette-success); }
+
+.or-label {
+    display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--so-text-muted);
+}
+
+.or-summary-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+.or-summary-head .so-panel-title { margin: 0; }
+.or-description { white-space: pre-line; font-size: 0.98rem; line-height: 1.6; max-width: 900px; margin: 10px 0 14px; overflow-wrap: anywhere; }
+.or-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.or-fact {
+    display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; min-width: 0;
+    border-radius: 10px; background: var(--so-bg-sunken); overflow-wrap: anywhere;
+}
+

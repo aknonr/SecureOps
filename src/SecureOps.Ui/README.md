@@ -474,6 +474,20 @@ identity field, or an em dash placeholder.
 
 ## Operational Record → Jira
 
+**Detail redesign and request-type suggestion, 2026-10-03.** Nav label is "Operasyonel Kayıtlar (OR)".
+The detail page no longer repeats the OR code and title under the header; it opens with one
+"Şimdi ne yapmalısınız?" line derived from re-read state and the held preview (unknown outcome and
+another operator's claim win over everything), then the request (description, requester, server,
+environment, created) as fact tiles. The empty "Talep türü (operatör beyanı)" select is replaced by
+`OrRequestTypeStep`: when the API returns `suggestedRequestType` (ADR-0018 Amendment 1, explicit
+title/description words only, matched words shown) the operator confirms it in one click or changes
+it; choosing a different type shows a warning. Without a suggestion the select (label "Talep türü",
+same `#sdm-request-type`) is shown with an honest "Metinden tür önerilemedi" note. The confirmed type
+is still sent as the operator's declaration and grants nothing. Order is now type → preview/actions →
+SDM evidence → history → folded technical details. The approved single-record policy button moved
+into a fold. Browser journeys were updated to the new label/heading but not run here (Playwright is
+not installed on this machine); render tests cover the three type-step states.
+
 The rule that governs this screen: **an existing Jira issue means create is never offered.**
 `OperationalRecordView.ActionsFor` checks that before any per-state rule, and a unit test asserts it
 across every workflow state — a single missed case is a duplicate Jira issue.
