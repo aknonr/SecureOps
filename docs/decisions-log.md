@@ -4,7 +4,7 @@
 
 First Windows run of the migration branch: SDK pin moved to 10.0.401 (same 10.0.12 runtime), Release build,
 tests, format and release-packaging dry run pass. Packages refreshed per ADR-0001 Amendment 2 "Package refresh".
-Swashbuckle 10 is prepared on a local branch but held for owner review of the OpenAPI snapshot change.
+Owner then approved the Swashbuckle 10 OpenAPI snapshot change and removal of the unused JsonSchema.Net.
 
 ## 2026-10-02 - Owner direction for the next work (session management, redesigns)
 
