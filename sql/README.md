@@ -1,5 +1,20 @@
 # sql/
 
+## Admin Operations Successor, 2026-10-03
+
+Isolated .NET 8 successor inventory is 001-028. **028-admin-service-account-operations**
+requires the reviewed 026/027 baseline and adds only missing Work/Assign/Verify/Import/Report
+capabilities to protected seeded Admin. It preserves unrelated capabilities, increments
+role and assigned-user access versions and requires atomic audit. Matching bundles
+reject replay. No runtime SQL grant, membership or module scope is added.
+
+028 is reserved after checking remote master and the published .NET 10 heads
+(all end at 027); numbering was rechecked before source publication.
+Keep prior packages and installed 022-027 unchanged. The sealed 0e85c9d review workflow
+does not package this successor: do not bypass its existing exact-inventory guards.
+Rollback retains additive capabilities/versions/audit; any removal is a separate
+audited owner-reviewed amendment, never version reset or audit deletion.
+
 ## Combined Source 026 Delta, 2026-10-02
 
 The current inventory is 001-027. **027-admin-service-account-navigation** extends only the
