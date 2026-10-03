@@ -1,7 +1,7 @@
 # SecureOps.Ui
 ## Start here
 
-Blazor Server UI for WASAS SecureOps: `net10.0`, C# 14, SDK pinned in `global.json`, MudBlazor 6.16. It talks
+Blazor Server UI for WASAS SecureOps: `net10.0`, C# 14, SDK pinned in `global.json`, MudBlazor 9.11. It talks
 only to the SecureOps API; the API decides every permission ([the one rule](#the-one-rule-that-shapes-everything)).
 Agent rules: `AGENTS.md`, `CLAUDE.md`, `docs/agent-guides/060-ui.md`.
 
@@ -634,6 +634,14 @@ Escape are keyboard-operable; heading focus moves with the step and returns to r
 The inline panel adapts to narrow layouts and reduced motion. Highlighting never activates a control;
 missing/hidden targets fall back to working route links. Management instructions require the actual
 server capability. A guide never modifies links/groups/favourites or opens destination sites.
+
+**MudBlazor 9 migration, 2026-10-03.** Central version is `9.11.0`. Compile-level changes: `PaletteLight` and
+`*Typography` theme types, `MudPopoverProvider` in `MainLayout`, `IMudDialogInstance`, immutable `DialogOptions`
+(`BackdropClick = false`), nullable `DialogResult`, `ShowMessageBoxAsync`, `MudHidden.Hidden`, `MudTabs.TabPanelsClass`,
+`MudAutocomplete.SearchFunc`, `IReadOnlyCollection<T>` for `MudSelect.SelectedValues`, the account menu activator
+opening through `MenuContext`, and the Account sign-out button using `Target="_top"` (no `ForceLoad` on `MudButton`).
+Build, format and all unit/render tests pass; interactive menu/select/dialog behaviour and the `_Host.cshtml`
+MudBlazor 6 accessibility bridges still need a browser pass. The assessment below is the earlier record.
 
 **MudBlazor assessment, 2026-09-06.** Keep central `6.16.0` for this milestone. The latest stable
 [9.9.0 package](https://www.nuget.org/packages/MudBlazor/9.9.0) targets .NET 8 (as well as later
