@@ -33,7 +33,6 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
-    <PackageReference Include="JsonSchema.Net" />
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>
 

@@ -62,8 +62,6 @@
     <!-- Blazor UI -->
     <PackageVersion Include="MudBlazor" Version="6.16.0" />
 
-    <!-- JSON Schema validation (contract tests) -->
-    <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
 
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
