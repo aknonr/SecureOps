@@ -22,7 +22,13 @@ public sealed partial class AccessController
     {
         if (repository is not SqlAccessRepository sql)
         {
-            return StatusCode(503);
+            // Non-SQL providers: the audited service read plus the shared filter (same rules as the SQL page).
+            AccessServiceResult<IReadOnlyList<AccessUserReadModel>> users = await _accessService.ListUsersAsync(Context(), cancellationToken);
+            if (!users.IsSuccess)
+            { return Failure<AccessPage<AccessUserResponse>>(users.ErrorCode!); }
+            try
+            { return Ok(AccessPageFilter.Users(users.Value!.Select(ToResponse), query)); }
+            catch (ArgumentException) { return Failure<AccessPage<AccessUserResponse>>(OperationalErrorCodes.AccessValidationFailed); }
         }
 
         if (!await AuditPageAsync(audit, AuditActions.AccessUsersViewed, cancellationToken))
@@ -40,7 +46,13 @@ public sealed partial class AccessController
     {
         if (repository is not SqlAccessRepository sql)
         {
-            return StatusCode(503);
+            AccessServiceResult<IReadOnlyList<AccessRequestReadModel>> requests = await _accessService.ListRequestsAsync(null, Context(), cancellationToken);
+            if (!requests.IsSuccess)
+            { return Failure<AccessPage<AccessRequestResponse>>(requests.ErrorCode!); }
+            var roles = (await repository.ListUsersAsync(cancellationToken)).ToDictionary(user => user.Id, user => user.Roles);
+            try
+            { return Ok(AccessPageFilter.Requests(requests.Value!.Select(item => ToResponse(item.Request, item.Profile)), roles, query)); }
+            catch (ArgumentException) { return Failure<AccessPage<AccessRequestResponse>>(OperationalErrorCodes.AccessValidationFailed); }
         }
 
         if (!await AuditPageAsync(audit, AuditActions.AccessRequestsViewed, cancellationToken))

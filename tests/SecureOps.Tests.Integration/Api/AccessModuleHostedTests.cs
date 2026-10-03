@@ -82,6 +82,27 @@ public sealed class AccessModuleHostedTests
         effective.Modules.SelectMany(module => module.Actions).Should().OnlyContain(action => !action.Granted);
     }
 
+    // Before 2026-10-03 the paged lists returned 503 for every non-SQL provider, so Demo/local admin pages were empty.
+    [Fact]
+    public async Task PagedLists_WorkWithoutSqlAndKeepTheirPermissions()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory(demoCompatibilityEnabled: true);
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        await lead.GetAsync("/api/v1/access/me");
+
+        AccessPage<AccessUserResponse> users = (await admin.GetFromJsonAsync<AccessPage<AccessUserResponse>>("/api/v1/access/users/page?page=1&pageSize=25"))!;
+        AccessPage<AccessRequestResponse> requests = (await admin.GetFromJsonAsync<AccessPage<AccessRequestResponse>>("/api/v1/access/requests/page?page=1&pageSize=25"))!;
+        HttpResponseMessage invalid = await admin.GetAsync("/api/v1/access/users/page?page=0&pageSize=25");
+        HttpResponseMessage denied = await lead.GetAsync("/api/v1/access/users/page?page=1&pageSize=25");
+
+        users.Total.Should().BeGreaterThanOrEqualTo(2);
+        users.Items.Should().OnlyContain(user => user.RequestHistory.Count == 0);
+        requests.Total.Should().BeGreaterThanOrEqualTo(0);
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        denied.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
         HttpClient client = factory.CreateClient();
