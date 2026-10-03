@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Isolated Service Accounts SQL harness for a disposable SQL Server container (Linux/cloud runners).
-# Creates a NEW database, applies numbered migrations (now 001-026) in order,
-# then candidates 2 (SA-002) and 3 (SA-003) when not yet numbered, verifies replay refusal and prints the connection string for SECUREOPS_SA_SQL_TEST_CONNECTION.
+# Creates a NEW database, applies numbered migrations (now 001-029) in order,
+# then candidates 2 (SA-002, numbered 026) and 3 (SA-003, numbered 029) only when not yet numbered, verifies replay refusal and prints the connection string for SECUREOPS_SA_SQL_TEST_CONNECTION.
 # It never targets an existing database and never runs against corporate servers.
 # Usage: SA_PASSWORD=... sa-sql-harness.sh <container> <new-database-name> [host-port]
 set -euo pipefail
@@ -38,7 +38,7 @@ if sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-002-usage-ru
   echo "Candidate 2 replay was not refused." >&2; exit 1
 fi
 echo "candidate 2 replay refused as expected"
-# Candidate 3 (one-time scope bootstrap) has no number yet: apply it only when no numbered migration added the column.
+# Candidate 3 (one-time scope bootstrap) is numbered 029: apply it only when no numbered migration added the column.
 has_bootstrap=$(sqlcmd / -d "$database" -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH(N'svcacct.ScopeGrants', N'IsBootstrap') IS NULL THEN 0 ELSE 1 END")
 if [[ "$has_bootstrap" == "0" ]]; then
   sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-003-scope-bootstrap.sql > /dev/null

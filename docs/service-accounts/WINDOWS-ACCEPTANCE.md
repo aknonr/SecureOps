@@ -211,8 +211,8 @@ yet) and a different module administrator.
 | 48 | coordinator | snapshot XLSX in **desktop Excel** | opens without a repair prompt; table sheets keep the header row frozen and offer AutoFilter; the "Rapor" sheet starts with the title |
 | 49 | any | page at 390 px and 1440 px | no horizontal scroll; file picker, provenance options and guide cards wrap; the progress line does not push content down |
 
-One-time first scope grant (ADR-0026) and page guides. Codex applies candidate `SA-003` under its reserved number first
-(on a copy of the installed database, then the installed one); record the number. Run rows 50–53 **before** any scope
+One-time first scope grant (ADR-0026) and page guides. `SA-003` is numbered **029** (2026-10-03). The owner applies
+029 first on a copy of the installed database, then, after a separate approval, on the installed one. Run rows 50–53 **before** any scope
 grant exists (if rows 39–41 already granted scope, run them on a fresh TEST database).
 
 | # | Caller | Call / screen | Expected |
@@ -221,10 +221,12 @@ grant exists (if rows 39–41 already granted scope, run them on a fresh TEST da
 | 51 | same administrator | `/service-accounts/imports` | import page opens (scope "Tüm kurum") |
 | 52 | any administrator | `POST .../scope-grants/bootstrap` again, also after revoking the bootstrap grant | 403 `bootstrapClosed`; panel no longer shown |
 | 53 | any administrator | `POST .../scope-grants` to own identity | 403 `selfGrant` (rule unchanged after bootstrap) |
-| 54 | before `SA-003` is applied | `GET .../scope-grants/bootstrap`, then `POST` | `schemaReady: false`; POST 403 `bootstrapSchema`; info text on the tab; ordinary grants still work |
+| 54 | before 029 (`SA-003`) is applied | `GET .../scope-grants/bootstrap`, then `POST` | `schemaReady: false`; POST 403 `bootstrapSchema`; info text on the tab; ordinary grants still work |
 | 55 | any | each module page and each admin tab | guide strip with numbered steps, one step highlighted at a time; "Nasıl kullanılır?" opens purpose, steps and "Bu sayfa şunları yapmaz"; with Windows "Show animations" off the highlight does not move |
 | 56 | coordinator | snapshot XLSX in desktop Excel | first sheet "Yönetici özeti": title, scope/period, eight tiles, gMSA block, team table, upcoming plans; values match the "Özet" and detail sheets; no formulas; no repair prompt |
 | 57 | coordinator | snapshot PDF | first page shows the same eight tiles and the three summary tables before the detail sections |
+| 58 | SQL operator, copy of the installed database (024–028) | `sqlcmd -I -b -i 029-service-account-scope-bootstrap.sql` from `sql/migrations` | succeeds once; existing grant rows `IsBootstrap = 0`; `CK_SaScopeGrants_NoSelfGrant` trusted; `UX_SaScopeGrants_OneBootstrap` present; a second run fails with "already applied"; installed API keeps granting/revoking normally |
+| 59 | SQL operator | `sa-sql-harness.ps1` (default, through 029) | prints "Scope bootstrap installed through a numbered migration" and "candidate 3 replay refused as expected" |
 
 UI (same identities): the team member opens `/service-accounts` and sees "Takibinizdeki işler"
 first; the account detail shows the participant notice and only the allowed controls.

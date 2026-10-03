@@ -1,5 +1,8 @@
 # Service Accounts Module — Design Note
 
+Owner decision (2026-10-03): Claude owns this module end to end — see "Authority and baseline". SA-003 is numbered
+029 (ADR-0026); source inventory is 001-029. Not applied to the installed TEST system; see PROGRESS.md.
+
 Owner-approved local successor (2026-10-03): all seven current Service Accounts
 capabilities belong to the genuine protected Admin bundle, with explicit module
 scope and self-grant protections unchanged. New 028 is an additive role-bundle
@@ -28,6 +31,12 @@ not the current integration state.
 
 ## Authority and baseline
 
+- **Owner decision (2026-10-03), supersedes the Codex split below for this module only:** Claude owns the Service
+  Accounts module's backend, API, UI, SQL migration numbering and Windows verification (previously with Codex).
+  The project owner merges and deploys and approves every execution against an installed system; new SQL is tried on
+  a copy of the installed database first. No corporate SQL/AD/Jira/SMTP writes; repository data stays synthetic.
+  Writing automation on managed servers (gMSA conversion) still needs its own ADR and approval (AGENTS.md rules 1, 9).
+  Repository-wide defaults in `AGENTS.md`/`CLAUDE.md` are unchanged outside this module.
 - Scoped owner exception (2026-09-28): Claude implements domain, contracts, infrastructure,
   API, SQL candidate, UI and tests **for this module only**. Codex keeps existing workflows,
   platform architecture, release engineering and final integration. Repository-wide ownership
@@ -76,7 +85,7 @@ Not reused, with reason:
 | API | `src/SecureOps.Api/Controllers/ServiceAccounts/`, module wiring `src/SecureOps.Api/ServiceAccounts/` |
 | Worker | `src/SecureOps.Worker/ServiceAccounts/` (recurring reminder schedule only) |
 | UI | `src/SecureOps.Ui/Pages/ServiceAccounts/`, `src/SecureOps.Ui/Services/ServiceAccounts/`, `src/SecureOps.Ui/Shared/Components/ServiceAccounts/` |
-| SQL payloads | `sql/pending/service-accounts/` retained includes; numbered discovery through `sql/schema/025-*.sql`, `026-*.sql` and matching migrations; separate grants |
+| SQL payloads | `sql/pending/service-accounts/` retained includes; numbered discovery through `sql/schema/025-*.sql`, `026-*.sql`, `029-*.sql` and matching migrations; separate grants |
 | Tests | `tests/SecureOps.Tests.Unit/ServiceAccounts/`, `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUiTests.cs`, `tests/SecureOps.Tests.Integration/ServiceAccounts/`, `tests/sql/service-accounts/`, `tests/browser/service-accounts.cjs` |
 
 All routes are under `/api/v1/service-accounts/…`.
@@ -129,7 +138,7 @@ classification, decision), AccountObservations, Evidence (bytes in SQL, scoped d
 ReportSnapshots (immutable payload + exports), ReminderOutbox, History.
 Candidate 2 (`SA-002`): AccountUsages (where an account is used; reasoned exception and removal, never deleted) and
 TeamRoles (SQL teams and the single gMSA executing team; configuration, never access).
-Candidate 3 (`SA-003`, unnumbered, ADR-0026): `ScopeGrants.IsBootstrap`, the self-grant check relaxed only for that one
+Candidate 3 (`SA-003`, numbered 029, ADR-0026): `ScopeGrants.IsBootstrap`, the self-grant check relaxed only for that one
 row (an "All" grant to its own grantor) and a filtered unique index allowing one bootstrap row ever.
 
 Dates: plan/business dates are `date`; events carry `datetimeoffset` only when a real instant is
@@ -197,4 +206,4 @@ existing label by `aria-labelledby` on `.sa-page` fields only.
 - Approved evidence storage/retention (candidate stores bounded bytes in SQL).
 - Approved holiday calendar and reminder periods; corporate sender for any future mail.
 - Team return (PAAS) file headers: generic mapping until a sample arrives.
-- Migration number reservation and DBA grants (see PROGRESS.md handoff).
+- DBA grants and execution of 029 on the installed system (owner approval pending; see PROGRESS.md).

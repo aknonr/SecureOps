@@ -9,6 +9,26 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## SA-003 numbered 029; module ownership moved to Claude (2026-10-03, same branch, Windows)
+
+Owner decision: Claude owns this module's backend, API, UI, migration numbering and Windows verification (README
+"Authority"). `SA-003-scope-bootstrap.sql` is included unchanged by new `sql/schema/029-service-account-scope-bootstrap.sql`
+(guard: reviewed 025/026) and `sql/migrations/029-…` (SQLCMD entry point), same pattern as 025/026; no published branch
+uses 029 or later. Harness range extended to 29. Verified on this Windows machine with LocalDB
+`(localdb)\SecureOpsResourcesV1` and sqlcmd (ODBC 17):
+- Fresh database through 029: harness printed "Scope bootstrap installed through a numbered migration" and refused the
+  SA-001/002/003 replays; role scripts applied, no member assigned.
+- `-ThroughMigration 28`: harness applied SA-003 as candidate and refused its replay (fallback still works).
+- Upgrade on a populated 001-028 database (synthetic `syn.*` users, one existing normal grant): 029 succeeded; existing row
+  `IsBootstrap = 0`; check trusted; filtered unique index present; 029 replay refused ("already applied"); normal
+  self-grant and a bootstrap row for another user refused by the check; a normal grant accepted; one bootstrap row
+  accepted; a second refused by the unique index.
+
+**Not done:** 029 on a copy of the installed TEST database (owner will supply a backup); nothing applied to the installed
+system. **Build/unit/integration not run on Windows:** pinned SDK 9.0.317 is not installed here (only 9.0.318 and
+10.0.401; `rollForward: disable`), so the updated `SqlAssetContractTests` (inventory 29, 029 contract) is unrun. Acceptance
+rows 58–59.
+
 ## One-time first scope grant, user picker, executive summary, page guides (2026-10-03, same branch)
 
 Owner decisions: (1) one-time first scope grant, (2) pick approved users instead of typing an identity, (3) an

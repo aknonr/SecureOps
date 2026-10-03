@@ -3,14 +3,14 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix,
-    [ValidateRange(26, 28)]
-    [int]$ThroughMigration = 28,
+    [ValidateRange(26, 29)]
+    [int]$ThroughMigration = 29,
     [switch]$SkipRoleScripts
 )
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-028), verifies module replay refusal, and
+# numbered migrations in order (now 001-029; 029 numbers SA-003), verifies module replay refusal, and
 # (unless -SkipRoleScripts) the two unnumbered role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'

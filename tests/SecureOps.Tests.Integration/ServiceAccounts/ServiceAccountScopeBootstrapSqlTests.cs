@@ -32,7 +32,7 @@ public sealed class ServiceAccountScopeBootstrapSqlTests
         (await fx.Service.BootstrapScopeAsync(admin.Principal, fx.Context, new ScopeBootstrapRequest(" "), _token)).Field.Should().Be("reason");
 
         ScopeBootstrapState before = Ok(await fx.Service.ScopeBootstrapStateAsync(admin.Principal, fx.Context, _token));
-        before.SchemaReady.Should().BeTrue("the harness applies candidate SA-003");
+        before.SchemaReady.Should().BeTrue("the harness installs SA-003 through numbered 029");
         if (before.Available)
         {
             Guid id = Ok(await fx.Service.BootstrapScopeAsync(admin.Principal, fx.Context, new ScopeBootstrapRequest("İlk kurulum (sentetik)"), _token));

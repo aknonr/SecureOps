@@ -1,5 +1,22 @@
 # sql/
 
+## Service Accounts Scope Bootstrap 029, 2026-10-03
+
+Inventory is 001-029. **029-service-account-scope-bootstrap** (ADR-0026) requires reviewed 025/026
+and includes the retained `pending/service-accounts/SA-003-scope-bootstrap.sql` unchanged: it adds
+`svcacct.ScopeGrants.IsBootstrap` (default 0, existing rows stay 0), re-creates
+`CK_SaScopeGrants_NoSelfGrant` WITH CHECK so a self-grant is allowed only for the single "All"
+bootstrap row, and adds `UX_SaScopeGrants_OneBootstrap`. One transaction; replay is refused.
+No data, runtime grant, role member or scope is added; the API role already inserts into
+`svcacct.ScopeGrants`. Installed binaries without the bootstrap code keep working (their inserts
+take the default 0 and the old rule); new binaries before 029 report `bootstrapSchema` and change nothing.
+
+029 was reserved after checking every published branch (all end at 028 or earlier). It does not
+depend on 027/028 and touches none of their objects. Do not replay installed 001-028. Apply only
+after separate owner approval, first on a copy of the installed database. Rollback: the original
+check can be restored only while no bootstrap row exists; otherwise keep the column, index and row.
+The isolated harness applies SA-003 itself only when run with `-ThroughMigration` below 29.
+
 ## Admin Operations Successor, 2026-10-03
 
 Isolated .NET 8 successor inventory is 001-028. **028-admin-service-account-operations**
