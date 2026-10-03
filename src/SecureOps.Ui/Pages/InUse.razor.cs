@@ -175,11 +175,11 @@ public partial class InUse
                 SendAsync<InUseRecord>(HttpMethod.Put, $"/{original.Id}/assignment", request)) }
         };
         IDialogReference dialog = await Dialogs.ShowAsync<InUseAssignmentDialog>("İnceleyici",
-            parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+            parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
         _assignmentDialog = dialog;
-        DialogResult result = await dialog.Result;
+        DialogResult? result = await dialog.Result;
         _assignmentDialog = null;
-        if (result.Canceled || result.Data is not InUseRecord updated || generation != _generation || _record?.Id != original.Id)
+        if (result is null || result.Canceled || result.Data is not InUseRecord updated || generation != _generation || _record?.Id != original.Id)
         { return; }
         if (_dirty)
         {
@@ -207,7 +207,7 @@ public partial class InUse
     {
         if (_record is null)
         { return; }
-        if (_record.Status == "Stale" && await Dialogs.ShowMessageBox("Değişen sunucu bilgilerini yeniden incele",
+        if (_record.Status == "Stale" && await Dialogs.ShowMessageBoxAsync("Değişen sunucu bilgilerini yeniden incele",
             "Kaynak değişiklikleri bölümündeki eski/yeni değerleri kontrol ettiniz mi? Kaydetmek mevcut cevapları yeni kaynak sürümü için onaylar; cevaplar kendiliğinden değiştirilmez.",
             yesText: "Farkları inceledim, cevapları kaydet", cancelText: "İncelemeye dön") != true)
         { return; }
@@ -227,7 +227,7 @@ public partial class InUse
         { return; }
         Guid id = _record.Id;
         long version = _record.Version;
-        if (await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikleri geri al",
+        if (await Dialogs.ShowMessageBoxAsync("Kaydedilmemiş değişiklikleri geri al",
             $"{_record.Source.Code}: yalnızca kaydedilmemiş cevaplar son kayıtlı taslağa dönecek. Arşiv ve kaynak kaydı değişmez.",
             yesText: "Geri al", cancelText: "Vazgeç") != true)
         { return; }
@@ -248,7 +248,7 @@ public partial class InUse
         Guid id = _record.Id;
         long version = _record.Version;
         string label = action switch { "Discard" => "Taslağı kaldır", "Restart" => "Yeniden başla", _ => "Kayıtlı cevapları sıfırla" };
-        if (await Dialogs.ShowMessageBox(label,
+        if (await Dialogs.ShowMessageBoxAsync(label,
             $"{_record.Source.Code}: {_record.Source.Servers.Count} sunucunun cevapları ve kabul edilmiş önerileri temizlenecek. Önceki sürümler ve Excel arşivleri korunur. Kaynak kaydı silinmez, dış işlemler geri alınmaz.",
             yesText: label, cancelText: "Vazgeç") != true)
         { return; }
@@ -418,7 +418,7 @@ public partial class InUse
         if (!CanEdit || _changes is null)
         { return; }
         (AnswerEdit Target, string Before, string After)[] changes = _changes;
-        if (await Dialogs.ShowMessageBox("Seçili sunucuların cevaplarını değiştir",
+        if (await Dialogs.ShowMessageBoxAsync("Seçili sunucuların cevaplarını değiştir",
             $"{changes.Select(c => c.Target.ServerId).Distinct().Count()} sunucuda {changes.Length} gösterilen cevap değişecek. Diğer cevaplar korunacak.",
             yesText: "Gösterilen değişiklikleri uygula", cancelText: "Vazgeç") != true)
         { return; }
@@ -500,7 +500,7 @@ public partial class InUse
         { ++_generation; ClearRecord(); return; }
         if (_busy)
         { context.PreventNavigation(); _notice = "İşlem sürüyor. Sonucu gördükten sonra sayfadan ayrılabilirsiniz."; return; }
-        if (HasUnsaved && await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikler",
+        if (HasUnsaved && await Dialogs.ShowMessageBoxAsync("Kaydedilmemiş değişiklikler",
             "Kaydedilmemiş cevaplar ve atama gerekçesi silinecek.", yesText: "Ayrıl", cancelText: "Sayfada kal") != true)
         { context.PreventNavigation(); }
     }

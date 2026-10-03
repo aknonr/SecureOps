@@ -14,7 +14,9 @@
          Dense="true"
          PopoverClass="so-user-menu-popover">
     <ActivatorContent>
-        <button type="button" class="so-user-trigger" title="@User.DisplayName" aria-label="Hesap menüsü">
+        @* MudBlazor 9: a custom activator opens the menu itself through MenuContext. *@
+        <button type="button" class="so-user-trigger" title="@User.DisplayName" aria-label="Hesap menüsü"
+                aria-haspopup="menu" @onclick="@(args => context.ToggleAsync(args))">
             <span class="so-avatar" aria-hidden="true">@User.Initials</span>
             <span class="so-user-trigger-text">
                 <span class="so-user-trigger-name">@User.DisplayName</span>

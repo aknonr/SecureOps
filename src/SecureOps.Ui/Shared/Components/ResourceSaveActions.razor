@@ -20,7 +20,7 @@
 </div>
 
 @code {
-    [CascadingParameter] private MudDialogInstance Dialog { get; set; } = default!;
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
 
     /// <summary>Saves current form values; null means the server confirmed success.</summary>
     [Parameter, EditorRequired] public Func<Task<UiProblem?>> Save { get; set; } = default!;

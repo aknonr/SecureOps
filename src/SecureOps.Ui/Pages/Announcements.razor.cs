@@ -94,7 +94,7 @@ public partial class Announcements
     });
     private async Task UpgradeAsync()
     {
-        if (await Dialogs.ShowMessageBox("Taslağı yükselt", "Düzenlemeler korunacak. Yeni biçim yalnızca Kaydet ile yeni sürüme işlenecek.", yesText: "Yükselt", cancelText: "Vazgeç") != true)
+        if (await Dialogs.ShowMessageBoxAsync("Taslağı yükselt", "Düzenlemeler korunacak. Yeni biçim yalnızca Kaydet ile yeni sürüme işlenecek.", yesText: "Yükselt", cancelText: "Vazgeç") != true)
         { return; }
         _form!.Template = "oco-table-v3";
         _form.DateTextRevision = "tr-v1";
@@ -103,7 +103,7 @@ public partial class Announcements
         Changed();
         await BannersAsync();
     }
-    private async Task<bool> DiscardAsync() => !_dirty || await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikler",
+    private async Task<bool> DiscardAsync() => !_dirty || await Dialogs.ShowMessageBoxAsync("Kaydedilmemiş değişiklikler",
         "Değişiklikleri bırakıp devam edilsin mi?", yesText: "Değişiklikleri bırak", cancelText: "Düzenlemeye dön") == true;
     private async Task LeavingAsync(LocationChangingContext context)
     {

@@ -8,12 +8,13 @@
 @inject IApiSessionStore ApiSessions
 
 <MudThemeProvider @ref="_themeProvider" Theme="@SecureOpsTheme.For(_mode)" IsDarkMode="@IsDarkMode" />
+<MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 <NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
 
 @* Bound by MudHidden: true when the viewport is lg-and-up, where the drawer is docked. *@
-<MudHidden Breakpoint="Breakpoint.LgAndUp" @bind-IsHidden="_isDesktop" />
+<MudHidden Breakpoint="Breakpoint.LgAndUp" @bind-Hidden="_isDesktop" />
 
 <MudLayout>
     <AuthorizeView>
@@ -133,7 +134,7 @@
             "light" => AppearanceMode.Light,
             "dark" => AppearanceMode.Dark,
             "night" => AppearanceMode.Dark,
-            _ => await _themeProvider.GetSystemPreference() ? AppearanceMode.Dark : AppearanceMode.Light
+            _ => await _themeProvider.GetSystemDarkModeAsync() ? AppearanceMode.Dark : AppearanceMode.Light
         };
 
         await SyncThemeClassAsync();

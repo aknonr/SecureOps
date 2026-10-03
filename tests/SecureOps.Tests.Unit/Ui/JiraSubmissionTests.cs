@@ -443,7 +443,7 @@ public sealed class JiraSubmissionTests
         public PageFixture(bool confirm = true)
         {
             IDialogReference reference = Substitute.For<IDialogReference>();
-            reference.Result.Returns(Task.FromResult(confirm ? DialogResult.Ok(true) : DialogResult.Cancel()));
+            reference.Result.Returns(Task.FromResult<DialogResult?>(confirm ? DialogResult.Ok(true) : DialogResult.Cancel()));
             Dialogs.ShowAsync<JiraCreateDialog>(Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>()).Returns(reference);
             Dialogs.ShowAsync<JiraRetryDialog>(Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>()).Returns(reference);
             Records.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(Record());

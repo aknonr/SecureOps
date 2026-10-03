@@ -117,7 +117,8 @@
                        StartIcon="@Icons.Material.Filled.VerifiedUser">
                 Erişimimi görüntüle
             </MudButton>
-            <MudButton Href="auth/sign-out" ForceLoad="true" Variant="Variant.Text" Color="Color.Default"
+            @* Target="_top": Blazor leaves the link to the browser, so the sign-out endpoint gets a real request (MudButton has no ForceLoad in v9). *@
+            <MudButton Href="auth/sign-out" Target="_top" Variant="Variant.Text" Color="Color.Default"
                        StartIcon="@Icons.Material.Filled.Logout">
                 Oturumu kapat
             </MudButton>

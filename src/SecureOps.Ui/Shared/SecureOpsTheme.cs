@@ -39,12 +39,9 @@ public static class SecureOpsTheme
     /// Shared theme carrying both palettes. The active one is selected at runtime by
     /// <c>MudThemeProvider.IsDarkMode</c>, driven by a circuit-scoped toggle.
     /// </summary>
-    // In MudBlazor 6.16 the light palette is MudTheme.Palette (obsolete in favor of the PaletteLight
-    // *type*, which is assigned here). MudThemeProvider selects Palette or PaletteDark via IsDarkMode.
-#pragma warning disable CS0618
     public static MudTheme Theme { get; } = new()
     {
-        Palette = new PaletteLight
+        PaletteLight = new PaletteLight
         {
             // Brand red is the primary action colour now that the corporate identity is
             // adopted. Error moves further from it in luminance so a failure never reads as a
@@ -66,7 +63,7 @@ public static class SecureOpsTheme
             Error = "#8E1B16",
             Dark = "#14233F",
             Background = "#EEF1F6",
-            BackgroundGrey = "#E4E9F1",
+            BackgroundGray = "#E4E9F1",
             Surface = "#FFFFFF",
             // Navigation is chrome, so it shares the app bar's navy: one L-shaped corporate frame
             // around a light reading surface, in every appearance.
@@ -113,7 +110,7 @@ public static class SecureOpsTheme
             // Elevation ladder. Each step is a small, even luminance increase, which is what gives the
             // dark theme depth; a single surface colour with borders reads flat and cheap.
             Background = "#0C1421",        // app ground
-            BackgroundGrey = "#080D17",    // recessed areas
+            BackgroundGray = "#080D17",    // recessed areas
             Surface = "#141F31",           // panels
             DrawerBackground = "#101A2A",  // navigation, one step under panels
             AppbarBackground = "#0C1421",  // merges with the ground; separated by a hairline in CSS
@@ -148,17 +145,17 @@ public static class SecureOpsTheme
         },
         Typography = new Typography
         {
-            Default = new Default
+            Default = new DefaultTypography
             {
                 FontFamily = ["Segoe UI", "Segoe UI Variable", "system-ui", "Arial", "sans-serif"],
                 LetterSpacing = "0"
             },
-            H1 = new H1 { LetterSpacing = "0" },
-            H2 = new H2 { LetterSpacing = "0" },
-            H3 = new H3 { LetterSpacing = "0" },
-            H4 = new H4 { LetterSpacing = "0" },
-            H5 = new H5 { LetterSpacing = "0" },
-            H6 = new H6 { LetterSpacing = "0" }
+            H1 = new H1Typography { LetterSpacing = "0" },
+            H2 = new H2Typography { LetterSpacing = "0" },
+            H3 = new H3Typography { LetterSpacing = "0" },
+            H4 = new H4Typography { LetterSpacing = "0" },
+            H5 = new H5Typography { LetterSpacing = "0" },
+            H6 = new H6Typography { LetterSpacing = "0" }
         }
     };
 
@@ -203,7 +200,7 @@ public static class SecureOpsTheme
         Error = "#FF8A80",
 
         Background = "#05080F",        // app ground, near black with a navy cast
-        BackgroundGrey = "#02040A",    // recessed areas
+        BackgroundGray = "#02040A",    // recessed areas
         Surface = "#0E141F",           // cards
         DrawerBackground = "#080D16",  // navigation, one step under cards
         AppbarBackground = "#05080F",
@@ -238,12 +235,11 @@ public static class SecureOpsTheme
 
     private static readonly MudTheme _deepDarkTheme = new()
     {
-        Palette = Theme.Palette,
+        PaletteLight = Theme.PaletteLight,
         PaletteDark = _deepDarkPalette,
         LayoutProperties = Theme.LayoutProperties,
         Typography = Theme.Typography
     };
-#pragma warning restore CS0618
 }
 
 /// <summary>

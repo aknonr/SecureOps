@@ -231,6 +231,6 @@ public partial class ServiceAccountImports
         public string? Sheet { get; set; }
         public string? TargetTeam { get; set; }
         public string Coverage { get; set; } = ServiceAccountImportCoverage.Unknown;
-        public IEnumerable<Guid> CoverageOrganizations { get; set; } = [];
+        public IReadOnlyCollection<Guid> CoverageOrganizations { get; set; } = [];
     }
 }

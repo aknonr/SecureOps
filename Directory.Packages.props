@@ -60,7 +60,7 @@
 
 
     <!-- Blazor UI -->
-    <PackageVersion Include="MudBlazor" Version="6.16.0" />
+    <PackageVersion Include="MudBlazor" Version="9.11.0" />
 
     <!-- JSON Schema validation (contract tests) -->
     <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />

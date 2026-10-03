@@ -26,7 +26,7 @@ public partial class InUse
         int generation = _generation;
         _report = await SendAsync<InUseReport>(HttpMethod.Post, $"/{selected.Id}/report", new ExportInUseRequest(selected.Version, Archive: true));
         InUseReport reviewed = _report;
-        if (await Dialogs.ShowMessageBox($"{selected.Source.Code}: WASAS adımını onayla",
+        if (await Dialogs.ShowMessageBoxAsync($"{selected.Source.Code}: WASAS adımını onayla",
             $"OR: {selected.Source.Code}. Başlatan: {_access?.Profile?.DisplayName ?? _access?.Profile?.Account ?? _access?.Access?.UserId.ToString("D")}. "
             + $"{selected.Source.Servers.Count} sunucu; rapor sürümü {reviewed.Version}; arşiv SHA-256 (16 karakterlik bloklar): {string.Join(" ", reviewed.Sha256.Chunk(16).Select(c => new string(c)))}. "
             + $"Kaynağa eklenecek dosya: {selected.Source.Code}_InUse.xlsx. Sunucu tipi: Application Server. Ortam: {RequiredEnvironment(selected)}. "
@@ -49,7 +49,7 @@ public partial class InUse
         { return; }
         int generation = _generation;
         bool activity = operation.VerificationMode == "WasasActivityManual";
-        if (await Dialogs.ShowMessageBox(activity ? "WASAS adımı için manuel doğrulama" : "Geçmiş OR kapanışı için manuel doğrulama",
+        if (await Dialogs.ShowMessageBoxAsync(activity ? "WASAS adımı için manuel doğrulama" : "Geçmiş OR kapanışı için manuel doğrulama",
             $"{operation.SourceCode}: kaynak sistemde {(activity ? "WASAS aktivitesinin tamamlandığını" : "bu OR'nin kapalı olduğunu")} kontrol ettiniz mi? Onayınız kimliğiniz ve UTC zamanıyla manuel doğrulama olarak kaydedilir; sistem doğrulaması değildir ve yeni kaynak isteği göndermez.",
             yesText: "Kontrol ettim, manuel onayı kaydet", cancelText: "Vazgeç") != true)
         { return; }
@@ -146,7 +146,7 @@ public partial class InUse
         if (!CanEdit || _history?.Proposals.SingleOrDefault(p => p.ReviewId == review.Id)?.CanReuse != true)
         { return; }
         InUseAnswer[] selected = review.Answers.Where(a => _reuseSelection.Contains(review.Id + ":" + a.Check) && a.Value is "Yes" or "No").ToArray();
-        if (selected.Length == 0 || await Dialogs.ShowMessageBox("Önceki cevapları kullan",
+        if (selected.Length == 0 || await Dialogs.ShowMessageBoxAsync("Önceki cevapları kullan",
             $"{review.OrCode} / {Time(review.ReviewedAt)} tarihli {selected.Length} cevap bu sunucuya öneri olarak alınacak. Kaydederken yeniden doğrulanacak.",
             yesText: "Seçili cevapları al", cancelText: "Vazgeç") != true)
         { return; }

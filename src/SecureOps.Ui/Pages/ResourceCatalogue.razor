@@ -286,7 +286,7 @@
         };
 
         IDialogReference dialog = await Dialogs.ShowAsync<ResourceCategoryDialog>(
-            "Kategori", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+            "Kategori", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
         await dialog.Result;
     }
 
@@ -307,7 +307,7 @@
         };
 
         IDialogReference dialog = await Dialogs.ShowAsync<ResourceLinkDialog>(
-            "Bağlantı", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+            "Bağlantı", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
         await dialog.Result;
     }
 
