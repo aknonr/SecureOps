@@ -63,7 +63,8 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(27)
+            .And.HaveCount(28)
+            .And.ContainSingle(name => name == "028-admin-service-account-operations.sql")
             .And.ContainSingle(name => name == "027-admin-service-account-navigation.sql")
             .And.ContainSingle(name => name == "026-service-account-usage-rules.sql")
             .And.ContainSingle(name => name == "025-service-accounts.sql")
@@ -267,6 +268,26 @@ public sealed class SqlAssetContractTests
             .And.Contain("transaction.CommitAsync(cancellationToken)")
             .And.Contain("transaction.RollbackAsync(cancellationToken)")
             .And.NotContain("DELETE FROM")
+            .And.NotContain("UPDATE audit.AuditLog");
+    }
+
+    [Fact]
+    public void AdminOperationAmendment_PreservesScopeAndRequiresAtomicVersionedAudit()
+    {
+        string sql = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "sql", "schema", "028-admin-service-account-operations.sql"));
+        sql.Should().Contain("IsProtected=1 AND IsSeeded=1")
+            .And.Contain("027 Admin navigation baseline required")
+            .And.Contain("028 already satisfied")
+            .And.Contain("ServiceAccounts.Import")
+            .And.Contain("ServiceAccounts.Verify")
+            .And.Contain("Version=Version+1")
+            .And.Contain("AccessVersion=AccessVersion+1")
+            .And.Contain("a.RevokedAt IS NULL")
+            .And.Contain("INSERT INTO audit.AuditLog")
+            .And.Contain("ROLLBACK TRANSACTION")
+            .And.NotContain("INSERT INTO svcacct.ScopeGrants")
+            .And.NotContain("INSERT INTO security.RoleAssignments")
+            .And.NotContain("ALTER ROLE")
             .And.NotContain("UPDATE audit.AuditLog");
     }
 

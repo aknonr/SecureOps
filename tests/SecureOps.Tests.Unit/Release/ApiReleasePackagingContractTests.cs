@@ -39,10 +39,10 @@ public sealed class ApiReleasePackagingContractTests
         string collector = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-InUseEvidencePackage.ps1"));
         collector.Should().Contain("Symbol outside fresh collector staging.").And.Contain("Remove-Item -LiteralPath $symbol.FullName")
             .And.Contain("Test-ApiReleasePayload.ps1");
-        // Schema selection moved to the reviewed 024/025 selector; the publisher must consume its result.
+        // The sealed selector still rejects unreviewed successor migrations; the publisher consumes its result.
         string selector = File.ReadAllText(Path.Combine(root, "scripts", "release", "Get-ReleaseSqlPlan.ps1"));
-        selector.Should().Contain("$last = if ($IncludeServiceAccounts) { 26 } else { 24 }")
-            .And.Contain("Expected the exact complete 001-$last SQL chain; 025/026 must be explicitly reviewed.");
+        selector.Should().Contain("$last = if ($UpgradeFromInstalled026) { 27 } elseif ($IncludeServiceAccounts) { 26 } else { 24 }")
+            .And.Contain("Expected the exact complete 001-$last SQL chain; later migrations must be explicitly reviewed.");
         paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema=$sqlPlan.RequiredSchema")
             .And.Contain("Get-ReleaseSqlPlan.ps1").And.Contain("-IncludeServiceAccounts:$IncludeServiceAccounts")
             .And.Contain("upgradeFromVerified018='019-024'").And.Contain("database-delta")
