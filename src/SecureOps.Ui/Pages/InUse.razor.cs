@@ -81,6 +81,29 @@ public partial class InUse
         : CompletedServers < _record.Source.Servers.Count ? "Eksik cevapları tamamlayın; taslağınız korunuyor."
         : "Kaydedilen taslağın Excel önizlemesini ve talebe ekleme koşullarını kontrol edin.";
 
+    /// <summary>Shell, so a blocked navigation can also clear the route indicator it started.</summary>
+    [CascadingParameter] public Shared.MainLayout? Shell { get; set; }
+
+    private static readonly (int Number, string Label)[] _detailSteps =
+        [(1, "Sunucuları incele"), (2, "Cevapları tamamla ve kaydet"), (3, "Excel önizleme ve WASAS adımı")];
+
+    // The step the reviewer is on, derived from the same facts as NextAction so the stepper and the text agree.
+    private int DetailStep => _record is null || _record.Source.Servers.Count == 0 ? 1
+        : _record.Draft is null || _dirty || _record.Status == "Stale" || CompletedServers < _record.Source.Servers.Count ? 2
+        : 3;
+
+    private string DetailTone => _record is null || _record.Discarded || !CanEdit ? "neutral"
+        : _record.Status == "Stale" || _record.SourceObservationMissing || _record.HasActiveExecution ? "warn"
+        : DetailStep == 3 ? "ready" : "todo";
+
+    private string DetailIcon => DetailTone switch
+    {
+        "warn" => Icons.Material.Filled.WarningAmber,
+        "ready" => Icons.Material.Filled.TaskAlt,
+        "todo" => Icons.Material.Filled.EditNote,
+        _ => Icons.Material.Filled.Visibility
+    };
+
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     { AccessProvider.Changed += AccessChanged; _access = await AccessProvider.GetAsync(_lifetime.Token); }
@@ -522,10 +545,10 @@ public partial class InUse
         if (Navigation.ToAbsoluteUri(context.TargetLocation).GetLeftPart(UriPartial.Path) == Navigation.ToAbsoluteUri("session-expired").GetLeftPart(UriPartial.Path))
         { ++_generation; ClearRecord(); return; }
         if (_busy)
-        { context.PreventNavigation(); _notice = "İşlem sürüyor. Sonucu gördükten sonra sayfadan ayrılabilirsiniz."; return; }
+        { context.PreventNavigation(); Shell?.CancelPendingNavigation(); _notice = "İşlem sürüyor. Sonucu gördükten sonra sayfadan ayrılabilirsiniz."; return; }
         if (HasUnsaved && await Dialogs.ShowMessageBoxAsync("Kaydedilmemiş değişiklikler",
             "Kaydedilmemiş cevaplar ve atama gerekçesi silinecek.", yesText: "Ayrıl", cancelText: "Sayfada kal") != true)
-        { context.PreventNavigation(); }
+        { context.PreventNavigation(); Shell?.CancelPendingNavigation(); }
     }
     /// <inheritdoc />
     public void Dispose() { AccessProvider.Changed -= AccessChanged; ++_generation; _lifetime.Cancel(); _lifetime.Dispose(); }

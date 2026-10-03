@@ -49,7 +49,7 @@
                 <MudButton OnClick="AcceptComparison" Disabled="_busy" StartIcon="@Icons.Material.Filled.Check">Farkları inceledim; yerel cevaplarla devam et</MudButton>
             </section>
         }
-        @if (_notice is not null) { <p role="status">@_notice</p> }
+        @if (_notice is not null) { <MudAlert Severity="Severity.Info" Dense="true" role="status" Class="ix-notice">@_notice</MudAlert> }
         @if (_busy) { <SoLoading Message="İşlem sürüyor" /> }
         @if (!Id.HasValue)
         {
@@ -154,21 +154,54 @@
         }
         else if (_record is { } record)
         {
-            <h2>@record.Source.Code · @record.Source.Title</h2>
-            <section class="inuse-ticket-summary" aria-label="İnceleme durumu">
-                <div><span>Atanan inceleyici</span><strong>@(record.AssigneeLabel ?? "Atanmamış")</strong></div>
-                <div><span>Kaydedilen ilerleme</span><strong>@SavedCompleted(record) / @record.Source.Servers.Count sunucu · @(record.Discarded ? "Yerel taslak kaldırılmış" : Status(record.Status))</strong></div>
+            <section class="ix-hero ix-hero--@DetailTone" aria-label="İnceleme durumu">
+                <div class="ix-hero-head">
+                    <span class="ix-code">@record.Source.Code</span>
+                    <span class="ix-state">@(record.Discarded ? "Yerel taslak kaldırılmış" : Status(record.Status))</span>
+                    @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }
+                </div>
+                <h2 class="ix-hero-title">@record.Source.Title</h2>
+                <ol class="ix-steps" aria-label="İnceleme adımları">
+                    @foreach (var (number, label) in _detailSteps)
+                    {
+                        string state = number < DetailStep ? "done" : number == DetailStep ? "current" : "todo";
+                        <li class="ix-step ix-step--@state" aria-current="@(state == "current" ? "step" : null)">
+                            <span class="ix-step-dot" aria-hidden="true">@if (state == "done") { <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" /> } else { @number }</span>
+                            <span class="ix-step-label">@label<span class="sr-only">@(state == "done" ? " (tamamlandı)" : state == "current" ? " (şu anki adım)" : "")</span></span>
+                        </li>
+                    }
+                </ol>
+                <div class="ix-next ix-hero-next inuse-next" role="status">
+                    <MudIcon Icon="@DetailIcon" aria-hidden="true" />
+                    <div class="ix-hero-next-text"><span class="ix-label">Sonraki adım</span><strong>@NextAction</strong></div>
+                    @if (CanEdit && DetailStep == 2 && CompletedServers < record.Source.Servers.Count)
+                    { <MudButton OnClick="() => Ready()" Disabled="_busy" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.MyLocation">İlk eksik cevaba git</MudButton> }
+                </div>
+                @if (_dirty) { <MudAlert Dense="true" Severity="Severity.Warning" role="status">Yerel cevaplar değişti; henüz kaydedilmedi. Formdaki ilerleme: @CompletedServers / @record.Source.Servers.Count. Sayfadan ayrılmadan önce “Cevapları kaydet”e basın.</MudAlert> }
                 @if (record.Discarded && Can(Capabilities.InUseReview))
                 { <p role="status">Bu yerel taslak aktif işten kaldırıldı. Kaynak OR ve geçmiş arşivler korunuyor.</p><MudButton OnClick='() => ChangeDraftAsync("Restart")' Disabled="_busy" StartIcon="@Icons.Material.Filled.RestartAlt">Yeniden başla</MudButton> }
-                <div><span>Kaynak okuma zamanı</span><strong>@Time(record.LastSeenAt)</strong></div>
-                <div><span>RFC talep eden · Ad soyad</span><strong>@ReporterSummary(record)</strong></div>
-                @if (Can(Capabilities.InUseAssign))
-                { <MudButton OnClick="OpenAssignmentAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Outlined" aria-haspopup="dialog">İnceleyici ata/değiştir</MudButton> }
-                <p class="inuse-next" role="status">Sonraki adım: @NextAction</p>
-                @if (_dirty) { <p role="status">Yerel cevaplar değişti; henüz kaydedilmedi. Formdaki ilerleme: @CompletedServers / @record.Source.Servers.Count.</p> }
-                @if (record.Draft is { } saved) { <p>İnceleyen / son kaydeden: @InUsePersonLabel.Format(saved.ReviewedByLabel, saved.ReviewedByAccount) · @Time(saved.ReviewedAt)</p> }
-                <p>WASAS aktivitesi: @SourceActivity(record) · Genel OR: @SourceLifecycle(record)</p>
-                @if (record.SourceObservationMissing) { <p>Son yenilemede görülmedi; önceki kaynak gözlemi korunuyor.</p> }
+                <div class="ix-hero-grid">
+                    <div class="ix-person-slot"><span class="ix-label">Atanan inceleyici</span>
+                        <SoPerson Name="@record.AssigneeLabel" Fallback="Atanmamış" />
+                        @if (Can(Capabilities.InUseAssign))
+                        { <MudButton OnClick="OpenAssignmentAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Text" Size="Size.Small" aria-haspopup="dialog">İnceleyici ata/değiştir</MudButton> }
+                    </div>
+                    <div class="ix-person-slot"><span class="ix-label">RFC talep eden · Ad soyad</span>
+                        @if (RfcReporters(record) is { Count: > 0 } reporters)
+                        { @foreach (var reporter in reporters) { <SoPerson Compact="true" Name="@reporter.Name" Caption="@reporter.Caption" /> } }
+                        else { <span class="ix-muted">@ReporterSummary(record)</span> }
+                    </div>
+                    <div class="ix-person-slot"><span class="ix-label">Kaydedilen ilerleme</span>
+                        <div class="ix-progress"><div class="ix-meter" aria-hidden="true"><span style="width:@(record.Source.Servers.Count == 0 ? 0 : 100 * SavedCompleted(record) / record.Source.Servers.Count)%"></span></div>
+                            <strong>@SavedCompleted(record) / @record.Source.Servers.Count sunucu</strong></div>
+                        <span class="ix-meta-line">Kaynak okuma: @Time(record.LastSeenAt)</span>
+                    </div>
+                </div>
+                <p class="ix-meta">
+                    @if (record.Draft is { } saved) { <span>İnceleyen / son kaydeden: @InUsePersonLabel.Format(saved.ReviewedByLabel, saved.ReviewedByAccount) · @Time(saved.ReviewedAt)</span> }
+                    <span>WASAS aktivitesi: @SourceActivity(record)</span><span>Genel OR: @SourceLifecycle(record)</span>
+                </p>
+                @if (record.SourceObservationMissing) { <p class="ix-note">Son yenilemede görülmedi; önceki kaynak gözlemi korunuyor.</p> }
             </section>
             @if (record.Source.Synthetic) { <MudAlert Severity="Severity.Info">Sentetik yerel veri; kurumsal doğrulama değildir.</MudAlert> }
             @if (record.Status == "Stale") { <MudAlert Severity="Severity.Warning">İncelemeyi etkileyen kaynak bilgisi değişti. Cevaplarınız korunuyor; aşağıdaki farkları inceleyip kaydedin.</MudAlert> }
@@ -187,8 +220,8 @@
                     </tbody></table></div>
                 </section>
             }
-            <section class="so-inuse-band" data-guide="inuse-owner">
-                <h3>Talep ve sorumlular</h3><dl class="so-inuse-evidence">
+            <section class="so-inuse-band ix-panel ix-panel--quiet" data-guide="inuse-owner">
+                <details class="ix-fold"><summary><span class="ix-fold-title">Talep ve sorumlular</span><span class="ix-fold-hint">talep eden, servis sahibi, kurulum ekibi, son atama</span></summary><dl class="so-inuse-evidence">
                     <dt>In Use kaydındaki talep eden</dt><dd>@InUseDisplayText.Decode(record.Source.Requester.Value)</dd>
                     <dt>Servis / uygulama sahibi</dt><dd>@BusinessEvidence(record.Source.ServiceOwner)</dd>
                     <dt>Kurulum operatörü / ekibi</dt><dd>@BusinessEvidence(record.Source.ProvisioningTeam)</dd>
@@ -203,9 +236,10 @@
                     <dt>Servis / uygulama sahibi</dt><dd>@Evidence(record.Source.ServiceOwner)</dd>
                     <dt>Kurulum operatörü / ekibi</dt><dd>@Evidence(record.Source.ProvisioningTeam)</dd>
                 </dl></details> }
+                </details>
             </section>
-            <section class="so-inuse-band" data-guide="inuse-servers">
-                <h3 id="inuse-review">1. Sunucuları incele</h3>
+            <section class="so-inuse-band ix-panel" data-guide="inuse-servers">
+                <h3 id="inuse-review">Sunucuları incele</h3>
                 <p>Servis öğesi: @Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p>
                 @if (_validation is not null) { <p role="alert">@_validation</p><MudButton OnClick="() => Ready()" StartIcon="@Icons.Material.Filled.MyLocation">Alana git</MudButton> }
                 @if (record.Source.Servers.Count > 0)
@@ -220,7 +254,7 @@
                 @if (record.Source.Servers.Count == 0) { <MudAlert Severity="Severity.Warning">Doğrulanmış sunucu ilişkisi yok. Kaynak ilişki kanıtı gerekli.</MudAlert> }
                 @if (record.Source.Servers.Count > 0)
                 {
-                    <h3 id="inuse-answers">2. Cevapları tamamla ve kaydet</h3>
+                    <h3 id="inuse-answers">Cevapları tamamla ve kaydet</h3>
                     <p role="status">Kaydedilen: @SavedCompleted(record) / @record.Source.Servers.Count sunucu. Ekrandaki cevaplar: @CompletedServers / @record.Source.Servers.Count sunucu; @_answers.Count(a => a.Value is not ("Yes" or "No")) cevap eksik.</p>
                     <p>Mikrosegmentasyon, sunucular arasındaki ağ erişiminin ayrı güvenlik kurallarıyla sınırlandırılmasıdır. Kanıtınız yoksa Bilinmiyor bırakın.</p>
                     <label>Cevap görünümü<select aria-label="Cevap görünümü" @bind="_answerView"><option value="all">Tümü</option><option value="missing">Eksik cevaplar</option><option value="changed">Kaynak bilgisi değişenler</option></select></label>
@@ -332,7 +366,7 @@
                     </details>
                 }
             </section>
-            <section class="so-inuse-band" data-guide="inuse-report">
+            <section class="so-inuse-band ix-panel" data-guide="inuse-report">
                 <h3 id="inuse-excel">3. Excel'i kontrol et</h3>
                 <OperationHistoryPanel RecordType="InUse" RecordId="record.Id" />
                 <div class="so-inline-actions">
@@ -380,7 +414,7 @@
                     { <p>Bu niyet önceki incelemeye aittir; güncel veri için yeniden doğrulama gerekir.</p> }
                 }
             </section>
-            <section class="so-inuse-band" aria-label="WASAS adımını onayla">
+            <section class="so-inuse-band ix-panel" aria-label="WASAS adımını onayla">
                 <h3 id="inuse-complete">4. Raporu ekle ve WASAS adımını onayla</h3>
                 @if (_execution is { } execution)
                 {

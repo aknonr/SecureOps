@@ -131,3 +131,66 @@
     .ix-cards > li.ix-card { transition: none; }
     .ix-cards > li.ix-card:hover { transform: none; }
 }
+
+/* -- In Use detail hero, 2026-10-03: where am I, what next, who is involved -- */
+.ix-hero {
+    --tone: var(--so-info);
+    display: flex; flex-direction: column; gap: .9rem; margin-block: .5rem 1.25rem;
+    padding: 1.25rem 1.4rem; border: 1px solid var(--so-border); border-radius: var(--so-radius-lg);
+    background: var(--so-surface); position: relative; overflow: hidden; box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+}
+.ix-hero::before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: var(--tone); }
+.ix-hero--warn { --tone: var(--so-warning); }
+.ix-hero--todo { --tone: var(--so-info); }
+.ix-hero--ready { --tone: var(--so-success); }
+.ix-hero--neutral { --tone: var(--so-text-faint); }
+.ix-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
+.ix-hero-title { margin: 0; font-size: 22px; line-height: 1.35; font-weight: 700; color: var(--so-text); overflow-wrap: anywhere; }
+
+.ix-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; counter-reset: none; }
+.ix-step { display: flex; align-items: center; gap: .6rem; padding: .55rem .75rem; border-radius: var(--so-radius); background: var(--so-bg-sunken); color: var(--so-text-muted); position: relative; }
+.ix-step-dot {
+    flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+    font-weight: 700; font-size: 14px; background: var(--so-surface); border: 2px solid var(--so-border); color: var(--so-text-muted);
+}
+.ix-step-label { font-weight: 600; font-size: 15px; line-height: 1.3; }
+.ix-step--done { color: var(--so-text); }
+.ix-step--done .ix-step-dot { background: var(--so-success); border-color: var(--so-success); color: #fff; }
+.ix-step--current { color: var(--so-text); background: color-mix(in srgb, var(--tone) 14%, var(--so-surface)); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tone) 55%, transparent); }
+.ix-step--current .ix-step-dot { border-color: var(--tone); color: var(--tone); }
+
+.ix-hero-next { padding: .75rem 1rem !important; }
+.ix-hero-next-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.ix-hero-next-text strong { font-size: 16px; line-height: 1.4; }
+.ix-hero-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem 1.5rem; padding-top: .25rem; }
+.ix-hero-grid .ix-person-slot { align-items: flex-start; }
+.ix-meta-line { font-size: 13px; color: var(--so-text-muted); }
+
+@media (max-width: 900px) {
+    .ix-steps { grid-template-columns: minmax(0, 1fr); }
+    .ix-hero-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 600px) { .ix-hero-grid { grid-template-columns: minmax(0, 1fr); } }
+.ix-fold > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .75rem; list-style-position: inside; }
+.ix-fold-title { font-size: 19px; font-weight: 700; color: var(--so-text); }
+.ix-fold-hint { font-size: 13px; font-weight: 400; color: var(--so-text-muted); }
+.ix-hero-grid .ix-progress { flex-direction: column; align-items: stretch; gap: 6px; width: 100%; }
+.ix-hero-grid .ix-meter { flex: none; width: 100%; max-width: 260px; }
+.ix-fold > summary, .ix-servers > summary { list-style: none; }
+.ix-fold > summary::-webkit-details-marker, .ix-servers > summary::-webkit-details-marker { display: none; }
+.ix-fold > summary::before, .ix-servers > summary::before { content: "▸"; display: inline-block; width: 1em; color: var(--so-text-muted); transition: transform 150ms ease; }
+.ix-fold[open] > summary::before, .ix-servers[open] > summary::before { transform: rotate(90deg); }
+
+/* Step sections read as cards that match the stepper above. */
+.ix-panel {
+    margin-block: 1rem; padding: 1.1rem 1.4rem !important; border: 1px solid var(--so-border) !important;
+    border-radius: var(--so-radius-lg); background: var(--so-surface);
+}
+.ix-panel--quiet { background: transparent; border-style: dashed !important; }
+.ix-panel > h3, .ix-panel h3#inuse-answers { display: flex; align-items: center; gap: .6rem; margin-top: .25rem !important; }
+#inuse-review::before, #inuse-answers::before {
+    display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; flex: none;
+    font-size: 15px; font-weight: 700; color: #fff; background: var(--so-accent);
+}
+#inuse-review::before { content: "1"; }
+#inuse-answers::before { content: "2"; }
