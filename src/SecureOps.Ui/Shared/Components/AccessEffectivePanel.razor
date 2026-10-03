@@ -30,13 +30,13 @@
 
     @if (Effective.Roles.Count > 0)
     {
-        <p class="eff-roles">
+        <div class="eff-roles">
             <span class="eff-roles-label">Atanmış roller:</span>
             @foreach (string role in Effective.Roles)
             {
                 <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" title="@role">@RoleName(role)</MudChip>
             }
-        </p>
+        </div>
     }
 
     <div class="eff-grid">

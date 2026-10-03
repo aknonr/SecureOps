@@ -426,6 +426,14 @@ When an identity provider is approved they become a challenge/callback pair and 
 
 ## Access administration
 
+**Module-based access, 2026-10-03.** `/access/modules` (Yetki haritası) shows each module's actions with the
+roles that grant them, as cards or a sticky role matrix, with search; it is read-only and links to the role
+editor. User detail and Erişimim render `AccessEffectivePanel` from `GET .../effective` (server explanation:
+granted/not granted in words and icons, granting roles, real x/y counts; non-Approved users have nothing
+granted). Erişimim keeps its `/access/me` capability list if the explanation cannot be read. The paged
+user/request lists now also work on the in-memory Demo provider. Browser-checked locally (Demo, InMemory).
+
+
 Three screens, each gated on its own capability, because the API gates them separately: the request
 queue needs `Access.ApproveRequests` while the user read model needs `Access.ManageUsers`. An
 approver without `ManageUsers` sees the queue and no user list.
