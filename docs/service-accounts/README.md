@@ -129,6 +129,8 @@ classification, decision), AccountObservations, Evidence (bytes in SQL, scoped d
 ReportSnapshots (immutable payload + exports), ReminderOutbox, History.
 Candidate 2 (`SA-002`): AccountUsages (where an account is used; reasoned exception and removal, never deleted) and
 TeamRoles (SQL teams and the single gMSA executing team; configuration, never access).
+Candidate 3 (`SA-003`, unnumbered, ADR-0026): `ScopeGrants.IsBootstrap`, the self-grant check relaxed only for that one
+row (an "All" grant to its own grantor) and a filtered unique index allowing one bootstrap row ever.
 
 Dates: plan/business dates are `date`; events carry `datetimeoffset` only when a real instant is
 known; `TimePrecision` records DateOnly/Instant/Unknown. Source timestamps without a timezone

@@ -95,6 +95,13 @@ migration package. The user enters the source report date and scope; upload time
 source date. Files are validated for type, signature, size, decompression, rows and cells;
 formulas, macros and external links are never executed or refreshed.
 
+Operator order (shown on the import page): the legacy tracking workbook once (initial migration), then each weekly
+coordination list with its source report date and date provenance, and DBA handover lists when they arrive. Import
+requires the Import capability **and** organization-level data scope (All or an organization); scope is granted by a
+different module administrator and never by the operator to themself, with one exception: while the module has never had
+any scope grant, a module administrator may take "All" scope once (ADR-0026). Before the first import no organization
+exists, so the first grant is "All" and can be narrowed later.
+
 Preview classes: new / existing-observation update / same / conflict / invalid / not seen in
 this batch. Old and proposed values are shown side by side. Source observation fields become
 new observations; an owner team from the source fills an empty confirmed assignment only with

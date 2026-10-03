@@ -76,6 +76,14 @@ public static class ServiceAccountProblems
         "databaseEngine" => "Veritabanı motoru yalnız veritabanı kullanımında seçilir.",
         "needVerified" => "İhtiyaç doğrulaması yalnız Windows servisi kullanımında işaretlenir.",
         "role" => "Bu ekip bu rolde zaten var ya da başka bir yürütücü ekip tanımlı; önce mevcut olanı kaldırın.",
+        "scope" => "Bu işlem kurum düzeyinde veri kapsamı ister. Yetkileriniz (Erişimim) tek başına yetmez: başka bir modül yöneticisi "
+            + "Modül yönetimi → Kapsam yetkileri'nden size \"Tüm kurum\" veya ilgili kurumu vermelidir. Kendinize kapsam veremezsiniz.",
+        "selfGrant" => "Kendinize kapsam veremezsiniz. Bu koruma bilerek var: kapsamı sizden bağımsız bir modül yöneticisi vermelidir.",
+        "corporateIdentity" => "Bu kurumsal kimlikle onaylı bir uygulama kullanıcısı bulunamadı. Kimliği DOMAIN\\kullanıcı veya UPN olarak birebir yazın; kişinin önce uygulamaya erişimi onaylanmış olmalı.",
+        "bootstrapClosed" => "Tek seferlik ilk kurulum kullanılamaz: bu modülde daha önce kapsam verilmiş. Kapsamı başka bir modül yöneticisi vermelidir.",
+        "bootstrapSchema" => "Tek seferlik ilk kurulum için gereken veritabanı güncellemesi (SA-003) henüz uygulanmadı.",
+        "duplicate" => "Bu kullanıcının bu kapsamda zaten etkin bir yetkisi var.",
+        "scopeKind" => "Kapsam türünü seçin; kurum için kurum, ekip için ekip seçilmelidir. Gerekçe zorunludur.",
         null => null,
         { } field => "Kontrol edilecek alan: " + field
     };

@@ -9,6 +9,37 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## One-time first scope grant, user picker, executive summary, page guides (2026-10-03, same branch)
+
+Owner decisions: (1) one-time first scope grant, (2) pick approved users instead of typing an identity, (3) an
+executive-summary sheet modelled on the tracking workbook's "Yonetici_Ozeti" but value-only, (4) in-page guides with an
+animated flow. Implemented: ADR-0026 and unnumbered SQL candidate `SA-003-scope-bootstrap.sql` (column, relaxed check for
+the one bootstrap row, filtered unique index; harnesses apply it while no numbered migration exists); repository/service/
+API `scope-grants/bootstrap` (state + POST) and `scope-grants/candidates`; a common application lock for scope-grant
+writers (found by a deadlock between the bootstrap's table range lock and a concurrent grant); admin tab with the bootstrap
+panel and the user picker; import page points administrators to the bootstrap; `ReportDashboard` rendered as the first
+XLSX sheet "Yönetici özeti" (merged tiles, gMSA block, top-10 teams and upcoming plans) and as tiles plus summary tables on
+the first PDF page; `SaPageGuide` on every module page and admin tab (CSS-only animation, stops for reduced motion, no
+stored state). Verified on Linux with SDK 9.0.317: SA-003 applied and replay refused; DB refused a normal self-grant, a
+non-"All" bootstrap and a second bootstrap; bootstrap success path on a fresh database; module SQL tests 47 passed (2
+LocalDB-only role tests excluded); unit 1680 passed (2 environment failures as on master). Windows rows 50–57.
+
+## Scope setup, import guidance and report layout (2026-10-03)
+
+Branch `feature/service-accounts-scope-import-ux-20261003` from master `77bcfab` (PR #6, #7, #10 merged; .NET 8; no
+migration added, 024–028 unchanged). Field finding: an administrator with the seven module capabilities still got
+`scope` on the import page. Cause: import needs organization-level **data scope** (`svcacct.ScopeGrants`, kind All or
+Organization) in addition to the Import capability, the page called `GET imports` on open, and self-grants are refused
+by design. Not a backend defect; the self-grant protection is kept. Changes: the import page reads `/me` first and, without
+organization scope, shows how a different module administrator grants it (first setup: "Tüm kurum", preselected on the
+admin tab while no organization exists); Turkish messages for `scope`, `selfGrant`, `corporateIdentity`, `duplicate`,
+`scopeKind`; a three-card guide (tracking workbook once, weekly coordination list, DBA list) that pre-fills the type and
+shows which step was already committed; a single numbered step line with hints (the old list printed "1. 1."); an explained,
+required date-provenance choice; a list of what still blocks the preview; a file picker card; a fixed-height progress
+slot. Reports: PDF in A4 landscape with a title band, Courier-Bold headings, shaded table headers, striped rows and a
+footer, still text-reconcilable with the XLSX; XLSX with a shaded, bordered, frozen header row, AutoFilter (with the
+hidden filter-database names) and the title on the cover sheet. No package added. Windows rows 39–49.
+
 ## Continuation on master and directory name search (2026-10-02)
 
 Branch `feature/service-accounts-continuation-20261002`, cut from master `e670617` (SDK 9.0.317/C# 12, migration 025,

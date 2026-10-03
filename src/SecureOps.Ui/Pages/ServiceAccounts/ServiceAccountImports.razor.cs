@@ -13,7 +13,12 @@ namespace SecureOps.Ui.Pages.ServiceAccounts;
 public partial class ServiceAccountImports
 {
     private const long _maxBytes = 20L * 1024 * 1024;
-    private static readonly (int Number, string Title)[] _steps = [(1, "Dosya ve kaynak bilgisi"), (2, "Önizleme ve kararlar"), (3, "Onay ve sonuç")];
+    private static readonly (int Number, string Title, string Hint)[] _steps =
+    [
+        (1, "Dosya ve kaynak bilgisi", "Türü seçin, dosyayı ve tarihi verin"),
+        (2, "Önizleme ve kararlar", "Ne değişeceğini görün, belirsiz satırlara karar verin"),
+        (3, "Onay ve sonuç", "Tek işlemde yazılır, sonuç raporu çıkar")
+    ];
     private static readonly (string Value, string Label)[] _profiles =
     [
         (ServiceAccountImportProfiles.CoordinationList, "Koordinasyon listesi (hesap ve kaynak gözlemi)"),
@@ -22,9 +27,13 @@ public partial class ServiceAccountImports
         (ServiceAccountImportProfiles.LegacyWorkbook, "Eski çalışma kitabı (.xlsx)"),
         (ServiceAccountImportProfiles.Generic, "Genel tablo (sütun eşlemeli)")
     ];
-    private static readonly string[] _provenances =
+    private static readonly (string Value, string Why)[] _provenances =
     [
-        "Dosya adındaki tarih", "Dosyayı ileten e-postanın tarihi", "Dosya sahibinin yazılı beyanı", "Dosya içindeki rapor tarihi", "Tarih bilinmiyor"
+        ("Dosyayı ileten e-postanın tarihi", "Haftalık liste e-postayla geldiyse en güvenilir kaynak budur."),
+        ("Dosya içindeki rapor tarihi", "Dosyanın içinde rapor/hazırlanma tarihi yazıyorsa."),
+        ("Dosya adındaki tarih", "Dosya adında tarih varsa (ör. liste_2026-09-29.xlsx)."),
+        ("Dosya sahibinin yazılı beyanı", "Dosyayı hazırlayan kişi tarihi yazılı bildirdiyse."),
+        ("Tarih bilinmiyor", "Tarih alanını boş bırakın; tam liste beyanı yapılamaz.")
     ];
 
     private static readonly (string Value, string Label)[] _coverages =
@@ -34,6 +43,8 @@ public partial class ServiceAccountImports
         (ServiceAccountImportCoverage.Complete, "Seçilen kurumların tam listesi")
     ];
 
+    private ServiceAccountMe? _me;
+    private ScopeBootstrapState? _bootstrap;
     private ImportBatchView? _batch;
     private IReadOnlyList<OrganizationView> _organizations = [];
     private ImportRowPage? _rows;
@@ -50,17 +61,80 @@ public partial class ServiceAccountImports
     private int Step => _batch is null ? 1 : _batch.Status == "Committed" ? 3 : 2;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The caller's scope is read first: import needs organization-level data scope in addition to the Import capability, and
+    /// without it the page explains how scope is granted instead of showing the API's access error.
+    /// </remarks>
     protected override Task LoadAsync() => RunSerializedAsync(async token =>
     {
+        _me = await Api.GetAsync<ServiceAccountMe>("/me", token);
+        if (!HasImportScope)
+        {
+            (_history, _organizations) = ([], []);
+            _bootstrap = Can(ServiceAccountCapabilities.Administer) ? await Api.GetAsync<ScopeBootstrapState>("/scope-grants/bootstrap", token) : null;
+            return;
+        }
+
         _history = await Api.GetAsync<IReadOnlyList<ImportHistoryItem>>("/imports", token);
         _organizations = await Api.GetAsync<IReadOnlyList<OrganizationView>>("/organizations", token);
     });
 
+    /// <summary>Import requires organization-level scope (All or at least one organization); a team-only scope is not enough.</summary>
+    private bool HasImportScope => _me?.ScopeKind is "All" or "Organization";
+
+    private bool MissingProvenance => string.IsNullOrWhiteSpace(_form.Provenance);
+
+    /// <summary>What still blocks the preview, in the operator's words (empty when ready).</summary>
+    private List<string> Missing
+    {
+        get
+        {
+            List<string> missing = [];
+            if (_file is null)
+            {
+                missing.Add("Dosya seçilmedi");
+            }
+
+            if (MissingProvenance)
+            {
+                missing.Add("Tarihin kaynağı seçilmedi (bilmiyorsanız \"Tarih bilinmiyor\")");
+            }
+
+            if (CoverageSupported && _form.Coverage == ServiceAccountImportCoverage.Complete)
+            {
+                if (!_form.CoverageOrganizations.Any())
+                {
+                    missing.Add("Tam liste için kurum seçilmedi");
+                }
+
+                if (_form.ReportDate is null)
+                {
+                    missing.Add("Tam liste için rapor tarihi girilmedi");
+                }
+            }
+
+            return missing;
+        }
+    }
+
+    private void ChooseProfile(string profile)
+    {
+        if (_form.Profile == profile)
+        {
+            return;
+        }
+
+        _form.Profile = profile;
+        _form.Coverage = ServiceAccountImportCoverage.Unknown;
+        _form.CoverageOrganizations = [];
+        if (_file is { } chosen && !Accept(profile).Split(',').Contains(Path.GetExtension(chosen.Name).ToLowerInvariant()))
+        {
+            (_file, _fileError) = (null, $"Seçilen dosya bu tür için uygun değil ({Accept(profile)}); dosyayı yeniden seçin.");
+        }
+    }
+
     private bool CoverageSupported => _form.Profile is ServiceAccountImportProfiles.CoordinationList or ServiceAccountImportProfiles.LegacyPackage
         or ServiceAccountImportProfiles.LegacyWorkbook;
-
-    private bool CoverageReady => !CoverageSupported || _form.Coverage != ServiceAccountImportCoverage.Complete
-        || _form.CoverageOrganizations.Any() && _form.ReportDate is not null;
 
     private async Task ChooseAsync(InputFileChangeEventArgs args)
     {

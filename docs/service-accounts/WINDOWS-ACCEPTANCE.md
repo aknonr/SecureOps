@@ -193,6 +193,39 @@ TEST users that share a first name (or note "no same-named pair available").
 
 Row 35 uses the configured `IdentityLookup` rate-limit window; record the configured value with the result.
 
+Scope setup, import guidance and report layout (2026-10-03). Use the installed system (migrations 024–028 already
+applied; nothing is re-applied). Identities: the operator who will import (holds the module bundle, **no** scope grant
+yet) and a different module administrator.
+
+| # | Caller | Call / screen | Expected |
+|---|---|---|---|
+| 39 | operator without scope | `/service-accounts/imports` | panel "Önce veri kapsamınız tanımlanmalı" with the four steps; no red access error; `GET .../imports` is not called (no `scope` 403 in the API log) |
+| 40 | operator | Modül yönetimi → Kapsam yetkileri → grant to own identity | 403 with the Turkish `selfGrant` explanation; no grant row, audit unchanged |
+| 41 | other module administrator | same tab, empty organization list | info "İlk kurulum…", scope kind preselected "Tüm kurum"; the operator is **picked from the list** of approved users (own entry disabled, users without module access marked); grant → 200, audit `ServiceAccount.ScopeGranted` |
+| 42 | operator | "Kapsamımı yeniden kontrol et" | the import page opens; step line shows 1–3 once each with hints (no "1. 1."); guide shows three cards, "İlk kurulum" marked "Henüz yapılmadı" |
+| 43 | operator | pick card 1, choose a TEST copy of the tracking workbook, leave provenance empty | "Önizleme oluştur" disabled and "Önizleme için eksik: Tarihin kaynağı seçilmedi…" listed; the date block is highlighted |
+| 44 | operator | choose "Dosyayı ileten e-postanın tarihi", preview, commit | preview and commit as rows 12/20; card 1 then shows "Son aktarım: <date>" |
+| 45 | operator | card 2 with a TEST weekly list (Book1 headers), report date, coverage "Bilinmiyor" | new / observation-update counts; no "bu listede yok"; owner, OR/OCO, plan, notes unchanged |
+| 46 | operator | switch file type after choosing a `.json` file | file cleared with the warning that it does not fit the type |
+| 47 | coordinator | snapshot PDF | A4 landscape; dark title band; shaded section and table header rows; alternating rows; footer "Sayfa n/m"; Turkish letters and dashes correct |
+| 48 | coordinator | snapshot XLSX in **desktop Excel** | opens without a repair prompt; table sheets keep the header row frozen and offer AutoFilter; the "Rapor" sheet starts with the title |
+| 49 | any | page at 390 px and 1440 px | no horizontal scroll; file picker, provenance options and guide cards wrap; the progress line does not push content down |
+
+One-time first scope grant (ADR-0026) and page guides. Codex applies candidate `SA-003` under its reserved number first
+(on a copy of the installed database, then the installed one); record the number. Run rows 50–53 **before** any scope
+grant exists (if rows 39–41 already granted scope, run them on a fresh TEST database).
+
+| # | Caller | Call / screen | Expected |
+|---|---|---|---|
+| 50 | module administrator, no grant exists | Modül yönetimi → Kapsam yetkileri | panel "İlk kurulum: kendinize bir kez…"; reason required; "İlk kapsamı al (bir kez)" → 200; grant row `IsBootstrap = 1`, `ScopeKind = All`; audit `ServiceAccount.ScopeBootstrapped`; history `Bootstrapped` |
+| 51 | same administrator | `/service-accounts/imports` | import page opens (scope "Tüm kurum") |
+| 52 | any administrator | `POST .../scope-grants/bootstrap` again, also after revoking the bootstrap grant | 403 `bootstrapClosed`; panel no longer shown |
+| 53 | any administrator | `POST .../scope-grants` to own identity | 403 `selfGrant` (rule unchanged after bootstrap) |
+| 54 | before `SA-003` is applied | `GET .../scope-grants/bootstrap`, then `POST` | `schemaReady: false`; POST 403 `bootstrapSchema`; info text on the tab; ordinary grants still work |
+| 55 | any | each module page and each admin tab | guide strip with numbered steps, one step highlighted at a time; "Nasıl kullanılır?" opens purpose, steps and "Bu sayfa şunları yapmaz"; with Windows "Show animations" off the highlight does not move |
+| 56 | coordinator | snapshot XLSX in desktop Excel | first sheet "Yönetici özeti": title, scope/period, eight tiles, gMSA block, team table, upcoming plans; values match the "Özet" and detail sheets; no formulas; no repair prompt |
+| 57 | coordinator | snapshot PDF | first page shows the same eight tiles and the three summary tables before the detail sections |
+
 UI (same identities): the team member opens `/service-accounts` and sees "Takibinizdeki işler"
 first; the account detail shows the participant notice and only the allowed controls.
 
@@ -223,5 +256,5 @@ recurring job is not removed automatically; removing it is an operator decision.
   (module sessions use their own pool.)
 - `SELECT Role, COUNT(*) FROM svcacct.TeamRoles WHERE RevokedAt IS NULL GROUP BY Role;` and
   `SELECT UsageKind, COUNT(*) FROM svcacct.AccountUsages GROUP BY UsageKind;`
-- Screenshots of rows 18–27 and 30–34 at 1440 px and 390 px (TEST directory names only; never commit them to the repository).
+- Screenshots of rows 18–27, 30–34 and 39–49 at 1440 px and 390 px (TEST directory names only; never commit them to the repository).
 - A short list of anything that differed from the expected column.

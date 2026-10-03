@@ -97,6 +97,38 @@ public sealed partial class ServiceAccountService
                 : await repository!.CreateGrantAsync(target.Id, kind, request.OrganizationId, request.TeamId, request.Reason.Trim(), caller.Actor, cancellationToken);
         }, cancellationToken);
 
+    /// <summary>State of the one-time first scope grant (ADR-0026).</summary>
+    public Task<SaResult<ScopeBootstrapState>> ScopeBootstrapStateAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        CancellationToken cancellationToken) =>
+        RunAsync(principal, context, ServiceAccountCapabilities.Administer, async _ =>
+        {
+            (bool ready, bool any, bool used) = await repository!.ScopeBootstrapStateAsync(cancellationToken);
+            return new SaResult<ScopeBootstrapState>(new ScopeBootstrapState(ready && !any, ready, used));
+        }, cancellationToken);
+
+    /// <summary>
+    /// One-time first scope grant: a module administrator takes "All" scope while the module has never had any grant.
+    /// Reason is mandatory; history and audit record it. Every later grant must come from a different administrator.
+    /// </summary>
+    public Task<SaResult<Guid>> BootstrapScopeAsync(ClaimsPrincipal principal, AccessOperationContext context, ScopeBootstrapRequest request,
+        CancellationToken cancellationToken) =>
+        RunAsync(principal, context, ServiceAccountCapabilities.Administer, caller => !ValidText(request.Reason, 400, true)
+            ? Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "reason"))
+            : repository!.BootstrapGrantAsync(caller.User.Id, request.Reason.Trim(), caller.Actor, cancellationToken), cancellationToken);
+
+    /// <summary>
+    /// Approved application users who can be chosen when granting scope. Only users already admitted to the application are
+    /// listed (no directory search); disabled and pending users are excluded.
+    /// </summary>
+    public Task<SaResult<IReadOnlyList<ScopeGrantCandidate>>> ScopeGrantCandidatesAsync(ClaimsPrincipal principal, AccessOperationContext context,
+        IAccessRepository users, CancellationToken cancellationToken) =>
+        RunAsync(principal, context, ServiceAccountCapabilities.Administer, async caller =>
+            new SaResult<IReadOnlyList<ScopeGrantCandidate>>([.. (await users.ListUsersAsync(cancellationToken))
+                .Where(u => u.Status == AccessStatus.Approved)
+                .Select(u => new ScopeGrantCandidate(u.CorporateIdentity, u.DisplayName ?? u.LoginName ?? u.CorporateIdentity, u.LoginName, u.Id == caller.User.Id,
+                    u.Capabilities.Contains(ServiceAccountCapabilities.View, StringComparer.Ordinal)))
+                .OrderBy(c => c.Label, StringComparer.CurrentCultureIgnoreCase)]), cancellationToken);
+
     /// <summary>Revokes a grant.</summary>
     public Task<SaResult<Guid>> RevokeGrantAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id, RevokeScopeGrantRequest request,
         CancellationToken cancellationToken) =>

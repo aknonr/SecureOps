@@ -19,9 +19,25 @@ public sealed record ReportCell(string? Text = null, long? Number = null, DateOn
 /// <summary>One table section.</summary>
 public sealed record ReportSection(string Title, IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<ReportCell>> Rows);
 
+/// <summary>One headline figure on the executive summary.</summary>
+/// <param name="Label">What is counted.</param>
+/// <param name="Value">The figure (same value as in the detail sections).</param>
+/// <param name="Note">Short qualifier, e.g. "takvim günü".</param>
+public sealed record ReportTile(string Label, long Value, string? Note = null);
+
+/// <summary>Executive summary: headline tiles and a few short tables. Every figure is also present in a detail section.</summary>
+/// <param name="Subtitle">Scope and period in one line.</param>
+/// <param name="Tiles">Headline figures, rendered four per row.</param>
+/// <param name="Blocks">Short tables (gMSA transition, teams, upcoming plans), each limited to a few rows.</param>
+public sealed record ReportDashboard(string Subtitle, IReadOnlyList<ReportTile> Tiles, IReadOnlyList<ReportSection> Blocks);
+
 /// <summary>Render-neutral report built only from an immutable snapshot payload; XLSX and PDF render the same document.</summary>
-public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, string Value)> Header, IReadOnlyList<ReportSection> Sections, DateTimeOffset CreatedAt)
+public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, string Value)> Header, IReadOnlyList<ReportSection> Sections, DateTimeOffset CreatedAt,
+    ReportDashboard? Dashboard = null)
 {
+    /// <summary>Rows shown in each executive-summary table (the full lists stay in the detail sections).</summary>
+    public const int DashboardRows = 10;
+
     /// <summary>Builds the document from a stored report payload and snapshot metadata.</summary>
     public static ReportDocument From(ServiceAccountReport report, Guid snapshotId, string payloadSha256, string? label, DateTimeOffset createdAt, string createdBy)
     {
@@ -84,6 +100,35 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
         ];
         sections.AddRange(VersionTwo(report));
         sections.Add(new("Tanımlar ve notlar", ["Not"], [.. report.Notes.Select(n => Row(n))]));
+        string period = $"{report.WeekStart:dd.MM.yyyy} – {report.WeekEndExclusive.AddDays(-1):dd.MM.yyyy}";
+        ReportDashboard dashboard = new($"{report.ScopeLabel} · {period}",
+        [
+            new("Tekil hesap", s.UniqueAccounts),
+            new("Sorumlusu atanmış hesap", s.AccountsWithAssignedPerson),
+            new("Açık talep", s.OpenRequests),
+            new("Geciken iş", s.OverdueRequests, "takvim günü"),
+            new("Tarihli açık plan", s.DatedOpenPlanRequests, "talep"),
+            new("Gerçekleşen işlem bildirimi", s.PerformedActionReports, "tümü"),
+            new("Doğrulanmış kapanış", s.VerifiedClosureAccounts, "tekil hesap"),
+            new("gMSA bekleyen", report.Handover.GmsaPending, "devir kapsamı")
+        ],
+        [
+            new("gMSA geçişi", ["Gösterge", "Değer"],
+            [
+                Row("Devir kapsamına bildirilen", report.Handover.Reported),
+                Row("Kabul kanıtı olan", report.Handover.Accepted),
+                Row("gMSA hedefli", report.Handover.GmsaTargeted),
+                Row("gMSA geçişi gerçekleşen", report.Handover.GmsaCompleted),
+                Row("gMSA bekleyen", report.Handover.GmsaPending),
+                .. (report.Funnel?.Stages ?? []).Select(st => Row("Huni: " + st.Label, st.Count))
+            ]),
+            new("Ekiplerde hesap ve bekleyen iş", ["Ekip", "Sahip olduğu hesap", "Muhatap açık talep", "Geciken"],
+                [.. report.TeamWorkload.OrderByDescending(t => t.OwnedAccounts).ThenBy(t => t.Team, StringComparer.Ordinal).Take(DashboardRows)
+                    .Select(t => Row(t.Team, t.OwnedAccounts, t.OpenRequestsAsTarget, t.OverdueAsTarget))]),
+            new("Yaklaşan planlar (bitişe göre)", ["Hesap", "Aksiyon", "Bitiş", "Muhatap ekip", "Gecikiyor"],
+                [.. report.DatedPlans.OrderBy(p => p.End).ThenBy(p => p.Account, StringComparer.Ordinal).Take(DashboardRows)
+                    .Select(p => Row(p.Account, p.Action, new ReportCell(Date: p.End), p.TargetTeam ?? "—", p.Overdue ? "Evet" : "Hayır"))])
+        ]);
         return new ReportDocument(report.Period switch
         {
             ReportPeriods.Month => "Servis Hesapları Aylık Rapor",
@@ -99,7 +144,7 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
             ("Metrik tanımı", report.MetricDefinitionVersion),
             ("Oluşturan / zaman", createdBy + " / " + createdAt.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture)),
             ("Yük özeti (SHA-256)", payloadSha256)
-        ], sections, createdAt);
+        ], sections, createdAt, dashboard);
     }
 
     /// <summary>Metric version 2 sections; a version 1 snapshot has none and renders exactly as before.</summary>
