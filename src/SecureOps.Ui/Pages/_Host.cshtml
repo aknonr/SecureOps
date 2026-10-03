@@ -143,31 +143,37 @@
             panel.querySelector('[data-so-open-status]').hidden = false;
         });
 
-        // MudBlazor 6 puts select attributes on a hidden input, not its keyboard target.
-        // Transfer resource field names to that target without replacing its keyboard behavior.
+        // Accessibility fallbacks written for MudBlazor 6 markup. Since the 9.11 upgrade they only fill in an
+        // attribute that is still missing: they never replace a role, name or relationship MudBlazor itself sets,
+        // so a library fix always wins over these bridges. Re-check them in a browser before removing any.
+        function setIfMissing(element, name, value) {
+            if (element && !element.hasAttribute(name)) { element.setAttribute(name, value); }
+        }
+        function hasAccessibleName(element) {
+            return element.hasAttribute('aria-label') || element.hasAttribute('aria-labelledby');
+        }
         var saLabelSequence = 0;
         function labelResourceSelects() {
-            // Service Accounts pages: MudBlazor 6 regenerates label[for] on every render without an input id, so fields
-            // had no accessible name. Give the label a stable id and reference it from the input or select slot.
+            // Service Accounts pages: give each field label a stable id and reference it where no name exists yet.
             document.querySelectorAll('.sa-page .mud-input-control').forEach(function (control) {
                 var label = control.querySelector('label.mud-input-label');
                 if (!label) { return; }
                 if (!label.id) { label.id = 'sa-label-' + (++saLabelSequence); }
                 var input = control.querySelector('input:not([type="hidden"]), textarea');
                 var slot = control.querySelector('div.mud-input-slot[tabindex="0"]');
-                if (input && input.getAttribute('aria-labelledby') !== label.id) { input.setAttribute('aria-labelledby', label.id); }
-                if (slot && slot.getAttribute('aria-labelledby') !== label.id) {
+                if (input && !hasAccessibleName(input)) { input.setAttribute('aria-labelledby', label.id); }
+                if (slot && !hasAccessibleName(slot)) {
                     slot.setAttribute('aria-labelledby', label.id);
-                    slot.setAttribute('role', 'button');
-                    slot.setAttribute('aria-haspopup', 'listbox');
+                    setIfMissing(slot, 'role', 'button');
+                    setIfMissing(slot, 'aria-haspopup', 'listbox');
                 }
             });
-            // MudBlazor 6 does not forward dialog attributes to its outer dialog container.
+            // Dialog name/modality when the dialog container does not already carry them.
             document.querySelectorAll('[data-sdm-dialog-title]').forEach(function (title) {
                 var dialog = title.closest('[role="dialog"]');
                 if (dialog) {
-                    dialog.setAttribute('aria-labelledby', title.id);
-                    dialog.setAttribute('aria-modal', 'true');
+                    if (!hasAccessibleName(dialog)) { dialog.setAttribute('aria-labelledby', title.id); }
+                    setIfMissing(dialog, 'aria-modal', 'true');
                     var cancel = dialog.querySelector('[data-sdm-cancel]');
                     if (cancel && !dialog.dataset.sdmFocusSet) {
                         dialog.dataset.sdmFocusSet = 'true';
@@ -179,31 +185,34 @@
                 .forEach(function (select) {
                     var input = select.querySelector('input[aria-label]');
                     var target = select.querySelector('div.mud-input-slot[tabindex="0"]');
-                    if (input && target) {
+                    if (input && target && !hasAccessibleName(target)) {
                         target.setAttribute('aria-label', input.getAttribute('aria-label'));
-                        target.setAttribute('role', 'button');
-                        target.setAttribute('aria-haspopup', 'listbox');
+                        setIfMissing(target, 'role', 'button');
+                        setIfMissing(target, 'aria-haspopup', 'listbox');
                     }
                 });
             document.querySelectorAll('.so-resource-dialog button svg[aria-label="Increment"], .so-resource-dialog button svg[aria-label="Decrement"]')
                 .forEach(function (icon) {
-                    // The library labels an aria-hidden icon instead of the actual spin button.
+                    // A labelled aria-hidden icon does not name its spin button; name the button if it has no name.
                     var button = icon.closest('button');
+                    if (!button || hasAccessibleName(button)) { return; }
                     var field = button.closest('.mud-input-control')?.querySelector('input[aria-label]');
                     var label = (field?.getAttribute('aria-label') || 'Değer') + (icon.getAttribute('aria-label') === 'Increment' ? ': Artır' : ': Azalt');
                     button.setAttribute('aria-label', label);
                     button.setAttribute('title', label);
                     button.setAttribute('tabindex', '0');
                 });
-            // MudBlazor 6 autocomplete has native keyboard navigation but omits combobox semantics.
+            // Combobox semantics for the environment autocomplete, managed only when the library sets no role.
             var input = document.querySelector('.so-resource-environment-filter input');
             if (!input) { return; }
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('maxlength', '40');
+            if (input.hasAttribute('role') && input.dataset.soComboboxBridge !== 'true') { return; }
+            input.dataset.soComboboxBridge = 'true';
             var list = document.querySelector('.mud-popover-open .so-resource-environment-options');
             input.setAttribute('role', 'combobox');
             input.setAttribute('aria-autocomplete', 'list');
-            input.setAttribute('autocomplete', 'off');
             input.setAttribute('aria-expanded', list ? 'true' : 'false');
-            input.setAttribute('maxlength', '40');
             if (list) {
                 list.id = 'so-resource-environment-options';
                 list.setAttribute('role', 'listbox');

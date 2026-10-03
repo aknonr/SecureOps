@@ -15,7 +15,7 @@
 :root {
     /* -- surfaces ------------------------------------------------------- */
     --so-bg: var(--mud-palette-background);
-    --so-bg-sunken: var(--mud-palette-background-grey);
+    --so-bg-sunken: var(--mud-palette-background-gray);
     --so-surface: var(--mud-palette-surface);
     --so-appbar: var(--mud-palette-appbar-background);
     --so-appbar-text: var(--mud-palette-appbar-text);
@@ -85,8 +85,8 @@
 
 /* Dark-mode overrides for the things a palette swap cannot express.
 
-   MudBlazor 6.16 signals dark mode only by rewriting --mud-palette-* on :root — it
-   adds no class — and CSS cannot branch on a variable's value. Shared/MainLayout.razor
+   MudBlazor signals dark mode mainly by rewriting --mud-palette-* on :root (6.16
+   added no class) and CSS cannot branch on a variable's value. Shared/MainLayout.razor
    therefore mirrors the active palette onto <html> as .so-dark so these rules have
    something to hook onto. Do not use .mud-theme-dark: that class is never emitted, and
    rules written against it silently do nothing.

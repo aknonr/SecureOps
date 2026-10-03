@@ -41,7 +41,8 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
     // Mirrors ops.OperationalRecordWorkflowHistory and the existence of ops.JiraTransfers rows, so
     // management reporting reads the same transitions SQL would have persisted.
     private readonly List<ReportingWorkflowFact> _history = [];
-    private readonly HashSet<Guid> _transfers = [];
+    // Mirrors ops.JiraTransfers: its own UpdatedAt moves only on create, Jira success and transfer failures.
+    private readonly Dictionary<Guid, ReportingTransferFact> _transfers = [];
     private readonly TimeProvider _timeProvider;
 
     /// <summary>Workflow transitions recorded before <paramref name="toExclusive"/>.</summary>
@@ -59,7 +60,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            return [.. _transfers.Select(id => _records[id]).Select(record => new ReportingTransferFact(record.Id, record.ReconciliationRequired, record.UpdatedAt))];
+            return [.. _transfers.Values];
         }
         finally { _gate.Release(); }
     }
@@ -381,7 +382,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
-            _transfers.Add(id);
+            _transfers[id] = new ReportingTransferFact(id, false, updated.UpdatedAt);
             return new WorkflowAcquireResult(
                 WorkflowAcquireDisposition.Acquired,
                 Commit(updated, OperationalRecordWorkflowState.CreateRequested, OperationalRecordWorkflowState.CreatingJira));
@@ -414,6 +415,7 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
+            _transfers[id] = new ReportingTransferFact(id, false, updated.UpdatedAt);
             return Commit(updated, OperationalRecordWorkflowState.JiraCreated);
         }
         finally
@@ -514,6 +516,12 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 UpdatedAt = _timeProvider.GetUtcNow(),
                 Version = current.Version + 1
             };
+            // SqlOperationalRecordRepository touches the transfer row only for Jira-create failures or reconciliation.
+            if ((stage == WorkflowFailureStage.JiraCreate || reconciliationRequired) && _transfers.ContainsKey(id))
+            {
+                _transfers[id] = new ReportingTransferFact(id, reconciliationRequired, updated.UpdatedAt);
+            }
+
             return Commit(updated, updated.WorkflowState);
         }
         finally

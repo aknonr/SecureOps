@@ -176,8 +176,11 @@ public sealed class FactManagementReportingRepository(IReportingAuditFacts audit
         {
             if (start is { } from && end is { } to && window.Contains(to) && from <= to)
             {
-                // DATEDIFF_BIG(millisecond, ...) counts whole elapsed milliseconds.
-                samples.Add((key, Math.Floor((to - from).TotalMilliseconds)));
+                // DATEDIFF_BIG(millisecond, a, b) counts millisecond boundaries crossed, not elapsed time rounded
+                // down: .0009 -> .0731 is 73, although only 72.2 ms elapsed. Compare whole-millisecond instants.
+                long fromMilliseconds = from.UtcTicks / TimeSpan.TicksPerMillisecond;
+                long toMilliseconds = to.UtcTicks / TimeSpan.TicksPerMillisecond;
+                samples.Add((key, toMilliseconds - fromMilliseconds));
             }
         }
 

@@ -197,8 +197,9 @@
     /// Mirrors the active palette onto the document element as <c>so-dark</c>.
     /// </summary>
     /// <remarks>
-    /// MudBlazor 6.16 signals dark mode only by rewriting the <c>--mud-palette-*</c> values on
-    /// <c>:root</c>; it adds no class, and CSS cannot branch on a variable's value. Custom rules that
+    /// MudBlazor signals dark mode mainly by rewriting the <c>--mud-palette-*</c> values on
+    /// <c>:root</c> (6.16 added no class at all), and CSS cannot branch on a variable's value. This app keeps its
+    /// own class so custom CSS never depends on library class names, which changed across 7-9. Custom rules that
     /// must differ by more than a colour — tint strength and shadow depth, which both need to be
     /// stronger on a dark ground — therefore have nothing to hook onto. This supplies that hook.
     /// <para>

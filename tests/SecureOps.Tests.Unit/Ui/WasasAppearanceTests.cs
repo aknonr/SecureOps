@@ -5,6 +5,25 @@ using SecureOps.Ui.Shared;
 
 namespace SecureOps.Tests.Unit.Ui;
 
+public sealed class MudBlazorCssVariableTests
+{
+    // MudBlazor 7 renamed every "grey" palette variable to "gray"; a stale name resolves to nothing at runtime.
+    [Fact]
+    public void ThemeCss_UsesOnlyCurrentGrayPaletteVariables()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Directory.Build.props")))
+        {
+            root = root.Parent;
+        }
+
+        string css = File.ReadAllText(Path.Combine(root!.FullName, "src", "SecureOps.Ui", "wwwroot", "css", "secureops-theme.css"));
+
+        css.Should().NotMatchRegex(@"--mud-palette-[a-z-]*grey");
+        css.Should().Contain("var(--mud-palette-background-gray)");
+    }
+}
+
 /// <summary>
 /// Pins the two appearance modes and the brand/error colour separation.
 /// </summary>
