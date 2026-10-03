@@ -21,13 +21,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Data access -->
+    <!-- Mail and images -->
     <PackageReference Include="MimeKit" />
     <PackageReference Include="MailKit" />
     <PackageReference Include="SkiaSharp" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+
+    <!-- Data access -->
     <PackageReference Include="Dapper" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
 
@@ -37,21 +36,17 @@
 
     <!-- PowerShell / JEA -->
     <PackageReference Include="Microsoft.PowerShell.SDK" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
 
     <!-- AD lookup -->
     <PackageReference Include="System.DirectoryServices" />
-
-    <!-- Resilience -->
-    <PackageReference Include="Polly" />
-    <PackageReference Include="Microsoft.Extensions.Http.Polly" />
-
-    <!-- AD lookup (Phase 2+) -->
     <PackageReference Include="System.DirectoryServices.AccountManagement" />
 
     <!-- Options + DI helpers -->
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- Named HttpClients for Jira and Turuncu Hat -->
+    <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
 
 </Project>

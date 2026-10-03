@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using SecureOps.Api.Middleware;
 using SecureOps.Api.Security;
@@ -128,6 +129,7 @@ public sealed partial class AccessController : ControllerBase
 
     /// <summary>Approves one pending request and assigns reviewed roles.</summary>
     [HttpPost("requests/{id:guid}/approve")]
+    [EnableRateLimiting(ApiRateLimits.AccessAdministration)]
     [Authorize(Policy = Policies.CanApproveAccessRequests)]
     [ProducesResponseType(typeof(AccessRequestResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -139,6 +141,7 @@ public sealed partial class AccessController : ControllerBase
 
     /// <summary>Rejects one pending request without assigning access.</summary>
     [HttpPost("requests/{id:guid}/reject")]
+    [EnableRateLimiting(ApiRateLimits.AccessAdministration)]
     [Authorize(Policy = Policies.CanApproveAccessRequests)]
     [ProducesResponseType(typeof(AccessRequestResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -150,6 +153,7 @@ public sealed partial class AccessController : ControllerBase
 
     /// <summary>Replaces active application roles for one approved user.</summary>
     [HttpPut("users/{id:guid}/roles")]
+    [EnableRateLimiting(ApiRateLimits.AccessAdministration)]
     [Authorize(Policy = Policies.CanAssignRoles)]
     [ProducesResponseType(typeof(CurrentAccessResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -174,6 +178,7 @@ public sealed partial class AccessController : ControllerBase
 
     /// <summary>Disables application access and revokes active roles immediately.</summary>
     [HttpPost("users/{id:guid}/disable")]
+    [EnableRateLimiting(ApiRateLimits.AccessAdministration)]
     [Authorize(Policy = Policies.CanManageUsers)]
     [ProducesResponseType(typeof(CurrentAccessResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]

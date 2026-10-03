@@ -1,11 +1,14 @@
 # tests/
 
-G-30 build policy: exact SDK 9.0.317 (`global.json`, no roll-forward), C# 12.0,
-analyzer level 9.0, unchanged net8.0 runtime. Build/test without a LangVersion
-command-line override. DPAPI key persistence uses WindowsFact/WindowsTheory;
+Build policy (G-30, moved to .NET 10 on 2026-10-02): exact SDK 10.0.401 (`global.json`, no roll-forward),
+C# 14.0, analyzer level 10.0, `net10.0`. Build/test without a LangVersion command-line override. DPAPI key persistence uses WindowsFact/WindowsTheory;
 Windows runs must execute these cases, not skip them. Portable ephemeral and
 configuration rejection cases run everywhere. No other platform failures are
 waived. See docs/26-ui-backend-contract-gaps.md, G-30.
+
+Test stack (2026-10-03): xunit v3 via `xunit.v3.mtp-off` + `xunit.runner.visualstudio` 4 (VSTest; test
+projects are `Exe`), FluentAssertions 7.2, NSubstitute 6, Test SDK 18, coverlet 10. `xUnit1051`
+(pass `TestContext.Current.CancellationToken`) is suppressed in both test projects pending a separate change.
 
 Numbered-release SQL selection has a focused Windows runner at
 `release/Test-PairedReleaseSqlSelection.ps1`. A new private evidence directory

@@ -1,7 +1,8 @@
+using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using SecureOps.Api.Middleware;
 using SecureOps.Api.OpenApi;
 using SecureOps.Api.Security;
@@ -51,6 +52,7 @@ builder.Services.AddSecureOpsApiAuthentication(
 builder.Services.AddSecureOpsAuthorization(builder.Configuration, !builder.Environment.IsDevelopment());
 builder.Services.Configure<ForwardedHeadersOptions>(options => ReverseProxyConfiguration.Configure(options, builder.Configuration));
 RateLimitingOptions configuredRateLimits = builder.Configuration.GetSection(RateLimitingOptions.SectionName).Get<RateLimitingOptions>() ?? new();
+ApiRateLimits.Validate(configuredRateLimits);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -84,6 +86,8 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(ApiRateLimits.JiraPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraPreview, configuredRateLimits.JiraPreview));
     options.AddPolicy(ApiRateLimits.JiraCreate, context => ApiRateLimits.Partition(context, ApiRateLimits.JiraCreate, configuredRateLimits.JiraCreate));
     options.AddPolicy(ApiRateLimits.WorkflowRetry, context => ApiRateLimits.Partition(context, ApiRateLimits.WorkflowRetry, configuredRateLimits.WorkflowRetry));
+    options.AddPolicy(ApiRateLimits.AccessAdministration, context => ApiRateLimits.Partition(context, ApiRateLimits.AccessAdministration, configuredRateLimits.AccessAdministration));
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context => ApiRateLimits.GlobalPartition(context, configuredRateLimits.Global));
     options.AddPolicy(ApiRateLimits.AnnouncementPreview, context => ApiRateLimits.Partition(context, ApiRateLimits.AnnouncementPreview, new OperationRateLimitOptions { PermitLimit = 120, WindowSeconds = 60 }));
     options.AddPolicy(ApiRateLimits.WorkflowReport, context => ApiRateLimits.Partition(context, ApiRateLimits.WorkflowReport, new OperationRateLimitOptions { PermitLimit = 3, WindowSeconds = 60 }));
     options.AddPolicy("AnnouncementMailConfirm", context => ApiRateLimits.Partition(context, "AnnouncementMailConfirm", new OperationRateLimitOptions { PermitLimit = 6, WindowSeconds = 60 }));
@@ -111,19 +115,9 @@ builder.Services.AddSwaggerGen(options =>
             Scheme = "negotiate",
             Description = "Windows Integrated Authentication / Negotiate. Non-development environments require authentication for Swagger and API endpoints."
         });
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "WindowsAuth"
-                    }
-                },
-                Array.Empty<string>()
-            }
+            [new OpenApiSecuritySchemeReference("WindowsAuth", document)] = []
         });
     }
     if (demoAuthEnabled)
@@ -135,15 +129,9 @@ builder.Services.AddSwaggerGen(options =>
             Name = builder.Configuration["DemoAuth:HeaderName"] ?? "X-SecureOps-Demo-Actor",
             Description = "Demo/Test only. Enter an approved demo actor key; no actor is prefilled."
         });
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "DemoActor" }
-                },
-                Array.Empty<string>()
-            }
+            [new OpenApiSecuritySchemeReference("DemoActor", document)] = []
         });
     }
     if (oidcEnabled)
@@ -155,15 +143,9 @@ builder.Services.AddSwaggerGen(options =>
             BearerFormat = "JWT",
             Description = "Corporate OIDC access token. SecureOps persisted access remains authoritative."
         });
-        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
-            {
-                new OpenApiSecurityScheme
-                {
-                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "OidcBearer" }
-                },
-                Array.Empty<string>()
-            }
+            [new OpenApiSecuritySchemeReference("OidcBearer", document)] = []
         });
     }
 });
@@ -219,13 +201,11 @@ if (swaggerEnabled)
 
 app.MapControllers();
 RouteHandlerBuilder healthEndpoint = app.MapGet("/api/v1/health", () => Results.Ok(new { status = "Healthy" }))
-    .WithName("Health")
-    .WithOpenApi();
+    .WithName("Health");
 RouteHandlerBuilder auditStoreHealthEndpoint = app.MapGet(
         "/api/v1/health/audit-store",
         (AuditHealthReporter reporter) => Results.Ok(reporter.GetHealth()))
-    .WithName("AuditStoreHealth")
-    .WithOpenApi();
+    .WithName("AuditStoreHealth");
 RouteHandlerBuilder persistenceHealthEndpoint = app.MapGet(
         "/api/v1/health/persistence",
         async (SqlPersistenceHealthReporter reporter, CancellationToken cancellationToken) =>
@@ -237,8 +217,7 @@ RouteHandlerBuilder persistenceHealthEndpoint = app.MapGet(
         })
     .WithName("PersistenceHealth")
     .Produces<SqlPersistenceHealthResponse>(StatusCodes.Status200OK)
-    .Produces<SqlPersistenceHealthResponse>(StatusCodes.Status503ServiceUnavailable)
-    .WithOpenApi();
+    .Produces<SqlPersistenceHealthResponse>(StatusCodes.Status503ServiceUnavailable);
 RouteHandlerBuilder identityProviderHealthEndpoint = app.MapGet(
         "/api/v1/health/identity-provider",
         (Microsoft.Extensions.Options.IOptions<IdentityLookupOptions> options) =>
@@ -249,13 +228,11 @@ RouteHandlerBuilder identityProviderHealthEndpoint = app.MapGet(
                 identityOptions.Provider,
                 string.Equals(identityOptions.Provider, "ActiveDirectory", StringComparison.OrdinalIgnoreCase)));
         })
-    .WithName("IdentityProviderHealth")
-    .WithOpenApi();
+    .WithName("IdentityProviderHealth");
 RouteHandlerBuilder enterpriseIntegrationHealthEndpoint = app.MapGet(
         "/api/v1/health/enterprise-integrations",
         (EnterpriseIntegrationDiagnostics diagnostics) => Results.Ok(diagnostics.Get()))
     .WithName("EnterpriseIntegrationHealth")
-    .WithOpenApi()
     .RequireAuthorization(Policies.AdminOnly);
 
 if (!app.Environment.IsDevelopment())

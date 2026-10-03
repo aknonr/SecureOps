@@ -24,8 +24,8 @@
 
   <ItemGroup>
     <!-- OpenAPI / Swagger -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Microsoft.OpenApi" />
 
     <!-- Auth -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
@@ -36,7 +36,6 @@
 
     <!-- Validation -->
     <PackageReference Include="FluentValidation" />
-    <PackageReference Include="FluentValidation.AspNetCore" />
 
     <!-- Logging -->
     <PackageReference Include="Serilog.AspNetCore" />

@@ -103,7 +103,8 @@ public sealed class SdmPilotTests
         else
         {
             f.Options.Pilot.ApprovalReference = "";
-        } (await f.Service.CreateAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeFalse();
+        }
+        (await f.Service.CreateAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeFalse();
         await f.Jira.DidNotReceiveWithAnyArgs().CreateIssueAsync(default!, default);
     }
 

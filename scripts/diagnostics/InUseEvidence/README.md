@@ -163,7 +163,7 @@ or collected evidence into the delivery directory, Git, or web-accessible paths.
 
 ## Host And Authentication
 
-- Approved TEST Windows x64 API/management host, with installed x64 .NET 8
+- Approved TEST Windows x64 API/management host, with installed x64 .NET 10 (.NET 8 for pre-2026-10-02 tools)
   `Microsoft.NETCore.App` AND `Microsoft.AspNetCore.App` shared runtimes. Read
   `dotnet --list-runtimes` and the delivered runtimeconfig/metadata. No SDK,
   repository, Office, SQL migration, IIS change or application installation.

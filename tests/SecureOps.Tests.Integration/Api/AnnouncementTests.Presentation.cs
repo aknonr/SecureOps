@@ -16,7 +16,8 @@ public sealed class AnnouncementSqlCollection;
 
 public sealed class BrowserAnnouncementMailFactAttribute : FactAttribute
 {
-    public BrowserAnnouncementMailFactAttribute()
+    public BrowserAnnouncementMailFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     { if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SECUREOPS_ANNOUNCEMENT_BROWSER_EVIDENCE"))) { Skip = "Opt-in local browser mail evidence not supplied."; } }
 }
 

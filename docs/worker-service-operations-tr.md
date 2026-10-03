@@ -38,7 +38,7 @@ engeli asmayin. Yerel inceleme ZIP'leri kurulum onayi degildir.
 - Binary/config icin Read/Execute; yalniz onayli data dizini icin gerekli yazma/
   donen log silme haklari. SQL/Hangfire mevcut runtime haklari, SCCM/WMI ve TH
   erisimi servis kimliginde dogrulanir. UI arsivi/branding haklari kopyalanmaz.
-- .NET 8 x64 runtime, mevcut Hangfire schema 9 ve paylasilan DB/queue korunur.
+- .NET 10 x64 runtime (2026-10-02 oncesi paketler icin .NET 8), mevcut Hangfire schema 9 ve paylasilan DB/queue korunur.
   `PrepareSchema=false`; uc AnnouncementMail bayragi ve InUseCompletion kapali
   kalir. Servis kurulumunun SQL deltasi yoktur; eslenik urundeki katalog 024 ayridir.
 - appsettings.json zorunlu degildir: yalniz appsettings.Test.json desteklenir.

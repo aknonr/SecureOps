@@ -96,6 +96,30 @@ public sealed class OidcConfigurationValidatorTests
         act.Should().NotThrow();
     }
 
+    [Theory]
+    [InlineData("Disable", true)]
+    [InlineData("useifavailable", true)]
+    [InlineData("Require", true)]
+    [InlineData("Always", false)]
+    [InlineData("1", false)]
+    [InlineData("", false)]
+    public void EnabledOidc_AcceptsOnlyKnownPushedAuthorizationModes(string mode, bool accepted)
+    {
+        Dictionary<string, string?> values = Valid();
+        values["Oidc:PushedAuthorization"] = mode;
+
+        Action act = () => OidcConfigurationValidator.Validate(Configuration(values), "Production");
+
+        if (accepted)
+        {
+            act.Should().NotThrow();
+        }
+        else
+        {
+            act.Should().Throw<InvalidOperationException>().WithMessage("*PushedAuthorization*");
+        }
+    }
+
     private static Dictionary<string, string?> Valid() => new()
     {
         ["Oidc:Enabled"] = "true",

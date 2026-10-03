@@ -39,10 +39,11 @@ public sealed class ApiReleasePackagingContractTests
         string collector = File.ReadAllText(Path.Combine(root, "scripts", "release", "New-InUseEvidencePackage.ps1"));
         collector.Should().Contain("Symbol outside fresh collector staging.").And.Contain("Remove-Item -LiteralPath $symbol.FullName")
             .And.Contain("Test-ApiReleasePayload.ps1");
-        // Schema selection moved to the reviewed 024/025 selector; the publisher must consume its result.
+        // Schema selection moved to the reviewed 024-027 selector; the publisher must consume its result.
         string selector = File.ReadAllText(Path.Combine(root, "scripts", "release", "Get-ReleaseSqlPlan.ps1"));
-        selector.Should().Contain("$last = if ($IncludeServiceAccounts) { 26 } else { 24 }")
-            .And.Contain("Expected the exact complete 001-$last SQL chain; 025/026 must be explicitly reviewed.");
+        selector.Should().Contain("$last = if ($UpgradeFromInstalled026) { 27 } elseif ($IncludeServiceAccounts) { 26 } else { 24 }")
+            .And.Contain("'027 selection requires explicit Service Accounts review.'")
+            .And.Contain("Expected the exact complete 001-$last SQL chain; later migrations must be explicitly reviewed.");
         paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema=$sqlPlan.RequiredSchema")
             .And.Contain("Get-ReleaseSqlPlan.ps1").And.Contain("-IncludeServiceAccounts:$IncludeServiceAccounts")
             .And.Contain("upgradeFromVerified018='019-024'").And.Contain("database-delta")
@@ -76,7 +77,7 @@ public sealed class ApiReleasePackagingContractTests
         validator.Should().Contain("ZIP has duplicate paths")
             .And.Contain("Publish payload is absent from the SHA256 manifest")
             .And.Contain("ZIP SHA256 does not match publish output")
-            .And.Contain("runtimes/win/lib/net8.0/System.DirectoryServices.AccountManagement.dll")
+            .And.Contain("runtimes/win/lib/net10.0/System.DirectoryServices.AccountManagement.dll")
             .And.NotContain("$relativePath:");
     }
 
@@ -86,14 +87,15 @@ public sealed class ApiReleasePackagingContractTests
         string root = FindRepositoryRoot();
         string assetsPath = Path.Combine(root, "src", "SecureOps.Api", "obj", "project.assets.json");
         using var document = JsonDocument.Parse(File.ReadAllText(assetsPath));
-        JsonElement target = document.RootElement.GetProperty("targets").GetProperty("net8.0");
-        JsonElement accountManagement = target.GetProperty("System.DirectoryServices.AccountManagement/8.0.1");
+        JsonElement target = document.RootElement.GetProperty("targets").GetProperty("net10.0");
+        JsonElement accountManagement = target.EnumerateObject()
+            .Single(item => item.Name.StartsWith("System.DirectoryServices.AccountManagement/", StringComparison.Ordinal)).Value;
 
         accountManagement.GetProperty("runtime").TryGetProperty(
-            "lib/net8.0/System.DirectoryServices.AccountManagement.dll",
+            "lib/net10.0/System.DirectoryServices.AccountManagement.dll",
             out _).Should().BeTrue();
         JsonElement windowsAsset = accountManagement.GetProperty("runtimeTargets")
-            .GetProperty("runtimes/win/lib/net8.0/System.DirectoryServices.AccountManagement.dll");
+            .GetProperty("runtimes/win/lib/net10.0/System.DirectoryServices.AccountManagement.dll");
         string? rid = windowsAsset.GetProperty("rid").GetString();
         rid.Should().Be("win");
         accountManagement.GetProperty("dependencies").EnumerateObject().Select(item => item.Name).Should().Contain([

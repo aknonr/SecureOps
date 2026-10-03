@@ -234,7 +234,7 @@ $env:DOTNET_ENVIRONMENT = 'Test'
 dotnet .\SecureOps.Worker.dll
 ```
 
-6. .NET 8 runtime gerekir. `SecureOps job server started` ve yeni SQL heartbeat
+6. Paketin runtimeconfig dosyasindaki runtime gerekir (2026-10-02 sonrasi .NET 10, oncesi .NET 8). `SecureOps job server started` ve yeni SQL heartbeat
    birlikte gorulmelidir; acik konsol tek basina kanit degildir. UI'den tek OCO
    kaynak isi baslatin, ayni queue/job ve terminal SourceJobs sonucunu dogrulayin;
    oneriyi acikca inceleyip uygulayin. Ctrl+C ile `job server stopped` beklenir;
@@ -616,8 +616,8 @@ dotnet --list-runtimes
 whoami
 ```
 
-API/UI için .NET 8 NETCore.App + AspNetCore.App ve IIS Hosting Bundle,
-Worker için .NET 8 NETCore.App gerekir. SDK gerekmez. Mevcut IIS auth,
+API/UI için .NET 10 NETCore.App + AspNetCore.App ve .NET 10 IIS Hosting Bundle (2026-10-02 öncesi paketlerde .NET 8),
+Worker için .NET 10 NETCore.App gerekir. SDK gerekmez. Mevcut IIS auth,
 OIDC/TLS/proxy sınırları, API/UI'nin ayrı kalıcı ringleri ve kimlikleri korunur.
 Paket runtimeconfig/metadata ile gerçek host karşılaştırılır. Git HEAD ve
 yerel paket klasörü kurulu sunucu kanıtı değildir.
@@ -1549,7 +1549,7 @@ When any SQL provider is selected, startup requires Integrated Security without 
 
 ### OIDC Activation-Pending Values
 
-Keep `Oidc__Enabled=false` until the corporate contract is approved. At activation, the UI host requires `Oidc__Authority`, `Oidc__MetadataAddress`, `Oidc__ClientId`, `Oidc__ClientAuthenticationMethod` (`None` or `ClientSecretPost`), conditional `Oidc__ClientSecret`, `Oidc__TokenEndpointRequestFormat`, `Oidc__ApiAudience`, callback/signed-out callback paths, scopes including `openid`, `Oidc__RequireHttpsMetadata=true`, and explicit `Oidc__UsePkce`. `Oidc__EnableRemoteSignOut` remains `false` until operational testing approves logout parameters.
+Keep `Oidc__Enabled=false` until the corporate contract is approved. At activation, the UI host requires `Oidc__Authority`, `Oidc__MetadataAddress`, `Oidc__ClientId`, `Oidc__ClientAuthenticationMethod` (`None` or `ClientSecretPost`), conditional `Oidc__ClientSecret`, `Oidc__TokenEndpointRequestFormat`, `Oidc__ApiAudience`, callback/signed-out callback paths, scopes including `openid`, `Oidc__RequireHttpsMetadata=true`, and explicit `Oidc__UsePkce`. `Oidc__EnableRemoteSignOut` remains `false` until operational testing approves logout parameters. `Oidc__PushedAuthorization` stays `Disable` (the behaviour before .NET 9) until the corporate IdP's PAR endpoint is tested; `UseIfAvailable` or `Require` then keeps authorization parameters out of the browser URL.
 
 The authorization challenge uses a fresh 32-byte Base64URL nonce retained and validated by the ASP.NET Core protected nonce-cookie flow. IdentityModel client telemetry parameters are suppressed. With `Oidc__UsePkce=false`, the authorization request is limited to `response_type`, `client_id`, `scope`, `state`, `redirect_uri`, and `nonce`; enabling PKCE additionally emits the standard challenge parameters.
 

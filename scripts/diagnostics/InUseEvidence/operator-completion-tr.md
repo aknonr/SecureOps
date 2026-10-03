@@ -7,7 +7,7 @@ API katalog 024 gereksinimi bu salt okunur aracin onkosulu degildir.
 
 Yalnız teslimat metadata/hash listesi bu derlemeyi doğruladığında kullanın.
 rc6.24 arşivindeki eski araca `--completion-evidence` eklemek yeterli değildir.
-`tool/` bağımlılık ağacını bütünüyle koruyun. Windows x64 üzerinde .NET 8
+`tool/` bağımlılık ağacını bütünüyle koruyun. Windows x64 üzerinde .NET 10 (2026-10-02 öncesi araçlarda .NET 8)
 NETCore.App ve AspNetCore.App gerekir; SDK, Office veya Windows Service gerekmez.
 
 ## Hazırlık

@@ -11,7 +11,7 @@ An enterprise Windows operations platform that receives monitoring alarms, runs 
 
 > **Status:** The real Turuncu Hat read-only import is deployed and verified in TEST at source `0ec0376`; external writes remain disabled, and deterministic SDM classification plus the broader controlled pilot remain pending.
 > **Owner:** CONTOSO Turkish Technology (placeholder)
-> **Stack:** .NET 8, Blazor Server, SQL Server, PowerShell Remoting + JEA
+> **Stack:** .NET 10 LTS (C# 14), Blazor Server + MudBlazor, SQL Server, PowerShell Remoting + JEA
 > **MVP timeline:** 6–8 weeks
 
 ---

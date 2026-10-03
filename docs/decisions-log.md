@@ -1,5 +1,29 @@
 # Decisions Log
 
+## 2026-10-03 - .NET 10 Windows gates and package refresh (PR #8)
+
+First Windows run of the migration branch: SDK pin moved to 10.0.401 (same 10.0.12 runtime), Release build,
+tests, format and release-packaging dry run pass. Packages refreshed per ADR-0001 Amendment 2 "Package refresh".
+Owner then approved the Swashbuckle 10 OpenAPI snapshot change and removal of the unused JsonSchema.Net.
+
+## 2026-10-02 - Owner direction for the next work (session management, redesigns)
+
+- Session policy becomes admin-adjustable within fixed lower and upper bounds (idle and absolute), audited.
+- When an administrator ends someone's session, that person is signed out: today the API session ends but the UI
+  cookie survives and the next request silently starts a new API session. The UI must drop its cookie and session
+  store on `SessionRevoked`, and the API must not silently restart a session for that browser.
+- ADRs must not block redesign: Jira/SDM, In Use, per-module permission sections and page layouts may be redesigned
+  on .NET 10, amending or superseding their ADRs in the same change.
+- Next steps run in local Claude Code on Windows, which can execute the Windows-only gates.
+
+## 2026-10-02 - .NET 10 migration (ADR-0001 Amendment 2), done by Claude by owner decision
+
+The owner assigned the backend .NET 10 migration to Claude for this change (scoped exception to the default
+Codex ownership). Branch `claude/dotnet10-backend-migration`: SDK 10.0.112 pinned, `net10.0`, C# 14,
+analyzer level 10.0; unused EF Core/Polly/OpenApi packages removed; OIDC PAR kept off by default; per-actor
+global and access-administration rate limits added. Windows/IIS, Negotiate, DPAPI and PowerShell runspace gates
+still need a Windows run before release.
+
 ## 2026-10-01 - Data access: Dapper and numbered SQL scripts retained
 
 Owner decision recorded as ADR-0001 Amendment 1: Dapper with parameterized SQL and numbered, DBA-reviewed scripts

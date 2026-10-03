@@ -28,7 +28,7 @@ public sealed class ServiceAccountImportsController(ServiceAccountService servic
     [RequestSizeLimit(_maxRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = _maxRequestBytes)]
     [ProducesResponseType(typeof(ImportBatchView), StatusCodes.Status200OK)]
-    public async Task<ActionResult<ImportBatchView>> StageAsync([FromForm] IFormFile file, [FromForm] string profile, [FromForm] DateOnly? sourceReportDate,
+    public async Task<ActionResult<ImportBatchView>> StageAsync(IFormFile file, [FromForm] string profile, [FromForm] DateOnly? sourceReportDate,
         [FromForm] string sourceDateProvenance, [FromForm] string? declaredScope, [FromForm] string? declaredDomain, [FromForm] string? sheet,
         [FromForm] string? targetTeam, [FromForm] string? mappingJson, [FromForm] string? coverage, [FromForm] string? coverageOrganizationIds,
         CancellationToken cancellationToken)

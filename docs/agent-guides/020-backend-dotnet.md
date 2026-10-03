@@ -4,13 +4,13 @@ Owner: Codex. Read the README of each project you touch; it records current cont
 
 ## Build settings (from `Directory.Build.props` / `global.json`)
 
-`net8.0`, C# 12 (`LangVersion` pinned), SDK pinned in `global.json` with roll-forward disabled, nullable enabled, warnings as errors, analyzers and code style enforced in build, XML docs required outside tests. Package versions are central in `Directory.Packages.props`. Do not change the toolchain without an ADR.
+`net10.0`, C# 14 (`LangVersion` pinned), analyzer level 10.0, SDK pinned in `global.json` with roll-forward disabled, nullable enabled, warnings as errors, analyzers and code style enforced in build, XML docs required outside tests. Package versions are central in `Directory.Packages.props`. Do not change the toolchain without an ADR.
 
 ## Conventions that are specific here
 
 - **Routes and errors.** Controllers live under `api/v1/<resource>` and return RFC 7807 `ProblemDetails` with a stable `code`, `stage` and `retryable`; never stack traces.
 - **Authorization.** `[Authorize(Policy = Policies.CanX)]` (or the module's own policy class, e.g. `ServiceAccountPolicies`); policies are capability-based. Never check role or group names inline.
-- **Data access.** SQL Server through Dapper with parameters only (ADR-0001, amended 2026-10-01); schema changes are new numbered scripts in `sql/schema/` and `sql/migrations/` with their dependencies stated (see `sql/README.md`). Scripts are never applied by application startup; corporate execution goes through the approved DBA process. There is no ORM model; the unused EF Core package references in Infrastructure are not something to build on, and adopting an ORM needs a new ADR.
+- **Data access.** SQL Server through Dapper with parameters only (ADR-0001, amended 2026-10-01); schema changes are new numbered scripts in `sql/schema/` and `sql/migrations/` with their dependencies stated (see `sql/README.md`). Scripts are never applied by application startup; corporate execution goes through the approved DBA process. There is no ORM; adopting one needs a new ADR.
 - **Concurrency.** Mutable aggregates carry a version; writes send the expected version and a stale write is a 409 that changes nothing.
 - **Idempotency.** External writes (Jira, mail) are preview-first and use durable idempotency keys; an unknown outcome is never retried automatically.
 - **Audit.** State changes and privileged reads write an audit event in the same transaction as the change.

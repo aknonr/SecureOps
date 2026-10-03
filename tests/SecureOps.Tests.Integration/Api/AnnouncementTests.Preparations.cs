@@ -16,7 +16,8 @@ namespace SecureOps.Tests.Integration.Api;
 
 public sealed class PreparationSqlFactAttribute : FactAttribute
 {
-    public PreparationSqlFactAttribute() { if (Environment.GetEnvironmentVariable("SECUREOPS_PREPARATION_SQL") != "1") { Skip = "Requires fresh preparation-only local harness."; } }
+    public PreparationSqlFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber) { if (Environment.GetEnvironmentVariable("SECUREOPS_PREPARATION_SQL") != "1") { Skip = "Requires fresh preparation-only local harness."; } }
 }
 public sealed partial class AnnouncementTests
 {

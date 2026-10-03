@@ -37,7 +37,7 @@ These are business and security constraints, not style preferences. They hold ev
 
 - **Git.** Check branch, HEAD and worktree before changing anything. Never reset, clean, stash, rebase or overwrite work you did not create. Push, open or update PRs, merge or deploy only with the owner's explicit authorization. An authorization stays valid while its scope is unchanged (same branch, PR and kind of operation); a new target, merge, deploy or corporate action needs a new one.
 - **Live systems.** Do not touch IIS, app pools, services, bindings, load balancers, databases or live configuration unless the task explicitly authorizes it. Local work cannot validate corporate AD/PAM/LDAP/SQL/IIS/F5 behaviour; use the deterministic fakes and say what remains unverified.
-- **Decisions.** A change to an architectural or security decision needs a new or amended ADR in `docs/adr/` first. Behaviour changes update the matching doc in the same change.
+- **Decisions.** Record a changed architectural or security decision by amending or superseding its ADR in the same change. An existing ADR is history, not a reason to keep a design the owner wants changed. Behaviour changes update the matching doc in the same change.
 - **Verification.** Run the build and the relevant tests (`docs/agent-guides/090-testing-quality.md`). Report exactly what ran and what did not; never claim an unrun pass. Prefer small, reviewable diffs.
 - **When to ask.** Ask only for a genuinely new owner decision — new scope, a security trade-off, conflicting sources of truth, or an irreversible or outward-facing action not already authorized. Do not re-ask for something already decided or authorized; otherwise decide, state the assumption, and proceed.
 
@@ -45,7 +45,7 @@ These are business and security constraints, not style preferences. They hold ev
 
 | Area | Decision |
 |---|---|
-| Stack | .NET 8 (`net8.0`, C# 12, SDK pinned in `global.json`), ASP.NET Core API, Worker Service — ADR-0001. .NET 8 support ends 2026-11-10; moving to .NET 10 needs an ADR. |
+| Stack | .NET 10 LTS (`net10.0`, C# 14, SDK pinned in `global.json`), ASP.NET Core API, Worker Service — ADR-0001 |
 | UI | Blazor Server + MudBlazor 6.16 (not React/Angular) — ADR-0001, ADR-0007 |
 | Data | SQL Server via Dapper (parameterized SQL) and numbered scripts in `sql/schema/` / `sql/migrations/`; append-only audit — ADR-0001 (amended 2026-10-01) |
 | Jobs | Hangfire on SQL Server, hosted by the Worker — ADR-0003 |
