@@ -234,7 +234,7 @@ $env:DOTNET_ENVIRONMENT = 'Test'
 dotnet .\SecureOps.Worker.dll
 ```
 
-6. .NET 8 runtime gerekir. `SecureOps job server started` ve yeni SQL heartbeat
+6. Paketin runtimeconfig dosyasindaki runtime gerekir (2026-10-02 sonrasi .NET 10, oncesi .NET 8). `SecureOps job server started` ve yeni SQL heartbeat
    birlikte gorulmelidir; acik konsol tek basina kanit degildir. UI'den tek OCO
    kaynak isi baslatin, ayni queue/job ve terminal SourceJobs sonucunu dogrulayin;
    oneriyi acikca inceleyip uygulayin. Ctrl+C ile `job server stopped` beklenir;
@@ -616,8 +616,8 @@ dotnet --list-runtimes
 whoami
 ```
 
-API/UI için .NET 8 NETCore.App + AspNetCore.App ve IIS Hosting Bundle,
-Worker için .NET 8 NETCore.App gerekir. SDK gerekmez. Mevcut IIS auth,
+API/UI için .NET 10 NETCore.App + AspNetCore.App ve .NET 10 IIS Hosting Bundle (2026-10-02 öncesi paketlerde .NET 8),
+Worker için .NET 10 NETCore.App gerekir. SDK gerekmez. Mevcut IIS auth,
 OIDC/TLS/proxy sınırları, API/UI'nin ayrı kalıcı ringleri ve kimlikleri korunur.
 Paket runtimeconfig/metadata ile gerçek host karşılaştırılır. Git HEAD ve
 yerel paket klasörü kurulu sunucu kanıtı değildir.
