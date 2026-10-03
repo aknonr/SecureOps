@@ -54,6 +54,14 @@ try {
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-002-usage-rules.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate 2 replay was not refused.' }
     Write-Host 'candidate 2 replay refused as expected'
+    $hasBootstrap = (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH(N'svcacct.ScopeGrants', N'IsBootstrap') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim()
+    if ($hasBootstrap -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-003-scope-bootstrap.sql'
+        Write-Host 'applied SA-003-scope-bootstrap.sql (candidate 3)'
+    } else { Write-Host 'Scope bootstrap installed through a numbered migration' }
+    & $sqlcmd -S $server -d $database -E -I -b -i 'SA-003-scope-bootstrap.sql' | Out-Null
+    if ($LASTEXITCODE -eq 0) { throw 'Candidate 3 replay was not refused.' }
+    Write-Host 'candidate 3 replay refused as expected'
     if (-not $SkipRoleScripts) {
         Invoke-SaSql -Database $database -File 'SA-API-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-Worker-permissions.sql'
