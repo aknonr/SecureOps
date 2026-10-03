@@ -193,6 +193,24 @@ TEST users that share a first name (or note "no same-named pair available").
 
 Row 35 uses the configured `IdentityLookup` rate-limit window; record the configured value with the result.
 
+Scope setup, import guidance and report layout (2026-10-03). Use the installed system (migrations 024–028 already
+applied; nothing is re-applied). Identities: the operator who will import (holds the module bundle, **no** scope grant
+yet) and a different module administrator.
+
+| # | Caller | Call / screen | Expected |
+|---|---|---|---|
+| 39 | operator without scope | `/service-accounts/imports` | panel "Önce veri kapsamınız tanımlanmalı" with the four steps; no red access error; `GET .../imports` is not called (no `scope` 403 in the API log) |
+| 40 | operator | Modül yönetimi → Kapsam yetkileri → grant to own identity | 403 with the Turkish `selfGrant` explanation; no grant row, audit unchanged |
+| 41 | other module administrator | same tab, empty organization list | info "İlk kurulum…", scope kind preselected "Tüm kurum"; grant to the operator → 200, audit `ServiceAccount.ScopeGranted` |
+| 42 | operator | "Kapsamımı yeniden kontrol et" | the import page opens; step line shows 1–3 once each with hints (no "1. 1."); guide shows three cards, "İlk kurulum" marked "Henüz yapılmadı" |
+| 43 | operator | pick card 1, choose a TEST copy of the tracking workbook, leave provenance empty | "Önizleme oluştur" disabled and "Önizleme için eksik: Tarihin kaynağı seçilmedi…" listed; the date block is highlighted |
+| 44 | operator | choose "Dosyayı ileten e-postanın tarihi", preview, commit | preview and commit as rows 12/20; card 1 then shows "Son aktarım: <date>" |
+| 45 | operator | card 2 with a TEST weekly list (Book1 headers), report date, coverage "Bilinmiyor" | new / observation-update counts; no "bu listede yok"; owner, OR/OCO, plan, notes unchanged |
+| 46 | operator | switch file type after choosing a `.json` file | file cleared with the warning that it does not fit the type |
+| 47 | coordinator | snapshot PDF | A4 landscape; dark title band; shaded section and table header rows; alternating rows; footer "Sayfa n/m"; Turkish letters and dashes correct |
+| 48 | coordinator | snapshot XLSX in **desktop Excel** | opens without a repair prompt; table sheets keep the header row frozen and offer AutoFilter; the "Rapor" sheet starts with the title |
+| 49 | any | page at 390 px and 1440 px | no horizontal scroll; file picker, provenance options and guide cards wrap; the progress line does not push content down |
+
 UI (same identities): the team member opens `/service-accounts` and sees "Takibinizdeki işler"
 first; the account detail shows the participant notice and only the allowed controls.
 
@@ -223,5 +241,5 @@ recurring job is not removed automatically; removing it is an operator decision.
   (module sessions use their own pool.)
 - `SELECT Role, COUNT(*) FROM svcacct.TeamRoles WHERE RevokedAt IS NULL GROUP BY Role;` and
   `SELECT UsageKind, COUNT(*) FROM svcacct.AccountUsages GROUP BY UsageKind;`
-- Screenshots of rows 18–27 and 30–34 at 1440 px and 390 px (TEST directory names only; never commit them to the repository).
+- Screenshots of rows 18–27, 30–34 and 39–49 at 1440 px and 390 px (TEST directory names only; never commit them to the repository).
 - A short list of anything that differed from the expected column.

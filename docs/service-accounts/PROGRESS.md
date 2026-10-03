@@ -9,6 +9,22 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Scope setup, import guidance and report layout (2026-10-03)
+
+Branch `feature/service-accounts-scope-import-ux-20261003` from master `77bcfab` (PR #6, #7, #10 merged; .NET 8; no
+migration added, 024–028 unchanged). Field finding: an administrator with the seven module capabilities still got
+`scope` on the import page. Cause: import needs organization-level **data scope** (`svcacct.ScopeGrants`, kind All or
+Organization) in addition to the Import capability, the page called `GET imports` on open, and self-grants are refused
+by design. Not a backend defect; the self-grant protection is kept. Changes: the import page reads `/me` first and, without
+organization scope, shows how a different module administrator grants it (first setup: "Tüm kurum", preselected on the
+admin tab while no organization exists); Turkish messages for `scope`, `selfGrant`, `corporateIdentity`, `duplicate`,
+`scopeKind`; a three-card guide (tracking workbook once, weekly coordination list, DBA list) that pre-fills the type and
+shows which step was already committed; a single numbered step line with hints (the old list printed "1. 1."); an explained,
+required date-provenance choice; a list of what still blocks the preview; a file picker card; a fixed-height progress
+slot. Reports: PDF in A4 landscape with a title band, Courier-Bold headings, shaded table headers, striped rows and a
+footer, still text-reconcilable with the XLSX; XLSX with a shaded, bordered, frozen header row, AutoFilter (with the
+hidden filter-database names) and the title on the cover sheet. No package added. Windows rows 39–49.
+
 ## Continuation on master and directory name search (2026-10-02)
 
 Branch `feature/service-accounts-continuation-20261002`, cut from master `e670617` (SDK 9.0.317/C# 12, migration 025,
