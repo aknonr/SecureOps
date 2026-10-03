@@ -22,7 +22,8 @@ namespace SecureOps.Tests.Integration.Announcements;
 
 public sealed class MailSqlFactAttribute : FactAttribute
 {
-    public MailSqlFactAttribute() { if (Environment.GetEnvironmentVariable("SECUREOPS_MAIL_SQL_CONNECTION") is null) { Skip = "Requires fresh task-owned 001-020 LocalDB OcoMail harness and loopback SMTP sink."; } }
+    public MailSqlFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber) { if (Environment.GetEnvironmentVariable("SECUREOPS_MAIL_SQL_CONNECTION") is null) { Skip = "Requires fresh task-owned 001-020 LocalDB OcoMail harness and loopback SMTP sink."; } }
 }
 
 public sealed class AnnouncementMailSqlTests

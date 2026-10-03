@@ -15,7 +15,6 @@ using SecureOps.Shared.Configuration;
 using SecureOps.Shared.Contracts.Announcements;
 using SecureOps.Tests.Integration.Sql;
 using SkiaSharp;
-using Xunit.Abstractions;
 
 namespace SecureOps.Tests.Integration.Api;
 

@@ -20,7 +20,8 @@ public sealed class ServiceAccountSqlFactAttribute : FactAttribute
     /// <summary>Environment variable holding the isolated test connection.</summary>
     public const string Variable = "SECUREOPS_SA_SQL_TEST_CONNECTION";
 
-    public ServiceAccountSqlFactAttribute()
+    public ServiceAccountSqlFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Variable)))
         {
