@@ -1,36 +1,32 @@
 @*
     The one way this UI says "waiting for the server".
 
-    Loading was previously written inline on every page, which drifted in size, wording, and whether
-    aria-busy was set at all. Consolidating it means a screen reader announces a pending region the
-    same way everywhere, and the spinner never competes with the content it is standing in for.
-
     Two variants, chosen by how much is unknown:
-      Inline — one region of a rendered page is still resolving; sits in the flow at text size.
-      Block  — the whole panel has nothing to show yet; centred, with room around it.
+      Inline — one region of a rendered page is still resolving; a small spinner and the message sit
+               in the flow at text size.
+      Block  — the whole panel has nothing to show yet; a skeleton in the rough shape of the content
+               holds its place, so the layout does not jump when data arrives and nothing covers the
+               page. (The full-panel flight animation was removed on 2026-10-03: it drew attention to
+               waiting, cost a large SVG per panel and read as a modal.)
+    A non-Bare Inline loader also stands in for a whole panel, so it renders as Block too.
 
-    Always indeterminate. A determinate bar would have to invent a percentage, and no call this UI
-    makes reports progress. See docs/20 §3 on not faking progress.
+    Always indeterminate: no call this UI makes reports progress (docs/20 §3). Both variants carry
+    role="status" with the message, so assistive technology hears the same thing either way.
 *@
-
-@*
-    The Block variant carries the product's flight treatment; Inline keeps the compact spinner.
-    That split is deliberate: a route drawing itself inside a one-line region would be noise, while
-    a panel with nothing in it yet is exactly where the product's own visual language belongs.
-
-    Both announce identically, so the choice is presentation only. SoFlightLoading owns its own
-    role/aria-live, so this wrapper does not add a second live region around it.
-*@
-@if (Variant == LoadingVariant.Block)
+@if (Variant == LoadingVariant.Block || !Bare)
 {
-    <div class="@CssClass">
-        <SoFlightLoading Message="@Message" Bare="true" />
+    <div class="@CssClass" role="status" aria-busy="true" aria-live="polite">
+        <MudSkeleton SkeletonType="SkeletonType.Text" Width="38%" Height="28px" />
+        <MudSkeleton SkeletonType="SkeletonType.Text" Width="92%" />
+        <MudSkeleton SkeletonType="SkeletonType.Text" Width="84%" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="96px" Class="so-loading-block-body" />
+        <span class="so-loading-text">@Message</span>
     </div>
 }
 else
 {
     <div class="@CssClass" role="status" aria-busy="true" aria-live="polite">
-        <MudProgressCircular Indeterminate="true" Size="@SpinnerSize" />
+        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
         <span class="so-loading-text">@Message</span>
     </div>
 }
@@ -63,11 +59,6 @@ else
     [Parameter]
     public bool Bare { get; set; }
 
-    private Size SpinnerSize => Variant == LoadingVariant.Block ? Size.Medium : Size.Small;
-
-    private string CssClass => Variant switch
-    {
-        LoadingVariant.Block => "so-loading so-loading--block",
-        _ => Bare ? "so-loading" : "so-panel so-loading"
-    };
+    // A loader that stands in for a whole panel becomes a skeleton; one inside a panel stays inline.
+    private string CssClass => Variant == LoadingVariant.Block || !Bare ? "so-loading so-loading--block" : "so-loading";
 }

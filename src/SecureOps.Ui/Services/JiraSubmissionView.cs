@@ -150,10 +150,9 @@ public static class JiraSubmissionView
     /// <param name="preview">The held preview, if any.</param>
     /// <returns>Distinct Turkish guidance lines, in server order.</returns>
     public static IReadOnlyList<string> UnsupportedTypeGuidance(OperationalRecordResponse record, JiraPreviewResponse? preview) =>
-        record.BlockingConditions
+        [.. record.BlockingConditions
             .Concat(preview?.BlockingConditions ?? [])
             .Where(UnsupportedTypeCodes.Contains)
             .Select(SdmEvidenceView.Guidance)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
+            .Distinct(StringComparer.Ordinal)];
 }

@@ -169,7 +169,7 @@ public static class ManagementReportView
     /// <param name="report">Report to project.</param>
     /// <returns>One view per duration the server defines, in the server's order.</returns>
     public static IReadOnlyList<DurationView> Durations(ManagementReportResponse report) =>
-        report.OperationalWorkflow.Durations.Select(Duration).ToArray();
+        [.. report.OperationalWorkflow.Durations.Select(Duration)];
 
     /// <summary>
     /// Prepares one duration statistic.
@@ -330,6 +330,10 @@ public static class ManagementReportView
         "HistoryBeforePersistenceUnavailable"
             => "İstenen aralığın bir bölümü, kalıcı kayıt tutulmaya başlanmadan öncesine denk geliyor; "
                + "o bölüm için kanıt yok.",
+
+        "NonDurableReportingSource"
+            => "Bu özetin bir kısmı bellek içi (InMemory) kayıttan üretildi; sunucu yeniden başlayınca silinir "
+               + "ve kalıcı geçmiş kanıtı değildir. SQL'e bağlı kaynaklar kalıcıdır.",
 
         _ => string.IsNullOrWhiteSpace(limitation.Message) ? limitation.Code : limitation.Message
     };

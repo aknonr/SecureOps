@@ -61,3 +61,18 @@ If refresh outruns evaluation persistence, API reads overlay stale/source-change
 DBA review/execution of migration 009 is required before SQL-backed binary upgrade. Its nullable fields are additive and old binaries can ignore them. Existing migrations, append-only triggers, grants, runtime settings, and deployed TEST state remain unchanged. SQL tests are offline contracts; they do not prove live constraint or transaction behavior.
 
 Native ETag/conditional updates, positive category policy, structured attestations, human approval endpoint/persistence, and external-write activation remain pending. Action Center consumes additive evidence and cannot infer approval from reason text. Synthetic provider harnesses remain separate from corporate evaluation and cannot supply corporate eligibility evidence.
+
+## Amendment 1, 2026-10-03: Advisory request-type suggestion
+
+Owner decision: the operator no longer starts from an empty "operator declaration" select. The read
+model adds `suggestedRequestType` (`RequestTypeSuggester`, rules `WASAS-REQUEST-TYPE-HINT-2026.10-v1`):
+explicit Turkish/English keywords in the title or description point to exactly one of ServerRequest,
+SoftwareInstallation or ServerRetirement, and the matched source words are returned so the UI can show
+why. Words for two types, or none, produce no suggestion. Server phrases ("yeni sunucu kurulumu") are
+consumed before installation words so they do not vote twice.
+
+This does not reopen "the evaluator never uses source prose": the suggestion is computed at read time
+outside `SdmEvaluationInput`, is not persisted, hashed, audited or used for classification, and grants
+no eligibility. The review request still carries the type the operator confirmed or changed, which
+remains an operator declaration (`OperatorDeclarationOnly`) and is still checked by the pilot policy
+and mapping rules above. New words or semantics require a new rule version.

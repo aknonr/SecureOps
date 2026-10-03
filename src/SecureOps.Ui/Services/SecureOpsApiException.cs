@@ -8,21 +8,13 @@ namespace SecureOps.Ui.Services;
 /// <see cref="Exception.Message"/> is intentionally the safe title only. Diagnostic detail belongs in
 /// server-side logs; nothing on this exception should be rendered raw.
 /// </remarks>
-public sealed class SecureOpsApiException : Exception
+/// <param name="problem">Translated operator-facing problem.</param>
+/// <param name="innerException">Optional underlying transport exception.</param>
+public sealed class SecureOpsApiException(UiProblem problem, Exception? innerException = null) : Exception(problem.Title, innerException)
 {
-    /// <summary>
-    /// Initializes a new API exception.
-    /// </summary>
-    /// <param name="problem">Translated operator-facing problem.</param>
-    /// <param name="innerException">Optional underlying transport exception.</param>
-    public SecureOpsApiException(UiProblem problem, Exception? innerException = null)
-        : base(problem.Title, innerException)
-    {
-        Problem = problem;
-    }
 
     /// <summary>
     /// Operator-facing translation of the failure.
     /// </summary>
-    public UiProblem Problem { get; }
+    public UiProblem Problem { get; } = problem;
 }

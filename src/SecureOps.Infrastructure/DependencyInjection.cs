@@ -286,7 +286,8 @@ public static class DependencyInjection
         }
         else
         {
-            services.AddSingleton<IOperationalRecordRepository, InMemoryOperationalRecordRepository>();
+            services.AddSingleton<InMemoryOperationalRecordRepository>();
+            services.AddSingleton<IOperationalRecordRepository>(sp => sp.GetRequiredService<InMemoryOperationalRecordRepository>());
             services.AddSingleton<ICommandIdempotencyStore, InMemoryCommandIdempotencyStore>();
         }
 
@@ -299,17 +300,7 @@ public static class DependencyInjection
         services.AddScoped<IManagementReportingService, ManagementReportingService>();
         services.AddScoped<SqlWorkflowReportStore>();
         services.AddScoped<WorkflowReportService>();
-        bool authoritativeReporting = string.Equals(auditProvider, "SqlServer", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(configuration[$"{AccessOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"], "SqlServer", StringComparison.OrdinalIgnoreCase);
-        if (authoritativeReporting)
-        {
-            services.AddScoped<IManagementReportingRepository, SqlManagementReportingRepository>();
-        }
-        else
-        {
-            services.AddSingleton<IManagementReportingRepository, UnavailableManagementReportingRepository>();
-        }
+        AddManagementReportingSources(services, configuration, auditProvider);
 
         return services;
     }
@@ -365,6 +356,45 @@ public static class DependencyInjection
         { services.AddScoped<Announcements.Sources.IAnnouncementServiceSourceClient, Announcements.Sources.FixtureAnnouncementServiceSourceClient>(); }
         else
         { services.AddScoped<Announcements.Sources.IAnnouncementServiceSourceClient, Announcements.Sources.DisabledAnnouncementSourceClient>(); }
+    }
+
+    /// <summary>
+    /// Management reporting reads each evidence stream from wherever that stream is configured (ADR-0011
+    /// Amendment 1): all-SQL keeps the set-based SQL aggregation; any in-memory stream switches to the
+    /// fact-based aggregation and the report states which stream is not durable. File audit cannot be
+    /// queried, so it stays fail-closed.
+    /// </summary>
+    private static void AddManagementReportingSources(IServiceCollection services, IConfiguration configuration, string? auditProvider)
+    {
+        bool sqlAudit = IsSqlServer(auditProvider);
+        bool sqlWorkflow = IsSqlServer(configuration[$"{OperationalRecordsOptions.SectionName}:RepositoryProvider"]);
+        bool fileAudit = string.Equals(auditProvider, "File", StringComparison.OrdinalIgnoreCase);
+
+        if (fileAudit)
+        {
+            services.AddSingleton<IManagementReportingRepository, UnavailableManagementReportingRepository>();
+            return;
+        }
+
+        if (sqlAudit && sqlWorkflow)
+        {
+            services.AddScoped<IManagementReportingRepository, SqlManagementReportingRepository>();
+            return;
+        }
+
+        if (sqlAudit)
+        { services.AddScoped<IReportingAuditFacts, SqlReportingAuditFacts>(); }
+        else
+        { services.AddSingleton<IReportingAuditFacts, InMemoryReportingAuditFacts>(); }
+
+        if (sqlWorkflow)
+        { services.AddScoped<IReportingWorkflowFacts, SqlReportingWorkflowFacts>(); }
+        else
+        { services.AddSingleton<IReportingWorkflowFacts, InMemoryReportingWorkflowFacts>(); }
+
+        services.AddScoped<IManagementReportingRepository, FactManagementReportingRepository>();
+
+        static bool IsSqlServer(string? provider) => string.Equals(provider, "SqlServer", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AddPersistentAuditWriter(IServiceCollection services, IConfiguration configuration)

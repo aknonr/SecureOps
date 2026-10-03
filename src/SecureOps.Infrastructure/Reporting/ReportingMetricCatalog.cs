@@ -92,6 +92,19 @@ public static class ReportingMetricCatalog
         .Distinct(StringComparer.Ordinal)
         .ToArray();
 
+    /// <summary>Retry outcomes that end a retried correlation unsuccessfully.</summary>
+    public static readonly string[] RetryFailureActions = [AuditActions.JiraCreateFailed, AuditActions.OperationalRecordCloseFailed];
+
+    /// <summary>Audit actions whose first occurrence per correlation drives elapsed-time metrics.</summary>
+    public static readonly string[] TimingActions = [AuditActions.OperationalRecordClaimed, AuditActions.JiraCreated, AuditActions.WorkflowCompleted];
+
+    /// <summary>Every action a fact-based (non-SQL-aggregated) summary needs to read.</summary>
+    public static readonly string[] FactActions =
+    [
+        .. SummaryActions.Concat(ActiveUserActions).Concat(RetryFailureActions).Concat(TimingActions)
+            .Append(AuditActions.WorkflowRetried).Distinct(StringComparer.Ordinal)
+    ];
+
     /// <summary>Maps one persisted action to its explainable workflow category.</summary>
     public static string? WorkflowFor(string action)
     {

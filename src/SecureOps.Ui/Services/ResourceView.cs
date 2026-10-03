@@ -76,7 +76,7 @@ public static class ResourceView
     /// collapsing them here would hide an editing mistake rather than surface it.
     /// </remarks>
     public static IReadOnlyList<Guid> LinkIds(ShiftSetResponse set) =>
-        set.Links.Select(link => link.Id).ToArray();
+        [.. set.Links.Select(link => link.Id)];
 
     /// <summary>
     /// Moves a link within an ordered list.
@@ -169,10 +169,9 @@ public static class ResourceView
     /// </remarks>
     public static string? Placement(ResourceLink link)
     {
-        string[] parts = new[] { link.Environment, link.Location }
+        string[] parts = [.. new[] { link.Environment, link.Location }
             .Where(part => !string.IsNullOrWhiteSpace(part))
-            .Select(part => part!.Trim())
-            .ToArray();
+            .Select(part => part!.Trim())];
 
         return parts.Length == 0 ? null : string.Join(" · ", parts);
     }

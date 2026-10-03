@@ -1,7 +1,7 @@
 # SecureOps.Ui
 ## Start here
 
-Blazor Server UI for WASAS SecureOps: `net10.0`, C# 14, SDK pinned in `global.json`, MudBlazor 6.16. It talks
+Blazor Server UI for WASAS SecureOps: `net10.0`, C# 14, SDK pinned in `global.json`, MudBlazor 9.11. It talks
 only to the SecureOps API; the API decides every permission ([the one rule](#the-one-rule-that-shapes-everything)).
 Agent rules: `AGENTS.md`, `CLAUDE.md`, `docs/agent-guides/060-ui.md`.
 
@@ -426,6 +426,14 @@ When an identity provider is approved they become a challenge/callback pair and 
 
 ## Access administration
 
+**Module-based access, 2026-10-03.** `/access/modules` (Yetki haritası) shows each module's actions with the
+roles that grant them, as cards or a sticky role matrix, with search; it is read-only and links to the role
+editor. User detail and Erişimim render `AccessEffectivePanel` from `GET .../effective` (server explanation:
+granted/not granted in words and icons, granting roles, real x/y counts; non-Approved users have nothing
+granted). Erişimim keeps its `/access/me` capability list if the explanation cannot be read. The paged
+user/request lists now also work on the in-memory Demo provider. Browser-checked locally (Demo, InMemory).
+
+
 Three screens, each gated on its own capability, because the API gates them separately: the request
 queue needs `Access.ApproveRequests` while the user read model needs `Access.ManageUsers`. An
 approver without `ManageUsers` sees the queue and no user list.
@@ -465,6 +473,20 @@ demo bridge resolves nothing, so absent is the common case. Fall back to the pri
 identity field, or an em dash placeholder.
 
 ## Operational Record → Jira
+
+**Detail redesign and request-type suggestion, 2026-10-03.** Nav label is "Operasyonel Kayıtlar (OR)".
+The detail page no longer repeats the OR code and title under the header; it opens with one
+"Şimdi ne yapmalısınız?" line derived from re-read state and the held preview (unknown outcome and
+another operator's claim win over everything), then the request (description, requester, server,
+environment, created) as fact tiles. The empty "Talep türü (operatör beyanı)" select is replaced by
+`OrRequestTypeStep`: when the API returns `suggestedRequestType` (ADR-0018 Amendment 1, explicit
+title/description words only, matched words shown) the operator confirms it in one click or changes
+it; choosing a different type shows a warning. Without a suggestion the select (label "Talep türü",
+same `#sdm-request-type`) is shown with an honest "Metinden tür önerilemedi" note. The confirmed type
+is still sent as the operator's declaration and grants nothing. Order is now type → preview/actions →
+SDM evidence → history → folded technical details. The approved single-record policy button moved
+into a fold. Browser journeys were updated to the new label/heading but not run here (Playwright is
+not installed on this machine); render tests cover the three type-step states.
 
 The rule that governs this screen: **an existing Jira issue means create is never offered.**
 `OperationalRecordView.ActionsFor` checks that before any per-state rule, and a unit test asserts it
@@ -634,6 +656,14 @@ Escape are keyboard-operable; heading focus moves with the step and returns to r
 The inline panel adapts to narrow layouts and reduced motion. Highlighting never activates a control;
 missing/hidden targets fall back to working route links. Management instructions require the actual
 server capability. A guide never modifies links/groups/favourites or opens destination sites.
+
+**MudBlazor 9 migration, 2026-10-03.** Central version is `9.11.0`. Compile-level changes: `PaletteLight` and
+`*Typography` theme types, `MudPopoverProvider` in `MainLayout`, `IMudDialogInstance`, immutable `DialogOptions`
+(`BackdropClick = false`), nullable `DialogResult`, `ShowMessageBoxAsync`, `MudHidden.Hidden`, `MudTabs.TabPanelsClass`,
+`MudAutocomplete.SearchFunc`, `IReadOnlyCollection<T>` for `MudSelect.SelectedValues`, the account menu activator
+opening through `MenuContext`, and the Account sign-out button using `Target="_top"` (no `ForceLoad` on `MudButton`).
+Build, format and all unit/render tests pass; interactive menu/select/dialog behaviour and the `_Host.cshtml`
+MudBlazor 6 accessibility bridges still need a browser pass. The assessment below is the earlier record.
 
 **MudBlazor assessment, 2026-09-06.** Keep central `6.16.0` for this milestone. The latest stable
 [9.9.0 package](https://www.nuget.org/packages/MudBlazor/9.9.0) targets .NET 8 (as well as later

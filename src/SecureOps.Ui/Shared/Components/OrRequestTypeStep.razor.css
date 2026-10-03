@@ -1,0 +1,25 @@
+.or-label {
+    display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--so-text-muted);
+}
+/* Suggestion: the system proposes, the operator decides in one click or changes it. */
+.or-suggest {
+    display: flex; gap: 14px; align-items: flex-start; padding: 16px; margin: 8px 0 12px; border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--so-accent) 35%, var(--so-border));
+    background: color-mix(in srgb, var(--so-accent) 6%, var(--so-surface));
+}
+.or-suggest ::deep .or-suggest-icon { flex: none; color: var(--so-accent); margin-top: 2px; }
+.or-suggest-body { min-width: 0; }
+.or-suggest-type { display: block; font-size: 1.2rem; margin: 2px 0 6px; color: var(--so-text); }
+.or-suggest-body p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.or-actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 8px; }
+.or-hint { color: var(--so-text-muted); font-size: 0.88rem; margin: 8px 0 0; }
+.or-type ::deep .mud-alert { margin: 8px 0; }
+.or-more { margin-top: 14px; }
+.or-more > summary { cursor: pointer; color: var(--so-text-muted); font-size: 0.9rem; }
+.or-more > summary:focus-visible { outline: 2px solid var(--so-accent); outline-offset: 2px; }
+
+@media (max-width: 600px) {
+    .or-suggest { flex-direction: column; }
+    .or-actions ::deep .mud-button-root { width: 100%; }
+}

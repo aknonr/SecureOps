@@ -13,21 +13,12 @@ namespace SecureOps.Ui.Services;
 /// non-production demo authentication bridge maps to a role. The handler adds nothing when
 /// demo mode is disabled or when the environment is not Development/Demo.
 /// </remarks>
-public sealed class DemoApiAuthHeaderHandler : DelegatingHandler
+/// <param name="environment">Host environment.</param>
+/// <param name="options">Demo mode options.</param>
+public sealed class DemoApiAuthHeaderHandler(IHostEnvironment environment, IOptions<DemoModeOptions> options) : DelegatingHandler
 {
-    private readonly IHostEnvironment _environment;
-    private readonly DemoModeOptions _options;
-
-    /// <summary>
-    /// Initializes a new demo API auth header handler.
-    /// </summary>
-    /// <param name="environment">Host environment.</param>
-    /// <param name="options">Demo mode options.</param>
-    public DemoApiAuthHeaderHandler(IHostEnvironment environment, IOptions<DemoModeOptions> options)
-    {
-        _environment = environment;
-        _options = options.Value;
-    }
+    private readonly IHostEnvironment _environment = environment;
+    private readonly DemoModeOptions _options = options.Value;
 
     /// <inheritdoc />
     protected override Task<HttpResponseMessage> SendAsync(

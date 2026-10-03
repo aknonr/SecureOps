@@ -21,6 +21,12 @@ public sealed partial class AccessAdminApiClient
     public Task<AccessRoleImpact> PreviewRoleAsync(AccessRoleChange change, CancellationToken cancellationToken) => RoleAsync(change, false, cancellationToken);
     /// <inheritdoc />
     public Task<AccessRoleImpact> SaveRoleAsync(AccessRoleChange change, CancellationToken cancellationToken) => RoleAsync(change, true, cancellationToken);
+    /// <inheritdoc />
+    public Task<AccessModuleOverviewResponse> ModulesAsync(CancellationToken cancellationToken) =>
+        GetAsync<AccessModuleOverviewResponse>("api/v1/access/modules", cancellationToken);
+    /// <inheritdoc />
+    public Task<AccessEffectiveResponse> EffectiveAsync(Guid userId, CancellationToken cancellationToken) =>
+        GetAsync<AccessEffectiveResponse>($"api/v1/access/users/{userId:D}/effective", cancellationToken);
 
     private async Task<AccessRoleImpact> RoleAsync(AccessRoleChange change, bool apply, CancellationToken cancellationToken)
     {

@@ -42,17 +42,9 @@
         }
         <div class="user-access-layout">
             <section aria-label="Geçerli yetkiler">
-                <h2>Atanmış roller</h2>
-                <div class="so-chip-row">@foreach (string role in _user.Roles) { <span class="so-chip">@RoleName(role)</span> }</div>
-                <h2>Yapabileceği işlemler (@_user.Capabilities.Count)</h2>
-                @if (_user.Capabilities.Count == 0) { <p>Tanımlı yetki yok.</p> }
-                @foreach (var group in AccessLabels.Group(_user.Capabilities))
+                @if (_effective is not null)
                 {
-                    <details class="user-capabilities" open>
-                        <summary>@group.Key (@group.Count())</summary>
-                        <dl>@foreach (var capability in group)
-                            { <dt>@capability.Label</dt><dd>@capability.Description<small>Sağlayan: @string.Join(", ", _roleDefinitions.Where(role => _user.Roles.Contains(role.Code) && role.Capabilities.Contains(capability.Capability)).Select(role => RoleName(role.Code)))</small></dd> }</dl>
-                    </details>
+                    <AccessEffectivePanel Effective="_effective" Title="Yapabileceği işlemler" RoleNames="RoleNames" StartWithGrantedOnly="true" />
                 }
             </section>
             <aside>
@@ -92,6 +84,8 @@
     private Guid _requestedUserId;
     private AccessActionDialog.Result? _attempted;
     private IReadOnlyList<AccessRoleDefinition> _roleDefinitions = [];
+    private AccessEffectiveResponse? _effective;
+    private IReadOnlyDictionary<string, string> RoleNames => _roleDefinitions.ToDictionary(role => role.Code, role => RoleName(role.Code));
     [SupplyParameterFromQuery(Name = "returnTo")] public string? ReturnTo { get; set; }
     private string ReturnLink => ReturnTo is not null && (ReturnTo.StartsWith("/access/users?", StringComparison.Ordinal) || ReturnTo.StartsWith("/access/requests?", StringComparison.Ordinal))
         && !ReturnTo.Contains('\\') && !ReturnTo.Contains('\r') && !ReturnTo.Contains('\n') ? ReturnTo : "/access/users";
@@ -146,9 +140,12 @@
 
         try
         {
-            IReadOnlyList<AccessRoleDefinition> definitions = await AccessAdmin.RolesAsync(token);
-            AccessUserResponse user = await AccessAdmin.GetUserAsync(targetId, token);
-            if (!token.IsCancellationRequested && targetId == UserId) { _roleDefinitions = definitions; _user = user; }
+            // Independent reads run together; the page renders only when all three describe the same user.
+            Task<IReadOnlyList<AccessRoleDefinition>> definitions = AccessAdmin.RolesAsync(token);
+            Task<AccessUserResponse> user = AccessAdmin.GetUserAsync(targetId, token);
+            Task<AccessEffectiveResponse> effective = AccessAdmin.EffectiveAsync(targetId, token);
+            await Task.WhenAll(definitions, user, effective);
+            if (!token.IsCancellationRequested && targetId == UserId) { _roleDefinitions = await definitions; _user = await user; _effective = await effective; }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (SecureOpsApiException ex)

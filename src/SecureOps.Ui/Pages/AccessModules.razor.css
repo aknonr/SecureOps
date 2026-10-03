@@ -1,0 +1,70 @@
+.map-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--so-space-3); margin-bottom: var(--so-space-4); }
+.map-toolbar ::deep .map-search { flex: 1 1 280px; max-width: 460px; }
+.map-summary { margin-left: auto; color: var(--so-text-muted); font-size: 0.85rem; }
+
+.map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--so-space-4); }
+
+.map-card {
+    --tone: var(--so-accent);
+    position: relative; display: flex; flex-direction: column; gap: var(--so-space-3);
+    padding: var(--so-space-4); border: 1px solid var(--so-border); border-radius: var(--so-radius-lg);
+    background: var(--so-surface); overflow: hidden;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.map-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--tone); }
+.map-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgb(0 0 0 / 12%); }
+
+.so-tone-0 { --tone: #3b82f6; } .so-tone-1 { --tone: #10b981; } .so-tone-2 { --tone: #f59e0b; }
+.so-tone-3 { --tone: #8b5cf6; } .so-tone-4 { --tone: #ef4444; } .so-tone-5 { --tone: #06b6d4; }
+
+.map-card-head { display: flex; align-items: center; gap: var(--so-space-3); }
+.map-card-head h2 { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--so-text); }
+.map-card-count { font-size: 0.8rem; color: var(--so-text-muted); }
+.map-icon {
+    display: inline-grid; place-items: center; width: 42px; height: 42px; border-radius: 12px;
+    color: var(--tone); background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+.map-guidance { margin: 0; font-size: 0.82rem; color: var(--so-text-muted); }
+
+.map-actions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--so-space-3); }
+.map-actions > li { padding-top: var(--so-space-3); border-top: 1px solid var(--so-border-soft); }
+.map-actions > li:first-child { padding-top: 0; border-top: 0; }
+.map-action-name { font-weight: 600; color: var(--so-text); }
+.map-action-desc { font-size: 0.8rem; color: var(--so-text-muted); margin: 2px 0 6px; }
+.map-action-roles { display: flex; flex-wrap: wrap; gap: 4px; }
+.map-none { font-size: 0.78rem; color: var(--so-text-faint); font-style: italic; }
+.map-tag {
+    margin-left: 6px; padding: 1px 6px; border-radius: 99px; font-size: 0.7rem; font-weight: 600;
+    color: var(--so-warning); background: color-mix(in srgb, var(--so-warning) 14%, transparent);
+}
+
+.map-matrix { overflow: auto; max-height: 72vh; border: 1px solid var(--so-border); border-radius: var(--so-radius-lg); background: var(--so-surface); }
+.map-matrix:focus-visible { outline: 2px solid var(--so-accent); outline-offset: 2px; }
+.map-matrix table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.85rem; }
+.map-matrix thead th {
+    position: sticky; top: 0; z-index: 2; background: var(--so-surface);
+    padding: 10px 8px; border-bottom: 1px solid var(--so-border); color: var(--so-text-muted); font-weight: 600; white-space: nowrap;
+}
+.map-role-head { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.map-matrix .map-matrix-action {
+    position: sticky; left: 0; z-index: 1; background: var(--so-surface); text-align: left;
+    padding: 8px 12px; min-width: 220px; font-weight: 500; color: var(--so-text);
+}
+.map-matrix thead .map-matrix-action { z-index: 3; }
+.map-matrix td { text-align: center; padding: 8px; border-bottom: 1px solid var(--so-border-soft); color: var(--so-text-faint); background: var(--so-surface); }
+.map-matrix td.is-on { color: var(--so-success); background: color-mix(in srgb, var(--so-success) 10%, var(--so-surface)); }
+.map-matrix tbody tr:hover td, .map-matrix tbody tr:hover th { background: var(--so-tint); }
+.map-matrix-module th {
+    --tone: var(--so-accent);
+    text-align: left; padding: 10px 12px; font-weight: 700; color: var(--so-text);
+    background: color-mix(in srgb, var(--tone) 10%, var(--so-surface)); border-bottom: 1px solid var(--so-border);
+}
+
+@media (max-width: 599px) {
+    .map-summary { margin-left: 0; width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .map-card { transition: none; }
+    .map-card:hover { transform: none; }
+}

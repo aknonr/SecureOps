@@ -81,6 +81,29 @@ public partial class InUse
         : CompletedServers < _record.Source.Servers.Count ? "Eksik cevapları tamamlayın; taslağınız korunuyor."
         : "Kaydedilen taslağın Excel önizlemesini ve talebe ekleme koşullarını kontrol edin.";
 
+    /// <summary>Shell, so a blocked navigation can also clear the route indicator it started.</summary>
+    [CascadingParameter] public Shared.MainLayout? Shell { get; set; }
+
+    private static readonly (int Number, string Label)[] _detailSteps =
+        [(1, "Sunucuları incele"), (2, "Cevapları tamamla ve kaydet"), (3, "Excel önizleme ve WASAS adımı")];
+
+    // The step the reviewer is on, derived from the same facts as NextAction so the stepper and the text agree.
+    private int DetailStep => _record is null || _record.Source.Servers.Count == 0 ? 1
+        : _record.Draft is null || _dirty || _record.Status == "Stale" || CompletedServers < _record.Source.Servers.Count ? 2
+        : 3;
+
+    private string DetailTone => _record is null || _record.Discarded || !CanEdit ? "neutral"
+        : _record.Status == "Stale" || _record.SourceObservationMissing || _record.HasActiveExecution ? "warn"
+        : DetailStep == 3 ? "ready" : "todo";
+
+    private string DetailIcon => DetailTone switch
+    {
+        "warn" => Icons.Material.Filled.WarningAmber,
+        "ready" => Icons.Material.Filled.TaskAlt,
+        "todo" => Icons.Material.Filled.EditNote,
+        _ => Icons.Material.Filled.Visibility
+    };
+
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     { AccessProvider.Changed += AccessChanged; _access = await AccessProvider.GetAsync(_lifetime.Token); }
@@ -120,6 +143,29 @@ public partial class InUse
         : record.Status == "Stale" ? "Sunucu incelemesini etkileyen farkları inceleyin; cevaplar korunuyor"
         : record.Source.Servers.Count == 0 ? "Sunucu ilişki kanıtı gerekli"
         : SavedCompleted(record) < record.Source.Servers.Count ? "Eksik cevapları tamamla" : "Excel önizlemesini incele";
+    // Visual tone of the row's next step; mirrors the RowNext branches so colour and text never disagree.
+    private static string RowTone(InUseRecord record) => record.TrackingOnly ? "neutral"
+        : record.HasActiveExecution || record.SourceObservationMissing || record.Status == "Stale" || record.Source.Servers.Count == 0 ? "warn"
+        : SavedCompleted(record) < record.Source.Servers.Count ? "todo" : "ready";
+
+    private static string RowIcon(InUseRecord record) => RowTone(record) switch
+    {
+        "warn" => Icons.Material.Filled.WarningAmber,
+        "todo" => Icons.Material.Filled.EditNote,
+        "ready" => Icons.Material.Filled.TaskAlt,
+        _ => Icons.Material.Filled.Visibility
+    };
+
+    // Distinct RFC requesters of a record, readable at a glance; the full per-server table stays one click away.
+    private static IReadOnlyList<(string Name, string Caption)> RfcReporters(InUseRecord record) =>
+    [
+        .. record.Source.Servers
+            .Select(server => server.RelatedRequestReporter)
+            .Where(reporter => reporter is not null && !string.IsNullOrWhiteSpace(reporter.Display))
+            .GroupBy(reporter => InUseDisplayText.Decode(reporter!.Display!), StringComparer.CurrentCultureIgnoreCase)
+            .Select(group => (group.Key, string.Join(", ", group.Select(r => r!.RequestCode ?? r.RfcReference).Where(code => code is not null).Distinct())))
+    ];
+
     private Task LoadAsync()
     {
         ++_generation;
@@ -175,11 +221,11 @@ public partial class InUse
                 SendAsync<InUseRecord>(HttpMethod.Put, $"/{original.Id}/assignment", request)) }
         };
         IDialogReference dialog = await Dialogs.ShowAsync<InUseAssignmentDialog>("İnceleyici",
-            parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+            parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
         _assignmentDialog = dialog;
-        DialogResult result = await dialog.Result;
+        DialogResult? result = await dialog.Result;
         _assignmentDialog = null;
-        if (result.Canceled || result.Data is not InUseRecord updated || generation != _generation || _record?.Id != original.Id)
+        if (result is null || result.Canceled || result.Data is not InUseRecord updated || generation != _generation || _record?.Id != original.Id)
         { return; }
         if (_dirty)
         {
@@ -207,7 +253,7 @@ public partial class InUse
     {
         if (_record is null)
         { return; }
-        if (_record.Status == "Stale" && await Dialogs.ShowMessageBox("Değişen sunucu bilgilerini yeniden incele",
+        if (_record.Status == "Stale" && await Dialogs.ShowMessageBoxAsync("Değişen sunucu bilgilerini yeniden incele",
             "Kaynak değişiklikleri bölümündeki eski/yeni değerleri kontrol ettiniz mi? Kaydetmek mevcut cevapları yeni kaynak sürümü için onaylar; cevaplar kendiliğinden değiştirilmez.",
             yesText: "Farkları inceledim, cevapları kaydet", cancelText: "İncelemeye dön") != true)
         { return; }
@@ -215,7 +261,7 @@ public partial class InUse
         bool assignmentEdited = AssignmentEdited;
         SetRecord(await SendAsync<InUseRecord>(HttpMethod.Put, $"/{_record.Id}/draft",
             new SaveInUseDraftRequest(_record.Version, _record.SourceVersion,
-                _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence) { Origin = a.Origin }).ToArray(), _notes)
+                [.. _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence) { Origin = a.Origin })], _notes)
             { ReviewedPolicyFingerprint = _acceptPolicy ? _record.PolicyProposal?.Fingerprint : null }));
         if (assignmentEdited)
         { _assignee = assignee; }
@@ -227,7 +273,7 @@ public partial class InUse
         { return; }
         Guid id = _record.Id;
         long version = _record.Version;
-        if (await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikleri geri al",
+        if (await Dialogs.ShowMessageBoxAsync("Kaydedilmemiş değişiklikleri geri al",
             $"{_record.Source.Code}: yalnızca kaydedilmemiş cevaplar son kayıtlı taslağa dönecek. Arşiv ve kaynak kaydı değişmez.",
             yesText: "Geri al", cancelText: "Vazgeç") != true)
         { return; }
@@ -248,7 +294,7 @@ public partial class InUse
         Guid id = _record.Id;
         long version = _record.Version;
         string label = action switch { "Discard" => "Taslağı kaldır", "Restart" => "Yeniden başla", _ => "Kayıtlı cevapları sıfırla" };
-        if (await Dialogs.ShowMessageBox(label,
+        if (await Dialogs.ShowMessageBoxAsync(label,
             $"{_record.Source.Code}: {_record.Source.Servers.Count} sunucunun cevapları ve kabul edilmiş önerileri temizlenecek. Önceki sürümler ve Excel arşivleri korunur. Kaynak kaydı silinmez, dış işlemler geri alınmaz.",
             yesText: label, cancelText: "Vazgeç") != true)
         { return; }
@@ -265,7 +311,7 @@ public partial class InUse
     {
         if (_comparison is null || _record is null)
         { return; }
-        AnswerEdit[] local = _answers.ToArray();
+        AnswerEdit[] local = [.. _answers];
         bool answersEdited = _dirty && !_comparison.Discarded && _comparison.InvalidatedReviewsThrough < _record.Version, assignmentEdited = AssignmentEdited;
         string assignee = _assignee;
         SetRecord(_comparison);
@@ -330,7 +376,7 @@ public partial class InUse
         { return; }
         _report = await SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
             new ExportInUseRequest(_record.Version, Archive: archivedVersion is null, ArchivedVersion: archivedVersion));
-        _record = _record with { ArchivedVersions = _record.ArchivedVersions.Append(_report.Version).Distinct().OrderDescending().ToArray() };
+        _record = _record with { ArchivedVersions = [.. _record.ArchivedVersions.Append(_report.Version).Distinct().OrderDescending()] };
         _notice = "Rapor WASAS arşivinde korunuyor. İndirme konumunu tarayıcınız belirler.";
         try
         {
@@ -345,7 +391,7 @@ public partial class InUse
     private bool Ready()
     {
         _answerView = "all";
-        InUseAnswer? missing = InUseChecks.Missing(_record!.Source, _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, "")).ToArray());
+        InUseAnswer? missing = InUseChecks.Missing(_record!.Source, [.. _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, ""))]);
         if (missing is not null)
         {
             _editingServer = missing.ServerId;
@@ -402,23 +448,23 @@ public partial class InUse
         _history = null;
         _reuseSelection.Clear();
         _rowElements.Clear();
-        _answers = record.Source.Servers.SelectMany(server => InUseChecks.OperatorCodes.Select(check =>
+        _answers = [.. record.Source.Servers.SelectMany(server => InUseChecks.OperatorCodes.Select(check =>
         {
             InUseAnswer? saved = record.Draft?.Answers.FirstOrDefault(a => a.ServerId == server.Id && a.Check == check);
             return new AnswerEdit(server.Id, check) { Value = saved?.Value ?? "Unknown", Evidence = saved?.Evidence ?? "", Origin = saved?.Origin };
-        })).ToList();
+        }))];
     }
     private void SelectServer(string id, ChangeEventArgs args)
     { if (args.Value is true) { _selected.Add(id); } else { _selected.Remove(id); } _changes = null; }
-    private void PreviewBulk() => _changes = _answers.Where(a => _selected.Contains(a.ServerId))
+    private void PreviewBulk() => _changes = [.. _answers.Where(a => _selected.Contains(a.ServerId))
         .Select(a => (Target: a, Before: a.Value, After: _answers.Single(s => s.ServerId == _editingServer && s.Check == a.Check).Value))
-        .Where(c => c.Before != c.After).ToArray();
+        .Where(c => c.Before != c.After)];
     private async Task ApplyBulk()
     {
         if (!CanEdit || _changes is null)
         { return; }
         (AnswerEdit Target, string Before, string After)[] changes = _changes;
-        if (await Dialogs.ShowMessageBox("Seçili sunucuların cevaplarını değiştir",
+        if (await Dialogs.ShowMessageBoxAsync("Seçili sunucuların cevaplarını değiştir",
             $"{changes.Select(c => c.Target.ServerId).Distinct().Count()} sunucuda {changes.Length} gösterilen cevap değişecek. Diğer cevaplar korunacak.",
             yesText: "Gösterilen değişiklikleri uygula", cancelText: "Vazgeç") != true)
         { return; }
@@ -499,10 +545,10 @@ public partial class InUse
         if (Navigation.ToAbsoluteUri(context.TargetLocation).GetLeftPart(UriPartial.Path) == Navigation.ToAbsoluteUri("session-expired").GetLeftPart(UriPartial.Path))
         { ++_generation; ClearRecord(); return; }
         if (_busy)
-        { context.PreventNavigation(); _notice = "İşlem sürüyor. Sonucu gördükten sonra sayfadan ayrılabilirsiniz."; return; }
-        if (HasUnsaved && await Dialogs.ShowMessageBox("Kaydedilmemiş değişiklikler",
+        { context.PreventNavigation(); Shell?.CancelPendingNavigation(); _notice = "İşlem sürüyor. Sonucu gördükten sonra sayfadan ayrılabilirsiniz."; return; }
+        if (HasUnsaved && await Dialogs.ShowMessageBoxAsync("Kaydedilmemiş değişiklikler",
             "Kaydedilmemiş cevaplar ve atama gerekçesi silinecek.", yesText: "Ayrıl", cancelText: "Sayfada kal") != true)
-        { context.PreventNavigation(); }
+        { context.PreventNavigation(); Shell?.CancelPendingNavigation(); }
     }
     /// <inheritdoc />
     public void Dispose() { AccessProvider.Changed -= AccessChanged; ++_generation; _lifetime.Cancel(); _lifetime.Dispose(); }

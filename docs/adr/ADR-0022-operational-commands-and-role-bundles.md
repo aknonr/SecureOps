@@ -2,6 +2,18 @@
 
 Status: approved for local implementation by owner continuation, 2026-09-15.
 
+## Owner Amendment: Module-Based Access View, 2026-10-03
+
+Administrators see access per product module. `GET /api/v1/access/modules` lists every registered action
+in catalog module order with the business roles that grant it; `GET /api/v1/access/users/{id}/effective`
+and `GET /api/v1/access/me/effective` explain one user's actions as granted/not granted with the assigned
+roles that grant each. Both are read-only projections (`AccessModuleView`): persisted user capabilities are
+the authority, roles only explain them, a non-Approved user has nothing granted, and a persisted
+capability outside the catalog is shown under "Diğer" instead of hidden. Role definitions are read through
+`IAccessRepository.GetRoleDefinitionsAsync` for every provider; role editing stays SQL-only with the
+existing preview, protection, self-escalation and last-administrator guards. No capability, role or SQL
+object is added.
+
 ## Owner Amendment: Administrative Page Access, 2026-10-02
 
 The genuine system-administrator is an Approved application user with an active

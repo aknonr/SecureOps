@@ -2,12 +2,27 @@ using FluentAssertions;
 using MudBlazor;
 using SecureOps.Ui.Shared;
 
-// MudBlazor 6.16 exposes the light palette as MudTheme.Palette and marks it obsolete in favour of
-// the PaletteLight *type*, which is what the theme assigns. Reading it back is the only way to
-// assert the light palette until MudBlazor splits the property.
-#pragma warning disable CS0618
 
 namespace SecureOps.Tests.Unit.Ui;
+
+public sealed class MudBlazorCssVariableTests
+{
+    // MudBlazor 7 renamed every "grey" palette variable to "gray"; a stale name resolves to nothing at runtime.
+    [Fact]
+    public void ThemeCss_UsesOnlyCurrentGrayPaletteVariables()
+    {
+        DirectoryInfo? root = new(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Directory.Build.props")))
+        {
+            root = root.Parent;
+        }
+
+        string css = File.ReadAllText(Path.Combine(root!.FullName, "src", "SecureOps.Ui", "wwwroot", "css", "secureops-theme.css"));
+
+        css.Should().NotMatchRegex(@"--mud-palette-[a-z-]*grey");
+        css.Should().Contain("var(--mud-palette-background-gray)");
+    }
+}
 
 /// <summary>
 /// Pins the two appearance modes and the brand/error colour separation.
@@ -68,15 +83,15 @@ public sealed class WasasAppearanceTests
     public void LightAndDarkShareOneLightPalette()
     {
         // Switching to Dark and back must not change what Light looks like.
-        SecureOpsTheme.For(AppearanceMode.Dark).Palette.Primary.Value
-            .Should().Be(SecureOpsTheme.For(AppearanceMode.Light).Palette.Primary.Value);
+        SecureOpsTheme.For(AppearanceMode.Dark).PaletteLight.Primary.Value
+            .Should().Be(SecureOpsTheme.For(AppearanceMode.Light).PaletteLight.Primary.Value);
     }
 
     [Fact]
     public void PrimaryAction_IsTheBrandRedInEveryMode()
     {
         // MudBlazor normalises to eight digits with an alpha pair, so compare the RGB prefix.
-        Rgb(SecureOpsTheme.For(AppearanceMode.Light).Palette.Primary.Value)
+        Rgb(SecureOpsTheme.For(AppearanceMode.Light).PaletteLight.Primary.Value)
             .Should().Be(Rgb(SecureOpsTheme.BrandRed));
 
         foreach (AppearanceMode mode in new[] { AppearanceMode.Dark })
@@ -92,8 +107,8 @@ public sealed class WasasAppearanceTests
         // Separated on luminance, in the direction each ground needs: darker than brand on light,
         // lighter than brand on dark. Hue alone would not survive a glance.
         MudTheme light = SecureOpsTheme.For(AppearanceMode.Light);
-        Luminance(light.Palette.Error.Value)
-            .Should().BeLessThan(Luminance(light.Palette.Primary.Value));
+        Luminance(light.PaletteLight.Error.Value)
+            .Should().BeLessThan(Luminance(light.PaletteLight.Primary.Value));
 
         foreach (AppearanceMode mode in new[] { AppearanceMode.Dark })
         {
@@ -147,4 +162,3 @@ public sealed class WasasAppearanceTests
     }
 }
 
-#pragma warning restore CS0618

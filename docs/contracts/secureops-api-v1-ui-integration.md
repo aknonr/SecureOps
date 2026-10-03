@@ -232,6 +232,9 @@ No migration or runtime grant is added; baseline remains 001-011.
 | `GET /api/v1/access/requests?status=Pending` | `Access.ApproveRequests` | optional `Pending`, `Approved`, or `Rejected` query | enriched `AccessRequestResponse[]` with decision actor/version | `AccessValidationFailed` |
 | `GET /api/v1/access/users` | `Access.ManageUsers` | none | authoritative `AccessUserResponse[]` | 403, `AuditStoreUnavailable` |
 | `GET /api/v1/access/users/{id}` | `Access.ManageUsers` | route GUID | `AccessUserResponse` with roles, capabilities, latest request, history, profile, version | `AccessRecordNotFound` |
+| `GET /api/v1/access/users/{id}/effective` | `Access.ManageUsers` | route GUID | `AccessEffectiveResponse`: per module, each registered action with `granted` and `viaRoles`; nothing is granted unless status is Approved | `AccessRecordNotFound`, 403 |
+| `GET /api/v1/access/me/effective` | Authenticated | none | the caller's own `AccessEffectiveResponse` (read-only explanation; grants nothing) | 401 |
+| `GET /api/v1/access/modules` | any of `Access.ManageUsers` / `Access.AssignRoles` / `Access.ApproveRequests` | none | `AccessModuleOverviewResponse`: modules in catalog order, each action with `grantedByRoles`, plus current role definitions | 403 |
 | `POST /api/v1/access/requests/{id}/approve` | `Access.ApproveRequests` | `{ "reason": "...", "roles": ["Operator"], "expectedVersion": 1 }` | decided `AccessRequestResponse` | validation, not found, already decided, concurrency, self-approval codes |
 | `POST /api/v1/access/requests/{id}/reject` | `Access.ApproveRequests` | `{ "reason": "...", "roles": null, "expectedVersion": 1 }` | decided `AccessRequestResponse` | same decision codes |
 | `PUT /api/v1/access/users/{id}/roles` | `Access.AssignRoles` | `{ "roles": ["Lead"], "reason": "...", "expectedVersion": 2 }` | `CurrentAccessResponse` | validation, not found, user state, concurrency codes |
@@ -362,7 +365,7 @@ The v1 wire contract intentionally serializes Operational Record enums as intege
 
 | Method and route | Capability | Request | Success | Important errors |
 |---|---|---|---|---|
-| `GET /api/v1/reporting/management/summary` | `Reporting.ManagementView` | `window=today|7d|30d|custom`; custom also requires UTC `from` and `to` | bounded team-level identity, workflow, adoption, session-governance, security, and elapsed-duration aggregates | `ReportingValidationFailed`, non-retryable `ReportingPersistenceNotConfigured`, retryable `ReportingUnavailable`, `AuditStoreUnavailable` |
+| `GET /api/v1/reporting/management/summary` | `Reporting.ManagementView` | `window=today|7d|30d|custom`; custom also requires UTC `from` and `to` | bounded team-level identity, workflow, adoption, session-governance, security, and elapsed-duration aggregates | `ReportingValidationFailed`, non-retryable `ReportingPersistenceNotConfigured` (File audit only; in-memory streams return a report with limitation `NonDurableReportingSource`, ADR-0011 Amd. 1), retryable `ReportingUnavailable`, `AuditStoreUnavailable` |
 | `GET /api/v1/reporting/management/operators` | `Reporting.ManagementView` | same window plus `page` and `pageSize` (maximum 100) | server-paginated persisted actor counts and activity bounds | same reporting errors |
 
 Only Admin and Auditor receive this capability. Windows are UTC half-open intervals and custom ranges are capped at 92 days. Duration fields are elapsed system workflow time, not active labor or time saved. Operator data must not be rendered as rankings or performance comparisons.

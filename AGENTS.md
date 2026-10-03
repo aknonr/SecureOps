@@ -46,7 +46,7 @@ These are business and security constraints, not style preferences. They hold ev
 | Area | Decision |
 |---|---|
 | Stack | .NET 10 LTS (`net10.0`, C# 14, SDK pinned in `global.json`), ASP.NET Core API, Worker Service — ADR-0001 |
-| UI | Blazor Server + MudBlazor 6.16 (not React/Angular) — ADR-0001, ADR-0007 |
+| UI | Blazor Server + MudBlazor 9.11 (not React/Angular) — ADR-0001, ADR-0007 |
 | Data | SQL Server via Dapper (parameterized SQL) and numbered scripts in `sql/schema/` / `sql/migrations/`; append-only audit — ADR-0001 (amended 2026-10-01) |
 | Jobs | Hangfire on SQL Server, hosted by the Worker — ADR-0003 |
 | Automation | PowerShell Remoting + JEA only; Ansible optional from Phase 6 — ADR-0003 |

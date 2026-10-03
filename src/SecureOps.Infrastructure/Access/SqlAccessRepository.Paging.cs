@@ -11,7 +11,7 @@ public sealed partial class SqlAccessRepository
     /// <summary>Queries only the requested page; profile values are persisted authentication evidence.</summary>
     public async Task<AccessPage<AccessUserResponse>> PageUsersAsync(AccessPageQuery query, CancellationToken cancellationToken)
     {
-        ValidatePage(query, ["Pending", "Approved", "Disabled", "Rejected"]);
+        AccessPageFilter.Validate(query, AccessPageFilter.UserStatuses);
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
@@ -45,7 +45,7 @@ public sealed partial class SqlAccessRepository
     /// <summary>Request state filters are independent of the user's approval state.</summary>
     public async Task<AccessPage<AccessRequestResponse>> PageRequestsAsync(AccessPageQuery query, CancellationToken cancellationToken)
     {
-        ValidatePage(query, ["Pending", "Approved", "Rejected", "Cancelled"]);
+        AccessPageFilter.Validate(query, AccessPageFilter.RequestStatuses);
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
@@ -68,15 +68,6 @@ public sealed partial class SqlAccessRepository
         }
         await transaction.CommitAsync(cancellationToken);
         return new(items, count, query.Page, query.PageSize);
-    }
-
-    private static void ValidatePage(AccessPageQuery query, string[] statuses)
-    {
-        if (query.Page is < 1 or > 1000000 || query.PageSize is < 1 or > 100 || query.Search?.Length > 128 ||
-            query.Role?.Length > 64 || (query.Status is not null && !statuses.Contains(query.Status, StringComparer.Ordinal)))
-        {
-            throw new ArgumentException("Invalid bounded access query.", nameof(query));
-        }
     }
 
     private static object PageParameters(AccessPageQuery query) => new

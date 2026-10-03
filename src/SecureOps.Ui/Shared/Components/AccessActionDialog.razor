@@ -128,7 +128,7 @@
     public sealed record Result(string Reason, IReadOnlyList<string> Roles, IReadOnlyDictionary<string, long>? RoleVersions = null);
 
     [CascadingParameter]
-    private MudDialogInstance Dialog { get; set; } = null!;
+    private IMudDialogInstance Dialog { get; set; } = null!;
 
     /// <summary>Which write is being confirmed.</summary>
     [Parameter, EditorRequired]

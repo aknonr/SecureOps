@@ -1,0 +1,176 @@
+@page "/access/modules"
+@attribute [Authorize]
+@implements IDisposable
+@using SecureOps.Ui.Shared
+@inject ICurrentAccessProvider AccessProvider
+@inject IAccessAdminApiClient AccessAdmin
+
+@*
+    Read-only map of authority: which module offers which action, and which business roles grant it
+    (GET /api/v1/access/modules). Nothing here grants or edits access; role changes stay on the reviewed
+    preview/apply flow of "Rol tanımları".
+*@
+
+<PageTitle>Yetki haritası · @WasasBrand.Name</PageTitle>
+<div class="so-page so-page--wide">
+    <SoPageHeader Title="Yetki haritası"
+                  Lead="Her modülde hangi işlemlerin olduğunu ve bu işlemleri hangi rollerin verdiğini tek ekranda görün.">
+        <Actions>
+            <MudButton Href="access/users" StartIcon="@Icons.Material.Filled.Group">Kullanıcılar</MudButton>
+            @if (_access?.Can(Capabilities.AccessAssignRoles) == true)
+            {
+                <MudButton Href="access/roles" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Tune">Rolleri düzenle</MudButton>
+            }
+        </Actions>
+    </SoPageHeader>
+
+    @if (_access is null) { <SoLoading Message="Yetkiler doğrulanıyor" /> }
+    else if (!IsAdministrator)
+    { <MudAlert Severity="Severity.Warning">Yetki haritası için kullanıcı yönetimi, rol atama veya talep onaylama yetkilerinden biri gerekir.</MudAlert> }
+    else if (_problem is not null) { <SoProblemPanel Problem="_problem" /> }
+    else if (_overview is null) { <SoLoading Message="Yetki haritası yükleniyor" /> }
+    else
+    {
+        <div class="map-toolbar">
+            <MudTextField T="string" @bind-Value="_search" Immediate="true" DebounceInterval="150" Clearable="true"
+                          Placeholder="İşlem, açıklama veya rol ara…" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="map-search" aria-label="Yetki haritasında ara" />
+            <MudToggleGroup T="string" @bind-Value="_view" Color="Color.Primary" Size="Size.Small" aria-label="Görünüm">
+                <MudToggleItem Value="@("modules")" Text="Modüller" />
+                <MudToggleItem Value="@("matrix")" Text="Rol matrisi" />
+            </MudToggleGroup>
+            <span class="map-summary">@_overview.Modules.Count modül · @ActionCount işlem · @_overview.Roles.Count rol</span>
+        </div>
+
+        @if (!FilteredModules.Any())
+        {
+            <SoEmptyState Title="Eşleşen işlem yok" Description="Aramayı değiştirin veya temizleyin." />
+        }
+        else if (_view == "matrix")
+        {
+            <div class="map-matrix" role="region" aria-label="Rol matrisi" tabindex="0">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col" class="map-matrix-action">İşlem</th>
+                            @foreach (AccessRoleDefinition role in _overview.Roles)
+                            {
+                                <th scope="col" title="@role.Code"><span class="map-role-head">@RoleName(role.Code)</span></th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (AccessModuleResponse module in FilteredModules)
+                        {
+                            <tr class="map-matrix-module @AccessLabels.ModuleTone(module.Module)">
+                                <th scope="rowgroup" colspan="@(_overview.Roles.Count + 1)">
+                                    <MudIcon Icon="@AccessLabels.ModuleIcon(module.Module)" Size="Size.Small" aria-hidden="true" /> @module.Module
+                                </th>
+                            </tr>
+                            @foreach (AccessModuleActionResponse action in module.Actions)
+                            {
+                                <tr>
+                                    <th scope="row" class="map-matrix-action" title="@action.Description">@action.Name</th>
+                                    @foreach (AccessRoleDefinition role in _overview.Roles)
+                                    {
+                                        bool grants = action.GrantedByRoles.Contains(role.Code, StringComparer.Ordinal);
+                                        <td class="@(grants ? "is-on" : null)">
+                                            @if (grants) { <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" aria-hidden="true" /><span class="sr-only">Verir</span> }
+                                            else { <span aria-hidden="true">·</span><span class="sr-only">Vermez</span> }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="map-grid">
+                @foreach (AccessModuleResponse module in FilteredModules)
+                {
+                    <article class="map-card @AccessLabels.ModuleTone(module.Module)">
+                        <header class="map-card-head">
+                            <span class="map-icon" aria-hidden="true"><MudIcon Icon="@AccessLabels.ModuleIcon(module.Module)" /></span>
+                            <div>
+                                <h2>@module.Module</h2>
+                                <span class="map-card-count">@module.Actions.Count işlem</span>
+                            </div>
+                        </header>
+                        @if (AccessLabels.ModuleGuidance(module.Module) is { } guidance) { <p class="map-guidance">@guidance</p> }
+                        <ul class="map-actions">
+                            @foreach (AccessModuleActionResponse action in module.Actions)
+                            {
+                                <li>
+                                    <div class="map-action-name">
+                                        @action.Name
+                                        @if (!action.Assignable) { <span class="map-tag">Yeni role eklenemez</span> }
+                                    </div>
+                                    <div class="map-action-desc">@action.Description</div>
+                                    <div class="map-action-roles">
+                                        @if (action.GrantedByRoles.Count == 0) { <span class="map-none">Hiçbir rol vermiyor</span> }
+                                        @foreach (string role in action.GrantedByRoles)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" title="@role">@RoleName(role)</MudChip>
+                                        }
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </article>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private AccessSnapshot? _access;
+    private AccessModuleOverviewResponse? _overview;
+    private UiProblem? _problem;
+    private string? _search;
+    private string _view = "modules";
+
+    private bool IsAdministrator => _access is not null
+        && (_access.Can(Capabilities.AccessManageUsers) || _access.Can(Capabilities.AccessAssignRoles) || _access.Can(Capabilities.AccessApproveRequests));
+
+    private int ActionCount => _overview?.Modules.Sum(module => module.Actions.Count) ?? 0;
+
+    private IEnumerable<AccessModuleResponse> FilteredModules => (_overview?.Modules ?? [])
+        .OrderBy(module => AccessLabels.ModuleOrder(module.Module))
+        .Select(module => module with { Actions = [.. module.Actions.Where(Matches)] })
+        .Where(module => module.Actions.Count > 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        AccessProvider.Changed += AccessChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _access = await AccessProvider.GetAsync(CancellationToken.None);
+        if (!IsAdministrator) { return; }
+        try { _overview = await AccessAdmin.ModulesAsync(CancellationToken.None); _problem = null; }
+        catch (SecureOpsApiException exception) { _problem = exception.Problem; }
+    }
+
+    private bool Matches(AccessModuleActionResponse action)
+    {
+        if (string.IsNullOrWhiteSpace(_search)) { return true; }
+        string term = _search.Trim();
+        return action.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase)
+            || action.Description.Contains(term, StringComparison.CurrentCultureIgnoreCase)
+            || action.Code.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || action.GrantedByRoles.Any(role => RoleName(role).Contains(term, StringComparison.CurrentCultureIgnoreCase));
+    }
+
+    private string RoleName(string code) =>
+        _overview?.Roles.FirstOrDefault(role => role.Code == code) is { Name: { Length: > 0 } name } && name != code ? name : AccessLabels.RoleLabel(code);
+
+    private void AccessChanged() => _ = InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+
+    public void Dispose() => AccessProvider.Changed -= AccessChanged;
+}

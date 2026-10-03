@@ -178,41 +178,125 @@
             </section>
         }
 
-        <section class="so-review-summary" data-guide="review-summary">
-            <h2 class="so-panel-title">Talep incelemesi</h2>
-            <p><strong>@_record.OrCode</strong> · @_record.Title</p>
-            <p class="so-review-description">@_record.Description</p>
-            <SoStatusBadge Label="@OperationalRecordView.StateLabel(_record)" Tone="@OperationalRecordView.StateTone(_record)" />
+        @* One sentence, always visible: what the operator should do now on this record. *@
+        <div class="or-next or-next--@NextTone(owner)" role="status">
+            <MudIcon Icon="@NextIcon(owner)" aria-hidden="true" />
+            <div><span class="or-label">Şimdi ne yapmalısınız?</span><strong>@NextAction(owner)</strong></div>
+        </div>
+
+        @* The header already names the OR and its title; this states the request itself, once. *@
+        <section class="so-review-summary or-summary" data-guide="review-summary" aria-labelledby="or-summary-title">
+            <div class="or-summary-head">
+                <h2 id="or-summary-title" class="so-panel-title">Talep</h2>
+                <SoStatusBadge Label="@OperationalRecordView.StateLabel(_record)" Tone="@OperationalRecordView.StateTone(_record)" />
+            </div>
+            <p class="so-review-description or-description">@_record.Description</p>
+            <div class="or-facts">
+                <div class="or-fact"><span class="or-label">Talep eden</span><SoPerson Name="@_record.Requester" Fallback="Kaynakta yok" /></div>
+                <div class="or-fact"><span class="or-label">Sunucu</span><span>@(_record.ServerReference ?? "Kaynakta doğrulanmış ilişki yok")</span></div>
+                @if (!string.IsNullOrWhiteSpace(_record.Environment)) { <div class="or-fact"><span class="or-label">Ortam</span><span>@_record.Environment</span></div> }
+                <div class="or-fact"><span class="or-label">Oluşturulma</span><span>@(_record.CreatedAt is { } created ? created.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "Kaynakta tarih yok")</span></div>
+            </div>
         </section>
         <ResourceHelp Surface="review" Disabled="@_busy" />
 
-        @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview)
-            && _record.WorkflowState is OperationalRecordWorkflowState.Imported or OperationalRecordWorkflowState.Classified
-                or OperationalRecordWorkflowState.NeedsManualReview or OperationalRecordWorkflowState.Eligible)
+        @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview) && InReview(_record))
         {
-            <section class="so-review-type" data-guide="review-type">
-                <h2 class="so-panel-title">Talep türü</h2>
-                <label for="sdm-request-type" class="so-field-label">Talep türü (operatör beyanı)</label>
-                <select id="sdm-request-type" class="so-request-type" @bind="_declaredType" @bind:after="ClearReviewDraft" disabled="@_busy" data-sdm-review-type>
-                    <option value="">Doğrulanmadı / kapsam dışı</option>
-                    <option value="ServerRequest">Sunucu Talebi</option>
-                    <option value="SoftwareInstallation">Uygulama Kurulumu</option>
-                    <option value="ServerRetirement">Sunucu İadesi/Emekliliği</option>
-                </select>
-                <p>Tür seçimi yayımlama onayı değildir. Sunucu İadesi/Emekliliği yalnız talep takibidir; altyapı silme veya kaynak kapatma yetkisi vermez.</p>
-                <SoFieldGrid MinColumnWidth="220px">
-                    <SoField Label="SDM takip gerekçesi (öneri)">@SdmEvidenceView.TrackingReason(_declaredType)</SoField>
-                    <SoField Label="İstenen iş / beklenen sonuç">@_record.Description</SoField>
-                    <SoField Label="Doğrulanmış sunucu referansı">@(_record.ServerReference ?? "Kaynakta doğrulanmış ilişki yok; açıklamadan çıkarılmaz.")</SoField>
-                </SoFieldGrid>
-                <MudButton StartIcon="@Icons.Material.Filled.Preview" Variant="Variant.Outlined" Color="Color.Primary"
-                           Disabled="@(_busy || _declaredType is null)" OnClick="ReviewAsync">İnceleme taslağı hazırla</MudButton>
-                @if (!_record.SimulationMode)
-                { <MudButton StartIcon="@Icons.Material.Filled.Verified" Disabled="_busy" OnClick="ValidatePilotAsync">Onaylı tek kayıt politikasını doğrula ve önizle</MudButton> }
-            </section>
+            <OrRequestTypeStep @key="_record.Id" Hint="_record.SuggestedRequestType" DeclaredType="_declaredType" DeclaredTypeChanged="DeclareType"
+                               OnConfirm="ConfirmSuggestionAsync" OnReview="ReviewAsync" OnValidatePilot="ValidatePilotAsync"
+                               OfferPilotValidation="@(!_record.SimulationMode)" Busy="_busy" />
         }
         else if (!_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
-        { <p>İnceleme taslağı hazırlamak için Jira önizleme yetkisi gerekir. Kayıt ve engelleri aşağıda inceleyebilirsiniz.</p> }
+        { <MudAlert Dense="true" Severity="Severity.Info">İnceleme taslağı hazırlamak için Jira önizleme yetkisi gerekir. Kayıt ve engelleri aşağıda inceleyebilirsiniz.</MudAlert> }
+
+            <section class="so-review-preview" data-guide="review-preview">
+                <h2 class="so-panel-title">Önizleme ve işlem</h2>
+
+                @* Ready, sending, created, refused and unknown are resolved from the re-read record
+                   first; a command response alone is never shown as a created issue. *@
+                <JiraSubmissionPanel Record="_record" Preview="_preview" Phase="phase" Attempt="_attempt"
+                                     UnavailableReason="@UnavailableReason(actions)" FocusRequest="_focusRequest" />
+
+                @* Error codes, mapping versions, and record identifiers are support material. They
+                   are kept — they are what a support call needs — and folded away, because an
+                   operator deciding whether to press "Jira Kaydı Oluştur" is not reading them. *@
+                <details class="so-technical">
+                    <summary>Teknik ayrıntılar ve destek bilgisi</summary>
+                    <SoFieldGrid MinColumnWidth="240px">
+                        @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
+                        {
+                            <SoField Label="Destek referansı">
+                                <code class="so-code so-code--sm">@_record.CorrelationId</code>
+                            </SoField>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_record.LastErrorCode))
+                        {
+                            <SoField Label="Son hata kodu">
+                                <code class="so-code so-code--sm">@_record.LastErrorCode</code>
+                            </SoField>
+                        }
+                        @if (_preview is not null)
+                        {
+                            <SoField Label="Eşleme sürümü">
+                                <code class="so-code so-code--sm">@_preview.MappingVersion</code>
+                            </SoField>
+                        }
+                        <SoField Label="Kayıt tanımlayıcısı">
+                            <code class="so-code so-code--sm">@_record.Id</code>
+                        </SoField>
+                        <SoField Label="Kayıt sürümü">
+                            <code class="so-code so-code--sm">@_record.Version</code>
+                        </SoField>
+                        <SoField Label="Deneme sayısı">@_record.RetryCount</SoField>
+                    </SoFieldGrid>
+                </details>
+
+                <div class="so-panel-actions so-panel-actions--wrap">
+                    @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Preview"
+                                   Disabled="@(_busy || !actions.Preview || _declaredType is not null)"
+                                   OnClick="PreviewAsync">
+                            Jira Taslağını Önizle
+                        </MudButton>
+                    }
+
+                    @if (_access.Can(Capabilities.OperationalRecordsCreateJira))
+                    {
+                        @* Creation requires a preview first: the confirmation must show what will
+                           actually be sent, and only the server can say what that is. *@
+<MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.AddTask"
+                                       Disabled="@(_busy || phase != JiraSubmissionView.Phase.Ready || _declaredType is not null)"
+                                       OnClick="CreateAsync">
+                                Jira Kaydı Oluştur
+                            </MudButton>
+                        </MudTooltip>
+                    }
+
+                    @if (_access.Can(Capabilities.OperationalRecordsRetry))
+                    {
+<MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.RestartAlt"
+                                       Disabled="@(_busy || !actions.Retry || phase is JiraSubmissionView.Phase.Uncertain or JiraSubmissionView.Phase.Acknowledged)"
+                                       OnClick="RetryAsync">
+                                Yeniden Dene
+                            </MudButton>
+                        </MudTooltip>
+                    }
+                </div>
+
+                @* The actions stay visible rather than disappearing; why they are disabled is stated
+                   by the submission panel directly above them. *@
+
+                @if (_busy)
+                {
+                    <SoLoading Message="@_busyMessage" Bare="true" />
+                }
+            </section>
 
         <SoSdmEvidence Record="_record" />
         <OperationHistoryPanel RecordType="OperationalRecord" RecordId="_record.Id" />
@@ -400,94 +484,6 @@
             @* ------------------------------------------------------------------ JIRA *@
         </div>
         </details>
-            <section class="so-review-preview" data-guide="review-preview">
-                <h2 class="so-panel-title">Önizleme ve işlem</h2>
-
-                @* Ready, sending, created, refused and unknown are resolved from the re-read record
-                   first; a command response alone is never shown as a created issue. *@
-                <JiraSubmissionPanel Record="_record" Preview="_preview" Phase="phase" Attempt="_attempt"
-                                     UnavailableReason="@UnavailableReason(actions)" FocusRequest="_focusRequest" />
-
-                @* Error codes, mapping versions, and record identifiers are support material. They
-                   are kept — they are what a support call needs — and folded away, because an
-                   operator deciding whether to press "Jira Kaydı Oluştur" is not reading them. *@
-                <details class="so-technical">
-                    <summary>Teknik ayrıntılar ve destek bilgisi</summary>
-                    <SoFieldGrid MinColumnWidth="240px">
-                        @if (!string.IsNullOrWhiteSpace(_record.CorrelationId))
-                        {
-                            <SoField Label="Destek referansı">
-                                <code class="so-code so-code--sm">@_record.CorrelationId</code>
-                            </SoField>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(_record.LastErrorCode))
-                        {
-                            <SoField Label="Son hata kodu">
-                                <code class="so-code so-code--sm">@_record.LastErrorCode</code>
-                            </SoField>
-                        }
-                        @if (_preview is not null)
-                        {
-                            <SoField Label="Eşleme sürümü">
-                                <code class="so-code so-code--sm">@_preview.MappingVersion</code>
-                            </SoField>
-                        }
-                        <SoField Label="Kayıt tanımlayıcısı">
-                            <code class="so-code so-code--sm">@_record.Id</code>
-                        </SoField>
-                        <SoField Label="Kayıt sürümü">
-                            <code class="so-code so-code--sm">@_record.Version</code>
-                        </SoField>
-                        <SoField Label="Deneme sayısı">@_record.RetryCount</SoField>
-                    </SoFieldGrid>
-                </details>
-
-                <div class="so-panel-actions so-panel-actions--wrap">
-                    @if (_access.Can(Capabilities.OperationalRecordsCreateJiraPreview))
-                    {
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Preview"
-                                   Disabled="@(_busy || !actions.Preview || _declaredType is not null)"
-                                   OnClick="PreviewAsync">
-                            Jira Taslağını Önizle
-                        </MudButton>
-                    }
-
-                    @if (_access.Can(Capabilities.OperationalRecordsCreateJira))
-                    {
-                        @* Creation requires a preview first: the confirmation must show what will
-                           actually be sent, and only the server can say what that is. *@
-<MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.AddTask"
-                                       Disabled="@(_busy || phase != JiraSubmissionView.Phase.Ready || _declaredType is not null)"
-                                       OnClick="CreateAsync">
-                                Jira Kaydı Oluştur
-                            </MudButton>
-                        </MudTooltip>
-                    }
-
-                    @if (_access.Can(Capabilities.OperationalRecordsRetry))
-                    {
-<MudTooltip Text="@actions.WriteFenceReason" Disabled="@(actions.WriteFenceReason is null)">
-                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.RestartAlt"
-                                       Disabled="@(_busy || !actions.Retry || phase is JiraSubmissionView.Phase.Uncertain or JiraSubmissionView.Phase.Acknowledged)"
-                                       OnClick="RetryAsync">
-                                Yeniden Dene
-                            </MudButton>
-                        </MudTooltip>
-                    }
-                </div>
-
-                @* The actions stay visible rather than disappearing; why they are disabled is stated
-                   by the submission panel directly above them. *@
-
-                @if (_busy)
-                {
-                    <SoLoading Message="@_busyMessage" Bare="true" />
-                }
-            </section>
     }
 </div>
 
@@ -546,6 +542,58 @@
             reasons.Add("Jira yayımlama yetkiniz yok. Gerekiyorsa yetkili yöneticinizden erişim talep edin.");
         if (reasons.Count == 0 && _preview is null) reasons.Add("Jira kaydı oluşturmadan önce önizleme alın.");
         return string.Join(" ", reasons);
+    }
+
+    private static bool InReview(OperationalRecordResponse record) =>
+        record.WorkflowState is OperationalRecordWorkflowState.Imported or OperationalRecordWorkflowState.Classified
+            or OperationalRecordWorkflowState.NeedsManualReview or OperationalRecordWorkflowState.Eligible;
+
+    private enum Next { Act, Wait, Warn, Done }
+
+    // The one instruction for this record now, from re-read state and the held preview only.
+    private (Next Tone, string Text) NextStep(OperationalRecordView.Ownership owner) => _record switch
+    {
+        null => (Next.Wait, "Kayıt yükleniyor."),
+        var r when OperationalRecordView.OutcomeUnknown(r) => (Next.Warn, "Jira tarafını elle doğrulayın; sonuç netleşene kadar yeni gönderim yapmayın."),
+        _ when owner == OperationalRecordView.Ownership.Other => (Next.Warn, "Kayıt şu anda başka bir operatörde. O bitirene kadar işlem yapmayın."),
+        { WorkflowState: OperationalRecordWorkflowState.Completed } => (Next.Done, "İş tamamlandı; bu kayıtta yapılacak bir şey yok."),
+        { WorkflowState: OperationalRecordWorkflowState.JiraCreateFailed } => (Next.Warn, "Jira kaydı oluşturulamadı. Aşağıdaki nedeni okuyun; uygunsa “Yeniden Dene”."),
+        { WorkflowState: OperationalRecordWorkflowState.CreateRequested or OperationalRecordWorkflowState.CreatingJira } => (Next.Wait, "Jira kaydı oluşturuluyor; sonuç doğrulanana kadar bekleyin."),
+        var r when OperationalRecordView.HasJira(r) => (Next.Done, $"Jira kaydı oluştu ({r.JiraIssueKey}). Kaynak kaydın durumunu takip edin."),
+        _ when _access?.Can(Capabilities.OperationalRecordsCreateJiraPreview) != true => (Next.Wait, "Yalnız görüntüleme yetkiniz var; kaydı ve engelleri inceleyebilirsiniz."),
+        _ when _preview is { ReviewOnly: true } => (Next.Act, "Aşağıdaki taslağı inceleyin. Bu taslak yalnız inceleme içindir; Jira kaydı açmaz."),
+        _ when _preview is not null => (Next.Act, "Önizlemeyi kontrol edin; bilgiler doğruysa “Jira Kaydı Oluştur”a basın."),
+        var r when InReview(r) => (Next.Act, r.SuggestedRequestType is null
+            ? "Talep türünü seçin ve inceleme taslağını hazırlayın."
+            : "Önerilen talep türünü onaylayın veya değiştirin; ardından taslak hazırlanır."),
+        var r => (Next.Wait, OperationalRecordView.StateDetail(r) is { Length: > 0 } detail ? detail : "Kaydın durumunu aşağıda inceleyin.")
+    };
+
+    private string NextAction(OperationalRecordView.Ownership owner) => NextStep(owner).Text;
+
+    private string NextTone(OperationalRecordView.Ownership owner) => NextStep(owner).Tone.ToString().ToLowerInvariant();
+
+    private string NextIcon(OperationalRecordView.Ownership owner) => NextStep(owner).Tone switch
+    {
+        Next.Act => Icons.Material.Filled.ArrowForward,
+        Next.Warn => Icons.Material.Filled.WarningAmber,
+        Next.Done => Icons.Material.Filled.TaskAlt,
+        _ => Icons.Material.Filled.HourglassTop
+    };
+
+    // A confirmed suggestion is the operator's declaration, exactly as if it had been selected.
+    private Task ConfirmSuggestionAsync(OperationalRecordClassification type)
+    {
+        _declaredType = type;
+        ClearReviewDraft();
+        return ReviewAsync();
+    }
+
+    // Any change of type invalidates a draft prepared for the previous one.
+    private void DeclareType(OperationalRecordClassification? type)
+    {
+        _declaredType = type;
+        ClearReviewDraft();
     }
 
     private string HeaderTitle => _record is null ? "Operasyonel kayıt" : _record.OrCode;

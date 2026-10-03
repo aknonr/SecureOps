@@ -180,7 +180,7 @@ patch; PowerShell hosting moves to the 7.6 line.
 runtime security patches through that bundle independently of the SDK pin. The OIDC handler's automatic Pushed
 Authorization Requests (default since .NET 9) is kept off until tested against the corporate IdP
 (`Oidc:PushedAuthorization`). The unused EF Core references noted in Amendment 1 were removed. Rollback is the previous .NET 8 release package on hosts that still have the .NET 8
-bundle. MudBlazor 6 still runs but is unsupported; its migration remains separate UI work.
+bundle. MudBlazor moved from 6.16 to 9.11 on 2026-10-03 in the separate UI change.
 
 **Package refresh (2026-10-03):** stable versions only, pinned in `Directory.Packages.props`. Microsoft.* stay on
 10.0.12 and PowerShell.SDK on 7.6.6 (both current). Majors taken: Microsoft.Data.SqlClient 7.1 (with

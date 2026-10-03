@@ -43,7 +43,7 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] private MudDialogInstance Dialog { get; set; } = default!;
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
     /// <summary>Version-bound selected record, not a source identity selector.</summary>
     [Parameter, EditorRequired] public InUseRecord Record { get; set; } = default!;
     /// <summary>Existing bounded API-authorized reviewer search.</summary>

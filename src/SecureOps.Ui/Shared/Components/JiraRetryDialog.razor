@@ -70,7 +70,7 @@
     private bool _acknowledged;
 
     [CascadingParameter]
-    private MudDialogInstance Dialog { get; set; } = null!;
+    private IMudDialogInstance Dialog { get; set; } = null!;
 
     /// <summary>Authoritative record the retry acts on.</summary>
     [Parameter, EditorRequired]

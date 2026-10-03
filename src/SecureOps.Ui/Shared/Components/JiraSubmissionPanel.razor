@@ -144,7 +144,7 @@
                 <code class="so-code">@Record.OrCode</code> · kaynak no <code class="so-code">@Record.SourceRecordId</code>
             </SoField>
             <SoField Label="Talep türü">@SdmEvidenceView.RequestTypeLabel(Preview.RequestType)</SoField>
-            <SoField Label="Türün dayanağı">@(Preview.ReviewOnly ? "Operatör beyanı; kaynak doğrulaması değil" : Record.SimulationMode ? "Yalıtılmış sentetik test" : "Kayıt değerlendirmesi")</SoField>
+            <SoField Label="Türün dayanağı">@(Preview.ReviewOnly ? "Sizin onayınız; kaynak doğrulaması değil" : Record.SimulationMode ? "Yalıtılmış sentetik test" : "Kayıt değerlendirmesi")</SoField>
             <SoField Label="Jira hedefi">
                 @Preview.ProjectKey · @Preview.IssueType
                 @if (!string.IsNullOrWhiteSpace(Preview.IssueTypeId))
@@ -306,7 +306,7 @@
         JiraSubmissionView.Phase.Uncertain =>
             "Jira'da kayıt oluşup oluşmadığı doğrulanamadı. Yeni bir gönderim mükerrer kayıt oluşturabileceği için gönderim ve yeniden deneme bu ekranda kapalıdır.",
         JiraSubmissionView.Phase.ReviewOnly =>
-            "Bu taslak operatör beyanına dayanır; yayımlama onayı veya uygunluk vermez.",
+            "Bu taslak onayladığınız talep türüne dayanır; yayımlama onayı veya uygunluk vermez.",
         _ => UnavailableReason ?? "Jira kaydı oluşturmadan önce önizleme alın."
     };
 

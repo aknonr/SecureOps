@@ -5,7 +5,9 @@ namespace SecureOps.Ui.Services;
 /// <summary>
 /// Circuit-scoped cache over <c>GET /api/v1/access/me</c>.
 /// </summary>
-public sealed class CurrentAccessProvider : ICurrentAccessProvider, IDisposable
+/// <param name="accessApi">Access API client.</param>
+/// <param name="logger">Logger.</param>
+public sealed class CurrentAccessProvider(IAccessApiClient accessApi, ILogger<CurrentAccessProvider> logger) : ICurrentAccessProvider, IDisposable
 {
     /// <summary>
     /// How long a snapshot is reused before it is reloaded.
@@ -17,22 +19,11 @@ public sealed class CurrentAccessProvider : ICurrentAccessProvider, IDisposable
     /// </remarks>
     private static readonly TimeSpan _snapshotLifetime = TimeSpan.FromSeconds(60);
 
-    private readonly IAccessApiClient _accessApi;
-    private readonly ILogger<CurrentAccessProvider> _logger;
+    private readonly IAccessApiClient _accessApi = accessApi;
+    private readonly ILogger<CurrentAccessProvider> _logger = logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private AccessSnapshot? _snapshot;
-
-    /// <summary>
-    /// Initializes a new access provider.
-    /// </summary>
-    /// <param name="accessApi">Access API client.</param>
-    /// <param name="logger">Logger.</param>
-    public CurrentAccessProvider(IAccessApiClient accessApi, ILogger<CurrentAccessProvider> logger)
-    {
-        _accessApi = accessApi;
-        _logger = logger;
-    }
 
     /// <inheritdoc />
     public event Action? Changed;

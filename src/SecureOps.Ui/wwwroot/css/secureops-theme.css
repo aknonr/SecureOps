@@ -15,7 +15,7 @@
 :root {
     /* -- surfaces ------------------------------------------------------- */
     --so-bg: var(--mud-palette-background);
-    --so-bg-sunken: var(--mud-palette-background-grey);
+    --so-bg-sunken: var(--mud-palette-background-gray);
     --so-surface: var(--mud-palette-surface);
     --so-appbar: var(--mud-palette-appbar-background);
     --so-appbar-text: var(--mud-palette-appbar-text);
@@ -85,8 +85,8 @@
 
 /* Dark-mode overrides for the things a palette swap cannot express.
 
-   MudBlazor 6.16 signals dark mode only by rewriting --mud-palette-* on :root — it
-   adds no class — and CSS cannot branch on a variable's value. Shared/MainLayout.razor
+   MudBlazor signals dark mode mainly by rewriting --mud-palette-* on :root (6.16
+   added no class) and CSS cannot branch on a variable's value. Shared/MainLayout.razor
    therefore mirrors the active palette onto <html> as .so-dark so these rules have
    something to hook onto. Do not use .mud-theme-dark: that class is never emitted, and
    rules written against it silently do nothing.
@@ -533,13 +533,37 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
     font-size: 0.88rem;
 }
 
-/* The whole panel is pending. min-height reserves roughly the height the resolved
-   content will occupy, so the page does not jump when it arrives. */
+/* The whole panel is pending: a skeleton in the shape of a panel holds its place, so the page
+   does not jump when content arrives and nothing overlays the page. */
 .so-loading--block {
     flex-direction: column;
-    justify-content: center;
-    min-height: 240px;
-    text-align: center;
+    align-items: stretch;
+    gap: var(--so-space-2);
+    min-height: 180px;
+    padding: var(--so-space-4) 0;
+}
+
+.so-loading--block .so-loading-block-body {
+    margin-top: var(--so-space-2);
+    border-radius: var(--so-radius, 8px);
+}
+
+.so-loading--block .so-loading-text {
+    font-size: 0.8rem;
+}
+
+/* Fast loads finish before the skeleton is ever painted; only a slow panel shows it. */
+.so-loading--block {
+    animation: so-loading-reveal 160ms ease 250ms both;
+}
+
+@keyframes so-loading-reveal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .so-loading--block { animation: none; }
 }
 
 .so-panel--primary {
@@ -2193,7 +2217,7 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
    one without a breakpoint, and a short panel never stretches to match a tall one. */
 .so-detail-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
     gap: var(--so-space-4);
     align-items: start;
 }
@@ -4040,97 +4064,6 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
     color: var(--so-text-muted);
 }
 
-/* -- flight loading ------------------------------------------------------ */
-
-/* Inline SVG plus CSS. No image request, no animation library, and it follows
-   the palette through the same tokens as the rest of the shell. */
-.so-flight {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--so-space-2);
-    padding: var(--so-space-5) var(--so-space-4);
-}
-
-.so-flight--bare {
-    padding: var(--so-space-3) 0;
-}
-
-.so-flight-svg {
-    width: 100%;
-    max-width: 240px;
-    height: auto;
-}
-
-.so-flight-track {
-    fill: none;
-    stroke: var(--so-border);
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-dasharray: 4 6;
-}
-
-/* The flown portion sweeps along the same geometry as the track. 320 comfortably
-   exceeds the path length, so the dash never wraps and restarts mid-route. */
-.so-flight-flown {
-    fill: none;
-    stroke: var(--so-brand);
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-dasharray: 320;
-    stroke-dashoffset: 320;
-    animation: so-flight-draw 2.4s ease-in-out infinite;
-}
-
-.so-flight-node {
-    fill: var(--so-border);
-}
-
-.so-flight-node--end {
-    fill: var(--so-brand);
-}
-
-.so-flight-plane {
-    fill: var(--so-brand);
-    offset-path: path("M 16 56 Q 120 4 224 20");
-    offset-rotate: auto;
-    animation: so-flight-travel 2.4s ease-in-out infinite;
-}
-
-.so-flight-message {
-    margin: 0;
-    font-size: 0.88rem;
-    color: var(--so-text-muted);
-    text-align: center;
-}
-
-@keyframes so-flight-draw {
-    0%   { stroke-dashoffset: 320; }
-    70%  { stroke-dashoffset: 0; }
-    100% { stroke-dashoffset: 0; }
-}
-
-@keyframes so-flight-travel {
-    0%   { offset-distance: 0%; }
-    70%  { offset-distance: 100%; }
-    100% { offset-distance: 100%; }
-}
-
-/* Motion is decoration here; the role, the live region, and the message carry the
-   state. When motion is declined the aircraft parks at the origin, the route shows
-   its full length as a static track, and nothing travels or sweeps. */
-@media (prefers-reduced-motion: reduce) {
-    .so-flight-flown {
-        stroke-dashoffset: 0;
-        animation: none;
-        opacity: 0.55;
-    }
-
-    .so-flight-plane {
-        offset-distance: 0%;
-        animation: none;
-    }
-}
 
 /* -- appearance selector ------------------------------------------------- */
 
@@ -4728,198 +4661,6 @@ html[data-so-appearance="light"] .so-auth-card {
     }
 }
 
-/* -- reference loading panel -------------------------------------------- */
-
-.so-flight {
-    width: 100%;
-    padding: var(--so-space-4);
-}
-
-.so-flight--bare {
-    padding: 0;
-}
-
-.so-flight-card {
-    --so-loading-border: #354357;
-    --so-loading-text: #f1f4f8;
-    --so-loading-muted: #b4bfce;
-    --so-loading-track: #2a3749;
-    --so-loading-red: #e8394e;
-
-    width: min(100%, 570px);
-    min-height: 318px;
-    margin: 0 auto;
-    padding: 16px 34px 28px;
-    overflow: hidden;
-    border: 1px solid var(--so-loading-border);
-    border-radius: 12px;
-    background: linear-gradient(160deg, #182334 0%, #0d1521 68%, #101a28 100%);
-    box-shadow: 0 22px 52px rgb(0 0 0 / 42%), 0 1px 0 rgb(255 255 255 / 5%) inset;
-    color: var(--so-loading-text);
-}
-
-.so-flight-svg {
-    display: block;
-    width: 100%;
-    max-width: none;
-    height: 174px;
-}
-
-.so-flight-map {
-    filter: invert(1);
-    opacity: 0.09;
-}
-
-.so-flight-emblem {
-    filter: drop-shadow(0 4px 8px rgb(0 0 0 / 35%));
-}
-
-.so-flight-track,
-.so-flight-flown {
-    fill: none;
-    stroke-linecap: round;
-}
-
-.so-flight-track {
-    stroke: #58677a;
-    stroke-width: 1.4;
-    stroke-dasharray: 4 7;
-    opacity: 0.72;
-}
-
-.so-flight-flown {
-    stroke: var(--so-loading-red);
-    stroke-width: 2.2;
-    stroke-dasharray: 480;
-    stroke-dashoffset: 480;
-    filter: drop-shadow(0 0 3px rgb(232 57 78 / 45%));
-    animation: so-flight-draw-reference 2.8s ease-in-out infinite;
-}
-
-.so-flight-hub-glow {
-    transform-origin: 246px 66px;
-    animation: so-hub-pulse 2.8s ease-in-out infinite;
-}
-
-.so-flight-node {
-    fill: #ffffff;
-    stroke: var(--so-loading-red);
-    stroke-width: 2;
-    filter: drop-shadow(0 0 5px var(--so-loading-red));
-}
-
-.so-flight-plane {
-    fill: initial;
-    offset-path: path("M 251 56 Q 350 140 464 84");
-    offset-distance: 0%;
-    offset-rotate: auto;
-    animation: so-flight-travel-reference 3.2s linear infinite;
-    filter: drop-shadow(0 3px 4px rgb(0 0 0 / 48%));
-}
-
-.so-flight-plane-shadow {
-    fill: rgb(0 0 0 / 28%);
-    transform: translate(2px, 3px);
-}
-
-.so-flight-plane-tail {
-    fill: var(--so-loading-red);
-}
-
-.so-flight-copy {
-    text-align: center;
-}
-
-.so-flight-title {
-    margin: 0;
-    color: var(--so-loading-text);
-    font-size: 1.3rem;
-    font-weight: 700;
-    line-height: 1.25;
-}
-
-.so-flight-message {
-    margin: 8px 0 0;
-    color: var(--so-loading-muted);
-    font-size: 0.88rem;
-    line-height: 1.45;
-}
-
-.so-flight-activity {
-    position: relative;
-    display: block;
-    height: 4px;
-    margin-top: 24px;
-    overflow: hidden;
-    border-radius: 4px;
-    background: var(--so-loading-track);
-}
-
-.so-flight-activity span {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 34%;
-    border-radius: inherit;
-    background: var(--so-loading-red);
-    animation: so-flight-activity 1.55s ease-in-out infinite;
-}
-
-@keyframes so-flight-draw-reference {
-    0% { stroke-dashoffset: 480; }
-    72%, 100% { stroke-dashoffset: 0; }
-}
-
-@keyframes so-flight-travel-reference {
-    0%, 3% { offset-distance: 0%; opacity: 0; }
-    9% { offset-distance: 0%; opacity: 1; }
-    72% { offset-distance: 100%; opacity: 1; }
-    82%, 100% { offset-distance: 100%; opacity: 0; }
-}
-
-@keyframes so-flight-activity {
-    0% { transform: translateX(-110%); }
-    55% { transform: translateX(195%); }
-    100% { transform: translateX(305%); }
-}
-
-@media (max-width: 520px) {
-    .so-flight-card {
-        min-height: 278px;
-        padding: 10px 18px 22px;
-        border-radius: 8px;
-    }
-
-    .so-flight-svg {
-        height: 150px;
-    }
-
-    .so-flight-title {
-        font-size: 1.12rem;
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .so-flight-flown {
-        stroke-dashoffset: 0;
-        animation: none;
-        opacity: 0.72;
-    }
-
-    .so-flight-plane {
-        offset-distance: 72%;
-        animation: none;
-        opacity: 1;
-    }
-
-    .so-flight-hub-glow,
-    .so-flight-activity span {
-        animation: none;
-    }
-
-    .so-flight-activity span {
-        transform: translateX(96%);
-    }
-}
 
 /* =============================================================================
    Reference-accurate authenticated shell
@@ -5170,59 +4911,42 @@ html[data-so-appearance="light"] .so-auth-card {
     box-shadow: 0 22px 58px rgb(0 0 0 / 34%);
 }
 
+/* Route change indicator. Most navigations finish well under 300 ms, so the bar stays
+   invisible for that long (transition-delay, not a timer) and appears only when a page is
+   genuinely slow: no flash, no popup, nothing covering content. */
 .so-route-progress {
     position: fixed;
     top: 64px;
     right: 0;
     left: var(--mud-drawer-width-left);
     z-index: 1090;
-    height: 4px;
+    height: 2px;
     overflow: hidden;
     pointer-events: none;
     opacity: 0;
-    transition: opacity 100ms ease;
+    transition: opacity 80ms ease;
 }
 
 .so-route-progress.is-active {
     opacity: 1;
+    transition: opacity 120ms ease 300ms;
 }
 
 .so-route-progress-line {
     position: absolute;
-    inset: 1px 0 auto;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--so-brand) 18%, var(--so-brand) 68%, transparent);
-    transform: scaleX(0);
-    transform-origin: left;
+    inset: 0;
+    width: 40%;
+    background: linear-gradient(90deg, transparent, var(--so-brand), transparent);
+    transform: translateX(-100%);
 }
 
 .so-route-progress.is-active .so-route-progress-line {
-    animation: so-route-line 900ms ease-out both;
-}
-
-.so-route-progress-plane {
-    position: absolute;
-    top: -7px;
-    left: -20px;
-    width: 20px;
-    height: 18px;
-    fill: var(--so-brand);
-    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 35%));
-}
-
-.so-route-progress.is-active .so-route-progress-plane {
-    animation: so-route-plane 1100ms ease-out both;
+    animation: so-route-line 1.1s ease-in-out 300ms infinite;
 }
 
 @keyframes so-route-line {
-    0% { transform: scaleX(0); opacity: 1; }
-    82% { transform: scaleX(0.9); opacity: 1; }
-    100% { transform: scaleX(1); opacity: 0.45; }
-}
-
-@keyframes so-route-plane {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(calc(100vw - var(--mud-drawer-width-left) + 20px)); }
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
 }
 
 @media (min-width: 1280px) {
@@ -5274,18 +4998,14 @@ html[data-so-appearance="light"] .so-auth-card {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .so-route-progress-line,
-    .so-route-progress-plane {
+    .so-route-progress-line {
         animation: none !important;
     }
 
     .so-route-progress.is-active .so-route-progress-line {
-        transform: scaleX(1);
+        width: 100%;
+        transform: none;
         opacity: 0.7;
-    }
-
-    .so-route-progress-plane {
-        left: 62%;
     }
 }
 

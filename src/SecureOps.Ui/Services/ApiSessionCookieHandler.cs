@@ -18,7 +18,9 @@ namespace SecureOps.Ui.Services;
 /// and startup calls are legitimate — they simply do not share a jar.
 /// </para>
 /// </remarks>
-public sealed class ApiSessionCookieHandler : DelegatingHandler
+/// <param name="store">Per-browser cookie jars.</param>
+/// <param name="logger">Logger. Never receives cookie values.</param>
+public sealed class ApiSessionCookieHandler(IApiSessionStore store, ILogger<ApiSessionCookieHandler> logger) : DelegatingHandler
 {
     private const string _applicationSessionCookieName = "__Host-SecureOps.ApplicationSession";
 
@@ -27,19 +29,8 @@ public sealed class ApiSessionCookieHandler : DelegatingHandler
     /// The outbound HttpClient timeout/cancellation bounds this wait. Proceeding without the gate
     /// would create a second logical session and is therefore not an acceptable fallback.
     /// </remarks>
-    private readonly IApiSessionStore _store;
-    private readonly ILogger<ApiSessionCookieHandler> _logger;
-
-    /// <summary>
-    /// Initializes a new API session cookie handler.
-    /// </summary>
-    /// <param name="store">Per-browser cookie jars.</param>
-    /// <param name="logger">Logger. Never receives cookie values.</param>
-    public ApiSessionCookieHandler(IApiSessionStore store, ILogger<ApiSessionCookieHandler> logger)
-    {
-        _store = store;
-        _logger = logger;
-    }
+    private readonly IApiSessionStore _store = store;
+    private readonly ILogger<ApiSessionCookieHandler> _logger = logger;
 
     /// <inheritdoc />
     protected override async Task<HttpResponseMessage> SendAsync(
