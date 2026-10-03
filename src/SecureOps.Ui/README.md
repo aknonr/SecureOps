@@ -410,7 +410,7 @@ have to be invented.
 | `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters; bounded directory name search panel (ADR-0025) | `ServiceAccounts.View` and scope grant; the name search also needs `Identity.Lookup` |
 | `/service-accounts/{id}` | Account detail, work, usages with the explained knowledge-base rule, evidence and history | `ServiceAccounts.View`; commands require their own capability (rule exception: `ServiceAccounts.Verify`) |
 | `/service-accounts/work` | Entry work summary, in-app reminders and unsent coordinator drafts | `ServiceAccounts.View` |
-| `/service-accounts/imports` | Import preview, decisions and idempotent commit | `ServiceAccounts.Import` and organization scope |
+| `/service-accounts/imports` | Import guide (tracking workbook once, weekly list, DBA list), preview, decisions and idempotent commit; without organization scope it explains how another module administrator grants it | `ServiceAccounts.Import` and organization scope |
 | `/service-accounts/reports` | Live report (directorate view, rules, gMSA funnel, trend, risk candidates), immutable snapshots, snapshot comparison, XLSX/PDF | `ServiceAccounts.Report` |
 | `/service-accounts/admin` | Scope grants, dictionaries and gMSA routing team roles | `ServiceAccounts.Administer` |
 | `/in-use`, `/in-use/{id}` | In Use local review workspace | `InUse.View`; review, assign, refresh and completion need their own capability |

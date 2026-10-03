@@ -1,0 +1,87 @@
+@* Which file, which type, in which order. Written for an operator, not a developer: three real situations, each with
+   the file type to pick, what to enter and what the import will and will not do. Choosing a card only pre-fills the
+   form; nothing is uploaded or written until the operator previews and approves. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+
+<section class="so-panel sa-import-guide" aria-labelledby="sa-import-guide-title">
+    <div class="so-panel-head">
+        <h2 id="sa-import-guide-title" class="so-panel-title">Hangi dosyayı nasıl yüklerim?</h2>
+        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _open = !_open)" aria-expanded="@(_open ? "true" : "false")"
+                   EndIcon="@(_open ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)">@(_open ? "Rehberi gizle" : "Rehberi göster")</MudButton>
+    </div>
+    @if (_open)
+    {
+        <p class="so-panel-text--sm">Sıra önemlidir: önce mevcut takip çalışma kitabı <strong>bir kez</strong>, sonra her hafta gelen liste. Kartı seçmek yalnız formu doldurur; önizlemeyi görüp onaylamadan hiçbir kayıt yazılmaz.</p>
+        <div class="sa-guide-cards" role="list">
+            @foreach (Scenario s in _scenarios)
+            {
+                DateTimeOffset? done = LastCommitted(s.Profile);
+                <article class="sa-guide-card @(Selected == s.Profile ? "sa-guide-card--selected" : null)" role="listitem" aria-labelledby="@($"sa-guide-{s.Order}")">
+                    <div class="sa-guide-card-head">
+                        <span class="sa-guide-order" aria-hidden="true">@s.Order</span>
+                        <h3 id="@($"sa-guide-{s.Order}")" class="sa-guide-title">@s.Title</h3>
+                    </div>
+                    <p class="sa-guide-when">@s.When</p>
+                    <dl class="sa-guide-facts">
+                        <dt>Dosya türü</dt><dd>@s.TypeLabel</dd>
+                        <dt>Örnek</dt><dd>@s.Example</dd>
+                        <dt>Rapor tarihi</dt><dd>@s.Date</dd>
+                        <dt>Liste kapsamı</dt><dd>@s.Coverage</dd>
+                    </dl>
+                    <p class="so-panel-text--sm">@s.Effect</p>
+                    <div class="sa-guide-foot">
+                        @if (done is { } at)
+                        {
+                            <SoStatusBadge Label="@($"Son aktarım: {at.ToLocalTime():dd.MM.yyyy}")" Tone="SoStatusBadge.BadgeTone.Positive" Icon="@Icons.Material.Filled.CheckCircle" />
+                        }
+                        else if (s.Order == 1)
+                        {
+                            <SoStatusBadge Label="Henüz yapılmadı" Tone="SoStatusBadge.BadgeTone.Caution" Icon="@Icons.Material.Filled.PendingActions" />
+                        }
+                        <MudButton Variant="@(Selected == s.Profile ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="@(() => OnChoose.InvokeAsync(s.Profile))">@(Selected == s.Profile ? "Seçildi" : "Bu türü seç")</MudButton>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private bool _open = true;
+
+    private sealed record Scenario(int Order, string Profile, string Title, string When, string TypeLabel, string Example, string Date, string Coverage, string Effect);
+
+    private static readonly Scenario[] _scenarios =
+    [
+        new(1, ServiceAccountImportProfiles.LegacyWorkbook, "İlk kurulum: mevcut takip çalışma kitabı",
+            "Bir kez yapılır. Bugüne kadar Excel'de tutulan hesap, sahip, talep, işlem ve mail kayıtları sisteme taşınır.",
+            "Eski çalışma kitabı (.xlsx)", "WASAS servis hesapları takip dosyası (Hesap_Bilgileri, Talep_Takibi, DBA_Devir sayfaları olan)",
+            "Çalışma kitabının en son güncellendiği gün", "Bilinmiyor bırakın",
+            "Özet ve formül sütunları alınmaz, sistem bunları kendisi hesaplar. Aynı dosyayı tekrar yüklemek kopya oluşturmaz."),
+        new(2, ServiceAccountImportProfiles.CoordinationList, "Her hafta: gelen servis hesabı listesi",
+            "Haftalık gönderilen liste (Kullanıcı Adı, Son Parola Değişiklik Zamanı, son oturum, Organizasyon, Grup Direktörlüğü, Yorum sütunları).",
+            "Koordinasyon listesi", "Haftalık gelen Book1.xlsx",
+            "Listenin gönderildiği / hazırlandığı gün (e-posta tarihi)", "Listenin kurumunuzdaki tüm hesapları içerdiğinden eminseniz \"tam liste\", değilseniz Bilinmiyor",
+            "Var olan hesapların yalnız parola ve son oturum bilgisi güncellenir; sahip, OR/OCO, plan ve notlar ezilmez. Yeni hesaplar önizlemede \"yeni\" görünür. Listede olmayan hesap silinmez."),
+        new(3, ServiceAccountImportProfiles.DbaHandover, "Gerektiğinde: DBA devir listesi",
+            "Veritabanı ekibinden WASAS'a devredilecek hesapların listesi (Kullanıcı Adı, Ekip, Kullanan_Ekip, WASAS_Devir).",
+            "DBA devir listesi", "DBA ekibinin gönderdiği devir listesi",
+            "Listenin gönderildiği gün", "Bu türde sorulmaz",
+            "Yalnız WASAS_Devir = OK satırları devir kapsamına girer. SQL ekibi hesapları için gMSA yönlendirmesi önizlemede gösterilir; devir kabulü sayılmaz.")
+    ];
+
+    /// <summary>Currently selected file type.</summary>
+    [Parameter] public string? Selected { get; set; }
+
+    /// <summary>Import history, used to show which steps were already done.</summary>
+    [Parameter] public IReadOnlyList<ImportHistoryItem> History { get; set; } = [];
+
+    /// <summary>Raised with the chosen profile.</summary>
+    [Parameter] public EventCallback<string> OnChoose { get; set; }
+
+    private DateTimeOffset? LastCommitted(string profile) => History
+        .Where(h => h.Status == "Committed" && (h.Profile == profile
+            || profile == ServiceAccountImportProfiles.LegacyWorkbook && h.Profile == ServiceAccountImportProfiles.LegacyPackage))
+        .Select(h => (DateTimeOffset?)(h.CommittedAt ?? h.UploadedAt)).Max();
+}

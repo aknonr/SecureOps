@@ -29,6 +29,11 @@ public partial class ServiceAccountAdmin
         _organizations = await Api.GetAsync<IReadOnlyList<OrganizationView>>("/organizations", token);
         _teams = await Api.GetAsync<IReadOnlyList<TeamView>>("/teams", token);
         _roles = await Api.GetAsync<IReadOnlyList<TeamRoleView>>("/team-roles", token);
+        if (_organizations.Count == 0 && _grant.Kind == "Organization")
+        {
+            // First setup: organizations only exist after the first import, so the only usable grant is the whole module.
+            _grant.Kind = "All";
+        }
     }
 
     private IReadOnlyList<TeamRoleView> _roles = [];
