@@ -82,6 +82,43 @@ public sealed class ServiceAccountUsageUiTests
         ServiceAccountProblems.FieldMessage(missingScope).Should().Contain("başka bir modül yöneticisi");
     }
 
+    [Fact]
+    public void EveryModulePage_HasAGuide_WithPurposeStepsAndLimits_AndTheAnimationRespectsReducedMotion()
+    {
+        foreach (string page in new[] { "ServiceAccountList", "ServiceAccountDetail", "ServiceAccountWork", "ServiceAccountImports", "ServiceAccountReports" })
+        {
+            Ui("Pages", "ServiceAccounts", page + ".razor").Should().Contain("<SaPageGuide", page);
+        }
+
+        string admin = Ui("Pages", "ServiceAccounts", "ServiceAccountAdmin.razor");
+        foreach (string guide in new[] { "AdminScope", "AdminOrganizations", "AdminRouting", "AdminPeople" })
+        {
+            admin.Should().Contain("ServiceAccountGuides." + guide + ".Steps");
+        }
+
+        foreach (ServiceAccountGuides.Guide guide in new[] { ServiceAccountGuides.List, ServiceAccountGuides.Detail, ServiceAccountGuides.Work, ServiceAccountGuides.Imports,
+            ServiceAccountGuides.Reports, ServiceAccountGuides.AdminScope, ServiceAccountGuides.AdminOrganizations, ServiceAccountGuides.AdminRouting, ServiceAccountGuides.AdminPeople })
+        {
+            guide.Purpose.Should().NotBeNullOrWhiteSpace();
+            guide.Steps.Should().HaveCountGreaterThan(2).And.HaveCountLessThan(7, "the animation window is sized for at most six steps");
+            guide.Never.Should().NotBeNullOrWhiteSpace();
+        }
+
+        ServiceAccountGuides.Detail.Never.Should().Contain("Sunucuda").And.Contain("Active Directory");
+        Ui("Shared", "Components", "ServiceAccounts", "SaPageGuide.razor.css").Should().Contain("prefers-reduced-motion");
+    }
+
+    [Fact]
+    public void AdminScopeTab_OffersTheOneTimeBootstrap_AndPicksApprovedUsersInsteadOfTypedIdentities()
+    {
+        string admin = Ui("Pages", "ServiceAccounts", "ServiceAccountAdmin.razor");
+        string code = Ui("Pages", "ServiceAccounts", "ServiceAccountAdmin.razor.cs");
+        admin.Should().Contain("_bootstrap is { Available: true }").And.Contain("İlk kapsamı al (bir kez)");
+        admin.Should().Contain("ScopeGrantCandidate c in _candidates").And.Contain("Disabled=\"@c.IsCaller\"");
+        admin.Should().NotContain("Kurumsal kimlik (DOMAIN\\kullanıcı veya UPN)", "identities are picked, not typed");
+        code.Should().Contain("\"/scope-grants/bootstrap\"").And.Contain("\"/scope-grants/candidates\"");
+    }
+
     private static string Ui(params string[] path) => File.ReadAllText(Path.Combine([Root(), "src", "SecureOps.Ui", .. path]));
 
     private static string Root()

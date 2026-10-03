@@ -44,6 +44,7 @@ public partial class ServiceAccountImports
     ];
 
     private ServiceAccountMe? _me;
+    private ScopeBootstrapState? _bootstrap;
     private ImportBatchView? _batch;
     private IReadOnlyList<OrganizationView> _organizations = [];
     private ImportRowPage? _rows;
@@ -70,6 +71,7 @@ public partial class ServiceAccountImports
         if (!HasImportScope)
         {
             (_history, _organizations) = ([], []);
+            _bootstrap = Can(ServiceAccountCapabilities.Administer) ? await Api.GetAsync<ScopeBootstrapState>("/scope-grants/bootstrap", token) : null;
             return;
         }
 

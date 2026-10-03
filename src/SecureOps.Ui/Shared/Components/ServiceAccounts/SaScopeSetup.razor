@@ -11,9 +11,17 @@
             @Purpose için yetkileriniz var, ancak hangi kurumların servis hesaplarını görebileceğiniz (veri kapsamı) henüz tanımlı değil.
             Şu anki kapsamınız: <strong>@Current</strong>. Yetki ile kapsam bilerek ayrı tutulur; kapsamı sizden bağımsız bir modül yöneticisi verir.
         </p>
+        @if (Bootstrap is { Available: true })
+        {
+            <MudAlert Severity="Severity.Success" Dense="true" Class="my-2">
+                Bu modülde henüz hiç kapsam verilmemiş ve siz modül yöneticisisiniz: <a href="service-accounts/admin">Modül yönetimi → Kapsam yetkileri</a> sekmesindeki
+                <strong>"İlk kapsamı al (bir kez)"</strong> ile kendiniz başlatabilirsiniz. Bu hak yalnız ilk kurulumda ve bir kez vardır.
+            </MudAlert>
+            <p class="so-panel-text--sm">İlk kurulum yapıldıktan sonra diğer kişilere kapsam aşağıdaki gibi verilir:</p>
+        }
         <ol class="sa-scope-steps">
             <li>Modül yönetimi yetkisi olan <strong>başka bir yönetici</strong>, Servis Hesapları → <a href="service-accounts/admin">Modül yönetimi</a> → <em>Kapsam yetkileri</em> sekmesini açar.</li>
-            <li>"Kurumsal kimlik" alanına sizin kimliğinizi birebir yazar (DOMAIN\kullanıcı veya UPN).</li>
+            <li>"Kişi" listesinden sizi seçer (liste uygulamaya onaylanmış kullanıcılardır; ayrı bir hesap veya PAM kimliği gerekmez).</li>
             <li>İlk kurulumda kapsam türü olarak <strong>Tüm kurum</strong> seçilir; kurumlar ilk aktarımla oluştuğu için bu aşamada başka seçenek boş olabilir. Sonradan kurum bazında daraltılabilir.</li>
             <li>Gerekçe yazılıp "Kapsam ver" denir. Siz bu sayfayı yenilediğinizde içe aktarım açılır.</li>
         </ol>
@@ -31,6 +39,9 @@
 
     /// <summary>What the caller wanted to do, e.g. "İçe aktarım".</summary>
     [Parameter] public string Purpose { get; set; } = "Bu işlem";
+
+    /// <summary>One-time first-grant state; null when the caller is not a module administrator.</summary>
+    [Parameter] public ScopeBootstrapState? Bootstrap { get; set; }
 
     /// <summary>Re-reads the caller's scope.</summary>
     [Parameter] public EventCallback OnRecheck { get; set; }

@@ -10,6 +10,9 @@ public partial class ServiceAccountAdmin
     private IReadOnlyList<ScopeGrantView> _grants = [];
     private IReadOnlyList<OrganizationView> _organizations = [];
     private IReadOnlyList<TeamView> _teams = [];
+    private IReadOnlyList<ScopeGrantCandidate> _candidates = [];
+    private ScopeBootstrapState? _bootstrap;
+    private string? _bootstrapReason;
     private ScopeGrantView? _revoke;
     private string? _revokeReason;
     private GrantForm _grant = new();
@@ -26,6 +29,8 @@ public partial class ServiceAccountAdmin
     private async Task ReloadAsync(CancellationToken token)
     {
         _grants = await Api.GetAsync<IReadOnlyList<ScopeGrantView>>("/scope-grants", token);
+        _bootstrap = await Api.GetAsync<ScopeBootstrapState>("/scope-grants/bootstrap", token);
+        _candidates = await Api.GetAsync<IReadOnlyList<ScopeGrantCandidate>>("/scope-grants/candidates", token);
         _organizations = await Api.GetAsync<IReadOnlyList<OrganizationView>>("/organizations", token);
         _teams = await Api.GetAsync<IReadOnlyList<TeamView>>("/teams", token);
         _roles = await Api.GetAsync<IReadOnlyList<TeamRoleView>>("/team-roles", token);
@@ -66,6 +71,20 @@ public partial class ServiceAccountAdmin
         }))
         {
             (_roleRevoke, _roleRevokeReason) = (null, null);
+        }
+    }
+
+    private ScopeGrantCandidate? SelectedCandidate => _candidates.FirstOrDefault(c => c.CorporateIdentity == _grant.Identity);
+
+    private async Task BootstrapAsync()
+    {
+        if (await RunAsync(async token =>
+        {
+            await Api.SendAsync<Guid>(HttpMethod.Post, "/scope-grants/bootstrap", new ScopeBootstrapRequest(_bootstrapReason!.Trim()), token);
+            await ReloadAsync(token);
+        }))
+        {
+            _bootstrapReason = null;
         }
     }
 
