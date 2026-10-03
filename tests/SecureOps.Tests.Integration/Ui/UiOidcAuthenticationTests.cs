@@ -460,6 +460,9 @@ public sealed partial class UiOidcAuthenticationTests
 
     private sealed class RecordingAccessApiClient : IAccessApiClient
     {
+        public Task<SecureOps.Shared.Contracts.Access.AccessEffectiveResponse> GetMyEffectiveAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Not used by sign-out tests.");
+
         public int LogoutCalls { get; private set; }
 
         public Task<LogoutResponse> LogoutAsync(CancellationToken cancellationToken)

@@ -114,6 +114,9 @@ public sealed class UiSignOutTests
     /// <summary>Records logout calls and can fail on demand.</summary>
     private sealed class RecordingAccessApiClient : IAccessApiClient
     {
+        public Task<SecureOps.Shared.Contracts.Access.AccessEffectiveResponse> GetMyEffectiveAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Not used by sign-out tests.");
+
         public int LogoutCalls { get; private set; }
 
         public SecureOpsApiException? Failure { get; init; }

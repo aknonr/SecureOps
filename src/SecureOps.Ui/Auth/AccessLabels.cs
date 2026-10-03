@@ -345,6 +345,29 @@ public static class AccessLabels
         return index < 0 ? _modules.Length : index;
     }
 
+    /// <summary>Recognisable icon for a server catalogue module; a generic one for unknown modules.</summary>
+    /// <param name="module">Module name from the server action catalogue.</param>
+    /// <returns>MudBlazor icon markup.</returns>
+    public static string ModuleIcon(string module) => module switch
+    {
+        "OR / SDM" => MudBlazor.Icons.Material.Filled.Assignment,
+        "In Use" => MudBlazor.Icons.Material.Filled.FactCheck,
+        "OCO" => MudBlazor.Icons.Material.Filled.Campaign,
+        "Servis Hesapları" => MudBlazor.Icons.Material.Filled.ManageAccounts,
+        "Kimlik" => MudBlazor.Icons.Material.Filled.PersonSearch,
+        "Bağlantılar" => MudBlazor.Icons.Material.Filled.Link,
+        "Erişim" => MudBlazor.Icons.Material.Filled.AdminPanelSettings,
+        "Raporlar" => MudBlazor.Icons.Material.Filled.Insights,
+        "Sistem" => MudBlazor.Icons.Material.Filled.MonitorHeart,
+        "Tarihsel" => MudBlazor.Icons.Material.Filled.History,
+        _ => MudBlazor.Icons.Material.Filled.Extension
+    };
+
+    /// <summary>Stable colour-tone class for a module card (decoration only; text always names the module).</summary>
+    /// <param name="module">Module name from the server action catalogue.</param>
+    /// <returns>A <c>so-tone-N</c> class.</returns>
+    public static string ModuleTone(string module) => $"so-tone-{ModuleOrder(module) % 6}";
+
     /// <summary>Written guidance for a server catalogue module, or <c>null</c> when none is written.</summary>
     /// <param name="module">Module name from the server action catalogue.</param>
     /// <returns>Guidance sentence.</returns>

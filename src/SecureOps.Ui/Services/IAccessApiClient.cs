@@ -26,4 +26,9 @@ public interface IAccessApiClient
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Provider-neutral logout result.</returns>
     public Task<LogoutResponse> LogoutAsync(CancellationToken cancellationToken);
+
+    /// <summary>Reads the server explanation of the caller's own effective actions per module.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Granted and not-granted actions per module, with the assigned roles that grant each.</returns>
+    public Task<AccessEffectiveResponse> GetMyEffectiveAsync(CancellationToken cancellationToken);
 }

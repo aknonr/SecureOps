@@ -1,0 +1,110 @@
+@using SecureOps.Shared.Contracts.Access
+@*
+    Shows one user's effective access per module, exactly as the server explains it
+    (GET .../effective). The panel decides nothing: "Yapabilir" and the role that grants it come from
+    the server, and a user who is not Approved is shown with nothing granted. Granted/not granted is
+    always stated in words and with an icon, never by colour alone.
+*@
+
+<section class="eff" aria-label="@Title">
+    <header class="eff-head">
+        <div>
+            <h2 class="eff-title">@Title</h2>
+            <p class="eff-lead">
+                @if (Effective.Status != "Approved")
+                {
+                    <span>Erişim onaylı olmadığı için şu an hiçbir işlem yapılamaz.</span>
+                }
+                else
+                {
+                    <span><strong>@Effective.GrantedCount</strong> işlem, <strong>@ModulesWithGrants</strong> modülde yapılabilir.</span>
+                }
+            </p>
+        </div>
+        <MudChipSet T="string" SelectedValue="@_filter" SelectedValueChanged="value => _filter = value ?? All" SelectionMode="SelectionMode.SingleSelection"
+                    CheckMark="true" Size="Size.Small" Variant="Variant.Outlined" aria-label="Gösterilecek işlemler">
+            <MudChip T="string" Value="@All" Text="Tüm işlemler" />
+            <MudChip T="string" Value="@GrantedOnly" Text="Yalnız yapabildikleri" />
+        </MudChipSet>
+    </header>
+
+    @if (Effective.Roles.Count > 0)
+    {
+        <p class="eff-roles">
+            <span class="eff-roles-label">Atanmış roller:</span>
+            @foreach (string role in Effective.Roles)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" title="@role">@RoleName(role)</MudChip>
+            }
+        </p>
+    }
+
+    <div class="eff-grid">
+        @foreach (AccessEffectiveModuleResponse module in OrderedModules)
+        {
+            IReadOnlyList<AccessEffectiveActionResponse> actions = _filter == GrantedOnly ? [.. module.Actions.Where(action => action.Granted)] : module.Actions;
+            if (actions.Count == 0) { continue; }
+            int granted = module.Actions.Count(action => action.Granted);
+            <article class="eff-card @AccessLabels.ModuleTone(module.Module)" aria-label="@($"{module.Module}: {granted} / {module.Actions.Count} işlem")">
+                <div class="eff-card-head">
+                    <span class="eff-icon" aria-hidden="true"><MudIcon Icon="@AccessLabels.ModuleIcon(module.Module)" /></span>
+                    <div class="eff-card-title">
+                        <h3>@module.Module</h3>
+                        <span class="eff-count">@granted / @module.Actions.Count işlem</span>
+                    </div>
+                </div>
+                <div class="eff-meter" aria-hidden="true"><span style="width:@(Percent(granted, module.Actions.Count))%"></span></div>
+                @if (AccessLabels.ModuleGuidance(module.Module) is { } guidance) { <p class="eff-guidance">@guidance</p> }
+                <ul class="eff-actions">
+                    @foreach (AccessEffectiveActionResponse action in actions)
+                    {
+                        <li class="eff-action @(action.Granted ? "is-granted" : "is-denied")">
+                            <MudIcon Icon="@(action.Granted ? Icons.Material.Filled.CheckCircle : Icons.Material.Outlined.Block)" Size="Size.Small" aria-hidden="true" />
+                            <div class="eff-action-text">
+                                <span class="eff-action-name">@action.Name <span class="eff-state">@(action.Granted ? "Yapabilir" : "Yapamaz")</span></span>
+                                <span class="eff-action-desc">@action.Description</span>
+                                @if (action.Granted)
+                                {
+                                    <span class="eff-via">
+                                        @if (action.ViaRoles.Count == 0) { <span>Kayıtlı yetki; hiçbir rol açıklamıyor.</span> }
+                                        else { <span>Rol: @string.Join(", ", action.ViaRoles.Select(RoleName))</span> }
+                                    </span>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </article>
+        }
+    </div>
+</section>
+
+@code {
+    private const string All = "all";
+    private const string GrantedOnly = "granted";
+    private string _filter = All;
+
+    /// <summary>Server explanation of the user's effective access.</summary>
+    [Parameter, EditorRequired] public AccessEffectiveResponse Effective { get; set; } = default!;
+
+    /// <summary>Section heading.</summary>
+    [Parameter] public string Title { get; set; } = "Modül bazlı yetkiler";
+
+    /// <summary>Optional role display names (code → name) known to the caller, e.g. from role definitions.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? RoleNames { get; set; }
+
+    /// <summary>Starts with only the granted actions visible.</summary>
+    [Parameter] public bool StartWithGrantedOnly { get; set; }
+
+    protected override void OnInitialized() => _filter = StartWithGrantedOnly ? GrantedOnly : All;
+
+    private IEnumerable<AccessEffectiveModuleResponse> OrderedModules =>
+        Effective.Modules.OrderBy(module => AccessLabels.ModuleOrder(module.Module));
+
+    private int ModulesWithGrants => Effective.Modules.Count(module => module.Actions.Any(action => action.Granted));
+
+    private string RoleName(string code) =>
+        RoleNames?.TryGetValue(code, out string? name) == true && !string.IsNullOrWhiteSpace(name) ? name : AccessLabels.HeldRoleLabel(code);
+
+    private static int Percent(int part, int total) => total == 0 ? 0 : (int)Math.Round(100.0 * part / total);
+}
