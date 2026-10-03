@@ -21,7 +21,7 @@ Queued intents and classifies expired Dispatching as Unknown. Original initiator
 survives Worker restart; current authorization is checked again before dispatch.
 SQL intent/audit precedes SMTP, recorded acceptance does not prove inbox delivery.
 See the current planned-announcements contract and Turkish upgrade runbook.
-The console needs .NET 8, the same private DB/schema/queue/profile/relay policy as
+The console needs the .NET 10 runtime (packages built before 2026-10-02: .NET 8), the same private DB/schema/queue/profile/relay policy as
 API, its actual Windows runtime identity, and private config/assets/log ACLs. It
 does not inherit IIS web.config or AppPool identity. Native hosting does not change
 these fences, send retries, actor attribution or SQL recovery contracts.
@@ -57,7 +57,7 @@ No direct in-memory calls, no message broker, no HTTP between them.
 
 ## Foreground Hosting
 
-Use the matched Worker payload, .NET 8 `Microsoft.NETCore.App`, and the approved
+Use the matched Worker payload, .NET 10 `Microsoft.NETCore.App` (.NET 8 for pre-2026-10-02 packages), and the approved
 server-owned configuration. No SDK is required. New source loads configuration
 from AppContext.BaseDirectory in console, service and diagnostics modes; only
 appsettings.Test.json is supported without requiring appsettings.json. Existing
