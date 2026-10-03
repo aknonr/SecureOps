@@ -1,6 +1,4 @@
-.so-inuse-records > li { grid-template-columns: minmax(0,1fr) minmax(10rem,.45fr) minmax(0,1.25fr) auto; align-items: start; padding-block: 1.25rem; }
 .inuse-request-date { display: flex; flex-direction: column; gap: .35rem; }
-.so-inuse-records h2 { font-size: 16px; line-height: 1.45; margin-top: .45rem; }
 .inuse-row-state p { margin-block: .35rem; }
 .inuse-row-state, .so-inuse-records > li > div { min-width: 0; overflow-wrap: anywhere; }
 .so-inuse-server-table th, .so-inuse-server-table td { overflow-wrap: anywhere; }
@@ -37,7 +35,6 @@
 .inuse-action-area { position: sticky; bottom: 0; padding: .75rem; background: var(--mud-palette-surface); border-top: 1px solid var(--mud-palette-lines-default); z-index: 2; display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
 .so-inuse select, .so-inuse button, .so-inuse a { scroll-margin-block: 6rem; }
 @media(max-width: 1000px) {
-    .so-inuse-records > li { grid-template-columns: minmax(0,1fr) minmax(10rem,.5fr); }
     .inuse-row-state { grid-column: 1 / -1; }
     .inuse-answer-table thead { display: none; }
     .inuse-answer-table table, .inuse-answer-table tbody, .inuse-answer-table tr, .inuse-answer-table th, .inuse-answer-table td { display: block; width: 100%; }
@@ -53,4 +50,84 @@
     .inuse-policy-table th, .inuse-policy-table td { border: 0; padding: .3rem 0; }
 }
 @media(max-width: 900px) { .inuse-ticket-summary { grid-template-columns: 1fr 1fr; } }
-@media(max-width: 600px) { .so-inuse-records > li,.inuse-ticket-summary { grid-template-columns: minmax(0,1fr); } }
+@media(max-width: 600px) { .inuse-ticket-summary { grid-template-columns: minmax(0,1fr); } }
+
+/* -- In Use list, 2026-10-03: one calm card per record; the next step is the loudest element -- */
+.ix-toolbar { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: .75rem 1rem; align-items: end; }
+.ix-select { display: flex; flex-direction: column; gap: 4px; font-weight: 600; color: var(--so-text-muted); font-size: 14px !important; }
+.ix-select select { border: 1px solid var(--so-border-input); border-radius: var(--so-radius); padding: 0 .75rem; background: var(--so-surface); color: var(--so-text); }
+.ix-source { display: flex; flex-direction: column; gap: .5rem; border-bottom: 0 !important; }
+.ix-source-main { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.25rem; }
+.ix-count { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 18px; color: var(--so-text); }
+.ix-source-time { color: var(--so-text-muted); font-size: 14px !important; }
+.ix-explain { color: var(--so-text-muted); }
+.ix-explain > summary { display: inline-flex; align-items: center; gap: 6px; font-weight: 500 !important; font-size: 14px; color: var(--so-text-muted); }
+.ix-explain p { font-size: 14px !important; margin: .25rem 0; }
+.ix-note { font-size: 14px !important; color: var(--so-text-muted); margin: .25rem 0; }
+
+.ix-cards { display: flex; flex-direction: column; gap: 1rem; }
+.ix-cards > li.ix-card {
+    --tone: var(--so-info);
+    display: flex; flex-direction: column; align-items: stretch; text-align: left; gap: .75rem;
+    padding: 1.1rem 1.25rem 1.1rem 1.4rem;
+    border: 1px solid var(--so-border); border-radius: var(--so-radius-lg);
+    background: var(--so-surface); position: relative; overflow: hidden;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+    transition: box-shadow 160ms ease, transform 160ms ease;
+}
+.ix-cards > li.ix-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--tone); }
+.ix-cards > li.ix-card:hover { box-shadow: 0 10px 26px rgb(0 0 0 / 10%); transform: translateY(-1px); }
+.ix-card--warn { --tone: var(--so-warning) !important; }
+.ix-card--todo { --tone: var(--so-info) !important; }
+.ix-card--ready { --tone: var(--so-success) !important; }
+.ix-card--neutral { --tone: var(--so-text-faint) !important; }
+
+.ix-card-top { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; }
+.ix-code {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-weight: 700; font-size: 14px;
+    padding: 3px 10px; border-radius: 99px; color: var(--so-accent-strong);
+    background: color-mix(in srgb, var(--so-accent) 12%, transparent); text-decoration: none;
+}
+.ix-code:hover { text-decoration: underline; }
+.ix-state { font-size: 13px; font-weight: 600; color: var(--so-text-muted); padding: 2px 8px; border-radius: 99px; background: var(--so-bg-sunken); }
+.ix-spacer { flex: 1; }
+.ix-title { margin: 0; font-size: 19px; line-height: 1.35; font-weight: 700; color: var(--so-text); overflow-wrap: anywhere; }
+
+.ix-progress { display: flex; align-items: center; gap: .75rem; font-size: 14px; color: var(--so-text-muted); }
+.ix-meter { flex: 0 1 240px; height: 8px; border-radius: 99px; background: var(--so-bg-sunken); overflow: hidden; }
+.ix-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--tone); transition: width 400ms ease; }
+
+.ix-next {
+    display: flex; align-items: center; gap: 8px; margin: 0 !important; padding: .55rem .8rem; border-radius: var(--so-radius);
+    font-weight: 600; color: var(--so-text) !important;
+    background: color-mix(in srgb, var(--tone) 12%, var(--so-surface));
+    border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+}
+.ix-next ::deep .mud-icon-root { color: var(--tone); }
+
+.ix-people { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem 1.25rem; }
+.ix-person-slot { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ix-label { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--so-text-muted); }
+.ix-date { font-size: 15px; color: var(--so-text); }
+.ix-muted { color: var(--so-text-muted) !important; font-style: italic; }
+.ix-reporters { display: flex; flex-direction: column; gap: 6px; }
+.ix-reporter-row { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; }
+
+.ix-servers { border-top: 1px dashed var(--so-border-soft); padding-top: .25rem; }
+.ix-servers > summary { font-size: 14px; color: var(--so-accent-strong); }
+.ix-meta { display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; margin: 0 !important; font-size: 13px !important; color: var(--so-text-muted); }
+.ix-pager { justify-content: center; }
+
+@media (max-width: 1000px) {
+    .ix-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .ix-search { grid-column: 1 / -1; }
+    .ix-people { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+    .ix-toolbar, .ix-people { grid-template-columns: minmax(0, 1fr); }
+    .ix-card-top .ix-spacer { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ix-cards > li.ix-card { transition: none; }
+    .ix-cards > li.ix-card:hover { transform: none; }
+}

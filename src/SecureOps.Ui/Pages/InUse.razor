@@ -53,62 +53,97 @@
         @if (_busy) { <SoLoading Message="İşlem sürüyor" /> }
         @if (!Id.HasValue)
         {
-            <div class="so-inuse-filters" data-guide="inuse-filter">
-                <div><MudTextField T="string" Label="OR, sunucu veya bildiren ara" aria-label="In Use kayıt ara" MaxLength="100" Value="_search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Margin="Margin.Dense" /></div>
-                <label>Görünüm<select aria-label="In Use görünüm" @bind="_view" @bind:after="FilterAsync">
+            <div class="ix-toolbar so-inuse-filters" data-guide="inuse-filter">
+                <div class="ix-search"><MudTextField T="string" Label="OR, sunucu veya bildiren ara" aria-label="In Use kayıt ara" MaxLength="100" Value="_search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" /></div>
+                <label class="ix-select">Görünüm<select aria-label="In Use görünüm" @bind="_view" @bind:after="FilterAsync">
                     <option value="all">Tümü</option><option value="review">İnceleme</option><option value="pending">WASAS adımı bekleyen</option><option value="verification">Doğrulama bekleyen</option><option value="tracking">Tamamlanan / takip</option><option value="mine">Bana atanan</option><option value="unassigned">Atanmamış</option>
                 </select></label>
-                <label>İnceleme durumu<select aria-label="In Use durum" @bind="_status" @bind:after="FilterAsync">
+                <label class="ix-select">İnceleme durumu<select aria-label="In Use durum" @bind="_status" @bind:after="FilterAsync">
                     <option value="">Aktif incelemeler</option><option value="Unreviewed">İncelenmedi</option><option value="Draft">Taslak</option><option value="Stale">Yeniden inceleme</option><option value="Discarded">Kaldırılmış taslaklar</option>
                 </select></label>
-                <label>Sıralama<select aria-label="In Use sıralaması" aria-describedby="inuse-date-order-note" @bind="_sort" @bind:after="FilterAsync">
+                <label class="ix-select">Sıralama<select aria-label="In Use sıralaması" aria-describedby="inuse-date-order-note" @bind="_sort" @bind:after="FilterAsync">
                     <option value="code">OR numarasına göre</option><option value="oldest" disabled>En eski talep (kullanılamıyor)</option><option value="newest" disabled>En yeni talep (kullanılamıyor)</option>
                 </select></label>
             </div>
-            <p id="inuse-date-order-note">Ana OR oluşturulma tarihi kaynaktan doğrulanmadığı için tarihe göre sıralama kullanılamıyor. İnceleme ve WASAS adımı onayının ön koşulu değildir.</p>
-            <section data-guide="inuse-refresh" class="so-inuse-band">
-                <p>Kaynak yenileme kayıtları, sunucu ilişkilerini ve bildirenleri okur; güvenlik kontrollerini yapmaz, kaydı kapatmaz.</p>
-                @if (Can(Capabilities.InUseRefresh))
-                { <MudButton OnClick="RefreshAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Outlined">In Use kaynağını yenile</MudButton> }
+            <section data-guide="inuse-refresh" class="ix-source so-inuse-band" aria-label="Kaynak durumu">
+                <div class="ix-source-main">
+                    @if (_page is not null)
+                    {
+                        <span class="ix-count"><MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" aria-hidden="true" /><span>@_page.Total kayıtlı eşleşme</span></span>
+                        <span class="ix-source-time">Son başarılı okuma: @Time(_page.Refresh.LastSuccessfulAt)</span>
+                    }
+                    @if (Can(Capabilities.InUseRefresh))
+                    { <MudButton OnClick="RefreshAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Outlined" Size="Size.Small">In Use kaynağını yenile</MudButton> }
+                </div>
                 @if (_page is not null)
                 {
-                    <p>Son başarılı okuma: @Time(_page.Refresh.LastSuccessfulAt)</p>
-                    @if (_page.Refresh.Stale) { <MudAlert Severity="@(_page.Refresh.Issue == "SourceCompletenessUnverified" && _page.Refresh.LastSuccessfulAt >= DateTimeOffset.UtcNow.AddHours(-24) ? Severity.Info : Severity.Warning)">@RefreshIssue(_page.Refresh.Issue) Kayıtlı veriler korunur.</MudAlert> }
+                    @if (_page.Refresh.Stale) { <MudAlert Dense="true" Severity="@(_page.Refresh.Issue == "SourceCompletenessUnverified" && _page.Refresh.LastSuccessfulAt >= DateTimeOffset.UtcNow.AddHours(-24) ? Severity.Info : Severity.Warning)">@RefreshIssue(_page.Refresh.Issue) Kayıtlı veriler korunur.</MudAlert> }
                     else if (_page.Items.Any(r => r.Source.ServiceItemsState == "Observed"))
-                    { <p>Gözlenen servis öğeleri gösteriliyor; ilişkilerin tamlığı doğrulanmadı.</p> }
-                    <p>@_page.Total kayıtlı eşleşme</p>
+                    { <p class="ix-note">Gözlenen servis öğeleri gösteriliyor; ilişkilerin tamlığı doğrulanmadı.</p> }
                 }
+                <details class="ix-explain">
+                    <summary><MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" aria-hidden="true" /> Bu liste nasıl okunur?</summary>
+                    <p>Kaynak yenileme kayıtları, sunucu ilişkilerini ve bildirenleri okur; güvenlik kontrollerini yapmaz, kaydı kapatmaz.</p>
+                    <p id="inuse-date-order-note">Ana OR oluşturulma tarihi kaynaktan doğrulanmadığı için tarihe göre sıralama kullanılamıyor. İnceleme ve WASAS adımı onayının ön koşulu değildir.</p>
+                </details>
             </section>
             <section data-guide="inuse-list" aria-label="In Use kayıtları">
-                @if (_page is { Items.Count: 0 }) { <SoEmptyState Title="Kayıtlı eşleşme yok" Description="Filtreleri kontrol edin veya yetkinizle kaynağı yenileyin." /> }
+                @if (_page is { Items.Count: 0 }) { <SoEmptyState Title="Kayıtlı eşleşme yok" Description="Filtreleri kontrol edin veya yetkinizle kaynağı yenileyin." Icon="@Icons.Material.Outlined.FactCheck" /> }
                 @if (_page is not null)
                 {
-                    <ul class="so-inuse-records">
+                    <ul class="so-inuse-records ix-cards">
                     @foreach (InUseRecord record in _page.Items)
                     {
-                        <li><div><a href="@RecordUrl(record.Id)">@record.Source.Code</a><h2>@record.Source.Title</h2>
-                            @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }</div>
-                            <div class="inuse-request-date"><strong>Talep tarihi</strong>
-                                @if (InUseProgress.Created(record.Source, DateTimeOffset.UtcNow) is { } created)
-                                { <time datetime="@created.ToString("O")">@created.ToUniversalTime().ToString("dd.MM.yyyy HH:mm:ss") UTC</time> }
-                                else { <span>Tarih alınmadı / doğrulanmadı</span> }
+                        int saved = SavedCompleted(record);
+                        int total = record.Source.Servers.Count;
+                        <li class="ix-card ix-card--@RowTone(record)">
+                            <div class="ix-card-top">
+                                <a class="ix-code" href="@RecordUrl(record.Id)">@record.Source.Code</a>
+                                <span class="ix-state">@(record.Discarded ? "Yerel taslak kaldırılmış" : Status(record.Status))</span>
+                                @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }
+                                <span class="ix-spacer"></span>
+                                <MudButton Href="@RecordUrl(record.Id)" Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">@(record.TrackingOnly ? "Takip et" : "İncele")</MudButton>
                             </div>
-                            <div class="inuse-row-state"><strong class="inuse-assignee">Atanan inceleyici: @(record.AssigneeLabel ?? "Atanmamış")</strong>
-                                <p>@SavedCompleted(record) / @record.Source.Servers.Count sunucu kaydedildi · @(record.Discarded ? "Yerel taslak kaldırılmış" : Status(record.Status))</p>
-                                <p class="inuse-next">@RowNext(record)</p><small>Son okuma: @Time(record.LastSeenAt)</small>
-                                <p><strong>OR talep eden:</strong> @InUseDisplayText.Decode(record.Source.Requester.Value)</p>
+                            <h2 class="ix-title">@record.Source.Title</h2>
+                            <div class="ix-progress" aria-label="@($"{saved} / {total} sunucu kaydedildi")">
+                                <div class="ix-meter" aria-hidden="true"><span style="width:@(total == 0 ? 0 : 100 * saved / total)%"></span></div>
+                                <span>@saved / @total sunucu kaydedildi</span>
+                            </div>
+                            <p class="ix-next inuse-next"><MudIcon Icon="@RowIcon(record)" Size="Size.Small" aria-hidden="true" /><span>@RowNext(record)</span></p>
+                            <div class="ix-people">
+                                <div class="ix-person-slot"><span class="ix-label">OR talep eden</span><SoPerson Name="@(record.Source.Requester.Value is { } requester ? InUseDisplayText.Decode(requester) : null)" Fallback="Talep eden bilinmiyor" /></div>
+                                <div class="ix-person-slot inuse-assignee"><span class="ix-label">Atanan inceleyici</span><SoPerson Name="@record.AssigneeLabel" Fallback="Atanmamış" /></div>
+                                <div class="ix-person-slot inuse-request-date"><span class="ix-label">Talep tarihi</span>
+                                    @if (InUseProgress.Created(record.Source, DateTimeOffset.UtcNow) is { } created)
+                                    { <time class="ix-date" datetime="@created.ToString("O")">@created.ToUniversalTime().ToString("dd.MM.yyyy HH:mm:ss") UTC</time> }
+                                    else { <span class="ix-date ix-muted">Tarih alınmadı / doğrulanmadı</span> }
+                                </div>
+                            </div>
+                            @if (RfcReporters(record) is { Count: > 0 } reporters)
+                            {
+                                <div class="ix-reporters" aria-label="RFC talep edenler">
+                                    <span class="ix-label">RFC talep edenler</span>
+                                    <div class="ix-reporter-row">
+                                        @foreach (var reporter in reporters)
+                                        { <SoPerson Compact="true" Name="@reporter.Name" Caption="@reporter.Caption" /> }
+                                    </div>
+                                </div>
+                            }
+                            <details class="ix-servers">
+                                <summary>@total sunucu · sunucu ve RFC eşleşmeleri</summary>
                                 <div class="so-inuse-server-table"><table><thead><tr><th>RFC talep eden · Ad soyad</th><th>Sunucu - RFC eşleşmesi</th></tr></thead><tbody>
                                 @foreach (var server in record.Source.Servers)
                                 { <tr><td><span class="so-inuse-mobile-label">RFC talep eden · Ad soyad</span><InUseReporter Value="server.RelatedRequestReporter" /></td><td><span class="so-inuse-mobile-label">Sunucu - RFC eşleşmesi</span>@Field(server, "HOSTNAME") · @(server.RelatedRequestReporter?.RequestCode ?? server.RelatedRequestReporter?.RfcReference ?? "RFC alınmadı")</td></tr> }
                                 </tbody></table></div>
-                                <p><strong>WASAS aktivitesi:</strong> @SourceActivity(record) · <strong>Genel OR:</strong> @SourceLifecycle(record)</p>
-                                @if (record.SourceObservationMissing) { <p>Son yenilemede görülmedi; önceki kaynak gözlemi korunuyor.</p> }
-                                @if (record.Source.ServiceItemsState is "Partial" or "Failed" or "Forbidden" or "Ambiguous")
-                                { <p>@Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p> }</div>
-                            <MudButton Href="@RecordUrl(record.Id)" EndIcon="@Icons.Material.Filled.ArrowForward">@(record.TrackingOnly ? "Takip et" : "İncele")</MudButton></li>
+                            </details>
+                            <p class="ix-meta"><span><strong>WASAS aktivitesi:</strong> @SourceActivity(record)</span><span><strong>Genel OR:</strong> @SourceLifecycle(record)</span><span>Son okuma: @Time(record.LastSeenAt)</span></p>
+                            @if (record.SourceObservationMissing) { <p class="ix-note">Son yenilemede görülmedi; önceki kaynak gözlemi korunuyor.</p> }
+                            @if (record.Source.ServiceItemsState is "Partial" or "Failed" or "Forbidden" or "Ambiguous")
+                            { <p class="ix-note">@Relationship(record.Source.ServiceItemsState, record.Source.Servers.Count)</p> }
+                        </li>
                     }
                     </ul>
-                    <footer class="so-inuse-pager">
+                    <footer class="so-inuse-pager ix-pager">
                         <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki In Use sayfası" Disabled="@(_busy || _number == 1)" OnClick="PreviousAsync" />
                         <span>Sayfa @_number / @Math.Max(1, (int)Math.Ceiling((double)_page.Total / _size))</span>
                         <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki In Use sayfası" Disabled="@(_busy || _number * _size >= _page.Total)" OnClick="NextAsync" />

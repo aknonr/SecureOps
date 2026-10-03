@@ -120,6 +120,29 @@ public partial class InUse
         : record.Status == "Stale" ? "Sunucu incelemesini etkileyen farkları inceleyin; cevaplar korunuyor"
         : record.Source.Servers.Count == 0 ? "Sunucu ilişki kanıtı gerekli"
         : SavedCompleted(record) < record.Source.Servers.Count ? "Eksik cevapları tamamla" : "Excel önizlemesini incele";
+    // Visual tone of the row's next step; mirrors the RowNext branches so colour and text never disagree.
+    private static string RowTone(InUseRecord record) => record.TrackingOnly ? "neutral"
+        : record.HasActiveExecution || record.SourceObservationMissing || record.Status == "Stale" || record.Source.Servers.Count == 0 ? "warn"
+        : SavedCompleted(record) < record.Source.Servers.Count ? "todo" : "ready";
+
+    private static string RowIcon(InUseRecord record) => RowTone(record) switch
+    {
+        "warn" => Icons.Material.Filled.WarningAmber,
+        "todo" => Icons.Material.Filled.EditNote,
+        "ready" => Icons.Material.Filled.TaskAlt,
+        _ => Icons.Material.Filled.Visibility
+    };
+
+    // Distinct RFC requesters of a record, readable at a glance; the full per-server table stays one click away.
+    private static IReadOnlyList<(string Name, string Caption)> RfcReporters(InUseRecord record) =>
+    [
+        .. record.Source.Servers
+            .Select(server => server.RelatedRequestReporter)
+            .Where(reporter => reporter is not null && !string.IsNullOrWhiteSpace(reporter.Display))
+            .GroupBy(reporter => InUseDisplayText.Decode(reporter!.Display!), StringComparer.CurrentCultureIgnoreCase)
+            .Select(group => (group.Key, string.Join(", ", group.Select(r => r!.RequestCode ?? r.RfcReference).Where(code => code is not null).Distinct())))
+    ];
+
     private Task LoadAsync()
     {
         ++_generation;
