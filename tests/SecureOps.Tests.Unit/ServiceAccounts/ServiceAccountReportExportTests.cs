@@ -71,6 +71,43 @@ public sealed class ServiceAccountReportExportTests
         }
     }
 
+    [Fact]
+    public void Xlsx_TableSheets_HaveAShadedFrozenFilteredHeader_AndTheCoverStartsWithTheTitle()
+    {
+        ReportDocument document = Document("SYN_SVC_01");
+        byte[] bytes = ReportWorkbookWriter.Write(document);
+        using ZipArchive zip = new(new MemoryStream(bytes));
+        string Part(string name)
+        {
+            using StreamReader reader = new(zip.GetEntry(name)!.Open());
+            return reader.ReadToEnd();
+        }
+
+        string workbook = Part("xl/workbook.xml");
+        string cover = Part("xl/worksheets/sheet1.xml");
+        string table = Part("xl/worksheets/sheet2.xml");
+        cover.Should().NotContain("<pane").And.NotContain("<autoFilter");
+        table.Should().Contain("state=\"frozen\"").And.Contain("<autoFilter ref=\"A1:");
+        table.IndexOf("<sheetViews>", StringComparison.Ordinal).Should().BeLessThan(table.IndexOf("<cols>", StringComparison.Ordinal), "schema order");
+        table.IndexOf("</sheetData>", StringComparison.Ordinal).Should().BeLessThan(table.IndexOf("<autoFilter", StringComparison.Ordinal), "schema order");
+        workbook.Should().Contain("_xlnm._FilterDatabase").And.Contain("localSheetId=\"1\"");
+        workbook.IndexOf("</sheets>", StringComparison.Ordinal).Should().BeLessThan(workbook.IndexOf("<definedNames>", StringComparison.Ordinal));
+        Part("xl/styles.xml").Should().Contain("<cellXfs count=\"4\">").And.Contain("patternType=\"solid\"");
+        SpreadsheetReader.Read(bytes, new SpreadsheetLimits(), ["Rapor"], out _).Single().Rows[0].Cells["A"].Text.Should().Be(document.Title);
+    }
+
+    [Fact]
+    public void Pdf_IsLandscape_UsesABoldFontForHeadings_AndKeepsDashes()
+    {
+        ReportDocument document = Document("SYN_SVC_01") with { Title = "Servis hesapları — SYN" };
+        byte[] pdf = ReportPdfWriter.Write(document);
+        string raw = Encoding.Latin1.GetString(pdf);
+        raw.Should().Contain("/MediaBox [0 0 841.89 595.28]").And.Contain("/BaseFont /Courier-Bold").And.Contain(" re f");
+        IReadOnlyList<string> lines = ReportPdfWriter.ExtractLines(pdf);
+        lines[0].Should().Be("Servis hesapları — SYN");
+        lines.Should().Contain(l => l.StartsWith("Sayfa 1/", StringComparison.Ordinal));
+    }
+
     private static ReportDocument Document(string account)
     {
         var a = Guid.NewGuid();
