@@ -22,19 +22,13 @@ public interface IOidcBackchannelClient
 }
 
 /// <inheritdoc />
-public sealed class OidcBackchannelClient : IOidcBackchannelClient
+/// <summary>Initializes the server-only backchannel.</summary>
+public sealed class OidcBackchannelClient(
+    IOptions<OidcOptions> configured,
+    IOptionsMonitor<OpenIdConnectOptions> handlerOptions) : IOidcBackchannelClient
 {
-    private readonly OidcOptions _configured;
-    private readonly IOptionsMonitor<OpenIdConnectOptions> _handlerOptions;
-
-    /// <summary>Initializes the server-only backchannel.</summary>
-    public OidcBackchannelClient(
-        IOptions<OidcOptions> configured,
-        IOptionsMonitor<OpenIdConnectOptions> handlerOptions)
-    {
-        _configured = configured.Value;
-        _handlerOptions = handlerOptions;
-    }
+    private readonly OidcOptions _configured = configured.Value;
+    private readonly IOptionsMonitor<OpenIdConnectOptions> _handlerOptions = handlerOptions;
 
     /// <inheritdoc />
     public async Task<OpenIdConnectMessage> PostTokenAsync(

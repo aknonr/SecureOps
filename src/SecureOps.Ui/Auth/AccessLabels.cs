@@ -286,12 +286,11 @@ public static class AccessLabels
     public static IReadOnlyList<IGrouping<string, CapabilityDescriptor>> Group(
         IEnumerable<string> capabilities)
     {
-        return capabilities
+        return [.. capabilities
             .Distinct(StringComparer.Ordinal)
             .Select(Describe)
             .GroupBy(descriptor => descriptor.Group)
-            .OrderBy(group => GroupOrder(group.Key))
-            .ToArray();
+            .OrderBy(group => GroupOrder(group.Key))];
     }
 
     /// <summary>Functional display order; an unknown group sorts last, never first.</summary>

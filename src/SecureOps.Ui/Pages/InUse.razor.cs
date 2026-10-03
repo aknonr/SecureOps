@@ -215,7 +215,7 @@ public partial class InUse
         bool assignmentEdited = AssignmentEdited;
         SetRecord(await SendAsync<InUseRecord>(HttpMethod.Put, $"/{_record.Id}/draft",
             new SaveInUseDraftRequest(_record.Version, _record.SourceVersion,
-                _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence) { Origin = a.Origin }).ToArray(), _notes)
+                [.. _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, a.Evidence) { Origin = a.Origin })], _notes)
             { ReviewedPolicyFingerprint = _acceptPolicy ? _record.PolicyProposal?.Fingerprint : null }));
         if (assignmentEdited)
         { _assignee = assignee; }
@@ -265,7 +265,7 @@ public partial class InUse
     {
         if (_comparison is null || _record is null)
         { return; }
-        AnswerEdit[] local = _answers.ToArray();
+        AnswerEdit[] local = [.. _answers];
         bool answersEdited = _dirty && !_comparison.Discarded && _comparison.InvalidatedReviewsThrough < _record.Version, assignmentEdited = AssignmentEdited;
         string assignee = _assignee;
         SetRecord(_comparison);
@@ -330,7 +330,7 @@ public partial class InUse
         { return; }
         _report = await SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",
             new ExportInUseRequest(_record.Version, Archive: archivedVersion is null, ArchivedVersion: archivedVersion));
-        _record = _record with { ArchivedVersions = _record.ArchivedVersions.Append(_report.Version).Distinct().OrderDescending().ToArray() };
+        _record = _record with { ArchivedVersions = [.. _record.ArchivedVersions.Append(_report.Version).Distinct().OrderDescending()] };
         _notice = "Rapor WASAS arşivinde korunuyor. İndirme konumunu tarayıcınız belirler.";
         try
         {
@@ -345,7 +345,7 @@ public partial class InUse
     private bool Ready()
     {
         _answerView = "all";
-        InUseAnswer? missing = InUseChecks.Missing(_record!.Source, _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, "")).ToArray());
+        InUseAnswer? missing = InUseChecks.Missing(_record!.Source, [.. _answers.Select(a => new InUseAnswer(a.ServerId, a.Check, a.Value, ""))]);
         if (missing is not null)
         {
             _editingServer = missing.ServerId;
@@ -402,17 +402,17 @@ public partial class InUse
         _history = null;
         _reuseSelection.Clear();
         _rowElements.Clear();
-        _answers = record.Source.Servers.SelectMany(server => InUseChecks.OperatorCodes.Select(check =>
+        _answers = [.. record.Source.Servers.SelectMany(server => InUseChecks.OperatorCodes.Select(check =>
         {
             InUseAnswer? saved = record.Draft?.Answers.FirstOrDefault(a => a.ServerId == server.Id && a.Check == check);
             return new AnswerEdit(server.Id, check) { Value = saved?.Value ?? "Unknown", Evidence = saved?.Evidence ?? "", Origin = saved?.Origin };
-        })).ToList();
+        }))];
     }
     private void SelectServer(string id, ChangeEventArgs args)
     { if (args.Value is true) { _selected.Add(id); } else { _selected.Remove(id); } _changes = null; }
-    private void PreviewBulk() => _changes = _answers.Where(a => _selected.Contains(a.ServerId))
+    private void PreviewBulk() => _changes = [.. _answers.Where(a => _selected.Contains(a.ServerId))
         .Select(a => (Target: a, Before: a.Value, After: _answers.Single(s => s.ServerId == _editingServer && s.Check == a.Check).Value))
-        .Where(c => c.Before != c.After).ToArray();
+        .Where(c => c.Before != c.After)];
     private async Task ApplyBulk()
     {
         if (!CanEdit || _changes is null)

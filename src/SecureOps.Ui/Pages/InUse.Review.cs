@@ -145,7 +145,7 @@ public partial class InUse
     {
         if (!CanEdit || _history?.Proposals.SingleOrDefault(p => p.ReviewId == review.Id)?.CanReuse != true)
         { return; }
-        InUseAnswer[] selected = review.Answers.Where(a => _reuseSelection.Contains(review.Id + ":" + a.Check) && a.Value is "Yes" or "No").ToArray();
+        InUseAnswer[] selected = [.. review.Answers.Where(a => _reuseSelection.Contains(review.Id + ":" + a.Check) && a.Value is "Yes" or "No")];
         if (selected.Length == 0 || await Dialogs.ShowMessageBoxAsync("Önceki cevapları kullan",
             $"{review.OrCode} / {Time(review.ReviewedAt)} tarihli {selected.Length} cevap bu sunucuya öneri olarak alınacak. Kaydederken yeniden doğrulanacak.",
             yesText: "Seçili cevapları al", cancelText: "Vazgeç") != true)

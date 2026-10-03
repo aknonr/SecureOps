@@ -50,7 +50,7 @@ public interface IApiSessionStore
 /// </summary>
 public sealed class BrowserApiSession : IDisposable
 {
-    private readonly object _tokenLock = new();
+    private readonly Lock _tokenLock = new();
     private OidcServerTokenSet? _oidcTokens;
     private int _requiresReauthentication;
 
@@ -302,25 +302,17 @@ public sealed record OidcAccessTokenResult(string? AccessToken, bool RequiresRea
 /// hand the next request an empty container and create exactly the duplicate session this store
 /// exists to prevent. The API remains the authority on when a session actually ends.
 /// </remarks>
-public sealed class ApiSessionStore : IApiSessionStore
+/// <param name="cache">Backing memory cache.</param>
+public sealed class ApiSessionStore(IMemoryCache cache) : IApiSessionStore
 {
     /// <summary>Sliding lifetime of an idle jar.</summary>
     public static readonly TimeSpan IdleRetention = TimeSpan.FromHours(13);
 
-    private readonly IMemoryCache _cache;
-    private readonly object _cacheLock = new();
+    private readonly IMemoryCache _cache = cache;
+    private readonly Lock _cacheLock = new();
 
     /// <inheritdoc />
     public event Action<string>? ReauthenticationRequired;
-
-    /// <summary>
-    /// Initializes a new API session store.
-    /// </summary>
-    /// <param name="cache">Backing memory cache.</param>
-    public ApiSessionStore(IMemoryCache cache)
-    {
-        _cache = cache;
-    }
 
     /// <inheritdoc />
     public BrowserApiSession GetOrCreate(string browserSessionKey)

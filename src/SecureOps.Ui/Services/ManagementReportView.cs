@@ -169,7 +169,7 @@ public static class ManagementReportView
     /// <param name="report">Report to project.</param>
     /// <returns>One view per duration the server defines, in the server's order.</returns>
     public static IReadOnlyList<DurationView> Durations(ManagementReportResponse report) =>
-        report.OperationalWorkflow.Durations.Select(Duration).ToArray();
+        [.. report.OperationalWorkflow.Durations.Select(Duration)];
 
     /// <summary>
     /// Prepares one duration statistic.

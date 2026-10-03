@@ -12,19 +12,11 @@ namespace SecureOps.Ui.Pages;
 /// Anonymous by necessity: the session is already gone by the time this renders. Server-rendered so it
 /// still appears when no Blazor circuit can be established.
 /// </remarks>
+/// <param name="shellMode">Effective shell mode.</param>
 [AllowAnonymous]
-public sealed class SignedOutModel : PageModel
+public sealed class SignedOutModel(IDemoModeState shellMode) : PageModel
 {
-    private readonly IDemoModeState _shellMode;
-
-    /// <summary>
-    /// Initializes a new signed-out page model.
-    /// </summary>
-    /// <param name="shellMode">Effective shell mode.</param>
-    public SignedOutModel(IDemoModeState shellMode)
-    {
-        _shellMode = shellMode;
-    }
+    private readonly IDemoModeState _shellMode = shellMode;
 
     /// <summary>
     /// Whether this host should name its environment at all.

@@ -27,9 +27,7 @@ public sealed class HttpsOffloadMiddleware
         HttpsOffloadOptions value = options.Value;
         _next = next;
         _enabled = value.Enabled;
-        _trustedProxyIps = value.TrustedProxyIps
-            .Select(proxyIp => NormalizeAddress(IPAddress.Parse(proxyIp.Trim())))
-            .ToHashSet();
+        _trustedProxyIps = [.. value.TrustedProxyIps.Select(proxyIp => NormalizeAddress(IPAddress.Parse(proxyIp.Trim())))];
         _expectedHosts = value.ExpectedHosts
             .Select(host => host.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
