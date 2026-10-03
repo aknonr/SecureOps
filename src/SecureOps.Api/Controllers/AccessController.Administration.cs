@@ -55,19 +55,63 @@ public sealed partial class AccessController
     [ProducesResponseType(typeof(IReadOnlyList<AccessRoleDefinition>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<AccessRoleDefinition>>> RolesAsync([FromServices] IAccessRepository repository, CancellationToken cancellationToken)
     {
-        AccessServiceResult<EnsureAccessUserResult> result = await _accessService.GetCurrentAsync(User, Context(), cancellationToken);
-        if (!result.IsSuccess || result.Value!.User.Status != AccessStatus.Approved || !result.Value.User.Capabilities.Any(capability =>
-            capability is Capabilities.AccessManageUsers or Capabilities.AccessAssignRoles or Capabilities.AccessApproveRequests))
+        if (!await IsAccessAdministratorAsync(cancellationToken))
         {
             return Failure<IReadOnlyList<AccessRoleDefinition>>(OperationalErrorCodes.AccessDenied);
         }
 
-        if (repository is SqlAccessRepository sql)
+        return Ok(await repository.GetRoleDefinitionsAsync(cancellationToken));
+    }
+
+    /// <summary>Read-only module view: every registered action and the business roles that grant it.</summary>
+    [HttpGet("modules")]
+    [ProducesResponseType(typeof(AccessModuleOverviewResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccessModuleOverviewResponse>> ModulesAsync([FromServices] IAccessRepository repository, CancellationToken cancellationToken)
+    {
+        if (!await IsAccessAdministratorAsync(cancellationToken))
         {
-            return Ok(await sql.GetRoleDefinitionsAsync(cancellationToken));
+            return Failure<AccessModuleOverviewResponse>(OperationalErrorCodes.AccessDenied);
         }
 
-        return Ok(AccessRoleCatalog.RoleCodes.Select(code => new AccessRoleDefinition(code, code, "Synthetic fixed-role profile", 1, true, AccessRoleCatalog.GetCapabilities([code]))).ToArray());
+        return Ok(AccessModuleView.Overview(AccessActionCatalog.Actions, await repository.GetRoleDefinitionsAsync(cancellationToken)));
+    }
+
+    /// <summary>Explains, per module, what one user can do and through which assigned roles.</summary>
+    [HttpGet("users/{id:guid}/effective")]
+    [Authorize(Policy = Policies.CanManageUsers)]
+    [ProducesResponseType(typeof(AccessEffectiveResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AccessEffectiveResponse>> EffectiveAsync(Guid id, [FromServices] IAccessRepository repository, CancellationToken cancellationToken)
+    {
+        AccessServiceResult<AccessUserReadModel> result = await _accessService.GetUserAsync(id, Context(), cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return Failure<AccessEffectiveResponse>(result.ErrorCode!);
+        }
+
+        return Ok(AccessModuleView.Explain(result.Value!.User, AccessActionCatalog.Actions, await repository.GetRoleDefinitionsAsync(cancellationToken)));
+    }
+
+    /// <summary>Explains the caller's own effective access; any authenticated principal may read their own.</summary>
+    [HttpGet("me/effective")]
+    [ProducesResponseType(typeof(AccessEffectiveResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccessEffectiveResponse>> MyEffectiveAsync([FromServices] IAccessRepository repository, CancellationToken cancellationToken)
+    {
+        AccessServiceResult<EnsureAccessUserResult> result = await _accessService.GetCurrentAsync(User, Context(), cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return Failure<AccessEffectiveResponse>(result.ErrorCode!);
+        }
+
+        return Ok(AccessModuleView.Explain(result.Value!.User, AccessActionCatalog.Actions, await repository.GetRoleDefinitionsAsync(cancellationToken)));
+    }
+
+    // Same gate as the role definitions read: an Approved user holding any access-administration capability.
+    private async Task<bool> IsAccessAdministratorAsync(CancellationToken cancellationToken)
+    {
+        AccessServiceResult<EnsureAccessUserResult> result = await _accessService.GetCurrentAsync(User, Context(), cancellationToken);
+        return result.IsSuccess && result.Value!.User.Status == AccessStatus.Approved && result.Value.User.Capabilities.Any(capability =>
+            capability is Capabilities.AccessManageUsers or Capabilities.AccessAssignRoles or Capabilities.AccessApproveRequests);
     }
 
     /// <summary>Returns registered action descriptions; arbitrary permission strings cannot be registered.</summary>
