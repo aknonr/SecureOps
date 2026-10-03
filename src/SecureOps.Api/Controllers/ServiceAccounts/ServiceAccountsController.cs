@@ -220,7 +220,7 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     [RequestSizeLimit(_maxEvidenceRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = _maxEvidenceRequestBytes)]
     [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
-    public async Task<ActionResult<AccountDetail>> EvidenceUploadAsync(Guid id, [FromForm] IFormFile file, [FromForm] string ownerType, [FromForm] Guid ownerId,
+    public async Task<ActionResult<AccountDetail>> EvidenceUploadAsync(Guid id, IFormFile file, [FromForm] string ownerType, [FromForm] Guid ownerId,
         [FromForm] string? label, CancellationToken cancellationToken)
     {
         if (file is null || file.Length is 0 or > _maxEvidenceRequestBytes)

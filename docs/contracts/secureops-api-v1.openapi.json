@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.1",
+  "openapi": "3.0.4",
   "info": {
     "title": "SecureOps API",
     "description": "Internal SecureOps backend API.",
@@ -15,7 +15,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -23,7 +22,6 @@
           {
             "name": "Status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -31,7 +29,6 @@
           {
             "name": "Role",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -39,7 +36,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -48,7 +44,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -97,7 +92,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -128,7 +123,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -136,7 +130,6 @@
           {
             "name": "Status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -144,7 +137,6 @@
           {
             "name": "Role",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -152,7 +144,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -161,7 +152,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -210,7 +200,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -279,7 +269,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -374,7 +364,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -463,7 +453,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -560,7 +550,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -629,7 +619,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -660,7 +650,6 @@
           {
             "name": "status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -708,7 +697,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -786,7 +775,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -827,7 +816,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -876,7 +864,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -928,7 +916,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -996,7 +983,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1048,7 +1035,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1116,7 +1102,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1168,7 +1154,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1236,7 +1221,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1288,7 +1273,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1356,7 +1340,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1445,7 +1429,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1476,7 +1460,6 @@
           {
             "name": "page",
             "in": "query",
-            "style": "form",
             "schema": {
               "maximum": 10000,
               "minimum": 1,
@@ -1488,7 +1471,6 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "maximum": 100,
               "minimum": 1,
@@ -1500,7 +1482,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1524,7 +1506,6 @@
           {
             "name": "templateRevision",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "oco-v1"
@@ -1533,7 +1514,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1561,7 +1542,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1570,7 +1550,6 @@
           {
             "name": "version",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int64",
@@ -1580,7 +1559,6 @@
           {
             "name": "format",
             "in": "query",
-            "style": "form",
             "schema": {
               "enum": [
                 "draft",
@@ -1594,7 +1572,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "headers": {
               "ETag": {
                 "description": "Quoted current draft version",
@@ -1636,7 +1614,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1645,7 +1622,6 @@
           {
             "name": "version",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int64",
@@ -1664,7 +1640,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "headers": {
               "ETag": {
                 "description": "Quoted current draft version",
@@ -1703,7 +1679,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "headers": {
               "X-Announcement-Incomplete": {
                 "description": "Comma-separated missing-field keys; no saved version or ETag.",
@@ -1760,7 +1736,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1801,7 +1777,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1826,7 +1802,6 @@
             "name": "draftId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1835,7 +1810,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1862,7 +1837,6 @@
           {
             "name": "page",
             "in": "query",
-            "style": "form",
             "schema": {
               "maximum": 10000,
               "minimum": 1,
@@ -1874,7 +1848,6 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "maximum": 100,
               "minimum": 1,
@@ -1886,7 +1859,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1911,7 +1884,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1920,7 +1892,6 @@
           {
             "name": "draftId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1929,7 +1900,6 @@
           {
             "name": "version",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -1938,7 +1908,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1961,7 +1931,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1970,7 +1939,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1992,7 +1961,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2017,7 +1986,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -2055,7 +2023,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -2064,7 +2031,6 @@
           {
             "name": "jobId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -2073,7 +2039,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2095,7 +2061,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -2105,7 +2070,6 @@
             "name": "jobId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -2114,7 +2078,6 @@
           {
             "name": "reviewedSourceOffset",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2122,7 +2085,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2144,7 +2107,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -2162,7 +2124,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2200,7 +2162,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2280,7 +2242,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2300,7 +2262,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -2331,7 +2293,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2411,7 +2373,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -2442,7 +2404,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2522,7 +2484,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2542,7 +2504,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -2573,7 +2535,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2653,7 +2615,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -2684,7 +2646,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2764,7 +2726,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -2795,7 +2757,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2875,7 +2837,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -2906,7 +2868,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -2986,7 +2948,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -3017,7 +2979,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3097,7 +3059,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -3128,7 +3090,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3208,7 +3170,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3228,7 +3190,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -3259,7 +3221,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "OK"
           },
           "400": {
             "description": "Bad Request",
@@ -3322,7 +3284,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3342,7 +3304,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -3354,7 +3316,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3403,7 +3365,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3491,7 +3453,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3591,7 +3553,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -3603,7 +3565,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3651,7 +3613,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3699,7 +3661,7 @@
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3759,7 +3721,7 @@
             }
           },
           "503": {
-            "description": "Server Error"
+            "description": "Service Unavailable"
           }
         }
       }
@@ -3774,7 +3736,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -3883,7 +3844,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -3914,7 +3875,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3922,7 +3882,6 @@
           {
             "name": "From",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3931,7 +3890,6 @@
           {
             "name": "To",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3940,7 +3898,6 @@
           {
             "name": "Version",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -3949,7 +3906,6 @@
           {
             "name": "Status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3957,7 +3913,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -3966,7 +3921,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -4075,7 +4029,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -4107,7 +4061,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4235,7 +4188,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -4267,7 +4220,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4395,7 +4347,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -4427,7 +4379,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4536,7 +4487,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -4566,7 +4517,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4694,7 +4644,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -4726,7 +4676,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4854,7 +4803,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -4886,7 +4835,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4896,7 +4844,6 @@
             "name": "serverId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string"
             }
@@ -4904,7 +4851,6 @@
           {
             "name": "search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4912,7 +4858,6 @@
           {
             "name": "page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -4922,7 +4867,6 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -5032,7 +4976,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -5161,7 +5105,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -5193,7 +5137,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -5321,7 +5264,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -5353,7 +5296,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -5481,7 +5423,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -5512,7 +5454,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5520,7 +5461,6 @@
           {
             "name": "View",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5528,7 +5468,6 @@
           {
             "name": "Status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5536,7 +5475,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -5545,7 +5483,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -5554,7 +5491,6 @@
           {
             "name": "Sort",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5662,7 +5598,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -5694,7 +5630,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -5803,7 +5738,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -5834,7 +5769,6 @@
           {
             "name": "search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5942,7 +5876,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6090,7 +6024,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6122,7 +6056,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -6250,7 +6183,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6282,7 +6215,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -6410,7 +6342,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6442,7 +6374,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -6570,7 +6501,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6590,7 +6521,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6621,7 +6552,6 @@
           {
             "name": "window",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6629,7 +6559,6 @@
           {
             "name": "from",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -6638,7 +6567,6 @@
           {
             "name": "to",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -6687,7 +6615,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6727,7 +6655,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6758,7 +6686,6 @@
           {
             "name": "window",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6766,7 +6693,6 @@
           {
             "name": "from",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -6775,7 +6701,6 @@
           {
             "name": "to",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -6784,7 +6709,6 @@
           {
             "name": "page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -6794,7 +6718,6 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -6844,7 +6767,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6884,7 +6807,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6953,7 +6876,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -6982,7 +6905,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7013,7 +6936,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "maxLength": 100,
               "minLength": 0,
@@ -7023,7 +6945,6 @@
           {
             "name": "State",
             "in": "query",
-            "style": "form",
             "schema": {
               "$ref": "#/components/schemas/OperationalRecordWorkflowState"
             }
@@ -7032,7 +6953,6 @@
             "name": "Sort",
             "in": "query",
             "required": true,
-            "style": "form",
             "schema": {
               "pattern": "^(updated|oldest|code)$",
               "type": "string"
@@ -7041,7 +6961,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "maximum": 100000,
               "minimum": 1,
@@ -7052,7 +6971,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "maximum": 100,
               "minimum": 1,
@@ -7103,7 +7021,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7155,7 +7073,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7204,7 +7121,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7256,7 +7173,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7305,7 +7221,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7365,7 +7281,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7385,7 +7301,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7417,7 +7333,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7485,7 +7400,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7525,7 +7440,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7557,7 +7472,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7566,7 +7480,6 @@
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "style": "simple",
             "schema": {
               "type": "string"
             }
@@ -7614,7 +7527,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7674,7 +7587,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7694,7 +7607,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7726,7 +7639,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7735,7 +7647,6 @@
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "style": "simple",
             "schema": {
               "type": "string"
             }
@@ -7783,7 +7694,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7843,7 +7754,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7863,7 +7774,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7895,7 +7806,6 @@
             "name": "recordType",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string"
             }
@@ -7904,7 +7814,6 @@
             "name": "recordId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7913,7 +7822,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7942,7 +7851,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -7971,7 +7880,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8119,7 +8028,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8139,7 +8048,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8287,7 +8196,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8307,7 +8216,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8347,7 +8256,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -8355,7 +8263,6 @@
           {
             "name": "CategoryId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8364,7 +8271,6 @@
           {
             "name": "IncludeArchived",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -8472,7 +8378,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8492,7 +8398,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8640,7 +8546,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8660,7 +8566,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8691,7 +8597,6 @@
           {
             "name": "includeArchived",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -8799,7 +8704,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8819,7 +8724,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8974,7 +8879,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8994,7 +8899,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9026,7 +8931,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9154,7 +9058,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9174,7 +9078,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9205,7 +9109,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -9213,7 +9116,6 @@
           {
             "name": "CategoryId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9222,7 +9124,6 @@
           {
             "name": "Environment",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -9230,7 +9131,6 @@
           {
             "name": "Location",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -9238,7 +9138,6 @@
           {
             "name": "Tag",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -9246,7 +9145,6 @@
           {
             "name": "IncludeArchived",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -9254,7 +9152,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -9263,7 +9160,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -9372,7 +9268,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9392,7 +9288,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9538,7 +9434,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9558,7 +9454,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9590,7 +9486,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9599,7 +9494,6 @@
           {
             "name": "includeArchived",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -9707,7 +9601,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9727,7 +9621,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9757,7 +9651,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9885,7 +9778,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -9905,7 +9798,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10034,7 +9927,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10054,7 +9947,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10086,7 +9979,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10214,7 +10106,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10234,7 +10126,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10382,7 +10274,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10402,7 +10294,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10434,7 +10326,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10562,7 +10453,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10582,7 +10473,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10612,7 +10503,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10621,7 +10511,6 @@
           {
             "name": "expectedVersion",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -10730,7 +10619,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10750,7 +10639,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10782,7 +10671,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10891,7 +10779,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10911,7 +10799,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -10941,7 +10829,7 @@
         "operationId": "Health",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "OK"
           }
         }
       }
@@ -10954,7 +10842,7 @@
         "operationId": "AuditStoreHealth",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "OK"
           }
         }
       }
@@ -10967,7 +10855,7 @@
         "operationId": "PersistenceHealth",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -10977,7 +10865,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -10997,7 +10885,7 @@
         "operationId": "IdentityProviderHealth",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "OK"
           }
         }
       }
@@ -11010,7 +10898,7 @@
         "operationId": "EnterpriseIntegrationHealth",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "OK"
           }
         }
       }
@@ -11082,7 +10970,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11102,7 +10990,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11191,7 +11079,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11211,7 +11099,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11326,7 +11214,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11346,7 +11234,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11381,7 +11269,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -11469,7 +11356,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11489,7 +11376,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11581,7 +11468,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11601,7 +11488,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11716,7 +11603,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11736,7 +11623,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11771,7 +11658,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -11859,7 +11745,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11879,7 +11765,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -11913,7 +11799,6 @@
           {
             "name": "search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11981,7 +11866,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12001,7 +11886,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12116,7 +12001,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12136,7 +12021,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12171,7 +12056,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12259,7 +12143,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12279,7 +12163,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12314,7 +12198,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12402,7 +12285,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12422,7 +12305,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12514,7 +12397,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12534,7 +12417,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12649,7 +12532,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12669,7 +12552,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12704,7 +12587,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12792,7 +12674,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12812,7 +12694,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12904,7 +12786,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -12924,7 +12806,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13039,7 +12921,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13059,7 +12941,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13094,7 +12976,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -13182,7 +13063,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13202,7 +13083,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13238,30 +13119,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "ContentType": {
-                    "type": "string"
-                  },
-                  "ContentDisposition": {
-                    "type": "string"
-                  },
-                  "Headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "Length": {
-                    "type": "integer",
-                    "format": "int64"
-                  },
-                  "Name": {
-                    "type": "string"
-                  },
-                  "FileName": {
-                    "type": "string"
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
                   },
                   "profile": {
                     "type": "string"
@@ -13297,22 +13157,7 @@
                 }
               },
               "encoding": {
-                "ContentType": {
-                  "style": "form"
-                },
-                "ContentDisposition": {
-                  "style": "form"
-                },
-                "Headers": {
-                  "style": "form"
-                },
-                "Length": {
-                  "style": "form"
-                },
-                "Name": {
-                  "style": "form"
-                },
-                "FileName": {
+                "file": {
                   "style": "form"
                 },
                 "profile": {
@@ -13431,7 +13276,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13451,7 +13296,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13558,7 +13403,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13578,7 +13423,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13619,7 +13464,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -13708,7 +13552,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13728,7 +13572,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13760,7 +13604,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -13769,7 +13612,6 @@
           {
             "name": "classification",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -13777,7 +13619,6 @@
           {
             "name": "kind",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -13785,7 +13626,6 @@
           {
             "name": "decisionsOnly",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean",
               "default": false
@@ -13794,7 +13634,6 @@
           {
             "name": "page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -13804,7 +13643,6 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -13894,7 +13732,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13914,7 +13752,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -13946,7 +13784,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -14054,7 +13891,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14074,7 +13911,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14106,7 +13943,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -14195,7 +14031,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14215,7 +14051,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14247,7 +14083,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -14256,7 +14091,6 @@
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "style": "simple",
             "schema": {
               "type": "string"
             }
@@ -14363,7 +14197,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14383,7 +14217,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14414,7 +14248,6 @@
           {
             "name": "status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -14422,7 +14255,6 @@
           {
             "name": "myTeam",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -14510,7 +14342,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14530,7 +14362,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14571,7 +14403,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -14679,7 +14510,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14699,7 +14530,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14811,7 +14642,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14831,7 +14662,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14862,7 +14693,6 @@
           {
             "name": "WeekStart",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date"
@@ -14871,7 +14701,6 @@
           {
             "name": "AsOf",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -14880,7 +14709,6 @@
           {
             "name": "OrganizationId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -14889,7 +14717,6 @@
           {
             "name": "TeamId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -14898,7 +14725,6 @@
           {
             "name": "Period",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -14906,7 +14732,6 @@
           {
             "name": "PeriodEnd",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date"
@@ -14975,7 +14800,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -14995,7 +14820,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15103,7 +14928,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15123,7 +14948,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15210,7 +15035,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15230,7 +15055,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15271,7 +15096,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15340,7 +15164,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15360,7 +15184,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15392,7 +15216,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15402,7 +15225,6 @@
             "name": "format",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string"
             }
@@ -15470,7 +15292,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15490,7 +15312,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15602,7 +15424,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15622,7 +15444,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15653,7 +15475,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -15661,7 +15482,6 @@
           {
             "name": "OrganizationId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15670,7 +15490,6 @@
           {
             "name": "TeamId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15679,7 +15498,6 @@
           {
             "name": "PersonId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15688,7 +15506,6 @@
           {
             "name": "Status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -15696,7 +15513,6 @@
           {
             "name": "Domain",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -15704,7 +15520,6 @@
           {
             "name": "MyTeam",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -15712,7 +15527,6 @@
           {
             "name": "DueBefore",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date"
@@ -15721,7 +15535,6 @@
           {
             "name": "Sort",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -15729,7 +15542,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -15737,7 +15549,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -15746,7 +15557,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -15835,7 +15645,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15855,7 +15665,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15889,7 +15699,6 @@
           {
             "name": "Search",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -15897,7 +15706,6 @@
           {
             "name": "OrganizationId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15906,7 +15714,6 @@
           {
             "name": "TeamId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15915,7 +15722,6 @@
           {
             "name": "PersonId",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15924,7 +15730,6 @@
           {
             "name": "Status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -15932,7 +15737,6 @@
           {
             "name": "Domain",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -15940,7 +15744,6 @@
           {
             "name": "MyTeam",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -15948,7 +15751,6 @@
           {
             "name": "DueBefore",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date"
@@ -15957,7 +15759,6 @@
           {
             "name": "Sort",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -15965,7 +15766,6 @@
           {
             "name": "Descending",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -15973,7 +15773,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -15982,7 +15781,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -16071,7 +15869,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16091,7 +15889,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16217,7 +16015,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16237,7 +16035,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16269,7 +16067,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16358,7 +16155,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16378,7 +16175,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16408,7 +16205,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16516,7 +16312,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16536,7 +16332,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16568,7 +16364,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16676,7 +16471,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16696,7 +16491,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16728,7 +16523,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16738,7 +16532,6 @@
             "name": "assignmentId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16846,7 +16639,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16866,7 +16659,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16898,7 +16691,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17006,7 +16798,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17026,7 +16818,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17058,7 +16850,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17166,7 +16957,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17186,7 +16977,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17218,7 +17009,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17326,7 +17116,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17346,7 +17136,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17378,7 +17168,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17486,7 +17275,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17506,7 +17295,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17538,7 +17327,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17646,7 +17434,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17666,7 +17454,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17698,7 +17486,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17806,7 +17593,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17826,7 +17613,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17858,7 +17645,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17966,7 +17752,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17986,7 +17772,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18114,7 +17900,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18134,7 +17920,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18262,7 +18048,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18282,7 +18068,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18314,7 +18100,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -18422,7 +18207,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18442,7 +18227,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18474,7 +18259,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -18582,7 +18366,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18602,7 +18386,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18634,7 +18418,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -18742,7 +18525,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18762,7 +18545,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18890,7 +18673,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18910,7 +18693,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -18962,7 +18745,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -19070,7 +18852,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19090,7 +18872,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19122,7 +18904,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -19230,7 +19011,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19250,7 +19031,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19282,7 +19063,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -19390,7 +19170,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19410,7 +19190,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19442,7 +19222,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -19550,7 +19329,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19570,7 +19349,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19602,7 +19381,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -19710,7 +19488,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19730,7 +19508,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19762,7 +19540,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -19775,30 +19552,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "ContentType": {
-                    "type": "string"
-                  },
-                  "ContentDisposition": {
-                    "type": "string"
-                  },
-                  "Headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "Length": {
-                    "type": "integer",
-                    "format": "int64"
-                  },
-                  "Name": {
-                    "type": "string"
-                  },
-                  "FileName": {
-                    "type": "string"
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
                   },
                   "ownerType": {
                     "type": "string"
@@ -19813,22 +19569,7 @@
                 }
               },
               "encoding": {
-                "ContentType": {
-                  "style": "form"
-                },
-                "ContentDisposition": {
-                  "style": "form"
-                },
-                "Headers": {
-                  "style": "form"
-                },
-                "Length": {
-                  "style": "form"
-                },
-                "Name": {
-                  "style": "form"
-                },
-                "FileName": {
+                "file": {
                   "style": "form"
                 },
                 "ownerType": {
@@ -19926,7 +19667,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19946,7 +19687,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -19978,7 +19719,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -20067,7 +19807,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20087,7 +19827,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20159,7 +19899,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20190,7 +19930,6 @@
           {
             "name": "page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -20200,7 +19939,6 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -20250,7 +19988,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20338,7 +20076,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20466,7 +20204,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20506,7 +20244,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20538,7 +20276,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -20547,7 +20284,6 @@
           {
             "name": "Module",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -20555,7 +20291,6 @@
           {
             "name": "Status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -20563,7 +20298,6 @@
           {
             "name": "RecordType",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -20571,7 +20305,6 @@
           {
             "name": "Metric",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -20579,7 +20312,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -20588,7 +20320,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -20657,7 +20388,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20677,7 +20408,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20709,7 +20440,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -20718,7 +20448,6 @@
           {
             "name": "Module",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -20726,7 +20455,6 @@
           {
             "name": "Status",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -20734,7 +20462,6 @@
           {
             "name": "RecordType",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -20742,7 +20469,6 @@
           {
             "name": "Metric",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -20750,7 +20476,6 @@
           {
             "name": "Page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -20759,7 +20484,6 @@
           {
             "name": "PageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -20828,7 +20552,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -20848,7 +20572,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -29456,6 +29180,65 @@
     },
     {
       "DemoActor": [ ]
+    }
+  ],
+  "tags": [
+    {
+      "name": "Access"
+    },
+    {
+      "name": "Announcements"
+    },
+    {
+      "name": "AnnouncementSource"
+    },
+    {
+      "name": "Directory"
+    },
+    {
+      "name": "Identity"
+    },
+    {
+      "name": "InUse"
+    },
+    {
+      "name": "ManagementReporting"
+    },
+    {
+      "name": "OperationalRecords"
+    },
+    {
+      "name": "OperationHistory"
+    },
+    {
+      "name": "OperationsDiagnostics"
+    },
+    {
+      "name": "Resources"
+    },
+    {
+      "name": "SecureOps.Api"
+    },
+    {
+      "name": "ServiceAccountAdmin"
+    },
+    {
+      "name": "ServiceAccountImports"
+    },
+    {
+      "name": "ServiceAccountReminders"
+    },
+    {
+      "name": "ServiceAccountReports"
+    },
+    {
+      "name": "ServiceAccounts"
+    },
+    {
+      "name": "Sessions"
+    },
+    {
+      "name": "WorkflowReports"
     }
   ]
 }

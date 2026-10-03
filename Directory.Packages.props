@@ -45,9 +45,9 @@
 
     <!-- Validation -->
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
-    <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
-    <!-- Pinned so the generated OpenAPI document stays byte-stable after Microsoft.AspNetCore.OpenApi was removed. -->
-    <PackageVersion Include="Microsoft.OpenApi" Version="1.4.3" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <!-- Swashbuckle 10 requires Microsoft.OpenApi 2.x; referenced directly because src/SecureOps.Api/OpenApi filters use its model. -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.12.2" />
 
     <!-- Logging (Serilog) -->
     <PackageVersion Include="Serilog" Version="4.4.0" />
@@ -62,8 +62,6 @@
     <!-- Blazor UI -->
     <PackageVersion Include="MudBlazor" Version="9.11.0" />
 
-    <!-- JSON Schema validation (contract tests) -->
-    <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
 
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />

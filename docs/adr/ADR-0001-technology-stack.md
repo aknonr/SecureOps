@@ -185,9 +185,10 @@ bundle. MudBlazor 6 still runs but is unsupported; its migration remains separat
 **Package refresh (2026-10-03):** stable versions only, pinned in `Directory.Packages.props`. Microsoft.* stay on
 10.0.12 and PowerShell.SDK on 7.6.6 (both current). Majors taken: Microsoft.Data.SqlClient 7.1 (with
 Serilog.Sinks.MSSqlServer 10), Serilog 4.4 line, FluentValidation 12 (the unused, deprecated
-FluentValidation.AspNetCore was dropped), JsonSchema.Net 9, and the test stack (xunit v3 on VSTest, Test SDK 18,
-coverlet 10, NSubstitute 6, FluentAssertions 7). Held: FluentAssertions 8 (commercial licence), MudBlazor 7+ (UI
-work), Swashbuckle 10 / Microsoft.OpenApi 2 (owner review of the OpenAPI snapshot change).
+FluentValidation.AspNetCore was dropped), Swashbuckle 10 with Microsoft.OpenApi 2 (OpenAPI 3.0 snapshot regenerated and
+owner-approved; the two upload bodies now describe a single binary `file`), and the test stack (xunit v3 on VSTest, Test SDK 18,
+coverlet 10, NSubstitute 6, FluentAssertions 7). Unused JsonSchema.Net was removed. Held: FluentAssertions 8 (commercial licence). MudBlazor 9
+is taken in the separate UI change.
 
 ## References
 
