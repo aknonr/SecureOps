@@ -182,6 +182,13 @@ Authorization Requests (default since .NET 9) is kept off until tested against t
 (`Oidc:PushedAuthorization`). The unused EF Core references noted in Amendment 1 were removed. Rollback is the previous .NET 8 release package on hosts that still have the .NET 8
 bundle. MudBlazor 6 still runs but is unsupported; its migration remains separate UI work.
 
+**Package refresh (2026-10-03):** stable versions only, pinned in `Directory.Packages.props`. Microsoft.* stay on
+10.0.12 and PowerShell.SDK on 7.6.6 (both current). Majors taken: Microsoft.Data.SqlClient 7.1 (with
+Serilog.Sinks.MSSqlServer 10), Serilog 4.4 line, FluentValidation 12 (the unused, deprecated
+FluentValidation.AspNetCore was dropped), JsonSchema.Net 9, and the test stack (xunit v3 on VSTest, Test SDK 18,
+coverlet 10, NSubstitute 6, FluentAssertions 7). Held: FluentAssertions 8 (commercial licence), MudBlazor 7+ (UI
+work), Swashbuckle 10 / Microsoft.OpenApi 2 (owner review of the OpenAPI snapshot change).
+
 ## References
 
 - `docs/03-architecture.md`

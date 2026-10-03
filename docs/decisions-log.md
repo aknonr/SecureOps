@@ -1,5 +1,11 @@
 # Decisions Log
 
+## 2026-10-03 - .NET 10 Windows gates and package refresh (PR #8)
+
+First Windows run of the migration branch: SDK pin moved to 10.0.401 (same 10.0.12 runtime), Release build,
+tests, format and release-packaging dry run pass. Packages refreshed per ADR-0001 Amendment 2 "Package refresh".
+Swashbuckle 10 is prepared on a local branch but held for owner review of the OpenAPI snapshot change.
+
 ## 2026-10-02 - Owner direction for the next work (session management, redesigns)
 
 - Session policy becomes admin-adjustable within fixed lower and upper bounds (idle and absolute), audited.
