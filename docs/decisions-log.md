@@ -1,5 +1,12 @@
 # Decisions Log
 
+## 2026-10-03 - OR request type: text suggestion, one-click confirm (ADR-0018 Amendment 1)
+
+Owner decision: the operator should not start from an empty "operator declaration" select. The API suggests
+one supported request type from explicit title/description words and shows the words; the operator confirms or
+changes it. Conflicting or absent words give no suggestion. The suggestion stays outside SDM evaluation input and
+never grants eligibility; the confirmed type is still the operator declaration checked by pilot policy and mapping.
+
 ## 2026-10-03 - .NET 10 Windows gates and package refresh (PR #8)
 
 First Windows run of the migration branch: SDK pin moved to 10.0.401 (same 10.0.12 runtime), Release build,

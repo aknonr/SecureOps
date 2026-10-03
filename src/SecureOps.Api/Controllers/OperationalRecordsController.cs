@@ -319,7 +319,10 @@ public sealed class OperationalRecordsController : ControllerBase
         SourceChanged = record.SdmEvaluation?.Result.SourceChanged ?? false,
         BlockingConditions = record.SdmEvaluation?.Result.BlockingConditions ?? [],
         ExternalWriteEligible = record.SdmEvaluation?.Result.ExternalWriteEligible == true
-            && !_readOnlyIntegrationMode && _controlledTestWritesEnabled
+            && !_readOnlyIntegrationMode && _controlledTestWritesEnabled,
+        SuggestedRequestType = RequestTypeSuggester.Suggest(record.Title, record.Description) is { } hint
+            ? new(hint.Type, hint.Terms, hint.RuleVersion)
+            : null
     };
 
     private bool IsRetryEligible(OperationalRecord record) =>
