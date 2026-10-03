@@ -27,6 +27,11 @@ public static class ReportPdfWriter
     private const string _headerFill = "0.851 0.878 0.922";
     private const string _stripeFill = "0.965 0.969 0.976";
     private const string _ruleStroke = "0.780 0.800 0.835";
+    private const string _tileFill = "0.949 0.961 0.980";
+    private const int _tilesPerRow = 4;
+    private const double _tileHeight = 46;
+    private const double _tileGap = 8;
+    private const double _tileValueSize = 18;
 
     private static readonly Dictionary<char, byte> _turkish = new()
     {
@@ -55,6 +60,14 @@ public static class ReportPdfWriter
     public static byte[] Write(ReportDocument document)
     {
         List<Line> lines = [.. document.Header.Select(h => new Line(LineKind.Meta, $"{h.Label}: {h.Value}"))];
+        IReadOnlyList<ReportTile> tiles = document.Dashboard?.Tiles ?? [];
+        foreach (ReportSection block in document.Dashboard?.Blocks ?? [])
+        {
+            lines.Add(new Line(LineKind.Blank, string.Empty));
+            lines.Add(new Line(LineKind.Section, "YÖNETİCİ ÖZETİ · " + block.Title.ToUpper(CultureInfo.GetCultureInfo("tr-TR"))));
+            lines.AddRange(Table(block));
+        }
+
         foreach (ReportSection section in document.Sections)
         {
             lines.Add(new Line(LineKind.Blank, string.Empty));
@@ -63,12 +76,14 @@ public static class ReportPdfWriter
         }
 
         List<Line> wrapped = [.. lines.SelectMany(Wrap)];
-        int firstPage = (int)((_pageHeight - 2 * _margin - _titleBand - _footerSpace) / _lineHeight);
+        int firstPage = (int)((_pageHeight - 2 * _margin - _titleBand - TilesHeight(tiles.Count) - _footerSpace) / _lineHeight);
         int otherPages = (int)((_pageHeight - 2 * _margin - _footerSpace) / _lineHeight);
         List<List<Line>> pages = [[.. wrapped.Take(firstPage)]];
         pages.AddRange(wrapped.Skip(firstPage).Chunk(otherPages).Select(c => c.ToList()));
-        return Build(document.Title, pages);
+        return Build(document.Title, tiles, pages);
     }
+
+    private static double TilesHeight(int count) => count == 0 ? 0 : Math.Ceiling(count / (double)_tilesPerRow) * (_tileHeight + _tileGap) + _tileGap;
 
     /// <summary>Extracts the rendered text lines of a PDF produced by this writer (tests and reconciliation).</summary>
     public static IReadOnlyList<string> ExtractLines(byte[] pdf)
@@ -136,7 +151,7 @@ public static class ReportPdfWriter
         }
     }
 
-    private static byte[] Build(string title, List<List<Line>> pages)
+    private static byte[] Build(string title, IReadOnlyList<ReportTile> tiles, List<List<Line>> pages)
     {
         List<byte[]> objects = [];
         const int pagesId = 2, fontId = 3, boldId = 4, firstPage = 5;
@@ -148,7 +163,7 @@ public static class ReportPdfWriter
         objects.Add(Ascii($"<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold {encoding} >>"));
         for (int i = 0; i < pages.Count; i++)
         {
-            byte[] stream = Encoding.Latin1.GetBytes(Page(title, pages[i], i, pages.Count));
+            byte[] stream = Encoding.Latin1.GetBytes(Page(title, i == 0 ? tiles : [], pages[i], i, pages.Count));
             objects.Add(Ascii($"<< /Type /Page /Parent {pagesId} 0 R /MediaBox [0 0 {N(_pageWidth)} {N(_pageHeight)}] "
                 + $"/Resources << /Font << /F1 {fontId} 0 R /F2 {boldId} 0 R >> >> /Contents {firstPage + i * 2 + 1} 0 R >>"));
             objects.Add([.. Ascii($"<< /Length {stream.Length} >>\nstream\n"), .. stream, .. Ascii("\nendstream")]);
@@ -178,7 +193,7 @@ public static class ReportPdfWriter
     }
 
     /// <summary>One page: shapes first (band, bars, shaded rows, rules), then one absolutely positioned text line per row.</summary>
-    private static string Page(string title, List<Line> lines, int index, int count)
+    private static string Page(string title, IReadOnlyList<ReportTile> tiles, List<Line> lines, int index, int count)
     {
         StringBuilder shapes = new();
         StringBuilder text = new();
@@ -189,6 +204,26 @@ public static class ReportPdfWriter
             shapes.Append(CultureInfo.InvariantCulture, $"{_band} rg {N(_margin)} {N(top - _titleBand + 6)} {N(width)} {N(_titleBand - 6)} re f\n");
             text.Append(CultureInfo.InvariantCulture, $"1 1 1 rg /F2 {N(_titleSize)} Tf\n1 0 0 1 {N(_margin + 10)} {N(top - _titleBand + 16)} Tm ({Encode(title)}) Tj\n");
             top -= _titleBand;
+        }
+
+        if (tiles.Count > 0)
+        {
+            double tileWidth = (width - (_tilesPerRow - 1) * _tileGap) / _tilesPerRow;
+            for (int t = 0; t < tiles.Count; t++)
+            {
+                double x = _margin + t % _tilesPerRow * (tileWidth + _tileGap);
+                double boxTop = top - _tileGap - t / _tilesPerRow * (_tileHeight + _tileGap);
+                double bottom = boxTop - _tileHeight;
+                shapes.Append(CultureInfo.InvariantCulture, $"{_tileFill} rg {_ruleStroke} RG 0.6 w {N(x)} {N(bottom)} {N(tileWidth)} {N(_tileHeight)} re B\n");
+                text.Append(CultureInfo.InvariantCulture, $"0.29 0.33 0.41 rg /F1 {N(_fontSize)} Tf\n1 0 0 1 {N(x + 8)} {N(boxTop - 12)} Tm ({Encode(tiles[t].Label)}) Tj\n");
+                text.Append(CultureInfo.InvariantCulture, $"{_band} rg /F2 {N(_tileValueSize)} Tf\n1 0 0 1 {N(x + 8)} {N(bottom + 10)} Tm ({Encode(tiles[t].Value.ToString(CultureInfo.InvariantCulture))}) Tj\n");
+                if (tiles[t].Note is { Length: > 0 } note)
+                {
+                    text.Append(CultureInfo.InvariantCulture, $"0.42 0.45 0.50 rg /F1 {N(_fontSize - 1)} Tf\n1 0 0 1 {N(x + tileWidth - 8 - note.Length * (_fontSize - 1) * 0.6)} {N(bottom + 10)} Tm ({Encode(note)}) Tj\n");
+                }
+            }
+
+            top -= TilesHeight(tiles.Count);
         }
 
         double y = top;

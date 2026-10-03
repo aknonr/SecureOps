@@ -75,6 +75,7 @@ public sealed class ServiceAccountReportExportTests
     public void Xlsx_TableSheets_HaveAShadedFrozenFilteredHeader_AndTheCoverStartsWithTheTitle()
     {
         ReportDocument document = Document("SYN_SVC_01");
+        document.Dashboard.Should().NotBeNull("snapshots render an executive summary first");
         byte[] bytes = ReportWorkbookWriter.Write(document);
         using ZipArchive zip = new(new MemoryStream(bytes));
         string Part(string name)
@@ -84,15 +85,15 @@ public sealed class ServiceAccountReportExportTests
         }
 
         string workbook = Part("xl/workbook.xml");
-        string cover = Part("xl/worksheets/sheet1.xml");
-        string table = Part("xl/worksheets/sheet2.xml");
+        string cover = Part("xl/worksheets/sheet2.xml");
+        string table = Part("xl/worksheets/sheet3.xml");
         cover.Should().NotContain("<pane").And.NotContain("<autoFilter");
         table.Should().Contain("state=\"frozen\"").And.Contain("<autoFilter ref=\"A1:");
         table.IndexOf("<sheetViews>", StringComparison.Ordinal).Should().BeLessThan(table.IndexOf("<cols>", StringComparison.Ordinal), "schema order");
         table.IndexOf("</sheetData>", StringComparison.Ordinal).Should().BeLessThan(table.IndexOf("<autoFilter", StringComparison.Ordinal), "schema order");
-        workbook.Should().Contain("_xlnm._FilterDatabase").And.Contain("localSheetId=\"1\"");
+        workbook.Should().Contain("_xlnm._FilterDatabase").And.Contain("localSheetId=\"2\"", "sheet 1 is the executive summary, 2 the cover");
         workbook.IndexOf("</sheets>", StringComparison.Ordinal).Should().BeLessThan(workbook.IndexOf("<definedNames>", StringComparison.Ordinal));
-        Part("xl/styles.xml").Should().Contain("<cellXfs count=\"4\">").And.Contain("patternType=\"solid\"");
+        Part("xl/styles.xml").Should().Contain("<cellXfs count=\"9\">").And.Contain("patternType=\"solid\"");
         SpreadsheetReader.Read(bytes, new SpreadsheetLimits(), ["Rapor"], out _).Single().Rows[0].Cells["A"].Text.Should().Be(document.Title);
     }
 
@@ -106,6 +107,29 @@ public sealed class ServiceAccountReportExportTests
         IReadOnlyList<string> lines = ReportPdfWriter.ExtractLines(pdf);
         lines[0].Should().Be("Servis hesapları — SYN");
         lines.Should().Contain(l => l.StartsWith("Sayfa 1/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Dashboard_IsTheFirstSheet_WithMergedTiles_ValuesOnly_AndTheSameFiguresInThePdf()
+    {
+        ReportDocument document = Document("SYN_SVC_01") with
+        {
+            Dashboard = new ReportDashboard("SYN ORG · dönem", [new("Tekil hesap", 390), new("Açık talep", 123), new("Geciken iş", 7, "takvim günü")],
+                [new ReportSection("Ekiplerde hesap ve bekleyen iş", ["Ekip", "Hesap"], [[new ReportCell("SYN WASAS"), new ReportCell(Number: 120)]])])
+        };
+        byte[] bytes = ReportWorkbookWriter.Write(document);
+        using ZipArchive zip = new(new MemoryStream(bytes));
+        using StreamReader reader = new(zip.GetEntry("xl/worksheets/sheet1.xml")!.Open());
+        string sheet = reader.ReadToEnd();
+        sheet.Should().Contain("<mergeCells").And.NotContain("<f>").And.NotContain("<f ");
+        sheet.IndexOf("</sheetData>", StringComparison.Ordinal).Should().BeLessThan(sheet.IndexOf("<mergeCells", StringComparison.Ordinal));
+        IReadOnlyList<SheetData> sheets = SpreadsheetReader.Read(bytes, new SpreadsheetLimits(), null, out _);
+        sheets[0].Name.Should().Be("Yönetici özeti");
+        sheets[0].Rows.SelectMany(r => r.Cells.Values).Should().Contain(c => c.Number == 390).And.Contain(c => c.Text == "Geciken iş");
+        sheets.Select(s => s.Name).Should().Contain("Özet", "the detail sheets stay");
+
+        IReadOnlyList<string> lines = ReportPdfWriter.ExtractLines(ReportPdfWriter.Write(document));
+        lines.Should().Contain("Tekil hesap").And.Contain("390").And.Contain(l => l.StartsWith("YÖNETİCİ ÖZETİ · EKİPLERDE", StringComparison.Ordinal));
     }
 
     private static ReportDocument Document(string account)
