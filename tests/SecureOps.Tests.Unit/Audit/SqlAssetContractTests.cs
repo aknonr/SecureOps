@@ -63,7 +63,8 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(29)
+            .And.HaveCount(30)
+            .And.ContainSingle(name => name == "030-service-account-usage-scans.sql")
             .And.ContainSingle(name => name == "029-service-account-scope-bootstrap.sql")
             .And.ContainSingle(name => name == "028-admin-service-account-operations.sql")
             .And.ContainSingle(name => name == "027-admin-service-account-navigation.sql")
@@ -311,6 +312,29 @@ public sealed class SqlAssetContractTests
             .And.NotContain("INSERT INTO svcacct.ScopeGrants")
             .And.NotContain("DELETE FROM")
             .And.NotContain("ALTER ROLE");
+    }
+
+    [Fact]
+    public void UsageScanMigration_IncludesReviewedCandidateOnce_IsAppendOnly_AndHasNoSecretColumn()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "030-service-account-usage-scans.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "030-service-account-usage-scans.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-004-usage-scans.sql"));
+        string grants = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-004-API-permissions.sql"));
+
+        migration.Should().Contain(":r ../schema/030-service-account-usage-scans.sql");
+        schema.Should().Contain("requires reviewed 025/026").And.Contain(":r ../pending/service-accounts/SA-004-usage-scans.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay");
+        foreach (string table in new[] { "UsageScans", "UsageScanServers", "UsageScanItems", "UsageScanLinks", "UsageScanDecisions" })
+        {
+            candidate.Should().Contain($"CREATE TABLE svcacct.{table}(");
+            candidate.Should().MatchRegex($@"CREATE TRIGGER svcacct\.TR_Sa\w+_Immutable ON svcacct\.{table} AFTER UPDATE, DELETE");
+            grants.Should().Contain($"GRANT SELECT, INSERT ON OBJECT::svcacct.{table} TO svcacct_api_runtime;");
+        }
+
+        candidate.Should().NotContainEquivalentOf("password").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("ALTER ROLE");
+        grants.Should().NotContain("UPDATE").And.NotContain("DELETE").And.NotContain("ALTER ROLE");
     }
 
     private static string FindRepositoryRoot()

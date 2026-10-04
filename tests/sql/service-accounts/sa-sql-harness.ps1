@@ -3,15 +3,15 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix,
-    [ValidateRange(26, 29)]
-    [int]$ThroughMigration = 29,
+    [ValidateRange(26, 30)]
+    [int]$ThroughMigration = 30,
     [switch]$SkipRoleScripts
 )
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-029; 029 numbers SA-003), verifies module replay refusal, and
-# (unless -SkipRoleScripts) the two unnumbered role scripts. No role member is assigned. Never targets a
+# numbered migrations in order (now 001-030; 029 numbers SA-003, 030 numbers SA-004), verifies module replay refusal, and
+# (unless -SkipRoleScripts) the module role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
@@ -62,11 +62,20 @@ try {
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-003-scope-bootstrap.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate 3 replay was not refused.' }
     Write-Host 'candidate 3 replay refused as expected'
+    $hasScans = (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN OBJECT_ID(N'svcacct.UsageScans', N'U') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim()
+    if ($hasScans -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-004-usage-scans.sql'
+        Write-Host 'applied SA-004-usage-scans.sql (candidate 4)'
+    } else { Write-Host 'Usage scans installed through numbered 030' }
+    & $sqlcmd -S $server -d $database -E -I -b -i 'SA-004-usage-scans.sql' | Out-Null
+    if ($LASTEXITCODE -eq 0) { throw 'Candidate 4 replay was not refused.' }
+    Write-Host 'candidate 4 replay refused as expected'
     if (-not $SkipRoleScripts) {
         Invoke-SaSql -Database $database -File 'SA-API-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-Worker-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-002-API-permissions.sql'
-        Write-Host 'applied SA-API-permissions.sql, SA-Worker-permissions.sql and SA-002-API-permissions.sql (no role member assigned)'
+        Invoke-SaSql -Database $database -File 'SA-004-API-permissions.sql'
+        Write-Host 'applied SA-API-permissions.sql, SA-Worker-permissions.sql, SA-002-API-permissions.sql and SA-004-API-permissions.sql (no role member assigned)'
     }
 } finally { Pop-Location }
 
