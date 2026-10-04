@@ -655,7 +655,7 @@
     /// <param name="Description">What the action is for.</param>
     /// <param name="Route">Target route.</param>
     /// <param name="Icon">Leading icon.</param>
-    private sealed record OperatorTask(string Title, string Description, string Route, string Icon);
+    internal sealed record OperatorTask(string Title, string Description, string Route, string Icon);
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
@@ -706,14 +706,17 @@
         }
     }
 
-    private bool IsRootRoute()
+    private bool IsRootRoute() => IsRoot(Navigation.ToBaseRelativePath(Navigation.Uri));
+
+    /// <summary>True for the base-relative root ("", "?x", "#y"); "/dashboard" is not the root.</summary>
+    internal static bool IsRoot(string relative)
     {
-        string relative = Navigation.ToBaseRelativePath(Navigation.Uri);
         int end = relative.IndexOfAny(['?', '#']);
         return (end < 0 ? relative : relative[..end]).Length == 0;
     }
 
-    private static bool OnlyServiceAccounts(AccessSnapshot? snapshot, IReadOnlyList<OperatorTask> available, bool managementView) =>
+    /// <summary>Whether an approved user's only dashboard entry is Service Accounts (owner decision 2026-10-04).</summary>
+    internal static bool OnlyServiceAccounts(AccessSnapshot? snapshot, IReadOnlyList<OperatorTask> available, bool managementView) =>
         snapshot is { IsApproved: true }
         && !managementView
         && snapshot.Can(ServiceAccountCapabilities.View)
@@ -798,7 +801,7 @@
 
     // Built from granted capabilities rather than a fixed list, so the dashboard shows what this
     // operator can actually do instead of advertising screens that would refuse them.
-    private static IReadOnlyList<OperatorTask> BuildTasks(AccessSnapshot snapshot)
+    internal static IReadOnlyList<OperatorTask> BuildTasks(AccessSnapshot snapshot)
     {
         List<OperatorTask> tasks = [];
 
