@@ -40,6 +40,11 @@ public static class AccessRoleCatalog
                 Capabilities.AccessViewAudit,
                 Capabilities.ManagementReportingView,
                 ServiceAccountCapabilities.View,
+                ServiceAccountCapabilities.Work,
+                ServiceAccountCapabilities.Assign,
+                ServiceAccountCapabilities.Verify,
+                ServiceAccountCapabilities.Import,
+                ServiceAccountCapabilities.Report,
                 ServiceAccountCapabilities.Administer
             ],
             ["Lead"] =

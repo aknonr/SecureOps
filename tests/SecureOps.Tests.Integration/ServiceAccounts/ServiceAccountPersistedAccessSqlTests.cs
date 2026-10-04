@@ -24,7 +24,7 @@ public sealed class ServiceAccountPersistedAccessSqlTests
     private static readonly CancellationToken _token = CancellationToken.None;
 
     [ServiceAccountSqlFact]
-    public async Task ProtectedAdmin_OpensModuleAdministration_ButNeedsExplicitScopeAndSeparateOperationalActions()
+    public async Task ProtectedAdmin_HasModuleOperations_ButNeedsExplicitIndependentScope()
     {
         string connectionString = Environment.GetEnvironmentVariable(ServiceAccountSqlFactAttribute.Variable)!;
         new SqlConnectionStringBuilder(connectionString).InitialCatalog.Should().StartWith("SecureOps_Sa");
@@ -55,7 +55,7 @@ public sealed class ServiceAccountPersistedAccessSqlTests
         ClaimsPrincipal second = new(new ClaimsIdentity([new Claim(ClaimTypes.Name, secondAdmin)], "test"));
         ApplicationUser persisted = (await users.GetUserAsync(admin, _token))!;
         persisted.Capabilities.Intersect(ServiceAccountCapabilities.All).Should()
-            .BeEquivalentTo(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Administer);
+            .BeEquivalentTo(ServiceAccountCapabilities.All);
         ServiceAccountMe me = Ok(await module.MeAsync(principal, context, _token));
         (me.ScopeKind, me.HasScope).Should().Be(("None", false));
         Ok(await module.GrantsAsync(principal, context, _token));
@@ -63,6 +63,7 @@ public sealed class ServiceAccountPersistedAccessSqlTests
             .Field.Should().Be("selfGrant");
         (await module.CreateAccountAsync(principal, context, new CreateAccountRequest("SYN-NO-ACTION-" + prefix, null, null, "Synthetic"), _token))
             .ErrorCode.Should().Be(SaErrors.Forbidden);
+        (await module.ImportsAsync(principal, context, _token)).Field.Should().Be("scope");
 
         string creatorRole = await BundleAsync(users, admin, prefix + "-creator",
             [ServiceAccountCapabilities.View, ServiceAccountCapabilities.Assign, ServiceAccountCapabilities.Work]);
@@ -72,11 +73,24 @@ public sealed class ServiceAccountPersistedAccessSqlTests
         Ok(await module.CreateGrantAsync(principal, context, new CreateScopeGrantRequest(identity, "Organization", org, null, "Synthetic scope"), users, _token));
         AccountDetail account = Ok(await module.CreateAccountAsync(creator, context, new CreateAccountRequest("SYN-" + prefix, null, org, "Synthetic"), _token));
         (await module.AccountAsync(principal, context, account.Summary.Id, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
-        Ok(await module.CreateGrantAsync(second, context, new CreateScopeGrantRequest(admin, "All", null, null, "Reviewed synthetic scope"), users, _token));
-        Ok(await module.MeAsync(principal, context, _token)).ScopeKind.Should().Be("All");
+        Ok(await module.CreateGrantAsync(second, context, new CreateScopeGrantRequest(admin, "Organization", org, null, "Reviewed synthetic scope"), users, _token));
+        Ok(await module.MeAsync(principal, context, _token)).ScopeKind.Should().Be("Organization");
         Ok(await module.AccountAsync(principal, context, account.Summary.Id, _token));
-        (await module.CreateAccountAsync(principal, context, new CreateAccountRequest("SYN-STILL-NO-ACTION-" + prefix, null, org, "Synthetic"), _token))
-            .ErrorCode.Should().Be(SaErrors.Forbidden, "All scope does not grant Assign");
+        Ok(await module.CreateAccountAsync(principal, context,
+            new CreateAccountRequest("SYN-ADMIN-ACTION-" + prefix, null, org, "Synthetic"), _token));
+        Ok(await module.ImportsAsync(principal, context, _token));
+        SyntheticLegacy legacy = new(prefix, "SYN ADMIN " + prefix);
+        ImportBatchView preview = Ok(await module.StageImportAsync(principal, context,
+            new StageImportRequest(ServiceAccountImportProfiles.LegacyWorkbook, new DateOnly(2026, 10, 3), "Synthetic source date"),
+            "synthetic-admin.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", legacy.Workbook, _token));
+        preview.Status.Should().Be("Previewed");
+        Ok(await module.ImportRowsAsync(principal, context, preview.Id, null, null, false, 1, 200, _token))
+            .Items.Should().NotBeEmpty();
+        Guid outside = Ok(await module.SaveOrganizationAsync(principal, context, null,
+            new SaveOrganizationRequest("SYN OUTSIDE " + prefix, "Department", null), _token));
+        (await module.CreateAccountAsync(principal, context,
+            new CreateAccountRequest("SYN-OUTSIDE-" + prefix, null, outside, "Synthetic"), _token))
+            .ErrorCode.Should().Be(SaErrors.Forbidden);
 
         (string _, ClaimsPrincipal ordinary) = await ApprovedAsync(users, admin, prefix + "-ordinary", "ReadOnly", definitions);
         ((ClaimsIdentity)ordinary.Identity!).AddClaim(new Claim(ClaimTypes.Role, "Admin"));
