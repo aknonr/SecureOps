@@ -111,6 +111,33 @@ public sealed class ServiceAccountAdminSqlTests
         fx.SqlDiagnostics.Should().BeEmpty("no deadlock, retry or swallowed persistence failure is allowed");
     }
 
+    /// <summary>
+    /// Regression for the unexplained first-run failures: serializable name checks without UPDLOCK let two concurrent saves
+    /// share a range lock and deadlock on the insert (SQL 1205 → ServiceAccountPersistenceUnavailable). Names with one
+    /// unique prefix fall into the same index gap, which reproduces the empty-table case on any database.
+    /// </summary>
+    [ServiceAccountSqlFact]
+    public async Task ConcurrentDictionarySaves_InTheSameKeyGap_AllCommitWithoutDeadlock()
+    {
+        ServiceAccountSqlFixture fx = new();
+        SynUser admin = await fx.UserAsync(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Administer);
+        string prefix = "SYN GAP " + fx.Suffix + " ";
+        const int saves = 12;
+
+        SaResult<Guid>[] organizations = await Task.WhenAll(Enumerable.Range(0, saves).Select(i => Task.Run(() =>
+            fx.Service.SaveOrganizationAsync(admin.Principal, fx.Context, null, new SaveOrganizationRequest(prefix + "ORG " + i.ToString("00"), "Department", null), _token))));
+        organizations.Select(r => r.ErrorCode).Should().OnlyContain(code => code == null, "no save may lose a deadlock");
+
+        SaResult<Guid>[] teams = await Task.WhenAll(Enumerable.Range(0, saves).Select(i => Task.Run(() =>
+            fx.Service.SaveTeamAsync(admin.Principal, fx.Context, null, new SaveTeamRequest(prefix + "TEAM " + i.ToString("00"), organizations[0].Value), _token))));
+        teams.Select(r => r.ErrorCode).Should().OnlyContain(code => code == null, "no save may lose a deadlock");
+
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.Organizations WHERE Name LIKE @p", new { p = prefix + "%" })).Should().Be(saves);
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.Teams WHERE Name LIKE @p", new { p = prefix + "%" })).Should().Be(saves);
+        (await fx.Service.SaveOrganizationAsync(admin.Principal, fx.Context, null, new SaveOrganizationRequest(prefix + "ORG 00", "Department", null), _token))
+            .Field.Should().Be("name", "the duplicate check still works under the update lock");
+    }
+
     private static T Ok<T>(SaResult<T> result)
     {
         result.ErrorCode.Should().BeNull($"field {result.Field}");

@@ -96,7 +96,9 @@ public sealed partial class SqlServiceAccountRepository
         parameters.AddDynamicParams(new { Id = key, Name = clean, Key = ServiceAccountText.LabelKey(clean), now, actor.UserId, RowVer = Version(expectedVersion) });
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
-        if (await connection.ExecuteScalarAsync<int>(Cmd($"SELECT COUNT(*) FROM svcacct.{table} WHERE NormalizedName = @Key AND Id <> @Id;", parameters, transaction, cancellationToken)) > 0)
+        // UPDLOCK turns the serializable range lock of this check into an update-range lock, so two concurrent saves wait for
+        // each other instead of both holding a shared range and deadlocking on the insert (seen on fresh, empty tables).
+        if (await connection.ExecuteScalarAsync<int>(Cmd($"SELECT COUNT(*) FROM svcacct.{table} WITH (UPDLOCK, HOLDLOCK) WHERE NormalizedName = @Key AND Id <> @Id;", parameters, transaction, cancellationToken)) > 0)
         {
             return SaResult<Guid>.Fail(SaErrors.Invalid, "name");
         }
@@ -148,7 +150,7 @@ public sealed partial class SqlServiceAccountRepository
         string? upn = ServiceAccountText.Clean(request.Upn)?.ToLowerInvariant();
         string? objectId = ServiceAccountText.Clean(request.DirectoryObjectId);
         if (await connection.ExecuteScalarAsync<int>(Cmd("""
-            SELECT COUNT(*) FROM svcacct.People WHERE Id <> @id AND ((@upn IS NOT NULL AND Upn = @upn) OR (@objectId IS NOT NULL AND DirectoryObjectId = @objectId));
+            SELECT COUNT(*) FROM svcacct.People WITH (UPDLOCK, HOLDLOCK) WHERE Id <> @id AND ((@upn IS NOT NULL AND Upn = @upn) OR (@objectId IS NOT NULL AND DirectoryObjectId = @objectId));
             """, new { id, upn, objectId }, transaction, cancellationToken)) > 0)
         {
             return SaResult<Guid>.Fail(SaErrors.Invalid, "upn");
@@ -179,7 +181,7 @@ public sealed partial class SqlServiceAccountRepository
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         int inserted = await connection.ExecuteAsync(Cmd("""
             IF EXISTS (SELECT 1 FROM svcacct.People WHERE Id = @id)
-               AND NOT EXISTS (SELECT 1 FROM svcacct.PersonAliases WHERE PersonId = @id AND AliasNormalized = @key)
+               AND NOT EXISTS (SELECT 1 FROM svcacct.PersonAliases WITH (UPDLOCK, HOLDLOCK) WHERE PersonId = @id AND AliasNormalized = @key)
                 INSERT INTO svcacct.PersonAliases(Id, PersonId, Alias, AliasNormalized, Evidence, CreatedAt, CreatedBy)
                 VALUES(NEWID(), @id, @alias, @key, @evidence, @now, @UserId);
             """, new { id, alias, key = ServiceAccountText.LabelKey(alias), evidence = request.Evidence.Trim(), now, actor.UserId }, transaction, cancellationToken));

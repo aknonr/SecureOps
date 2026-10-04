@@ -71,3 +71,6 @@ try {
 } finally { Pop-Location }
 
 Write-Host "SECUREOPS_SA_SQL_TEST_CONNECTION=Server=$server;Database=$database;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=15"
+# Every failure above throws. The intentionally refused replays leave $LASTEXITCODE at 1, and `powershell -File`
+# would return it when nothing runs afterwards (-SkipRoleScripts), so a successful run ends explicitly.
+exit 0
