@@ -1,6 +1,9 @@
 # ADR-0024: Read-only service account usage discovery (PROPOSED)
 
-**Status:** Proposed — draft for review. Not accepted, not implemented, nothing deployed.
+**Status:** Proposed — draft for review. Not accepted, not implemented, nothing deployed. **Shelved by the project owner on
+2026-10-04** (Bilgi Güvenliği approval and the server pilot are open). The person-run scan and its import are decided
+separately in ADR-0027, which reuses this ADR's read-only functions in a self-contained collector and needs no JEA
+endpoint or Worker job. The JEA/Worker parts below remain proposed only.
 **Date:** 2026-10-01
 **Decision makers (required):** project owner; Bilgi Güvenliği and Siber Güvenlik approval (JEA change); target server owners for the pilot list.
 

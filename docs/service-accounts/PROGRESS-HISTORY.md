@@ -13,6 +13,39 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Cloud session 2026-10-04 night: usage scan import (ADR-0027, migration 030)
+
+Owner request: the team finds today by hand, with its own PowerShell tool, where an account runs (server, service,
+scheduled task, IIS application pool, virtual directory); the module should import such a scan run by a person under their
+own authority, attach it to the account as evidence and use it in the gMSA conversion. JEA/Worker (ADR-0024) shelved.
+Synthetic data only; nothing applied anywhere; the team's original script is not in the repository.
+
+Design decisions (ADR-0027): no product-initiated or default-endpoint remoting (rule 3); self-contained collector that
+prints one line and writes nothing on the server (rule 1); combine step on the workstation keeps every planned server
+(`NoResult`/`Unreachable`); strict parser, secret guard first (file refused, nothing stored); dedicated append-only tables
+instead of `svcacct.Findings` (one scan would otherwise create dozens of open findings and duplicates on every re-scan);
+responsible basis attaches and decides, a participant attaches only through its own open request; per-match human
+decision into an ordinary usage; gMSA evidence derived per account, never a verification; detail stays readable before 030.
+
+Commits: `cffa127` ADR + contract, `1c27d00` migration 030, `8326249` parser, `7fa72b5` collector/combine, `161a986`
+backend/API/OpenAPI, `4c7aef9` UI, `905a0a9` UI keyboard/390 px fix, then docs.
+
+Verification (Linux): SDK 9.0.317 and the .NET 8 runtime were taken from the official `mcr.microsoft.com/dotnet` images
+(the `dot.net` download host is blocked by the proxy); SQL Server 2022 in a disposable container. Build 0/0; unit
+1803/1805, the two failures (`AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`,
+`SccmFailureEvidenceTests.StagedInvocations_…`) also fail on `e6b3e03` in this container; integration 339 passed, 65
+skipped, 9 failed = 7 SkiaSharp-native announcement tests (same on `e6b3e03`) + 2 LocalDB-only role tests (by design). Module
+SQL on a fresh 001–030 database: 53 passed + 2 LocalDB-only, also with the repository connected as a user that is only in
+`svcacct_api_runtime` (SA-API, SA-Worker, SA-002-API, SA-004-API applied); grants on the 030 tables probed: SELECT/INSERT
+only. Harness: candidate 4 replay refused. `dotnet format --verify-no-changes` clean on a CRLF copy. OpenAPI regenerated:
+3 paths, 7 schemas, 2 `AccountDetail` properties added, nothing removed or changed. PowerShell: collector/module drift test,
+collector run (no Windows sources here → `Failed`, valid contract line), combine round trip into the module parser.
+UI: render tests; static render of the real component with MudBlazor CSS and the theme at 390/640/1280 px, light and dark:
+no horizontal scroll, Tab/Enter reach and open every section (MudBlazor 6.16 panel headers were not focusable, so the tab
+uses `<details>`; long values wrap inside their own element so stacked labels keep whole words).
+
+Not run: everything Windows-only (rows 67–75), browser login, desktop viewers.
+
 ## Windows session 2026-10-04 evening (after the cloud session below)
 
 Owner's workstation, `659a666`, SDK 9.0.317 (user-local install; `global.json` unchanged), LocalDB, synthetic data only.

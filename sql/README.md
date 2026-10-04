@@ -1,5 +1,19 @@
 # sql/
 
+## Service Account Usage Scans 030, 2026-10-04
+
+Inventory is 001-030. **030-service-account-usage-scans** (ADR-0027) requires reviewed 025/026 and includes the retained
+`pending/service-accounts/SA-004-usage-scans.sql` unchanged: five new append-only tables (`UsageScans`,
+`UsageScanServers`, `UsageScanItems`, `UsageScanLinks`, `UsageScanDecisions`) with triggers refusing UPDATE/DELETE
+(error 51307). No existing table, constraint, row, role or grant changes; no data is added. One transaction; replay is
+refused (51360). Runtime grants are separate in `pending/service-accounts/SA-004-API-permissions.sql`: SELECT and INSERT
+on the five tables for `svcacct_api_runtime` only; the Worker role gets nothing.
+
+030 was reserved after checking every published branch (all end at 029 or earlier) and depends on no other unapplied
+script. Binaries with the usage-scan code keep working before 030: the account detail reports scans as unavailable and an
+upload is refused with `scanTablesMissing`; nothing else changes. Apply only after separate owner approval, first on a copy
+of the installed database. Rollback: stop uploads (older binaries never touch the tables); keep the tables, rows and audit.
+
 ## Service Accounts Scope Bootstrap 029, 2026-10-03
 
 Inventory is 001-029. **029-service-account-scope-bootstrap** (ADR-0026) requires reviewed 025/026

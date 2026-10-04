@@ -65,6 +65,17 @@ public sealed class ServiceAccountUsageScanScriptTests
         combine.Should().Contain("[switch]$UseJeaEndpoint");
     }
 
+    [Fact]
+    public void UploadExample_FollowsTheContract_AndTheContractIsClosed()
+    {
+        JsonNode example = JsonNode.Parse(File.ReadAllText(Path.Combine(Root(), "contracts", "examples", "service-account-usage-scan-example.json")))!;
+        BundleSchema().Evaluate(example).IsValid.Should().BeTrue();
+
+        JsonNode leaked = example.DeepClone();
+        leaked["results"]![0]!["components"]![0]!["Password"] = "SYN-NEVER-UPLOADED";
+        BundleSchema().Evaluate(leaked).IsValid.Should().BeFalse("no property outside the contract is allowed");
+    }
+
     [NonWindowsFact]
     public void Collector_PrintsOneContractLine_AndAFailedSourceIsNeverNotUsed()
     {

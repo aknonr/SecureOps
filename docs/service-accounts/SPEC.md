@@ -11,8 +11,9 @@ one historical migration package, never production constants.
 Import preview and approved merge, account list, account detail timeline, team-scoped
 authorization, request/action/communication/finding records, handover and gMSA-transition
 tracking, and weekly/manager reporting. The module manages plans, external references and
-evidence. It never deletes AD accounts, rotates passwords, converts to gMSA, scans servers,
-collects secrets or analyses mail with AI.
+evidence. It never deletes AD accounts, rotates passwords, converts to gMSA, scans servers itself,
+collects secrets or analyses mail with AI. A usage scan a person ran under their own authority can be uploaded as
+evidence (ADR-0027, "Usage scans" below).
 
 Account owner team, executing team, consuming team, follow-up person, contact person and the
 coordinator are different roles and must never be collapsed into one "responsible" field.
@@ -207,6 +208,30 @@ department, same-name flag, truncation flag). A result links to a Service Accoun
 with that account name is in the caller's scope. Selecting a result grants nothing, confirms no ownership and changes
 nothing in the directory. The audit keeps a query hash and counts, never the name. Exact lookup is unchanged.
 
+## Usage scans (ADR-0027)
+
+A person runs the read-only collector on each server under their own authority, combines the per-server documents with
+the planned server list on their own workstation and uploads the file on the account page. The module never connects to a
+server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR.md).
+
+1. **Evidence, not a decision.** Attaching a scan changes nothing else: no ownership, request, action, finding, closure,
+   suitability or report figure. Scan matches are not counted as open findings.
+2. **Honest coverage.** Every planned server is kept. "Not found" exists only after a complete scan (all three sources read)
+   and is shown as "not found in the scanned sources", never "not used"; a partial scan without a match is uncertain; a
+   failed, unreachable or unanswered server is "no information" (rule 15).
+3. **No secrets.** A file with a property name or a value that looks like a password, secret, token, credential or
+   connection string (Turkish spellings included) is refused as a whole and nothing from it is stored or echoed.
+4. **Who.** Attaching needs Work and the responsible basis, or the participant basis through one of the caller's own open
+   requests (the scan is then evidence on that request). The file must have searched this account (same name; same domain
+   when both carry one). Turning a match into a usage, or dismissing it with a reason, needs Work and the responsible basis,
+   once per match and account, never automatically; the created usage is an ordinary manual usage.
+5. **gMSA evidence.** A scan with an expected gMSA yields, per account: former account still configured; incomplete (a
+   planned server not fully covered); converted on the covered servers (every planned server fully scanned, no former
+   account, the gMSA runs a component); or no components. It is shown as evidence only; the verifier verifies the
+   conversion through the existing action verification.
+6. **Append-only.** Scans, servers, matches, links and decisions are never updated or deleted; the same bytes from the same
+   person are one scan; every link and decision writes module history and the audit log.
+
 ## Reminders
 
 In-app notifications and coordinator message drafts only. Automatic mail requires a configured
@@ -254,6 +279,11 @@ bounded retry and a visible dead-letter list are required.
     the correct week.
 18. The XLSX export opens in desktop Microsoft Excel without a repair prompt; formula/
     shared-formula XML and dates are checked; PDF and XLSX reconcile to the same snapshot.
+19. A usage scan whose servers were all fully scanned without a match leaves the account, its requests, actions and
+    closure unchanged and says "not found in the scanned sources"; an unreachable server stays "no information".
+20. A scan file with a `Password` (or `parola`, `şifre`, `token`, `connection_string`, …) property or a `password=` value
+    is refused and nothing from it is stored.
+21. A gMSA check with one unreachable server is never "converted"; the verifier still verifies the conversion action.
 
 Legacy ownership reconciliation control: the main account inputs name a responsible person for
 40 accounts using 7 distinct name labels. The legacy combined view reached 53 accounts / 9

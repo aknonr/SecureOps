@@ -16,7 +16,8 @@ Cross-component data contracts. Authoritative source for the shape of payloads t
 | `audit-event.schema.json` | Serialized audit entry shape | 1 |
 | `identity-lookup.schema.json` | Phase 1A identity lookup request/response, safe metadata, health, and error responses | 1A |
 | `notification-message.schema.json` | Generic notification payload before channel-specific rendering | 3 |
-| `service-account-usage.schema.json` | PROPOSED (ADR-0024): read-only service account usage scan of one server and post-conversion gMSA check | SA |
+| `service-account-usage.schema.json` | Read-only service account usage scan of one server and post-conversion gMSA check (collector output; ADR-0027, originally ADR-0024) | SA |
+| `service-account-usage-scan.schema.json` | Upload file of a person-run usage scan: planned servers, per-server documents, servers without a result (ADR-0027); the API also refuses secret-like fields | SA |
 | `ai-analysis-request.schema.json` | Request to the internal AI service | 7 |
 | `ai-analysis-response.schema.json` | Response from the internal AI service | 7 |
 
@@ -31,6 +32,7 @@ Cross-component data contracts. Authoritative source for the shape of payloads t
 | `identity-lookup-example.json` | `identity-lookup.schema.json` |
 | `notification-message-example.json` | `notification-message.schema.json` |
 | `service-account-usage-example.json` | `service-account-usage.schema.json` |
+| `service-account-usage-scan-example.json` | `service-account-usage-scan.schema.json` (refers to `service-account-usage.schema.json` by `$id`) |
 | `ai-analysis-example.json` | `ai-analysis-request.schema.json` + `ai-analysis-response.schema.json` |
 
 ## Versioning
