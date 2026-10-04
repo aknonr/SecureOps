@@ -9,6 +9,7 @@
 @inject IIdentityLookupApiClient IdentityClient
 @inject IManagementReportingApiClient Reporting
 @inject ILogger<Dashboard> Logger
+@inject NavigationManager Navigation
 
 <PageTitle>@WasasBrand.Title(_managementView ? "Yönetim Panosu" : "Genel Bakış")</PageTitle>
 
@@ -696,7 +697,28 @@
         }
 
         await LoadAsync(force: false);
+
+        // Owner decision 2026-10-04: an approved user whose only offered work is Service Accounts lands in that module
+        // from "/". "/dashboard" stays reachable, and any other capability with its own entry keeps the board.
+        if (OnlyServiceAccounts(_snapshot, _available, _managementView) && IsRootRoute())
+        {
+            Navigation.NavigateTo("service-accounts", replace: true);
+        }
     }
+
+    private bool IsRootRoute()
+    {
+        string relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        int end = relative.IndexOfAny(['?', '#']);
+        return (end < 0 ? relative : relative[..end]).Length == 0;
+    }
+
+    private static bool OnlyServiceAccounts(AccessSnapshot? snapshot, IReadOnlyList<OperatorTask> available, bool managementView) =>
+        snapshot is { IsApproved: true }
+        && !managementView
+        && snapshot.Can(ServiceAccountCapabilities.View)
+        && available.Count == 1
+        && available[0].Route == "service-accounts";
 
     private Task RefreshAsync() => LoadAsync(force: true);
 

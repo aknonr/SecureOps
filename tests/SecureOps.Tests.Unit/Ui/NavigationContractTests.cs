@@ -31,6 +31,20 @@ public sealed class NavigationContractTests
     }
 
     [Fact]
+    public void ServiceAccountsOnlyUser_LandsInTheModuleFromRoot_ButDashboardStaysReachable()
+    {
+        string dashboard = Ui("Pages", "Dashboard.razor");
+
+        dashboard.Should().Contain("@page \"/\"").And.Contain("@page \"/dashboard\"");
+        dashboard.Should().Contain("Navigation.NavigateTo(\"service-accounts\", replace: true)")
+            .And.Contain("snapshot is { IsApproved: true }")
+            .And.Contain("!managementView")
+            .And.Contain("available.Count == 1")
+            .And.Contain("available[0].Route == \"service-accounts\"")
+            .And.Contain("IsRootRoute()", "only \"/\" redirects; \"/dashboard\" keeps the board");
+    }
+
+    [Fact]
     public void OperatorReportRoute_StillExists()
     {
         Ui("Pages", "OperatorReport.razor").Should().Contain("@page \"/reporting/operators\"");
