@@ -1,24 +1,47 @@
 #Requires -Version 5.1
 <#
-    SecureOps.ServiceAccountUsage — PROPOSED (ADR-0024), not deployable until ADR-0024 is accepted and Bilgi Güvenliği
-    has approved the JEA role capability. Read-only by construction:
+.SYNOPSIS
+    ADR-0027. Read-only: where do the given service accounts run on THIS server (Windows services, scheduled tasks, IIS
+    application pools, sites, applications and virtual directories)? With -ExpectedAccount (a gMSA ending with "$") it also
+    reports whether those components now run as the gMSA.
 
-    - One exported command, Get-SecureOpsAccountUsage, which a JEA role capability exposes as the only visible function.
-      Function bodies run outside JEA's language restrictions (Microsoft PowerShell-Docs, "JEA role capabilities"), so the
-      raw cmdlets it uses (Get-CimInstance, Get-ScheduledTask, Get-Content) never need to be visible to the caller and
-      are called by fully qualified module name.
-    - Sources: Win32_Service.StartName, Scheduled Task principals, and IIS identities read from applicationHost.config.
-      For IIS only these attributes are read: application pool name, processModel identityType and userName; site,
-      application and virtual directory path, userName and physicalPath. Password attributes are never read, selected,
-      decrypted or returned. COM+ identities and user-right assignments are not scanned (see ADR-0024 "Coverage").
-    - Nothing is written: no service, task, IIS, file, registry or account change; no temporary files.
+.DESCRIPTION
+    Self-contained collector for one server. The person who runs it uses their own authority and their own way of reaching
+    the server; the SecureOps product never starts it and this script opens no network connection.
 
-    Pure helpers (ConvertTo-SoAccountKey, Test-SoAccountMatch, Read-SoIisIdentity, Find-SoAccountUsage,
-    Test-SoGmsaConversion) take data in and return data, so they are unit-tested without a Windows server.
+    It never changes anything: no service, task, IIS, file, registry or account change, and it writes no file. Passwords are
+    never read: Windows does not expose service or task passwords, and from applicationHost.config only names, identityType,
+    userName and physicalPath are selected (password attributes are not read, decrypted or returned).
+
+    Output: ONE line of JSON on the success stream, schema service-account-usage-v1
+    (contracts/schemas/service-account-usage.schema.json). Save it on your own workstation, one file per server or one line
+    per server in a JSON-Lines file, then build the upload file with
+    Invoke-ServiceAccountUsageScan.ps1 -CombinePath ... -ComputerName <planned servers> -Account ... -OutputPath ...
+    A source that cannot be read is reported as Failed (scan Partial or Failed), never as "not used".
+
+    The functions between the BEGIN/END markers are a verbatim copy of
+    scripts/jea/proposed/SecureOps.ServiceAccountUsage/SecureOps.ServiceAccountUsage.psm1; a unit test fails on any drift.
+
+.EXAMPLE
+    .\Get-ServiceAccountUsage.ps1 -Account 'SYN\svc_synapp'
+
+.EXAMPLE
+    .\Get-ServiceAccountUsage.ps1 -Account 'SYN\svc_synapp' -ExpectedAccount 'SYN\gmsa_synapp$'
 #>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)]
+    [ValidateCount(1, 20)]
+    [ValidatePattern('^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,14}\\)?[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}\$?$')]
+    [string[]]$Account,
+
+    [ValidatePattern('^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,14}\\)?[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}\$$')]
+    [string]$ExpectedAccount
+)
 
 Set-StrictMode -Version 3.0
 
+# >>> BEGIN SecureOps.ServiceAccountUsage functions (verbatim)
 $script:SchemaName = 'service-account-usage-v1'
 $script:MaxAccounts = 20
 $script:AccountPattern = '^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,14}\\)?[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}\$?$'
@@ -277,5 +300,8 @@ function Get-SecureOpsAccountUsage {
         warnings     = @($warnings)
     }
 }
+# <<< END SecureOps.ServiceAccountUsage functions
 
-Export-ModuleMember -Function Get-SecureOpsAccountUsage, ConvertTo-SoAccountKey, Test-SoAccountMatch, Read-SoIisIdentity, Find-SoAccountUsage, Test-SoGmsaConversion
+$usageArguments = @{ Account = $Account }
+if ($ExpectedAccount) { $usageArguments.ExpectedAccount = $ExpectedAccount }
+Get-SecureOpsAccountUsage @usageArguments | ConvertTo-Json -Depth 8 -Compress
