@@ -26,7 +26,7 @@
     }
     else if (Chart.Kind == ReportChartKind.Line)
     {
-        long top = NiceTop(Chart.Peak);
+        long top = ReportCharts.AxisTop(Chart.Peak);
         <div class="sa-line" aria-hidden="true">
             <div class="sa-line-grid">
                 <span style="bottom:100%">@Format(top)</span><span style="bottom:50%">@Format(top / 2)</span><span style="bottom:0">0</span>
@@ -115,17 +115,4 @@
     private static string Points(IReadOnlyList<long> values, long top) => string.Join(' ', values.Select((v, i) =>
         (values.Count == 1 ? 50.0 : i * 100.0 / (values.Count - 1)).ToString("0.##", CultureInfo.InvariantCulture) + "," +
         (100 - v * 100.0 / top).ToString("0.##", CultureInfo.InvariantCulture)));
-
-    /// <summary>Rounds the axis top up to an even 1-10 × 10^k step so the mid gridline is a whole, readable number.</summary>
-    internal static long NiceTop(long peak)
-    {
-        long magnitude = 1;
-        while (magnitude * 10 <= peak) { magnitude *= 10; }
-        foreach (long step in new long[] { 1, 2, 4, 5, 6, 8, 10 })
-        {
-            if (step * magnitude >= peak && step * magnitude % 2 == 0) { return step * magnitude; }
-        }
-
-        return 10 * magnitude;
-    }
 }

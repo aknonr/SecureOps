@@ -47,6 +47,26 @@ public static class ReportCharts
     /// <summary>Weeks shown in the trend chart.</summary>
     public const int MaxWeeks = 12;
 
+    /// <summary>Rounds an axis top up to an even 1-10 × 10^k step so the mid gridline is a whole, readable number.</summary>
+    public static long AxisTop(long peak)
+    {
+        long magnitude = 1;
+        while (magnitude * 10 <= peak)
+        {
+            magnitude *= 10;
+        }
+
+        foreach (long step in new long[] { 1, 2, 4, 5, 6, 8, 10 })
+        {
+            if (step * magnitude >= peak && step * magnitude % 2 == 0)
+            {
+                return step * magnitude;
+            }
+        }
+
+        return 10 * magnitude;
+    }
+
     /// <summary>Charts in display order.</summary>
     public static IReadOnlyList<ReportChart> Build(ServiceAccountReport report)
     {

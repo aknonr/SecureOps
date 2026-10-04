@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using SecureOps.Domain.ServiceAccounts;
 
 namespace SecureOps.Infrastructure.ServiceAccounts.Reporting;
 
@@ -80,7 +81,8 @@ public static class ReportPdfWriter
         int otherPages = (int)((_pageHeight - 2 * _margin - _footerSpace) / _lineHeight);
         List<List<Line>> pages = [[.. wrapped.Take(firstPage)]];
         pages.AddRange(wrapped.Skip(firstPage).Chunk(otherPages).Select(c => c.ToList()));
-        return Build(document.Title, tiles, pages);
+        ReportChart[] charts = [.. (document.Dashboard?.Charts ?? []).Where(c => !c.IsEmpty).Take(ReportPdfCharts.Slots)];
+        return Build(document.Title, tiles, pages, charts);
     }
 
     private static double TilesHeight(int count) => count == 0 ? 0 : Math.Ceiling(count / (double)_tilesPerRow) * (_tileHeight + _tileGap) + _tileGap;
@@ -151,19 +153,24 @@ public static class ReportPdfWriter
         }
     }
 
-    private static byte[] Build(string title, IReadOnlyList<ReportTile> tiles, List<List<Line>> pages)
+    private static byte[] Build(string title, IReadOnlyList<ReportTile> tiles, List<List<Line>> pages, IReadOnlyList<ReportChart> charts)
     {
         List<byte[]> objects = [];
         const int pagesId = 2, fontId = 3, boldId = 4, firstPage = 5;
         const string encoding = "/Encoding << /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [128 /Gbreve /gbreve /Idotaccent /dotlessi /Scedilla /scedilla] >>";
-        string kids = string.Join(" ", Enumerable.Range(0, pages.Count).Select(i => $"{firstPage + i * 2} 0 R"));
+        // The chart page, when there is one, follows the first page (tiles and summary tables) and precedes the detail pages.
+        int total = pages.Count + (charts.Count > 0 ? 1 : 0);
+        string kids = string.Join(" ", Enumerable.Range(0, total).Select(i => $"{firstPage + i * 2} 0 R"));
         objects.Add(Ascii("<< /Type /Catalog /Pages 2 0 R >>"));
-        objects.Add(Ascii($"<< /Type /Pages /Kids [{kids}] /Count {pages.Count} >>"));
+        objects.Add(Ascii($"<< /Type /Pages /Kids [{kids}] /Count {total} >>"));
         objects.Add(Ascii($"<< /Type /Font /Subtype /Type1 /BaseFont /Courier {encoding} >>"));
         objects.Add(Ascii($"<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold {encoding} >>"));
-        for (int i = 0; i < pages.Count; i++)
+        for (int i = 0; i < total; i++)
         {
-            byte[] stream = Encoding.Latin1.GetBytes(Page(title, i == 0 ? tiles : [], pages[i], i, pages.Count));
+            string content = charts.Count > 0 && i == 1
+                ? ReportPdfCharts.Page(charts, _pageWidth, _pageHeight, _margin, _footerSpace) + Footer(i, total)
+                : Page(title, i == 0 ? tiles : [], pages[charts.Count > 0 && i > 1 ? i - 1 : i], i, total);
+            byte[] stream = Encoding.Latin1.GetBytes(content);
             objects.Add(Ascii($"<< /Type /Page /Parent {pagesId} 0 R /MediaBox [0 0 {N(_pageWidth)} {N(_pageHeight)}] "
                 + $"/Resources << /Font << /F1 {fontId} 0 R /F2 {boldId} 0 R >> >> /Contents {firstPage + i * 2 + 1} 0 R >>"));
             objects.Add([.. Ascii($"<< /Length {stream.Length} >>\nstream\n"), .. stream, .. Ascii("\nendstream")]);
@@ -258,15 +265,23 @@ public static class ReportPdfWriter
             y -= _lineHeight;
         }
 
-        shapes.Append(CultureInfo.InvariantCulture, $"{_ruleStroke} RG 0.6 w {N(_margin)} {N(_margin + _footerSpace - 8)} m {N(_margin + width)} {N(_margin + _footerSpace - 8)} l S\n");
-        text.Append(CultureInfo.InvariantCulture, $"0.40 0.43 0.48 rg /F1 {N(_fontSize)} Tf\n1 0 0 1 {N(_margin)} {N(_margin + 2)} Tm ({Encode("Kurum içi · salt okunur rapor nüshası")}) Tj\n");
-        text.Append(CultureInfo.InvariantCulture, $"1 0 0 1 {N(_pageWidth - _margin - 15 * _charWidth)} {N(_margin + 2)} Tm ({Encode($"Sayfa {index + 1}/{count}")}) Tj\n");
-        return shapes + "BT\n" + text + "ET";
+        return shapes + "BT\n" + text + "ET" + Footer(index, count);
     }
 
-    private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    /// <summary>Footer rule, classification line and page number (its own text object).</summary>
+    private static string Footer(int index, int count)
+    {
+        double width = _pageWidth - 2 * _margin;
+        StringBuilder footer = new();
+        footer.Append(CultureInfo.InvariantCulture, $"\n{_ruleStroke} RG 0.6 w {N(_margin)} {N(_margin + _footerSpace - 8)} m {N(_margin + width)} {N(_margin + _footerSpace - 8)} l S\nBT\n");
+        footer.Append(CultureInfo.InvariantCulture, $"0.40 0.43 0.48 rg /F1 {N(_fontSize)} Tf\n1 0 0 1 {N(_margin)} {N(_margin + 2)} Tm ({Encode("Kurum içi · salt okunur rapor nüshası")}) Tj\n");
+        footer.Append(CultureInfo.InvariantCulture, $"1 0 0 1 {N(_pageWidth - _margin - 15 * _charWidth)} {N(_margin + 2)} Tm ({Encode($"Sayfa {index + 1}/{count}")}) Tj\nET");
+        return footer.ToString();
+    }
 
-    private static string Encode(string line)
+    internal static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    internal static string Encode(string line)
     {
         StringBuilder builder = new(line.Length);
         foreach (char c in line)

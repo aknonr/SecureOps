@@ -69,7 +69,7 @@ public sealed class ServiceAccountChartUiTests
     [InlineData(11, 20)]
     [InlineData(37, 40)]
     [InlineData(145, 200)]
-    public void AxisTop_RoundsUpToAnEvenStep(long peak, long top) => SaChart.NiceTop(peak).Should().Be(top);
+    public void AxisTop_RoundsUpToAnEvenStep(long peak, long top) => ReportCharts.AxisTop(peak).Should().Be(top);
 
     [Fact]
     public void ReportView_ShowsTheChartsBeforeTheTables()
