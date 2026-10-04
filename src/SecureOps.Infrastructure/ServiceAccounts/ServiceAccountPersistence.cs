@@ -48,6 +48,8 @@ public static class SaErrors
     public const string AlreadyImported = "ServiceAccountImportAlreadyCommitted";
     /// <summary>Idempotency key missing or invalid.</summary>
     public const string IdempotencyKey = "ServiceAccountIdempotencyKeyRequired";
+    /// <summary>Usage-scan upload refused (the field names the stable reason; nothing from the file is stored).</summary>
+    public const string UsageScanFile = "ServiceAccountUsageScanRejected";
 }
 
 /// <summary>Scope inputs loaded for one caller.</summary>

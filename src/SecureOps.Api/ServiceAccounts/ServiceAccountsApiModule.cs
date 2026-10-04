@@ -48,6 +48,7 @@ public static class ServiceAccountReplies
             SaErrors.Forbidden => (403, "authorization", false, "Bu işlem için yetkiniz veya kapsamınız yok."),
             SaErrors.Invalid => (400, "validation", false, "Girilen bilgi geçersiz."),
             SaErrors.ImportFile => (400, "import-file", false, "Dosya kabul edilmedi."),
+            SaErrors.UsageScanFile => (400, "usage-scan-file", false, "Tarama dosyası kabul edilmedi; dosyadan hiçbir şey kaydedilmedi."),
             SaErrors.IdempotencyKey => (400, "validation", false, "İşlem anahtarı eksik."),
             SaErrors.Conflict => (409, "concurrency", true, "Kayıt siz düzenlerken değişti; güncel değerleri inceleyip yeniden kaydedin."),
             SaErrors.PreviewStale => (409, "import-preview", true, "Önizlemeden sonra veri değişti; önizlemeyi yenileyin."),
