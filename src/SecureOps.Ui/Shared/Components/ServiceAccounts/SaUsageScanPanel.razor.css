@@ -13,12 +13,25 @@
     margin-top: 0.5rem;
 }
 
-.sa-scan-limits summary {
-    cursor: pointer;
-    width: fit-content;
+.sa-scan-section {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
 }
 
-.sa-scan-limits summary:focus-visible {
+.sa-scan-limits summary,
+.sa-scan-section summary {
+    cursor: pointer;
+    width: fit-content;
+    font-weight: 600;
+}
+
+.sa-scan-section[open] summary {
+    margin-bottom: 0.5rem;
+}
+
+.sa-scan-limits summary:focus-visible,
+.sa-scan-section summary:focus-visible {
     outline: 2px solid var(--so-text);
     outline-offset: 2px;
 }
@@ -29,15 +42,23 @@
     padding-left: 1.25rem;
 }
 
-/* Server, component and path names are long and unbroken; they must wrap at 390 px and 200 % zoom. */
-::deep .sa-scan-wrap,
+/* Server, component and path names are long and unbroken; they must wrap at 390 px and 200 % zoom. Only the value wraps
+   anywhere; the stacked-table labels keep whole words. */
 .sa-scan-wrap {
     overflow-wrap: anywhere;
-    word-break: break-word;
+    min-width: 0;
 }
 
 .sa-scan-decision {
     border: 1px solid var(--mud-palette-lines-default);
     border-radius: 0.5rem;
     padding: 0.75rem;
+}
+
+/* Stacked (narrow) tables: the data label keeps whole words and does not shrink to make room for a long value. */
+.so-panel ::deep .mud-table-cell::before {
+    flex: 0 0 auto;
+    max-width: 45%;
+    overflow-wrap: normal;
+    word-break: normal;
 }

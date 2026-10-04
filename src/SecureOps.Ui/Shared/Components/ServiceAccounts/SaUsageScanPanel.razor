@@ -31,7 +31,9 @@
     }
     else if (CanUpload)
     {
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Tarama dosyası yükle ve bu hesaba bağla">
+        @* Native details/summary: keyboard operable without script (MudBlazor 6 panel headers take no focus). *@
+        <details class="sa-scan-section mt-2">
+            <summary>Tarama dosyası yükle ve bu hesaba bağla</summary>
             <p class="so-panel-text--sm">
                 Dosya, her sunucuda çalıştırılan <code>Get-ServiceAccountUsage.ps1</code> çıktılarından kendi makinenizde
                 <code>Invoke-ServiceAccountUsageScan.ps1 -CombinePath</code> ile üretilir (JSON, en çok 4 MB). Dosya bu hesabı aramış olmalı.
@@ -61,7 +63,7 @@
             @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
             <MudButton OnClick="UploadAsync" Disabled="@(!CanSend)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
                 StartIcon="@Icons.Material.Filled.UploadFile">Yükle ve bu hesaba bağla</MudButton>
-        </MudExpansionPanel></MudExpansionPanels>
+        </details>
     }
 
     @if (Detail.UsageScans is { Count: 0 })
@@ -136,16 +138,18 @@
             <MudTable Items="former" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageScanItemView">
                 <HeaderContent><MudTh>Sunucu</MudTh><MudTh>Bileşen</MudTh><MudTh>Yapılandırılmış kimlik</MudTh><MudTh>Karar</MudTh></HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Sunucu" Class="sa-scan-wrap">@context.ServerName</MudTd>
-                    <MudTd DataLabel="Bileşen" Class="sa-scan-wrap">
-                        @context.ComponentTypeLabel: @context.ComponentName
-                        @if (context.Detail is not null || context.State is not null)
-                        {
-                            <div class="so-panel-text--sm">@string.Join(" · ", new[] { context.State, context.Detail }.Where(v => v is not null))</div>
-                        }
+                    <MudTd DataLabel="Sunucu"><span class="sa-scan-wrap">@context.ServerName</span></MudTd>
+                    <MudTd DataLabel="Bileşen">
+                        <div class="sa-scan-wrap">
+                            @context.ComponentTypeLabel: @context.ComponentName
+                            @if (context.Detail is not null || context.State is not null)
+                            {
+                                <div class="so-panel-text--sm">@string.Join(" · ", new[] { context.State, context.Detail }.Where(v => v is not null))</div>
+                            }
+                        </div>
                     </MudTd>
-                    <MudTd DataLabel="Yapılandırılmış kimlik" Class="sa-scan-wrap">@context.ConfiguredIdentity</MudTd>
-                    <MudTd DataLabel="Karar">
+                    <MudTd DataLabel="Yapılandırılmış kimlik"><span class="sa-scan-wrap">@context.ConfiguredIdentity</span></MudTd>
+                    <MudTd DataLabel="Karar"><div>
                         @if (context.Decision == "UsageRecorded")
                         {
                             <SoStatusBadge Label="Kullanım kaydı oluşturuldu" Tone="SoStatusBadge.BadgeTone.Positive" Icon="@Icons.Material.Filled.CheckCircle" />
@@ -164,7 +168,7 @@
                         {
                             <span class="so-panel-text--sm">Karar bekliyor (hesaptan sorumlu ekip)</span>
                         }
-                    </MudTd>
+                    </div></MudTd>
                 </RowTemplate>
             </MudTable>
         }
@@ -209,7 +213,8 @@
             </ul>
         }
 
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="@($"Sunucu bazında kapsam ({scan.Servers.Count} sunucu)")">
+        <details class="sa-scan-section mt-2">
+            <summary>Sunucu bazında kapsam (@scan.Servers.Count sunucu)</summary>
             <MudTable Items="scan.Servers" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageScanServerView">
                 <HeaderContent>
                     <MudTh>Sunucu</MudTh><MudTh>Tarama</MudTh><MudTh>Bu hesap için</MudTh>
@@ -217,17 +222,19 @@
                     <MudTh>Kaynaklar</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Sunucu" Class="sa-scan-wrap">@context.ServerName</MudTd>
-                    <MudTd DataLabel="Tarama">@context.ResultLabel<div class="so-panel-text--sm">@(context.ScannedAt is null ? "" : ServiceAccountUiText.Instant(context.ScannedAt))</div></MudTd>
-                    <MudTd DataLabel="Bu hesap için">@context.OutcomeLabel@(context.Matches > 0 ? $" ({context.Matches} bileşen)" : "")</MudTd>
-                    @if (scan.Gmsa is not null) { <MudTd DataLabel="gMSA">@context.GmsaStateLabel</MudTd> }
-                    <MudTd DataLabel="Kaynaklar" Class="sa-scan-wrap">
-                        @Sources(context)
-                        @if (context.Warnings is not null) { <div class="so-panel-text--sm">Uyarı: @context.Warnings</div> }
+                    <MudTd DataLabel="Sunucu"><span class="sa-scan-wrap">@context.ServerName</span></MudTd>
+                    <MudTd DataLabel="Tarama"><div>@context.ResultLabel<div class="so-panel-text--sm">@(context.ScannedAt is null ? "" : ServiceAccountUiText.Instant(context.ScannedAt))</div></div></MudTd>
+                    <MudTd DataLabel="Bu hesap için"><span>@context.OutcomeLabel@(context.Matches > 0 ? $" ({context.Matches} bileşen)" : "")</span></MudTd>
+                    @if (scan.Gmsa is not null) { <MudTd DataLabel="gMSA"><span>@context.GmsaStateLabel</span></MudTd> }
+                    <MudTd DataLabel="Kaynaklar">
+                        <div class="sa-scan-wrap">
+                            @Sources(context)
+                            @if (context.Warnings is not null) { <div class="so-panel-text--sm">Uyarı: @context.Warnings</div> }
+                        </div>
                     </MudTd>
                 </RowTemplate>
             </MudTable>
-        </MudExpansionPanel></MudExpansionPanels>
+        </details>
     </section>
 }
 
