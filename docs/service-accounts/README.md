@@ -25,7 +25,7 @@ on `feature/service-accounts-pinned-integration-20260929`, based on `e997c5b`.
 Not deployed or corporately accepted. Combined Windows evidence and limitations:
 [INTEGRATION-FOLLOWUP-20261001.md](INTEGRATION-FOLLOWUP-20261001.md).
 The canonical requirements register remains [integrated-test-activation.md](../integrated-test-activation.md).
-Business rules: [SPEC.md](SPEC.md). Historical stage evidence: [PROGRESS.md](PROGRESS.md).
+Business rules: [SPEC.md](SPEC.md). Current state: [PROGRESS.md](PROGRESS.md); historical stage evidence: [PROGRESS-HISTORY.md](PROGRESS-HISTORY.md).
 The authority/baseline history below describes the original isolated development,
 not the current integration state.
 
@@ -48,7 +48,7 @@ not the current integration state.
   `a3037175bb0bb9ecc7ab5c36c7c28607726469ce`. **Codex must reconcile this branch with the
   integrated source before acceptance.** Stale `master` was not used. The integrated branch has
   since been published at `e997c5b68cebcd23716860a9b06fdc25ebbb4493` (tested product `deda848…`);
-  see PROGRESS.md for the read-only reconciliation preview. Nothing was merged or rebased here.
+  see PROGRESS-HISTORY.md for the read-only reconciliation preview. Nothing was merged or rebased here.
 
 ## Reuse decisions (verified paths)
 

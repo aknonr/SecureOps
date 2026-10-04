@@ -45,7 +45,7 @@ checkpoint `4e6a4ef`) and its continuation on current master, `feature/service-a
 Use the repository's pinned SDK (master's G-30 gate: `global.json` 9.0.317, `rollForward: disable`,
 `Directory.Build.props` `LangVersion` 12.0) with **no `LangVersion` override**; record `dotnet --version`. The continuation
 branch keeps these files identical to master. On Linux it was built and tested with the Microsoft SDK 9.0.317 and no
-override (results in `PROGRESS.md`); the Windows G-30 gate itself is still to be run by Codex. Older notes measured with
+override (results in `PROGRESS-HISTORY.md`); the Windows G-30 gate itself is still to be run by Codex. Older notes measured with
 SDK 10.0.112 and `-p:LangVersion=13` do **not** count for the gate.
 
 ```powershell
@@ -237,10 +237,9 @@ grant exists (if rows 39–41 already granted scope, run them on a fresh TEST da
 
 **Windows run 2026-10-04 at 659a666 (owner's workstation, SDK 9.0.317, LocalDB `SecureOpsResourcesV1`, synthetic data
 only).** Build 0/0; integration 301 passed / 107 SQL-gated skipped; `dotnet format --verify-no-changes` clean. Unit
-1741 tests: two of four full runs clean, two failed once in `ServiceAccountUsageModuleTests` with "running scripts is
-disabled" — a process-wide execution-policy race with `SccmFailureEvidenceTests` (Restricted runspace) that exists on
-Windows only; the module tests alone pass 20/20. Fix: run the module tests in a non-parallel xUnit collection (prepared
-by Codex, not yet on this branch). Rows 59 and 63–66 recorded above. Rows 1–38: **BLOCKED** here — they need approved
+1741 tests at 659a666: two of four full runs failed once in `ServiceAccountUsageModuleTests` with "running scripts is
+disabled" — a process-wide execution-policy race with `SccmFailureEvidenceTests` (Restricted runspace), Windows only.
+Fixed in `36e6669` (module tests in a non-parallel xUnit collection, prepared by Codex): 1741/1741 in five runs in a row. Rows 59 and 63–66 recorded above. Rows 1–38: **BLOCKED** here — they need approved
 TEST OIDC identities (and rows 29–38 the TEST Active Directory). Rows 39–58 and 60–61: **NOT RUN** in this session
 (they need product role and scope assignments as different TEST users; row 58 also needs the owner's `.bak`). ADR-0024
 module under Windows PowerShell 5.1 (5.1.26100): `Import-Module`, `Test-SoAccountMatch`, `Read-SoIisIdentity`,
