@@ -9,6 +9,36 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Cloud session 2026-10-04 (after the Windows handoff below)
+
+Done on Linux with SDK 9.0.317 (no override), same branch; synthetic data only; nothing applied anywhere:
+1. **PDF fonts (handoff item 1) — done.** Liberation Mono 2.1.5 regular/bold (SIL OFL 1.1, unmodified, licence beside the
+   files) embedded as `Type0`/`CIDFontType2`/`Identity-H` with `ToUnicode`; `cmap` format 4 and `hmtx` parsed in managed
+   code (`ReportPdfFont`); only the two font files are FlateDecode-compressed; `/Differences` and the Turkish slot map
+   removed; `ExtractLines` decodes glyph strings per font. Checked: `pdffonts` (both embedded, Unicode map), `pdftotext`,
+   pypdf and PDFium (the Edge engine) render and extract Ğ ğ İ ı Ş ş Ç ç Ö ö Ü ü – —, including the chart page. PDF size
+   grows by about 350 KB (full fonts; subsetting is a possible later step). Windows: row 64.
+2. **Discovery and gMSA check (handoff item 2) — designed and implemented as PROPOSED.** ADR-0024 "Design detail":
+   one JEA-visible function `Get-SecureOpsAccountUsage` (services, scheduled tasks, IIS identities; never passwords),
+   role capability and session configuration under `scripts/jea/proposed/`, operator script
+   `scripts/powershell/Invoke-ServiceAccountUsageScan.ps1`, contract `service-account-usage-v1`, 20 runspace-hosted
+   tests. The team's tool was analysed (sanitized summary in the ADR; original not stored). Finding for Bilgi
+   Güvenliği: the canonical allow-list exposes raw `Get-WebConfigurationProperty`/`Get-Content`. Not run under Windows
+   PowerShell 5.1 or on any server; not deployable until ADR-0024 is accepted.
+3. **First-run failures (handoff item 5) — root cause found and fixed.** A SQL deadlock graph (`system_health`) showed two
+   concurrent organization saves deadlocking: serializable name checks without `UPDLOCK` share a range lock and both
+   need the insert range; on a fresh, empty table every insert falls into the same gap, so it happens on first runs only.
+   Fixed for organization/team saves, person verification and alias inserts; regression test fails 7–9 of 12 saves
+   without the fix and passes with it; two fresh databases then ran without any 1205. `AccountExport_…` itself was not
+   reproduced here; row 65 tells how to classify it if it recurs.
+4. **Harness `-SkipRoleScripts` exit code — fixed** (explicit `exit 0`; callers use `&`, so their `$LASTEXITCODE` is now 0).
+5. **Landing redirect — render-tested, not browser-tested.** The real Dashboard component now runs in the static HTML
+   renderer with synthetic snapshots (sent from "/" with replace; "/dashboard", other entries, pending, no capability and
+   management view stay). A browser run on Linux is not possible without weakening the Integrated-Security startup
+   validation, which was not done; rows 60–61 remain for Windows.
+
+Remaining (Windows only): 029 on the `.bak` copy (row 58), rows 1–66, desktop Excel, Edge/Adobe PDF (row 64).
+
 ## HANDOFF 2026-10-04 — open work for the next session (start here)
 
 **Context.** Branch `feature/service-accounts-scope-import-ux-20261003` (draft PR #11), based on master `77bcfab`.
