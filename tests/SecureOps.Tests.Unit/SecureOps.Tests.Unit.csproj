@@ -31,6 +31,7 @@
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>
 

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Security;
 using System.Text;
+using SecureOps.Domain.ServiceAccounts;
 
 namespace SecureOps.Infrastructure.ServiceAccounts.Reporting;
 
@@ -9,7 +10,8 @@ namespace SecureOps.Infrastructure.ServiceAccounts.Reporting;
 /// Deterministic, text-and-number XLSX writer: no formulas, shared formulas, macros, external links or
 /// calculation chain. Text that a spreadsheet could interpret as a formula is neutralized; dates are real
 /// date serials with a date number format. Table sheets get a shaded, bordered header row that stays frozen while
-/// scrolling and an AutoFilter; the cover sheet starts with the report title. Same document → same bytes.
+/// scrolling and an AutoFilter; the cover sheet starts with the report title. The executive summary carries native Excel
+/// charts whose series reference the last sheet ("Grafik verisi") and cache the same values. Same document → same bytes.
 /// </summary>
 public static class ReportWorkbookWriter
 {
@@ -24,6 +26,8 @@ public static class ReportWorkbookWriter
     private const int _blockTitleStyle = 8;
     private const int _dashboardColumns = 12;
     private const int _tilesPerRow = 4;
+    private const int _rowsPerChart = 16;
+    private const string _chartDataSheet = "Grafik verisi";
     private static readonly char[] _formulaStarts = ['=', '+', '-', '@', '\t', '\r', '\n'];
 
     /// <summary>Renders the document; entry timestamps are fixed to the snapshot time.</summary>
@@ -37,18 +41,20 @@ public static class ReportWorkbookWriter
                 [("Rapor", [[document.Title], [], .. document.Header.Select(h => (IReadOnlyList<ReportCell>)[h.Label, h.Value])], false)];
             foreach (ReportSection section in document.Sections)
             {
-                tables.Add((SheetName(section.Title, tables.Select(s => s.Name).Append("Yönetici özeti")), [section.Headers.Select(h => (ReportCell)h).ToArray(), .. section.Rows], true));
+                tables.Add((SheetName(section.Title, tables.Select(s => s.Name).Append("Yönetici özeti").Append(_chartDataSheet)), [section.Headers.Select(h => (ReportCell)h).ToArray(), .. section.Rows], true));
             }
 
+            List<ReportChartXml.DataBlock> blocks = ChartData(document, tables);
             List<(string Name, string Xml, string? Filter)> sheets = [.. tables.Select(t => (t.Name, Sheet(t.Rows, t.HasHeaderBlock), FilterRange(t.Rows, t.HasHeaderBlock)))];
+            int chartRow = 0;
             if (document.Dashboard is { } dashboard)
             {
-                sheets.Insert(0, ("Yönetici özeti", DashboardSheet(document.Title, dashboard), null));
+                sheets.Insert(0, ("Yönetici özeti", DashboardSheet(document.Title, dashboard, blocks.Count, out chartRow), null));
             }
 
             Add(zip, "[Content_Types].xml", stamp, $"""
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-                <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>{string.Concat(sheets.Select((_, i) => $"<Override PartName=\"/xl/worksheets/sheet{i + 1}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>"))}</Types>
+                <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>{string.Concat(sheets.Select((_, i) => $"<Override PartName=\"/xl/worksheets/sheet{i + 1}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>"))}{ChartContentTypes(blocks.Count)}</Types>
                 """);
             Add(zip, "_rels/.rels", stamp, """
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -70,10 +76,60 @@ public static class ReportWorkbookWriter
             {
                 Add(zip, $"xl/worksheets/sheet{i + 1}.xml", stamp, sheets[i].Xml);
             }
+
+            if (blocks.Count > 0)
+            {
+                Add(zip, "xl/worksheets/_rels/sheet1.xml.rels", stamp, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+                    + "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing1.xml\"/></Relationships>");
+                Add(zip, "xl/drawings/drawing1.xml", stamp, ReportChartXml.Drawing(blocks.Count, chartRow, _rowsPerChart));
+                Add(zip, "xl/drawings/_rels/drawing1.xml.rels", stamp, ReportChartXml.DrawingRelationships(blocks.Count));
+                for (int i = 0; i < blocks.Count; i++)
+                {
+                    Add(zip, $"xl/charts/chart{i + 1}.xml", stamp, ReportChartXml.Chart(blocks[i], _chartDataSheet));
+                }
+            }
         }
 
         return stream.ToArray();
     }
+
+    /// <summary>
+    /// Adds the chart-data sheet (last) for the executive-summary charts and returns where each chart's cells are. Only a
+    /// document with an executive summary has charts; all-zero charts are left out (their values are in the detail sections).
+    /// </summary>
+    private static List<ReportChartXml.DataBlock> ChartData(ReportDocument document, List<(string Name, List<IReadOnlyList<ReportCell>> Rows, bool HasHeaderBlock)> tables)
+    {
+        ReportChart[] charts = [.. (document.Dashboard?.Charts ?? []).Where(c => !c.IsEmpty)];
+        List<ReportChartXml.DataBlock> blocks = [];
+        if (charts.Length == 0)
+        {
+            return blocks;
+        }
+
+        List<IReadOnlyList<ReportCell>> data = [[_chartDataSheet + " (yönetici özetindeki grafiklerin değerleri)"]];
+        foreach (ReportChart chart in charts)
+        {
+            data.Add([]);
+            data.Add([chart.Title]);
+            data.Add([chart.Kind == ReportChartKind.Line ? "Hafta başı" : "Kalem", .. chart.Series.Select(s => (ReportCell)s.Name)]);
+            int header = data.Count;
+            for (int i = 0; i < chart.Categories.Count; i++)
+            {
+                int index = i;
+                data.Add([chart.Categories[i], .. chart.Series.Select(s => new ReportCell(Number: s.Values[index]))]);
+            }
+
+            blocks.Add(new(chart, header, header + 1, data.Count));
+        }
+
+        tables.Add((_chartDataSheet, data, false));
+        return blocks;
+    }
+
+    private static string ChartContentTypes(int count) => count == 0
+        ? string.Empty
+        : "<Override PartName=\"/xl/drawings/drawing1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/>"
+          + string.Concat(Enumerable.Range(1, count).Select(i => $"<Override PartName=\"/xl/charts/chart{i}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawingml.chart+xml\"/>"));
 
     /// <summary>Prefixes text that could be evaluated as a formula when copied or re-saved.</summary>
     public static string Neutralize(string text) => text.Length > 0 && _formulaStarts.Contains(text[0]) ? "'" + text : text;
@@ -160,7 +216,7 @@ public static class ReportWorkbookWriter
     /// Executive summary sheet: title, scope/period line, headline tiles (four per row, each a merged 3-column box with label,
     /// value and note) and short tables whose columns are spread over twelve grid columns. Values only, no formulas.
     /// </summary>
-    private static string DashboardSheet(string title, ReportDashboard dashboard)
+    private static string DashboardSheet(string title, ReportDashboard dashboard, int charts, out int chartRow)
     {
         SortedDictionary<int, SortedDictionary<int, string>> cells = [];
         List<string> merges = [];
@@ -215,6 +271,16 @@ public static class ReportWorkbookWriter
             r += 4;
         }
 
+        // Charts follow the tiles, before the tables; each pair of charts takes a fixed band of rows (no cell sits under a chart).
+        chartRow = 0;
+        if (charts > 0)
+        {
+            r++;
+            Span(r++, 0, _dashboardColumns, "Grafikler (değerler \"" + _chartDataSheet + "\" sayfasında)", _blockTitleStyle);
+            chartRow = r;
+            r += (charts + 1) / 2 * (_rowsPerChart + 1);
+        }
+
         foreach (ReportSection block in dashboard.Blocks)
         {
             r++;
@@ -243,7 +309,7 @@ public static class ReportWorkbookWriter
             }
         }
 
-        StringBuilder xml = new($"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"{_main}\">");
+        StringBuilder xml = new($"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"{_main}\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">");
         xml.Append("<sheetViews><sheetView workbookViewId=\"0\" showGridLines=\"0\" tabSelected=\"1\"/></sheetViews>");
         xml.Append(CultureInfo.InvariantCulture, $"<cols><col min=\"1\" max=\"{_dashboardColumns}\" width=\"13\" customWidth=\"1\"/></cols><sheetData>");
         foreach ((int row, SortedDictionary<int, string> line) in cells)
@@ -256,6 +322,11 @@ public static class ReportWorkbookWriter
         if (merges.Count > 0)
         {
             xml.Append(CultureInfo.InvariantCulture, $"<mergeCells count=\"{merges.Count}\">").Append(string.Concat(merges.Select(m => $"<mergeCell ref=\"{m}\"/>"))).Append("</mergeCells>");
+        }
+
+        if (charts > 0)
+        {
+            xml.Append("<drawing r:id=\"rId1\"/>");
         }
 
         xml.Append("</worksheet>");

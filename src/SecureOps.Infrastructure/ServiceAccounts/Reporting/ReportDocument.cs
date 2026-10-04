@@ -29,7 +29,9 @@ public sealed record ReportTile(string Label, long Value, string? Note = null);
 /// <param name="Subtitle">Scope and period in one line.</param>
 /// <param name="Tiles">Headline figures, rendered four per row.</param>
 /// <param name="Blocks">Short tables (gMSA transition, teams, upcoming plans), each limited to a few rows.</param>
-public sealed record ReportDashboard(string Subtitle, IReadOnlyList<ReportTile> Tiles, IReadOnlyList<ReportSection> Blocks);
+/// <param name="Charts">Charts drawn from the same payload (<see cref="ReportCharts"/>); renderers skip all-zero charts.</param>
+public sealed record ReportDashboard(string Subtitle, IReadOnlyList<ReportTile> Tiles, IReadOnlyList<ReportSection> Blocks,
+    IReadOnlyList<ReportChart>? Charts = null);
 
 /// <summary>Render-neutral report built only from an immutable snapshot payload; XLSX and PDF render the same document.</summary>
 public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, string Value)> Header, IReadOnlyList<ReportSection> Sections, DateTimeOffset CreatedAt,
@@ -128,7 +130,7 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
             new("Yaklaşan planlar (bitişe göre)", ["Hesap", "Aksiyon", "Bitiş", "Muhatap ekip", "Gecikiyor"],
                 [.. report.DatedPlans.OrderBy(p => p.End).ThenBy(p => p.Account, StringComparer.Ordinal).Take(DashboardRows)
                     .Select(p => Row(p.Account, p.Action, new ReportCell(Date: p.End), p.TargetTeam ?? "—", p.Overdue ? "Evet" : "Hayır"))])
-        ]);
+        ], ReportCharts.Build(report));
         return new ReportDocument(report.Period switch
         {
             ReportPeriods.Month => "Servis Hesapları Aylık Rapor",
