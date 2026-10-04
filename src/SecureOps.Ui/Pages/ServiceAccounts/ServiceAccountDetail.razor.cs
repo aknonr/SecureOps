@@ -31,6 +31,12 @@ public partial class ServiceAccountDetail
         ? $"Kullanım ve kural ({(_detail.Usages ?? []).Count(u => !u.Removed)}) · kurala aykırı"
         : $"Kullanım ve kural ({(_detail?.Usages ?? []).Count(u => !u.Removed)})";
 
+    /// <summary>Scan tab title with the matches still waiting for a person's decision.</summary>
+    private string ScanTabText => _detail?.UsageScans is not { Count: > 0 } scans ? "Kullanım taraması"
+        : scans.SelectMany(s => s.Items).Count(i => i.Role == "Former" && i.Decision is null) is var pending and > 0
+            ? $"Kullanım taraması ({scans.Count}) · {pending} karar bekliyor"
+            : $"Kullanım taraması ({scans.Count})";
+
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
@@ -87,6 +93,18 @@ public partial class ServiceAccountDetail
                 ["ownerType"] = upload.OwnerType,
                 ["ownerId"] = upload.OwnerId.ToString("D"),
                 ["label"] = upload.Label
+            }, token));
+        await AfterCommandAsync(saved);
+    }
+
+    /// <summary>Attaches a usage-scan file; the API validates the whole file before anything is stored.</summary>
+    private async Task UploadScanAsync(SaUsageScanUpload upload)
+    {
+        bool saved = await RunAsync(async token => _detail = await Api.UploadAsync<AccountDetail>($"/accounts/{Id}/usage-scans", upload.FileName,
+            "application/json", upload.Content, new Dictionary<string, string?>
+            {
+                ["runStatement"] = upload.RunStatement,
+                ["requestId"] = upload.RequestId?.ToString("D")
             }, token));
         await AfterCommandAsync(saved);
     }

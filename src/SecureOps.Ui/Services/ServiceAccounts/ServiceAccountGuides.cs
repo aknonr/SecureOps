@@ -32,6 +32,7 @@ public static class ServiceAccountGuides
         [
             ("Sahipliği kontrol et", "\"Sahiplik\" sekmesinde sorumlu ekip ve kişi; eksikse öneri veya teyit talebi."),
             ("Kullanım yerlerini gir", "\"Kullanım ve kural\" sekmesine veritabanı, IIS uygulama havuzu, Windows servisi gibi kullanım yerlerini ekleyin; bilgi bankası kuralı önerilen yolu (ör. gMSA) gerekçesiyle gösterir."),
+            ("Taramayı bağla", "Sunucularda kendi yetkinizle çalıştırdığınız taramanın dosyasını \"Kullanım taraması\" sekmesine yükleyin; bulunan bileşenleri tek tek kullanım kaydına alın veya gerekçeyle kayda almayın. gMSA dönüşümünden sonra yapılan kontrol taraması kanıttır, doğrulama değildir."),
             ("Talep aç ve planla", "Beklenen işi talep olarak açın, muhatap ekibi ve plan tarihini girin."),
             ("İşlemi bildir", "İş sunucuda yapıldıktan sonra (sistem dışında, değişiklik kaydıyla) burada \"gerçekleşti\" olarak bildirin ve kanıt ekleyin."),
             ("Doğrula ve kapat", "Doğrulama yetkisi olan kişi kanıtı inceleyip onaylar; silme veya gMSA dönüşümü doğrulanınca hesap kapanır.")

@@ -50,6 +50,13 @@
 
 <section class="so-panel" aria-labelledby="sa-gmsa">
     <div class="so-panel-head"><h2 id="sa-gmsa" class="so-panel-title">gMSA geçiş izlemesi</h2></div>
+    @if (Detail.UsageScans?.FirstOrDefault(s => s.Gmsa is not null) is { Gmsa: { } check } latest)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+            Son gMSA kontrol taraması (@ServiceAccountUiText.Instant(latest.LastScannedAt ?? latest.CombinedAt), @check.ExpectedAccount): @check.ConclusionLabel.
+            Ayrıntı "Kullanım taraması" sekmesinde. Tarama kanıttır; dönüşümü işlem doğrulamasında doğrulayıcı onaylar.
+        </MudAlert>
+    }
     @if (Detail.Transitions.Count == 0) { <SoEmptyState Title="gMSA izlemesi yok" /> }
     @foreach (TransitionView t in Detail.Transitions)
     {

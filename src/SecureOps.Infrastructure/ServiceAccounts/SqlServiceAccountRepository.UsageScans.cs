@@ -35,7 +35,7 @@ public sealed partial class SqlServiceAccountRepository
             """, new { accountId, requestId }, transaction, cancellationToken));
         if (anchor < 2)
         {
-            return SaResult<(Guid, bool)>.Fail(anchor == 0 ? SaErrors.NotFound : SaErrors.Invalid, anchor switch { -1 => "scanSchema", 0 => null, _ => "requestId" });
+            return SaResult<(Guid, bool)>.Fail(anchor == 0 ? SaErrors.NotFound : SaErrors.Invalid, anchor switch { -1 => "scanTablesMissing", 0 => null, _ => "requestId" });
         }
 
         Guid? existing = await connection.QuerySingleOrDefaultAsync<Guid?>(Cmd("""
