@@ -1,5 +1,12 @@
 # Service Accounts Module — Design Note
 
+Owner-approved local successor (2026-10-03): all seven current Service Accounts
+capabilities belong to the genuine protected Admin bundle, with explicit module
+scope and self-grant protections unchanged. New 028 is an additive role-bundle
+amendment only; see [ADMIN-OPERATIONS-20261003.md](ADMIN-OPERATIONS-20261003.md).
+Source changes are isolated on .NET 8; the sealed 0e85c9d candidate is unchanged.
+This is not target SQL execution, deployment or .NET 10 integration approval.
+
 Owner-approved local correction (2026-10-02): protected Admin navigation and independent
 general AD name search, with explicit scope and no target changes:
 [ADMIN-ACCESS-AND-GENERAL-LOOKUP-20261002.md](ADMIN-ACCESS-AND-GENERAL-LOOKUP-20261002.md).

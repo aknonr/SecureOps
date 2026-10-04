@@ -2,6 +2,28 @@
 
 Status: approved for local implementation by owner continuation, 2026-09-15.
 
+## Owner Amendment: Service Accounts Admin Operations, 2026-10-03
+
+The owner explicitly approves all seven current Service Accounts capabilities for
+the genuine persisted protected Admin bundle: View, Work, Assign, Verify, Import,
+Report and Administer. This supersedes the navigation-only operational-capability
+restriction in the 2026-10-02 amendment below, for this module only. It does not
+grant unrelated capabilities or automatically include future module capabilities.
+
+Reviewed migration 028 adds only missing module capabilities after the 026/027
+baseline, preserves other role permissions and identities, advances role and
+affected access versions, and requires same-transaction audit. It rejects replay.
+The in-memory reviewed catalog matches the SQL bundle; production authorization
+still comes from persisted approval/assignment, never a display name or claim.
+
+Explicit Organization/Team/All scope remains a separate persisted grant. Admin
+does not gain global inventory scope, self-grant or self-escalation exceptions.
+An independent authorized actor is still needed to grant scope to the Admin.
+Business validation, action verification requirements and fail-closed audit stay
+unchanged. No provider, integration, scheduler, SQL runtime grant or principal
+membership is activated by this decision. Source work is approved; target SQL,
+installation and activation remain separate owner-executed operations.
+
 ## Owner Amendment: Administrative Page Access, 2026-10-02
 
 The genuine system-administrator is an Approved application user with an active

@@ -9,10 +9,10 @@ namespace SecureOps.Tests.Unit.Access;
 public sealed class AccessRoleCatalogTests
 {
     [Fact]
-    public void Admin_ModuleNavigationAndAdministration_DoNotGrantOperationalActionsOrScope()
+    public void Admin_HasReviewedServiceAccountOperations_WithoutChangingOtherRoleBundles()
     {
         AccessRoleCatalog.GetCapabilities(["Admin"]).Intersect(ServiceAccountCapabilities.All)
-            .Should().BeEquivalentTo(ServiceAccountCapabilities.View, ServiceAccountCapabilities.Administer);
+            .Should().BeEquivalentTo(ServiceAccountCapabilities.All);
         foreach (string role in AccessRoleCatalog.RoleCodes.Where(role => role != "Admin"))
         {
             AccessRoleCatalog.GetCapabilities([role]).Intersect(ServiceAccountCapabilities.All).Should().BeEmpty();

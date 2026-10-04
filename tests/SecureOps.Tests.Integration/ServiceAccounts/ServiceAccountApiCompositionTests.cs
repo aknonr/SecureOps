@@ -17,7 +17,7 @@ namespace SecureOps.Tests.Integration.ServiceAccounts;
 /// The module through the application's own API composition (<c>Program</c>): real authentication selection, the
 /// platform capability authorization handler, the real access service and the module registration. The Test-environment
 /// identity bridge only authenticates two fixed identities; module rights come solely from access role bundles. Protected
-/// Admin has navigation/administration only. Allowed data journeys need the SQL access store and explicit scope, with Integrated Security
+/// Admin has all current module capabilities. Allowed data journeys still need an enabled provider and explicit scope, with Integrated Security
 /// (Windows runner procedure in docs/service-accounts/WINDOWS-ACCEPTANCE.md). No SQL is touched here.
 /// </summary>
 public sealed class ServiceAccountApiCompositionTests
@@ -41,7 +41,7 @@ public sealed class ServiceAccountApiCompositionTests
     }
 
     [Fact]
-    public async Task AdminNavigation_DoesNotActivateDisabledModuleOrGrantOperationalActions_LeadRemainsForbidden()
+    public async Task AdminCapabilities_DoNotActivateDisabledModule_LeadRemainsForbidden()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
         await ApproveAsync(factory, "demo:platform-admin", "Admin");
@@ -57,9 +57,7 @@ public sealed class ServiceAccountApiCompositionTests
 
             foreach (string route in _moduleReads)
             {
-                bool navigation = route is "/api/v1/service-accounts/me" or "/api/v1/service-accounts/work-summary"
-                    or "/api/v1/service-accounts/accounts" or "/api/v1/service-accounts/reminders";
-                HttpStatusCode expected = actor == DemoApiAuthentication.PlatformAdminActor && navigation
+                HttpStatusCode expected = actor == DemoApiAuthentication.PlatformAdminActor
                     ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden;
                 (await client.GetAsync(route)).StatusCode.Should().Be(expected, $"{actor} {route}");
             }
