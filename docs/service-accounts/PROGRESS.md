@@ -9,6 +9,21 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Windows session 2026-10-04 evening (after the cloud session below)
+
+Owner's workstation, `659a666`, SDK 9.0.317 (user-local install; `global.json` unchanged), LocalDB, synthetic data only.
+Results are in `WINDOWS-ACCEPTANCE.md` (rows 59, 63–66 and the "Windows run 2026-10-04" paragraph). Summary: build 0/0,
+integration 301/0 (107 SQL-gated skipped), format clean, module SQL 50/50 on a fresh database at the first run without
+`Number=1205`, harness `-SkipRoleScripts` exits 0, desktop Excel opens the synthetic snapshot XLSX without a repair
+marker, the PDF embeds both Liberation Mono fonts, the ADR-0024 helpers pass under Windows PowerShell 5.1.
+
+Open:
+- **Unit flake (Windows only).** `ServiceAccountUsageModuleTests` fails now and then with "running scripts is disabled":
+  `SccmFailureEvidenceTests` opens a `Restricted` runspace, and on Windows the execution policy is process-wide. Codex
+  prepared the fix (module tests in a `DisableParallelization` collection, `ServiceAccountPowerShellCollection`) in its
+  worktree; it is not on this branch yet. Merge waits for it.
+- Edge/Adobe viewing of the PDF and the Fonts dialog (row 64), rows 39–61 with TEST users, row 58 with the `.bak`.
+
 ## Cloud session 2026-10-04 (after the Windows handoff below)
 
 Done on Linux with SDK 9.0.317 (no override), same branch; synthetic data only; nothing applied anywhere:
