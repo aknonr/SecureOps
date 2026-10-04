@@ -53,7 +53,10 @@ public sealed class ReportPdfChartTests
             raw[int.Parse(offsets[i][..10], System.Globalization.CultureInfo.InvariantCulture)..].Should().StartWith($"{i + 1} 0 obj");
         }
 
-        raw.Should().NotContain("/JavaScript").And.NotContain("/URI").And.NotContain("/EmbeddedFile").And.NotContain("/FlateDecode");
+        raw.Should().NotContain("/JavaScript").And.NotContain("/URI").And.NotContain("/EmbeddedFile");
+        // Only the two embedded font files are compressed; every content stream stays plain.
+        System.Text.RegularExpressions.Regex.Matches(raw, "/FlateDecode").Should().HaveCount(2);
+        System.Text.RegularExpressions.Regex.Matches(raw, @"/Length1 \d+ /Filter /FlateDecode").Should().HaveCount(2);
     }
 
     [Fact]

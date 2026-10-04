@@ -6,8 +6,8 @@ namespace SecureOps.Infrastructure.ServiceAccounts.Reporting;
 
 /// <summary>
 /// The PDF chart page: up to six charts in a 2 × 3 grid, drawn with plain PDF path operators (rectangles, lines, Bézier
-/// markers) and the writer's standard fonts. Every value is printed as text beside its mark, so the page reads without
-/// colour and reconciles with the XLSX "Grafik verisi" sheet. Deterministic; no images, fonts or compression.
+/// markers) and the writer's embedded fonts. Every value is printed as text beside its mark, so the page reads without
+/// colour and reconciles with the XLSX "Grafik verisi" sheet. Deterministic; no images.
 /// </summary>
 internal static class ReportPdfCharts
 {
@@ -26,9 +26,9 @@ internal static class ReportPdfCharts
     private static readonly string[] _markers = ["circle", "square", "triangle", "diamond"];
 
     /// <summary>Content stream of the chart page (without the footer).</summary>
-    internal static string Page(IReadOnlyList<ReportChart> charts, double pageWidth, double pageHeight, double margin, double footerSpace)
+    internal static string Page(IReadOnlyList<ReportChart> charts, double pageWidth, double pageHeight, double margin, double footerSpace, ReportPdfText encoder)
     {
-        Canvas canvas = new();
+        Canvas canvas = new(encoder);
         double width = pageWidth - 2 * margin, top = pageHeight - margin;
         canvas.Rect(_headingFill, margin, top - _heading, width, _heading);
         canvas.Text(margin + 4, top - 11.5, 8, true, _ink, "GRAFİKLER · DEĞERLER DETAY TABLOLARIYLA VE XLSX \"GRAFİK VERİSİ\" SAYFASIYLA AYNIDIR");
@@ -205,7 +205,7 @@ internal static class ReportPdfCharts
     private static string N(double value) => ReportPdfWriter.N(value);
 
     /// <summary>Collects shapes and text separately; text goes into one BT … ET object after the shapes.</summary>
-    private sealed class Canvas
+    private sealed class Canvas(ReportPdfText encoder)
     {
         private readonly StringBuilder _shapes = new();
         private readonly StringBuilder _text = new();
@@ -219,7 +219,7 @@ internal static class ReportPdfCharts
             _shapes.Append(CultureInfo.InvariantCulture, $"{color} RG {N(width)} w {path} S\n");
 
         public void Text(double x, double y, double size, bool bold, string color, string value) =>
-            _text.Append(CultureInfo.InvariantCulture, $"{color} rg /{(bold ? "F2" : "F1")} {N(size)} Tf\n1 0 0 1 {N(x)} {N(y)} Tm ({ReportPdfWriter.Encode(value)}) Tj\n");
+            _text.Append(CultureInfo.InvariantCulture, $"{color} rg /{(bold ? "F2" : "F1")} {N(size)} Tf\n1 0 0 1 {N(x)} {N(y)} Tm {encoder.Show(value, bold)} Tj\n");
 
         public override string ToString() => _shapes + "BT\n" + _text + "ET";
     }

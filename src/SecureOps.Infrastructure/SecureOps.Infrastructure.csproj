@@ -16,6 +16,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Liberation Mono (SIL OFL 1.1, unmodified; licence beside the files), embedded in Service Accounts report PDFs. -->
+    <EmbeddedResource Include="ServiceAccounts\Reporting\Fonts\LiberationMono-Regular.ttf" LogicalName="SecureOps.Reporting.LiberationMono-Regular.ttf" />
+    <EmbeddedResource Include="ServiceAccounts\Reporting\Fonts\LiberationMono-Bold.ttf" LogicalName="SecureOps.Reporting.LiberationMono-Bold.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\SecureOps.Domain\SecureOps.Domain.csproj" />
     <ProjectReference Include="..\SecureOps.Shared\SecureOps.Shared.csproj" />
   </ItemGroup>

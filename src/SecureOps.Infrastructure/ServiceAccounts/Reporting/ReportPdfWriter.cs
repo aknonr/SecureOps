@@ -5,11 +5,12 @@ using SecureOps.Domain.ServiceAccounts;
 namespace SecureOps.Infrastructure.ServiceAccounts.Reporting;
 
 /// <summary>
-/// Deterministic PDF (1.4) renderer for report snapshots, A4 landscape. Uses the standard Courier and Courier-Bold fonts
-/// with a WinAnsi base encoding whose unused slots are remapped to the Turkish glyphs (Ğ ğ İ ı Ş ş). Layout: a title band,
-/// the snapshot metadata, then each section with a heading bar and a table whose header row is shaded and whose rows
-/// alternate. The text of every line stays a plain fixed-width line ("label | value"), so the PDF reconciles with the XLSX.
-/// No scripts, forms, links, compression or embedded files. Same document → same bytes.
+/// Deterministic PDF (1.4) renderer for report snapshots, A4 landscape. Text uses the embedded Liberation Mono regular and
+/// bold fonts (SIL OFL 1.1, unmodified) as Type0 / CIDFontType2 / Identity-H with a ToUnicode map, so every Turkish letter
+/// renders the same in every viewer and stays searchable and copyable. Layout: a title band, the snapshot metadata, then
+/// each section with a heading bar and a table whose header row is shaded and whose rows alternate. The text of every
+/// line stays a plain fixed-width line ("label | value"), so the PDF reconciles with the XLSX. Only the two font files
+/// are compressed (FlateDecode); no scripts, forms, links or embedded files. Same document → same bytes.
 /// </summary>
 public static class ReportPdfWriter
 {
@@ -33,16 +34,6 @@ public static class ReportPdfWriter
     private const double _tileHeight = 46;
     private const double _tileGap = 8;
     private const double _tileValueSize = 18;
-
-    private static readonly Dictionary<char, byte> _turkish = new()
-    {
-        ['Ğ'] = 0x80,
-        ['ğ'] = 0x81,
-        ['İ'] = 0x82,
-        ['ı'] = 0x83,
-        ['Ş'] = 0x84,
-        ['ş'] = 0x85
-    };
 
     private enum LineKind
     {
@@ -87,30 +78,33 @@ public static class ReportPdfWriter
 
     private static double TilesHeight(int count) => count == 0 ? 0 : Math.Ceiling(count / (double)_tilesPerRow) * (_tileHeight + _tileGap) + _tileGap;
 
-    /// <summary>Extracts the rendered text lines of a PDF produced by this writer (tests and reconciliation).</summary>
+    /// <summary>
+    /// Extracts the rendered text lines of a PDF produced by this writer (tests and reconciliation): follows the current
+    /// font (<c>/F1</c> regular, <c>/F2</c> bold) and decodes each hex glyph string through that font's cmap.
+    /// </summary>
     public static IReadOnlyList<string> ExtractLines(byte[] pdf)
     {
         List<string> lines = [];
-        string text = Encoding.Latin1.GetString(pdf);
-        foreach (string part in text.Split('\n'))
+        ReportPdfFont font = ReportPdfFont.Regular;
+        foreach (string part in Encoding.Latin1.GetString(pdf).Split('\n'))
         {
-            int start = part.IndexOf('(', StringComparison.Ordinal);
-            if (start < 0 || !part.EndsWith(") Tj", StringComparison.Ordinal))
+            if (part.EndsWith(" Tf", StringComparison.Ordinal))
+            {
+                font = part.Contains("/F2 ", StringComparison.Ordinal) ? ReportPdfFont.BoldFace : ReportPdfFont.Regular;
+            }
+
+            int start = part.IndexOf('<', StringComparison.Ordinal);
+            if (start < 0 || !part.EndsWith("> Tj", StringComparison.Ordinal) || part.StartsWith("<<", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            StringBuilder builder = new();
-            string body = part[(start + 1)..^4];
-            for (int i = 0; i < body.Length; i++)
+            string hex = part[(start + 1)..^4];
+            StringBuilder builder = new(hex.Length / 4);
+            for (int i = 0; i + 4 <= hex.Length; i += 4)
             {
-                char c = body[i];
-                if (c == '\\' && i + 1 < body.Length)
-                {
-                    c = body[++i];
-                }
-
-                builder.Append(_turkish.FirstOrDefault(p => p.Value == c).Key is var tr && tr != default ? tr : c switch { '\u0096' => '–', '\u0097' => '—', _ => c });
+                ushort glyph = ushort.Parse(hex.AsSpan(i, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                builder.Append(font.Unicode.TryGetValue(glyph, out char c) ? c : '?');
             }
 
             lines.Add(builder.ToString());
@@ -157,23 +151,36 @@ public static class ReportPdfWriter
     {
         List<byte[]> objects = [];
         const int pagesId = 2, fontId = 3, boldId = 4, firstPage = 5;
-        const string encoding = "/Encoding << /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [128 /Gbreve /gbreve /Idotaccent /dotlessi /Scedilla /scedilla] >>";
+        ReportPdfText text = new();
         // The chart page, when there is one, follows the first page (tiles and summary tables) and precedes the detail pages.
         int total = pages.Count + (charts.Count > 0 ? 1 : 0);
         string kids = string.Join(" ", Enumerable.Range(0, total).Select(i => $"{firstPage + i * 2} 0 R"));
         objects.Add(Ascii("<< /Type /Catalog /Pages 2 0 R >>"));
         objects.Add(Ascii($"<< /Type /Pages /Kids [{kids}] /Count {total} >>"));
-        objects.Add(Ascii($"<< /Type /Font /Subtype /Type1 /BaseFont /Courier {encoding} >>"));
-        objects.Add(Ascii($"<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold {encoding} >>"));
+        // Placeholders: the Type0 font bodies depend on the glyphs the pages use, so they are filled in after the pages.
+        objects.Add([]);
+        objects.Add([]);
         for (int i = 0; i < total; i++)
         {
             string content = charts.Count > 0 && i == 1
-                ? ReportPdfCharts.Page(charts, _pageWidth, _pageHeight, _margin, _footerSpace) + Footer(i, total)
-                : Page(title, i == 0 ? tiles : [], pages[charts.Count > 0 && i > 1 ? i - 1 : i], i, total);
+                ? ReportPdfCharts.Page(charts, _pageWidth, _pageHeight, _margin, _footerSpace, text) + Footer(i, total, text)
+                : Page(title, i == 0 ? tiles : [], pages[charts.Count > 0 && i > 1 ? i - 1 : i], i, total, text);
             byte[] stream = Encoding.Latin1.GetBytes(content);
             objects.Add(Ascii($"<< /Type /Page /Parent {pagesId} 0 R /MediaBox [0 0 {N(_pageWidth)} {N(_pageHeight)}] "
                 + $"/Resources << /Font << /F1 {fontId} 0 R /F2 {boldId} 0 R >> >> /Contents {firstPage + i * 2 + 1} 0 R >>"));
             objects.Add([.. Ascii($"<< /Length {stream.Length} >>\nstream\n"), .. stream, .. Ascii("\nendstream")]);
+        }
+
+        foreach ((int id, byte[] body) in text.Objects([fontId, boldId], objects.Count + 1))
+        {
+            if (id <= objects.Count)
+            {
+                objects[id - 1] = body;
+            }
+            else
+            {
+                objects.Add(body);
+            }
         }
 
         using MemoryStream output = new();
@@ -200,7 +207,7 @@ public static class ReportPdfWriter
     }
 
     /// <summary>One page: shapes first (band, bars, shaded rows, rules), then one absolutely positioned text line per row.</summary>
-    private static string Page(string title, IReadOnlyList<ReportTile> tiles, List<Line> lines, int index, int count)
+    private static string Page(string title, IReadOnlyList<ReportTile> tiles, List<Line> lines, int index, int count, ReportPdfText encoder)
     {
         StringBuilder shapes = new();
         StringBuilder text = new();
@@ -209,7 +216,7 @@ public static class ReportPdfWriter
         if (index == 0)
         {
             shapes.Append(CultureInfo.InvariantCulture, $"{_band} rg {N(_margin)} {N(top - _titleBand + 6)} {N(width)} {N(_titleBand - 6)} re f\n");
-            text.Append(CultureInfo.InvariantCulture, $"1 1 1 rg /F2 {N(_titleSize)} Tf\n1 0 0 1 {N(_margin + 10)} {N(top - _titleBand + 16)} Tm ({Encode(title)}) Tj\n");
+            text.Append(CultureInfo.InvariantCulture, $"1 1 1 rg /F2 {N(_titleSize)} Tf\n1 0 0 1 {N(_margin + 10)} {N(top - _titleBand + 16)} Tm {encoder.Show(title, true)} Tj\n");
             top -= _titleBand;
         }
 
@@ -222,11 +229,11 @@ public static class ReportPdfWriter
                 double boxTop = top - _tileGap - t / _tilesPerRow * (_tileHeight + _tileGap);
                 double bottom = boxTop - _tileHeight;
                 shapes.Append(CultureInfo.InvariantCulture, $"{_tileFill} rg {_ruleStroke} RG 0.6 w {N(x)} {N(bottom)} {N(tileWidth)} {N(_tileHeight)} re B\n");
-                text.Append(CultureInfo.InvariantCulture, $"0.29 0.33 0.41 rg /F1 {N(_fontSize)} Tf\n1 0 0 1 {N(x + 8)} {N(boxTop - 12)} Tm ({Encode(tiles[t].Label)}) Tj\n");
-                text.Append(CultureInfo.InvariantCulture, $"{_band} rg /F2 {N(_tileValueSize)} Tf\n1 0 0 1 {N(x + 8)} {N(bottom + 10)} Tm ({Encode(tiles[t].Value.ToString(CultureInfo.InvariantCulture))}) Tj\n");
+                text.Append(CultureInfo.InvariantCulture, $"0.29 0.33 0.41 rg /F1 {N(_fontSize)} Tf\n1 0 0 1 {N(x + 8)} {N(boxTop - 12)} Tm {encoder.Show(tiles[t].Label, false)} Tj\n");
+                text.Append(CultureInfo.InvariantCulture, $"{_band} rg /F2 {N(_tileValueSize)} Tf\n1 0 0 1 {N(x + 8)} {N(bottom + 10)} Tm {encoder.Show(tiles[t].Value.ToString(CultureInfo.InvariantCulture), true)} Tj\n");
                 if (tiles[t].Note is { Length: > 0 } note)
                 {
-                    text.Append(CultureInfo.InvariantCulture, $"0.42 0.45 0.50 rg /F1 {N(_fontSize - 1)} Tf\n1 0 0 1 {N(x + tileWidth - 8 - note.Length * (_fontSize - 1) * 0.6)} {N(bottom + 10)} Tm ({Encode(note)}) Tj\n");
+                    text.Append(CultureInfo.InvariantCulture, $"0.42 0.45 0.50 rg /F1 {N(_fontSize - 1)} Tf\n1 0 0 1 {N(x + tileWidth - 8 - note.Length * (_fontSize - 1) * 0.6)} {N(bottom + 10)} Tm {encoder.Show(note, false)} Tj\n");
                 }
             }
 
@@ -259,49 +266,27 @@ public static class ReportPdfWriter
                 bool bold = line.Kind is LineKind.Section or LineKind.TableHeader;
                 string color = line.Kind == LineKind.Note ? "0.40 0.43 0.48" : "0.10 0.12 0.16";
                 text.Append(CultureInfo.InvariantCulture, $"{color} rg /{(bold ? "F2" : "F1")} {N(_fontSize)} Tf\n");
-                text.Append(CultureInfo.InvariantCulture, $"1 0 0 1 {N(_margin + 4)} {N(baseline)} Tm ({Encode(line.Text)}) Tj\n");
+                text.Append(CultureInfo.InvariantCulture, $"1 0 0 1 {N(_margin + 4)} {N(baseline)} Tm {encoder.Show(line.Text, bold)} Tj\n");
             }
 
             y -= _lineHeight;
         }
 
-        return shapes + "BT\n" + text + "ET" + Footer(index, count);
+        return shapes + "BT\n" + text + "ET" + Footer(index, count, encoder);
     }
 
     /// <summary>Footer rule, classification line and page number (its own text object).</summary>
-    private static string Footer(int index, int count)
+    private static string Footer(int index, int count, ReportPdfText encoder)
     {
         double width = _pageWidth - 2 * _margin;
         StringBuilder footer = new();
         footer.Append(CultureInfo.InvariantCulture, $"\n{_ruleStroke} RG 0.6 w {N(_margin)} {N(_margin + _footerSpace - 8)} m {N(_margin + width)} {N(_margin + _footerSpace - 8)} l S\nBT\n");
-        footer.Append(CultureInfo.InvariantCulture, $"0.40 0.43 0.48 rg /F1 {N(_fontSize)} Tf\n1 0 0 1 {N(_margin)} {N(_margin + 2)} Tm ({Encode("Kurum içi · salt okunur rapor nüshası")}) Tj\n");
-        footer.Append(CultureInfo.InvariantCulture, $"1 0 0 1 {N(_pageWidth - _margin - 15 * _charWidth)} {N(_margin + 2)} Tm ({Encode($"Sayfa {index + 1}/{count}")}) Tj\nET");
+        footer.Append(CultureInfo.InvariantCulture, $"0.40 0.43 0.48 rg /F1 {N(_fontSize)} Tf\n1 0 0 1 {N(_margin)} {N(_margin + 2)} Tm {encoder.Show("Kurum içi · salt okunur rapor nüshası", false)} Tj\n");
+        footer.Append(CultureInfo.InvariantCulture, $"1 0 0 1 {N(_pageWidth - _margin - 15 * _charWidth)} {N(_margin + 2)} Tm {encoder.Show($"Sayfa {index + 1}/{count}", false)} Tj\nET");
         return footer.ToString();
     }
 
     internal static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
-
-    internal static string Encode(string line)
-    {
-        StringBuilder builder = new(line.Length);
-        foreach (char c in line)
-        {
-            char mapped = _turkish.TryGetValue(c, out byte code) ? (char)code
-                : c == '…' ? '.'
-                : c == '–' ? '\u0096'
-                : c == '—' ? '\u0097'
-                : c < 0x80 || c is >= '\u00A0' and <= '\u00FF' ? c
-                : '?';
-            if (mapped is '(' or ')' or '\\')
-            {
-                builder.Append('\\');
-            }
-
-            builder.Append(mapped);
-        }
-
-        return builder.ToString();
-    }
 
     private static byte[] Ascii(string value) => Encoding.Latin1.GetBytes(value);
 

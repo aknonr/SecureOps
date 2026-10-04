@@ -103,7 +103,7 @@ public sealed class ServiceAccountReportExportTests
         ReportDocument document = Document("SYN_SVC_01") with { Title = "Servis hesapları — SYN" };
         byte[] pdf = ReportPdfWriter.Write(document);
         string raw = Encoding.Latin1.GetString(pdf);
-        raw.Should().Contain("/MediaBox [0 0 841.89 595.28]").And.Contain("/BaseFont /Courier-Bold").And.Contain(" re f");
+        raw.Should().Contain("/MediaBox [0 0 841.89 595.28]").And.Contain("/BaseFont /LiberationMono-Bold").And.Contain(" re f");
         IReadOnlyList<string> lines = ReportPdfWriter.ExtractLines(pdf);
         lines[0].Should().Be("Servis hesapları — SYN");
         lines.Should().Contain(l => l.StartsWith("Sayfa 1/", StringComparison.Ordinal));
@@ -130,6 +130,41 @@ public sealed class ServiceAccountReportExportTests
 
         IReadOnlyList<string> lines = ReportPdfWriter.ExtractLines(ReportPdfWriter.Write(document));
         lines.Should().Contain("Tekil hesap").And.Contain("390").And.Contain(l => l.StartsWith("YÖNETİCİ ÖZETİ · EKİPLERDE", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Pdf_EmbedsTheOpenLicensedFonts_AndEveryTurkishLetterAndDashRoundTrips()
+    {
+        const string sample = "ĞğİıŞşÇçÖöÜü–—·…";
+        ReportDocument document = Document("SYN_" + sample) with { Title = "Rapor " + sample };
+        byte[] pdf = ReportPdfWriter.Write(document);
+        string raw = Encoding.Latin1.GetString(pdf);
+
+        raw.Should().Contain("/Subtype /Type0").And.Contain("/Encoding /Identity-H").And.Contain("/Subtype /CIDFontType2")
+            .And.Contain("/FontFile2").And.Contain("/ToUnicode").And.Contain("/BaseFont /LiberationMono ");
+        raw.Should().NotContain("/Differences").And.NotContain("/WinAnsiEncoding").And.NotContain("/BaseFont /Courier");
+        IReadOnlyList<string> lines = ReportPdfWriter.ExtractLines(pdf);
+        lines[0].Should().Be("Rapor " + sample, "the bold title round-trips through the bold font's cmap");
+        lines.Should().Contain(l => l.Contains("SYN_" + sample, StringComparison.Ordinal), "regular text round-trips too");
+        foreach (char c in sample)
+        {
+            ReportPdfFont.Regular.Covers(c).Should().BeTrue($"regular covers {c}");
+            ReportPdfFont.BoldFace.Covers(c).Should().BeTrue($"bold covers {c}");
+        }
+
+        ReportPdfFont.Regular.FixedPitch.Should().BeTrue("the table layout assumes one advance width");
+        ReportPdfFont.Regular.Scale(ReportPdfFont.Regular.Advances[ReportPdfFont.Regular.Glyph('W')]).Should().Be(600);
+    }
+
+    [Fact]
+    public void Pdf_ToUnicodeMapsEveryUsedGlyph_AndUncoveredCharactersBecomeAQuestionMark()
+    {
+        ReportDocument document = Document("SYN_₺_🙂") with { Title = "Başlık" };
+        byte[] pdf = ReportPdfWriter.Write(document);
+        ReportPdfWriter.ExtractLines(pdf).Should().Contain(l => l.Contains("SYN_?_??", StringComparison.Ordinal),
+            "a character the font lacks (₺) and a surrogate pair render as the font's question mark");
+        string raw = Encoding.Latin1.GetString(pdf);
+        raw.Should().Contain("beginbfchar").And.Contain($"<{(int)'ş':X4}>").And.Contain($"<{(int)'ı':X4}>");
     }
 
     private static ReportDocument Document(string account)
