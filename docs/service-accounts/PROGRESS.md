@@ -9,6 +9,69 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## HANDOFF 2026-10-04 — open work for the next session (start here)
+
+**Context.** Branch `feature/service-accounts-scope-import-ux-20261003` (draft PR #11), based on master `77bcfab`.
+Owner decision 2026-10-03: Claude owns this module end to end (README "Authority"); the owner merges and deploys.
+Rules: `AGENTS.md` + `CLAUDE.md`; SDK 9.0.317 exactly (`global.json`, no override); small commits, normal push, no
+rebase/force-push; synthetic data only (`syn.*`, `SYN_*`); no corporate SQL/AD/Jira/SMTP writes; nothing applied to the
+installed TEST system without the owner's explicit approval; report to the owner **in Turkish**, stating plainly what
+was and was not verified, and where (Linux cloud vs. Windows).
+
+**Done on this branch (details in the sections below):** SA-003 numbered 029 (harness skips SA-003 once 029 exists);
+no-scope explanation on list/detail; Service-Accounts-only users land in the module from `/`; team role setup guide
+([TEAM-ROLE-SETUP-TR.md](TEAM-ROLE-SETUP-TR.md)); report charts on screen, XLSX (native charts) and PDF (vector chart
+page). Windows-verified with SDK 9.0.317: build 0/0, unit 1708/1708, format clean, integration 301/0 (106 SQL-gated
+skipped), module SQL 49/49 on a fresh 001-029 LocalDB database.
+
+**Open work, in order:**
+
+1. **PDF Turkish glyphs — owner decision 2026-10-04: embed an open-licensed TrueType font.** (Linux OK.) Defect,
+   pre-existing: `ReportPdfWriter` uses non-embedded base-14 Courier with WinAnsi `/Differences` for Ğ ğ İ ı Ş ş; the
+   owner's viewer shows İ, Ş, Ğ as boxes (screenshots 2026-10-04) and a preview renderer showed ğ blank.
+   - Add one monospaced font with an embedding-friendly licence (Noto Sans Mono, SIL OFL 1.1, or DejaVu Sans Mono,
+     Bitstream Vera/DejaVu licence) as an embedded resource of Infrastructure, with its licence text beside it. Regular
+     and Bold. Keep the fixed-width layout (column math uses one advance width).
+   - Write fonts as `Type0` / `CIDFontType2` / `Identity-H`, `CIDToGIDMap /Identity` (or an explicit map), `/W` widths
+     from `hmtx`, `FontFile2`, and a `ToUnicode` CMap; text as hex glyph strings. Parse `cmap` format 4 and `hmtx` in
+     managed code — no new runtime package, no native code. Subsetting is optional (later, for size).
+   - Keep "same document → same bytes", the valid xref table, and no JavaScript/links/embedded files.
+     `FlateDecode` for the font stream is acceptable (update the test that forbids it to allow only the font stream).
+   - `ExtractLines` must keep working for reconciliation tests: decode hex strings through the font's cmap (reverse
+     map), or keep an equivalent layout-level line list. All existing PDF tests must pass unchanged in meaning.
+   - Remove the `/Differences` table and the `_turkish` map. Test: every character of "ĞğİıŞşÇçÖöÜü–—" round-trips.
+   - Windows follow-up for the owner: open a synthetic snapshot PDF in Edge and Adobe (acceptance row 63).
+2. **ADR-0024 read-only discovery and gMSA verification (item D of the owner brief).** (Linux OK for design/code;
+   execution is never against real servers from this repo.) The owner has found the team's existing PowerShell
+   script; they will remove passwords and real names before sharing it. Do not commit the original; commit only a
+   synthetic, sanitized excerpt if it is needed as evidence.
+   - Summarize the script's idea and why it is slow (serial loops, long timeouts, broad queries, etc.).
+   - Design one read-only function for the Worker → WinRM → JEA model: IIS app-pool `processModel.userName`, virtual
+     directory `userName`/`physicalPath`, `Win32_Service.StartName`, Scheduled Task `Principal`. Passwords are never
+     read. Parallel `Invoke-Command` with short timeouts; results become module Findings; `NoMatch`/`Unreachable` never
+     close an account. Add the post-conversion check "does it now run as the gMSA".
+   - Any cmdlet allow-list change needs an ADR (AGENTS.md rule 3). Writing/automatic conversion needs its own ADR and
+     approval — write no write code; `Stop-Service`/`Restart-Service`/`Remove-Item` are forbidden.
+3. **029 on a copy of the installed TEST database.** (Windows only.) Waiting for the owner's `.bak`. Restore under a
+   new LocalDB name, apply `sql/migrations/029-…` with `sqlcmd -I -b`, check existing grants `IsBootstrap = 0`,
+   trusted check, filtered index, refused replay (acceptance row 58). Ask before anything touches the installed system.
+4. **Windows acceptance rows 1–63** in `WINDOWS-ACCEPTANCE.md`, results written into that document (no new status
+   file); desktop Excel without repair prompt (rows 48, 56, 63); screenshots without real names, never committed.
+   (Windows only; rows 60–62 have local synthetic results already.)
+5. **Smaller items.**
+   - Investigate the occasional first-run failure of `ServiceAccountImportSqlTests.AccountExport_RowLimitIsExact_AndRefusalIsNotAudited`
+     (`ServiceAccountPersistenceUnavailable`; seen once on a fresh Windows database, passed alone and on reruns).
+   - `sa-sql-harness.ps1 -SkipRoleScripts` exits 1 on success (last `$LASTEXITCODE` is the intentionally refused replay).
+   - Browser check of the Service-Accounts-only landing redirect (covered by a source test only; the Demo UI actor is fixed).
+
+**Verification per change:** `dotnet build SecureOps.sln` (0/0), unit and integration tests, `dotnet format
+--verify-no-changes` (repository-wide), OpenAPI snapshot via `SECUREOPS_UPDATE_OPENAPI=1` only when the API changes
+(additions only). Module SQL on Linux: `tests/sql/service-accounts/sa-sql-harness.sh` with a disposable SQL Server
+container. Local Demo with SQL-backed access needs `Access__RepositoryProvider=SqlServer`,
+`SessionSecurity__RepositoryProvider=SqlServer`, `Access__DemoCompatibilityEnabled=true`,
+`ConnectionStrings__SecureOpsDb`, `ServiceAccounts__Provider=SqlServer`; seed synthetic data through the API with the
+`X-SecureOps-Demo-Actor` header.
+
 ## Report charts on screen, in XLSX and in PDF (2026-10-04, same branch, Windows)
 
 Owner request: charts in the executive report and visible in the product. One render-neutral list,
