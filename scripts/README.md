@@ -7,6 +7,11 @@ PowerShell artifacts. Production diagnostic and JEA scripts are not implemented 
 Present today: `powershell/` (local harnesses and TEST smoke/readiness checks), `diagnostics/` (read-only SQL and
 evidence helpers) and `release/` (packaging and validation; see `release/README.md`).
 
+Proposed, **not deployable** until ADR-0024 is accepted and Bilgi Güvenliği approves the role capability:
+`jea/proposed/SecureOps.ServiceAccountUsage/` (read-only service account usage discovery: one visible function,
+module, role capability and session configuration) and `powershell/Invoke-ServiceAccountUsageScan.ps1` (operator
+tooling that calls that endpoint on many servers in parallel; read-only, writes only its own local report file).
+
 Planned for Phase 1, **not yet present**:
 
 ```
