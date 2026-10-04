@@ -70,10 +70,39 @@ public static class ReportPdfWriter
         List<Line> wrapped = [.. lines.SelectMany(Wrap)];
         int firstPage = (int)((_pageHeight - 2 * _margin - _titleBand - TilesHeight(tiles.Count) - _footerSpace) / _lineHeight);
         int otherPages = (int)((_pageHeight - 2 * _margin - _footerSpace) / _lineHeight);
-        List<List<Line>> pages = [[.. wrapped.Take(firstPage)]];
-        pages.AddRange(wrapped.Skip(firstPage).Chunk(otherPages).Select(c => c.ToList()));
+        List<List<Line>> pages = Paginate(wrapped, firstPage, otherPages);
         ReportChart[] charts = [.. (document.Dashboard?.Charts ?? []).Where(c => !c.IsEmpty).Take(ReportPdfCharts.Slots)];
         return Build(document.Title, tiles, pages, charts);
+    }
+
+    /// <summary>Fills pages in order; a section heading, its table header or a blank line is never left alone at a page bottom.</summary>
+    private static List<List<Line>> Paginate(List<Line> lines, int firstPage, int otherPages)
+    {
+        List<List<Line>> pages = [];
+        int start = 0;
+        int capacity = firstPage;
+        while (start < lines.Count || pages.Count == 0)
+        {
+            int end = Math.Min(start + capacity, lines.Count);
+            if (end < lines.Count)
+            {
+                while (end > start + 1 && lines[end - 1].Kind is LineKind.Section or LineKind.TableHeader or LineKind.Blank)
+                {
+                    end--;
+                }
+            }
+
+            pages.Add([.. lines.Skip(start).Take(end - start)]);
+            start = end;
+            while (start < lines.Count && lines[start].Kind == LineKind.Blank)
+            {
+                start++;
+            }
+
+            capacity = otherPages;
+        }
+
+        return pages;
     }
 
     private static double TilesHeight(int count) => count == 0 ? 0 : Math.Ceiling(count / (double)_tilesPerRow) * (_tileHeight + _tileGap) + _tileGap;
