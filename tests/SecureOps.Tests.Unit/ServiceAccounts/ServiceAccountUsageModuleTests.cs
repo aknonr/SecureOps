@@ -12,6 +12,7 @@ namespace SecureOps.Tests.Unit.ServiceAccounts;
 /// PowerShell SDK. Collectors are replaced inside the module scope with synthetic data, so no Windows server, service,
 /// IIS or directory is touched. Synthetic names only.
 /// </summary>
+[Collection(nameof(ServiceAccountPowerShellCollection))]
 public sealed class ServiceAccountUsageModuleTests
 {
     private const string _secret = "SYN-NEVER-RETURNED-9f2c";
