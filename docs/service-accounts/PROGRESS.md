@@ -20,8 +20,18 @@ activation, no corporate SQL/source/Jira/AD/SMTP call.
   (`OrganizationRequired="false"`: team or organization scope is enough) instead of an empty list or a not-found error;
   module administrators also see the one-time bootstrap hint. The list no longer calls work-summary/organizations/teams/
   accounts without scope. Import keeps the organization-level requirement. Unit and browser text assertions updated.
-- Not done: landing redirect for users with only module capabilities (changes the platform home page; owner question).
-  **Not compiled or tested:** pinned SDK 9.0.317 still missing on this machine. Acceptance rows 60–61.
+- Landing (owner decision 2026-10-04): an approved user whose only dashboard entry is Service Accounts (no management
+  view, no other capability with its own entry) goes from "/" to `/service-accounts`; "/dashboard" and the nav link keep
+  the board. Acceptance rows 60–61.
+
+**Windows verification (2026-10-04, SDK 9.0.317 installed user-locally with runtimes 8.0.31, owner-approved):**
+build 0 warnings / 0 errors; unit 1685/1685 (the two Linux environment failures do not occur here);
+`dotnet format SecureOps.sln --verify-no-changes` clean; integration without SQL variables 301 passed, 106 skipped, 0
+failed (OpenAPI snapshot test included, unchanged: no API change); module SQL tests on a fresh 001-029 LocalDB database
+(harness) 48/49 on the first run, then 49/49 twice on the same database, including the LocalDB-only
+`ServiceAccountRoleSqlTests`. First-run failure: `AccountExport_RowLimitIsExact_AndRefusalIsNotAudited` returned
+`ServiceAccountPersistenceUnavailable`; it passed alone and in both reruns. Same pattern as the earlier unexplained
+first-run failures; not yet explained. Browser journeys and desktop Excel not run yet.
 
 ## SA-003 numbered 029; module ownership moved to Claude (2026-10-03, same branch, Windows)
 
@@ -40,7 +50,7 @@ uses 029 or later. Harness range extended to 29. Verified on this Windows machin
 
 **Not done:** 029 on a copy of the installed TEST database (owner will supply a backup); nothing applied to the installed
 system. **Build/unit/integration not run on Windows:** pinned SDK 9.0.317 is not installed here (only 9.0.318 and
-10.0.401; `rollForward: disable`), so the updated `SqlAssetContractTests` (inventory 29, 029 contract) is unrun. Acceptance
+10.0.401; `rollForward: disable`), so the updated `SqlAssetContractTests` (inventory 29, 029 contract) was unrun here; it passed on 2026-10-04 (section above). Acceptance
 rows 58–59.
 
 ## One-time first scope grant, user picker, executive summary, page guides (2026-10-03, same branch)
