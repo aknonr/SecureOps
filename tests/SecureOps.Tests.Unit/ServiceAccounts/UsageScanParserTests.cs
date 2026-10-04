@@ -309,6 +309,23 @@ public sealed class UsageScanParserTests
         UsageScanOutcomes.Conclusion([]).Should().Be(ScanGmsaConclusion.Incomplete);
     }
 
+    // Review 2026-10-05: the searched name decides which matches the account shows; choosing one that hides matches of
+    // another searched name would turn a server with a match into "not found".
+    [Theory]
+    [InlineData("SYN\\svc_synapp|svc_synapp", "SYN", "SYN\\svc_synapp")]
+    [InlineData("svc_synapp|SYN\\svc_synapp", "SYN", "SYN\\svc_synapp")]
+    [InlineData("OTHER\\svc_synapp|svc_synapp", "SYN", "svc_synapp")]
+    [InlineData("SYN\\svc_synapp", null, "SYN\\svc_synapp")]
+    [InlineData("SYN\\svc_synapp|svc_synapp", null, "svc_synapp")]
+    [InlineData("svc_other|svc_synapp", null, "svc_synapp")]
+    [InlineData("svc_other", "SYN", null)]
+    public void SearchedName_PrefersTheAccountsOwnDomain_AndNeverHidesMatchesWhenTheDomainIsUnknown(string file, string? domain, string? expected) =>
+        UsageScanOutcomes.SearchedName(file.Split('|'), "svc_synapp", domain).Should().Be((expected, false));
+
+    [Fact]
+    public void SearchedName_WithTwoDomainsAndNoDomainOnTheAccount_IsAmbiguous() =>
+        UsageScanOutcomes.SearchedName(["SYN\\svc_synapp", "OTHER\\svc_synapp"], "svc_synapp", null).Should().Be(((string?)null, true));
+
     [Theory]
     [InlineData("SYN\\svc_synapp", "svc_synapp", "SYN", true)]
     [InlineData("syn\\SVC_SYNAPP", "svc_synapp", "SYN", true)]

@@ -89,8 +89,10 @@ second account adds only a link. Another person uploading the same bytes creates
 - **Attach a scan to an account** (`POST accounts/{id}/usage-scans`, multipart): `ServiceAccounts.Work` and either the
   *responsible* basis on that account, or the *participant* basis with one of the caller's own open requests named
   (`requestId`) — the scan is then evidence on that request, which SPEC already allows a participant. The file must have
-  searched this account (same name; when both sides carry a domain, the same domain). Out of scope and missing are
-  indistinguishable (404).
+  searched this account (same name; when both sides carry a domain, the same domain). When several searched names refer to
+  the account, the one qualified with the account's domain is used; with no domain on the account the bare name is used
+  (it matches every domain, so no match is hidden), and two names with different domains and no bare name refuse the
+  upload (`accountAmbiguousInScan`). Out of scope and missing are indistinguishable (404).
 - **Turn a matched component into a usage** or **dismiss it with a reason**: `ServiceAccounts.Work` with the responsible
   basis, one decision per item and account, never automatic. The person chooses the usage kind (a suggestion is shown).
 - **Read**: everyone who can see the account sees its attached scans — only the items matched to that account's searched

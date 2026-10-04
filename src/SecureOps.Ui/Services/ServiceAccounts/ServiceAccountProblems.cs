@@ -87,6 +87,7 @@ public static class ServiceAccountProblems
         "scanServers" => "Planlanan her sunucu ya sonuçlarda ya da ulaşılamayan/sonuç yok listesinde tam bir kez olmalı; plan dışı sunucu kabul edilmez.",
         "scanInconsistent" => "Bir sunucu belgesi dosyayla veya kendisiyle çelişiyor (aranan hesaplar, kaynak durumu, gMSA durumu ya da zaman). Taramayı yeniden üretin.",
         "scanFutureDate" => "Dosyadaki bir tarama zamanı ileri tarihte; sunucu saatlerini kontrol edin.",
+        "accountAmbiguousInScan" => "Dosya bu hesabın adını farklı domain'lerle aramış ve hesapta domain kayıtlı değil; hangi eşleşmenin bu hesaba ait olduğu belli değil. Hesaba domain bilgisi girildikten sonra yeniden yükleyin veya taramayı tek adla yeniden üretin.",
         "accountNotInScan" => "Bu dosya bu hesabı aramamış (hesap adı veya domain farklı). Doğru hesabın sayfasından yükleyin.",
         "runStatement" => "Çalıştırma beyanı gerekli (5–400 karakter): taramayı nerede ve hangi yetkiyle çalıştırdığınızı yazın.",
         "scanTablesMissing" => "Bu ortamda tarama kaydı için veritabanı güncellemesi (030) uygulanmamış.",

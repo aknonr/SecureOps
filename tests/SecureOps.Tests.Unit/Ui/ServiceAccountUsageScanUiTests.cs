@@ -76,6 +76,7 @@ public sealed class ServiceAccountUsageScanUiTests
     [InlineData("scanSecretValue", "saklanmadı")]
     [InlineData("scanServers", "tam bir kez")]
     [InlineData("accountNotInScan", "bu hesabı aramamış")]
+    [InlineData("accountAmbiguousInScan", "farklı domain")]
     [InlineData("runStatement", "hangi yetkiyle")]
     [InlineData("alreadyDecided", "karar zaten verilmiş")]
     [InlineData("scanTablesMissing", "030")]

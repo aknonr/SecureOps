@@ -121,6 +121,26 @@ public static class UsageScanOutcomes
             && (fileDomainKey is null || accountDomainKey is null || fileDomainKey == accountDomainKey);
     }
 
+    /// <summary>
+    /// The searched name of the file under which a scan is attached to the module account; the account then shows only the
+    /// matches of that name. With a known domain the name qualified with that domain wins (a bare name would also show other
+    /// domains' matches). With an unknown domain the bare name wins, because it matches every domain and so hides nothing;
+    /// two names qualified with different domains and no bare name are <c>Ambiguous</c> (fail closed: the person adds the
+    /// domain to the account or scans one name). Null when no searched name refers to the account.
+    /// </summary>
+    public static (string? Name, bool Ambiguous) SearchedName(IEnumerable<string> fileAccounts, string accountName, string? accountDomain)
+    {
+        string[] candidates = [.. fileAccounts.Where(a => NameMatches(a, accountName, accountDomain))];
+        string? bare = candidates.FirstOrDefault(a => !a.Contains('\\', StringComparison.Ordinal));
+        string[] qualified = [.. candidates.Where(a => a.Contains('\\', StringComparison.Ordinal))];
+        if (ServiceAccountText.DomainKey(accountDomain) is not null)
+        {
+            return (qualified.FirstOrDefault() ?? bare, false);
+        }
+
+        return bare is not null || qualified.Length <= 1 ? (bare ?? qualified.FirstOrDefault(), false) : (null, true);
+    }
+
     /// <summary>Turkish label of a server result.</summary>
     public static string ResultLabel(ScanServerResult value) => value switch
     {
