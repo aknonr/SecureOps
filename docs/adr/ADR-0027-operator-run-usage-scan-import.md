@@ -55,8 +55,11 @@ frees or verifies anything; secrets are never read, stored or shown; the server 
    depth ≤ 12, no duplicate property names.
 2. **Secret guard before anything else is read or stored:** any property name that contains `password`, `passwd`, `pwd`,
    `secret`, `credential`, `token`, `apikey`, `privatekey`, `connectionstring`, `parola` or `şifre/sifre` (any case,
-   anywhere in the file), or any string value of the form `password=`/`pwd=`/`parola:` …, rejects the whole file with
-   `secretField`/`secretValue`. A rejected file is not stored, hashed into a record or echoed back; nothing is audited
+   anywhere in the file), or any string value that assigns one of these words (`password=`, `pwd=`, `parola:`,
+   `"Password":`, `token:`, `client_secret=`, `api-key=` …; checked after compatibility folding, so full-width letters and
+   invisible characters such as a zero-width space or a soft hyphen do not split the word), rejects the whole file with
+   `secretField`/`secretValue`. Any text longer than 4 096 characters is refused before it is searched (`scanSchema`), so
+   no file can make the guard slow. A rejected file is not stored, hashed into a record or echoed back; nothing is audited
    from its content.
 3. Closed schema: unknown properties, wrong types, patterns, lengths and enums are rejected; counts are bounded
    (≤ 2 000 components per server, ≤ 10 000 in total, ≤ 20 warnings per server).

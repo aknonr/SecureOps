@@ -86,6 +86,8 @@ public static partial class UsageScanParser
     public const int MaxWarnings = 20;
 
     private const int _maxDepth = 12;
+    /// <summary>Longest text anywhere in the file; the longest contract field is 1 024 characters, so this only bounds the guard.</summary>
+    private const int _maxGuardedText = 4096;
     private const string _bundleSchema = "service-account-usage-scan-v1";
     private const string _documentSchema = "service-account-usage-v1";
     private static readonly string[] _secretWords =
@@ -108,7 +110,12 @@ public static partial class UsageScanParser
     [GeneratedRegex(@"(?:Z|[+-]\d{2}:\d{2})$", RegexOptions.CultureInvariant, 100)]
     private static partial Regex OffsetSuffix();
 
-    [GeneratedRegex(@"(?:password|passwd|pwd|parola|sifre)\s*[=:]\s*\S", RegexOptions.CultureInvariant, 100)]
+    /// <summary>
+    /// A secret word, optionally plural or closing a quoted key (<c>"password":</c>, <c>'pwd' :</c>), then <c>=</c> or <c>:</c>
+    /// and a value. Runs on folded text (see <see cref="Fold"/>), so width variants and invisible characters cannot split it.
+    /// </summary>
+    [GeneratedRegex(@"(?:password|passwd|pwd|parola|sifre|secret|token|api[-_ ]?key|credential|connection[-_ ]?string|private[-_ ]?key)s?[""']?\s*[=:]\s*\S",
+        RegexOptions.CultureInvariant, 100)]
     private static partial Regex SecretAssignment();
 
     /// <summary>Validates and reads an upload; throws <see cref="UsageScanFileException"/> with a stable code on any doubt.</summary>
@@ -177,6 +184,11 @@ public static partial class UsageScanParser
                 HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
                 foreach (JsonProperty property in element.EnumerateObject())
                 {
+                    if (property.Name.Length > _maxGuardedText)
+                    {
+                        throw new UsageScanFileException(UsageScanFileCodes.Schema);
+                    }
+
                     if (LooksSecret(property.Name))
                     {
                         throw new UsageScanFileException(UsageScanFileCodes.SecretField);
@@ -198,8 +210,36 @@ public static partial class UsageScanParser
                 }
 
                 break;
-            case JsonValueKind.String when SecretAssignment().IsMatch(Fold(element.GetString()!)):
-                throw new UsageScanFileException(UsageScanFileCodes.SecretValue);
+            case JsonValueKind.String:
+                GuardText(element.GetString()!);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Text far longer than any contract field is refused before it is searched (no file can make the guard slow or time out);
+    /// otherwise an embedded secret assignment refuses the file. A guard that cannot finish refuses the file too.
+    /// </summary>
+    private static void GuardText(string value)
+    {
+        if (value.Length > _maxGuardedText)
+        {
+            throw new UsageScanFileException(UsageScanFileCodes.Schema);
+        }
+
+        bool secret;
+        try
+        {
+            secret = SecretAssignment().IsMatch(Fold(value));
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            throw new UsageScanFileException(UsageScanFileCodes.Limits);
+        }
+
+        if (secret)
+        {
+            throw new UsageScanFileException(UsageScanFileCodes.SecretValue);
         }
     }
 
@@ -210,13 +250,16 @@ public static partial class UsageScanParser
         return _secretWords.Any(word => key.Contains(word, StringComparison.Ordinal));
     }
 
-    /// <summary>Invariant lower case without combining marks (Ş→s, İ→i, ı→i), so Turkish spellings meet the same words.</summary>
+    /// <summary>
+    /// Invariant lower case in compatibility form without combining marks or invisible format characters (Ş→s, İ→i, ı→i,
+    /// full-width letters → ASCII, zero-width space and soft hyphen removed), so other spellings meet the same words.
+    /// </summary>
     private static string Fold(string value)
     {
         StringBuilder folded = new(value.Length);
-        foreach (char c in value.Normalize(NormalizationForm.FormD))
+        foreach (char c in value.Normalize(NormalizationForm.FormKD))
         {
-            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            if (CharUnicodeInfo.GetUnicodeCategory(c) is not (UnicodeCategory.NonSpacingMark or UnicodeCategory.Format))
             {
                 folded.Append(c == 'ı' ? 'i' : char.ToLowerInvariant(c));
             }

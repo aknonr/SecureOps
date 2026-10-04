@@ -88,6 +88,64 @@ public sealed class UsageScanParserTests
         Code(Bytes(file)).Should().Be(UsageScanFileCodes.SecretValue);
     }
 
+    // Review 2026-10-05: spellings that slipped past the value guard (a quoted key, other secret words, width and invisible
+    // characters). Each refuses the whole file in every free-text field the contract has.
+    [Theory]
+    [InlineData("{\"Password\":\"x1\"}")]
+    [InlineData("'pwd' : 'x1'")]
+    [InlineData("<add key=\"x\" password=\"x1\" />")]
+    [InlineData("client_secret=x1")]
+    [InlineData("Token: x1")]
+    [InlineData("api-key=x1")]
+    [InlineData("ApiKey=x1")]
+    [InlineData("credential=x1")]
+    [InlineData("ConnectionString=Server=syn-db")]
+    [InlineData("\uFF50\uFF41\uFF53\uFF53\uFF57\uFF4F\uFF52\uFF44\uFF1Dx1")]
+    [InlineData("pass\u200Bword=x1")]
+    [InlineData("pass\u00ADword=x1")]
+    [InlineData("pass\u2060word=x1")]
+    public void EmbeddedSecret_InOtherSpellings_RefusesTheFileInEveryTextField(string text)
+    {
+        foreach (string field in new[] { "ComponentName", "Identity", "State", "Detail" })
+        {
+            JsonNode file = Example();
+            file["results"]![0]!["components"]![0]![field] = text;
+            Code(Bytes(file)).Should().Be(UsageScanFileCodes.SecretValue, field);
+        }
+
+        JsonNode warning = Example();
+        warning["results"]![2]!["warnings"]![0] = text;
+        Code(Bytes(warning)).Should().Be(UsageScanFileCodes.SecretValue, "warnings");
+    }
+
+    [Theory]
+    [InlineData("LogonType=Password")]
+    [InlineData("LogonType=InteractiveTokenOrPassword")]
+    [InlineData("\\Syn\\Password Expiry Notification")]
+    [InlineData("TokenBroker")]
+    [InlineData("Syn Secret Server Agent")]
+    [InlineData("D:\\syn\\credentials-ui")]
+    public void OrdinaryNames_ThatOnlyMentionASecretWord_AreAccepted(string text)
+    {
+        JsonNode file = Example();
+        file["results"]![0]!["components"]![0]!["Detail"] = text;
+
+        UsageScanParser.Parse(Bytes(file), _max, _now).Items.Should().Contain(i => i.Detail == text);
+    }
+
+    [Fact]
+    public void AValueFarLongerThanAnyContractField_IsRefusedQuickly_WithAStableCode()
+    {
+        JsonNode file = Example();
+        file["results"]![0]!["components"]![0]!["Detail"] = string.Concat(Enumerable.Repeat("pwd pwd password ", 230_000));
+        byte[] bytes = Bytes(file);
+        bytes.Length.Should().BeLessThan(_max);
+
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        Code(bytes).Should().Be(UsageScanFileCodes.Schema);
+        timer.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
+    }
+
     [Fact]
     public void Contract_IsClosed_AndDuplicatesDepthAndSizeFailClosed()
     {
