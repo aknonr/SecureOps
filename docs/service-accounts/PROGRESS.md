@@ -9,6 +9,20 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Team separation: role bundles and no-scope explanation (2026-10-04, same branch)
+
+- Role bundles `sa-ekip-uyesi` (View, Work), `sa-koordinator` (View, Work, Assign, Verify, Import, Report) and
+  `sa-yonetici` (View, Administer) are created in the product (`/access/roles` → Yeni rol → Etkiyi incele → Değişikliği
+  uygula), assigned on `/access/users`, and scoped on the module admin tab. Procedure, recommended scopes and checks:
+  [TEAM-ROLE-SETUP-TR.md](TEAM-ROLE-SETUP-TR.md). No SQL role, assignment or scope script; UI labels and server rules
+  (code format, protected Admin, self-escalation, Administer-only grant) were checked against source.
+- Account list and detail now read `/me` first and, without any data scope, show `SaScopeSetup`
+  (`OrganizationRequired="false"`: team or organization scope is enough) instead of an empty list or a not-found error;
+  module administrators also see the one-time bootstrap hint. The list no longer calls work-summary/organizations/teams/
+  accounts without scope. Import keeps the organization-level requirement. Unit and browser text assertions updated.
+- Not done: landing redirect for users with only module capabilities (changes the platform home page; owner question).
+  **Not compiled or tested:** pinned SDK 9.0.317 still missing on this machine. Acceptance rows 60–61.
+
 ## SA-003 numbered 029; module ownership moved to Claude (2026-10-03, same branch, Windows)
 
 Owner decision: Claude owns this module's backend, API, UI, migration numbering and Windows verification (README

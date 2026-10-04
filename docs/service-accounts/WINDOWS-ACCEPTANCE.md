@@ -227,6 +227,8 @@ grant exists (if rows 39–41 already granted scope, run them on a fresh TEST da
 | 57 | coordinator | snapshot PDF | first page shows the same eight tiles and the three summary tables before the detail sections |
 | 58 | SQL operator, copy of the installed database (024–028) | `sqlcmd -I -b -i 029-service-account-scope-bootstrap.sql` from `sql/migrations` | succeeds once; existing grant rows `IsBootstrap = 0`; `CK_SaScopeGrants_NoSelfGrant` trusted; `UX_SaScopeGrants_OneBootstrap` present; a second run fails with "already applied"; installed API keeps granting/revoking normally |
 | 59 | SQL operator | `sa-sql-harness.ps1` (default, through 029) | prints "Scope bootstrap installed through a numbered migration" and "candidate 3 replay refused as expected" |
+| 60 | user with module View but no scope (e.g. new `sa-ekip-uyesi`) | `/service-accounts`, then `/service-accounts/{id}` | panel "Önce veri kapsamınız tanımlanmalı", current scope "tanımlı değil", team-or-organization step; no filters, no empty table, no not-found error; module administrator without any grant also sees the one-time bootstrap hint |
+| 61 | roles from `TEAM-ROLE-SETUP-TR.md` with synthetic TEST users | create the three `sa-*` roles, assign, grant Team / Organization scope | each role sees exactly the links and actions in section 4 of that document; no SQL used |
 
 UI (same identities): the team member opens `/service-accounts` and sees "Takibinizdeki işler"
 first; the account detail shows the participant notice and only the allowed controls.

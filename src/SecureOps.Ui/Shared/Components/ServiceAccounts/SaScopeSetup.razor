@@ -1,4 +1,5 @@
-@* Shown instead of an access error when the caller holds the module capabilities but no organization-level data scope.
+@* Shown instead of an access error or an empty list when the caller holds the module capabilities but not the data scope
+   the page needs (organization level for import; any scope for the account list and detail).
    Capabilities (Erişimim) and data scope are separate on purpose; scope is granted by a different module administrator
    (self-grants are refused by the service and the schema). This panel explains that path; it grants nothing. *@
 @using SecureOps.Shared.Contracts.ServiceAccounts
@@ -22,8 +23,15 @@
         <ol class="sa-scope-steps">
             <li>Modül yönetimi yetkisi olan <strong>başka bir yönetici</strong>, Servis Hesapları → <a href="service-accounts/admin">Modül yönetimi</a> → <em>Kapsam yetkileri</em> sekmesini açar.</li>
             <li>"Kişi" listesinden sizi seçer (liste uygulamaya onaylanmış kullanıcılardır; ayrı bir hesap veya PAM kimliği gerekmez).</li>
-            <li>İlk kurulumda kapsam türü olarak <strong>Tüm kurum</strong> seçilir; kurumlar ilk aktarımla oluştuğu için bu aşamada başka seçenek boş olabilir. Sonradan kurum bazında daraltılabilir.</li>
-            <li>Gerekçe yazılıp "Kapsam ver" denir. Siz bu sayfayı yenilediğinizde içe aktarım açılır.</li>
+            @if (OrganizationRequired)
+            {
+                <li>İlk kurulumda kapsam türü olarak <strong>Tüm kurum</strong> seçilir; kurumlar ilk aktarımla oluştuğu için bu aşamada başka seçenek boş olabilir. Sonradan kurum bazında daraltılabilir.</li>
+            }
+            else
+            {
+                <li>Kapsam türü olarak sizin <strong>ekibiniz</strong> veya sorumlu olduğunuz <strong>kurum</strong> seçilir. Ekip ve kurum kayıtları henüz yoksa (ilk aktarım yapılmadıysa) <strong>Tüm kurum</strong> seçilir.</li>
+            }
+            <li>Gerekçe yazılıp "Kapsam ver" denir. Ardından aşağıdaki <strong>Kapsamımı yeniden kontrol et</strong> düğmesiyle bu sayfa açılır.</li>
         </ol>
         <p class="so-panel-text--sm">Kendinize kapsam veremezsiniz; bu bir hata değil, görevler ayrılığı korumasıdır. Verilen ve geri alınan her kapsam denetim kaydına yazılır.</p>
         <div class="d-flex flex-wrap gap-2 mt-2">
@@ -43,12 +51,15 @@
     /// <summary>One-time first-grant state; null when the caller is not a module administrator.</summary>
     [Parameter] public ScopeBootstrapState? Bootstrap { get; set; }
 
+    /// <summary>True when the page needs organization-level scope (import); false when any scope is enough (list, detail).</summary>
+    [Parameter] public bool OrganizationRequired { get; set; } = true;
+
     /// <summary>Re-reads the caller's scope.</summary>
     [Parameter] public EventCallback OnRecheck { get; set; }
 
     private string Current => Me?.ScopeKind switch
     {
-        "Team" => "yalnız ekip (" + string.Join(", ", Me.Teams.Select(t => t.Label)) + ") — içe aktarım için kurum düzeyi gerekir",
+        "Team" when OrganizationRequired => "yalnız ekip (" + string.Join(", ", Me.Teams.Select(t => t.Label)) + ") — içe aktarım için kurum düzeyi gerekir",
         _ => "tanımlı değil"
     };
 }

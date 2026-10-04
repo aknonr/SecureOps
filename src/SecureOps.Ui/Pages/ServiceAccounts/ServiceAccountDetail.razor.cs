@@ -9,6 +9,8 @@ namespace SecureOps.Ui.Pages.ServiceAccounts;
 public partial class ServiceAccountDetail
 {
     private AccountDetail? _detail;
+    private ServiceAccountMe? _me;
+    private ScopeBootstrapState? _bootstrap;
     private IReadOnlyList<OrganizationView> _organizations = [];
     private bool _directoryRequested;
     private IReadOnlyList<TeamView> _teams = [];
@@ -40,9 +42,18 @@ public partial class ServiceAccountDetail
     }
 
     /// <inheritdoc />
+    /// <remarks>Scope is read first so a caller without any data scope gets an explanation instead of a not-found error.</remarks>
     protected override Task LoadAsync() => RunSerializedAsync(async token =>
     {
         _loadedId = Id;
+        _me = await Api.GetAsync<ServiceAccountMe>("/me", token);
+        if (!_me.HasScope)
+        {
+            _detail = null;
+            _bootstrap = Can(ServiceAccountCapabilities.Administer) ? await Api.GetAsync<ScopeBootstrapState>("/scope-grants/bootstrap", token) : null;
+            return;
+        }
+
         _detail = await Api.GetAsync<AccountDetail>($"/accounts/{Id}", token);
         _organizations = await Api.GetAsync<IReadOnlyList<OrganizationView>>("/organizations", token);
         _teams = await Api.GetAsync<IReadOnlyList<TeamView>>("/teams", token);

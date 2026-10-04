@@ -83,6 +83,27 @@ public sealed class ServiceAccountUsageUiTests
     }
 
     [Fact]
+    public void ListAndDetail_WithoutAnyScope_ExplainHowScopeIsGranted_InsteadOfAnEmptyListOrNotFound()
+    {
+        string list = Ui("Pages", "ServiceAccounts", "ServiceAccountList.razor");
+        string detail = Ui("Pages", "ServiceAccounts", "ServiceAccountDetail.razor");
+        string detailCode = Ui("Pages", "ServiceAccounts", "ServiceAccountDetail.razor.cs");
+        string setup = Ui("Shared", "Components", "ServiceAccounts", "SaScopeSetup.razor");
+
+        foreach (string page in new[] { list, detail })
+        {
+            page.Should().Contain("_me is { HasScope: false }").And.Contain("OrganizationRequired=\"false\"");
+        }
+
+        list.Should().NotContain("liste boş görünür", "a missing scope is explained, not shown as an empty list");
+        list.IndexOf("\"/me\"", StringComparison.Ordinal).Should().BeLessThan(list.IndexOf("\"/work-summary\"", StringComparison.Ordinal));
+        detailCode.IndexOf("\"/me\"", StringComparison.Ordinal).Should().BeLessThan(detailCode.IndexOf("$\"/accounts/{Id}\"", StringComparison.Ordinal),
+            "scope is read before the account so a caller without scope does not see a not-found error");
+        setup.Should().Contain("[Parameter] public bool OrganizationRequired { get; set; } = true;")
+            .And.Contain("\"Team\" when OrganizationRequired");
+    }
+
+    [Fact]
     public void EveryModulePage_HasAGuide_WithPurposeStepsAndLimits_AndTheAnimationRespectsReducedMotion()
     {
         foreach (string page in new[] { "ServiceAccountList", "ServiceAccountDetail", "ServiceAccountWork", "ServiceAccountImports", "ServiceAccountReports" })
