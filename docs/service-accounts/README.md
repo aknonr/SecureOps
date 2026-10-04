@@ -172,6 +172,11 @@ XLSX and PDF. Snapshots store the JSON payload, input watermark and metric defin
 XLSX/PDF are rendered from that stored payload only. Exports are text-only; cells starting with
 `= + - @` or control characters are neutralized.
 
+Charts (2026-10-04): `ReportCharts.Build` (Domain) copies chart values from the payload; the reports page (`SaChart`),
+the XLSX (native DrawingML charts on "Yönetici özeti", data on the last sheet "Grafik verisi", cached values) and the PDF
+(a vector chart page after page 1) draw the same list. All three writers stay deterministic and add no runtime package;
+DocumentFormat.OpenXml is a test-only schema validator.
+
 The legacy ownership projection is a labelled figure only: the person named in the legacy inputs
 (proposal or confirmation) plus, for otherwise unassigned accounts, the latest request follow-up
 person. On the supplied package it reproduces 40 + 13 = 53 accounts / 9 people. Confirmed

@@ -9,6 +9,30 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Report charts on screen, in XLSX and in PDF (2026-10-04, same branch, Windows)
+
+Owner request: charts in the executive report and visible in the product. One render-neutral list,
+`ReportCharts.Build(report)` (Domain), copies values from the stored payload — gMSA transition, gMSA funnel, 12-week
+trend, top-10 team workload, rule conformance — and every renderer draws that list; nothing is recomputed.
+- Screen: `SaChart` (HTML bars, SVG trend line under HTML markers, shapes + printed values + legend, table view per
+  chart; validated categorical palette, light/dark). "Görsel özet" section first on the reports page and snapshot view.
+- XLSX: native DrawingML charts on "Yönetici özeti" right after the tiles; series reference the new last sheet
+  "Grafik verisi" and cache the same values; no formulas/macros/links; bytes stay deterministic.
+- PDF: a chart page after page 1 (2 × 3 grid), drawn with plain PDF vector operators in the existing writer.
+- Library decision vs. what shipped: the owner chose DocumentFormat.OpenXml for Excel and SkiaSharp for PDF. Both
+  writers carry a tested "same document → same bytes" contract and an extractable text layer, so the charts are emitted
+  by the existing writers instead: DocumentFormat.OpenXml 3.5.1 is **test-only** (Office 2016 schema validator over the
+  whole workbook), and SkiaSharp is **not used** for PDF (native dependency, unproven TEST fonts, nondeterministic bytes).
+  Embedded real fonts in the PDF are a separate follow-up.
+
+Verified on this Windows machine (SDK 9.0.317): build 0/0, unit 1708/1708, format clean, integration 301 passed / 106
+SQL-gated skipped, module SQL 49/49 on a fresh 001-029 database (first run). Local Demo API/UI with synthetic LocalDB data:
+charts checked in dark 1220 px and light 390 px (no page overflow); module pages and the four admin tabs showed no error
+panel, Blazor error bar, overflow or server error. Desktop Excel (installed here) opened a synthetic snapshot XLSX
+read-only without a repair marker and rendered the four charts (inspected through Excel's own PDF export). The snapshot
+PDF chart page was inspected visually. **Known risk, pre-existing:** the preview renderer used here drew "ğ/Ğ" as blank
+in the standard-font PDF (text layer correct); check in Edge and Adobe on Windows/TEST (row 63).
+
 ## Team separation: role bundles and no-scope explanation (2026-10-04, same branch)
 
 - Role bundles `sa-ekip-uyesi` (View, Work), `sa-koordinator` (View, Work, Assign, Verify, Import, Report) and
