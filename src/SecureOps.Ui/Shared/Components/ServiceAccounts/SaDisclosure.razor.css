@@ -48,6 +48,13 @@
     min-width: 0;
 }
 
+/* MudBlazor text buttons draw no focus indicator (measured on Windows on the scan tab's "Karar ver"); the buttons of every
+   disclosed form get the same ring as the summary, so focus stays visible after the section opens. */
+.sa-disclosure-body ::deep .mud-button-root:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
+
 /* A native file picker has an intrinsic width (about 350 px in Chromium) that would scroll a 390 px page sideways. */
 .sa-disclosure-body ::deep input[type=file] {
     max-width: 100%;

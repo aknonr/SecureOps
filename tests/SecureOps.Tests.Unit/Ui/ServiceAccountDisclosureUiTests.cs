@@ -73,6 +73,15 @@ public sealed class ServiceAccountDisclosureUiTests
     }
 
     [Fact]
+    public void Disclosure_GivesSummaryAndBodyButtonsAVisibleKeyboardFocusRing()
+    {
+        // Windows 2026-10-05: MudBlazor text buttons drew no focus indicator; both the summary and the buttons of an opened form need one.
+        string css = File.ReadAllText(Path.Combine(Root(), "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaDisclosure.razor.css"));
+        css.Should().MatchRegex(@"\.sa-disclosure > summary:focus-visible\s*\{[^}]*outline:\s*2px solid")
+            .And.MatchRegex(@"\.sa-disclosure-body ::deep \.mud-button-root:focus-visible\s*\{[^}]*outline:\s*2px solid");
+    }
+
+    [Fact]
     public void NoServiceAccountsPage_UsesAMudBlazorExpansionPanel()
     {
         string ui = Path.Combine(Root(), "src", "SecureOps.Ui");
