@@ -70,14 +70,18 @@ try {
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-004-usage-scans.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate 4 replay was not refused.' }
     Write-Host 'candidate 4 replay refused as expected'
-    $hasGmsaName = (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH(N'svcacct.WorkRequests', N'RequestedGmsaName') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim()
-    if ($hasGmsaName -eq '0') {
+    # -ThroughMigration 30 leaves the database like an installed 030 system (no requested gMSA name columns).
+    $hasGmsaName = if ($ThroughMigration -ge 31) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH(N'svcacct.WorkRequests', N'RequestedGmsaName') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasGmsaName -eq 'skip') { Write-Host 'Requested gMSA name (031) left out: -ThroughMigration below 31' }
+    elseif ($hasGmsaName -eq '0') {
         Invoke-SaSql -Database $database -File 'SA-005-requested-gmsa-name.sql'
         Write-Host 'applied SA-005-requested-gmsa-name.sql (candidate 5)'
     } else { Write-Host 'Requested gMSA name installed through numbered 031' }
-    & $sqlcmd -S $server -d $database -E -I -b -i 'SA-005-requested-gmsa-name.sql' | Out-Null
-    if ($LASTEXITCODE -eq 0) { throw 'Candidate 5 replay was not refused.' }
-    Write-Host 'candidate 5 replay refused as expected'
+    if ($hasGmsaName -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-005-requested-gmsa-name.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 5 replay was not refused.' }
+        Write-Host 'candidate 5 replay refused as expected'
+    }
     if (-not $SkipRoleScripts) {
         Invoke-SaSql -Database $database -File 'SA-API-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-Worker-permissions.sql'
