@@ -99,6 +99,14 @@ public sealed class ServiceAccountUsageScanUiTests
             .Should().Contain("else if (Detail.Permissions.Work)").And.Contain("@if (!Detail.Permissions.Work)").And.NotContain("HttpMethod.Delete");
     }
 
+    [Fact]
+    public void ScanPanel_GivesItsButtonsAVisibleKeyboardFocusRing()
+    {
+        // Measured in the live app: MudBlazor text buttons ("Karar ver") drew no focus indicator; keyboard focus must be visible.
+        string css = File.ReadAllText(Path.Combine(Root(), "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaUsageScanPanel.razor.css"));
+        css.Should().MatchRegex(@"\.so-panel ::deep \.mud-button-root:focus-visible\s*\{[^}]*outline:\s*2px solid");
+    }
+
     private static AccountDetail Detail(AccountPermissions permissions, IReadOnlyList<UsageScanView>? scans)
     {
         AccountSummaryView summary = new(_account, "svc_synapp", "SYN", null, "Provisional", null, null, null, null, "Active", null, null, null, 1, null, [],
