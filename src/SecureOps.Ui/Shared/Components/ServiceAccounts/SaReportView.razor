@@ -166,6 +166,7 @@ else
 {
     <section class="so-panel" aria-labelledby="sa-report-funnel">
         <h2 id="sa-report-funnel" class="so-panel-title">gMSA hunisi (@funnel.Population hesap)</h2>
+        <div class="sa-table-scroll" role="region" aria-label="gMSA hunisi tablosu" tabindex="0">
         <table class="sa-bars" aria-describedby="sa-report-funnel">
             <thead><tr><th scope="col">Aşama</th><th scope="col">Hesap</th><th scope="col">Beklenen</th></tr></thead>
             <tbody>
@@ -180,6 +181,7 @@ else
                 <tr><th scope="row">Uygun değil</th><td><span class="sa-bar-value">@funnel.Ineligible</span></td><td class="so-panel-text--sm">Huniden ayrı sayılır.</td></tr>
             </tbody>
         </table>
+        </div>
         <p class="so-panel-text--sm mt-1">@funnel.Note</p>
     </section>
 }
@@ -188,6 +190,7 @@ else
 {
     <section class="so-panel" aria-labelledby="sa-report-trend">
         <h2 id="sa-report-trend" class="so-panel-title">Trend (son @trend.Points.Count hafta)</h2>
+        <div class="sa-table-scroll" role="region" aria-label="Trend tablosu" tabindex="0">
         <table class="sa-bars" aria-describedby="sa-report-trend">
             <thead><tr><th scope="col">Hafta</th><th scope="col">Hafta sonu açık talep</th><th scope="col">Geciken</th><th scope="col">Doğrulanmış kapanış</th><th scope="col">Gerçekleşen işlem</th></tr></thead>
             <tbody>
@@ -201,6 +204,7 @@ else
                 }
             </tbody>
         </table>
+        </div>
         <p class="so-panel-text--sm mt-1">@trend.Note@(trend.UnknownCloseTime > 0 ? $" Kapanış zamanı bilinmeyen talep: {trend.UnknownCloseTime}." : "")</p>
     </section>
 }

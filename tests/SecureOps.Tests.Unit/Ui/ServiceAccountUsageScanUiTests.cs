@@ -136,7 +136,10 @@ public sealed class ServiceAccountUsageScanUiTests
         File.ReadAllText(Path.Combine(root, "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaHandoverPanel.razor"))
             .Should().Contain("Tarama kanıttır; dönüşümü işlem doğrulamasında doğrulayıcı onaylar.");
         File.ReadAllText(Path.Combine(root, "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaUsageScanPanel.razor"))
-            .Should().Contain("else if (Detail.Permissions.Work)").And.Contain("@if (!Detail.Permissions.Work)").And.NotContain("HttpMethod.Delete");
+            .Should().Contain("else if (Detail.Permissions.Work)").And.Contain("@if (!Detail.Permissions.Work)").And.NotContain("HttpMethod.Delete")
+            // Measured with the keyboard only (2026-10-05): without Immediate the dismiss button was still disabled when Tab left
+            // the reason field, so focus skipped it.
+            .And.Contain("Label=\"Kayda almama gerekçesi\" MaxLength=\"1000\" Variant=\"Variant.Outlined\" Immediate=\"true\"");
     }
 
     [Fact]

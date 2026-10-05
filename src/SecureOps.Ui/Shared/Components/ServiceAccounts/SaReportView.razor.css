@@ -29,3 +29,7 @@
 
 /* Requested gMSA names wrap at narrow widths. */
 .sa-wrap-anywhere { overflow-wrap: anywhere; }
+
+/* At 390 px the trend table is wider than the page; it scrolls inside a focusable region instead of being clipped. */
+.sa-table-scroll { max-width: 100%; overflow-x: auto; }
+.sa-table-scroll:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
