@@ -314,7 +314,7 @@ public sealed partial class SqlServiceAccountRepository
             SELECT COUNT(*) FROM svcacct.UsageScanDecisions WITH (UPDLOCK, HOLDLOCK) WHERE ItemId = @itemId AND AccountId = @accountId;
             """, new { itemId, accountId }, transaction, cancellationToken)) > 0)
         {
-            return SaResult<Guid>.Fail(SaErrors.Invalid, "alreadyDecided");
+            return SaResult<Guid>.Fail(SaErrors.AlreadyDecided, "alreadyDecided");
         }
 
         Guid id = await decide(connection, transaction, item, now);

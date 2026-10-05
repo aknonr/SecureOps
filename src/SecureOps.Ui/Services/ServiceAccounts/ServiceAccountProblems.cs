@@ -35,6 +35,8 @@ public static class ServiceAccountProblems
         "ServiceAccountUsageScanRejected" => Build(UiProblemKind.Validation, code, "Tarama dosyası kabul edilmedi",
             "Dosyanın tamamı reddedildi; dosyadan hiçbir şey kaydedilmedi.", ["Aşağıdaki açıklamaya göre dosyayı yeniden üretin; dosyayı elle düzenlemeyin."],
             false, false),
+        "ServiceAccountUsageScanAlreadyDecided" => Build(UiProblemKind.Conflict, code, "Karar zaten verilmiş",
+            "Bu bileşen için bu hesapta daha önce karar verildi; yeni kayıt oluşmadı. Güncel durum yüklendi.", [], false, true),
         "ServiceAccountIdempotencyKeyRequired" => Build(UiProblemKind.Validation, code, "İşlem anahtarı eksik",
             "Aktarım onayı tekrar gönderimi güvenli kılan anahtarla yapılmalıdır.", ["Sayfayı yenileyip onayı yeniden verin."], false, true),
         _ => null

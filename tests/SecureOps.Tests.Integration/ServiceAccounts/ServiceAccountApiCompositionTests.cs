@@ -3,12 +3,16 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Api.Security;
+using SecureOps.Api.ServiceAccounts;
 using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Access;
+using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
@@ -128,6 +132,20 @@ public sealed class ServiceAccountApiCompositionTests
     }
 
     [Fact]
+    public void SecondScanDecision_IsA409Conflict_NamingTheRule()
+    {
+        ControllerBase controller = new Probe { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+
+        ObjectResult result = ServiceAccountReplies.Reply(controller, SaResult<AccountDetail>.Fail(SaErrors.AlreadyDecided, "alreadyDecided")).Result
+            .Should().BeOfType<ObjectResult>().Subject;
+
+        result.StatusCode.Should().Be(StatusCodes.Status409Conflict, "the item was decided before; the request itself is valid");
+        ProblemDetails problem = result.Value.Should().BeAssignableTo<ProblemDetails>().Subject;
+        problem.Extensions["code"].Should().Be(SaErrors.AlreadyDecided);
+        problem.Extensions["field"].Should().Be("alreadyDecided");
+    }
+
+    [Fact]
     public void EveryModuleEndpoint_RequiresAModuleCapabilityPolicy()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
@@ -167,4 +185,6 @@ public sealed class ServiceAccountApiCompositionTests
         (await repository.DecideRequestAsync(ensured.PendingRequest!.Id, AccessRequestStatus.Approved, ensured.PendingRequest.Version, "system:test-seed",
             [role], "Synthetic platform role fixture.", CancellationToken.None)).Disposition.Should().Be(AccessMutationDisposition.Applied);
     }
+
+    private sealed class Probe : ControllerBase;
 }

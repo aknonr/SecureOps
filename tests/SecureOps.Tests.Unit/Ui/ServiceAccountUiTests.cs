@@ -16,6 +16,7 @@ public sealed class ServiceAccountUiTests
     [Theory]
     [InlineData("ServiceAccountConcurrencyConflict", 409, UiProblemKind.Conflict)]
     [InlineData("ServiceAccountImportPreviewStale", 409, UiProblemKind.Conflict)]
+    [InlineData("ServiceAccountUsageScanAlreadyDecided", 409, UiProblemKind.Conflict)]
     [InlineData("ServiceAccountAccessDenied", 403, UiProblemKind.Forbidden)]
     [InlineData("ServiceAccountsNotConfigured", 503, UiProblemKind.NotConfigured)]
     [InlineData("ServiceAccountImportFileRejected", 400, UiProblemKind.Validation)]

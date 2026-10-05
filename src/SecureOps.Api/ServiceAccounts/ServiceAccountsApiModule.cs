@@ -54,6 +54,7 @@ public static class ServiceAccountReplies
             SaErrors.PreviewStale => (409, "import-preview", true, "Önizlemeden sonra veri değişti; önizlemeyi yenileyin."),
             SaErrors.DecisionsRequired => (409, "import-decisions", false, "Karar bekleyen satırlar var."),
             SaErrors.AlreadyImported => (409, "import-replay", false, "Bu dosya aynı dönem ve kapsam için zaten aktarıldı."),
+            SaErrors.AlreadyDecided => (409, "usage-scan-decision", false, "Bu bileşen için bu hesapta karar zaten verilmiş."),
             SaErrors.NotConfigured => (503, "configuration", false, "Servis hesapları modülü bu ortamda etkin değil."),
             SaErrors.DirectoryUnavailable => (503, "directory", true, "Dizin sağlayıcısına şu an ulaşılamıyor."),
             _ => (503, "persistence", true, "Kayıt deposuna şu an ulaşılamıyor.")

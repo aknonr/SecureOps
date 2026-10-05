@@ -160,8 +160,9 @@ public sealed class ServiceAccountUsageScanSqlTests
         (usage.Kind, usage.Server, usage.Component).Should().Be(("IisAppPool", "SYN-APP01", "IIS uygulama havuzu: SynPool"));
         recorded.UsageScans![0].Items.Single(i => i.Id == pool.Id).Should().Match<UsageScanItemView>(i => i.Decision == "UsageRecorded" && i.UsageId == usage.Id);
         recorded.Rule!.Items.Should().Contain(r => r.UsageId == usage.Id, "a recorded usage feeds the knowledge-base rules like a manual one");
-        (await fx.Service.RecordScanUsageAsync(coordinator.Principal, fx.Context, id, pool.Id, new RecordScanUsageRequest("IisAppPool"), _token))
-            .Field.Should().Be("alreadyDecided");
+        SaResult<AccountDetail> again = await fx.Service.RecordScanUsageAsync(coordinator.Principal, fx.Context, id, pool.Id, new RecordScanUsageRequest("IisAppPool"),
+            _token);
+        (again.ErrorCode, again.Field).Should().Be((SaErrors.AlreadyDecided, "alreadyDecided"), "a second decision is a 409 conflict, not invalid input");
 
         (await fx.Service.DismissScanItemAsync(coordinator.Principal, fx.Context, id, task.Id, new DismissScanItemRequest(" "), _token)).Field.Should().Be("reason");
         AccountDetail dismissed = Ok(await fx.Service.DismissScanItemAsync(coordinator.Principal, fx.Context, id, task.Id,
@@ -169,7 +170,7 @@ public sealed class ServiceAccountUsageScanSqlTests
         dismissed.UsageScans![0].Items.Single(i => i.Id == task.Id).Decision.Should().Be("Dismissed");
         dismissed.Usages.Should().ContainSingle("a dismissal creates nothing");
         (await fx.Service.RecordScanUsageAsync(coordinator.Principal, fx.Context, id, task.Id, new RecordScanUsageRequest("ScheduledTask"), _token))
-            .Field.Should().Be("alreadyDecided");
+            .ErrorCode.Should().Be(SaErrors.AlreadyDecided);
 
         AccountDetail other = await CreateAccountAsync(fx, coordinator, org, "DEC2");
         (await fx.Service.RecordScanUsageAsync(coordinator.Principal, fx.Context, other.Summary.Id, task.Id, new RecordScanUsageRequest("ScheduledTask"), _token))
