@@ -239,8 +239,10 @@ public sealed partial class UiOidcAuthenticationTests
             value.Contains("__Host-SecureOpsUi.Session", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task RevokedOidcSession_NextHttpRequestDeletesUiCookieWithoutProviderSignOut()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RevokedOrLostOidcSession_NextHttpRequestDeletesUiCookieWithoutProviderSignOut(bool lost)
     {
         using OidcUiFactory factory = new();
         using HttpClient browser = CreateClient(factory);
@@ -252,7 +254,14 @@ public sealed partial class UiOidcAuthenticationTests
         CookieAuthenticationOptions options = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(CookieAuthenticationDefaults.AuthenticationScheme);
         string key = options.TicketDataFormat.Unprotect(cookie.Split('=', 2)[1])!.Principal.FindFirst(SignedInUserService.BrowserSessionClaim)!.Value;
         IApiSessionStore store = factory.Services.GetRequiredService<IApiSessionStore>();
-        store.RequireReauthentication(key);
+        if (lost)
+        {
+            store.Remove(key);
+        }
+        else
+        {
+            store.RequireReauthentication(key);
+        }
         int tokenRequests = factory.Provider.TokenRequests;
 
         HttpResponseMessage landing = await browser.GetAsync("/session-expired", TestContext.Current.CancellationToken);

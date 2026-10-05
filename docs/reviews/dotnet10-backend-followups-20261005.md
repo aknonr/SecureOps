@@ -29,7 +29,16 @@ do not establish atomic terminal-state audit. Both paths predate these follow-up
 Approval needed: a repository operation that commits the exact termination and append-only
 audit together, with deterministic failure tests and separately authorized isolated SQL evidence.
 
-**F2 - P1: Losing the UI process store can defeat the terminal browser marker.**
+**F2 - P1: Resolved; missing UI process state now requires explicit sign-in.**
+Evidence: `UiSignOutTests.MissingSessionEntry_OldCookieIsDeletedAndExplicitSignInGetsNewCorrelation`
+replays the old UI cookie after entry removal and receives a login challenge plus cookie deletion.
+`ApplicationSessionHostedTests.UiStoreLoss_ExistingCorrelationCannotStartAnotherApiSession`
+simulates entry removal and fresh-store/cache loss against the hosted API; its session-start
+audit count remains one. Transport and OIDC regressions pass (32 unit + 32 hosted integration,
+0 skips; `artifacts/test-results/f2-final/`). Only explicit successful sign-in initializes an
+active correlation. ADR-0014 Amendment 2 records the owner decision; no SQL correlation was added.
+
+Original finding (historical source references):
 `src/SecureOps.Ui/Hosting/UiOidcAuthentication.cs:79` calls `GetOrCreate` while validating an
 existing authentication cookie. `src/SecureOps.Ui/Services/ApiSessionStore.cs:355` creates an
 empty session when the cache entry is missing. With interim authentication, a still-valid UI
@@ -39,7 +48,7 @@ revoked browser can therefore lose its terminal marker and create a fresh API se
 OIDC token loss follows its own rejection path; it is not evidence for interim-cookie safety.
 The process-local transport and this missing-entry behavior predate the changes. Session v2
 clears credentials and retains a terminal marker within the current process, but does not
-introduce durable browser correlation. The full loss/restart scenario was inspected, not run.
+introduce durable browser correlation. The loss/restart scenario was originally inspected, not run.
 Approval question: should missing store entries force explicit sign-in, or should correlation
 be durable? Any implementation must update ADR-0014 and test old-cookie replay after loss.
 
@@ -99,7 +108,8 @@ The build catches the diagnostic without a replacement suppression.
 
 ## 3. Blockers
 
-- F1 and F2 remain security review blockers for broader session release readiness.
+- F1 remains a security review blocker pending its approved atomicity implementation. F2 is
+  resolved with hosted loss/replay evidence; actual IIS/browser lifecycle acceptance is separate.
 - F3 and F4 require concurrency semantics before code changes.
 - The 2026-10-02 admin-adjustable bounded session-policy decision remains separate work.
   Current policy is read from `SessionSecurityOptions` and exposed by `AccessController.cs:74`;
@@ -110,8 +120,8 @@ The build catches the diagnostic without a replacement suppression.
 
 ## 4. Minimal Safe Next Step
 
-Review the draft PR and choose the missing-store policy in F2; then approve a separately
-scoped atomic session/audit change for F1. Define F3/F4 semantics before implementation.
+Implement the now-approved atomic session/audit change for F1 locally. F2's approved fail-closed
+policy is implemented. Define F3/F4 semantics before implementation.
 Amend ADR-0014 in any behavior-changing commit. F5/F6 can wait for those decisions.
 
 ## 5. Risks
@@ -120,4 +130,4 @@ Revocation is observed on the browser's next API operation. The existing circuit
 triggers an HTTP request that rejects/deletes the UI cookie. Idle browsers do not receive a new
 polling mechanism. Credential clearing and old-cookie rejection are locally tested; multi-node
 hosting, actual browser navigation and Windows/IIS/provider lifecycle behavior remain unproven.
-Passing these local gates does not establish corporate readiness or remove F1/F2.
+Passing these local gates does not establish corporate readiness or remove the remaining F1 gate.

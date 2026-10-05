@@ -45,3 +45,22 @@ Implements the owner's 2026-10-02 decision in `docs/decisions-log.md`.
 
 The UI marker and tokens remain process-local. Persistent multi-node/recycle correlation and
 actual Windows/IIS/provider/browser behavior require separate validation and owner decisions.
+
+## Amendment 2 - Missing UI process state fails closed, 2026-10-05
+
+Owner-approved F2 policy: losing the UI process-store entry requires explicit sign-in, not
+silent continuation. There is no durable SQL browser correlation in this change.
+
+- Only successful explicit interim/OIDC sign-in initializes a fresh active browser correlation.
+  Cookie renewal and validation never initialize one. A missing correlation claim is rejected.
+- A missing store lookup creates a terminal marker, rejects/deletes the existing UI cookie,
+  and blocks outbound API transport from an existing circuit. An existing terminal entry cannot
+  be reactivated by initialization; explicit sign-in uses a new correlation.
+- Cache eviction invalidates credential material without disposing gates that in-flight requests
+  may still hold. Existing Session v2 terminal-handle and credential-clearing behavior remains.
+- Hosted cookie replay and API transport tests simulate cache loss and a fresh empty store;
+  neither allows an old correlation to start another API session. These are deterministic hosted
+  tests, not IIS recycle or browser acceptance.
+
+F1 atomic session termination/audit is the next approved follow-up. F3 concurrent termination
+results and F4 already-running validation boundaries remain open and outside this change.

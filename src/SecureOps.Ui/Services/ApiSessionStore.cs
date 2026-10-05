@@ -25,11 +25,15 @@ public interface IApiSessionStore
     public event Action<string>? ReauthenticationRequired;
 
     /// <summary>
-    /// Returns the jar for a browser session, creating it on first use.
+    /// Returns the jar for an existing browser session; a missing entry is terminal.
     /// </summary>
     /// <param name="browserSessionKey">Browser-session correlation value.</param>
     /// <returns>The jar owned by that browser session.</returns>
     public BrowserApiSession GetOrCreate(string browserSessionKey);
+
+    /// <summary>Initializes a fresh correlation only during explicit successful sign-in.</summary>
+    /// <remarks>An existing terminal correlation is never reactivated.</remarks>
+    public BrowserApiSession InitializeAuthenticatedSession(string browserSessionKey);
 
     /// <summary>
     /// Discards a browser session's jar.
@@ -329,9 +333,8 @@ public sealed record OidcAccessTokenResult(string? AccessToken, bool RequiresRea
 /// </summary>
 /// <remarks>
 /// Entries expire on a sliding window so an abandoned browser session does not hold memory forever.
-/// The window is deliberately longer than the API's own idle timeout: expiring a jar early would
-/// hand the next request an empty container and create exactly the duplicate session this store
-/// exists to prevent. The API remains the authority on when a session actually ends.
+/// The window is longer than the API's idle timeout. Losing an entry requires explicit sign-in;
+/// an old authentication cookie or circuit never receives a fresh active jar.
 /// </remarks>
 /// <param name="cache">Backing memory cache.</param>
 public sealed class ApiSessionStore(IMemoryCache cache) : IApiSessionStore
@@ -346,19 +349,41 @@ public sealed class ApiSessionStore(IMemoryCache cache) : IApiSessionStore
     public event Action<string>? ReauthenticationRequired;
 
     /// <inheritdoc />
-    public BrowserApiSession GetOrCreate(string browserSessionKey)
+    public BrowserApiSession GetOrCreate(string browserSessionKey) => GetOrCreateCore(browserSessionKey, authenticated: false);
+
+    /// <inheritdoc />
+    public BrowserApiSession InitializeAuthenticatedSession(string browserSessionKey) => GetOrCreateCore(browserSessionKey, authenticated: true);
+
+    private BrowserApiSession GetOrCreateCore(string browserSessionKey, bool authenticated)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(browserSessionKey);
 
+        bool notify = false;
+        BrowserApiSession session;
         lock (_cacheLock)
         {
-            return _cache.GetOrCreate(CacheKey(browserSessionKey), entry =>
+            session = _cache.GetOrCreate(CacheKey(browserSessionKey), entry =>
             {
                 entry.SlidingExpiration = IdleRetention;
-                entry.RegisterPostEvictionCallback(static (_, value, _, _) => (value as BrowserApiSession)?.Dispose());
-                return new BrowserApiSession();
+                // Evicted jars may still have requests waiting on their gates. Invalidate credentials
+                // without disposing semaphores underneath those requests.
+                entry.RegisterPostEvictionCallback(static (_, value, _, _) => (value as BrowserApiSession)?.TryRequireReauthentication());
+                BrowserApiSession created = new();
+                if (!authenticated)
+                {
+                    notify = created.TryRequireReauthentication();
+                }
+
+                return created;
             })!;
         }
+
+        if (notify)
+        {
+            ReauthenticationRequired?.Invoke(browserSessionKey);
+        }
+
+        return session;
     }
 
     /// <inheritdoc />

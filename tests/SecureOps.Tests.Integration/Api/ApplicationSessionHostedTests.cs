@@ -21,6 +21,49 @@ namespace SecureOps.Tests.Integration.Api;
 
 public sealed class ApplicationSessionHostedTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UiStoreLoss_ExistingCorrelationCannotStartAnotherApiSession(bool restart)
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using MemoryCache cache = new(new MemoryCacheOptions());
+        IApiSessionStore store = new ApiSessionStore(cache);
+        const string key = "synthetic-store-loss";
+        store.InitializeAuthenticatedSession(key);
+        using HttpClient first = Transport(store);
+        using HttpResponseMessage started = await first.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken);
+        started.EnsureSuccessStatusCode();
+        store.RequireReauthentication(key);
+        if (restart)
+        {
+            store = new ApiSessionStore(cache);
+            cache.Compact(1);
+        }
+        else
+        {
+            store.Remove(key);
+        }
+
+        using HttpClient replay = Transport(store);
+        using HttpResponseMessage response = await replay.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken);
+
+        await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionRevoked");
+        factory.Services.GetRequiredService<InMemoryAuditWriter>().Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(1);
+
+        HttpClient Transport(IApiSessionStore sessions)
+        {
+            ApiSessionCookieHandler handler = new(sessions, NullLogger<ApiSessionCookieHandler>.Instance)
+            {
+                InnerHandler = factory.Server.CreateHandler()
+            };
+            HttpClient client = new(handler) { BaseAddress = new Uri("http://localhost/") };
+            client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+            client.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, key);
+            return client;
+        }
+    }
+
     [Fact]
     public async Task Current_CreatesSecureBrowserSessionHandleAfterAuthentication()
     {
@@ -82,6 +125,7 @@ public sealed class ApplicationSessionHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(simulation: true);
         using var cache = new MemoryCache(new MemoryCacheOptions());
         ApiSessionStore store = new(cache);
+        store.InitializeAuthenticatedSession("one-logical-browser-session");
         ApiSessionCookieHandler sessionHandler = new(store, NullLogger<ApiSessionCookieHandler>.Instance)
         {
             InnerHandler = factory.Server.CreateHandler()
@@ -197,6 +241,7 @@ public sealed class ApplicationSessionHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using var cache = new MemoryCache(new MemoryCacheOptions());
         ApiSessionStore store = new(cache);
+        store.InitializeAuthenticatedSession("self-revoked-browser");
         ApiSessionCookieHandler sessionHandler = new(store, NullLogger<ApiSessionCookieHandler>.Instance)
         {
             InnerHandler = factory.Server.CreateHandler()
@@ -230,6 +275,7 @@ public sealed class ApplicationSessionHostedTests
         store.GetOrCreate("self-revoked-browser").GetApiCookieHeader(new Uri("http://localhost/")).Should().BeEmpty();
         browser.DefaultRequestHeaders.Remove(ApiSessionHeaders.BrowserSession);
         browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "explicit-new-authentication");
+        store.InitializeAuthenticatedSession("explicit-new-authentication");
         ApplicationSessionResponse reauthenticated = (await (await browser.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken)).Content
             .ReadFromJsonAsync<ApplicationSessionResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
 

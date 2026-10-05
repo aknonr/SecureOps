@@ -1,8 +1,11 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +28,38 @@ namespace SecureOps.Tests.Integration.Ui;
 /// </remarks>
 public sealed partial class UiSignOutTests
 {
+    [Fact]
+    public async Task MissingSessionEntry_OldCookieIsDeletedAndExplicitSignInGetsNewCorrelation()
+    {
+        using SignOutUiFactory factory = new(new RecordingAccessApiClient());
+        using HttpClient browser = CreateClient(factory);
+        using HttpResponseMessage signedIn = await SignInAsync(browser);
+        string cookie = signedIn.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Host-SecureOpsUi.Session=", StringComparison.Ordinal)).Split(';')[0];
+        CookieAuthenticationOptions options = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(CookieAuthenticationDefaults.AuthenticationScheme);
+        string key = options.TicketDataFormat.Unprotect(cookie.Split('=', 2)[1])!.Principal.FindFirst(SignedInUserService.BrowserSessionClaim)!.Value;
+        IApiSessionStore store = factory.Services.GetRequiredService<IApiSessionStore>();
+        store.Remove(key);
+
+        using HttpClient replay = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = false,
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost/")
+        });
+        replay.DefaultRequestHeaders.Add("Cookie", cookie);
+        using HttpResponseMessage response = await replay.GetAsync("/synthetic-auth-probe", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location!.OriginalString.Should().Contain("/login");
+        response.Headers.GetValues("Set-Cookie").Should().Contain(value => value.StartsWith("__Host-SecureOpsUi.Session=;", StringComparison.Ordinal));
+        store.GetOrCreate(key).RequiresReauthentication.Should().BeTrue();
+        using HttpResponseMessage newLogin = await SignInAsync(browser);
+        string newCookie = newLogin.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Host-SecureOpsUi.Session=", StringComparison.Ordinal)).Split(';')[0];
+        string newKey = options.TicketDataFormat.Unprotect(newCookie.Split('=', 2)[1])!.Principal.FindFirst(SignedInUserService.BrowserSessionClaim)!.Value;
+        newKey.Should().NotBe(key);
+        store.GetOrCreate(newKey).RequiresReauthentication.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("/session-expired")]
     [InlineData("/login")]
@@ -164,10 +199,40 @@ public sealed partial class UiSignOutTests
                     ["ReverseProxy:HttpsOffload:Enabled"] = "false"
                 }));
 
-            builder.ConfigureServices(services => services.AddScoped(_ => _accessApi));
+            builder.ConfigureServices(services =>
+            {
+                services.AddScoped(_ => _accessApi);
+                services.AddSingleton<IStartupFilter, AuthenticationProbe>();
+            });
 
             return base.CreateHost(builder);
         }
+    }
+
+    private sealed class AuthenticationProbe : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, nextMiddleware) =>
+            {
+                if (context.Request.Path == "/synthetic-auth-probe")
+                {
+                    if (!(await context.AuthenticateAsync()).Succeeded)
+                    {
+                        await context.ChallengeAsync();
+                    }
+                    else
+                    {
+                        context.Response.StatusCode = StatusCodes.Status200OK;
+                    }
+
+                    return;
+                }
+
+                await nextMiddleware(context);
+            });
+            next(app);
+        };
     }
 
     /// <summary>Records logout calls and can fail on demand.</summary>

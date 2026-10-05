@@ -27,6 +27,23 @@ public sealed class ApiSessionTransportTests
     private const string _apiCookie = "__Host-SecureOps.ApplicationSession";
 
     [Fact]
+    public void MissingEntry_IsTerminalAndInitializationCannotReactivateIt()
+    {
+        using MemoryCache cache = new(new MemoryCacheOptions());
+        ApiSessionStore store = new(cache);
+        string? notified = null;
+        store.ReauthenticationRequired += key => notified = key;
+
+        BrowserApiSession missing = store.GetOrCreate("missing");
+
+        missing.RequiresReauthentication.Should().BeTrue();
+        notified.Should().Be("missing");
+        store.InitializeAuthenticatedSession("missing").Should().BeSameAs(missing);
+        missing.RequiresReauthentication.Should().BeTrue();
+        store.InitializeAuthenticatedSession("new-explicit-sign-in").RequiresReauthentication.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task SecondRequest_ReplaysTheSessionCookieTheApiIssued()
     {
         // A browser refresh: same correlation value, second call. The API must see the handle it
@@ -159,7 +176,7 @@ public sealed class ApiSessionTransportTests
     }
 
     [Fact]
-    public async Task RemovingAJar_StopsTheHandleFromBeingReplayed()
+    public async Task RemovingAJar_RequiresSignInWithoutAnotherApiRequest()
     {
         // What sign-out relies on: after API logout the handle is dead, and replaying it for the
         // next person on this browser would be worse than losing session reuse.
@@ -168,9 +185,11 @@ public sealed class ApiSessionTransportTests
 
         await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
         store.Remove("browser-a");
-        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        using HttpResponseMessage response = await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
-        handler.SentCookies[1].Should().BeNull();
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        handler.SentCookies.Should().ContainSingle();
+        store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
     }
 
     [Fact]
@@ -490,8 +509,13 @@ public sealed class ApiSessionTransportTests
         }
     }
 
-    private static IApiSessionStore NewStore() =>
-        new ApiSessionStore(new MemoryCache(new MemoryCacheOptions()));
+    private static IApiSessionStore NewStore()
+    {
+        ApiSessionStore store = new(new MemoryCache(new MemoryCacheOptions()));
+        store.InitializeAuthenticatedSession("browser-a");
+        store.InitializeAuthenticatedSession("browser-b");
+        return store;
+    }
 
     private static (HttpClient Client, RecordingHandler Handler, IApiSessionStore Store) Create(
         string? browserSessionKey,
