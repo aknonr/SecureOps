@@ -2409,6 +2409,19 @@ open the exact owned draft; access/synthetic/historical limitations stay visible
 An unavailable response retains the previous cut and restores its applied filters.
 This is not target activation or an employee productivity ranking. See
 `docs/integrated-test-activation.md` and `docs/integrated-activation-tr.md`.
+## Service Accounts scan comparison (2026-10-06)
+
+Under every usage scan that has an older scan of the same purpose on the account, `SaScanDiffView` shows "Önceki taramaya
+göre fark" (`ServiceAccountScanDiff`; UI only, from the already loaded `UsageScans`, no API change). Per planned server:
+newly found, not found now, information arrived, information lost, added to or absent from the plan. Per matched component:
+new, not found now, unknown now, identity changed; plus a changed gMSA conclusion. Rules kept: "not found" only follows a fully
+scanned server and never means "not used"; a server or component the newer scan did not cover is "unknown", never "gone"; an
+unchanged result is not a usage verdict. Lists are capped at 50 rows with a count of the rest. The gap alert gets
+"Yeniden taranacak sunucu listesini indir (.txt)": servers without a usable result, in the collector's `ComputerListPath`
+format (one name per line, `#` comments), built in the browser from the scan; nothing is sent. Tests:
+`tests/SecureOps.Tests.Unit/Ui/ServiceAccountScanDiffTests.cs`. Checked locally (Demo API + UI, synthetic LocalDB) at 390 px,
+light and dark, no horizontal scroll.
+
 ## E-08 In Use activity review
 
 The primary action submits only the eligible WASAS activity, not overall OR

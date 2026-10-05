@@ -1,0 +1,113 @@
+@* What changed since the previous scan of the same purpose, from the loaded scans only (no new data, no write). "Not found"
+   follows only a fully scanned server and never means "not used"; a server or component the newer scan did not cover is
+   "unknown", not "gone". Nothing here closes, frees or verifies the account. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<div class="sa-diff">
+    <p class="so-panel-text--sm">
+        Karşılaştırma: @ServiceAccountUiText.Instant(Diff.Previous.LastScannedAt ?? Diff.Previous.CombinedAt) taraması ile bu tarama.
+        @Diff.UnchangedServers sunucuda sonuç aynı.
+    </p>
+    @if (!Diff.HasChanges)
+    {
+        <p class="so-panel-text">İki tarama arasında sunucu sonucu veya bileşen farkı yok. Bu, hesabın kullanıldığını veya kullanılmadığını göstermez; yalnız iki taramanın aynı sonucu verdiğini gösterir.</p>
+    }
+    @if (Diff.ChangedServers.Count > 0)
+    {
+        <h4 class="sa-diff-subtitle">Sunucu farkları (@Diff.ChangedServers.Count)</h4>
+        <ul class="sa-diff-list" aria-label="Sunucu farkları">
+            @foreach (SaServerDiff row in Diff.ChangedServers.Take(MaxRows))
+            {
+                <li>
+                    <SoStatusBadge Label="@ServerLabel(row.Change)" Tone="@ServerTone(row.Change)" Icon="@ServerIcon(row.Change)" />
+                    <strong class="sa-diff-name">@row.Server</strong>
+                    <div class="so-panel-text--sm">@row.Text</div>
+                </li>
+            }
+        </ul>
+        @if (Diff.ChangedServers.Count > MaxRows)
+        {
+            <p class="so-panel-text--sm mt-1">İlk @MaxRows sunucu gösteriliyor; @(Diff.ChangedServers.Count - MaxRows) sunucu daha değişti. Tam liste her taramanın sunucu tablosundadır.</p>
+        }
+    }
+    @if (Diff.Components.Count > 0)
+    {
+        <h4 class="sa-diff-subtitle">Bileşen farkları (@Diff.Components.Count)</h4>
+        <ul class="sa-diff-list" aria-label="Bileşen farkları">
+            @foreach (SaComponentDiff row in Diff.Components.Take(MaxRows))
+            {
+                <li>
+                    <SoStatusBadge Label="@ComponentLabel(row.Change)" Tone="@ComponentTone(row.Change)" Icon="@ComponentIcon(row.Change)" />
+                    <strong class="sa-diff-name">@row.Server · @row.Component</strong>
+                    <div class="so-panel-text--sm">@row.Text</div>
+                </li>
+            }
+        </ul>
+        @if (Diff.Components.Count > MaxRows)
+        {
+            <p class="so-panel-text--sm mt-1">İlk @MaxRows bileşen gösteriliyor; @(Diff.Components.Count - MaxRows) bileşen daha farklı. Her taramanın tam bileşen listesi kendi bölümündedir.</p>
+        }
+    }
+    @if (Diff.GmsaText is not null)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@Diff.GmsaText</MudAlert>
+    }
+</div>
+
+@code {
+    private const int MaxRows = 50;
+
+    /// <summary>The comparison to show.</summary>
+    [Parameter, EditorRequired] public SaScanDiff Diff { get; set; } = default!;
+
+    private static string ServerLabel(SaServerChange change) => change switch
+    {
+        SaServerChange.NewlyFound => "Yeni bulundu",
+        SaServerChange.NoLongerFound => "Bu taramada bulunmadı",
+        SaServerChange.InformationArrived => "Bilgi geldi",
+        SaServerChange.InformationLost => "Güncel bilgi yok",
+        SaServerChange.NewlyPlanned => "Plana eklendi",
+        SaServerChange.NotPlannedNow => "Planda yok",
+        _ => "Aynı"
+    };
+
+    private static SoStatusBadge.BadgeTone ServerTone(SaServerChange change) => change switch
+    {
+        SaServerChange.NewlyFound => SoStatusBadge.BadgeTone.Info,
+        SaServerChange.InformationArrived => SoStatusBadge.BadgeTone.Positive,
+        SaServerChange.InformationLost or SaServerChange.NotPlannedNow => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static string ServerIcon(SaServerChange change) => change switch
+    {
+        SaServerChange.NewlyFound => Icons.Material.Filled.AddCircleOutline,
+        SaServerChange.InformationArrived => Icons.Material.Filled.FactCheck,
+        SaServerChange.InformationLost or SaServerChange.NotPlannedNow => Icons.Material.Filled.ReportProblem,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+
+    private static string ComponentLabel(SaComponentChange change) => change switch
+    {
+        SaComponentChange.Added => "Yeni görüldü",
+        SaComponentChange.NotFoundNow => "Bu taramada bulunmadı",
+        SaComponentChange.UnknownNow => "Durumu bilinmiyor",
+        _ => "Kimlik değişmiş"
+    };
+
+    private static SoStatusBadge.BadgeTone ComponentTone(SaComponentChange change) => change switch
+    {
+        SaComponentChange.Added or SaComponentChange.IdentityChanged => SoStatusBadge.BadgeTone.Info,
+        SaComponentChange.UnknownNow => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    private static string ComponentIcon(SaComponentChange change) => change switch
+    {
+        SaComponentChange.Added => Icons.Material.Filled.AddCircleOutline,
+        SaComponentChange.IdentityChanged => Icons.Material.Filled.SwapHoriz,
+        SaComponentChange.UnknownNow => Icons.Material.Filled.HelpOutline,
+        _ => Icons.Material.Filled.RemoveCircleOutline
+    };
+}

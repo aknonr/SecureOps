@@ -75,8 +75,10 @@
     }
 </section>
 
-@foreach (UsageScanView scan in Detail.UsageScans ?? [])
+@for (int scanIndex = 0; scanIndex < (Detail.UsageScans?.Count ?? 0); scanIndex++)
 {
+    UsageScanView scan = Detail.UsageScans![scanIndex];
+    SaScanDiff? diff = ServiceAccountScanDiff.PreviousOf(Detail.UsageScans, scanIndex) is { } previousScan ? ServiceAccountScanDiff.Compute(scan, previousScan) : null;
     string headingId = $"sa-scan-{scan.LinkId:N}";
     UsageScanItemView[] former = [.. scan.Items.Where(i => i.Role == "Former")];
     UsageScanItemView[] gmsa = [.. scan.Items.Where(i => i.Role == "Expected")];
@@ -124,7 +126,22 @@
             <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
                 @gaps.Length sunucu için sonuç eksik: @string.Join(", ", gaps.Take(20).Select(s => $"{s.ServerName} ({s.ResultLabel})"))@(gaps.Length > 20 ? $" ve {gaps.Length - 20} sunucu daha" : "").
                 Bu sunucularda hesap çalışıyor olabilir; yeniden tarayın.
+                @if (OnSaveFile.HasDelegate)
+                {
+                    <div class="mt-1">
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="Busy" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => SaveRescanAsync(scan))">
+                            Yeniden taranacak sunucu listesini indir (.txt)
+                        </MudButton>
+                    </div>
+                }
             </MudAlert>
+        }
+
+        @if (diff is not null)
+        {
+            <SaDisclosure Class="mt-2" Title="@($"Önceki taramaya göre fark ({diff.ChangedServers.Count} sunucu, {diff.Components.Count} bileşen)")">
+                <SaScanDiffView Diff="diff" />
+            </SaDisclosure>
         }
 
         <h3 class="sa-scan-subtitle">Bu hesabın bulunduğu bileşenler (@former.Length)</h3>
@@ -261,6 +278,12 @@
 
     /// <summary>Command sink for decisions.</summary>
     [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    /// <summary>Hands a locally built file (the re-scan server list) to the browser.</summary>
+    [Parameter] public EventCallback<ServiceAccountFile> OnSaveFile { get; set; }
+
+    private Task SaveRescanAsync(UsageScanView scan) => OnSaveFile.InvokeAsync(new ServiceAccountFile("yeniden-taranacak-sunucular.txt",
+        "text/plain", System.Text.Encoding.UTF8.GetBytes(ServiceAccountScanDiff.RescanFile(scan))));
 
     private IEnumerable<RequestView> ParticipantRequests =>
         Detail.Requests.Where(r => r.Status == "Open" && (Detail.Permissions.ParticipantRequestIds?.Contains(r.Id) ?? false));

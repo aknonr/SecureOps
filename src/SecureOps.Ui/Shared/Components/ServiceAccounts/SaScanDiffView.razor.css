@@ -1,0 +1,24 @@
+.sa-diff-subtitle {
+    margin: 0.75rem 0 0.25rem;
+    font-size: 1rem;
+}
+
+.sa-diff-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sa-diff-list li {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--so-border);
+    border-radius: 6px;
+    overflow-wrap: anywhere;
+}
+
+.sa-diff-name {
+    margin-left: 0.5rem;
+}
