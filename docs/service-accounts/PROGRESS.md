@@ -47,17 +47,27 @@ user, no `Number=1205` · other integration failures are the 7 SkiaSharp announc
 format clean on a CRLF copy (Linux checkouts are LF; `.editorconfig` wants CRLF) · OpenAPI additions only · scan tab
 checked on a static render at 390/640/1280 px light/dark and by keyboard. Not run on Windows: rows 67–75.
 
+## Verified (Windows workstation, 2026-10-05, usage scan, `63e6d5d` + fix `9fc5ee3`, SDK 9.0.317, LocalDB)
+
+Build 0/0 · unit 1806 passed (1 intentional skip) · integration 302 passed / 112 skipped · format clean · harness 001–030 exit 0,
+module SQL 56/56 on the first run, no `Number=1205` · collector and combine under Windows PowerShell 5.1 (UTF-16 in, UTF-8
+without BOM out, `NoResult`/`Unreachable` kept, the secret guard stops the script) · local Demo (identity bridge, not OIDC):
+upload, a `Password` file refused with nothing stored, usage/dismiss decisions (second decision refused), a participant uploads
+only through its own request (403 otherwise), 390 px, emulated 200 % zoom, light/dark, keyboard · one defect found and fixed
+(no focus ring on "Karar ver", `9fc5ee3`) · rehearsal of 029 and 030 on a synthetic copy (existing rows and definitions
+unchanged, one transaction each, replay refused). Not run: rows 67–68 (no lab server), anything on the real TEST database or a `.bak`.
 ## Open work
 
 1. **Merge of PR #11** — owner approved Claude merging once tests are complete. Still open before merge: rows 39–61 need
    TEST users (role and scope assignment through the product); the owner decides whether to merge with them pending.
-2. **Row 58:** 029 on a restored copy of the installed TEST database — waiting for the owner's `.bak`.
+2. **Row 58:** 029 on a restored copy of the installed TEST database — waiting for the owner's `.bak` (synthetic-copy rehearsal done 2026-10-05).
 3. **Row 64:** open the synthetic snapshot PDF in Edge and Adobe; Properties → Fonts shows both fonts as embedded.
 4. **Rows 60–61:** browser check of the landing redirect and the three `sa-*` roles with synthetic TEST users.
 5. **Rows 1–38:** blocked until approved TEST OIDC identities (and TEST AD for 29–38) are available.
-6. **Rows 67–75 (usage scan):** collector under Windows PowerShell 5.1 on a TEST/lab server, combine on a workstation,
-   030 on LocalDB and on the `.bak` copy, browser upload/decision/participant flows. 030 and `SA-004-API-permissions.sql`
-   need the owner's approval before any installed system.
+6. **Usage scan, still open:** rows 67–68 (collector on a lab/TEST server where the synthetic account runs a service, a
+   scheduled task and an app pool with a stored password; also non-administrator there) and the `.bak` parts of rows 58 and 75
+   (029/030 on a restored copy). The synthetic-copy rehearsal is done; DBA note: [DBA-029-030-TR.md](DBA-029-030-TR.md). 029, 030
+   and `SA-004-API-permissions.sql` need the owner's approval before any installed system.
 7. Module-wide: MudBlazor 6.16 expansion-panel headers take no keyboard focus (seen while checking the scan tab, which now
    uses `<details>`); the other module panels still use them.
 

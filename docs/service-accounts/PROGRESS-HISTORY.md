@@ -13,6 +13,37 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Windows session 2026-10-05: usage scan acceptance, rows 67–75 (`63e6d5d`, fix `9fc5ee3`)
+
+Owner's workstation, SDK 9.0.317 user-local, LocalDB `SecureOpsResourcesV1`, synthetic data only, nothing applied to the TEST
+system. Results are in `WINDOWS-ACCEPTANCE.md` (rows 58, 67–75 and the paragraph under the table); this is the narrative.
+
+- Baseline: build 0/0; unit 1805 passed + 1 intentional skip (1806 after the new focus test); integration 302 passed / 112
+  skipped; format clean. No Windows-only failure; the Linux-only failures did not occur.
+- Row 70: fresh database `SecureOps_SaW1005a`: harness exit 0, "candidate 4 replay refused as expected"; module SQL 56/56 on the first
+  run, diagnostics only intentional probes, no `Number=1205`.
+- Rows 67–69: no lab server, so 67 and 68 were NOT RUN. A read-only collector run on the workstation (`SYN\svc_none`, not
+  elevated) printed one valid line, `Success`, no components (tasks were readable without elevation and IIS is not installed, so
+  no `Partial`). Combine under Windows PowerShell 5.1 passed: UTF-16 `Out-File` input, UTF-8-without-BOM output, `NoResult` and
+  `Unreachable` rows; a `Password` property (top level, and nested in `sources`) stopped the script and no file was written.
+- Rows 71–74 (browser): local Demo API + two Demo UI hosts (`demo:platform-admin` on 5100, `demo:team-lead` on 5101) on a
+  fresh database `SecureOps_SaW1005ui`. Owner approved assigning a role to the Demo users on that synthetic database: a role
+  bundle `sa-ekip-uyesi` (View, Work) created on `/access/roles` and assigned to `demo:team-lead` on `/access/users`; the first
+  scope taken by `demo:platform-admin` through "İlk kapsamı al (bir kez)" (Admin already carries all seven module actions since 028).
+  Both UI hosts share the `localhost` cookie, so only one actor is signed in at a time. Organization, teams, account,
+  executor team role, the team-lead's Team scope and a `GmsaHandover` request were seeded through the API with the
+  `X-SecureOps-Demo-Actor` header. The scan files came from the checked-in synthetic example (combined under Windows PowerShell
+  5.1) plus a hand-built gMSA check; they reached the file input by script. Everything passed; the participant's upload without a
+  request or with a foreign request is 403 `requestId`, a participant decision is 403 `scope`. 390 px and an emulated 200 % (640 px)
+  in light and dark: no horizontal scroll. **Defect:** "Karar ver" had no keyboard focus indicator; fixed and pinned by a test
+  (`9fc5ee3`). Still open module-wide: the MudBlazor expansion panels take no keyboard focus.
+- Rows 58 and 75 (synthetic copy, not the real TEST database): `sa-sql-harness.ps1 -ThroughMigration 28` applies candidates 3 and 4
+  itself, so 001–028 were applied by hand. 029, then 030 + `SA-004-API-permissions.sql`: existing rows byte-identical, all 48
+  pre-existing table definitions unchanged, grants API SELECT/INSERT only, replay refused, an injected `THROW` before `COMMIT`
+  left nothing (each is one transaction). Manual rollback statements for both were tried inside a rolled-back transaction. The
+  DBA note is [DBA-029-030-TR.md](DBA-029-030-TR.md). The rehearsal scripts were scratch files and are not in the repository.
+- Local databases created (all synthetic, kept): `SecureOps_SaW1005a`, `SecureOps_SaW1005ui`, `SecureOps_SaW1005Up28`,
+  `…Up28b` … `…Up28i` (the first runs of the rehearsal script failed on my own script errors and were abandoned).
 ## Cloud session 2026-10-04 night: usage scan import (ADR-0027, migration 030)
 
 Owner request: the team finds today by hand, with its own PowerShell tool, where an account runs (server, service,
