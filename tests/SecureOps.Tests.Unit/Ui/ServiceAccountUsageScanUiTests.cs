@@ -71,6 +71,30 @@ public sealed class ServiceAccountUsageScanUiTests
         missing.Should().Contain("veritabanı güncellemesi 030 uygulanmamış").And.NotContain("Tarama dosyası yükle").And.NotContain("Bu hesaba bağlı tarama yok");
     }
 
+    // Review 2026-10-05: with no match the component section said "not found in the scanned sources" even when no server
+    // was fully scanned; it must say what was actually covered.
+    [Fact]
+    public async Task NoMatch_SaysOnlyWhatWasFullyScanned()
+    {
+        AccountPermissions work = new(true, true, true, true, true, true, ServiceAccountAccessBasis.Responsible);
+
+        string nothingScanned = Words(await RenderAsync(Detail(work, [Empty(
+            Server("SYN-APP01", "Unreachable", "Erişilemedi", 0, "NotCovered", "Bilgi yok: sunucu taranamadı"),
+            Server("SYN-APP02", "Partial", "Kısmi tarandı", 0, "Uncertain", "Belirsiz: kısmi tarama, okunamayan kaynakta olabilir"))])));
+        nothingScanned.Should().NotContain("Taranan kaynaklarda bu hesapla çalışan bileşen bulunmadı")
+            .And.Contain("Hiçbir sunucu tam taranmadı").And.Contain("bilinmiyor");
+
+        string mixed = Words(await RenderAsync(Detail(work, [Empty(
+            Server("SYN-APP01", "Success", "Tam tarandı", 0, "NotFound", "Taranan kaynaklarda bulunmadı (kullanılmıyor demek değildir)"),
+            Server("SYN-APP02", "Unreachable", "Erişilemedi", 0, "NotCovered", "Bilgi yok: sunucu taranamadı"))])));
+        mixed.Should().Contain("Tam taranan 1 sunucuda bu hesapla çalışan bileşen bulunmadı").And.Contain("1 sunucu için sonuç eksik")
+            .And.Contain("kullanılmadığını göstermez");
+
+        string complete = Words(await RenderAsync(Detail(work, [Empty(
+            Server("SYN-APP01", "Success", "Tam tarandı", 0, "NotFound", "Taranan kaynaklarda bulunmadı (kullanılmıyor demek değildir)"))])));
+        complete.Should().Contain("Taranan kaynaklarda bu hesapla çalışan bileşen bulunmadı").And.Contain("kullanılmadığını göstermez");
+    }
+
     [Theory]
     [InlineData("scanSecretField", "parola veya gizli değer")]
     [InlineData("scanSecretValue", "saklanmadı")]
@@ -128,6 +152,15 @@ public sealed class ServiceAccountUsageScanUiTests
             DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "Sentetik beyan", "Sentetik kullanıcı", DateTimeOffset.UnixEpoch, null,
             DateTimeOffset.UnixEpoch, new UsageScanCoverageView(4, 2, 1, 0, 1, 0, 1, 1, 1, 1), null, servers, items);
     }
+
+    /// <summary>A discovery scan without any match, over the given servers.</summary>
+    private static UsageScanView Empty(params UsageScanServerView[] servers) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), "Discovery", "SYN\\svc_synapp", null, "empty.json", new string('c', 64), "Combined", DateTimeOffset.UnixEpoch,
+            DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "Sentetik beyan", "Sentetik kullanıcı", DateTimeOffset.UnixEpoch, null, DateTimeOffset.UnixEpoch,
+            new UsageScanCoverageView(servers.Length, servers.Count(s => s.Result == "Success"), servers.Count(s => s.Result == "Partial"),
+                servers.Count(s => s.Result == "Failed"), servers.Count(s => s.Result == "Unreachable"), servers.Count(s => s.Result == "NoResult"), 0,
+                servers.Count(s => s.Outcome == "NotFound"), servers.Count(s => s.Outcome == "Uncertain"), servers.Count(s => s.Outcome == "NotCovered")),
+            null, servers, []);
 
     private static UsageScanView Check()
     {

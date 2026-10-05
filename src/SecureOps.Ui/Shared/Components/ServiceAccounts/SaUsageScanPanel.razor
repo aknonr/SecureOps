@@ -131,7 +131,8 @@
         <h3 class="sa-scan-subtitle">Bu hesabın bulunduğu bileşenler (@former.Length)</h3>
         @if (former.Length == 0)
         {
-            <p class="so-panel-text--sm">Taranan kaynaklarda bu hesapla çalışan bileşen bulunmadı. Bu, hesabın kullanılmadığını göstermez.</p>
+            @* "Not found" only for the servers that were fully scanned; with none, nothing is known (SPEC rule 15). *@
+            <p class="so-panel-text--sm">@NoMatchText(scan.Coverage, gaps.Length)</p>
         }
         else
         {
@@ -315,6 +316,13 @@
 
     private static string CoverageLabel(UsageScanCoverageView c) =>
         c.Success == c.Planned ? $"{c.Planned} sunucunun tamamı tam tarandı" : $"{c.Planned} sunucudan {c.Success} tanesi tam tarandı";
+
+    private static string NoMatchText(UsageScanCoverageView c, int gaps) =>
+        c.Success == 0
+            ? "Hiçbir sunucu tam taranmadı; bu hesabın bu sunucularda çalışıp çalışmadığı bilinmiyor. Eksik sunucuları yeniden tarayın."
+            : gaps == 0
+                ? "Taranan kaynaklarda bu hesapla çalışan bileşen bulunmadı. Bu, hesabın kullanılmadığını göstermez."
+                : $"Tam taranan {c.Success} sunucuda bu hesapla çalışan bileşen bulunmadı; {gaps} sunucu için sonuç eksik. Bu, hesabın kullanılmadığını göstermez.";
 
     private static string ScanTimes(UsageScanView scan) => scan.FirstScannedAt is null
         ? "Hiçbir sunucudan sonuç gelmedi"
