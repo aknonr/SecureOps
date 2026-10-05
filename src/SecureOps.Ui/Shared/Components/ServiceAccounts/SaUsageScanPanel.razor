@@ -173,7 +173,8 @@
             </MudTable>
         }
 
-        @if (_selected is { } item && former.Any(i => i.Id == item.Id))
+        @* Only while the item is still undecided in the server's current view: after a 409 the reloaded decision is shown instead. *@
+        @if (_selected is { } item && former.Any(i => i.Id == item.Id && i.Decision is null))
         {
             <div class="sa-scan-decision mt-2" role="group" aria-label="Seçili bileşen için karar">
                 <p class="so-panel-text"><strong>Seçili bileşen:</strong> @item.ServerName · @item.ComponentTypeLabel · @item.ComponentName</p>

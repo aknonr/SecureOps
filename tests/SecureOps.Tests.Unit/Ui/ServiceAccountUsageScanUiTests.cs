@@ -125,6 +125,18 @@ public sealed class ServiceAccountUsageScanUiTests
     }
 
     [Fact]
+    public void AlreadyDecided_ReloadsAsAConflict_AndTheDecisionBoxClosesForADecidedItem()
+    {
+        // Windows 2026-10-05: a second decision is 409 ServiceAccountUsageScanAlreadyDecided; the page reloads (conflict) and the
+        // stale decision box must not stay open for an item that now has a decision.
+        UiProblem problem = UiProblemFactory.FromResponse(409, new ProblemDetailsPayload { Code = "ServiceAccountUsageScanAlreadyDecided", Fields = ["alreadyDecided"] });
+        (problem.Kind, problem.Title).Should().Be((UiProblemKind.Conflict, "Karar zaten verilmiş"));
+        ServiceAccountProblems.FieldMessage(problem).Should().Contain("karar zaten verilmiş");
+        File.ReadAllText(Path.Combine(Root(), "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaUsageScanPanel.razor"))
+            .Should().Contain("former.Any(i => i.Id == item.Id && i.Decision is null)");
+    }
+
+    [Fact]
     public void ScanPanel_GivesItsButtonsAVisibleKeyboardFocusRing()
     {
         // Measured in the live app: MudBlazor text buttons ("Karar ver") drew no focus indicator; keyboard focus must be visible.
