@@ -101,13 +101,13 @@ public static partial class UsageScanParser
     private static readonly string[] _verificationFields = ["ExpectedAccount", "Status", "RunningAsGmsa", "StillFormerAccount"];
     private static readonly string[] _notReachedFields = ["serverName", "reason"];
 
-    [GeneratedRegex(@"^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,14}\\)?[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}\$?$", RegexOptions.CultureInvariant, 100)]
+    [GeneratedRegex(@"^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,14}\\)?[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}\$?\z", RegexOptions.CultureInvariant, 100)]
     private static partial Regex AccountPattern();
 
-    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$", RegexOptions.CultureInvariant, 100)]
+    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9.-]{0,252}\z", RegexOptions.CultureInvariant, 100)]
     private static partial Regex ServerPattern();
 
-    [GeneratedRegex(@"(?:Z|[+-]\d{2}:\d{2})$", RegexOptions.CultureInvariant, 100)]
+    [GeneratedRegex(@"(?:Z|[+-]\d{2}:\d{2})\z", RegexOptions.CultureInvariant, 100)]
     private static partial Regex OffsetSuffix();
 
     /// <summary>

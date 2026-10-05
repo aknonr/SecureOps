@@ -146,6 +146,28 @@ public sealed class UsageScanParserTests
         timer.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
     }
 
+    // Review 2026-10-05: in .NET "$" also matches before a final line feed, so a name ending in "\n" passed the patterns.
+    [Fact]
+    public void NamesEndingInALineFeed_AreNotTheContract()
+    {
+        JsonNode server = Example();
+        server["plannedServers"]![0] = "SYN-APP01\n";
+        server["results"]![0]!["serverName"] = "SYN-APP01\n";
+        Code(Bytes(server)).Should().Be(UsageScanFileCodes.Schema);
+
+        JsonNode account = Example();
+        account["accounts"]![0] = "SYN\\svc_synapp\n";
+        Code(Bytes(account)).Should().Be(UsageScanFileCodes.Schema);
+
+        JsonNode matched = Example();
+        matched["results"]![0]!["components"]![0]!["MatchedAccount"] = "SYN\\svc_synapp\n";
+        Code(Bytes(matched)).Should().Be(UsageScanFileCodes.Schema);
+
+        JsonNode date = Example();
+        date["generatedAt"] = date["generatedAt"]!.GetValue<string>() + "\n";
+        Code(Bytes(date)).Should().Be(UsageScanFileCodes.Schema);
+    }
+
     [Fact]
     public void Contract_IsClosed_AndDuplicatesDepthAndSizeFailClosed()
     {
