@@ -66,6 +66,24 @@ public sealed class ServiceAccountUsageScanUiTests
         html.Should().NotContain("Karar ver").And.Contain("Karar bekliyor (hesaptan sorumlu ekip)");
     }
 
+    [Theory]
+    [InlineData(2, 25, 25, 1)]   // 25 undecided left, the person was on page 2 and decided one more
+    [InlineData(2, 26, 25, 2)]   // still a page 2 with one row
+    [InlineData(3, 50, 25, 2)]   // 51 -> 50: page 3 vanished
+    [InlineData(3, 0, 25, 1)]    // nothing undecided left: page 1 with the honest "none left" text
+    [InlineData(1, 10, 25, 1)]
+    public void ClampPage_PullsBackToTheLastPageWithRows(int page, int total, int size, int expected) =>
+        ServiceAccountUiText.ClampPage(page, total, size).Should().Be(expected);
+
+    [Fact]
+    public void RefreshAfterADecision_ClampsThePageInsteadOfShowingAnEmptyRange()
+    {
+        // A decision removes an item from "undecided only"; the refresh must go back to the last page that has rows
+        // (no "26–25 / 25" range and no false "no undecided component left" on a page past the end).
+        string source = File.ReadAllText(Path.Combine(Root(), "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaUsageScanPanel.razor"));
+        source.Should().Contain("ServiceAccountUiText.ClampPage(view.Page, data.Total, data.PageSize)");
+    }
+
     [Fact]
     public async Task Viewer_SeesEvidenceButNoCommand()
     {

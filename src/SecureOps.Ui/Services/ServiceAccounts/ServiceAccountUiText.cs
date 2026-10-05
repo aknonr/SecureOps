@@ -100,6 +100,12 @@ public static class ServiceAccountUiText
             : $"İstenen gMSA adı {length} karakter (domain öneki, UPN eki ve sondaki $ hariç). Active Directory en çok {GmsaNameLimit} karakter kabul eder; bu ad kısaltılır veya oluşturulamaz. Sunucu bu adı kaydetmez, daha kısa bir ad yazın.";
     }
 
+    /// <summary>
+    /// The last page that still has rows when the list shrank (a decision removes an item from "undecided only"): the page a
+    /// person was on is pulled back instead of showing an empty page or a range such as "26–25 / 25". At least 1.
+    /// </summary>
+    public static int ClampPage(int page, int total, int pageSize) => Math.Max(1, Math.Min(page, (Math.Max(0, total) + pageSize - 1) / pageSize));
+
     /// <summary>Helper text under a requested gMSA name field: the counted length against the limit.</summary>
     public static string RequestedGmsaNameHelper(string? requestedName) =>
         $"{SecureOps.Domain.ServiceAccounts.ServiceAccountGmsaName.Length(requestedName)}/{GmsaNameLimit} karakter (domain öneki, UPN eki ve sondaki $ sayılmaz)";

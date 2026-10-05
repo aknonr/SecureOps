@@ -352,7 +352,22 @@
         {
             if (LoadItems is not null && await LoadItems(link, role, view.PendingOnly, view.Page) is { } data)
             {
-                _views[(link, role)] = view with { Data = data };
+                // The list may have shrunk (a decision leaves "undecided only"): go back to the last page that still has rows.
+                ItemView next = view with { Data = data };
+                int page = ServiceAccountUiText.ClampPage(view.Page, data.Total, data.PageSize);
+                if (page != view.Page && await LoadItems(link, role, view.PendingOnly, page) is { } clamped)
+                {
+                    next = view with { Page = page, Data = clamped };
+                }
+
+                if (next.IsDefault)
+                {
+                    _views.Remove((link, role));
+                }
+                else
+                {
+                    _views[(link, role)] = next;
+                }
             }
         }
     }
