@@ -227,6 +227,26 @@ else
     </section>
 }
 
+@if (Report.GmsaNames is { } gmsaNames)
+{
+    <section class="so-panel" aria-labelledby="sa-report-gmsa-names">
+        <h2 id="sa-report-gmsa-names" class="so-panel-title">İstenen gMSA adları (@gmsaNames.Count)</h2>
+        <p class="so-panel-text--sm">Açık taleplerde ve gMSA geçiş izlemesinde kaydedilen adlar. Karakter sayısı domain öneki, UPN eki ve sondaki $ hariç; Active Directory en çok @ServiceAccountUiText.GmsaNameLimit karakter kabul eder.</p>
+        @if (gmsaNames.Count == 0) { <SoEmptyState Title="Kayıtlı istenen gMSA adı yok" /> }
+        else
+        {
+            <MudTable Items="gmsaNames" Dense="true" Breakpoint="Breakpoint.Sm" T="GmsaNameLine">
+                <HeaderContent><MudTh>Hesap</MudTh><MudTh>Kaynak</MudTh><MudTh>İstenen gMSA adı</MudTh><MudTh>Karakter</MudTh><MudTh>Durum</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Hesap">@context.Account</MudTd><MudTd DataLabel="Kaynak">@context.Source</MudTd>
+                    <MudTd DataLabel="İstenen gMSA adı"><span class="sa-wrap-anywhere">@context.RequestedName</span></MudTd>
+                    <MudTd DataLabel="Karakter">@($"{context.Length}/{ServiceAccountUiText.GmsaNameLimit}")</MudTd><MudTd DataLabel="Durum">@context.Status</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </section>
+}
+
 @if (Report.Rules is null)
 {
     <p class="so-panel-text--sm">Bu nüsha @Report.MetricDefinitionVersion metrik sürümüyle kaydedildi; kural, huni, trend, risk ve direktörlük bölümleri bu sürümde yoktur.</p>

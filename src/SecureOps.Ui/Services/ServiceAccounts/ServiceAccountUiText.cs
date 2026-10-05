@@ -66,8 +66,8 @@ public static class ServiceAccountUiText
         _ => "Açık"
     };
 
-    /// <summary>Longest gMSA name Active Directory accepts, without the trailing <c>$</c>.</summary>
-    public const int GmsaNameLimit = 15;
+    /// <summary>Longest gMSA name Active Directory accepts, without the trailing <c>$</c> (the shared domain rule).</summary>
+    public const int GmsaNameLimit = SecureOps.Domain.ServiceAccounts.ServiceAccountGmsaName.Limit;
 
     /// <summary>
     /// Advice while typing an account name; never a block (the server and Active Directory decide). The name is counted
@@ -77,10 +77,8 @@ public static class ServiceAccountUiText
     /// </summary>
     public static string? GmsaNameHint(string? accountName)
     {
-        string name = accountName?.Trim() ?? string.Empty;
-        bool gmsa = name.EndsWith('$');
-        string bare = name[(name.LastIndexOf('\\') + 1)..];
-        bare = (bare.IndexOf('@', StringComparison.Ordinal) is var at and >= 0 ? bare[..at] : bare).TrimEnd('$');
+        bool gmsa = SecureOps.Domain.ServiceAccounts.ServiceAccountGmsaName.HasGmsaSuffix(accountName);
+        string bare = SecureOps.Domain.ServiceAccounts.ServiceAccountGmsaName.Bare(accountName);
         if (bare.Length <= GmsaNameLimit)
         {
             return null;
@@ -90,6 +88,21 @@ public static class ServiceAccountUiText
             ? $"gMSA adı {bare.Length} karakter (sondaki $ hariç); Active Directory gMSA adlarını en çok {GmsaNameLimit} karakterle sınırlar, bu ad gMSA olarak oluşturulamayabilir. Kayıt engellenmez; adı sunucu ve Active Directory doğrular."
             : $"Ad {bare.Length} karakter. Bu hesap gMSA'ya dönüştürülecekse yeni gMSA adı (sondaki $ hariç) en çok {GmsaNameLimit} karakter olabilir; daha kısa bir gMSA adı planlayın. Kayıt engellenmez.";
     }
+
+    /// <summary>
+    /// Advice while typing a requested gMSA name (work request or transition), counted by the same rule. Above the limit the
+    /// server refuses the name; the hint says so before sending but never disables the button (the server decides).
+    /// </summary>
+    public static string? RequestedGmsaNameHint(string? requestedName)
+    {
+        int length = SecureOps.Domain.ServiceAccounts.ServiceAccountGmsaName.Length(requestedName);
+        return length <= GmsaNameLimit ? null
+            : $"İstenen gMSA adı {length} karakter (domain öneki, UPN eki ve sondaki $ hariç). Active Directory en çok {GmsaNameLimit} karakter kabul eder; bu ad kısaltılır veya oluşturulamaz. Sunucu bu adı kaydetmez, daha kısa bir ad yazın.";
+    }
+
+    /// <summary>Helper text under a requested gMSA name field: the counted length against the limit.</summary>
+    public static string RequestedGmsaNameHelper(string? requestedName) =>
+        $"{SecureOps.Domain.ServiceAccounts.ServiceAccountGmsaName.Length(requestedName)}/{GmsaNameLimit} karakter (domain öneki, UPN eki ve sondaki $ sayılmaz)";
 
     /// <summary>Reference text (OR/OCO/Jira).</summary>
     public static string References(IReadOnlyList<SecureOps.Shared.Contracts.ServiceAccounts.SaExternalRef> references) =>
