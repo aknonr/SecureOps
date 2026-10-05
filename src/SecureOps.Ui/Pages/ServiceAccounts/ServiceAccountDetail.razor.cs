@@ -118,6 +118,9 @@ public partial class ServiceAccountDetail
         await AfterCommandAsync(saved);
     }
 
+    /// <summary>Opens the tab a next step points to; it only switches the view.</summary>
+    private void OpenTab(int tab) => _tab = tab;
+
     private Task DownloadAsync(Guid evidenceId) => RunAsync(async token => await SaveFileAsync(await Api.DownloadAsync($"/evidence/{evidenceId}", token)));
 
     /// <summary>Success clears section forms; a conflict reloads the authoritative view while keeping typed input.</summary>
