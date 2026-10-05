@@ -3,6 +3,11 @@
 Kime: Bilgi Güvenliği, Siber Güvenlik; bilgi: PAM / BeyondTrust ekibi, AD ekibi, değişiklik kurulu. Kimden: proje sahibi.
 Ayrıntı: ADR-0024 revizyon 2 (okuma) ve ADR-0028 (gMSA'ya geçiş). İki onay **ayrıdır**; okuma tek başına onaylanabilir.
 
+**Durum (2026-10-06):** ADR-0024 R2 sahip kararıyla *Accepted*. Bilgi Güvenliği / Siber Güvenlik ile sunucu sahibi onayı
+(JEA uç noktası kaydı, okuma gMSA'sı) **ALINMADI** ve pilot öncesi şarttır; Worker erişim yolu (doğrudan WinRM+Kerberos
+mı, BeyondTrust mı) **açık soru**. Sahip kararı gereği sunucuda yazma yoktur: aşağıdaki 2. ve 3. talepler (ADR-0028,
+*Proposed*) bu pakette **beklemededir**, şu an istenmiyor; AGENTS.md kural 1 ve 3 değişmez.
+
 ## Ne istiyoruz
 
 | # | Talep | Sunucuda ne değişir | Karar |

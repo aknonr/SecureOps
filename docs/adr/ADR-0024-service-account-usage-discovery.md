@@ -1,10 +1,15 @@
-# ADR-0024: Read-only service account usage discovery (PROPOSED)
+# ADR-0024: Read-only service account usage discovery (Revision 2 ACCEPTED as an owner decision; approvals open)
 
-**Status:** Proposed — draft for review. Not accepted, not implemented, nothing deployed. **Shelved by the project owner on
-2026-10-04** (Bilgi Güvenliği approval and the server pilot are open). The person-run scan and its import are decided
-separately in ADR-0027, which reuses this ADR's read-only functions in a self-contained collector and needs no JEA
-endpoint or Worker job. The JEA/Worker parts below remain proposed only. **Revision 2 (2026-10-06)** at the end of this
-file is the version prepared for the approval decision; it stays shelved until the owner takes it to Bilgi Güvenliği.
+**Status:** **Revision 2 — Accepted (sahip kararı, 2026-10-06).** Read-only scan through a constrained JEA endpoint is the
+chosen direction; the sections above stay valid unless Revision 2 changes them. Nothing is implemented or deployed.
+**Not obtained, and required before any pilot:** (1) Bilgi Güvenliği (and Siber Güvenlik) approval of the JEA endpoint
+registration and of the read gMSA; (2) approval of the target server owners for the pilot list. **Open question:** the
+Worker access path — direct WinRM + Kerberos or through BeyondTrust (PAM team; `docs/15-system-landscape.md`). The
+diagnostic allow-list finding must also be closed by its own ADR before deployment. The owner decision is read-only: no
+write to servers, `AGENTS.md` rules 1 and 3 are unchanged and no exception is added; ADR-0028 stays Proposed.
+Earlier status: shelved by the project owner on 2026-10-04. The person-run scan and its import are decided separately in
+ADR-0027, which reuses this ADR's read-only functions in a self-contained collector and needs no JEA endpoint or Worker
+job; it stays valid for servers without the endpoint.
 **Date:** 2026-10-01 (revision 2: 2026-10-06)
 **Decision makers (required):** project owner; Bilgi Güvenliği and Siber Güvenlik approval (JEA change); target server owners for the pilot list.
 
@@ -153,7 +158,7 @@ list. What it drops: writes, the GUI, per-item SID translation, repeated IIS rea
 3. Codex: Worker job contract, migration number (if the finding/usage link needs a column), OpenAPI.
 4. Synthetic test fixtures only; no real server or account names in the repository.
 
-## Revision 2 (2026-10-06, PROPOSED — prepared for the approval decision)
+## Revision 2 (2026-10-06, ACCEPTED as owner decision; Bilgi Güvenliği / server-owner approvals NOT obtained)
 
 Why now: the team's own tool (analysis in `docs/service-accounts/ops-research/01-script-farki.md`) is fast at reaching
 servers but runs unconstrained sessions, drops servers silently and trusts a stale cache. The project owner wants the
@@ -201,7 +206,7 @@ result says "AD allows; the host has not proven it yet" until a post-change scan
 **R2-5 Audit.** `ServiceAccount.UsageScanRequested` / `…Completed` / `…Cancelled` with counts and the plan hash; server
 names live in the scan record, not in the audit text. JEA transcripts stay on each server.
 
-**R2-6 Approvals needed (unchanged list, made explicit).** Bilgi Güvenliği and Siber Güvenlik: the function, the two
+**R2-6 Approvals needed (unchanged list, made explicit; none obtained as of 2026-10-06, all are pre-pilot conditions).** Bilgi Güvenliği and Siber Güvenlik: the function, the two
 opt-in sources and the gMSA identity; PAM / BeyondTrust team and team lead: the Worker access path (open decision in
 `docs/15-system-landscape.md`; this revision assumes direct WinRM + Kerberos + JEA and does not decide it); server owners:
 the 10–15 server pilot. **Before deployment** the diagnostic allow-list finding above must be closed by its own ADR.

@@ -32,7 +32,7 @@ Aşama A sonunda: aracın "bulma" işlevi kişi çalıştırmalı yolla, toplu p
 |---|---|---|---|---|
 | B1 | Worker erişim yolu kararı (BeyondTrust aracılı / doğrudan WinRM + Kerberos + JEA) | Sahip | — | ⏸ PAM ekibi, Bilgi Güvenliği, takım lideri |
 | B2 | Tanılama izin listesi bulgusunu kapatan ADR (ham `Get-WebConfigurationProperty` / `Get-Content`) | Codex | 1–2 | ⏸ Bilgi Güvenliği |
-| B3 | ADR-0024 güncellemesi ve onay paketi — **taslak yazıldı 2026-10-06** (ADR-0024 R2, 06-onay-paketi.md); sahip götürür | Claude | ✓ | ⏸ Bilgi Güvenliği, Siber Güvenlik |
+| B3 | ADR-0024 R2 **Accepted (sahip kararı, 2026-10-06)**; onay paketi hazır (06-onay-paketi.md), sahip götürür. JEA uç noktası kaydı ve okuma gMSA'sı için güvenlik ve sunucu sahibi onayı **alınmadı**, pilot öncesi şart | Claude ✓ | ⏸ Bilgi Güvenliği, Siber Güvenlik, sunucu sahipleri |
 | B4 | Worker'da genel JEA çalıştırıcı: bağlantı, zaman aşımı, sınırlı paralellik, iptal, sonuç türleri, sahte uygulama (Faz 1 tanılama da kullanır) | **Codex** | 4–6 | B1 |
 | B5 | JEA uç nokta kurulum betiği ve paketleme (`proposed/` → sürüm) | **Codex** | 2–3 | B3 |
 | B6 | Modül tarama işi: Hangfire işi, sunucu bitince sonucu tarama kaydına yaz (`tool = Jea`), canlı ilerleme | Claude | 5–7 | B4 |
@@ -43,7 +43,7 @@ Aşama A sonunda: aracın "bulma" işlevi kişi çalıştırmalı yolla, toplu p
 
 | # | Adım | Sahip | Tahmin | Onay |
 |---|---|---|---|---|
-| C1 | Katalog ADR'si — **taslak yazıldı 2026-10-06** (ADR-0028); **Faz 8 ön koşulu istisnası** sahip + yönetim kararı | Claude ✓ / Sahip | — | ⏸ Sahip + yönetim + Bilgi Güv. + Siber Güv. + değişiklik kurulu |
+| C1 | Katalog ADR'si — taslak yazıldı (ADR-0028, **Proposed kalır**); sahip kararı: sunucuda yazma yok, AGENTS.md kural 1 ve 3 değişmez, istisna eklenmez → **aşama C şimdilik kapalı** | Claude ✓ / Sahip | — | ⏸ Sahip + yönetim + Bilgi Güv. + Siber Güv. + değişiklik kurulu |
 | C2 | Yazma JEA uç noktası tasarımı (beklenen-mevcut kimlik kontrolü, önce/sonra dönüşü) | Claude | 3 | C1 |
 | C3 | Yazma uç noktası kurulumu, ayrı yazma kimliği, imza/paket | **Codex** | 3–4 | C2 |
 | C4 | Değişiklik planı veri modeli, iki kişi onayı, acil durdurma, ekleme-yalnız sonuç tabloları | Claude | 8–10 | C1 |

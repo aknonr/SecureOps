@@ -15,15 +15,17 @@ kullanıcıyı yönlendirerek yapmasını istiyor.
 | [04-tasarim-secenekleri.md](04-tasarim-secenekleri.md) | Erişim ve değişiklik seçenekleri, toplu akış, parola, denetim, hız, arayüz; güvenlik / onay / tahmin |
 | [05-yol-haritasi.md](05-yol-haritasi.md) | Sıralı adımlar, Claude / Codex / sahip, onay bekleyenler işaretli |
 | [06-onay-paketi.md](06-onay-paketi.md) | Bilgi Güvenliği / Siber Güvenlik'e verilecek Türkçe onay paketi |
-| [ADR-0024 revizyon 2](../../adr/ADR-0024-service-account-usage-discovery.md) | Ürün tarafı salt okunur tarama (Worker → WinRM → JEA), onaya hazır hâli |
+| [ADR-0024 revizyon 2](../../adr/ADR-0024-service-account-usage-discovery.md) | Ürün tarafı salt okunur tarama (Worker → WinRM → JEA); **Accepted (sahip, 2026-10-06)**, güvenlik/sunucu sahibi onayı alınmadı |
 | [ADR-0028](../../adr/ADR-0028-service-account-gmsa-switch.md) | Onaylı gMSA'ya geçiş: parola parametresi olmayan yazma uç noktası, plan → önizleme → onay → çalıştırma → doğrulama → geri dönüş |
 
 ## Sahip kararları (2026-10-06)
 
 - **Parola değişimi PAM ekibinin yükümlülüğü;** ürün parola değiştirmez, taşımaz. Ürünün yazması (onaylanırsa) yalnız
   servis / IIS havuzu / görev kimliğini gMSA'ya çevirmekle sınırlı önerildi (ADR-0028).
-- "Aracın yaptığını en iyi şekilde yapalım": okuma (ADR-0024 R2) ve gMSA geçişi (ADR-0028) onaya hazır taslak olarak
-  yazıldı; ikisi de onay gelene kadar **uygulanmaz**.
+- **Sunucuda yazma yok.** AGENTS.md kural 1 ve 3 değişmez, istisna eklenmez; ADR-0028 *Proposed* kalır.
+- **ADR-0024 R2 (salt okunur JEA ile tarama): Accepted (sahip kararı, 2026-10-06).** Bilgi Güvenliği ve sunucu sahibi onayı
+  (JEA uç noktası kaydı, okuma gMSA'sı) **alınmadı**, pilot öncesi şart; Worker erişim yolu (doğrudan WinRM+Kerberos mı,
+  BeyondTrust mı) açık soru. Onay gelene kadar kod/dağıtım yok.
 
 ## Bir paragrafta öneri
 
@@ -39,7 +41,7 @@ uygulama, yeniden okumayla doğrulama). Klasik parola döndürme ürüne alınma
    yönetimden Faz 8 ön koşul istisnası istenecek mi? İstenmezse değiştirme insanda kalır (aşama A + B).
 2. ~~Klasik parolalar~~ — cevaplandı: PAM'ın yükümlülüğü. Açık kalan: PAM yalnız AD parolasını mı döndürüyor, yoksa
    bağımlı servis/görev/havuzu da güncelliyor mu (D1)? Güncellemiyorsa o iş hâlâ elle yapılıyor demektir.
-3. **ADR-0024 R2 ve onay paketi:** 06-onay-paketi.md ile Bilgi Güvenliği'ne götürülsün mü?
+3. ~~ADR-0024 R2~~ — kabul edildi (sahip). Açık: 06-onay-paketi.md ile Bilgi Güvenliği onayı ve sunucu sahibi onayı alınmadı.
 4. **Worker erişim yolu:** PAM / BeyondTrust ekibine yazışma (sistem haritasındaki açık karar) ne durumda (B1)?
 
 ## Belirsiz kalanlar (doğrulanmadan karar verilmemeli)
