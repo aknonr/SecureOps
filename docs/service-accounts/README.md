@@ -214,7 +214,10 @@ command. Page loads are serialized so a concurrent access refresh cannot drop a 
 single-flight. MudBlazor 6 does not associate its labels with inputs, so `_Host.cshtml` binds the
 existing label by `aria-labelledby` on `.sa-page` fields only. MudBlazor 6.16 expansion-panel headers are a `div` without a tab
 stop, so every collapsible form in the module is `SaDisclosure` (native `details`/`summary`: Tab reaches it, Enter/Space
-toggle it, ▸/▾ shows the state); a render test fails if a module page uses `MudExpansionPanel` again.
+toggle it, ▸/▾ shows the state); a render test fails if a module page uses `MudExpansionPanel` again. Registering an account whose name (without
+`DOMAIN\`, a UPN suffix or the trailing `$`) is longer than 15 characters shows a non-blocking hint: a `$` name cannot be a
+gMSA as typed, any other name needs a shorter gMSA name if it is converted; the server and Active Directory decide. The
+requested gMSA name of a conversion has no field in the API yet (open owner question, review 2026-10-05).
 
 ## Actionable unknowns (not invented)
 
