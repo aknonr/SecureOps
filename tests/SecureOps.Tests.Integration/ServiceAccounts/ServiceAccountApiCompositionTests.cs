@@ -3,12 +3,16 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Api.Security;
+using SecureOps.Api.ServiceAccounts;
 using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Access;
+using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
@@ -98,6 +102,50 @@ public sealed class ServiceAccountApiCompositionTests
     }
 
     [Fact]
+    public async Task UsageScanRoutes_NeedTheWorkCapability_AndBoundTheUpload()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using (HttpClient anonymous = factory.CreateClient())
+        {
+            using MultipartFormDataContent form = [];
+            form.Add(new ByteArrayContent("{}"u8.ToArray()), "file", "scan.json");
+            (await anonymous.PostAsync($"/api/v1/service-accounts/accounts/{Guid.NewGuid()}/usage-scans", form)).StatusCode
+                .Should().Be(HttpStatusCode.Unauthorized);
+        }
+
+        RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText?.Contains("usage-scan", StringComparison.Ordinal) == true)];
+        endpoints.Select(e => e.RoutePattern.RawText).Should().BeEquivalentTo(
+        [
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scans",
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage",
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/dismiss"
+        ], "evidence is attached and decided per account; there is no scan start, list or download route");
+        foreach (RouteEndpoint endpoint in endpoints)
+        {
+            endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.Work);
+            endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods.Should().Equal("POST");
+        }
+
+        endpoints.Single(e => e.RoutePattern.RawText!.EndsWith("usage-scans", StringComparison.Ordinal)).Metadata
+            .GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize.Should().Be(5L * 1024 * 1024);
+    }
+
+    [Fact]
+    public void SecondScanDecision_IsA409Conflict_NamingTheRule()
+    {
+        ControllerBase controller = new Probe { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+
+        ObjectResult result = ServiceAccountReplies.Reply(controller, SaResult<AccountDetail>.Fail(SaErrors.AlreadyDecided, "alreadyDecided")).Result
+            .Should().BeOfType<ObjectResult>().Subject;
+
+        result.StatusCode.Should().Be(StatusCodes.Status409Conflict, "the item was decided before; the request itself is valid");
+        ProblemDetails problem = result.Value.Should().BeAssignableTo<ProblemDetails>().Subject;
+        problem.Extensions["code"].Should().Be(SaErrors.AlreadyDecided);
+        problem.Extensions["field"].Should().Be("alreadyDecided");
+    }
+
+    [Fact]
     public void EveryModuleEndpoint_RequiresAModuleCapabilityPolicy()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
@@ -137,4 +185,6 @@ public sealed class ServiceAccountApiCompositionTests
         (await repository.DecideRequestAsync(ensured.PendingRequest!.Id, AccessRequestStatus.Approved, ensured.PendingRequest.Version, "system:test-seed",
             [role], "Synthetic platform role fixture.", CancellationToken.None)).Disposition.Should().Be(AccessMutationDisposition.Applied);
     }
+
+    private sealed class Probe : ControllerBase;
 }

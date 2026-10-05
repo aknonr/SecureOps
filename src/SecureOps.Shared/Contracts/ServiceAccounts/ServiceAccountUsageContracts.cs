@@ -54,3 +54,39 @@ public sealed record DirectoryNameMatch(string DisplayName, string Account, stri
 
 /// <summary>Search answer; <c>Truncated</c> asks the caller to refine the query instead of paging the directory.</summary>
 public sealed record DirectoryNameSearchResponse(IReadOnlyList<DirectoryNameMatch> Matches, bool Truncated, int MinimumLetters, int MaximumResults);
+
+/// <summary>
+/// A usage scan attached to this account (ADR-0027): evidence a person produced under their own authority. Only the items
+/// matched to this account's searched name and the per-server coverage are included; nothing here closes, frees or
+/// verifies the account.
+/// </summary>
+public sealed record UsageScanView(Guid ScanId, Guid LinkId, string Purpose, string MatchedAccount, string? ExpectedAccount, string FileName, string Sha256,
+    string Tool, DateTimeOffset CombinedAt, DateTimeOffset? FirstScannedAt, DateTimeOffset? LastScannedAt, string RunStatement, string UploadedBy,
+    DateTimeOffset UploadedAt, Guid? RequestId, DateTimeOffset LinkedAt, UsageScanCoverageView Coverage, UsageScanGmsaView? Gmsa,
+    IReadOnlyList<UsageScanServerView> Servers, IReadOnlyList<UsageScanItemView> Items);
+
+/// <summary>Planned servers by result and by what the scan says about this account.</summary>
+public sealed record UsageScanCoverageView(int Planned, int Success, int Partial, int Failed, int Unreachable, int NoResult, int Found, int NotFound,
+    int Uncertain, int NotCovered);
+
+/// <summary>Derived gMSA conversion evidence for this account (never a verification).</summary>
+public sealed record UsageScanGmsaView(string ExpectedAccount, string Conclusion, string ConclusionLabel, int StillFormerServers, int RunsAsGmsaServers,
+    int NoComponentServers, int UnknownServers);
+
+/// <summary>One planned server; <c>Outcome</c> is Found / NotFound / Uncertain / NotCovered for this account.</summary>
+public sealed record UsageScanServerView(string ServerName, string Result, string ResultLabel, string? WindowsServices, string? ScheduledTasks, string? Iis,
+    DateTimeOffset? ScannedAt, string? Warnings, int Matches, string Outcome, string OutcomeLabel, string? GmsaState, string? GmsaStateLabel);
+
+/// <summary>
+/// One matched component. <c>Role</c> is <c>Former</c> (runs as this account) or <c>Expected</c> (runs as the expected gMSA).
+/// A person may turn a Former item into a usage record or dismiss it with a reason; <c>Decision</c> is null until then.
+/// </summary>
+public sealed record UsageScanItemView(Guid Id, string ServerName, string Role, string ComponentType, string ComponentTypeLabel, string ComponentName,
+    string ConfiguredIdentity, string? State, string? Detail, string SuggestedKind, string? Decision, Guid? UsageId, string? DecisionReason,
+    DateTimeOffset? DecidedAt);
+
+/// <summary>Records a matched component as a usage (the person chooses the kind; same rules as a manual usage).</summary>
+public sealed record RecordScanUsageRequest(string Kind, string? DatabaseEngine = null, bool? NeedVerified = null, string? Notes = null);
+
+/// <summary>Leaves a matched component out of the usage records, with a reason (kept as a decision).</summary>
+public sealed record DismissScanItemRequest(string Reason);

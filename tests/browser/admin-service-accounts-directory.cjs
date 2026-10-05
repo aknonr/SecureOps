@@ -36,7 +36,7 @@ const out = path.resolve(process.argv[6]);
         await signIn(adminPage, adminUi); await signIn(ordinaryPage, ordinaryUi);
         await step('Admin opens module and administrative pages without silently acquiring data scope', async () => {
             await navigate(adminPage, adminUi, 'service-accounts');
-            await adminPage.getByText('Size henüz bir kurum veya ekip kapsamı atanmadı; liste boş görünür.').waitFor();
+            await adminPage.getByRole('heading', { name: 'Önce veri kapsamınız tanımlanmalı', exact: true }).waitFor();
             await capture(adminPage, out, 'admin-no-scope');
             await navigate(adminPage, adminUi, 'service-accounts/admin');
             await adminPage.getByText('Kapsam yetkileri', { exact: true }).first().waitFor();

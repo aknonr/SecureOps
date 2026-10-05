@@ -15,30 +15,14 @@
     font-weight: 600;
 }
 
-.sa-bars td:nth-child(2) {
-    min-width: 12rem;
-    white-space: nowrap;
-}
-
-/* Single-series magnitude: one hue, thin rounded bar; the value is always printed beside it. */
-.sa-bar {
-    display: inline-block;
-    width: calc(var(--sa-bar) * 0.7);
-    min-width: 2px;
-    max-width: 70%;
-    height: 0.6rem;
-    margin-right: 0.5rem;
-    border-radius: 0 4px 4px 0;
-    background: var(--mud-palette-primary);
-    vertical-align: middle;
-}
-
 .sa-bar-value {
     font-variant-numeric: tabular-nums;
 }
 
-@media (forced-colors: active) {
-    .sa-bar {
-        background: CanvasText;
-    }
+/* Charts sit two to a row on wide screens and stack on a phone; min() keeps a single column from overflowing at 390 px. */
+.sa-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+    gap: 1.5rem 2rem;
+    margin-top: 1rem;
 }

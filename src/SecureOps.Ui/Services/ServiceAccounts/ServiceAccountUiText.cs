@@ -66,6 +66,31 @@ public static class ServiceAccountUiText
         _ => "Açık"
     };
 
+    /// <summary>Longest gMSA name Active Directory accepts, without the trailing <c>$</c>.</summary>
+    public const int GmsaNameLimit = 15;
+
+    /// <summary>
+    /// Advice while typing an account name; never a block (the server and Active Directory decide). The name is counted
+    /// without a <c>DOMAIN\</c> prefix, a UPN suffix or the trailing <c>$</c>. Above 15 characters a <c>$</c> name cannot be
+    /// a gMSA as typed; any other name is valid as a user account, so the hint only asks for a shorter name for a planned
+    /// gMSA conversion. Null when there is nothing to say.
+    /// </summary>
+    public static string? GmsaNameHint(string? accountName)
+    {
+        string name = accountName?.Trim() ?? string.Empty;
+        bool gmsa = name.EndsWith('$');
+        string bare = name[(name.LastIndexOf('\\') + 1)..];
+        bare = (bare.IndexOf('@', StringComparison.Ordinal) is var at and >= 0 ? bare[..at] : bare).TrimEnd('$');
+        if (bare.Length <= GmsaNameLimit)
+        {
+            return null;
+        }
+
+        return gmsa
+            ? $"gMSA adı {bare.Length} karakter (sondaki $ hariç); Active Directory gMSA adlarını en çok {GmsaNameLimit} karakterle sınırlar, bu ad gMSA olarak oluşturulamayabilir. Kayıt engellenmez; adı sunucu ve Active Directory doğrular."
+            : $"Ad {bare.Length} karakter. Bu hesap gMSA'ya dönüştürülecekse yeni gMSA adı (sondaki $ hariç) en çok {GmsaNameLimit} karakter olabilir; daha kısa bir gMSA adı planlayın. Kayıt engellenmez.";
+    }
+
     /// <summary>Reference text (OR/OCO/Jira).</summary>
     public static string References(IReadOnlyList<SecureOps.Shared.Contracts.ServiceAccounts.SaExternalRef> references) =>
         references.Count == 0 ? "Referans yok" : string.Join(", ", references.Select(r => r.Type + " " + r.Number));

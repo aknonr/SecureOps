@@ -1,0 +1,65 @@
+@* Shown instead of an access error or an empty list when the caller holds the module capabilities but not the data scope
+   the page needs (organization level for import; any scope for the account list and detail).
+   Capabilities (Erişimim) and data scope are separate on purpose; scope is granted by a different module administrator
+   (self-grants are refused by the service and the schema). This panel explains that path; it grants nothing. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+
+<section class="so-panel so-panel--attention sa-scope-setup" aria-labelledby="sa-scope-setup-title">
+    <span class="so-notice-icon so-notice-icon--warn" aria-hidden="true"><MudIcon Icon="@Icons.Material.Filled.ManageAccounts" /></span>
+    <div>
+        <h2 id="sa-scope-setup-title" class="so-panel-title">Önce veri kapsamınız tanımlanmalı</h2>
+        <p class="so-panel-text">
+            @Purpose için yetkileriniz var, ancak hangi kurumların servis hesaplarını görebileceğiniz (veri kapsamı) henüz tanımlı değil.
+            Şu anki kapsamınız: <strong>@Current</strong>. Yetki ile kapsam bilerek ayrı tutulur; kapsamı sizden bağımsız bir modül yöneticisi verir.
+        </p>
+        @if (Bootstrap is { Available: true })
+        {
+            <MudAlert Severity="Severity.Success" Dense="true" Class="my-2">
+                Bu modülde henüz hiç kapsam verilmemiş ve siz modül yöneticisisiniz: <a href="service-accounts/admin">Modül yönetimi → Kapsam yetkileri</a> sekmesindeki
+                <strong>"İlk kapsamı al (bir kez)"</strong> ile kendiniz başlatabilirsiniz. Bu hak yalnız ilk kurulumda ve bir kez vardır.
+            </MudAlert>
+            <p class="so-panel-text--sm">İlk kurulum yapıldıktan sonra diğer kişilere kapsam aşağıdaki gibi verilir:</p>
+        }
+        <ol class="sa-scope-steps">
+            <li>Modül yönetimi yetkisi olan <strong>başka bir yönetici</strong>, Servis Hesapları → <a href="service-accounts/admin">Modül yönetimi</a> → <em>Kapsam yetkileri</em> sekmesini açar.</li>
+            <li>"Kişi" listesinden sizi seçer (liste uygulamaya onaylanmış kullanıcılardır; ayrı bir hesap veya PAM kimliği gerekmez).</li>
+            @if (OrganizationRequired)
+            {
+                <li>İlk kurulumda kapsam türü olarak <strong>Tüm kurum</strong> seçilir; kurumlar ilk aktarımla oluştuğu için bu aşamada başka seçenek boş olabilir. Sonradan kurum bazında daraltılabilir.</li>
+            }
+            else
+            {
+                <li>Kapsam türü olarak sizin <strong>ekibiniz</strong> veya sorumlu olduğunuz <strong>kurum</strong> seçilir. Ekip ve kurum kayıtları henüz yoksa (ilk aktarım yapılmadıysa) <strong>Tüm kurum</strong> seçilir.</li>
+            }
+            <li>Gerekçe yazılıp "Kapsam ver" denir. Ardından aşağıdaki <strong>Kapsamımı yeniden kontrol et</strong> düğmesiyle bu sayfa açılır.</li>
+        </ol>
+        <p class="so-panel-text--sm">Kendinize kapsam veremezsiniz; bu bir hata değil, görevler ayrılığı korumasıdır. Verilen ve geri alınan her kapsam denetim kaydına yazılır.</p>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="OnRecheck">Kapsamımı yeniden kontrol et</MudButton>
+            <MudButton Variant="Variant.Text" Href="access/me" StartIcon="@Icons.Material.Filled.VerifiedUser">Erişimim (yetkiler)</MudButton>
+        </div>
+    </div>
+</section>
+
+@code {
+    /// <summary>Caller's module context; null while unknown.</summary>
+    [Parameter] public ServiceAccountMe? Me { get; set; }
+
+    /// <summary>What the caller wanted to do, e.g. "İçe aktarım".</summary>
+    [Parameter] public string Purpose { get; set; } = "Bu işlem";
+
+    /// <summary>One-time first-grant state; null when the caller is not a module administrator.</summary>
+    [Parameter] public ScopeBootstrapState? Bootstrap { get; set; }
+
+    /// <summary>True when the page needs organization-level scope (import); false when any scope is enough (list, detail).</summary>
+    [Parameter] public bool OrganizationRequired { get; set; } = true;
+
+    /// <summary>Re-reads the caller's scope.</summary>
+    [Parameter] public EventCallback OnRecheck { get; set; }
+
+    private string Current => Me?.ScopeKind switch
+    {
+        "Team" when OrganizationRequired => "yalnız ekip (" + string.Join(", ", Me.Teams.Select(t => t.Label)) + ") — içe aktarım için kurum düzeyi gerekir",
+        _ => "tanımlı değil"
+    };
+}

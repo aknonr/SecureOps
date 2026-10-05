@@ -48,11 +48,13 @@ public static class ServiceAccountReplies
             SaErrors.Forbidden => (403, "authorization", false, "Bu işlem için yetkiniz veya kapsamınız yok."),
             SaErrors.Invalid => (400, "validation", false, "Girilen bilgi geçersiz."),
             SaErrors.ImportFile => (400, "import-file", false, "Dosya kabul edilmedi."),
+            SaErrors.UsageScanFile => (400, "usage-scan-file", false, "Tarama dosyası kabul edilmedi; dosyadan hiçbir şey kaydedilmedi."),
             SaErrors.IdempotencyKey => (400, "validation", false, "İşlem anahtarı eksik."),
             SaErrors.Conflict => (409, "concurrency", true, "Kayıt siz düzenlerken değişti; güncel değerleri inceleyip yeniden kaydedin."),
             SaErrors.PreviewStale => (409, "import-preview", true, "Önizlemeden sonra veri değişti; önizlemeyi yenileyin."),
             SaErrors.DecisionsRequired => (409, "import-decisions", false, "Karar bekleyen satırlar var."),
             SaErrors.AlreadyImported => (409, "import-replay", false, "Bu dosya aynı dönem ve kapsam için zaten aktarıldı."),
+            SaErrors.AlreadyDecided => (409, "usage-scan-decision", false, "Bu bileşen için bu hesapta karar zaten verilmiş."),
             SaErrors.NotConfigured => (503, "configuration", false, "Servis hesapları modülü bu ortamda etkin değil."),
             SaErrors.DirectoryUnavailable => (503, "directory", true, "Dizin sağlayıcısına şu an ulaşılamıyor."),
             _ => (503, "persistence", true, "Kayıt deposuna şu an ulaşılamıyor.")

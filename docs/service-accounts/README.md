@@ -1,5 +1,9 @@
 # Service Accounts Module — Design Note
 
+Owner decision (2026-10-03): Claude owns this module end to end — see "Authority and baseline". SA-003 is numbered
+029 (ADR-0026) and SA-004 (usage scans, ADR-0027) is numbered 030; source inventory is 001-030. Not applied to the
+installed TEST system; see PROGRESS.md.
+
 Owner-approved local successor (2026-10-03): all seven current Service Accounts
 capabilities belong to the genuine protected Admin bundle, with explicit module
 scope and self-grant protections unchanged. New 028 is an additive role-bundle
@@ -22,12 +26,18 @@ on `feature/service-accounts-pinned-integration-20260929`, based on `e997c5b`.
 Not deployed or corporately accepted. Combined Windows evidence and limitations:
 [INTEGRATION-FOLLOWUP-20261001.md](INTEGRATION-FOLLOWUP-20261001.md).
 The canonical requirements register remains [integrated-test-activation.md](../integrated-test-activation.md).
-Business rules: [SPEC.md](SPEC.md). Historical stage evidence: [PROGRESS.md](PROGRESS.md).
+Business rules: [SPEC.md](SPEC.md). Current state: [PROGRESS.md](PROGRESS.md); historical stage evidence: [PROGRESS-HISTORY.md](PROGRESS-HISTORY.md).
 The authority/baseline history below describes the original isolated development,
 not the current integration state.
 
 ## Authority and baseline
 
+- **Owner decision (2026-10-03), supersedes the Codex split below for this module only:** Claude owns the Service
+  Accounts module's backend, API, UI, SQL migration numbering and Windows verification (previously with Codex).
+  The project owner merges and deploys and approves every execution against an installed system; new SQL is tried on
+  a copy of the installed database first. No corporate SQL/AD/Jira/SMTP writes; repository data stays synthetic.
+  Writing automation on managed servers (gMSA conversion) still needs its own ADR and approval (AGENTS.md rules 1, 9).
+  Repository-wide defaults in `AGENTS.md`/`CLAUDE.md` are unchanged outside this module.
 - Scoped owner exception (2026-09-28): Claude implements domain, contracts, infrastructure,
   API, SQL candidate, UI and tests **for this module only**. Codex keeps existing workflows,
   platform architecture, release engineering and final integration. Repository-wide ownership
@@ -39,7 +49,7 @@ not the current integration state.
   `a3037175bb0bb9ecc7ab5c36c7c28607726469ce`. **Codex must reconcile this branch with the
   integrated source before acceptance.** Stale `master` was not used. The integrated branch has
   since been published at `e997c5b68cebcd23716860a9b06fdc25ebbb4493` (tested product `deda848…`);
-  see PROGRESS.md for the read-only reconciliation preview. Nothing was merged or rebased here.
+  see PROGRESS-HISTORY.md for the read-only reconciliation preview. Nothing was merged or rebased here.
 
 ## Reuse decisions (verified paths)
 
@@ -76,7 +86,8 @@ Not reused, with reason:
 | API | `src/SecureOps.Api/Controllers/ServiceAccounts/`, module wiring `src/SecureOps.Api/ServiceAccounts/` |
 | Worker | `src/SecureOps.Worker/ServiceAccounts/` (recurring reminder schedule only) |
 | UI | `src/SecureOps.Ui/Pages/ServiceAccounts/`, `src/SecureOps.Ui/Services/ServiceAccounts/`, `src/SecureOps.Ui/Shared/Components/ServiceAccounts/` |
-| SQL payloads | `sql/pending/service-accounts/` retained includes; numbered discovery through `sql/schema/025-*.sql`, `026-*.sql` and matching migrations; separate grants |
+| SQL payloads | `sql/pending/service-accounts/` retained includes; numbered discovery through `sql/schema/025-*.sql`, `026-*.sql`, `029-*.sql` and matching migrations; separate grants |
+| Usage scan tooling | `scripts/powershell/Get-ServiceAccountUsage.ps1` (collector), `scripts/powershell/Invoke-ServiceAccountUsageScan.ps1` (combine), contracts `service-account-usage(-scan).schema.json`, parser `Infrastructure/ServiceAccounts/UsageScans/` |
 | Tests | `tests/SecureOps.Tests.Unit/ServiceAccounts/`, `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUiTests.cs`, `tests/SecureOps.Tests.Integration/ServiceAccounts/`, `tests/sql/service-accounts/`, `tests/browser/service-accounts.cjs` |
 
 All routes are under `/api/v1/service-accounts/…`.
@@ -99,6 +110,10 @@ Account visibility: `All`; or organization grant covering the account's report o
 or team grant matching the owner team, an open request's target team, or an incoming handover
 target team. Owner-team changes require `Assign` plus organization/All scope; owner-person
 changes within a team require `Assign` plus that team or wider scope.
+
+Usage scans (ADR-0027): attaching a person-run scan needs Work plus the responsible basis, or a participant's own open
+request; deciding a match needs Work plus the responsible basis. Readers see only the matches for the account's own
+searched name and the per-server coverage. See SPEC "Usage scans".
 
 Visibility is not authority (`AccountPermissions.Basis`): organization scope or the owner team is
 *responsible*; a team seeing the account only through its targeted open request or an incoming
@@ -129,6 +144,12 @@ classification, decision), AccountObservations, Evidence (bytes in SQL, scoped d
 ReportSnapshots (immutable payload + exports), ReminderOutbox, History.
 Candidate 2 (`SA-002`): AccountUsages (where an account is used; reasoned exception and removal, never deleted) and
 TeamRoles (SQL teams and the single gMSA executing team; configuration, never access).
+Candidate 3 (`SA-003`, numbered 029, ADR-0026): `ScopeGrants.IsBootstrap`, the self-grant check relaxed only for that one
+row (an "All" grant to its own grantor) and a filtered unique index allowing one bootstrap row ever.
+Candidate 4 (`SA-004`, numbered 030, ADR-0027): UsageScans (uploaded file ≤ 4 MiB + SHA-256, purpose, searched accounts,
+expected gMSA, times, run statement), UsageScanServers (one row per planned server, result and per-source status),
+UsageScanItems (matched components, role Former/Expected), UsageScanLinks (scan → account, optional participant request)
+and UsageScanDecisions (usage recorded / dismissed with reason). All append-only by trigger; runtime SELECT/INSERT only.
 
 Dates: plan/business dates are `date`; events carry `datetimeoffset` only when a real instant is
 known; `TimePrecision` records DateOnly/Instant/Unknown. Source timestamps without a timezone
@@ -161,6 +182,11 @@ XLSX and PDF. Snapshots store the JSON payload, input watermark and metric defin
 XLSX/PDF are rendered from that stored payload only. Exports are text-only; cells starting with
 `= + - @` or control characters are neutralized.
 
+Charts (2026-10-04): `ReportCharts.Build` (Domain) copies chart values from the payload; the reports page (`SaChart`),
+the XLSX (native DrawingML charts on "Yönetici özeti", data on the last sheet "Grafik verisi", cached values) and the PDF
+(a vector chart page after page 1) draw the same list. All three writers stay deterministic and add no runtime package;
+DocumentFormat.OpenXml is a test-only schema validator.
+
 The legacy ownership projection is a labelled figure only: the person named in the legacy inputs
 (proposal or confirmation) plus, for otherwise unassigned accounts, the latest request follow-up
 person. On the supplied package it reproduces 40 + 13 = 53 accounts / 9 people. Confirmed
@@ -181,12 +207,20 @@ until an approved holiday calendar exists. Mail channel is not implemented.
 ## UI
 
 Pages `/service-accounts` (scoped list, filters, multi-account mail), `/service-accounts/{id}`
-(summary, work/actions, ownership, mail, findings, handover/gMSA, evidence, source and history),
+(summary, work/actions, usage and rules, usage scans, ownership, mail, findings, handover/gMSA, evidence, source and history),
 `/service-accounts/work` (reminders and drafts), `/service-accounts/imports`, `/service-accounts/reports`
 and `/service-accounts/admin`. One nav entry gated on `ServiceAccounts.View`; the API decides every
 command. Page loads are serialized so a concurrent access refresh cannot drop a read; commands are
 single-flight. MudBlazor 6 does not associate its labels with inputs, so `_Host.cshtml` binds the
-existing label by `aria-labelledby` on `.sa-page` fields only.
+existing label by `aria-labelledby` on `.sa-page` fields only. MudBlazor 6.16 expansion-panel headers are a `div` without a tab
+stop, so every collapsible form in the module is `SaDisclosure` (native `details`/`summary`: Tab reaches it, Enter/Space
+toggle it, ▸/▾ shows the state); a render test fails if a module page uses `MudExpansionPanel` again. MudTabs headers are
+divs without a tab stop too, so every account and admin tab header holds a `SaTabTitle` button (Enter/Space switch the tab,
+`aria-current` marks the selected one), and every module page gives MudBlazor buttons a 2 px focus ring (they draw none
+on their own). Registering an account whose name (without
+`DOMAIN\`, a UPN suffix or the trailing `$`) is longer than 15 characters shows a non-blocking hint: a `$` name cannot be a
+gMSA as typed, any other name needs a shorter gMSA name if it is converted; the server and Active Directory decide. The
+requested gMSA name of a conversion has no field in the API yet (open owner question, review 2026-10-05).
 
 ## Actionable unknowns (not invented)
 
@@ -195,4 +229,7 @@ existing label by `aria-labelledby` on `.sa-page` fields only.
 - Approved evidence storage/retention (candidate stores bounded bytes in SQL).
 - Approved holiday calendar and reminder periods; corporate sender for any future mail.
 - Team return (PAAS) file headers: generic mapping until a sample arrives.
-- Migration number reservation and DBA grants (see PROGRESS.md handoff).
+- DBA grants and execution of 029 and 030 (with `SA-004-API-permissions.sql`) on the installed system (owner approval
+  pending; see PROGRESS.md).
+- How the team reaches many servers with the collector is their own approved practice; a product-side fan-out over the
+  default WinRM endpoint would be an exception to AGENTS.md rule 3 and needs an owner decision and its own ADR.

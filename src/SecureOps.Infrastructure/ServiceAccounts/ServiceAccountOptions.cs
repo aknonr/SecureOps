@@ -15,6 +15,9 @@ public sealed class ServiceAccountOptions
     /// <summary>Maximum evidence file size in bytes.</summary>
     public int MaxEvidenceBytes { get; set; } = 10 * 1024 * 1024;
 
+    /// <summary>Maximum usage-scan upload size in bytes (ADR-0027).</summary>
+    public int MaxUsageScanBytes { get; set; } = 4 * 1024 * 1024;
+
     /// <summary>Reminder rules (explicit calendar days only; business days need an approved holiday calendar).</summary>
     public ServiceAccountReminderOptions Reminders { get; set; } = new();
 

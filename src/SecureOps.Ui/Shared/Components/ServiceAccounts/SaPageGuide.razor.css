@@ -1,0 +1,119 @@
+.sa-guide {
+    margin: 0 0 var(--so-space-4);
+    border: 1px solid var(--so-border);
+    border-radius: 8px;
+    background: var(--so-surface);
+}
+
+.sa-guide-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2) var(--so-space-3);
+    padding: var(--so-space-2) var(--so-space-3);
+}
+
+.sa-guide-icon {
+    display: inline-flex;
+    color: var(--so-accent-strong);
+}
+
+.sa-guide-flow {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-1) 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sa-guide-step {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.82rem;
+    color: var(--so-text);
+}
+
+.sa-guide-step + .sa-guide-step::before {
+    content: "→";
+    margin: 0 6px;
+    color: var(--so-text-muted);
+}
+
+.sa-guide-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 4px;
+    border-radius: 999px;
+    /* One step lit at a time: every pill runs the same cycle, offset by its index; the lit window (15%) is shorter
+       than one step's share of the cycle for up to six steps, so two pills are never lit together. */
+    animation: sa-guide-pulse calc(var(--sa-guide-steps) * 1.6s) infinite;
+    animation-delay: calc(var(--sa-guide-index) * 1.6s);
+}
+
+.sa-guide-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--so-accent-strong) 14%, transparent);
+    color: var(--so-accent-strong);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+@keyframes sa-guide-pulse {
+    0%, 15% {
+        background: color-mix(in srgb, var(--so-accent-strong) 16%, transparent);
+        font-weight: 600;
+    }
+
+    16%, 100% {
+        background: transparent;
+        font-weight: 400;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sa-guide-pill {
+        animation: none;
+    }
+}
+
+/* MudButton renders its own element, so the isolated rule must reach it with ::deep. */
+.sa-guide-strip ::deep .sa-guide-toggle {
+    margin-left: auto;
+}
+
+.sa-guide-body {
+    padding: 0 var(--so-space-4) var(--so-space-3);
+    border-top: 1px solid var(--so-border-soft);
+    font-size: 0.88rem;
+}
+
+.sa-guide-purpose {
+    margin: var(--so-space-3) 0 var(--so-space-2);
+}
+
+.sa-guide-details {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.sa-guide-details li {
+    margin-bottom: var(--so-space-1);
+}
+
+.sa-guide-never {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin: var(--so-space-2) 0 0;
+    color: var(--so-text-muted);
+}

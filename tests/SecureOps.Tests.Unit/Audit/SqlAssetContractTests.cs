@@ -63,7 +63,9 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(28)
+            .And.HaveCount(30)
+            .And.ContainSingle(name => name == "030-service-account-usage-scans.sql")
+            .And.ContainSingle(name => name == "029-service-account-scope-bootstrap.sql")
             .And.ContainSingle(name => name == "028-admin-service-account-operations.sql")
             .And.ContainSingle(name => name == "027-admin-service-account-navigation.sql")
             .And.ContainSingle(name => name == "026-service-account-usage-rules.sql")
@@ -289,6 +291,50 @@ public sealed class SqlAssetContractTests
             .And.NotContain("INSERT INTO security.RoleAssignments")
             .And.NotContain("ALTER ROLE")
             .And.NotContain("UPDATE audit.AuditLog");
+    }
+
+    [Fact]
+    public void ScopeBootstrapMigration_IncludesReviewedCandidateOnceAndKeepsSelfGrantGuard()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "029-service-account-scope-bootstrap.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "029-service-account-scope-bootstrap.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-003-scope-bootstrap.sql"));
+
+        migration.Should().Contain(":r ../schema/029-service-account-scope-bootstrap.sql");
+        schema.Should().Contain("svcacct.ScopeGrants")
+            .And.Contain("requires reviewed 025/026")
+            .And.Contain(":r ../pending/service-accounts/SA-003-scope-bootstrap.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay")
+            .And.Contain("(IsBootstrap = 0 AND UserId <> GrantedBy)")
+            .And.Contain("IsBootstrap = 1 AND UserId = GrantedBy AND ScopeKind = 'All'")
+            .And.Contain("CREATE UNIQUE INDEX UX_SaScopeGrants_OneBootstrap ON svcacct.ScopeGrants(IsBootstrap) WHERE IsBootstrap = 1")
+            .And.NotContain("INSERT INTO svcacct.ScopeGrants")
+            .And.NotContain("DELETE FROM")
+            .And.NotContain("ALTER ROLE");
+    }
+
+    [Fact]
+    public void UsageScanMigration_IncludesReviewedCandidateOnce_IsAppendOnly_AndHasNoSecretColumn()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "030-service-account-usage-scans.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "030-service-account-usage-scans.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-004-usage-scans.sql"));
+        string grants = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-004-API-permissions.sql"));
+
+        migration.Should().Contain(":r ../schema/030-service-account-usage-scans.sql");
+        schema.Should().Contain("requires reviewed 025/026").And.Contain(":r ../pending/service-accounts/SA-004-usage-scans.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay");
+        foreach (string table in new[] { "UsageScans", "UsageScanServers", "UsageScanItems", "UsageScanLinks", "UsageScanDecisions" })
+        {
+            candidate.Should().Contain($"CREATE TABLE svcacct.{table}(");
+            candidate.Should().MatchRegex($@"CREATE TRIGGER svcacct\.TR_Sa\w+_Immutable ON svcacct\.{table} AFTER UPDATE, DELETE");
+            grants.Should().Contain($"GRANT SELECT, INSERT ON OBJECT::svcacct.{table} TO svcacct_api_runtime;");
+        }
+
+        candidate.Should().NotContainEquivalentOf("password").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("ALTER ROLE");
+        grants.Should().NotContain("UPDATE").And.NotContain("DELETE").And.NotContain("ALTER ROLE");
     }
 
     private static string FindRepositoryRoot()

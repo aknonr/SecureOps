@@ -25,6 +25,8 @@ public sealed partial class ServiceAccountService
     {
         Guid id = detail.Summary.Id;
         IReadOnlyList<UsageView> usages = await repository!.UsagesAsync(id, cancellationToken);
+        (IReadOnlyList<UsageScanView>? scans, int scanTotal) = await repository.UsageScansAsync(id, cancellationToken);
+        detail = detail with { UsageScans = scans, UsageScanTotal = scanTotal };
         (ReportFacts facts, _) = await repository.ReportFactsAsync(_accountOnlyScope, null, null, Thresholds, id, cancellationToken);
         Dictionary<Guid, AccountRuleEvaluation> rules = ServiceAccountInsights.Evaluate(facts, facts.Insights!);
         if (!rules.TryGetValue(id, out AccountRuleEvaluation? rule))
@@ -49,33 +51,43 @@ public sealed partial class ServiceAccountService
         CancellationToken cancellationToken) =>
         MutateAccountAsync(principal, context, accountId, ServiceAccountCapabilities.Work, p => p.Work, (caller, _) =>
         {
-            if (!Enum.TryParse(request.Kind, false, out UsageKind kind) || !Enum.IsDefined(kind))
-            {
-                return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "kind"));
-            }
-
-            DatabaseEngine? engine = null;
-            if (kind == UsageKind.Database)
-            {
-                if (!Enum.TryParse(request.DatabaseEngine ?? nameof(DatabaseEngine.Unknown), false, out DatabaseEngine parsed) || !Enum.IsDefined(parsed))
-                {
-                    return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "databaseEngine"));
-                }
-
-                engine = parsed;
-            }
-
-            string? invalid = kind != UsageKind.Database && request.DatabaseEngine is not null ? "databaseEngine"
-                : kind != UsageKind.WindowsService && request.NeedVerified is not null ? "needVerified"
-                : !ValidText(request.Server, 256) ? "server"
+            (UsageKind kind, DatabaseEngine? engine, bool? needVerified, string? invalid) = UsageFields(request.Kind, request.DatabaseEngine, request.NeedVerified);
+            invalid ??= !ValidText(request.Server, 256) ? "server"
                 : !ValidText(request.Component, 256) ? "component"
                 : !ValidText(request.Notes, 1000) ? "notes"
                 : null;
             return invalid is not null
                 ? Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, invalid))
-                : repository!.CreateUsageAsync(accountId, kind, engine, kind == UsageKind.WindowsService ? request.NeedVerified ?? false : null, request,
-                    caller.Actor, cancellationToken);
+                : repository!.CreateUsageAsync(accountId, kind, engine, needVerified, request, caller.Actor, cancellationToken);
         }, cancellationToken);
+
+    /// <summary>
+    /// Kind and kind-specific fields of a usage, the same for a manual usage and one recorded from a scan: engine only for a
+    /// database (default Unknown), the need flag only for a Windows service (default false).
+    /// </summary>
+    private static (UsageKind Kind, DatabaseEngine? Engine, bool? NeedVerified, string? Invalid) UsageFields(string kindText, string? engineText, bool? needVerified)
+    {
+        if (!Enum.TryParse(kindText, false, out UsageKind kind) || !Enum.IsDefined(kind))
+        {
+            return (default, null, null, "kind");
+        }
+
+        DatabaseEngine? engine = null;
+        if (kind == UsageKind.Database)
+        {
+            if (!Enum.TryParse(engineText ?? nameof(DatabaseEngine.Unknown), false, out DatabaseEngine parsed) || !Enum.IsDefined(parsed))
+            {
+                return (kind, null, null, "databaseEngine");
+            }
+
+            engine = parsed;
+        }
+
+        string? invalid = kind != UsageKind.Database && engineText is not null ? "databaseEngine"
+            : kind != UsageKind.WindowsService && needVerified is not null ? "needVerified"
+            : null;
+        return (kind, engine, kind == UsageKind.WindowsService ? needVerified ?? false : null, invalid);
+    }
 
     /// <summary>Updates an active usage at the expected version.</summary>
     public Task<SaResult<AccountDetail>> UpdateUsageAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id, UpdateUsageRequest request,

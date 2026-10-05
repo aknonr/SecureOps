@@ -9,10 +9,13 @@ namespace SecureOps.Ui.Pages.ServiceAccounts;
 public partial class ServiceAccountDetail
 {
     private AccountDetail? _detail;
+    private ServiceAccountMe? _me;
+    private ScopeBootstrapState? _bootstrap;
     private IReadOnlyList<OrganizationView> _organizations = [];
     private bool _directoryRequested;
     private IReadOnlyList<TeamView> _teams = [];
     private int _revision;
+    private int _tab;
     private Guid? _loadedId;
 
     /// <summary>Account id.</summary>
@@ -24,10 +27,24 @@ public partial class ServiceAccountDetail
     private string? Lead => _detail is null ? null
         : $"{_detail.Summary.Domain ?? "Domain bilinmiyor"} · {(_detail.Summary.IdentityState == "Confirmed" ? "kimlik teyitli" : "kimlik geçici")}";
 
+    private string WorkTabText => $"İşler ({_detail?.Requests.Count(r => r.Status == "Open") ?? 0} açık)";
+
+    private string MailTabText => $"Yazışmalar ({_detail?.Communications.Count ?? 0})";
+
+    private string FindingsTabText => $"Bulgular ({_detail?.Findings.Count ?? 0})";
+
+    private string EvidenceTabText => $"Kanıtlar ({_detail?.Evidence.Count ?? 0})";
+
     /// <summary>Usage tab title with the rule state so an against-rule account stands out without opening the tab.</summary>
     private string UsageTabText => _detail?.Rule is { } rule && rule.Conformance == "Unplanned"
         ? $"Kullanım ve kural ({(_detail.Usages ?? []).Count(u => !u.Removed)}) · kurala aykırı"
         : $"Kullanım ve kural ({(_detail?.Usages ?? []).Count(u => !u.Removed)})";
+
+    /// <summary>Scan tab title with the matches still waiting for a person's decision.</summary>
+    private string ScanTabText => _detail?.UsageScans is not { Count: > 0 } scans ? "Kullanım taraması"
+        : scans.SelectMany(s => s.Items).Count(i => i.Role == "Former" && i.Decision is null) is var pending and > 0
+            ? $"Kullanım taraması ({scans.Count}) · {pending} karar bekliyor"
+            : $"Kullanım taraması ({scans.Count})";
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
@@ -40,9 +57,18 @@ public partial class ServiceAccountDetail
     }
 
     /// <inheritdoc />
+    /// <remarks>Scope is read first so a caller without any data scope gets an explanation instead of a not-found error.</remarks>
     protected override Task LoadAsync() => RunSerializedAsync(async token =>
     {
         _loadedId = Id;
+        _me = await Api.GetAsync<ServiceAccountMe>("/me", token);
+        if (!_me.HasScope)
+        {
+            _detail = null;
+            _bootstrap = Can(ServiceAccountCapabilities.Administer) ? await Api.GetAsync<ScopeBootstrapState>("/scope-grants/bootstrap", token) : null;
+            return;
+        }
+
         _detail = await Api.GetAsync<AccountDetail>($"/accounts/{Id}", token);
         _organizations = await Api.GetAsync<IReadOnlyList<OrganizationView>>("/organizations", token);
         _teams = await Api.GetAsync<IReadOnlyList<TeamView>>("/teams", token);
@@ -76,6 +102,18 @@ public partial class ServiceAccountDetail
                 ["ownerType"] = upload.OwnerType,
                 ["ownerId"] = upload.OwnerId.ToString("D"),
                 ["label"] = upload.Label
+            }, token));
+        await AfterCommandAsync(saved);
+    }
+
+    /// <summary>Attaches a usage-scan file; the API validates the whole file before anything is stored.</summary>
+    private async Task UploadScanAsync(SaUsageScanUpload upload)
+    {
+        bool saved = await RunAsync(async token => _detail = await Api.UploadAsync<AccountDetail>($"/accounts/{Id}/usage-scans", upload.FileName,
+            "application/json", upload.Content, new Dictionary<string, string?>
+            {
+                ["runStatement"] = upload.RunStatement,
+                ["requestId"] = upload.RequestId?.ToString("D")
             }, token));
         await AfterCommandAsync(saved);
     }

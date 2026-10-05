@@ -78,7 +78,7 @@
         @if (_pending.Count > 0) { <MudButton OnClick="@(() => _pending.Clear())" Variant="Variant.Text">Kaydedilmemiş kararları sil</MudButton> }
     </div>
 
-    <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Toplu karar">
+    <SaDisclosure Class="mt-2" Title="Toplu karar">
         <p class="so-panel-text--sm">Seçilen sınıf ve kayıt türündeki, bu kararın izinli olduğu tüm satırlara uygulanır. Birden çok olası eşleşmesi olan satırlara toplu bağlama yapılmaz.</p>
         <MudGrid Spacing="2">
             <MudItem xs="6" md="4">
@@ -98,7 +98,7 @@
             </MudItem>
         </MudGrid>
         <MudButton OnClick="BulkAsync" Disabled="@(Busy || _bulkDecision is null)" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">Toplu kararı uygula</MudButton>
-    </MudExpansionPanel></MudExpansionPanels>
+    </SaDisclosure>
 </section>
 
 @code {

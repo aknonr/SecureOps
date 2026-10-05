@@ -45,6 +45,32 @@ public sealed class ServiceAccountDomainTests
     [InlineData("belirlenecek")]
     public void Placeholder_IsNeverATeamOrPerson(string? label) => ServiceAccountText.IsPlaceholder(label).Should().BeTrue();
 
+    // Review 2026-10-05: an uploaded file name is stored and shown; invisible or direction-changing characters could hide or
+    // reorder its extension on screen ("tarama\u202Enosj.exe" displays as "taramaexe.json").
+    [Theory]
+    [InlineData("tarama\u202Enosj.exe", "taramanosj.exe")]
+    [InlineData("\u2066tarama\u2069.json", "tarama.json")]
+    [InlineData("tar\u200Bama\u200D.json", "tarama.json")]
+    [InlineData("\uFEFFtarama\u200E\u200F\u061C.json", "tarama.json")]
+    [InlineData("tarama\u00AD\u2060\u034F\u3164\uFE0F.json", "tarama.json")]
+    [InlineData("tarama\u2028\u2029\r\n\t.json", "tarama.json")]
+    [InlineData("syn\u00A0tarama\u3000v2.json", "syn tarama v2.json")]
+    [InlineData("C:\\Users\\syn\\tarama \"1\".json", "tarama 1.json")]
+    [InlineData("../../tarama.json", "tarama.json")]
+    [InlineData("Şirket-tarama-ğüış.json", "Şirket-tarama-ğüış.json")]
+    [InlineData("\u202E\u200B ", "yuklenen-dosya")]
+    [InlineData(null, "yuklenen-dosya")]
+    public void FileName_DropsInvisibleAndDirectionCharacters_KeepsVisibleText(string? uploaded, string stored) =>
+        ServiceAccountText.FileName(uploaded).Should().Be(stored);
+
+    [Fact]
+    public void FileName_IsAtMost200Characters_AndNeverSplitsASurrogatePair()
+    {
+        ServiceAccountText.FileName(new string('a', 250) + ".json").Should().HaveLength(200);
+        string cut = ServiceAccountText.FileName(new string('a', 199) + "\U0001F600" + ".json");
+        cut.Should().Be(new string('a', 199));
+    }
+
     [Fact]
     public void Verification_OnSameAction_KeepsPerformedCountAndRequiresEvidenceVerifierOrder()
     {

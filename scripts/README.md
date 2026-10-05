@@ -7,6 +7,18 @@ PowerShell artifacts. Production diagnostic and JEA scripts are not implemented 
 Present today: `powershell/` (local harnesses and TEST smoke/readiness checks), `diagnostics/` (read-only SQL and
 evidence helpers) and `release/` (packaging and validation; see `release/README.md`).
 
+Service account usage scan (ADR-0027), run by a person under their own authority, never by the product:
+`powershell/Get-ServiceAccountUsage.ps1` (self-contained read-only collector for one server; prints one
+`service-account-usage-v1` JSON line, writes nothing, opens no connection) and
+`powershell/Invoke-ServiceAccountUsageScan.ps1 -CombinePath` (on the person's workstation: builds the upload file
+`service-account-usage-scan-v1` from the collected documents and the planned server list). Operator guide:
+`docs/service-accounts/USAGE-SCAN-TR.md`.
+
+Proposed, **not deployable** until ADR-0024 is accepted and Bilgi Güvenliği approves the role capability (shelved by the
+owner on 2026-10-04): `jea/proposed/SecureOps.ServiceAccountUsage/` (one visible function, module, role capability and
+session configuration; the collector above carries its functions verbatim) and the dormant `-UseJeaEndpoint` mode of
+`Invoke-ServiceAccountUsageScan.ps1`.
+
 Planned for Phase 1, **not yet present**:
 
 ```

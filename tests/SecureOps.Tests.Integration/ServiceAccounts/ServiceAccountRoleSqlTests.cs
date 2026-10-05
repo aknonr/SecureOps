@@ -7,6 +7,8 @@ namespace SecureOps.Tests.Integration.ServiceAccounts;
 /// <summary>Local SQL execution-token checks, not Windows-principal or corporate acceptance.</summary>
 public sealed class ServiceAccountRoleSqlTests
 {
+    private static readonly string[] _usageScanTables = ["UsageScans", "UsageScanServers", "UsageScanItems", "UsageScanLinks", "UsageScanDecisions"];
+
     [ServiceAccountSqlFact]
     public async Task ApiRole_AllRequiredVerbsAreAllowed_AndUnneededPrivilegesAreDenied()
     {
@@ -42,6 +44,13 @@ public sealed class ServiceAccountRoleSqlTests
                 Func<Task> deleteNewTable = async () => await connection.ExecuteAsync($"DELETE FROM svcacct.{table} WHERE 1 = 0;", transaction: transaction);
                 (await deleteNewTable.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(229);
             }
+            // Numbered 030 retains SA-004: usage scans, links and decisions are append-only evidence.
+            foreach (string table in _usageScanTables)
+            {
+                await RightsAsync(connection, transaction, "svcacct." + table, true, "SELECT", "INSERT");
+                await RightsAsync(connection, transaction, "svcacct." + table, false, "UPDATE", "DELETE", "ALTER", "CONTROL");
+            }
+
             await connection.ExecuteAsync("SELECT TOP (0) Id FROM svcacct.Accounts; UPDATE svcacct.Accounts SET Notes = Notes WHERE 1 = 0;",
                 transaction: transaction);
             Func<Task> delete = async () => await connection.ExecuteAsync("DELETE FROM svcacct.Accounts WHERE 1 = 0;", transaction: transaction);
@@ -64,6 +73,11 @@ public sealed class ServiceAccountRoleSqlTests
             await RightsAsync(connection, transaction, "audit.AuditLog", false, "INSERT");
             await RightsAsync(connection, transaction, "svcacct.AccountUsages", false, "SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "CONTROL");
             await RightsAsync(connection, transaction, "svcacct.TeamRoles", false, "SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "CONTROL");
+            foreach (string table in _usageScanTables)
+            {
+                await RightsAsync(connection, transaction, "svcacct." + table, false, "SELECT", "INSERT", "UPDATE", "DELETE");
+            }
+
             await connection.ExecuteAsync("SELECT TOP (0) Id FROM svcacct.Accounts; SELECT TOP (0) Id FROM svcacct.WorkRequests; "
                 + "UPDATE svcacct.ReminderOutbox SET LeaseOwner = LeaseOwner WHERE 1 = 0;", transaction: transaction);
             Func<Task> readHistory = async () => await connection.ExecuteAsync("SELECT TOP (0) Id FROM svcacct.History;", transaction: transaction);

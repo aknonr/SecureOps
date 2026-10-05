@@ -1,0 +1,358 @@
+@* Usage scans a person ran under their own authority and uploaded (ADR-0027). The system never connects to a server or
+   starts a scan. A scan is evidence: "not found" only follows a complete scan and never means "not used", an uncovered
+   server is "no information", and nothing here closes, frees or verifies the account. A match becomes a usage only when
+   a person records it. The API decides every permission; the buttons only mirror Detail.Permissions. *@
+@using SecureOps.Domain.ServiceAccounts
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-scan-intro">
+    <div class="so-panel-head"><h2 id="sa-scan-intro" class="so-panel-title">Kullanım taraması</h2></div>
+    <p class="so-panel-text--sm">
+        Bir kişinin kendi yetkisiyle sunucularda çalıştırdığı salt okunur taramanın sonucudur: hesabın hangi sunucuda Windows servisi,
+        zamanlanmış görev, IIS uygulama havuzu, site, uygulama veya sanal dizin olarak çalıştığı. Sistem sunuculara bağlanmaz, tarama
+        başlatmaz ve parola okumaz. Sonuç kanıttır; hiçbir sonuç hesabı kapatmaz, serbest bırakmaz veya doğrulamaz.
+    </p>
+    <details class="sa-scan-limits">
+        <summary>Tarama neyi göremez?</summary>
+        <ul>
+            <li>COM+ uygulama kimlikleri ve kullanıcı hakları (ör. hizmet olarak oturum açma).</li>
+            <li>Uygulama veya bağlantı dizesi içindeki kimlik bilgileri, veritabanı oturumları, dosya paylaşımı izinleri.</li>
+            <li>Linux/Oracle sunucuları ve taranmayan (planlanmamış) sunucular.</li>
+        </ul>
+        <p class="so-panel-text--sm">Bu yüzden "bulunmadı" yalnız taranan kaynaklar için geçerlidir; hesabın kullanılmadığını göstermez.</p>
+    </details>
+
+    @if (Detail.UsageScans is null)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+            Bu ortamda tarama kaydı kullanılamıyor: veritabanı güncellemesi 030 uygulanmamış. Hesabın diğer bilgileri etkilenmez.
+        </MudAlert>
+    }
+    else if (CanUpload)
+    {
+        @* Native details/summary (SaDisclosure): keyboard operable without script (MudBlazor 6 panel headers take no focus). *@
+        <SaDisclosure Class="mt-2" Title="Tarama dosyası yükle ve bu hesaba bağla">
+            <p class="so-panel-text--sm">
+                Dosya, her sunucuda çalıştırılan <code>Get-ServiceAccountUsage.ps1</code> çıktılarından kendi makinenizde
+                <code>Invoke-ServiceAccountUsageScan.ps1 -CombinePath</code> ile üretilir (JSON, en çok 4 MB). Dosya bu hesabı aramış olmalı.
+                Parola veya gizli değer gibi görünen bir alan içeren dosyanın tamamı reddedilir ve hiçbir parçası saklanmaz.
+            </p>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4">
+                    <label class="so-panel-text" for="sa-scan-file">Tarama dosyası (.json)</label>
+                    <InputFile id="sa-scan-file" OnChange="ChooseAsync" accept=".json,application/json" />
+                </MudItem>
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="_statement" Label="Çalıştırma beyanı (zorunlu)" MaxLength="400" Variant="Variant.Outlined"
+                        HelperText="Nerede ve hangi yetkiyle çalıştırdınız? Ör. kendi yönetici hesabımla, atlama sunucusundan, değişiklik kaydı numarası." />
+                </MudItem>
+                @if (!Detail.Permissions.Work)
+                {
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="Guid?" @bind-Value="_request" Label="Ekibinize atanmış talep (zorunlu)" Variant="Variant.Outlined">
+                            @foreach (RequestView r in ParticipantRequests)
+                            {
+                                <MudSelectItem T="Guid?" Value="@((Guid?)r.Id)">@($"{r.ActionLabel} · {r.TargetTeam?.Label ?? "ekip yok"}")</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+            </MudGrid>
+            @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
+            <MudButton OnClick="UploadAsync" Disabled="@(!CanSend)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
+                StartIcon="@Icons.Material.Filled.UploadFile">Yükle ve bu hesaba bağla</MudButton>
+        </SaDisclosure>
+    }
+
+    @if (Detail.UsageScans is { Count: 0 })
+    {
+        <SoEmptyState Title="Bu hesaba bağlı tarama yok" Description="Tarama yüklenene kadar sunucu bazında bilgi yoktur; bu, hesabın kullanılmadığı anlamına gelmez." />
+    }
+    else if (Detail.UsageScans is { } shown && Detail.UsageScanTotal > shown.Count)
+    {
+        <p class="so-panel-text--sm mt-2">En yeni @shown.Count tarama gösteriliyor; bu hesaba toplam @Detail.UsageScanTotal tarama bağlı.</p>
+    }
+</section>
+
+@foreach (UsageScanView scan in Detail.UsageScans ?? [])
+{
+    string headingId = $"sa-scan-{scan.LinkId:N}";
+    UsageScanItemView[] former = [.. scan.Items.Where(i => i.Role == "Former")];
+    UsageScanItemView[] gmsa = [.. scan.Items.Where(i => i.Role == "Expected")];
+    UsageScanServerView[] gaps = [.. scan.Servers.Where(s => s.Outcome is "NotCovered" or "Uncertain")];
+    <section class="so-panel" aria-labelledby="@headingId">
+        <div class="so-panel-head sa-scan-head">
+            <h2 id="@headingId" class="so-panel-title">
+                @(scan.Purpose == "GmsaCheck" ? "gMSA kontrol taraması" : "Kullanım taraması") · @ServiceAccountUiText.Instant(scan.LastScannedAt ?? scan.CombinedAt)
+            </h2>
+            <SoStatusBadge Label="@CoverageLabel(scan.Coverage)" Tone="@(gaps.Length == 0 && scan.Coverage.Failed == 0 ? SoStatusBadge.BadgeTone.Positive : SoStatusBadge.BadgeTone.Caution)"
+                Icon="@(gaps.Length == 0 ? Icons.Material.Filled.FactCheck : Icons.Material.Filled.ReportProblem)" />
+            @if (scan.Gmsa is { } check)
+            {
+                <SoStatusBadge Label="@GmsaBadge(check.Conclusion)" Tone="@GmsaTone(check.Conclusion)" Icon="@GmsaIcon(check.Conclusion)" />
+            }
+        </div>
+        <SoFieldGrid>
+            <SoField Label="Aranan hesap" Value="@scan.MatchedAccount" />
+            @if (scan.ExpectedAccount is not null) { <SoField Label="Beklenen gMSA" Value="@scan.ExpectedAccount" /> }
+            <SoField Label="Tarama zamanı" Value="@ScanTimes(scan)" />
+            <SoField Label="Yükleyen / bağlanma" Value="@($"{scan.UploadedBy} · {ServiceAccountUiText.Instant(scan.LinkedAt)}")" />
+            <SoField Label="Çalıştırma beyanı" Value="@scan.RunStatement" />
+            @if (scan.RequestId is { } requestId)
+            {
+                <SoField Label="Bağlı talep" Value="@(Detail.Requests.FirstOrDefault(r => r.Id == requestId)?.ActionLabel ?? "Talep")" />
+            }
+            <SoField Label="Dosya" Value="@($"{scan.FileName} · SHA-256 {scan.Sha256[..12]}…")" />
+        </SoFieldGrid>
+        <p class="so-panel-text--sm mt-1">
+            @scan.Coverage.Planned planlanan sunucu: @scan.Coverage.Found sunucuda çalışıyor · @scan.Coverage.NotFound sunucuda tam taramada bulunmadı ·
+            @scan.Coverage.Uncertain sunucuda belirsiz (kısmi tarama) · @scan.Coverage.NotCovered sunucu için bilgi yok.
+        </p>
+
+        @if (scan.Gmsa is { } evidence)
+        {
+            <MudAlert Severity="@(evidence.Conclusion == nameof(ScanGmsaConclusion.ConvertedOnCoveredServers) ? Severity.Info : Severity.Warning)" Dense="true" Class="mt-2">
+                <strong>gMSA kanıtı:</strong> @evidence.ConclusionLabel
+                (eski hesap: @evidence.StillFormerServers sunucu · gMSA: @evidence.RunsAsGmsaServers sunucu · bilinmiyor: @evidence.UnknownServers sunucu).
+                Dönüşümü doğrulayıcı, işlem doğrulamasında karar verir; bu tarama doğrulama değildir.
+            </MudAlert>
+        }
+
+        @if (gaps.Length > 0)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                @gaps.Length sunucu için sonuç eksik: @string.Join(", ", gaps.Take(20).Select(s => $"{s.ServerName} ({s.ResultLabel})"))@(gaps.Length > 20 ? $" ve {gaps.Length - 20} sunucu daha" : "").
+                Bu sunucularda hesap çalışıyor olabilir; yeniden tarayın.
+            </MudAlert>
+        }
+
+        <h3 class="sa-scan-subtitle">Bu hesabın bulunduğu bileşenler (@former.Length)</h3>
+        @if (former.Length == 0)
+        {
+            @* "Not found" only for the servers that were fully scanned; with none, nothing is known (SPEC rule 15). *@
+            <p class="so-panel-text--sm">@NoMatchText(scan.Coverage, gaps.Length)</p>
+        }
+        else
+        {
+            <MudTable Items="former" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageScanItemView">
+                <HeaderContent><MudTh>Sunucu</MudTh><MudTh>Bileşen</MudTh><MudTh>Yapılandırılmış kimlik</MudTh><MudTh>Karar</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Sunucu"><span class="sa-scan-wrap">@context.ServerName</span></MudTd>
+                    <MudTd DataLabel="Bileşen">
+                        <div class="sa-scan-wrap">
+                            @context.ComponentTypeLabel: @context.ComponentName
+                            @if (context.Detail is not null || context.State is not null)
+                            {
+                                <div class="so-panel-text--sm">@string.Join(" · ", new[] { context.State, context.Detail }.Where(v => v is not null))</div>
+                            }
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Yapılandırılmış kimlik"><span class="sa-scan-wrap">@context.ConfiguredIdentity</span></MudTd>
+                    <MudTd DataLabel="Karar"><div>
+                        @if (context.Decision == "UsageRecorded")
+                        {
+                            <SoStatusBadge Label="Kullanım kaydı oluşturuldu" Tone="SoStatusBadge.BadgeTone.Positive" Icon="@Icons.Material.Filled.CheckCircle" />
+                        }
+                        else if (context.Decision == "Dismissed")
+                        {
+                            <SoStatusBadge Label="Kayda alınmadı" Tone="SoStatusBadge.BadgeTone.Neutral" Icon="@Icons.Material.Filled.RemoveCircleOutline" />
+                            <div class="so-panel-text--sm">@context.DecisionReason</div>
+                        }
+                        else if (Detail.Permissions.Work)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Disabled="Busy" OnClick="@(() => Select(context))"
+                                aria-label="@($"Karar ver: {context.ServerName} {context.ComponentName}")">Karar ver</MudButton>
+                        }
+                        else
+                        {
+                            <span class="so-panel-text--sm">Karar bekliyor (hesaptan sorumlu ekip)</span>
+                        }
+                    </div></MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+
+        @* Only while the item is still undecided in the server's current view: after a 409 the reloaded decision is shown instead. *@
+        @if (_selected is { } item && former.Any(i => i.Id == item.Id && i.Decision is null))
+        {
+            <div class="sa-scan-decision mt-2" role="group" aria-label="Seçili bileşen için karar">
+                <p class="so-panel-text"><strong>Seçili bileşen:</strong> @item.ServerName · @item.ComponentTypeLabel · @item.ComponentName</p>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="string" @bind-Value="_kind" Label="Kullanım türü (öneri seçili)" Variant="Variant.Outlined">
+                            @foreach (UsageKind kind in Enum.GetValues<UsageKind>())
+                            {
+                                <MudSelectItem T="string" Value="@kind.ToString()">@ServiceAccountUsageRules.UsageLabel(kind)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="8"><MudTextField @bind-Value="_notes" Label="Not (isteğe bağlı)" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+                </MudGrid>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <MudButton OnClick="@(() => RecordAsync(item))" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary">Kullanım kaydı oluştur</MudButton>
+                    <MudButton OnClick="@(() => _selected = null)" Disabled="Busy" Variant="Variant.Text">Vazgeç</MudButton>
+                </div>
+                <MudGrid Spacing="2" Class="mt-2">
+                    <MudItem xs="12" md="8"><MudTextField @bind-Value="_reason" Label="Kayda almama gerekçesi" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="4" Class="d-flex align-center">
+                        <MudButton OnClick="@(() => DismissAsync(item))" Disabled="@(Busy || string.IsNullOrWhiteSpace(_reason))" Variant="Variant.Outlined">Kayda almadan kapat</MudButton>
+                    </MudItem>
+                </MudGrid>
+                <p class="so-panel-text--sm mt-1">Karar bu hesap için bir kez verilir ve geçmişte kalır. Kullanım kaydı bilgi bankası kuralını besler; hesabı kapatmaz.</p>
+            </div>
+        }
+
+        @if (gmsa.Length > 0)
+        {
+            <h3 class="sa-scan-subtitle">Beklenen gMSA ile çalışan bileşenler (@gmsa.Length)</h3>
+            <ul class="sa-scan-list">
+                @foreach (UsageScanItemView g in gmsa)
+                {
+                    <li class="sa-scan-wrap">@g.ServerName · @g.ComponentTypeLabel: @g.ComponentName (@g.ConfiguredIdentity)</li>
+                }
+            </ul>
+        }
+
+        <SaDisclosure Class="mt-2" Title="@($"Sunucu bazında kapsam ({scan.Servers.Count} sunucu)")">
+            <MudTable Items="scan.Servers" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageScanServerView">
+                <HeaderContent>
+                    <MudTh>Sunucu</MudTh><MudTh>Tarama</MudTh><MudTh>Bu hesap için</MudTh>
+                    @if (scan.Gmsa is not null) { <MudTh>gMSA</MudTh> }
+                    <MudTh>Kaynaklar</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Sunucu"><span class="sa-scan-wrap">@context.ServerName</span></MudTd>
+                    <MudTd DataLabel="Tarama"><div>@context.ResultLabel<div class="so-panel-text--sm">@(context.ScannedAt is null ? "" : ServiceAccountUiText.Instant(context.ScannedAt))</div></div></MudTd>
+                    <MudTd DataLabel="Bu hesap için"><span>@context.OutcomeLabel@(context.Matches > 0 ? $" ({context.Matches} bileşen)" : "")</span></MudTd>
+                    @if (scan.Gmsa is not null) { <MudTd DataLabel="gMSA"><span>@context.GmsaStateLabel</span></MudTd> }
+                    <MudTd DataLabel="Kaynaklar">
+                        <div class="sa-scan-wrap">
+                            @Sources(context)
+                            @if (context.Warnings is not null) { <div class="so-panel-text--sm">Uyarı: @context.Warnings</div> }
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </SaDisclosure>
+    </section>
+}
+
+@code {
+    private const long MaxBytes = 4L * 1024 * 1024;
+    private (string Name, byte[] Content)? _file;
+    private string? _statement, _fileError, _notes, _reason;
+    private Guid? _request;
+    private UsageScanItemView? _selected;
+    private string _kind = nameof(UsageKind.Other);
+    private int _seenRevision = -1;
+
+    /// <summary>Account detail.</summary>
+    [Parameter] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Page revision; a new value means the last command was saved.</summary>
+    [Parameter] public int Revision { get; set; }
+
+    /// <summary>Upload sink.</summary>
+    [Parameter] public EventCallback<SaUsageScanUpload> OnUpload { get; set; }
+
+    /// <summary>Command sink for decisions.</summary>
+    [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
+
+    private IEnumerable<RequestView> ParticipantRequests =>
+        Detail.Requests.Where(r => r.Status == "Open" && (Detail.Permissions.ParticipantRequestIds?.Contains(r.Id) ?? false));
+
+    /// <summary>The responsible team attaches to the account; a participant only through its own open request.</summary>
+    private bool CanUpload => Detail.Permissions.Work || ParticipantRequests.Any();
+
+    private bool CanSend => !Busy && _file is not null && _statement is { } s && s.Trim().Length >= 5 && (Detail.Permissions.Work || _request is not null);
+
+    protected override void OnParametersSet()
+    {
+        if (_seenRevision != Revision)
+        {
+            (_seenRevision, _file, _statement, _fileError, _request, _selected, _notes, _reason) = (Revision, null, null, null, null, null, null, null);
+        }
+    }
+
+    private async Task ChooseAsync(InputFileChangeEventArgs args)
+    {
+        (_file, _fileError) = (null, null);
+        IBrowserFile file = args.File;
+        if (!string.Equals(Path.GetExtension(file.Name), ".json", StringComparison.OrdinalIgnoreCase))
+        {
+            _fileError = "Yalnız birleştirme adımının ürettiği .json dosyası yüklenir.";
+            return;
+        }
+
+        if (file.Size is 0 or > MaxBytes)
+        {
+            _fileError = "Dosya boş veya 4 MB sınırını aşıyor.";
+            return;
+        }
+
+        using MemoryStream buffer = new();
+        await using Stream stream = file.OpenReadStream(MaxBytes);
+        await stream.CopyToAsync(buffer);
+        _file = (file.Name, buffer.ToArray());
+    }
+
+    private Task UploadAsync() =>
+        OnUpload.InvokeAsync(new SaUsageScanUpload(_file!.Value.Name, _file.Value.Content, _statement!.Trim(), Detail.Permissions.Work ? null : _request));
+
+    private void Select(UsageScanItemView item) => (_selected, _kind, _notes, _reason) = (item, item.SuggestedKind, null, null);
+
+    private Task RecordAsync(UsageScanItemView item) => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post,
+        $"/accounts/{Detail.Summary.Id}/usage-scan-items/{item.Id}/usage", new RecordScanUsageRequest(_kind, Notes: Blank(_notes))));
+
+    private Task DismissAsync(UsageScanItemView item) => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post,
+        $"/accounts/{Detail.Summary.Id}/usage-scan-items/{item.Id}/dismiss", new DismissScanItemRequest(_reason!.Trim())));
+
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string CoverageLabel(UsageScanCoverageView c) =>
+        c.Success == c.Planned ? $"{c.Planned} sunucunun tamamı tam tarandı" : $"{c.Planned} sunucudan {c.Success} tanesi tam tarandı";
+
+    private static string NoMatchText(UsageScanCoverageView c, int gaps) =>
+        c.Success == 0
+            ? "Hiçbir sunucu tam taranmadı; bu hesabın bu sunucularda çalışıp çalışmadığı bilinmiyor. Eksik sunucuları yeniden tarayın."
+            : gaps == 0
+                ? "Taranan kaynaklarda bu hesapla çalışan bileşen bulunmadı. Bu, hesabın kullanılmadığını göstermez."
+                : $"Tam taranan {c.Success} sunucuda bu hesapla çalışan bileşen bulunmadı; {gaps} sunucu için sonuç eksik. Bu, hesabın kullanılmadığını göstermez.";
+
+    private static string ScanTimes(UsageScanView scan) => scan.FirstScannedAt is null
+        ? "Hiçbir sunucudan sonuç gelmedi"
+        : scan.FirstScannedAt == scan.LastScannedAt ? ServiceAccountUiText.Instant(scan.FirstScannedAt)
+        : $"{ServiceAccountUiText.Instant(scan.FirstScannedAt)} – {ServiceAccountUiText.Instant(scan.LastScannedAt)}";
+
+    private static string Sources(UsageScanServerView s) => s.WindowsServices is null
+        ? "Okunmadı"
+        : $"Servisler: {Source(s.WindowsServices)} · Görevler: {Source(s.ScheduledTasks)} · IIS: {Source(s.Iis)}";
+
+    private static string Source(string? value) => value switch { "Success" => "okundu", "Failed" => "okunamadı", "NotInstalled" => "kurulu değil", _ => "—" };
+
+    private static string GmsaBadge(string conclusion) => conclusion switch
+    {
+        nameof(ScanGmsaConclusion.StillFormer) => "gMSA: eski hesap hâlâ var",
+        nameof(ScanGmsaConclusion.Incomplete) => "gMSA: kanıt eksik",
+        nameof(ScanGmsaConclusion.ConvertedOnCoveredServers) => "gMSA: taranan sunucularda dönüşmüş (kanıt)",
+        _ => "gMSA: bileşen bulunmadı"
+    };
+
+    private static SoStatusBadge.BadgeTone GmsaTone(string conclusion) => conclusion switch
+    {
+        nameof(ScanGmsaConclusion.StillFormer) => SoStatusBadge.BadgeTone.Critical,
+        nameof(ScanGmsaConclusion.ConvertedOnCoveredServers) => SoStatusBadge.BadgeTone.Positive,
+        _ => SoStatusBadge.BadgeTone.Caution
+    };
+
+    private static string GmsaIcon(string conclusion) => conclusion switch
+    {
+        nameof(ScanGmsaConclusion.StillFormer) => Icons.Material.Filled.ErrorOutline,
+        nameof(ScanGmsaConclusion.ConvertedOnCoveredServers) => Icons.Material.Filled.FactCheck,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+}

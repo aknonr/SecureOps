@@ -1,0 +1,265 @@
+/* Categorical slots in fixed order (validated: adjacent CVD ΔE ≥ 8.4, normal-vision ≥ 19.8 in both modes; the light
+   aqua/yellow sit under 3:1 on white, so every mark carries a printed value and the table view). Text uses text tokens. */
+.sa-chart {
+    --sa-s1: #2a78d6;
+    --sa-s2: #eb6834;
+    --sa-s3: #1baf7a;
+    --sa-s4: #eda100;
+    margin: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+:root.so-dark .sa-chart {
+    --sa-s1: #3987e5;
+    --sa-s2: #d95926;
+    --sa-s3: #199e70;
+    --sa-s4: #c98500;
+}
+
+.sa-chart-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--so-text);
+}
+
+.sa-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8rem;
+    color: var(--so-text-muted);
+}
+
+.sa-chart-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sa-chart-last {
+    color: var(--so-text);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Legend keys repeat the marker shapes, so identity survives without colour. */
+.sa-key {
+    width: 10px;
+    height: 10px;
+    flex: none;
+}
+
+.sa-key--1, .sa-mark--1 { background: var(--sa-s1); border-radius: 50%; }
+.sa-key--2, .sa-mark--2 { background: var(--sa-s2); border-radius: 1px; }
+.sa-key--3, .sa-mark--3 { background: var(--sa-s3); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.sa-key--4, .sa-mark--4 { background: var(--sa-s4); transform: rotate(45deg) scale(0.85); }
+
+.sa-chart-empty,
+.sa-chart-note {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--so-text-muted);
+}
+
+/* -- horizontal bars (single series and grouped) --------------------------------------------------------- */
+.sa-hbars {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sa-hbar-group {
+    display: grid;
+    grid-template-columns: minmax(6rem, 38%) 1fr;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.sa-hbar-label {
+    font-size: 0.82rem;
+    color: var(--so-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.sa-hbar-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.sa-hbar-row {
+    display: grid;
+    grid-template-columns: 1fr 3.5rem;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sa-hbar-track {
+    display: block;
+    height: 10px;
+}
+
+.sa-hbar-fill {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 0 4px 4px 0;
+}
+
+.sa-fill--1 { background: var(--sa-s1); }
+.sa-fill--2 { background: var(--sa-s2); }
+.sa-fill--3 { background: var(--sa-s3); }
+.sa-fill--4 { background: var(--sa-s4); }
+
+.sa-hbar-value {
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--so-text);
+}
+
+/* -- line ------------------------------------------------------------------------------------------------- */
+.sa-line {
+    margin-top: 0.75rem;
+    display: grid;
+    grid-template-columns: 2.5rem 1fr;
+    grid-template-rows: 180px auto;
+    gap: 0.25rem 0.5rem;
+}
+
+.sa-line-grid {
+    position: relative;
+    font-size: 0.72rem;
+    color: var(--so-text-faint);
+    text-align: right;
+}
+
+.sa-line-grid span {
+    position: absolute;
+    right: 0;
+    transform: translateY(50%);
+    font-variant-numeric: tabular-nums;
+}
+
+.sa-line-plot {
+    position: relative;
+    margin: 6px 6px 0;
+    border-bottom: 1px solid var(--so-border);
+}
+
+.sa-line-plot svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.sa-line-plot polyline {
+    fill: none;
+    stroke-width: 2px;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.sa-line-rule {
+    stroke: var(--so-border-soft);
+    stroke-width: 1px;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+}
+
+.sa-stroke--1 { stroke: var(--sa-s1); }
+.sa-stroke--2 { stroke: var(--sa-s2); }
+.sa-stroke--3 { stroke: var(--sa-s3); }
+.sa-stroke--4 { stroke: var(--sa-s4); }
+
+.sa-mark {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    margin: 0 0 -4.5px -4.5px;
+    box-shadow: 0 0 0 2px var(--so-surface);
+}
+
+.sa-mark--3 { box-shadow: none; }
+
+.sa-line-axis {
+    grid-column: 2;
+    position: relative;
+    height: 1.1rem;
+    margin: 0 6px;
+    font-size: 0.72rem;
+    color: var(--so-text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.sa-line-axis span {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+/* On a phone only every other week is labelled; the table view keeps all of them. */
+@media (max-width: 599.98px) {
+    .sa-line-axis span:nth-child(even) {
+        visibility: hidden;
+    }
+}
+
+/* -- table view ------------------------------------------------------------------------------------------- */
+.sa-chart-data summary {
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--so-accent);
+}
+
+.sa-chart-data summary:focus-visible {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 2px;
+}
+
+.sa-chart-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.sa-chart-table {
+    margin-top: 0.4rem;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.sa-chart-table th,
+.sa-chart-table td {
+    padding: 0.2rem 0.6rem;
+    border-bottom: 1px solid var(--so-border);
+    text-align: left;
+}
+
+.sa-chart-table td {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (forced-colors: active) {
+    .sa-hbar-fill,
+    .sa-mark,
+    .sa-key {
+        background: CanvasText;
+        forced-color-adjust: none;
+    }
+
+    .sa-line-plot polyline {
+        stroke: CanvasText;
+    }
+}

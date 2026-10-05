@@ -9,6 +9,7 @@
 @inject IIdentityLookupApiClient IdentityClient
 @inject IManagementReportingApiClient Reporting
 @inject ILogger<Dashboard> Logger
+@inject NavigationManager Navigation
 
 <PageTitle>@WasasBrand.Title(_managementView ? "Yönetim Panosu" : "Genel Bakış")</PageTitle>
 
@@ -654,7 +655,7 @@
     /// <param name="Description">What the action is for.</param>
     /// <param name="Route">Target route.</param>
     /// <param name="Icon">Leading icon.</param>
-    private sealed record OperatorTask(string Title, string Description, string Route, string Icon);
+    internal sealed record OperatorTask(string Title, string Description, string Route, string Icon);
 
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
@@ -696,7 +697,31 @@
         }
 
         await LoadAsync(force: false);
+
+        // Owner decision 2026-10-04: an approved user whose only offered work is Service Accounts lands in that module
+        // from "/". "/dashboard" stays reachable, and any other capability with its own entry keeps the board.
+        if (OnlyServiceAccounts(_snapshot, _available, _managementView) && IsRootRoute())
+        {
+            Navigation.NavigateTo("service-accounts", replace: true);
+        }
     }
+
+    private bool IsRootRoute() => IsRoot(Navigation.ToBaseRelativePath(Navigation.Uri));
+
+    /// <summary>True for the base-relative root ("", "?x", "#y"); "/dashboard" is not the root.</summary>
+    internal static bool IsRoot(string relative)
+    {
+        int end = relative.IndexOfAny(['?', '#']);
+        return (end < 0 ? relative : relative[..end]).Length == 0;
+    }
+
+    /// <summary>Whether an approved user's only dashboard entry is Service Accounts (owner decision 2026-10-04).</summary>
+    internal static bool OnlyServiceAccounts(AccessSnapshot? snapshot, IReadOnlyList<OperatorTask> available, bool managementView) =>
+        snapshot is { IsApproved: true }
+        && !managementView
+        && snapshot.Can(ServiceAccountCapabilities.View)
+        && available.Count == 1
+        && available[0].Route == "service-accounts";
 
     private Task RefreshAsync() => LoadAsync(force: true);
 
@@ -776,7 +801,7 @@
 
     // Built from granted capabilities rather than a fixed list, so the dashboard shows what this
     // operator can actually do instead of advertising screens that would refuse them.
-    private static IReadOnlyList<OperatorTask> BuildTasks(AccessSnapshot snapshot)
+    internal static IReadOnlyList<OperatorTask> BuildTasks(AccessSnapshot snapshot)
     {
         List<OperatorTask> tasks = [];
 

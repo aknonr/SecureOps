@@ -374,12 +374,7 @@ public sealed partial class ServiceAccountService
         ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         : bytes.Length > 0 && bytes[0] == (byte)'{' ? "application/json" : "text/csv";
 
-    private static string SafeName(string fileName)
-    {
-        string name = Path.GetFileName(fileName ?? string.Empty);
-        name = new string([.. name.Where(c => !char.IsControl(c) && c is not ('/' or '\\' or '"'))]);
-        return string.IsNullOrWhiteSpace(name) ? "yuklenen-dosya" : name.Length <= 200 ? name : name[..200];
-    }
+    private static string SafeName(string fileName) => Domain.ServiceAccounts.ServiceAccountText.FileName(fileName);
 
     private static string? Clean(string? value, int max) =>
         Domain.ServiceAccounts.ServiceAccountText.Clean(value) is { } clean ? clean.Length <= max ? clean : clean[..max] : null;

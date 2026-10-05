@@ -24,6 +24,17 @@
     </div>
 </section>
 
+@if (_charts.Count > 0)
+{
+    <section class="so-panel" aria-labelledby="sa-report-charts">
+        <h2 id="sa-report-charts" class="so-panel-title">Görsel özet</h2>
+        <p class="so-panel-text--sm">Grafikler aşağıdaki tablolarla aynı değerleri gösterir; her grafiğin altında tablo görünümü vardır. Excel ve PDF çıktısındaki grafikler de aynı değerlerden çizilir.</p>
+        <div class="sa-chart-grid">
+            @foreach (ReportChart chart in _charts) { <SaChart @key="chart.Key" Chart="chart" /> }
+        </div>
+    </section>
+}
+
 <section class="so-panel" aria-labelledby="sa-report-week">
     <h2 id="sa-report-week" class="so-panel-title">@(Report.Period == ReportPeriods.Week ? "Haftalık hareket" : "Dönem hareketi")</h2>
     <MudSimpleTable Dense="true" Bordered="true">
@@ -153,7 +164,6 @@ else
 
 @if (Report.Funnel is { } funnel)
 {
-    int top = Math.Max(1, funnel.Stages.Max(st => st.Count));
     <section class="so-panel" aria-labelledby="sa-report-funnel">
         <h2 id="sa-report-funnel" class="so-panel-title">gMSA hunisi (@funnel.Population hesap)</h2>
         <table class="sa-bars" aria-describedby="sa-report-funnel">
@@ -163,7 +173,7 @@ else
                 {
                     <tr>
                         <th scope="row">@stage.Label</th>
-                        <td><span class="sa-bar" style="--sa-bar:@Percent(stage.Count, top)" title="@($"{stage.Label}: {stage.Count}")" aria-hidden="true"></span><span class="sa-bar-value">@stage.Count</span></td>
+                        <td><span class="sa-bar-value">@stage.Count</span></td>
                         <td class="so-panel-text--sm">@stage.Expected</td>
                     </tr>
                 }
@@ -176,7 +186,6 @@ else
 
 @if (Report.Trend is { } trend)
 {
-    int peak = Math.Max(1, trend.Points.Max(p => p.OpenAtWeekEnd));
     <section class="so-panel" aria-labelledby="sa-report-trend">
         <h2 id="sa-report-trend" class="so-panel-title">Trend (son @trend.Points.Count hafta)</h2>
         <table class="sa-bars" aria-describedby="sa-report-trend">
@@ -186,7 +195,7 @@ else
                 {
                     <tr>
                         <th scope="row">@point.WeekStart.ToString("dd.MM.yyyy")</th>
-                        <td><span class="sa-bar" style="--sa-bar:@Percent(point.OpenAtWeekEnd, peak)" title="@($"{point.WeekStart:dd.MM}: {point.OpenAtWeekEnd} açık")" aria-hidden="true"></span><span class="sa-bar-value">@point.OpenAtWeekEnd</span></td>
+                        <td><span class="sa-bar-value">@point.OpenAtWeekEnd</span></td>
                         <td>@point.OverdueAtWeekEnd</td><td>@point.VerifiedClosures</td><td>@point.PerformedActions</td>
                     </tr>
                 }
@@ -232,8 +241,10 @@ else
 
     private ReportSummary S => Report.Summary;
 
-    private static string Percent(int value, int max) =>
-        (value * 100.0 / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    private IReadOnlyList<ReportChart> _charts = [];
+
+    /// <inheritdoc />
+    protected override void OnParametersSet() => _charts = ReportCharts.Build(Report);
 
     private IEnumerable<(string, PlacementCounts)> Placements =>
     [

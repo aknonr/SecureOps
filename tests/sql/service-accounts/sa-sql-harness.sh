@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Isolated Service Accounts SQL harness for a disposable SQL Server container (Linux/cloud runners).
-# Creates a NEW database, applies numbered migrations (now 001-026) in order,
-# then candidate 2 (SA-002), verifies replay refusal and prints the connection string for SECUREOPS_SA_SQL_TEST_CONNECTION.
+# Creates a NEW database, applies numbered migrations (now 001-030) in order,
+# then candidates 2 (SA-002, numbered 026), 3 (SA-003, numbered 029) and 4 (SA-004, numbered 030) only when not yet numbered, verifies replay refusal and prints the connection string for SECUREOPS_SA_SQL_TEST_CONNECTION.
 # It never targets an existing database and never runs against corporate servers.
 # Usage: SA_PASSWORD=... sa-sql-harness.sh <container> <new-database-name> [host-port]
 set -euo pipefail
@@ -38,4 +38,24 @@ if sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-002-usage-ru
   echo "Candidate 2 replay was not refused." >&2; exit 1
 fi
 echo "candidate 2 replay refused as expected"
+# Candidate 3 (one-time scope bootstrap) is numbered 029: apply it only when no numbered migration added the column.
+has_bootstrap=$(sqlcmd / -d "$database" -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH(N'svcacct.ScopeGrants', N'IsBootstrap') IS NULL THEN 0 ELSE 1 END")
+if [[ "$has_bootstrap" == "0" ]]; then
+  sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-003-scope-bootstrap.sql > /dev/null
+  echo "applied SA-003-scope-bootstrap.sql (candidate 3)"
+fi
+if sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-003-scope-bootstrap.sql > /dev/null 2>&1; then
+  echo "Candidate 3 replay was not refused." >&2; exit 1
+fi
+echo "candidate 3 replay refused as expected"
+# Candidate 4 (usage scans, ADR-0027) is numbered 030: apply it only when no numbered migration created the tables.
+has_scans=$(sqlcmd / -d "$database" -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN OBJECT_ID(N'svcacct.UsageScans', N'U') IS NULL THEN 0 ELSE 1 END")
+if [[ "$has_scans" == "0" ]]; then
+  sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-004-usage-scans.sql > /dev/null
+  echo "applied SA-004-usage-scans.sql (candidate 4)"
+fi
+if sqlcmd "$work/sql/pending/service-accounts" -d "$database" -i SA-004-usage-scans.sql > /dev/null 2>&1; then
+  echo "Candidate 4 replay was not refused." >&2; exit 1
+fi
+echo "candidate 4 replay refused as expected"
 echo "SECUREOPS_SA_SQL_TEST_CONNECTION=Server=127.0.0.1,$port;Database=$database;User Id=sa;Password=<SA_PASSWORD>;TrustServerCertificate=True;Encrypt=False"
