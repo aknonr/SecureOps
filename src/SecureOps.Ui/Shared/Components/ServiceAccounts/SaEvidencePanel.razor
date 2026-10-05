@@ -22,7 +22,7 @@
 
     @if (Detail.Permissions.UploadEvidence)
     {
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Kanıt dosyası ekle">
+        <SaDisclosure Class="mt-2" Title="Kanıt dosyası ekle">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
                     <MudSelect T="string" @bind-Value="_owner" Label="Bağlanacak kayıt" Variant="Variant.Outlined">
@@ -37,7 +37,7 @@
             </MudGrid>
             @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
             <MudButton OnClick="UploadAsync" Disabled="@(Busy || _file is null)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Dosyayı yükle</MudButton>
-        </MudExpansionPanel></MudExpansionPanels>
+        </SaDisclosure>
     }
 </section>
 

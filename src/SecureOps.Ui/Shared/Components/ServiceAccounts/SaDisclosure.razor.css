@@ -1,0 +1,54 @@
+/* Native disclosure for the module's collapsible forms: theme tokens only, a visible focus ring, a large enough target and
+   an explicit open/closed marker so the state is not shown by colour alone. */
+.sa-disclosure {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 0.5rem;
+    background: var(--mud-palette-surface);
+    min-width: 0;
+}
+
+.sa-disclosure > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+    overflow-wrap: anywhere;
+}
+
+.sa-disclosure > summary::-webkit-details-marker {
+    display: none;
+}
+
+.sa-disclosure > summary::before {
+    content: "▸";
+    flex: 0 0 auto;
+    width: 1em;
+    text-align: center;
+}
+
+.sa-disclosure[open] > summary::before {
+    content: "▾";
+}
+
+.sa-disclosure > summary:hover {
+    background: var(--mud-palette-action-default-hover);
+}
+
+.sa-disclosure > summary:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
+
+.sa-disclosure-body {
+    padding: 0 0.75rem 0.75rem;
+    min-width: 0;
+}
+
+/* A native file picker has an intrinsic width (about 350 px in Chromium) that would scroll a 390 px page sideways. */
+.sa-disclosure-body ::deep input[type=file] {
+    max-width: 100%;
+}

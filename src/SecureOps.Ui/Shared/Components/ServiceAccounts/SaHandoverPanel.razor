@@ -33,7 +33,7 @@
 
     @if (Detail.Permissions.AssignTeam)
     {
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Devir bildir">
+        <SaDisclosure Class="mt-2" Title="Devir bildir">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
                     <MudSelect T="Guid?" @bind-Value="_target" Label="Hedef ekip" Variant="Variant.Outlined">
@@ -44,7 +44,7 @@
                 <MudItem xs="12" md="4" Class="d-flex align-center"><MudCheckBox T="bool" @bind-Value="_trackGmsa" Label="gMSA geçişi olarak izle" /></MudItem>
             </MudGrid>
             <MudButton OnClick="CreateAsync" Disabled="@(Busy || _target is null)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Devri bildir</MudButton>
-        </MudExpansionPanel></MudExpansionPanels>
+        </SaDisclosure>
     }
 </section>
 

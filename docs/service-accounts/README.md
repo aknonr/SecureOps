@@ -212,7 +212,9 @@ Pages `/service-accounts` (scoped list, filters, multi-account mail), `/service-
 and `/service-accounts/admin`. One nav entry gated on `ServiceAccounts.View`; the API decides every
 command. Page loads are serialized so a concurrent access refresh cannot drop a read; commands are
 single-flight. MudBlazor 6 does not associate its labels with inputs, so `_Host.cshtml` binds the
-existing label by `aria-labelledby` on `.sa-page` fields only.
+existing label by `aria-labelledby` on `.sa-page` fields only. MudBlazor 6.16 expansion-panel headers are a `div` without a tab
+stop, so every collapsible form in the module is `SaDisclosure` (native `details`/`summary`: Tab reaches it, Enter/Space
+toggle it, ▸/▾ shows the state); a render test fails if a module page uses `MudExpansionPanel` again.
 
 ## Actionable unknowns (not invented)
 

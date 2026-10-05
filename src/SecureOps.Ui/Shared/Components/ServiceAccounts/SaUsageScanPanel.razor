@@ -31,9 +31,8 @@
     }
     else if (CanUpload)
     {
-        @* Native details/summary: keyboard operable without script (MudBlazor 6 panel headers take no focus). *@
-        <details class="sa-scan-section mt-2">
-            <summary>Tarama dosyası yükle ve bu hesaba bağla</summary>
+        @* Native details/summary (SaDisclosure): keyboard operable without script (MudBlazor 6 panel headers take no focus). *@
+        <SaDisclosure Class="mt-2" Title="Tarama dosyası yükle ve bu hesaba bağla">
             <p class="so-panel-text--sm">
                 Dosya, her sunucuda çalıştırılan <code>Get-ServiceAccountUsage.ps1</code> çıktılarından kendi makinenizde
                 <code>Invoke-ServiceAccountUsageScan.ps1 -CombinePath</code> ile üretilir (JSON, en çok 4 MB). Dosya bu hesabı aramış olmalı.
@@ -63,7 +62,7 @@
             @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
             <MudButton OnClick="UploadAsync" Disabled="@(!CanSend)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
                 StartIcon="@Icons.Material.Filled.UploadFile">Yükle ve bu hesaba bağla</MudButton>
-        </details>
+        </SaDisclosure>
     }
 
     @if (Detail.UsageScans is { Count: 0 })
@@ -214,8 +213,7 @@
             </ul>
         }
 
-        <details class="sa-scan-section mt-2">
-            <summary>Sunucu bazında kapsam (@scan.Servers.Count sunucu)</summary>
+        <SaDisclosure Class="mt-2" Title="@($"Sunucu bazında kapsam ({scan.Servers.Count} sunucu)")">
             <MudTable Items="scan.Servers" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageScanServerView">
                 <HeaderContent>
                     <MudTh>Sunucu</MudTh><MudTh>Tarama</MudTh><MudTh>Bu hesap için</MudTh>
@@ -235,7 +233,7 @@
                     </MudTd>
                 </RowTemplate>
             </MudTable>
-        </details>
+        </SaDisclosure>
     </section>
 }
 
