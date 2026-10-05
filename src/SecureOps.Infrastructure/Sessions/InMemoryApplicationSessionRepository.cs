@@ -92,7 +92,7 @@ public sealed class InMemoryApplicationSessionRepository(IAuditWriter auditWrite
                 next[sessionId] = session! with { EndedAtUtc = endedAtUtc, EndReason = reason };
             }
 
-            // Prepare state before audit; after the atomic append, publication cannot fail or cancel.
+            // Prepare state before audit; after successful audit, publication cannot fail or cancel.
             await AppendAuditAsync([auditEvent], cancellationToken);
             _sessions = next;
             return ended;
@@ -205,16 +205,22 @@ public sealed class InMemoryApplicationSessionRepository(IAuditWriter auditWrite
 
         try
         {
-            if (auditWriter is not IAtomicAuditWriter atomic)
+            if (auditWriter is IAtomicAuditWriter atomic)
             {
-                throw new AuditWriteUnavailableException("Atomic in-memory session termination requires an atomic local audit writer.");
+                await atomic.WriteBatchAsync(events, cancellationToken);
             }
-
-            await atomic.WriteBatchAsync(events, cancellationToken);
+            else
+            {
+                // Non-durable sessions publish only after every audit write succeeds; audit prefixes remain append-only.
+                foreach (AuditEvent auditEvent in events)
+                {
+                    await auditWriter.WriteAsync(auditEvent, cancellationToken);
+                }
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            throw new AuditWriteUnavailableException("Application-session atomic local audit failed.", exception);
+            throw new AuditWriteUnavailableException("Application-session local audit failed.", exception);
         }
     }
 }

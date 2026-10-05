@@ -68,22 +68,32 @@ results and F4 already-running validation boundaries remain open and outside thi
 ## Amendment 3 - Atomic session termination and audit, 2026-10-05
 
 Owner-approved F1 policy: logout, administrative revoke, idle/absolute expiry and terminal
-bulk operations commit their session changes and required append-only audit together.
+bulk operations commit their SQL session changes and required append-only audit together.
+The owner's 2026-10-06 correction permits audit-first sequencing for non-durable InMemory
+sessions with non-atomic writers, as specified below; SQL transaction guarantees are unchanged.
 
 - The SQL repository owns the transaction and directly inserts into the existing `audit.AuditLog`
   on the same connection/transaction as the session update. Queued audit cannot enlist and is
   not used for these terminal events. No schema, grant, audit update/delete or migration changes.
-- Expiry sweeps and access-disable/change batches commit all affected state and terminal events
+- SQL expiry sweeps and access-disable/change batches commit all affected state and terminal events
   together. Any update/audit failure rolls back the batch; the caller receives an unavailable
   result. Caller cancellation propagates and an uncommitted transaction is disposed/rolled back.
-- InMemory prepares replacement state under its repository gate before publishing an atomic
-  audit batch, then publishes state without another failing/cancellable operation. The local
-  audit writer prepares all events and reserves capacity before appending them as one batch.
+- InMemory with `IAtomicAuditWriter` prepares replacement state under its repository gate before
+  publishing an atomic audit batch, then publishes state without another failing/cancellable
+  operation. The local audit writer prepares all events and reserves capacity before appending
+  them as one batch.
   This is process-local test behavior, not durable crash-recovery evidence.
-- Unsupported mixed InMemory session/File or queued audit compositions cannot satisfy atomicity:
-  termination fails closed with `AuditStoreUnavailable`, leaving state and terminal audit unchanged.
-  Existing shipped defaults are not changed; supported local acceptance uses InMemory/InMemory,
-  and durable acceptance uses SQL sessions and the same SQL audit table.
+- InMemory with non-atomic File/Queued writers prepares replacement state under the same gate,
+  awaits each audit write first, and publishes session termination only after all writes succeed.
+  Audit failure throws `AuditWriteUnavailableException`, returns `AuditStoreUnavailable` (503),
+  and leaves all affected sessions Active. Writer-observed cancellation propagates without
+  publishing state; after successful audit no new cancellable operation precedes publication.
+  This supports the shipped File default without changing configuration or writer behavior.
+  Rationale: InMemory sessions are a non-durable local store; they cannot share a persistent
+  transaction with File/Queued audit. A later write failure can leave an append-only audit prefix
+  while every session stays Active; retries can append duplicates. Queue success means accepted
+  enqueue, not confirmed durable sink persistence. Neither pairing promises durable crash recovery
+  or SQL-style batch rollback. SQL sessions retain genuine same-transaction state/audit atomicity.
 - Audit failures are translated to safe unavailable responses; internal exceptions are retained
   but their payloads, identity and handles are not logged by the new terminal-audit error paths.
 - The repository still returns whether an active row actually transitioned. Service response

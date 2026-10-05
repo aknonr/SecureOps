@@ -22,6 +22,79 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class ApplicationSessionHostedTests
 {
     [Theory]
+    [InlineData("Logout", false)]
+    [InlineData("Revoke", false)]
+    [InlineData("Expiry", false)]
+    [InlineData("AccessDisabled", false)]
+    [InlineData("Logout", true)]
+    [InlineData("Revoke", true)]
+    [InlineData("Expiry", true)]
+    [InlineData("AccessDisabled", true)]
+    public async Task NonAtomicAudit_TerminationSucceedsOrReturns503WithoutEndingSession(string path, bool failAudit)
+    {
+        NonAtomicTerminalAudit audit = new();
+        SessionClock time = new(DateTimeOffset.UtcNow);
+        using WebApplicationFactory<Program> factory = CreateFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IAuditWriter>(audit);
+            services.AddSingleton<TimeProvider>(time);
+        }));
+        using HttpClient browser = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse session, string cookie) = await StartAsync(browser);
+        (_, string adminCookie) = await StartAsync(admin);
+        long version = 0;
+        if (path == "AccessDisabled")
+        {
+            using HttpRequestMessage usersRequest = Request(HttpMethod.Get, "/api/v1/access/users", adminCookie);
+            using HttpResponseMessage usersResponse = await admin.SendAsync(usersRequest, TestContext.Current.CancellationToken);
+            version = (await usersResponse.Content.ReadFromJsonAsync<AccessUserResponse[]>(cancellationToken: TestContext.Current.CancellationToken))!
+                .Single(user => user.UserId == session.UserId).Version;
+        }
+
+        audit.Reject = failAudit;
+        if (path == "Expiry")
+        {
+            time.Advance(TimeSpan.FromMinutes(30));
+        }
+
+        using HttpRequestMessage request = Request(path == "Expiry" ? HttpMethod.Get : HttpMethod.Post, path switch
+        {
+            "Logout" => "/api/v1/access/logout",
+            "Revoke" => "/api/v1/sessions/revoke",
+            "AccessDisabled" => $"/api/v1/access/users/{session.UserId}/disable",
+            _ => "/api/v1/sessions/current"
+        }, path is "Revoke" or "AccessDisabled" ? adminCookie : cookie);
+        if (path == "Revoke")
+        {
+            request.Content = JsonContent.Create(new RevokeApplicationSessionRequest(session.SessionId, "Synthetic approved revoke"));
+        }
+        else if (path == "AccessDisabled")
+        {
+            request.Content = JsonContent.Create(new DisableAccessRequest("Synthetic approved disable", version));
+        }
+
+        using HttpResponseMessage response = await (path is "Revoke" or "AccessDisabled" ? admin : browser)
+            .SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(failAudit ? HttpStatusCode.ServiceUnavailable
+            : path == "Expiry" ? HttpStatusCode.Forbidden : HttpStatusCode.OK);
+        if (failAudit)
+        {
+            await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, "AuditStoreUnavailable");
+        }
+        else if (path == "Expiry")
+        {
+            await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionExpired");
+        }
+
+        (await factory.Services.GetRequiredService<IApplicationSessionRepository>()
+            .GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().Be(failAudit);
+        audit.TerminalWriteAttempts.Should().Be(1);
+        audit.Inner.Events.Count(item => NonAtomicTerminalAudit.IsTerminal(item.Action)).Should().Be(failAudit ? 0 : 1);
+    }
+
+    [Theory]
     [InlineData("Logout")]
     [InlineData("Revoke")]
     [InlineData("Expiry")]
@@ -479,6 +552,31 @@ public sealed class ApplicationSessionHostedTests
         response.StatusCode.Should().Be(status);
         ProblemDetails problem = (await response.Content.ReadFromJsonAsync<ProblemDetails>())!;
         problem.Extensions["code"]!.ToString().Should().Be(code);
+    }
+
+    private sealed class NonAtomicTerminalAudit : IAuditWriter
+    {
+        public InMemoryAuditWriter Inner { get; } = new();
+        public bool Reject { get; set; }
+        public int TerminalWriteAttempts { get; private set; }
+        public static bool IsTerminal(string action) => action is AuditActions.ApplicationSessionLoggedOut
+            or AuditActions.ApplicationSessionRevoked or AuditActions.ApplicationSessionIdleTimedOut
+            or AuditActions.ApplicationSessionAccessDisabled;
+
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsTerminal(auditEvent.Action))
+            {
+                TerminalWriteAttempts++;
+                if (Reject)
+                {
+                    throw new IOException("Synthetic file-like audit failure.");
+                }
+            }
+
+            return Inner.WriteAsync(auditEvent, cancellationToken);
+        }
     }
 
     private sealed class RejectingTerminalAudit : IAtomicAuditWriter

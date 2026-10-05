@@ -19,17 +19,21 @@ isolated SQL failure injection is now verified by the approved F1 follow-up.
 
 ### Missing Guarantees
 
-**F1 - P1: Resolved; termination and append-only audit commit atomically.**
+**F1 - P1: Resolved; SQL termination/audit commit atomically; non-durable memory uses audit-first publication.**
 Evidence: `ApplicationSessionServiceTests.Termination_*` covers audit failure, update failure
 and success for logout, revoke, idle/absolute expiry, expiry sweep and access-disable batches.
 Hosted `TerminalAuditFailure_ReturnsRetryableUnavailableAndKeepsPersistedSessionActive` proves
 retryable 503 responses for logout/revoke/expiry. The SQL repository uses one transaction for
-updates and direct audit INSERT; InMemory stages state and requires atomic audit publication.
+updates and direct audit INSERT. InMemory stages state and retains atomic audit batching with
+`IAtomicAuditWriter`; the approved 2026-10-06 correction awaits File/Queued writes before state
+publication. `NonAtomicAudit_TerminationSucceedsOrReturns503WithoutEndingSession` covers hosted
+logout/revoke/expiry/user-disable success and audit-failure 503; unit non-atomic matrices cover
+all six paths, cancellation, awaited asynchronous failure and retained audit prefixes with Active state.
 Six actual `ResourceSqlTests.Sessions_*` tests cover the same six-path matrix, second-audit
 insert rollback of the first insert and both updates, cancellation, and true/false transition
 results. `artifacts/test-results/f1-sql-final/` and `artifacts/session-localdb-final.log` retain
 evidence. The complete guarded harness passed 56 SQL tests, zero skips, migrations 001-027.
-ADR-0014 Amendment 3 records atomicity, supported compositions and F3/F4 exclusions.
+ADR-0014 Amendment 3 records SQL atomicity, the corrected local audit-first compositions and F3/F4 exclusions.
 
 Original finding (historical source references):
 `src/SecureOps.Infrastructure/Sessions/ApplicationSessionService.cs:215` ends a session before
@@ -147,6 +151,41 @@ dropped in `finally`. Both isolated databases are retained for inspection:
 - `SecureOps_ResourcesV1_SessionAtomic_20261005_983d69252cb8` (red/green focused evidence).
 - `SecureOps_ResourcesV1_SessionFinal_20261005_f821770ce3d5` (fresh full SQL harness).
 
+### InMemory Audit-First Correction Verification, 2026-10-06
+
+The new commit changes only InMemory terminal audit dispatch; SQL implementation, atomic
+audit batching, terminal-handle cleanup and F3-F6 remain unchanged. Tests preceded the fix:
+17 unit and 8 hosted integration cases failed because non-atomic writers were never called;
+the existing atomic cancellation control passed. Final evidence on SDK 10.0.401:
+
+| Gate | Result |
+|---|---|
+| Focused session and atomic-audit regressions | 51 unit + 24 hosted integration passed, 0 skips |
+| `dotnet build SecureOps.sln -c Release` | 0 warnings, 0 errors |
+| `dotnet test SecureOps.sln -c Release --no-build` | 1,768 unit + 332 integration passed; 110 opt-ins skipped |
+| `dotnet format SecureOps.sln --verify-no-changes` | Passed |
+| `git diff --check` | Passed |
+| Guarded `Test-ResourceCatalogueSql.ps1 -RunTests` | 56 Resource SQL tests passed, 0 skips; migrations 001-027 and upgrade fixture passed |
+
+Fresh retained database: `SecureOps_ResourcesV1_SessionAudit_20261006_61c50e191d3f` on the
+authorized `(localdb)\SecureOpsResourcesV1` instance. SQL failure-injection regressions re-prove
+audit/update rollback, partial-batch rollback, cancellation and transition booleans without
+SQL runtime changes. The 56 SQL tests were skipped in the ordinary run and executed separately;
+54 other opt-ins remain unrun. Focused totals overlap the full suite. Ignored evidence:
+`artifacts/test-results/non-atomic-red/`, `non-atomic-focused/`, `non-atomic-full/`, and
+`artifacts/session-audit-localdb-20261006.log`.
+
+File-like non-atomic tests prove all six termination paths, exception cause preservation,
+awaited asynchronous failure, pre-audit cancellation and partial-batch audit-prefix retention
+with all sessions Active. Hosted tests prove logout, admin revoke, expiry and user-disable
+success or 503/Active on audit failure. Atomic writer regressions pass unchanged. Real File
+sink failure, queue-drain persistence, browser/IIS/provider and multi-node acceptance are not
+claimed; F5 concrete-provider scope remains open. No Playwright, deployment or corporate access.
+
+The entire correction diff was reviewed for awaits, exception handling, cancellation,
+publication under the existing gate and absence of new identity/handle logging. No SQL,
+forbidden UI, configuration or F3-F6 implementation edits were made.
+
 ## 3. Blockers
 
 - F1/F2 are resolved within the approved scope; actual IIS/browser lifecycle acceptance is separate.
@@ -160,8 +199,9 @@ dropped in `finally`. Both isolated databases are retained for inspection:
 
 ## 4. Minimal Safe Next Step
 
-Review the two separate local F2/F1 commits and the prepared draft PR text. The current task
-explicitly forbids push/PR creation. Define F3/F4 semantics before implementation; F5/F6 wait.
+Review the separate F2/F1 commits and the new InMemory audit-first correction in a draft PR
+against `claude/dotnet10-ui-mudblazor9`. The owner authorized own-branch push/draft PR on
+2026-10-06, not merge/deployment. Define F3/F4 semantics before implementation; F5/F6 wait.
 
 ## 5. Risks
 
@@ -169,7 +209,9 @@ Revocation is observed on the browser's next API operation. The existing circuit
 triggers an HTTP request that rejects/deletes the UI cookie. Idle browsers do not receive a new
 polling mechanism. Credential clearing and old-cookie rejection are locally tested; multi-node
 hosting, actual browser navigation and Windows/IIS/provider lifecycle behavior remain unproven.
-InMemory/File or queued audit cannot share atomic session persistence and now fails closed
-for termination; shipped defaults were not changed. Initial-session insertion/failed-start
-compensation was not redesigned. Passing local gates does not establish corporate readiness
+InMemory/File or queued audit awaits audit acceptance before publishing non-durable session
+termination; audit failure leaves sessions Active and returns 503. A failed multi-event batch
+can retain an append-only audit prefix; retry can duplicate events. Queue acceptance is not
+durable sink persistence. SQL retains real transactional rollback; shipped defaults were not changed.
+Initial-session insertion/failed-start compensation was not redesigned. Passing local gates does not establish corporate readiness
 or resolve F3/F4. No simultaneous-termination or already-running request policy is claimed.

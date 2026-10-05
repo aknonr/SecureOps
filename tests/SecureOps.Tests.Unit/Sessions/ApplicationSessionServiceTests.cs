@@ -98,10 +98,13 @@ public sealed class ApplicationSessionServiceTests
         audit.Inner.Events.Should().NotContain(item => IsTerminal(item.Action));
     }
 
-    [Fact]
-    public async Task BatchTermination_CancellationBeforeAuditPublishesNeitherStateNorAudit()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BatchTermination_CancellationBeforeAuditPublishesNeitherStateNorAudit(bool nonAtomic)
     {
-        Fixture fixture = new();
+        NonAtomicAuditWriter writer = new();
+        Fixture fixture = new(auditWriter: nonAtomic ? writer : null);
         ApplicationSession session = (await fixture.StartAsync()).Session!;
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         Func<Task> terminate = () => fixture.Repository.EndActiveForUserAsync(fixture.User.Id, fixture.Time.GetUtcNow(), SessionEndReason.AccessDisabled,
@@ -115,19 +118,109 @@ public sealed class ApplicationSessionServiceTests
 
         (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
         fixture.Audit.Events.Should().NotContain(item => IsTerminal(item.Action));
+        writer.Inner.Events.Should().NotContain(item => IsTerminal(item.Action));
     }
 
     [Fact]
-    public async Task Termination_NonAtomicAuditWriterFailsClosedBeforePublishingState()
+    public async Task Termination_NonAtomicPendingAuditIsAwaitedAndAsyncFailureKeepsSessionActive()
     {
+        TaskCompletionSource pendingAudit = new(TaskCreationOptions.RunContinuationsAsynchronously);
         IAuditWriter writer = Substitute.For<IAuditWriter>();
+        writer.WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        writer.WriteAsync(Arg.Is<AuditEvent>(item => item.Action == AuditActions.ApplicationSessionLoggedOut),
+            Arg.Any<CancellationToken>()).Returns(pendingAudit.Task);
         Fixture fixture = new(auditWriter: writer);
         ApplicationSession session = (await fixture.StartAsync()).Session!;
 
-        (await fixture.TerminateAsync("Logout", session.SessionId)).Should().Be(OperationalErrorCodes.AuditStoreUnavailable);
+        Task<string?> termination = fixture.TerminateAsync("Logout", session.SessionId);
+        try
+        {
+            termination.IsCompleted.Should().BeFalse("session termination must await the audit write");
+        }
+        finally
+        {
+            pendingAudit.SetException(new IOException("Synthetic asynchronous audit failure."));
+        }
 
+        (await termination).Should().Be(OperationalErrorCodes.AuditStoreUnavailable);
         (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
-        await writer.DidNotReceive().WriteAsync(Arg.Is<AuditEvent>(item => item.Action == AuditActions.ApplicationSessionLoggedOut), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("Logout")]
+    [InlineData("Revoke")]
+    [InlineData("Idle")]
+    [InlineData("Absolute")]
+    [InlineData("Sweep")]
+    [InlineData("AccessDisabled")]
+    public async Task Termination_NonAtomicAuditWriterWritesAuditBeforePublishingState(string path)
+    {
+        NonAtomicAuditWriter writer = new();
+        Fixture fixture = new(auditWriter: writer);
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+
+        (await fixture.TerminateAsync(path, session.SessionId)).Should().Be(
+            path is "Idle" or "Absolute" ? OperationalErrorCodes.SessionExpired : null);
+
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeFalse();
+        writer.Inner.Events.Should().ContainSingle(item => IsTerminal(item.Action));
+    }
+
+    [Theory]
+    [InlineData("Logout")]
+    [InlineData("Revoke")]
+    [InlineData("Idle")]
+    [InlineData("Absolute")]
+    [InlineData("Sweep")]
+    [InlineData("AccessDisabled")]
+    public async Task Termination_NonAtomicAuditFailureLeavesSessionActive(string path)
+    {
+        NonAtomicAuditWriter writer = new();
+        Fixture fixture = new(auditWriter: writer);
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+        writer.FailOnTerminalWrite = 1;
+
+        (await fixture.TerminateAsync(path, session.SessionId)).Should().Be(OperationalErrorCodes.AuditStoreUnavailable);
+
+        writer.TerminalWriteAttempts.Should().Be(1);
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        writer.Inner.Events.Should().NotContain(item => IsTerminal(item.Action));
+    }
+
+    [Theory]
+    [InlineData("Sweep")]
+    [InlineData("AccessDisabled")]
+    public async Task BatchTermination_NonAtomicSecondAuditFailureKeepsAllSessionsActiveAndRetainsWrittenPrefix(string path)
+    {
+        NonAtomicAuditWriter writer = new();
+        Fixture fixture = new(auditWriter: writer);
+        ApplicationSession first = (await fixture.StartAsync()).Session!;
+        ApplicationSession second = (await fixture.StartAsync()).Session!;
+        writer.FailOnTerminalWrite = 2;
+
+        (await fixture.TerminateAsync(path, first.SessionId)).Should().Be(OperationalErrorCodes.AuditStoreUnavailable);
+
+        writer.TerminalWriteAttempts.Should().Be(2);
+        (await fixture.Repository.GetAsync(first.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        (await fixture.Repository.GetAsync(second.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        writer.Inner.Events.Should().ContainSingle(item => IsTerminal(item.Action));
+    }
+
+    [Fact]
+    public async Task RepositoryTermination_NonAtomicFailureWrapsOriginalExceptionAndPreservesActiveState()
+    {
+        NonAtomicAuditWriter writer = new();
+        Fixture fixture = new(auditWriter: writer);
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+        writer.FailOnTerminalWrite = 1;
+        Func<Task> terminate = () => fixture.Repository.EndWithAuditAsync(session.SessionId,
+            fixture.Time.GetUtcNow(), SessionEndReason.Logout,
+            new AuditEvent { Actor = "synthetic", Action = AuditActions.ApplicationSessionLoggedOut },
+            TestContext.Current.CancellationToken);
+
+        (await terminate.Should().ThrowAsync<AuditWriteUnavailableException>()).Which.InnerException
+            .Should().BeOfType<IOException>();
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
     }
 
     [Fact]
@@ -376,6 +469,24 @@ public sealed class ApplicationSessionServiceTests
     {
         public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken) =>
             Task.FromException(new AuditWriteUnavailableException("Synthetic audit failure."));
+    }
+
+    private sealed class NonAtomicAuditWriter : IAuditWriter
+    {
+        public InMemoryAuditWriter Inner { get; } = new();
+        public int FailOnTerminalWrite { get; set; }
+        public int TerminalWriteAttempts { get; private set; }
+
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsTerminal(auditEvent.Action) && ++TerminalWriteAttempts == FailOnTerminalWrite)
+            {
+                throw new IOException("Synthetic file-like audit failure.");
+            }
+
+            return Inner.WriteAsync(auditEvent, cancellationToken);
+        }
     }
 
     private sealed class ToggleAuditWriter : IAtomicAuditWriter
