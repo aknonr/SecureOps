@@ -1,5 +1,9 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SecureOps.Shared.Contracts.Api;
+using SecureOps.Shared.Contracts.Sessions;
 
 namespace SecureOps.Ui.Services;
 
@@ -76,6 +80,21 @@ public sealed class ApiSessionCookieHandler(IApiSessionStore store, ILogger<ApiS
         CancellationToken cancellationToken)
     {
         string cookieHeader = session.GetApiCookieHeader(uri);
+        if (session.RequiresReauthentication)
+        {
+            return new HttpResponseMessage(HttpStatusCode.Forbidden)
+            {
+                RequestMessage = request,
+                Content = JsonContent.Create(new
+                {
+                    status = 403,
+                    code = OperationalErrorCodes.SessionRevoked,
+                    stage = "session",
+                    retryable = false
+                }, mediaType: new("application/problem+json"))
+            };
+        }
+
         if (!string.IsNullOrEmpty(cookieHeader))
         {
             request.Headers.Remove(HeaderNames.Cookie);
@@ -83,6 +102,23 @@ public sealed class ApiSessionCookieHandler(IApiSessionStore store, ILogger<ApiS
         }
 
         HttpResponseMessage response = await base.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            try
+            {
+                string body = await response.Content.ReadAsStringAsync(cancellationToken);
+                ProblemDetailsPayload? problem = JsonSerializer.Deserialize<ProblemDetailsPayload>(body, ApiResponseReader.JsonOptions);
+                if (problem?.EffectiveCode is OperationalErrorCodes.SessionRevoked or OperationalErrorCodes.SessionExpired)
+                {
+                    _store.RequireReauthentication(browserSessionKey);
+                }
+            }
+            catch (JsonException)
+            {
+                // Leave malformed or non-session errors for the typed client's usual handling.
+            }
+        }
+
         Capture(browserSessionKey, session, uri, response);
         return response;
     }
@@ -93,6 +129,12 @@ public sealed class ApiSessionCookieHandler(IApiSessionStore store, ILogger<ApiS
         Uri uri,
         HttpResponseMessage response)
     {
+        if (response.Headers.TryGetValues(ApplicationSessionHeaders.ReauthenticationRequired, out IEnumerable<string>? required)
+            && required.Contains(ApplicationSessionHeaders.Required, StringComparer.Ordinal))
+        {
+            _store.RequireReauthentication(browserSessionKey);
+        }
+
         if (!response.Headers.TryGetValues(HeaderNames.SetCookie, out IEnumerable<string>? setCookies))
         {
             return;
@@ -102,10 +144,8 @@ public sealed class ApiSessionCookieHandler(IApiSessionStore store, ILogger<ApiS
         {
             try
             {
-                // A terminal server session must keep presenting its dead protected handle until
-                // the UI authentication session is explicitly replaced. This also covers a
-                // successful self-revoke response: applying its deletion header would make the
-                // next request look like a first login and silently create a fresh session.
+                // Also accept the deletion signal from older API deployments. A terminal marker
+                // blocks subsequent calls after the cookie jar and token material are cleared.
                 if (IsApplicationSessionDeletion(setCookie))
                 {
                     if (!IsExplicitLogout(uri))

@@ -11,7 +11,7 @@ public sealed class OperationalRecordClaimTests
     {
         ManualTimeProvider time = new();
         InMemoryOperationalRecordRepository repository = new(time);
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
 
         WorkflowClaimResult first = await repository.TryClaimAsync(record.Id, "actor-a", TimeSpan.FromMinutes(2), "correlation-a", CancellationToken.None);
         WorkflowClaimResult second = await repository.TryClaimAsync(record.Id, "actor-b", TimeSpan.FromMinutes(2), "correlation-b", CancellationToken.None);
@@ -26,7 +26,7 @@ public sealed class OperationalRecordClaimTests
     {
         ManualTimeProvider time = new();
         InMemoryOperationalRecordRepository repository = new(time);
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         _ = await repository.TryClaimAsync(record.Id, "actor-a", TimeSpan.FromMinutes(2), "correlation-a", CancellationToken.None);
         time.Advance(TimeSpan.FromMinutes(3));
 
@@ -41,7 +41,7 @@ public sealed class OperationalRecordClaimTests
     {
         ManualTimeProvider time = new();
         InMemoryOperationalRecordRepository repository = new(time);
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         string transferKey = OperationalRecordIdempotency.Create(record.SourceRecordId, "mapping-v1");
         _ = await repository.MarkPreviewedAsync(record.Id, "mapping-v1", transferKey, "actor-a", "correlation-a", CancellationToken.None);
         _ = await repository.TryClaimAsync(record.Id, "actor-a", TimeSpan.FromMinutes(2), "correlation-a", CancellationToken.None);

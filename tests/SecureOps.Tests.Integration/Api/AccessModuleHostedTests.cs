@@ -18,7 +18,7 @@ public sealed class AccessModuleHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(demoCompatibilityEnabled: true);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        AccessModuleOverviewResponse overview = (await admin.GetFromJsonAsync<AccessModuleOverviewResponse>("/api/v1/access/modules"))!;
+        AccessModuleOverviewResponse overview = (await admin.GetFromJsonAsync<AccessModuleOverviewResponse>("/api/v1/access/modules", cancellationToken: TestContext.Current.CancellationToken))!;
 
         overview.Modules.Select(module => module.Module).Should().Contain(["In Use", "Bağlantılar", "OCO"]);
         overview.Modules.SelectMany(module => module.Actions).Single(action => action.Code == Capabilities.InUseView)
@@ -32,7 +32,7 @@ public sealed class AccessModuleHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(demoCompatibilityEnabled: true);
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
 
-        HttpResponseMessage response = await lead.GetAsync("/api/v1/access/modules");
+        HttpResponseMessage response = await lead.GetAsync("/api/v1/access/modules", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -43,10 +43,10 @@ public sealed class AccessModuleHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(demoCompatibilityEnabled: true);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
-        JsonNode me = (await lead.GetFromJsonAsync<JsonNode>("/api/v1/access/me"))!;
+        JsonNode me = (await lead.GetFromJsonAsync<JsonNode>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
         Guid leadId = me["userId"]!.GetValue<Guid>();
 
-        AccessEffectiveResponse effective = (await admin.GetFromJsonAsync<AccessEffectiveResponse>($"/api/v1/access/users/{leadId}/effective"))!;
+        AccessEffectiveResponse effective = (await admin.GetFromJsonAsync<AccessEffectiveResponse>($"/api/v1/access/users/{leadId}/effective", cancellationToken: TestContext.Current.CancellationToken))!;
 
         effective.UserId.Should().Be(leadId);
         effective.Status.Should().Be("Approved");
@@ -62,9 +62,9 @@ public sealed class AccessModuleHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(demoCompatibilityEnabled: true);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
-        Guid adminId = (await admin.GetFromJsonAsync<JsonNode>("/api/v1/access/me"))!["userId"]!.GetValue<Guid>();
+        Guid adminId = (await admin.GetFromJsonAsync<JsonNode>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!["userId"]!.GetValue<Guid>();
 
-        HttpResponseMessage response = await lead.GetAsync($"/api/v1/access/users/{adminId}/effective");
+        HttpResponseMessage response = await lead.GetAsync($"/api/v1/access/users/{adminId}/effective", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -75,7 +75,7 @@ public sealed class AccessModuleHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(demoCompatibilityEnabled: false);
         using HttpClient pending = Client(factory, DemoApiAuthentication.TeamLeadActor);
 
-        AccessEffectiveResponse effective = (await pending.GetFromJsonAsync<AccessEffectiveResponse>("/api/v1/access/me/effective"))!;
+        AccessEffectiveResponse effective = (await pending.GetFromJsonAsync<AccessEffectiveResponse>("/api/v1/access/me/effective", cancellationToken: TestContext.Current.CancellationToken))!;
 
         effective.Status.Should().Be("Pending");
         effective.GrantedCount.Should().Be(0);
@@ -89,12 +89,12 @@ public sealed class AccessModuleHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(demoCompatibilityEnabled: true);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
-        await lead.GetAsync("/api/v1/access/me");
+        await lead.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken);
 
-        AccessPage<AccessUserResponse> users = (await admin.GetFromJsonAsync<AccessPage<AccessUserResponse>>("/api/v1/access/users/page?page=1&pageSize=25"))!;
-        AccessPage<AccessRequestResponse> requests = (await admin.GetFromJsonAsync<AccessPage<AccessRequestResponse>>("/api/v1/access/requests/page?page=1&pageSize=25"))!;
-        HttpResponseMessage invalid = await admin.GetAsync("/api/v1/access/users/page?page=0&pageSize=25");
-        HttpResponseMessage denied = await lead.GetAsync("/api/v1/access/users/page?page=1&pageSize=25");
+        AccessPage<AccessUserResponse> users = (await admin.GetFromJsonAsync<AccessPage<AccessUserResponse>>("/api/v1/access/users/page?page=1&pageSize=25", cancellationToken: TestContext.Current.CancellationToken))!;
+        AccessPage<AccessRequestResponse> requests = (await admin.GetFromJsonAsync<AccessPage<AccessRequestResponse>>("/api/v1/access/requests/page?page=1&pageSize=25", cancellationToken: TestContext.Current.CancellationToken))!;
+        HttpResponseMessage invalid = await admin.GetAsync("/api/v1/access/users/page?page=0&pageSize=25", TestContext.Current.CancellationToken);
+        HttpResponseMessage denied = await lead.GetAsync("/api/v1/access/users/page?page=1&pageSize=25", TestContext.Current.CancellationToken);
 
         users.Total.Should().BeGreaterThanOrEqualTo(2);
         users.Items.Should().OnlyContain(user => user.RequestHistory.Count == 0);

@@ -29,9 +29,8 @@ public sealed class AnnouncementSourceConfigurationTests
         });
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
-        using HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/announcements/" + Guid.NewGuid() + "/source/jobs",
-            new { profile = "NonProd", ocoReference = "OCO-TEST", submissionKey = "test-key" });
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/announcements/" + Guid.NewGuid() + "/source/jobs", new { profile = "NonProd", ocoReference = "OCO-TEST", submissionKey = "test-key" }, cancellationToken: TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be(error);
+        (await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken)).GetProperty("code").GetString().Should().Be(error);
     }
 }

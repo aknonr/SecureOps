@@ -18,25 +18,25 @@ public sealed class ResourcesApiTests
         using HttpClient admin = Client(factory, "platform-admin");
         using HttpClient lead = Client(factory, "team-lead");
         using HttpClient anonymous = factory.CreateClient();
-        (await anonymous.GetAsync("/api/v1/resources/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await lead.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Denied"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        ResourceCategory category = await ReadAsync<ResourceCategory>(await admin.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Synthetic")));
+        (await anonymous.GetAsync("/api/v1/resources/me", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await lead.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Denied"), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        ResourceCategory category = await ReadAsync<ResourceCategory>(await admin.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Synthetic"), cancellationToken: TestContext.Current.CancellationToken));
         var request = new SaveResourceLinkRequest(category.Id, "Synthetic link", "https://example.invalid/d?orgId=1", "Synthetic purpose");
-        ResourceLink link = await ReadAsync<ResourceLink>(await admin.PostAsJsonAsync("/api/v1/resources/links", request));
-        ResourcePage page = await ReadAsync<ResourcePage>(await lead.GetAsync("/api/v1/resources/links?page=1&pageSize=1&search=Synthetic"));
+        ResourceLink link = await ReadAsync<ResourceLink>(await admin.PostAsJsonAsync("/api/v1/resources/links", request, cancellationToken: TestContext.Current.CancellationToken));
+        ResourcePage page = await ReadAsync<ResourcePage>(await lead.GetAsync("/api/v1/resources/links?page=1&pageSize=1&search=Synthetic", TestContext.Current.CancellationToken));
         page.Items.Single().Id.Should().Be(link.Id);
-        ResourcePreferencesResponse preferences = await ReadAsync<ResourcePreferencesResponse>(await lead.PostAsJsonAsync("/api/v1/resources/me/sets", new SaveShiftSetRequest("Synthetic shift", [link.Id], true)));
+        ResourcePreferencesResponse preferences = await ReadAsync<ResourcePreferencesResponse>(await lead.PostAsJsonAsync("/api/v1/resources/me/sets", new SaveShiftSetRequest("Synthetic shift", [link.Id], true), cancellationToken: TestContext.Current.CancellationToken));
         Guid id = preferences.Sets.Single().Id;
-        (await admin.GetAsync($"/api/v1/resources/me/sets/{id}/resolve")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await admin.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}", new SaveShiftSetRequest("Cross user", [], false, 0))).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await admin.DeleteAsync($"/api/v1/resources/me/sets/{id}?expectedVersion=0")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        preferences = await ReadAsync<ResourcePreferencesResponse>(await lead.PutAsJsonAsync($"/api/v1/resources/me/favourites/{link.Id}", new SaveFavouriteRequest(true, preferences.Version)));
-        (await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me"))).Favourites.Should().BeEmpty();
-        (await admin.PutAsJsonAsync($"/api/v1/resources/links/{link.Id}", request with { Archived = true, ExpectedVersion = link.Version })).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await ReadAsync<ShiftSetResponse>(await lead.GetAsync($"/api/v1/resources/me/sets/{id}/resolve"))).Links.Should().BeEmpty();
-        (await ReadAsync<ResourcePreferencesResponse>(await lead.GetAsync("/api/v1/resources/me"))).Favourites.Should().BeEmpty();
-        (await lead.GetAsync($"/api/v1/resources/links/{link.Id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await lead.GetAsync("/api/v1/resources/links?includeArchived=true")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await admin.GetAsync($"/api/v1/resources/me/sets/{id}/resolve", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await admin.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}", new SaveShiftSetRequest("Cross user", [], false, 0), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await admin.DeleteAsync($"/api/v1/resources/me/sets/{id}?expectedVersion=0", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        preferences = await ReadAsync<ResourcePreferencesResponse>(await lead.PutAsJsonAsync($"/api/v1/resources/me/favourites/{link.Id}", new SaveFavouriteRequest(true, preferences.Version), cancellationToken: TestContext.Current.CancellationToken));
+        (await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me", TestContext.Current.CancellationToken))).Favourites.Should().BeEmpty();
+        (await admin.PutAsJsonAsync($"/api/v1/resources/links/{link.Id}", request with { Archived = true, ExpectedVersion = link.Version }, cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadAsync<ShiftSetResponse>(await lead.GetAsync($"/api/v1/resources/me/sets/{id}/resolve", TestContext.Current.CancellationToken))).Links.Should().BeEmpty();
+        (await ReadAsync<ResourcePreferencesResponse>(await lead.GetAsync("/api/v1/resources/me", TestContext.Current.CancellationToken))).Favourites.Should().BeEmpty();
+        (await lead.GetAsync($"/api/v1/resources/links/{link.Id}", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await lead.GetAsync("/api/v1/resources/links?includeArchived=true", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -44,19 +44,19 @@ public sealed class ResourcesApiTests
     {
         using WebApplicationFactory<Program> factory = Factory();
         using HttpClient admin = Client(factory, "platform-admin");
-        ResourcePreferencesResponse empty = await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me"));
+        ResourcePreferencesResponse empty = await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me", TestContext.Current.CancellationToken));
         empty.Version.Should().Be(0);
         empty.DefaultSetId.Should().BeNull();
         empty.Favourites.Should().BeEmpty();
         empty.Sets.Should().BeEmpty();
-        ResourceCategory category = await ReadAsync<ResourceCategory>(await admin.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Synthetic")));
+        ResourceCategory category = await ReadAsync<ResourceCategory>(await admin.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Synthetic"), cancellationToken: TestContext.Current.CancellationToken));
         var request = new SaveResourceLinkRequest(category.Id, "Synthetic", "https://example.invalid/?token=synthetic", "Synthetic");
-        (await admin.PostAsJsonAsync("/api/v1/resources/links", request)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await admin.GetAsync("/api/v1/resources/links?pageSize=101")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await admin.PutAsJsonAsync($"/api/v1/resources/categories/{category.Id}", new SaveResourceCategoryRequest("Changed", ExpectedVersion: 1))).StatusCode.Should().Be(HttpStatusCode.OK);
-        HttpResponseMessage conflict = await admin.PutAsJsonAsync($"/api/v1/resources/categories/{category.Id}", new SaveResourceCategoryRequest("Stale", ExpectedVersion: 1));
+        (await admin.PostAsJsonAsync("/api/v1/resources/links", request, cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await admin.GetAsync("/api/v1/resources/links?pageSize=101", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await admin.PutAsJsonAsync($"/api/v1/resources/categories/{category.Id}", new SaveResourceCategoryRequest("Changed", ExpectedVersion: 1), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        HttpResponseMessage conflict = await admin.PutAsJsonAsync($"/api/v1/resources/categories/{category.Id}", new SaveResourceCategoryRequest("Stale", ExpectedVersion: 1), cancellationToken: TestContext.Current.CancellationToken);
         conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        using var json = JsonDocument.Parse(await conflict.Content.ReadAsStringAsync());
+        using var json = JsonDocument.Parse(await conflict.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         json.RootElement.GetProperty("code").GetString().Should().Be("ResourceConcurrencyConflict");
         json.RootElement.GetProperty("retryable").GetBoolean().Should().BeTrue();
     }
@@ -66,7 +66,7 @@ public sealed class ResourcesApiTests
     {
         using WebApplicationFactory<Program> factory = Factory();
         using HttpClient client = factory.CreateClient();
-        using var document = JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken));
         JsonElement root = document.RootElement;
         int count = 0;
         foreach (JsonProperty path in root.GetProperty("paths").EnumerateObject().Where(p => p.Name.StartsWith("/api/v1/resources", StringComparison.Ordinal)))
@@ -93,29 +93,27 @@ public sealed class ResourcesApiTests
         using WebApplicationFactory<Program> factory = Factory();
         using HttpClient admin = Client(factory, "platform-admin");
         using HttpClient owner = Client(factory, "team-lead");
-        ResourceCategory category = await ReadAsync<ResourceCategory>(await admin.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Synthetic contract")));
+        ResourceCategory category = await ReadAsync<ResourceCategory>(await admin.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Synthetic contract"), cancellationToken: TestContext.Current.CancellationToken));
         var request = new SaveResourceLinkRequest(category.Id, "Synthetic", "https://example.invalid/contract", "Synthetic", Environment: "Pilot");
-        ResourceLink link = await ReadAsync<ResourceLink>(await admin.PostAsJsonAsync("/api/v1/resources/links", request));
-        ResourcePreferencesResponse personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PostAsJsonAsync("/api/v1/resources/me/sets", new SaveShiftSetRequest("Original", [link.Id])));
+        ResourceLink link = await ReadAsync<ResourceLink>(await admin.PostAsJsonAsync("/api/v1/resources/links", request, cancellationToken: TestContext.Current.CancellationToken));
+        ResourcePreferencesResponse personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PostAsJsonAsync("/api/v1/resources/me/sets", new SaveShiftSetRequest("Original", [link.Id]), cancellationToken: TestContext.Current.CancellationToken));
         Guid id = personal.Sets.Single().Id;
-        await admin.PutAsJsonAsync($"/api/v1/resources/links/{link.Id}", request with { Archived = true, ExpectedVersion = 1 });
-        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}",
-            new { name = "Legacy rename", linkIds = Array.Empty<Guid>(), isDefault = true, expectedVersion = personal.Version }));
+        await admin.PutAsJsonAsync($"/api/v1/resources/links/{link.Id}", request with { Archived = true, ExpectedVersion = 1 }, cancellationToken: TestContext.Current.CancellationToken);
+        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}", new { name = "Legacy rename", linkIds = Array.Empty<Guid>(), isDefault = true, expectedVersion = personal.Version }, cancellationToken: TestContext.Current.CancellationToken));
         personal.Sets.Single().Links.Should().BeEmpty();
         personal.DefaultSetId.Should().Be(id);
-        (await ReadAsync<ResourceEnvironmentOptions>(await owner.GetAsync("/api/v1/resources/environments"))).Values.Should().BeEmpty();
-        (await owner.GetAsync("/api/v1/resources/environments?includeArchived=true")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        await admin.PutAsJsonAsync($"/api/v1/resources/links/{link.Id}", request with { ExpectedVersion = 2 });
-        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.GetAsync("/api/v1/resources/me"));
+        (await ReadAsync<ResourceEnvironmentOptions>(await owner.GetAsync("/api/v1/resources/environments", TestContext.Current.CancellationToken))).Values.Should().BeEmpty();
+        (await owner.GetAsync("/api/v1/resources/environments?includeArchived=true", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        await admin.PutAsJsonAsync($"/api/v1/resources/links/{link.Id}", request with { ExpectedVersion = 2 }, cancellationToken: TestContext.Current.CancellationToken);
+        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.GetAsync("/api/v1/resources/me", TestContext.Current.CancellationToken));
         personal.Sets.Single().Links.Single().Id.Should().Be(link.Id);
-        (await ReadAsync<ResourceEnvironmentOptions>(await owner.GetAsync("/api/v1/resources/environments?search=pilot"))).Values.Should().Equal("Pilot");
-        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync("/api/v1/resources/me/guide", new DismissResourceGuideRequest(personal.Version)));
+        (await ReadAsync<ResourceEnvironmentOptions>(await owner.GetAsync("/api/v1/resources/environments?search=pilot", TestContext.Current.CancellationToken))).Values.Should().Equal("Pilot");
+        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync("/api/v1/resources/me/guide", new DismissResourceGuideRequest(personal.Version), cancellationToken: TestContext.Current.CancellationToken));
         personal.GuideDismissed.Should().BeTrue();
-        (await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me"))).GuideDismissed.Should().BeFalse();
-        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}",
-            new SaveShiftSetRequest("Removed", [], true, personal.Version, [link.Id])));
+        (await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me", TestContext.Current.CancellationToken))).GuideDismissed.Should().BeFalse();
+        personal = await ReadAsync<ResourcePreferencesResponse>(await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}", new SaveShiftSetRequest("Removed", [], true, personal.Version, [link.Id]), cancellationToken: TestContext.Current.CancellationToken));
         personal.Sets.Single().Links.Should().BeEmpty();
-        (await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}", new SaveShiftSetRequest("Stale", [], ExpectedVersion: 1)))
+        (await owner.PutAsJsonAsync($"/api/v1/resources/me/sets/{id}", new SaveShiftSetRequest("Stale", [], ExpectedVersion: 1), cancellationToken: TestContext.Current.CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
@@ -127,18 +125,18 @@ public sealed class ResourcesApiTests
         using HttpClient admin = Client(factory, "platform-admin");
         var layout = new ResourceWorkspaceLayout("list", "compact", 10, ["groups", "links"]);
         ResourcePreferencesResponse saved = await ReadAsync<ResourcePreferencesResponse>(
-            await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout, 0)));
+            await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout, 0), cancellationToken: TestContext.Current.CancellationToken));
         saved.WorkspaceLayout.Should().BeEquivalentTo(layout);
-        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout, 0)))
+        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout, 0), cancellationToken: TestContext.Current.CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me"))).Version.Should().Be(0);
-        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout with { Shortcuts = ["catalogue"] }, 1)))
+        (await ReadAsync<ResourcePreferencesResponse>(await admin.GetAsync("/api/v1/resources/me", TestContext.Current.CancellationToken))).Version.Should().Be(0);
+        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new SaveResourceLayoutRequest(layout with { Shortcuts = ["catalogue"] }, 1), cancellationToken: TestContext.Current.CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new { layout = (object?)null, expectedVersion = 1 }))
+        (await owner.PutAsJsonAsync("/api/v1/resources/me/layout", new { layout = (object?)null, expectedVersion = 1 }, cancellationToken: TestContext.Current.CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await owner.PostAsJsonAsync("/api/v1/resources/links/resolve", new { linkIds = Array.Empty<Guid>() }))
+        (await owner.PostAsJsonAsync("/api/v1/resources/links/resolve", new { linkIds = Array.Empty<Guid>() }, cancellationToken: TestContext.Current.CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await ReadAsync<ResourceLink[]>(await owner.PostAsJsonAsync("/api/v1/resources/links/resolve", new ResolveResourceLinksRequest([Guid.NewGuid()]))))
+        (await ReadAsync<ResourceLink[]>(await owner.PostAsJsonAsync("/api/v1/resources/links/resolve", new ResolveResourceLinksRequest([Guid.NewGuid()]), cancellationToken: TestContext.Current.CancellationToken)))
             .Should().BeEmpty();
     }
 

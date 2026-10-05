@@ -27,14 +27,31 @@ public sealed class ApiSessionTransportTests
     private const string _apiCookie = "__Host-SecureOps.ApplicationSession";
 
     [Fact]
+    public void MissingEntry_IsTerminalAndInitializationCannotReactivateIt()
+    {
+        using MemoryCache cache = new(new MemoryCacheOptions());
+        ApiSessionStore store = new(cache);
+        string? notified = null;
+        store.ReauthenticationRequired += key => notified = key;
+
+        BrowserApiSession missing = store.GetOrCreate("missing");
+
+        missing.RequiresReauthentication.Should().BeTrue();
+        notified.Should().Be("missing");
+        store.InitializeAuthenticatedSession("missing").Should().BeSameAs(missing);
+        missing.RequiresReauthentication.Should().BeTrue();
+        store.InitializeAuthenticatedSession("new-explicit-sign-in").RequiresReauthentication.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task SecondRequest_ReplaysTheSessionCookieTheApiIssued()
     {
         // A browser refresh: same correlation value, second call. The API must see the handle it
         // already issued rather than being asked for a new session.
         (HttpClient client, RecordingHandler handler, _) = Create("browser-a", issueCookie: true);
 
-        await client.GetAsync("api/v1/access/me");
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         handler.SentCookies[0].Should().BeNull();
         handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
@@ -48,8 +65,8 @@ public sealed class ApiSessionTransportTests
             issueCookie: true,
             baseAddress: new Uri("http://localhost:5000/"));
 
-        await client.GetAsync("api/v1/access/me");
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         handler.SentCookies[0].Should().BeNull();
         handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
@@ -65,7 +82,7 @@ public sealed class ApiSessionTransportTests
 
         for (int operation = 0; operation < 20; operation++)
         {
-            await client.GetAsync("api/v1/access/me");
+            await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
         }
 
         handler.SentCookies.Should().HaveCount(20);
@@ -82,8 +99,8 @@ public sealed class ApiSessionTransportTests
         (HttpClient second, RecordingHandler secondHandler, _) = Create("browser-a", true, store);
 
         await Task.WhenAll(
-            first.GetAsync("api/v1/access/me"),
-            second.GetAsync("api/v1/sessions/current"));
+            first.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken),
+            second.GetAsync("api/v1/sessions/current", TestContext.Current.CancellationToken));
 
         firstHandler.SentCookies.Concat(secondHandler.SentCookies)
             .Count(cookie => cookie is null)
@@ -110,9 +127,9 @@ public sealed class ApiSessionTransportTests
         (HttpClient first, RecordingHandler firstHandler, _) = Create("browser-a", true, store);
         (HttpClient second, RecordingHandler secondHandler, _) = Create("browser-b", true, store);
 
-        await first.GetAsync("api/v1/access/me");
-        await first.GetAsync("api/v1/access/me");
-        await second.GetAsync("api/v1/access/me");
+        await first.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        await first.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        await second.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         firstHandler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
         secondHandler.SentCookies[0].Should().BeNull();
@@ -127,8 +144,8 @@ public sealed class ApiSessionTransportTests
         (HttpClient sessions, _, _) = Create("browser-a", true, store);
         (HttpClient directory, RecordingHandler directoryHandler, _) = Create("browser-a", true, store);
 
-        await sessions.GetAsync("api/v1/sessions/current");
-        await directory.GetAsync("api/v1/directory/groups/lookup");
+        await sessions.GetAsync("api/v1/sessions/current", TestContext.Current.CancellationToken);
+        await directory.GetAsync("api/v1/directory/groups/lookup", TestContext.Current.CancellationToken);
 
         directoryHandler.SentCookies[0].Should().Contain(_apiCookie + "=session-1");
     }
@@ -140,7 +157,7 @@ public sealed class ApiSessionTransportTests
         // unexplained header carrying a value the API has no business seeing.
         (HttpClient client, RecordingHandler handler, _) = Create("browser-a", issueCookie: true);
 
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         handler.SawCorrelationHeader.Should().BeFalse();
     }
@@ -152,25 +169,27 @@ public sealed class ApiSessionTransportTests
         // they must not fall back to a shared default jar.
         (HttpClient client, RecordingHandler handler, _) = Create(browserSessionKey: null, issueCookie: true);
 
-        await client.GetAsync("api/v1/access/me");
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         handler.SentCookies.Should().AllSatisfy(cookie => cookie.Should().BeNull());
     }
 
     [Fact]
-    public async Task RemovingAJar_StopsTheHandleFromBeingReplayed()
+    public async Task RemovingAJar_RequiresSignInWithoutAnotherApiRequest()
     {
         // What sign-out relies on: after API logout the handle is dead, and replaying it for the
         // next person on this browser would be worse than losing session reuse.
         IApiSessionStore store = NewStore();
         (HttpClient client, RecordingHandler handler, _) = Create("browser-a", true, store);
 
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
         store.Remove("browser-a");
-        await client.GetAsync("api/v1/access/me");
+        using HttpResponseMessage response = await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
-        handler.SentCookies[1].Should().BeNull();
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        handler.SentCookies.Should().ContainSingle();
+        store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
     }
 
     [Fact]
@@ -179,7 +198,7 @@ public sealed class ApiSessionTransportTests
         (HttpClient client, RecordingHandler handler, _) = Create("browser-a", issueCookie: false);
         handler.MalformedSetCookie = true;
 
-        HttpResponseMessage response = await client.GetAsync("api/v1/access/me");
+        HttpResponseMessage response = await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -190,15 +209,15 @@ public sealed class ApiSessionTransportTests
         (HttpClient client, RecordingHandler handler, IApiSessionStore store) = Create("browser-a", issueCookie: true);
         string? reauthenticationKey = null;
         store.ReauthenticationRequired += key => reauthenticationKey = key;
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
         handler.RejectExistingSession = true;
 
-        await client.GetAsync("api/v1/access/me");
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
-        handler.SentCookies.Should().HaveCount(3);
+        handler.SentCookies.Should().HaveCount(2);
         handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
-        handler.SentCookies[2].Should().Contain(_apiCookie + "=session-1");
+        store.GetOrCreate("browser-a").GetApiCookieHeader(new Uri("https://localhost/")).Should().BeEmpty();
         reauthenticationKey.Should().Be("browser-a");
         store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
     }
@@ -209,18 +228,70 @@ public sealed class ApiSessionTransportTests
         (HttpClient client, RecordingHandler handler, IApiSessionStore store) = Create("browser-a", issueCookie: true);
         string? reauthenticationKey = null;
         store.ReauthenticationRequired += key => reauthenticationKey = key;
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
         handler.DeleteExistingSession = true;
 
-        HttpResponseMessage revoke = await client.PostAsync("api/v1/sessions/revoke", content: null);
-        await client.GetAsync("api/v1/access/me");
+        HttpResponseMessage revoke = await client.PostAsync("api/v1/sessions/revoke", content: null, cancellationToken: TestContext.Current.CancellationToken);
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         revoke.StatusCode.Should().Be(HttpStatusCode.OK);
-        handler.SentCookies.Should().HaveCount(3);
+        handler.SentCookies.Should().HaveCount(2);
         handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
-        handler.SentCookies[2].Should().Contain(_apiCookie + "=session-1");
+        store.GetOrCreate("browser-a").GetApiCookieHeader(new Uri("https://localhost/")).Should().BeEmpty();
         reauthenticationKey.Should().Be("browser-a");
         store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RevocationSignal_ClearsCredentialsAndBlocksEveryClientForOnlyThatBrowser()
+    {
+        IApiSessionStore store = NewStore();
+        (HttpClient first, RecordingHandler handler, _) = Create("browser-a", true, store);
+        (HttpClient tab, RecordingHandler tabHandler, _) = Create("browser-a", true, store);
+        (HttpClient separate, RecordingHandler separateHandler, _) = Create("browser-b", true, store);
+        await first.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        store.GetOrCreate("browser-a").SetOidcTokens(new OidcServerTokenSet(
+            "synthetic-access", DateTimeOffset.UtcNow.AddHours(1), "synthetic-refresh",
+            DateTimeOffset.UtcNow.AddHours(2), "synthetic-id", new Uri("https://identity.example.test/token")));
+        int signals = 0;
+        store.ReauthenticationRequired += _ => signals++;
+        handler.RequireReauthentication = true;
+
+        await first.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        HttpResponseMessage blocked = await tab.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        HttpResponseMessage other = await separate.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        store.RequireReauthentication("browser-a");
+
+        blocked.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ApiResponseReader.ToExceptionAsync(blocked, TestContext.Current.CancellationToken)).Problem.Code.Should().Be("SessionRevoked");
+        tabHandler.SentCookies.Should().BeEmpty();
+        other.StatusCode.Should().Be(HttpStatusCode.OK);
+        separateHandler.SentCookies.Should().ContainSingle();
+        signals.Should().Be(1);
+        BrowserApiSession terminal = store.GetOrCreate("browser-a");
+        terminal.GetApiCookieHeader(new Uri("https://localhost/")).Should().BeEmpty();
+        terminal.GetOidcAccessToken(DateTimeOffset.UtcNow).Should().BeNull();
+        terminal.GetOidcIdToken().Should().BeNull();
+        terminal.SetApiCookies(new Uri("https://localhost/"), _apiCookie + "=late-response; Path=/; Secure");
+        terminal.SetOidcAccessToken("late-refresh", DateTimeOffset.UtcNow.AddHours(1));
+        terminal.GetApiCookieHeader(new Uri("https://localhost/")).Should().BeEmpty();
+        terminal.GetOidcAccessToken(DateTimeOffset.UtcNow).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("SessionRevoked", true)]
+    [InlineData("SessionExpired", true)]
+    [InlineData("AccessDenied", false)]
+    public async Task ForbiddenProblem_OnlyTerminalSessionCodesEndBrowserAuthentication(string code, bool terminal)
+    {
+        (HttpClient client, RecordingHandler handler, IApiSessionStore store) = Create("browser-a", true);
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+        handler.ProblemCode = code;
+
+        HttpResponseMessage response = await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
+
+        (await ApiResponseReader.ToExceptionAsync(response, TestContext.Current.CancellationToken)).Problem.Code.Should().Be(code);
+        store.GetOrCreate("browser-a").RequiresReauthentication.Should().Be(terminal);
     }
 
     [Fact]
@@ -229,10 +300,10 @@ public sealed class ApiSessionTransportTests
         (HttpClient client, RecordingHandler handler, IApiSessionStore store) = Create("browser-a", issueCookie: true);
         string? reauthenticationKey = null;
         store.ReauthenticationRequired += key => reauthenticationKey = key;
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
         handler.DeleteExistingSession = true;
 
-        await client.PostAsync("api/v1/access/logout", content: null);
+        await client.PostAsync("api/v1/access/logout", content: null, cancellationToken: TestContext.Current.CancellationToken);
 
         reauthenticationKey.Should().BeNull();
         store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeFalse();
@@ -294,7 +365,7 @@ public sealed class ApiSessionTransportTests
         using HttpClient client = new(relay) { BaseAddress = new Uri("https://localhost/") };
         ApiSessionHeaders.Attach(client, new FakeApiSessionContext("browser-a"));
 
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         recording.Authorization.Should().Be("Bearer token-a");
     }
@@ -316,7 +387,7 @@ public sealed class ApiSessionTransportTests
         using HttpClient client = new(relay) { BaseAddress = new Uri("https://localhost/") };
         ApiSessionHeaders.Attach(client, new FakeApiSessionContext("browser-a"));
 
-        await client.GetAsync("api/v1/access/me");
+        await client.GetAsync("api/v1/access/me", TestContext.Current.CancellationToken);
 
         recording.Authorization.Should().BeNull();
     }
@@ -360,6 +431,29 @@ public sealed class ApiSessionTransportTests
                 && values["refresh_token"] == "initial-refresh"
                 && !values.ContainsKey("client_secret")),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task OidcSession_RevokedDuringRefresh_DoesNotRestoreTokenMaterial()
+    {
+        IApiSessionStore store = NewStore();
+        BrowserApiSession session = store.GetOrCreate("browser-a");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        session.SetOidcTokens(new OidcServerTokenSet("expired", now, "synthetic-refresh",
+            now.AddHours(1), "synthetic-id", new Uri("https://identity.example.test/token")));
+        TaskCompletionSource<OpenIdConnectMessage> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        IOidcBackchannelClient backchannel = Substitute.For<IOidcBackchannelClient>();
+        backchannel.PostTokenAsync(Arg.Any<Uri>(), Arg.Any<IReadOnlyDictionary<string, string>>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
+        Task<OidcAccessTokenResult> refresh = session.GetOidcAccessTokenAsync(now,
+            new OidcOptions { ClientId = "synthetic-client", ClientAuthenticationMethod = "None" }, backchannel, TestContext.Current.CancellationToken);
+
+        store.RequireReauthentication("browser-a");
+        pending.SetResult(new OpenIdConnectMessage { AccessToken = "late-access", RefreshToken = "late-refresh", ExpiresIn = "900" });
+        OidcAccessTokenResult result = await refresh;
+
+        result.Should().Be(new OidcAccessTokenResult(null, true));
+        session.GetOidcAccessToken(now).Should().BeNull();
+        session.GetOidcIdToken().Should().BeNull();
     }
 
     [Fact]
@@ -415,8 +509,13 @@ public sealed class ApiSessionTransportTests
         }
     }
 
-    private static IApiSessionStore NewStore() =>
-        new ApiSessionStore(new MemoryCache(new MemoryCacheOptions()));
+    private static IApiSessionStore NewStore()
+    {
+        ApiSessionStore store = new(new MemoryCache(new MemoryCacheOptions()));
+        store.InitializeAuthenticatedSession("browser-a");
+        store.InitializeAuthenticatedSession("browser-b");
+        return store;
+    }
 
     private static (HttpClient Client, RecordingHandler Handler, IApiSessionStore Store) Create(
         string? browserSessionKey,
@@ -461,6 +560,10 @@ public sealed class ApiSessionTransportTests
 
         public bool DeleteExistingSession { get; set; }
 
+        public bool RequireReauthentication { get; set; }
+
+        public string? ProblemCode { get; set; }
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -474,6 +577,17 @@ public sealed class ApiSessionTransportTests
             HttpResponseMessage response = new(RejectExistingSession && SentCookies[^1] is not null
                 ? HttpStatusCode.Forbidden
                 : HttpStatusCode.OK);
+
+            if (RequireReauthentication)
+            {
+                response.Headers.Add(SecureOps.Shared.Contracts.Sessions.ApplicationSessionHeaders.ReauthenticationRequired, "required");
+            }
+
+            if (ProblemCode is not null)
+            {
+                response.StatusCode = HttpStatusCode.Forbidden;
+                response.Content = System.Net.Http.Json.JsonContent.Create(new { code = ProblemCode });
+            }
 
             if ((RejectExistingSession || DeleteExistingSession) && SentCookies[^1] is not null)
             {

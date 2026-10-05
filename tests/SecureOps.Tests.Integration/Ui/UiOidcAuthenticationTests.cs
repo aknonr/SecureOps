@@ -6,6 +6,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -84,7 +85,7 @@ public sealed partial class UiOidcAuthenticationTests
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
         factory.Provider.Nonce = query["nonce"];
 
-        HttpResponseMessage callback = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        HttpResponseMessage callback = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
 
         callback.StatusCode.Should().Be(HttpStatusCode.Redirect);
         callback.Headers.Location!.OriginalString.Should().Be("/dashboard");
@@ -109,7 +110,7 @@ public sealed partial class UiOidcAuthenticationTests
         factory.Provider.Nonce = query["nonce"];
         using HttpClient callbackClient = CreateClient(factory);
 
-        HttpResponseMessage callback = await callbackClient.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        HttpResponseMessage callback = await callbackClient.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
 
         callback.StatusCode.Should().Be(HttpStatusCode.Redirect);
         callback.Headers.Location!.OriginalString.Should().Be("/login?error=sign-in-failed");
@@ -125,8 +126,7 @@ public sealed partial class UiOidcAuthenticationTests
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
         factory.Provider.Nonce = query["nonce"];
 
-        HttpResponseMessage callback = await client.GetAsync(
-            $"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"] + "tampered")}");
+        HttpResponseMessage callback = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"] + "tampered")}", TestContext.Current.CancellationToken);
 
         callback.StatusCode.Should().Be(HttpStatusCode.Redirect);
         callback.Headers.Location!.OriginalString.Should().Be("/login?error=sign-in-failed");
@@ -142,8 +142,7 @@ public sealed partial class UiOidcAuthenticationTests
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
         factory.Provider.Nonce = "different-nonce";
 
-        HttpResponseMessage callback = await client.GetAsync(
-            $"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        HttpResponseMessage callback = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
 
         callback.Headers.Location!.OriginalString.Should().Be("/login?error=sign-in-failed");
     }
@@ -160,7 +159,7 @@ public sealed partial class UiOidcAuthenticationTests
         Dictionary<string, string> secondQuery = Query(secondChallenge.Headers.Location!);
         factory.Provider.Nonce = query["nonce"];
 
-        _ = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        _ = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
 
         challenge.Headers.Location!.AbsolutePath.Should().Be("/idp/rest/authorize");
         query.Keys.Should().BeEquivalentTo(
@@ -195,7 +194,7 @@ public sealed partial class UiOidcAuthenticationTests
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
         factory.Provider.Nonce = query["nonce"];
 
-        HttpResponseMessage callback = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        HttpResponseMessage callback = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
 
         callback.StatusCode.Should().Be(HttpStatusCode.Redirect);
         callback.Headers.GetValues("Set-Cookie").Should().Contain(value =>
@@ -217,8 +216,7 @@ public sealed partial class UiOidcAuthenticationTests
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
         factory.Provider.Nonce = query["nonce"];
 
-        HttpResponseMessage callback = await client.GetAsync(
-            $"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        HttpResponseMessage callback = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
 
         callback.Headers.Location!.OriginalString.Should().Be("/dashboard");
         factory.Provider.UserInfoRequests.Should().Be(1);
@@ -233,13 +231,47 @@ public sealed partial class UiOidcAuthenticationTests
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
         factory.Provider.Nonce = query["nonce"];
 
-        HttpResponseMessage callback = await client.GetAsync(
-            $"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        HttpResponseMessage callback = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
 
         callback.StatusCode.Should().Be(HttpStatusCode.Redirect);
         callback.Headers.Location!.OriginalString.Should().Be("/login?error=sign-in-failed");
         callback.Headers.GetValues("Set-Cookie").Should().NotContain(value =>
             value.Contains("__Host-SecureOpsUi.Session", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RevokedOrLostOidcSession_NextHttpRequestDeletesUiCookieWithoutProviderSignOut(bool lost)
+    {
+        using OidcUiFactory factory = new();
+        using HttpClient browser = CreateClient(factory);
+        HttpResponseMessage challenge = await ChallengeAsync(browser);
+        Dictionary<string, string> query = Query(challenge.Headers.Location!);
+        factory.Provider.Nonce = query["nonce"];
+        HttpResponseMessage callback = await browser.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
+        string cookie = callback.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Host-SecureOpsUi.Session=", StringComparison.Ordinal)).Split(';')[0];
+        CookieAuthenticationOptions options = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(CookieAuthenticationDefaults.AuthenticationScheme);
+        string key = options.TicketDataFormat.Unprotect(cookie.Split('=', 2)[1])!.Principal.FindFirst(SignedInUserService.BrowserSessionClaim)!.Value;
+        IApiSessionStore store = factory.Services.GetRequiredService<IApiSessionStore>();
+        if (lost)
+        {
+            store.Remove(key);
+        }
+        else
+        {
+            store.RequireReauthentication(key);
+        }
+        int tokenRequests = factory.Provider.TokenRequests;
+
+        HttpResponseMessage landing = await browser.GetAsync("/session-expired", TestContext.Current.CancellationToken);
+
+        landing.StatusCode.Should().Be(HttpStatusCode.OK);
+        landing.Headers.Location.Should().BeNull();
+        landing.Headers.GetValues("Set-Cookie").Should().Contain(value => value.StartsWith("__Host-SecureOpsUi.Session=;", StringComparison.Ordinal));
+        factory.Provider.TokenRequests.Should().Be(tokenRequests);
+        store.GetOrCreate(key).GetOidcAccessToken(DateTimeOffset.UtcNow).Should().BeNull();
+        store.GetOrCreate(key).GetOidcIdToken().Should().BeNull();
     }
 
     [Fact]
@@ -251,9 +283,9 @@ public sealed partial class UiOidcAuthenticationTests
         HttpResponseMessage challenge = await ChallengeAsync(client);
         Dictionary<string, string> query = Query(challenge.Headers.Location!);
         factory.Provider.Nonce = query["nonce"];
-        _ = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        _ = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}", TestContext.Current.CancellationToken);
 
-        HttpResponseMessage logout = await client.GetAsync("/auth/sign-out");
+        HttpResponseMessage logout = await client.GetAsync("/auth/sign-out", TestContext.Current.CancellationToken);
 
         accessApi.LogoutCalls.Should().Be(1);
         logout.StatusCode.Should().Be(HttpStatusCode.Redirect);

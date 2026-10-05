@@ -50,8 +50,8 @@ public sealed partial class ResourceCatalogueTests
         ResourceCatalogueService service = Service(repository, "Admin", status: status);
         (await service.QueryAsync(_principal, _context, new(), _token)).ErrorCode.Should().Be("AccessDenied");
         (await service.PreferencesAsync(_principal, _context, _token)).ErrorCode.Should().Be("AccessDenied");
-        await repository.DidNotReceiveWithAnyArgs().QueryAsync(default!, default, default);
-        await repository.DidNotReceiveWithAnyArgs().PreferencesAsync(default, default);
+        await repository.DidNotReceiveWithAnyArgs().QueryAsync(default!, default, TestContext.Current.CancellationToken);
+        await repository.DidNotReceiveWithAnyArgs().PreferencesAsync(default, TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -228,7 +228,7 @@ public sealed partial class ResourceCatalogueTests
         ResourceCatalogueService service = Service(repository, "Operator");
         (await service.SaveSetAsync(_principal, _context, Guid.Empty, new("Synthetic", [], ExpectedVersion: 1), true, _token))
             .ErrorCode.Should().Be(ResourceErrors.Conflict);
-        await repository.DidNotReceiveWithAnyArgs().SavePreferencesAsync(default!, default, default!, default);
+        await repository.DidNotReceiveWithAnyArgs().SavePreferencesAsync(default!, default, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]

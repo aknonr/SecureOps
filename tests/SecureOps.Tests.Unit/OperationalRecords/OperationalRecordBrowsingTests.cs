@@ -19,19 +19,19 @@ public sealed class OperationalRecordBrowsingTests
         var repository = new InMemoryOperationalRecordRepository();
         for (int i = 0; i < 12; i++)
         {
-            await repository.UpsertImportedAsync(TestRecord.SourceItem($"synthetic-{i:D2}", $"SYN-{i:D2}") with { Title = "Synthetic [literal]%" }, "synthetic", default);
+            await repository.UpsertImportedAsync(TestRecord.SourceItem($"synthetic-{i:D2}", $"SYN-{i:D2}") with { Title = "Synthetic [literal]%" }, "synthetic", TestContext.Current.CancellationToken);
         }
         IOperationalRecordClient source = Substitute.For<IOperationalRecordClient>();
         var audit = new InMemoryAuditWriter();
         var service = new OperationalRecordService(source, new ManualReviewOperationalRecordClassifier(), repository,
             audit, Options.Create(new OperationalRecordsOptions()), NullLogger<OperationalRecordService>.Instance);
-        OperationalRecordPage first = await service.BrowseAsync(new() { Search = "[literal]%", Sort = "code", PageSize = 10 }, default);
-        OperationalRecordPage second = await service.BrowseAsync(new() { Search = "[literal]%", Sort = "code", Page = 2, PageSize = 10 }, default);
+        OperationalRecordPage first = await service.BrowseAsync(new() { Search = "[literal]%", Sort = "code", PageSize = 10 }, TestContext.Current.CancellationToken);
+        OperationalRecordPage second = await service.BrowseAsync(new() { Search = "[literal]%", Sort = "code", Page = 2, PageSize = 10 }, TestContext.Current.CancellationToken);
         first.Total.Should().Be(12);
         second.Items.Should().HaveCount(2);
         first.Items.Select(r => r.Id).Intersect(second.Items.Select(r => r.Id)).Should().BeEmpty();
-        (await service.BrowseAsync(new() { State = OperationalRecordWorkflowState.Completed }, default)).Total.Should().Be(0);
-        (await repository.BrowseAsync(new(), true, default)).Total.Should().Be(0);
+        (await service.BrowseAsync(new() { State = OperationalRecordWorkflowState.Completed }, TestContext.Current.CancellationToken)).Total.Should().Be(0);
+        (await repository.BrowseAsync(new(), true, TestContext.Current.CancellationToken)).Total.Should().Be(0);
         audit.Events.Should().BeEmpty();
         source.ReceivedCalls().Should().BeEmpty();
     }

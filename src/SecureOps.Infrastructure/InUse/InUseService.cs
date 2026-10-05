@@ -49,8 +49,8 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         {
             if (search?.Length > 100)
             { return InUseResult<IReadOnlyList<InUseAssignee>>.Fail("InUseInvalid"); }
-            if (users is SqlAccessRepository && identities is not null)
-            { return new(await identities.ReadAsync(null, search, token)); }
+            if ((users, identities) is (SqlAccessRepository, { } identityReader))
+            { return new(await identityReader.ReadAsync(null, search, token)); }
             ApplicationUser[] eligible = (await users.ListUsersAsync(token)).Where(Reviewer).ToArray();
             IReadOnlyDictionary<Guid, string> labels = InUseAssigneeLabels.Create(eligible);
             return new(eligible.Where(u => string.IsNullOrWhiteSpace(search) || labels[u.Id].Contains(search, StringComparison.OrdinalIgnoreCase))
@@ -237,8 +237,8 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
 
     private static InUseReport DownloadPresentation(InUseReport report) => report with { FileName = InUseReportNames.Download(report) };
 
-    private Task ReceiptAsync(InUseReport report, CancellationToken token) => reports is not null && repository is SqlInUseRepository
-        ? reports.ArchiveAsync(report, !report.Sheets.Concat(report.EvidenceSheets).Any(s => s.Name == "Provenance"
+    private Task ReceiptAsync(InUseReport report, CancellationToken token) => (reports, repository) is ({ } reportReader, SqlInUseRepository)
+        ? reportReader.ArchiveAsync(report, !report.Sheets.Concat(report.EvidenceSheets).Any(s => s.Name == "Provenance"
             && s.Rows.Any(r => r.Count == 2 && r[0] == "Synthetic" && r[1] == "False")), token) : Task.CompletedTask;
 
     private async Task<InUseResult<InUseRecord>> SaveAsync(InUseRecord next, long expected, AuditEvent audit, CancellationToken token)
@@ -282,7 +282,7 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             if (!current.IsSuccess)
             { return InUseResult<T>.Fail(current.ErrorCode!); }
             ApplicationUser user = current.Value!.User;
-            if (user.Id == Guid.Empty || user.Status != AccessStatus.Approved
+            if (user.Id == Guid.Empty || user is not { Status: AccessStatus.Approved }
                 || !user.Capabilities.Contains(Capabilities.InUseView) || !user.Capabilities.Contains(capability))
             { return InUseResult<T>.Fail("AccessDenied"); }
             return await operation(user);
@@ -299,17 +299,17 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
         }
     }
 
-    private static bool Reviewer(ApplicationUser user) => user.Status == AccessStatus.Approved
+    private static bool Reviewer(ApplicationUser user) => user is { Status: AccessStatus.Approved }
         && user.Capabilities.Contains(Capabilities.InUseView) && user.Capabilities.Contains(Capabilities.InUseReview);
     private async Task<IReadOnlyDictionary<Guid, string>> LabelsAsync(IReadOnlyList<InUseRecord> records, CancellationToken token) =>
-        users is SqlAccessRepository && identities is not null
-            ? (await identities.ReadAsync(records.Where(r => r.AssigneeId.HasValue).Select(r => r.AssigneeId!.Value).Distinct().ToArray(), null, token)).ToDictionary(p => p.Id, p => p.Label)
+        (users, identities) is (SqlAccessRepository, { } identityReader)
+            ? (await identityReader.ReadAsync(records.Where(r => r.AssigneeId.HasValue).Select(r => r.AssigneeId!.Value).Distinct().ToArray(), null, token)).ToDictionary(p => p.Id, p => p.Label)
             : InUseAssigneeLabels.Create(await users.ListUsersAsync(token));
     private static string ActorLabel(ApplicationUser user) => InUsePersonLabel.Format(user.DisplayName, user.LoginName);
     private static bool Text(string? value, int max, bool required = false) => value is not null && value.Length <= max
         && (!required || !string.IsNullOrWhiteSpace(value)) && !value.Any(c => char.IsControl(c) && c is not ('\r' or '\n' or '\t'));
     private static bool ValidDraft(SaveInUseDraftRequest request, InUseRecord record) =>
-        Text(request.Notes, 2000) && request.Answers is not null && request.Answers.Count <= 900
+        Text(request.Notes, 2000) && request.Answers is { Count: <= 900 }
         && request.Answers.All(a => a is not null)
         && request.Answers.Select(a => (a.ServerId, a.Check)).Distinct().Count() == request.Answers.Count
         && request.Answers.All(a => record.Source.Servers.Any(s => s.Id == a.ServerId)

@@ -19,7 +19,7 @@ public sealed class SdmPilotTests
     {
         var source = new SimulationOperationalRecordClient();
         var classifier = new SimulationOperationalRecordClassifier();
-        OperationalRecordSourceItem happy = (await source.GetActiveAsync(10, default)).Single(item => item.OrCode == "SIM-OR-100");
+        OperationalRecordSourceItem happy = (await source.GetActiveAsync(10, TestContext.Current.CancellationToken)).Single(item => item.OrCode == "SIM-OR-100");
         classifier.Classify(happy).Classification.Should().Be(OperationalRecordClassification.ServerRequest);
         classifier.Classify(happy with { SourceRecordId = "unapproved-synthetic" }).JiraEligible.Should().BeFalse();
     }
@@ -28,24 +28,24 @@ public sealed class SdmPilotTests
     public async Task PositivePreview_PersistsHumanDecision_CreateAndReplayKeepSourceOpen()
     {
         Fixture f = await Fixture.Create();
-        OperationalRecordResult<JiraIssueDraft> preview = await f.Service.PreviewAsync(f.Record.Id, f.Context, default);
+        OperationalRecordResult<JiraIssueDraft> preview = await f.Service.PreviewAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken);
         preview.IsSuccess.Should().BeTrue();
         preview.Value!.SourceCloseRequested.Should().BeFalse();
-        OperationalRecord stored = (await f.Repository.GetAsync(f.Record.Id, default))!;
+        OperationalRecord stored = (await f.Repository.GetAsync(f.Record.Id, TestContext.Current.CancellationToken))!;
         stored.JiraEligible.Should().BeTrue();
         stored.SdmEvaluation!.Result.ExternalWriteEligible.Should().BeFalse();
         f.Audit.Events.Should().Contain(e => e.Action == SdmEvaluationEvidence.AuditAction && e.Actor == f.Context.Actor);
-        (await f.Service.CreateAsync(f.Record.Id, f.Context, default)).Failure!.Code.Should().Be(OperationalErrorCodes.ExternalWritesDisabled);
+        (await f.Service.CreateAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).Failure!.Code.Should().Be(OperationalErrorCodes.ExternalWritesDisabled);
         // Only synthetic substitutes execute; no corporate transport is constructed.
         f.Options.ReadOnlyIntegrationMode = false;
         f.Options.ControlledTestWritesEnabled = true;
-        OperationalRecordResult<OperationalRecord> result = await f.Service.CreateAsync(f.Record.Id, f.Context, default);
+        OperationalRecordResult<OperationalRecord> result = await f.Service.CreateAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken);
         result.IsSuccess.Should().BeTrue();
         result.Value!.JiraIssueKey.Should().Be("TEST-901");
         result.Value.WorkflowState.Should().Be(OperationalRecordWorkflowState.JiraCreated);
-        (await f.Service.CreateAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeTrue();
+        (await f.Service.CreateAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).IsSuccess.Should().BeTrue();
         await f.Jira.Received(1).CreateIssueAsync(Arg.Any<JiraIssueDraft>(), Arg.Any<CancellationToken>());
-        await f.Source.DidNotReceiveWithAnyArgs().CloseAsync(default!, default!, default!, default);
+        await f.Source.DidNotReceiveWithAnyArgs().CloseAsync(default!, default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -84,8 +84,8 @@ public sealed class SdmPilotTests
                 break;
         }
         SdmPilotPolicy.Blockers(f.Record, f.Options, f.JiraOptions, f.SourceOptions, DateTimeOffset.UtcNow).Should().Contain(reason);
-        (await f.Service.PreviewAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeFalse();
-        await f.Jira.DidNotReceiveWithAnyArgs().CreateIssueAsync(default!, default);
+        (await f.Service.PreviewAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).IsSuccess.Should().BeFalse();
+        await f.Jira.DidNotReceiveWithAnyArgs().CreateIssueAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -94,7 +94,7 @@ public sealed class SdmPilotTests
     public async Task RevokedPolicyOrChangedSource_AfterPreviewCannotCreate(bool sourceChange)
     {
         Fixture f = await Fixture.Create();
-        (await f.Service.PreviewAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeTrue();
+        (await f.Service.PreviewAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).IsSuccess.Should().BeTrue();
         f.Options.ReadOnlyIntegrationMode = false;
         if (sourceChange)
         {
@@ -104,8 +104,8 @@ public sealed class SdmPilotTests
         {
             f.Options.Pilot.ApprovalReference = "";
         }
-        (await f.Service.CreateAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeFalse();
-        await f.Jira.DidNotReceiveWithAnyArgs().CreateIssueAsync(default!, default);
+        (await f.Service.CreateAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).IsSuccess.Should().BeFalse();
+        await f.Jira.DidNotReceiveWithAnyArgs().CreateIssueAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -113,14 +113,14 @@ public sealed class SdmPilotTests
     {
         Fixture f = await Fixture.Create();
         f.Resolver.ResolveExactAsync("sample.requester", Arg.Any<CancellationToken>()).Returns(RequesterResolutionResult.Ambiguous());
-        (await f.Service.PreviewAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeFalse();
+        (await f.Service.PreviewAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).IsSuccess.Should().BeFalse();
         f.Resolver.ResolveExactAsync("sample.requester", Arg.Any<CancellationToken>()).Returns(RequesterResolutionResult.Found("requester-account"));
-        (await f.Service.PreviewAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeTrue();
+        (await f.Service.PreviewAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).IsSuccess.Should().BeTrue();
         f.Options.ReadOnlyIntegrationMode = false;
         f.Jira.CreateIssueAsync(Arg.Any<JiraIssueDraft>(), Arg.Any<CancellationToken>()).Returns<Task<JiraIssueCreationResult>>(_ => throw new ExternalIntegrationException(OperationalErrorCodes.JiraUnavailable, true, outcomeUnknown: true));
-        (await f.Service.CreateAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeFalse();
-        (await f.Repository.GetAsync(f.Record.Id, default))!.ReconciliationRequired.Should().BeTrue();
-        (await f.Service.RetryAsync(f.Record.Id, f.Context, default)).IsSuccess.Should().BeFalse();
+        (await f.Service.CreateAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).IsSuccess.Should().BeFalse();
+        (await f.Repository.GetAsync(f.Record.Id, TestContext.Current.CancellationToken))!.ReconciliationRequired.Should().BeTrue();
+        (await f.Service.RetryAsync(f.Record.Id, f.Context, TestContext.Current.CancellationToken)).IsSuccess.Should().BeFalse();
         await f.Jira.Received(1).CreateIssueAsync(Arg.Any<JiraIssueDraft>(), Arg.Any<CancellationToken>());
     }
 

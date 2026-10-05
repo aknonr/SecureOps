@@ -57,14 +57,10 @@ public sealed class DirectoryExplorerPhase2HostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, DemoApiAuthentication.TeamLeadActor);
 
-        HttpResponseMessage unknown = await client.PostAsJsonAsync(
-            "/api/v1/directory/principals/membership-paths",
-            new { account = "pam12356", targetGroup = "missing-group", purpose = _purpose });
-        HttpResponseMessage unrelated = await client.PostAsJsonAsync(
-            "/api/v1/directory/principals/membership-paths",
-            new { account = "pam12356", targetGroup = "unrelated-group", purpose = _purpose });
+        HttpResponseMessage unknown = await client.PostAsJsonAsync("/api/v1/directory/principals/membership-paths", new { account = "pam12356", targetGroup = "missing-group", purpose = _purpose }, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage unrelated = await client.PostAsJsonAsync("/api/v1/directory/principals/membership-paths", new { account = "pam12356", targetGroup = "unrelated-group", purpose = _purpose }, cancellationToken: TestContext.Current.CancellationToken);
         DirectoryMembershipPathResponse? result =
-            await unrelated.Content.ReadFromJsonAsync<DirectoryMembershipPathResponse>();
+            await unrelated.Content.ReadFromJsonAsync<DirectoryMembershipPathResponse>(cancellationToken: TestContext.Current.CancellationToken);
 
         unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
         unrelated.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -80,12 +76,10 @@ public sealed class DirectoryExplorerPhase2HostedTests
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         var request = new { account = "pam12356", purpose = _purpose };
 
-        HttpResponseMessage allowed = await admin.PostAsJsonAsync(
-            "/api/v1/directory/principals/privileged-memberships", request);
-        HttpResponseMessage forbidden = await lead.PostAsJsonAsync(
-            "/api/v1/directory/principals/privileged-memberships", request);
+        HttpResponseMessage allowed = await admin.PostAsJsonAsync("/api/v1/directory/principals/privileged-memberships", request, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage forbidden = await lead.PostAsJsonAsync("/api/v1/directory/principals/privileged-memberships", request, cancellationToken: TestContext.Current.CancellationToken);
         DirectoryPrivilegedMembershipResponse? response =
-            await allowed.Content.ReadFromJsonAsync<DirectoryPrivilegedMembershipResponse>();
+            await allowed.Content.ReadFromJsonAsync<DirectoryPrivilegedMembershipResponse>(cancellationToken: TestContext.Current.CancellationToken);
 
         forbidden.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         allowed.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -104,10 +98,8 @@ public sealed class DirectoryExplorerPhase2HostedTests
         var firstRequest = new { account = "pam12356", purpose = "first optional context" };
         var secondRequest = new { account = "pam12356", purpose = "different optional context" };
 
-        HttpResponseMessage first = await client.PostAsJsonAsync(
-            "/api/v1/directory/principals/account-health", firstRequest);
-        HttpResponseMessage second = await client.PostAsJsonAsync(
-            "/api/v1/directory/principals/account-health", secondRequest);
+        HttpResponseMessage first = await client.PostAsJsonAsync("/api/v1/directory/principals/account-health", firstRequest, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage second = await client.PostAsJsonAsync("/api/v1/directory/principals/account-health", secondRequest, cancellationToken: TestContext.Current.CancellationToken);
 
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         second.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
@@ -135,7 +127,7 @@ public sealed class DirectoryExplorerPhase2HostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(swagger: true);
         using HttpClient client = factory.CreateClient();
 
-        string openApi = await client.GetStringAsync("/swagger/v1/swagger.json");
+        string openApi = await client.GetStringAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken);
 
         openApi.Should().Contain("/api/v1/directory/principals/memberships")
             .And.Contain("/api/v1/directory/principals/membership-paths")

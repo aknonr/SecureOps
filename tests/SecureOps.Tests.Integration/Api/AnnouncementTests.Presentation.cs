@@ -94,8 +94,8 @@ public sealed partial class AnnouncementTests
         };
         var renderer = new AnnouncementRenderer(Options.Create(config));
         using (var locked = new FileStream(Path.Combine(config.AssetDirectory, "banner.bin"), FileMode.Open, FileAccess.Read, FileShare.None))
-        { renderer.Bundles(default).Single().State.Should().Be("PresentNotValidated"); }
-        AnnouncementPresentation presentation = await renderer.PresentationAsync(FinalContent(), default);
+        { renderer.Bundles(TestContext.Current.CancellationToken).Single().State.Should().Be("PresentNotValidated"); }
+        AnnouncementPresentation presentation = await renderer.PresentationAsync(FinalContent(), TestContext.Current.CancellationToken);
         var draft = new AnnouncementDraft(Guid.NewGuid(), Guid.NewGuid(), 1, DateTimeOffset.UtcNow, FinalContent(), "sender@example.invalid",
             presentation.Hash, TemplateRevision: "oco-table-v2");
         (string html, string text) = AnnouncementRenderer.RenderPresentation(draft, presentation, true);
@@ -104,32 +104,32 @@ public sealed partial class AnnouncementTests
         { text.Should().Contain(service); html.Should().Contain(WebUtility.HtmlEncode(service)); }
         string[] headings = ["Duyuru Tarihi", "Çalışma Kayıt Numarası", "Çalışma Yapılacak Sistem/Uygulama", "Çalışmanın Başlangıç", "Çalışma Bitiş", "Çalışmanın Açıklaması", "Çalışmanın Etki Detayı", "Çalışmadan Etkilenen Servisler", "Notlar/Özel Durumlar"];
         headings.Select(h => html.IndexOf(h, StringComparison.Ordinal)).Should().BeInAscendingOrder();
-        using var mail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(draft, presentation, default)));
+        using var mail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(draft, presentation, TestContext.Current.CancellationToken)), TestContext.Current.CancellationToken);
         mail.TextBody.Should().NotBeNull();
         mail.TextBody!.ReplaceLineEndings("\n").Should().Be(text.ReplaceLineEndings("\n"));
         foreach (AnnouncementImage asset in presentation.Images)
         {
             MimePart part = mail.BodyParts.OfType<MimePart>().Single(p => p.ContentId == asset.Role);
             using var bytes = new MemoryStream();
-            part.Content!.DecodeTo(bytes);
+            part.Content!.DecodeTo(bytes, TestContext.Current.CancellationToken);
             bytes.ToArray().Should().Equal(asset.Bytes);
             mail.HtmlBody.Should().Contain("cid:" + asset.Role);
             html.Should().Contain(Convert.ToBase64String(bytes.ToArray()));
         }
         mail.BodyParts.OfType<MimePart>().Count(p => p.ContentId is not null).Should().Be(6);
         AnnouncementContent readable = FinalContent() with { DateTextRevision = "tr-v1", WorkStart = "2026-09-13T23:59:37+03:00", WorkEnd = "2026-09-14T02:01:03+03:00" };
-        AnnouncementPresentation changed = await renderer.PresentationAsync(readable, default);
+        AnnouncementPresentation changed = await renderer.PresentationAsync(readable, TestContext.Current.CancellationToken);
         changed.Hash.Should().NotBe(presentation.Hash);
         AnnouncementDraft readableDraft = draft with { Content = readable, BannerHash = changed.Hash };
-        using var readableMail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(readableDraft, changed, default)));
+        using var readableMail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(readableDraft, changed, TestContext.Current.CancellationToken)), TestContext.Current.CancellationToken);
         readableMail.TextBody.Should().Contain("13.09.2026 23:59:37 UTC +03:00").And.Contain("14.09.2026 02:01:03 UTC +03:00");
         readableMail.HtmlBody.Should().Contain("23:59:37 UTC +03:00");
         AnnouncementRenderer.RenderPresentation(draft, presentation, true).Html.Should().Be(html);
-        (await renderer.PresentationAsync(FinalContent(), default)).Hash.Should().Be(presentation.Hash);
+        (await renderer.PresentationAsync(FinalContent(), TestContext.Current.CancellationToken)).Hash.Should().Be(presentation.Hash);
         config.Bundles["bundle-v1"].Footer += " amended";
-        (await renderer.PresentationAsync(FinalContent(), default)).Hash.Should().NotBe(presentation.Hash);
+        (await renderer.PresentationAsync(FinalContent(), TestContext.Current.CancellationToken)).Hash.Should().NotBe(presentation.Hash);
         config.Bundles["bundle-v1"].Assets.Remove("logo");
-        renderer.Bundles(default).Single().State.Should().Be("Invalid");
+        renderer.Bundles(TestContext.Current.CancellationToken).Single().State.Should().Be("Invalid");
         await FluentActions.Awaiting(() => renderer.PresentationAsync(FinalContent(), default)).Should().ThrowAsync<InvalidOperationException>();
     }
 

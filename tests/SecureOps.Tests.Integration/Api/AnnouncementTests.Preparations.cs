@@ -214,14 +214,14 @@ public sealed partial class AnnouncementTests
         IAnnouncementDispatchClaim claim = Substitute.For<IAnnouncementDispatchClaim>();
         IAnnouncementTransport transport = Substitute.For<IAnnouncementTransport>();
         var boundary = new AnnouncementDispatchBoundary(claim, transport);
-        (await boundary.ExecuteAsync(snapshot, default)).State.Should().Be("NotDispatched");
-        claim.ClaimAsync(snapshot.Id, snapshot.Fingerprint, default).Returns(true, false);
-        transport.SubmitAsync(snapshot, default).Returns(new AnnouncementTransportOutcome(state, state == "PartialRecipientAcceptance" ? ["reader@example.invalid"] : [], []));
+        (await boundary.ExecuteAsync(snapshot, TestContext.Current.CancellationToken)).State.Should().Be("NotDispatched");
+        claim.ClaimAsync(snapshot.Id, snapshot.Fingerprint, TestContext.Current.CancellationToken).Returns(true, false);
+        transport.SubmitAsync(snapshot, TestContext.Current.CancellationToken).Returns(new AnnouncementTransportOutcome(state, state == "PartialRecipientAcceptance" ? ["reader@example.invalid"] : [], []));
         if (state == "UnknownOutcome")
-        { transport.SubmitAsync(snapshot, default).Returns<Task<AnnouncementTransportOutcome>>(_ => throw new IOException("Uncertain local test submission")); }
-        (await boundary.ExecuteAsync(snapshot, default)).State.Should().Be(state);
-        (await boundary.ExecuteAsync(snapshot, default)).State.Should().Be("NotDispatched");
-        await transport.Received(1).SubmitAsync(snapshot, default);
-        (await boundary.ExecuteAsync(snapshot with { Html = "tampered" }, default)).State.Should().Be("NotDispatched");
+        { transport.SubmitAsync(snapshot, TestContext.Current.CancellationToken).Returns<Task<AnnouncementTransportOutcome>>(_ => throw new IOException("Uncertain local test submission")); }
+        (await boundary.ExecuteAsync(snapshot, TestContext.Current.CancellationToken)).State.Should().Be(state);
+        (await boundary.ExecuteAsync(snapshot, TestContext.Current.CancellationToken)).State.Should().Be("NotDispatched");
+        await transport.Received(1).SubmitAsync(snapshot, TestContext.Current.CancellationToken);
+        (await boundary.ExecuteAsync(snapshot with { Html = "tampered" }, TestContext.Current.CancellationToken)).State.Should().Be("NotDispatched");
     }
 }

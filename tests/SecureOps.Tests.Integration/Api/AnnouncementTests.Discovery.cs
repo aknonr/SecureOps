@@ -52,17 +52,17 @@ public sealed partial class AnnouncementTests
         var renderer = new AnnouncementRenderer(Options.Create(config));
         await using (var locked = new FileStream(Path.Combine(root, "banner.bin"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
-            renderer.Banners().Last().Should().Be(new AnnouncementBanner("synthetic-v1", "Türkçe & sade", "PresentNotValidated"));
+            renderer.Banners(TestContext.Current.CancellationToken).Last().Should().Be(new AnnouncementBanner("synthetic-v1", "Türkçe & sade", "PresentNotValidated"));
             await FluentActions.Awaiting(() => renderer.AssetAsync("synthetic-v1", default)).Should().ThrowAsync<IOException>();
         }
-        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), new byte[64]);
-        renderer.Banners().Last().State.Should().Be("PresentNotValidated");
+        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), new byte[64], TestContext.Current.CancellationToken);
+        renderer.Banners(TestContext.Current.CancellationToken).Last().State.Should().Be("PresentNotValidated");
         await FluentActions.Awaiting(() => renderer.AssetAsync("synthetic-v1", default)).Should().ThrowAsync<InvalidOperationException>();
-        renderer.Banners().First().Should().Be(new AnnouncementBanner("missing-v1", "missing-v1", "Missing"));
-        JsonSerializer.Serialize(renderer.Banners()).Should().NotContain(root).And.NotContain("banner.bin").And.NotContain("<script>");
+        renderer.Banners(TestContext.Current.CancellationToken).First().Should().Be(new AnnouncementBanner("missing-v1", "missing-v1", "Missing"));
+        JsonSerializer.Serialize(renderer.Banners(TestContext.Current.CancellationToken)).Should().NotContain(root).And.NotContain("banner.bin").And.NotContain("<script>");
         var watch = Stopwatch.StartNew();
         for (int n = 0; n < 100; n++)
-        { renderer.Banners().Should().HaveCount(2); }
+        { renderer.Banners(TestContext.Current.CancellationToken).Should().HaveCount(2); }
         output.WriteLine("100 two-banner metadata calls ms={0:F2}; image bytes read=0 (exclusive-lock proof)", watch.Elapsed.TotalMilliseconds);
         config.Banners = Enumerable.Range(0, 33).ToDictionary(n => "banner-" + n, _ => "banner.bin");
         FluentActions.Invoking(() => renderer.Banners()).Should().Throw<InvalidOperationException>();

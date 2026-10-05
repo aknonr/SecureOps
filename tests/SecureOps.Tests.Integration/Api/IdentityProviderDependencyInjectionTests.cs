@@ -75,12 +75,10 @@ public sealed class IdentityProviderDependencyInjectionTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
-        HttpResponseMessage response = await client.PostAsJsonAsync(
-            "/api/v1/identity/lookup",
-            new { account = "pam12356" });
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "pam12356" }, cancellationToken: TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        IdentityLookupResponse? result = await response.Content.ReadFromJsonAsync<IdentityLookupResponse>();
+        IdentityLookupResponse? result = await response.Content.ReadFromJsonAsync<IdentityLookupResponse>(cancellationToken: TestContext.Current.CancellationToken);
         result!.Status.Should().Be("Found");
         result.User!.SamAccountName.Should().Be("pam12356");
     }
@@ -92,15 +90,12 @@ public sealed class IdentityProviderDependencyInjectionTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
-        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(
-            "/api/v1/identity/lookup/capabilities");
-        HttpResponseMessage response = await client.PostAsJsonAsync(
-            "/api/v1/identity/lookup",
-            new { account = "pam12356@contoso.local", purpose = "Approved operational lookup" });
+        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>("/api/v1/identity/lookup/capabilities", cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "pam12356@contoso.local", purpose = "Approved operational lookup" }, cancellationToken: TestContext.Current.CancellationToken);
 
         capabilities!.SupportsUpnLookup.Should().BeTrue();
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        IdentityLookupResponse? result = await response.Content.ReadFromJsonAsync<IdentityLookupResponse>();
+        IdentityLookupResponse? result = await response.Content.ReadFromJsonAsync<IdentityLookupResponse>(cancellationToken: TestContext.Current.CancellationToken);
         result!.User!.SamAccountName.Should().Be("pam12356");
     }
 
@@ -111,8 +106,7 @@ public sealed class IdentityProviderDependencyInjectionTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
-        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(
-            "/api/v1/identity/lookup/capabilities");
+        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>("/api/v1/identity/lookup/capabilities", cancellationToken: TestContext.Current.CancellationToken);
 
         capabilities!.SupportsUpnLookup.Should().BeFalse();
     }
@@ -124,12 +118,10 @@ public sealed class IdentityProviderDependencyInjectionTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
-        HttpResponseMessage response = await client.PostAsJsonAsync(
-            "/api/v1/identity/lookup",
-            new { account = "missing.account@contoso.local", purpose = "Approved operational lookup" });
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "missing.account@contoso.local", purpose = "Approved operational lookup" }, cancellationToken: TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync());
+        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         problem!["code"]!.GetValue<string>().Should().Be(OperationalErrorCodes.IdentityNotFound);
     }
 
@@ -145,8 +137,7 @@ public sealed class IdentityProviderDependencyInjectionTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
-        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(
-            "/api/v1/identity/lookup/capabilities");
+        IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>("/api/v1/identity/lookup/capabilities", cancellationToken: TestContext.Current.CancellationToken);
 
         capabilities!.SupportsUpnLookup.Should().Be(enableUpnLookup);
     }

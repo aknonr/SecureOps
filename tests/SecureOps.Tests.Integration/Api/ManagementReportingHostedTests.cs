@@ -23,14 +23,14 @@ public sealed class ManagementReportingHostedTests
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage anonymousResponse = await anonymous.GetAsync("/api/v1/reporting/management/summary?window=7d");
-        HttpResponseMessage leadResponse = await lead.GetAsync("/api/v1/reporting/management/summary?window=7d");
-        HttpResponseMessage adminResponse = await admin.GetAsync("/api/v1/reporting/management/summary?window=7d");
+        HttpResponseMessage anonymousResponse = await anonymous.GetAsync("/api/v1/reporting/management/summary?window=7d", TestContext.Current.CancellationToken);
+        HttpResponseMessage leadResponse = await lead.GetAsync("/api/v1/reporting/management/summary?window=7d", TestContext.Current.CancellationToken);
+        HttpResponseMessage adminResponse = await admin.GetAsync("/api/v1/reporting/management/summary?window=7d", TestContext.Current.CancellationToken);
 
         anonymousResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         await AssertProblemAsync(leadResponse, HttpStatusCode.Forbidden, "AccessDenied");
         adminResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        ManagementReportResponse report = (await adminResponse.Content.ReadFromJsonAsync<ManagementReportResponse>())!;
+        ManagementReportResponse report = (await adminResponse.Content.ReadFromJsonAsync<ManagementReportResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         report.IdentityLookup.TotalLookups.Should().Be(0);
         report.SecurityAndQuality.RateLimitEvents.Should().BeNull();
         report.Coverage.CoverageComplete.Should().BeTrue();
@@ -44,7 +44,7 @@ public sealed class ManagementReportingHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/summary?window=custom");
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/summary?window=custom", TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, "ReportingValidationFailed");
     }
@@ -55,10 +55,10 @@ public sealed class ManagementReportingHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/operators?window=30d&page=3&pageSize=100");
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/operators?window=30d&page=3&pageSize=100", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        OperatorActivityPageResponse page = (await response.Content.ReadFromJsonAsync<OperatorActivityPageResponse>())!;
+        OperatorActivityPageResponse page = (await response.Content.ReadFromJsonAsync<OperatorActivityPageResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         page.Page.Should().Be(3);
         page.PageSize.Should().Be(100);
         page.TotalItems.Should().Be(250);
@@ -71,7 +71,7 @@ public sealed class ManagementReportingHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/operators?pageSize=101");
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/operators?pageSize=101", TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, "ReportingValidationFailed");
     }
@@ -82,8 +82,8 @@ public sealed class ManagementReportingHostedTests
         using WebApplicationFactory<Program> factory = CreateUnconfiguredFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/summary?window=7d");
-        JsonNode report = JsonNode.Parse(await response.Content.ReadAsStringAsync())!;
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/reporting/management/summary?window=7d", TestContext.Current.CancellationToken);
+        JsonNode report = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!;
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         report["limitations"]!.AsArray().Select(item => item!["code"]!.GetValue<string>())

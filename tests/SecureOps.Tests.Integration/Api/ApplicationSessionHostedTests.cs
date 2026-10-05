@@ -21,6 +21,166 @@ namespace SecureOps.Tests.Integration.Api;
 
 public sealed class ApplicationSessionHostedTests
 {
+    [Theory]
+    [InlineData("Logout", false)]
+    [InlineData("Revoke", false)]
+    [InlineData("Expiry", false)]
+    [InlineData("AccessDisabled", false)]
+    [InlineData("Logout", true)]
+    [InlineData("Revoke", true)]
+    [InlineData("Expiry", true)]
+    [InlineData("AccessDisabled", true)]
+    public async Task NonAtomicAudit_TerminationSucceedsOrReturns503WithoutEndingSession(string path, bool failAudit)
+    {
+        NonAtomicTerminalAudit audit = new();
+        SessionClock time = new(DateTimeOffset.UtcNow);
+        using WebApplicationFactory<Program> factory = CreateFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IAuditWriter>(audit);
+            services.AddSingleton<TimeProvider>(time);
+        }));
+        using HttpClient browser = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse session, string cookie) = await StartAsync(browser);
+        (_, string adminCookie) = await StartAsync(admin);
+        long version = 0;
+        if (path == "AccessDisabled")
+        {
+            using HttpRequestMessage usersRequest = Request(HttpMethod.Get, "/api/v1/access/users", adminCookie);
+            using HttpResponseMessage usersResponse = await admin.SendAsync(usersRequest, TestContext.Current.CancellationToken);
+            version = (await usersResponse.Content.ReadFromJsonAsync<AccessUserResponse[]>(cancellationToken: TestContext.Current.CancellationToken))!
+                .Single(user => user.UserId == session.UserId).Version;
+        }
+
+        audit.Reject = failAudit;
+        if (path == "Expiry")
+        {
+            time.Advance(TimeSpan.FromMinutes(30));
+        }
+
+        using HttpRequestMessage request = Request(path == "Expiry" ? HttpMethod.Get : HttpMethod.Post, path switch
+        {
+            "Logout" => "/api/v1/access/logout",
+            "Revoke" => "/api/v1/sessions/revoke",
+            "AccessDisabled" => $"/api/v1/access/users/{session.UserId}/disable",
+            _ => "/api/v1/sessions/current"
+        }, path is "Revoke" or "AccessDisabled" ? adminCookie : cookie);
+        if (path == "Revoke")
+        {
+            request.Content = JsonContent.Create(new RevokeApplicationSessionRequest(session.SessionId, "Synthetic approved revoke"));
+        }
+        else if (path == "AccessDisabled")
+        {
+            request.Content = JsonContent.Create(new DisableAccessRequest("Synthetic approved disable", version));
+        }
+
+        using HttpResponseMessage response = await (path is "Revoke" or "AccessDisabled" ? admin : browser)
+            .SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(failAudit ? HttpStatusCode.ServiceUnavailable
+            : path == "Expiry" ? HttpStatusCode.Forbidden : HttpStatusCode.OK);
+        if (failAudit)
+        {
+            await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, "AuditStoreUnavailable");
+        }
+        else if (path == "Expiry")
+        {
+            await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionExpired");
+        }
+
+        (await factory.Services.GetRequiredService<IApplicationSessionRepository>()
+            .GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().Be(failAudit);
+        audit.TerminalWriteAttempts.Should().Be(1);
+        audit.Inner.Events.Count(item => NonAtomicTerminalAudit.IsTerminal(item.Action)).Should().Be(failAudit ? 0 : 1);
+    }
+
+    [Theory]
+    [InlineData("Logout")]
+    [InlineData("Revoke")]
+    [InlineData("Expiry")]
+    public async Task TerminalAuditFailure_ReturnsRetryableUnavailableAndKeepsPersistedSessionActive(string path)
+    {
+        RejectingTerminalAudit audit = new();
+        SessionClock time = new(DateTimeOffset.UtcNow);
+        using WebApplicationFactory<Program> factory = CreateFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IAuditWriter>(audit);
+            services.AddSingleton<TimeProvider>(time);
+        }));
+        using HttpClient browser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse session, string cookie) = await StartAsync(browser);
+        audit.Reject = true;
+        if (path == "Expiry")
+        {
+            time.Advance(TimeSpan.FromMinutes(30));
+        }
+
+        using HttpRequestMessage request = Request(path == "Expiry" ? HttpMethod.Get : HttpMethod.Post, path switch
+        {
+            "Logout" => "/api/v1/access/logout",
+            "Revoke" => "/api/v1/sessions/revoke",
+            _ => "/api/v1/sessions/current"
+        }, cookie);
+        if (path == "Revoke")
+        {
+            request.Content = JsonContent.Create(new RevokeApplicationSessionRequest(session.SessionId, "Synthetic approved revoke"));
+        }
+
+        using HttpResponseMessage response = await browser.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        ProblemDetails problem = (await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken: TestContext.Current.CancellationToken))!;
+        problem.Extensions["code"]!.ToString().Should().Be("AuditStoreUnavailable");
+        ((JsonElement)problem.Extensions["retryable"]!).GetBoolean().Should().BeTrue();
+        response.Headers.Contains(ApplicationSessionHeaders.ReauthenticationRequired).Should().BeFalse();
+        (await factory.Services.GetRequiredService<IApplicationSessionRepository>().GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        audit.Inner.Events.Should().NotContain(item => item.Action == AuditActions.ApplicationSessionLoggedOut
+            || item.Action == AuditActions.ApplicationSessionRevoked || item.Action == AuditActions.ApplicationSessionIdleTimedOut);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UiStoreLoss_ExistingCorrelationCannotStartAnotherApiSession(bool restart)
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using MemoryCache cache = new(new MemoryCacheOptions());
+        IApiSessionStore store = new ApiSessionStore(cache);
+        const string key = "synthetic-store-loss";
+        store.InitializeAuthenticatedSession(key);
+        using HttpClient first = Transport(store);
+        using HttpResponseMessage started = await first.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken);
+        started.EnsureSuccessStatusCode();
+        store.RequireReauthentication(key);
+        if (restart)
+        {
+            store = new ApiSessionStore(cache);
+            cache.Compact(1);
+        }
+        else
+        {
+            store.Remove(key);
+        }
+
+        using HttpClient replay = Transport(store);
+        using HttpResponseMessage response = await replay.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken);
+
+        await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionRevoked");
+        factory.Services.GetRequiredService<InMemoryAuditWriter>().Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(1);
+
+        HttpClient Transport(IApiSessionStore sessions)
+        {
+            ApiSessionCookieHandler handler = new(sessions, NullLogger<ApiSessionCookieHandler>.Instance)
+            {
+                InnerHandler = factory.Server.CreateHandler()
+            };
+            HttpClient client = new(handler) { BaseAddress = new Uri("http://localhost/") };
+            client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+            client.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, key);
+            return client;
+        }
+    }
+
     [Fact]
     public async Task Current_CreatesSecureBrowserSessionHandleAfterAuthentication()
     {
@@ -28,9 +188,9 @@ public sealed class ApplicationSessionHostedTests
         using HttpClient anonymous = Client(factory);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage anonymousResponse = await anonymous.GetAsync("/api/v1/sessions/current");
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/sessions/current");
-        ApplicationSessionResponse current = (await response.Content.ReadFromJsonAsync<ApplicationSessionResponse>())!;
+        HttpResponseMessage anonymousResponse = await anonymous.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken);
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken);
+        ApplicationSessionResponse current = (await response.Content.ReadFromJsonAsync<ApplicationSessionResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         string setCookie = response.Headers.GetValues("Set-Cookie").Single();
 
         anonymousResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -61,13 +221,13 @@ public sealed class ApplicationSessionHostedTests
         (ApplicationSessionResponse first, string cookie) = await StartAsync(browser);
 
         using HttpRequestMessage refresh = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
-        ApplicationSessionResponse refreshed = (await (await browser.SendAsync(refresh)).Content
-            .ReadFromJsonAsync<ApplicationSessionResponse>())!;
+        ApplicationSessionResponse refreshed = (await (await browser.SendAsync(refresh, TestContext.Current.CancellationToken)).Content
+            .ReadFromJsonAsync<ApplicationSessionResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         using HttpRequestMessage navigation = Request(HttpMethod.Get, "/api/v1/access/me", cookie);
-        HttpResponseMessage navigationResponse = await browser.SendAsync(navigation);
+        HttpResponseMessage navigationResponse = await browser.SendAsync(navigation, TestContext.Current.CancellationToken);
         using HttpRequestMessage anotherTab = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
-        ApplicationSessionResponse tab = (await (await browser.SendAsync(anotherTab)).Content
-            .ReadFromJsonAsync<ApplicationSessionResponse>())!;
+        ApplicationSessionResponse tab = (await (await browser.SendAsync(anotherTab, TestContext.Current.CancellationToken)).Content
+            .ReadFromJsonAsync<ApplicationSessionResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         (ApplicationSessionResponse separate, _) = await StartAsync(privateBrowser);
 
         refreshed.SessionId.Should().Be(first.SessionId);
@@ -82,6 +242,7 @@ public sealed class ApplicationSessionHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(simulation: true);
         using var cache = new MemoryCache(new MemoryCacheOptions());
         ApiSessionStore store = new(cache);
+        store.InitializeAuthenticatedSession("one-logical-browser-session");
         ApiSessionCookieHandler sessionHandler = new(store, NullLogger<ApiSessionCookieHandler>.Instance)
         {
             InnerHandler = factory.Server.CreateHandler()
@@ -90,14 +251,12 @@ public sealed class ApplicationSessionHostedTests
         browser.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "one-logical-browser-session");
 
-        HttpResponseMessage first = await browser.GetAsync("/api/v1/operational-records");
+        HttpResponseMessage first = await browser.GetAsync("/api/v1/operational-records", TestContext.Current.CancellationToken);
         first.EnsureSuccessStatusCode();
-        OperationalRecordResponse record = (await first.Content.ReadFromJsonAsync<OperationalRecordResponse[]>())!
+        OperationalRecordResponse record = (await first.Content.ReadFromJsonAsync<OperationalRecordResponse[]>(cancellationToken: TestContext.Current.CancellationToken))!
             .Single(item => item.OrCode == "SIM-OR-100");
 
-        HttpResponseMessage preview = await browser.PostAsync(
-            $"/api/v1/operational-records/{record.Id}/jira-preview",
-            null);
+        HttpResponseMessage preview = await browser.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null, TestContext.Current.CancellationToken);
         preview.EnsureSuccessStatusCode();
 
         for (int operation = 0; operation < 18; operation++)
@@ -108,7 +267,7 @@ public sealed class ApplicationSessionHostedTests
                 1 => "/api/v1/sessions/current",
                 _ => "/api/v1/operational-records"
             };
-            (await browser.GetAsync(path)).EnsureSuccessStatusCode();
+            (await browser.GetAsync(path, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
         }
 
         IApplicationSessionRepository sessions = factory.Services.GetRequiredService<IApplicationSessionRepository>();
@@ -137,18 +296,18 @@ public sealed class ApplicationSessionHostedTests
         (ApplicationSessionResponse AdminSession, string AdminCookie) adminState = await StartAsync(admin);
 
         using HttpRequestMessage leadList = Request(HttpMethod.Get, "/api/v1/sessions/active", leadState.LeadCookie);
-        HttpResponseMessage leadListResponse = await lead.SendAsync(leadList);
+        HttpResponseMessage leadListResponse = await lead.SendAsync(leadList, TestContext.Current.CancellationToken);
         using HttpRequestMessage adminList = Request(HttpMethod.Get, "/api/v1/sessions/active?page=1&pageSize=50", adminState.AdminCookie);
-        HttpResponseMessage adminListResponse = await admin.SendAsync(adminList);
-        ActiveApplicationSessionsResponse active = (await adminListResponse.Content.ReadFromJsonAsync<ActiveApplicationSessionsResponse>())!;
+        HttpResponseMessage adminListResponse = await admin.SendAsync(adminList, TestContext.Current.CancellationToken);
+        ActiveApplicationSessionsResponse active = (await adminListResponse.Content.ReadFromJsonAsync<ActiveApplicationSessionsResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         using HttpRequestMessage revoke = Request(HttpMethod.Post, "/api/v1/sessions/revoke", adminState.AdminCookie);
         revoke.Content = JsonContent.Create(new RevokeApplicationSessionRequest(leadState.LeadSession.SessionId, "Approved synthetic hosted revocation."));
-        HttpResponseMessage revokeResponse = await admin.SendAsync(revoke);
+        HttpResponseMessage revokeResponse = await admin.SendAsync(revoke, TestContext.Current.CancellationToken);
         using HttpRequestMessage replay = Request(HttpMethod.Get, "/api/v1/sessions/current", leadState.LeadCookie);
-        HttpResponseMessage replayResponse = await lead.SendAsync(replay);
+        HttpResponseMessage replayResponse = await lead.SendAsync(replay, TestContext.Current.CancellationToken);
         using HttpRequestMessage relist = Request(HttpMethod.Get, "/api/v1/sessions/active", adminState.AdminCookie);
-        ActiveApplicationSessionsResponse afterRevoke = (await (await admin.SendAsync(relist)).Content
-            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>())!;
+        ActiveApplicationSessionsResponse afterRevoke = (await (await admin.SendAsync(relist, TestContext.Current.CancellationToken)).Content
+            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
 
         await AssertProblemAsync(leadListResponse, HttpStatusCode.Forbidden, "AccessDenied");
         adminListResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -174,18 +333,18 @@ public sealed class ApplicationSessionHostedTests
         (ApplicationSessionResponse AdminSession, string AdminCookie) adminState = await StartAsync(admin);
 
         using HttpRequestMessage usersRequest = Request(HttpMethod.Get, "/api/v1/access/users", adminState.AdminCookie);
-        AccessUserResponse[] users = (await (await admin.SendAsync(usersRequest)).Content
-            .ReadFromJsonAsync<AccessUserResponse[]>())!;
+        AccessUserResponse[] users = (await (await admin.SendAsync(usersRequest, TestContext.Current.CancellationToken)).Content
+            .ReadFromJsonAsync<AccessUserResponse[]>(cancellationToken: TestContext.Current.CancellationToken))!;
         AccessUserResponse target = users.Single(user => user.UserId == leadState.LeadSession.UserId);
         using HttpRequestMessage disable = Request(HttpMethod.Post, $"/api/v1/access/users/{target.UserId}/disable", adminState.AdminCookie);
         disable.Content = JsonContent.Create(new DisableAccessRequest("Approved synthetic access-disable test.", target.Version));
 
-        HttpResponseMessage disableResponse = await admin.SendAsync(disable);
+        HttpResponseMessage disableResponse = await admin.SendAsync(disable, TestContext.Current.CancellationToken);
         using HttpRequestMessage blocked = Request(HttpMethod.Get, "/api/v1/access/me", leadState.LeadCookie);
-        HttpResponseMessage blockedResponse = await lead.SendAsync(blocked);
+        HttpResponseMessage blockedResponse = await lead.SendAsync(blocked, TestContext.Current.CancellationToken);
         using HttpRequestMessage relist = Request(HttpMethod.Get, "/api/v1/sessions/active", adminState.AdminCookie);
-        ActiveApplicationSessionsResponse active = (await (await admin.SendAsync(relist)).Content
-            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>())!;
+        ActiveApplicationSessionsResponse active = (await (await admin.SendAsync(relist, TestContext.Current.CancellationToken)).Content
+            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
 
         disableResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         await AssertProblemAsync(blockedResponse, HttpStatusCode.Forbidden, "AccessDisabled");
@@ -199,6 +358,7 @@ public sealed class ApplicationSessionHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using var cache = new MemoryCache(new MemoryCacheOptions());
         ApiSessionStore store = new(cache);
+        store.InitializeAuthenticatedSession("self-revoked-browser");
         ApiSessionCookieHandler sessionHandler = new(store, NullLogger<ApiSessionCookieHandler>.Instance)
         {
             InnerHandler = factory.Server.CreateHandler()
@@ -207,12 +367,10 @@ public sealed class ApplicationSessionHostedTests
         browser.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "self-revoked-browser");
 
-        ApplicationSessionResponse current = (await (await browser.GetAsync("/api/v1/sessions/current")).Content
-            .ReadFromJsonAsync<ApplicationSessionResponse>())!;
-        HttpResponseMessage revoke = await browser.PostAsJsonAsync(
-            "/api/v1/sessions/revoke",
-            new RevokeApplicationSessionRequest(current.SessionId, "Approved synthetic self-revocation."));
-        HttpResponseMessage rejected = await browser.GetAsync("/api/v1/access/me");
+        ApplicationSessionResponse current = (await (await browser.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken)).Content
+            .ReadFromJsonAsync<ApplicationSessionResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
+        HttpResponseMessage revoke = await browser.PostAsJsonAsync("/api/v1/sessions/revoke", new RevokeApplicationSessionRequest(current.SessionId, "Approved synthetic self-revocation."), cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage rejected = await browser.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken);
 
         IApplicationSessionRepository sessions = factory.Services.GetRequiredService<IApplicationSessionRepository>();
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -231,13 +389,61 @@ public sealed class ApplicationSessionHostedTests
         audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionRevoked).Should().Be(1);
         store.GetOrCreate("self-revoked-browser").RequiresReauthentication.Should().BeTrue();
 
-        store.Remove("self-revoked-browser");
-        store.GetOrCreate("self-revoked-browser").RequiresReauthentication.Should().BeFalse();
-        ApplicationSessionResponse reauthenticated = (await (await browser.GetAsync("/api/v1/sessions/current")).Content
-            .ReadFromJsonAsync<ApplicationSessionResponse>())!;
+        store.GetOrCreate("self-revoked-browser").GetApiCookieHeader(new Uri("http://localhost/")).Should().BeEmpty();
+        browser.DefaultRequestHeaders.Remove(ApiSessionHeaders.BrowserSession);
+        browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "explicit-new-authentication");
+        store.InitializeAuthenticatedSession("explicit-new-authentication");
+        ApplicationSessionResponse reauthenticated = (await (await browser.GetAsync("/api/v1/sessions/current", TestContext.Current.CancellationToken)).Content
+            .ReadFromJsonAsync<ApplicationSessionResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
 
         reauthenticated.SessionId.Should().NotBe(current.SessionId);
         audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task AdminRevocation_RepeatedCookieRequestsCannotSilentlyStartAnotherSession()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        using HttpClient browser = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        (ApplicationSessionResponse adminSession, string adminCookie) = await StartAsync(admin);
+        (ApplicationSessionResponse ended, string cookie) = await StartAsync(browser);
+        using HttpRequestMessage revoke = Request(HttpMethod.Post, "/api/v1/sessions/revoke", adminCookie);
+        revoke.Content = JsonContent.Create(new RevokeApplicationSessionRequest(ended.SessionId, "Synthetic administrative revocation."));
+        (await admin.SendAsync(revoke, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            using HttpRequestMessage request = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
+            using HttpResponseMessage response = await browser.SendAsync(request, TestContext.Current.CancellationToken);
+            await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionRevoked");
+            response.Headers.Contains("Set-Cookie").Should().BeFalse();
+            response.Headers.GetValues(ApplicationSessionHeaders.ReauthenticationRequired).Should().ContainSingle("required");
+        }
+
+        InMemoryAuditWriter audit = factory.Services.GetRequiredService<InMemoryAuditWriter>();
+        audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(2);
+        audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionRevoked).Should().Be(1);
+        using HttpRequestMessage list = Request(HttpMethod.Get, "/api/v1/sessions/active", adminCookie);
+        ActiveApplicationSessionsResponse active = (await (await admin.SendAsync(list, TestContext.Current.CancellationToken)).Content.ReadFromJsonAsync<ActiveApplicationSessionsResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
+        active.Items.Should().ContainSingle(item => item.SessionId == adminSession.SessionId);
+    }
+
+    [Fact]
+    public async Task SelfRevocation_RetainsApiHandleAndRepeatedRequestsRemainTerminal()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient browser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse ended, string cookie) = await StartAsync(browser);
+        using HttpRequestMessage revoke = Request(HttpMethod.Post, "/api/v1/sessions/revoke", cookie);
+        revoke.Content = JsonContent.Create(new RevokeApplicationSessionRequest(ended.SessionId, "Synthetic self-revocation."));
+        using HttpResponseMessage response = await browser.SendAsync(revoke, TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        response.Headers.Contains("Set-Cookie").Should().BeFalse();
+        response.Headers.GetValues(ApplicationSessionHeaders.ReauthenticationRequired).Should().ContainSingle("required");
+        using HttpRequestMessage next = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
+        await AssertProblemAsync(await browser.SendAsync(next, TestContext.Current.CancellationToken), HttpStatusCode.Forbidden, "SessionRevoked");
+        factory.Services.GetRequiredService<InMemoryAuditWriter>().Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(1);
     }
 
     [Fact]
@@ -250,7 +456,7 @@ public sealed class ApplicationSessionHostedTests
             "/api/v1/sessions/current",
             "__Host-SecureOps.ApplicationSession=client-supplied-unprotected-value");
 
-        HttpResponseMessage response = await admin.SendAsync(request);
+        HttpResponseMessage response = await admin.SendAsync(request, TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionRevoked");
     }
@@ -267,7 +473,7 @@ public sealed class ApplicationSessionHostedTests
             "/api/v1/sessions/current",
             adminCookie);
 
-        HttpResponseMessage response = await lead.SendAsync(crossUser);
+        HttpResponseMessage response = await lead.SendAsync(crossUser, TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionRevoked");
     }
@@ -280,14 +486,14 @@ public sealed class ApplicationSessionHostedTests
         (ApplicationSessionResponse ended, string cookie) = await StartAsync(browser);
 
         using HttpRequestMessage logout = Request(HttpMethod.Post, "/api/v1/access/logout", cookie);
-        HttpResponseMessage logoutResponse = await browser.SendAsync(logout);
+        HttpResponseMessage logoutResponse = await browser.SendAsync(logout, TestContext.Current.CancellationToken);
         using HttpRequestMessage replay = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
-        HttpResponseMessage replayResponse = await browser.SendAsync(replay);
+        HttpResponseMessage replayResponse = await browser.SendAsync(replay, TestContext.Current.CancellationToken);
         using HttpClient otherBrowser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         (ApplicationSessionResponse current, string currentCookie) = await StartAsync(otherBrowser);
         using HttpRequestMessage list = Request(HttpMethod.Get, "/api/v1/sessions/active", currentCookie);
-        ActiveApplicationSessionsResponse active = (await (await otherBrowser.SendAsync(list)).Content
-            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>())!;
+        ActiveApplicationSessionsResponse active = (await (await otherBrowser.SendAsync(list, TestContext.Current.CancellationToken)).Content
+            .ReadFromJsonAsync<ActiveApplicationSessionsResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
 
         logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         logoutResponse.Headers.GetValues("Set-Cookie").Should().Contain(value =>
@@ -346,5 +552,48 @@ public sealed class ApplicationSessionHostedTests
         response.StatusCode.Should().Be(status);
         ProblemDetails problem = (await response.Content.ReadFromJsonAsync<ProblemDetails>())!;
         problem.Extensions["code"]!.ToString().Should().Be(code);
+    }
+
+    private sealed class NonAtomicTerminalAudit : IAuditWriter
+    {
+        public InMemoryAuditWriter Inner { get; } = new();
+        public bool Reject { get; set; }
+        public int TerminalWriteAttempts { get; private set; }
+        public static bool IsTerminal(string action) => action is AuditActions.ApplicationSessionLoggedOut
+            or AuditActions.ApplicationSessionRevoked or AuditActions.ApplicationSessionIdleTimedOut
+            or AuditActions.ApplicationSessionAccessDisabled;
+
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (IsTerminal(auditEvent.Action))
+            {
+                TerminalWriteAttempts++;
+                if (Reject)
+                {
+                    throw new IOException("Synthetic file-like audit failure.");
+                }
+            }
+
+            return Inner.WriteAsync(auditEvent, cancellationToken);
+        }
+    }
+
+    private sealed class RejectingTerminalAudit : IAtomicAuditWriter
+    {
+        public InMemoryAuditWriter Inner { get; } = new();
+        public bool Reject { get; set; }
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken) => WriteBatchAsync([auditEvent], cancellationToken);
+        public Task WriteBatchAsync(IReadOnlyCollection<AuditEvent> events, CancellationToken cancellationToken) =>
+            Reject && events.Any(item => item.Action is AuditActions.ApplicationSessionLoggedOut or AuditActions.ApplicationSessionRevoked or AuditActions.ApplicationSessionIdleTimedOut)
+                ? Task.FromException(new AuditWriteUnavailableException("Synthetic terminal audit failure."))
+                : Inner.WriteBatchAsync(events, cancellationToken);
+    }
+
+    private sealed class SessionClock(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset _now = now;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan duration) => _now = _now.Add(duration);
     }
 }

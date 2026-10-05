@@ -55,14 +55,14 @@ public sealed partial class AnnouncementTests(ITestOutputHelper output)
     {
         string root = Assets(type);
         var renderer = new AnnouncementRenderer(Options.Create(new AnnouncementOptions { AssetDirectory = root, Banners = new() { ["synthetic-v1"] = "banner.bin" } }));
-        (await renderer.AssetAsync("synthetic-v1", default)).Type.Should().Be(type == SKEncodedImageFormat.Png ? "png" : "jpeg");
-        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), new byte[64]);
+        (await renderer.AssetAsync("synthetic-v1", TestContext.Current.CancellationToken)).Type.Should().Be(type == SKEncodedImageFormat.Png ? "png" : "jpeg");
+        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), new byte[64], TestContext.Current.CancellationToken);
         await FluentActions.Awaiting(() => renderer.AssetAsync("synthetic-v1", default)).Should().ThrowAsync<InvalidOperationException>();
         using var wide = new SKBitmap(2049, 1);
         using SKData encoded = wide.Encode(SKEncodedImageFormat.Png, 90);
-        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), encoded.ToArray());
+        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), encoded.ToArray(), TestContext.Current.CancellationToken);
         await FluentActions.Awaiting(() => renderer.AssetAsync("synthetic-v1", default)).Should().ThrowAsync<InvalidOperationException>();
-        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), new byte[262145]);
+        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), new byte[262145], TestContext.Current.CancellationToken);
         await FluentActions.Awaiting(() => renderer.AssetAsync("synthetic-v1", default)).Should().ThrowAsync<InvalidOperationException>();
     }
 

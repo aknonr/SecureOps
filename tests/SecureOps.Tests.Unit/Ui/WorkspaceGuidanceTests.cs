@@ -32,7 +32,7 @@ public sealed class WorkspaceGuidanceTests
         using var handler = new ReadHandler();
         using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.invalid/") };
         var client = new OperationalRecordApiClient(http, new FakeApiSessionContext());
-        OperationalRecordPageResponse page = await client.BrowseAsync(new() { Search = "A&B %", Page = 2, PageSize = 10 }, default);
+        OperationalRecordPageResponse page = await client.BrowseAsync(new() { Search = "A&B %", Page = 2, PageSize = 10 }, TestContext.Current.CancellationToken);
         page.Total.Should().Be(12);
         handler.Calls.Should().Be(1);
         handler.Uri!.AbsolutePath.Should().Be("/api/v1/operational-records/stored");

@@ -168,20 +168,20 @@ public sealed class SdmEvaluationTests
     {
         InMemoryOperationalRecordRepository repository = new();
         InMemoryAuditWriter audit = new();
-        OperationalRecord imported = await repository.UpsertImportedAsync(Source(), _context.CorrelationId, default);
+        OperationalRecord imported = await repository.UpsertImportedAsync(Source(), _context.CorrelationId, TestContext.Current.CancellationToken);
         await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => repository.EvaluateAsync(imported.Id, Input, _context, audit, default)));
-        OperationalRecord evaluated = (await repository.GetAsync(imported.Id, default))!;
+        OperationalRecord evaluated = (await repository.GetAsync(imported.Id, TestContext.Current.CancellationToken))!;
         audit.Events.Should().ContainSingle();
         string json = SdmEvaluationEvidence.Serialize(evaluated.SdmEvaluation!);
         JsonSerializer.Deserialize<SdmEvaluationSnapshot>(json).Should().BeEquivalentTo(evaluated.SdmEvaluation);
         json.Should().NotContain(Source().Title).And.NotContain(Source().Description).And.NotContain(Source().Requester!);
-        OperationalRecord repeated = await repository.EvaluateAsync(imported.Id, Input, _context, audit, default);
+        OperationalRecord repeated = await repository.EvaluateAsync(imported.Id, Input, _context, audit, TestContext.Current.CancellationToken);
         repeated.Version.Should().Be(evaluated.Version);
         repeated.SdmEvaluation!.EvaluatedAt.Should().Be(evaluated.SdmEvaluation!.EvaluatedAt);
-        OperationalRecord changed = await repository.EvaluateAsync(imported.Id, Input with { SourceFingerprint = new string('b', 64) }, _context, audit, default);
+        OperationalRecord changed = await repository.EvaluateAsync(imported.Id, Input with { SourceFingerprint = new string('b', 64) }, _context, audit, TestContext.Current.CancellationToken);
         changed.SdmEvaluation!.Result.SourceChanged.Should().BeTrue();
         changed.SdmEvaluation.Result.EvaluationStale.Should().BeTrue();
-        (await repository.EvaluateAsync(imported.Id, Input with { SourceFingerprint = new string('b', 64) }, _context, audit, default))
+        (await repository.EvaluateAsync(imported.Id, Input with { SourceFingerprint = new string('b', 64) }, _context, audit, TestContext.Current.CancellationToken))
             .Version.Should().Be(changed.Version);
         audit.Events.Should().HaveCount(2);
     }
@@ -190,11 +190,11 @@ public sealed class SdmEvaluationTests
     public async Task EvaluateAsync_AuditFailure_DoesNotPersistEvaluation()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await repository.UpsertImportedAsync(Source(), _context.CorrelationId, default);
+        OperationalRecord record = await repository.UpsertImportedAsync(Source(), _context.CorrelationId, TestContext.Current.CancellationToken);
         IAuditWriter audit = Substitute.For<IAuditWriter>();
         audit.WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>()).Returns(Task.FromException(new InvalidOperationException()));
         await FluentActions.Invoking(() => repository.EvaluateAsync(record.Id, Input, _context, audit, default)).Should().ThrowAsync<InvalidOperationException>();
-        (await repository.GetAsync(record.Id, default))!.SdmEvaluation.Should().BeNull();
+        (await repository.GetAsync(record.Id, TestContext.Current.CancellationToken))!.SdmEvaluation.Should().BeNull();
     }
 
     [Fact]
@@ -208,10 +208,10 @@ public sealed class SdmEvaluationTests
         OperationalRecordService service = new(client, classifier, new InMemoryOperationalRecordRepository(), audit,
             Options.Create(new OperationalRecordsOptions { SourceProvider = "TuruncuHat", ReadOnlyIntegrationMode = true }),
             NullLogger<OperationalRecordService>.Instance);
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(_context, default);
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(_context, TestContext.Current.CancellationToken);
         result.Value.Should().HaveCount(4).And.OnlyContain(r => !r.JiraEligible
             && r.Classification == OperationalRecordClassification.NeedsManualReview && !r.SdmEvaluation!.Result.SdmCandidateRecommended);
-        await service.ListAsync(_context, default);
+        await service.ListAsync(_context, TestContext.Current.CancellationToken);
         audit.Events.Should().HaveCount(4);
         client.ReceivedCalls().Should().OnlyContain(c => c.GetMethodInfo().Name == nameof(IOperationalRecordClient.GetActiveAsync));
         classifier.ReceivedCalls().Should().BeEmpty();

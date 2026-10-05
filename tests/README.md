@@ -8,7 +8,9 @@ waived. See docs/26-ui-backend-contract-gaps.md, G-30.
 
 Test stack (2026-10-03): xunit v3 via `xunit.v3.mtp-off` + `xunit.runner.visualstudio` 4 (VSTest; test
 projects are `Exe`), FluentAssertions 7.2, NSubstitute 6, Test SDK 18, coverlet 10. `xUnit1051`
-(pass `TestContext.Current.CancellationToken`) is suppressed in both test projects pending a separate change.
+(pass `TestContext.Current.CancellationToken`) is enforced in both test projects as of 2026-10-05.
+Ordinary calls with omitted optional tokens now use the current test token; dedicated cancellation
+inputs remain explicit. The build has no replacement suppression for this rule.
 
 Numbered-release SQL selection has a focused Windows runner at
 `release/Test-PairedReleaseSqlSelection.ps1`. A new private evidence directory
@@ -232,6 +234,12 @@ The local harness in scripts/powershell/Test-ResourceCatalogueSql.ps1 validates
 the actual migration upgrade and then runs SQL round-trip, concurrency,
 transactional audit rollback, append-only, and SDM persistence tests. Corporate
 SQL/AD/HTTP endpoints remain forbidden. Offline SQL asset assertions are separate.
+
+`ResourceSqlTests.Sessions_*` also runs through this guarded harness: logout, revoke,
+idle/absolute expiry, expiry sweep and access-disable termination are checked for update/audit
+failure rollback and success. Second-audit insert failure rolls back earlier audit and state;
+cancellation inside a transaction also leaves both unchanged. No test disables append-only
+triggers. InMemory and hosted API equivalents cover safe unavailable responses and atomic batches.
 
 In Use recovery acceptance uses `tests/browser/in-use-recovery.cjs` with arguments
 `<playwright-core> <ui-loopback> <api-loopback> <fresh-evidence-directory> <proxy-port>`.

@@ -115,4 +115,10 @@ public sealed class AuditWriteUnavailableException : Exception
         : base(message)
     {
     }
+
+    /// <summary>Initializes a safe audit failure while retaining the internal cause.</summary>
+    public AuditWriteUnavailableException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }

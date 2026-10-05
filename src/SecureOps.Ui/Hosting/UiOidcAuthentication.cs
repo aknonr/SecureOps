@@ -60,6 +60,13 @@ public static class UiOidcAuthentication
         options.AccessDeniedPath = "/access-denied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+        options.Events.OnSigningIn = context =>
+        {
+            string key = context.Principal?.FindFirst(SignedInUserService.BrowserSessionClaim)?.Value
+                ?? throw new InvalidOperationException("Explicit UI sign-in requires a browser correlation.");
+            context.HttpContext.RequestServices.GetRequiredService<IApiSessionStore>().InitializeAuthenticatedSession(key);
+            return Task.CompletedTask;
+        };
         options.Events.OnValidatePrincipal = async context =>
         {
             if (context.Principal?.Identity is not ClaimsIdentity { IsAuthenticated: true } identity)
@@ -70,9 +77,18 @@ public static class UiOidcAuthentication
             Claim? browserSession = identity.FindFirst(SignedInUserService.BrowserSessionClaim);
             if (browserSession is null)
             {
-                browserSession = new Claim(SignedInUserService.BrowserSessionClaim, Guid.NewGuid().ToString("N"));
-                identity.AddClaim(browserSession);
-                context.ShouldRenew = true;
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            IApiSessionStore sessions = context.HttpContext.RequestServices.GetRequiredService<IApiSessionStore>();
+            BrowserApiSession session = sessions.GetOrCreate(browserSession.Value);
+            if (session.RequiresReauthentication)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
             }
 
             bool oidcPrincipal = string.Equals(
@@ -81,10 +97,9 @@ public static class UiOidcAuthentication
                 StringComparison.Ordinal);
             if (oidcPrincipal)
             {
-                IApiSessionStore sessions = context.HttpContext.RequestServices.GetRequiredService<IApiSessionStore>();
                 TimeProvider timeProvider = context.HttpContext.RequestServices.GetRequiredService<TimeProvider>();
                 OidcAccessTokenResult token = oidcEnabled
-                    ? await sessions.GetOrCreate(browserSession.Value).GetOidcAccessTokenAsync(
+                    ? await session.GetOidcAccessTokenAsync(
                         timeProvider.GetUtcNow(),
                         context.HttpContext.RequestServices.GetRequiredService<IOptions<OidcOptions>>().Value,
                         context.HttpContext.RequestServices.GetRequiredService<IOidcBackchannelClient>(),
@@ -92,7 +107,7 @@ public static class UiOidcAuthentication
                     : new OidcAccessTokenResult(null, true);
                 if (token.RequiresReauthentication)
                 {
-                    sessions.Remove(browserSession.Value);
+                    sessions.RequireReauthentication(browserSession.Value);
                     context.RejectPrincipal();
                     await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 }
@@ -310,7 +325,7 @@ public static class UiOidcAuthentication
             .GetUtcNow();
         context.HttpContext.RequestServices
             .GetRequiredService<IApiSessionStore>()
-            .GetOrCreate(browserSessionKey)
+            .InitializeAuthenticatedSession(browserSessionKey)
             .SetOidcTokens(new OidcServerTokenSet(
                 accessToken,
                 now.AddSeconds(expiresInSeconds),

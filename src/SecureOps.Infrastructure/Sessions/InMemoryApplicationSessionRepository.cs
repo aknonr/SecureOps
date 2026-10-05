@@ -1,12 +1,13 @@
 using SecureOps.Domain.Sessions;
+using SecureOps.Infrastructure.Audit;
 
 namespace SecureOps.Infrastructure.Sessions;
 
 /// <summary>Concurrency-safe non-durable application-session repository for local and isolated tests.</summary>
-public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRepository
+public sealed class InMemoryApplicationSessionRepository(IAuditWriter auditWriter) : IApplicationSessionRepository
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly Dictionary<Guid, ApplicationSession> _sessions = [];
+    private Dictionary<Guid, ApplicationSession> _sessions = [];
 
     /// <inheritdoc />
     public async Task InsertAsync(ApplicationSession session, CancellationToken cancellationToken)
@@ -79,7 +80,31 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken)
+    public async Task<bool> EndWithAuditAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, AuditEvent auditEvent, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            Dictionary<Guid, ApplicationSession> next = new(_sessions);
+            bool ended = next.TryGetValue(sessionId, out ApplicationSession? session) && session.IsActive;
+            if (ended)
+            {
+                next[sessionId] = session! with { EndedAtUtc = endedAtUtc, EndReason = reason };
+            }
+
+            // Prepare state before audit; after successful audit, publication cannot fail or cancel.
+            await AppendAuditAsync([auditEvent], cancellationToken);
+            _sessions = next;
+            return ended;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, Func<ApplicationSession, AuditEvent> auditFactory, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -87,11 +112,14 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
             ApplicationSession[] affected = _sessions.Values
                 .Where(session => session.UserId == userId && session.IsActive)
                 .ToArray();
+            Dictionary<Guid, ApplicationSession> next = new(_sessions);
             foreach (ApplicationSession session in affected)
             {
-                _sessions[session.SessionId] = session with { EndedAtUtc = endedAtUtc, EndReason = reason };
+                next[session.SessionId] = session with { EndedAtUtc = endedAtUtc, EndReason = reason };
             }
 
+            await AppendAuditAsync(affected.Select(auditFactory).ToArray(), cancellationToken);
+            _sessions = next;
             return affected;
         }
         finally
@@ -105,12 +133,14 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
         DateTimeOffset nowUtc,
         DateTimeOffset idleCutoffUtc,
         int maximumCount,
+        Func<ApplicationSession, AuditEvent> auditFactory,
         CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
         {
             List<ApplicationSession> ended = [];
+            Dictionary<Guid, ApplicationSession> next = new(_sessions);
             foreach (ApplicationSession session in _sessions.Values
                          .Where(item => item.IsActive
                              && (item.AbsoluteExpiresAtUtc <= nowUtc || item.LastSeenAtUtc <= idleCutoffUtc))
@@ -130,10 +160,12 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
                 }
 
                 ApplicationSession terminal = session with { EndedAtUtc = nowUtc, EndReason = reason };
-                _sessions[session.SessionId] = terminal;
+                next[session.SessionId] = terminal;
                 ended.Add(terminal);
             }
 
+            await AppendAuditAsync(ended.Select(auditFactory).ToArray(), cancellationToken);
+            _sessions = next;
             return ended;
         }
         finally
@@ -161,6 +193,34 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
         finally
         {
             _gate.Release();
+        }
+    }
+
+    private async Task AppendAuditAsync(IReadOnlyCollection<AuditEvent> events, CancellationToken cancellationToken)
+    {
+        if (events.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            if (auditWriter is IAtomicAuditWriter atomic)
+            {
+                await atomic.WriteBatchAsync(events, cancellationToken);
+            }
+            else
+            {
+                // Non-durable sessions publish only after every audit write succeeds; audit prefixes remain append-only.
+                foreach (AuditEvent auditEvent in events)
+                {
+                    await auditWriter.WriteAsync(auditEvent, cancellationToken);
+                }
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new AuditWriteUnavailableException("Application-session local audit failed.", exception);
         }
     }
 }
