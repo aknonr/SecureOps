@@ -15,7 +15,8 @@
     parallel. It works only after ADR-0024 is accepted and the endpoint is registered; it never uses the default endpoint.
 
     The upload file contains server names, component names and identities only: no passwords, no person names. A document
-    with a password-like property is refused here, and the module refuses the whole file as well.
+    with a password-like property or a value that looks like a password assignment (password=, pwd:, token=, ...) is refused
+    here, and the module refuses the whole file as well.
 
 .EXAMPLE
     .\Invoke-ServiceAccountUsageScan.ps1 -CombinePath .\results.jsonl -ComputerListPath .\planned.txt -Account 'SYN\svc_synapp' -OutputPath .\scan.json
@@ -87,8 +88,12 @@ Set-StrictMode -Version 3.0
 
 $serverPattern = '^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$'
 $documentProperties = @('schema', 'serverName', 'generatedAt', 'durationMs', 'accounts', 'scanResult', 'sources', 'components', 'verification', 'warnings')
-# Same words the module refuses (ADR-0027); checked here too so a bad document is caught before it leaves the workstation.
-$secretPattern = 'password|passwd|pwd|secret|credential|token|apikey|privatekey|connectionstring|parola|[s\u015f]ifre'
+# Same rules the module applies (ADR-0027, UsageScanParser); checked here too so a bad document is caught before it leaves
+# the workstation. Names and values are compared in folded form (see ConvertTo-FoldedText).
+$secretWords = 'password|passwd|pwd|secret|credential|token|apikey|privatekey|connectionstring|parola|sifre'
+# A secret word, optionally plural or closing a quoted key, then = or : and a value ("password=x", "pwd : x", '"token":"x"').
+$secretAssignment = '(?:password|passwd|pwd|parola|sifre|secret|token|api[-_ ]?key|credential|connection[-_ ]?string|private[-_ ]?key)s?["'']?\s*[=:]\s*\S'
+$maxGuardedText = 4096
 
 if ($PSCmdlet.ParameterSetName -in @('List', 'CombineList')) {
     $ComputerName = @(Get-Content -LiteralPath $ComputerListPath | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
@@ -107,21 +112,54 @@ foreach ($name in $ComputerName) {
     }
 }
 
-function Test-SecretName {
-    # True when any property name in the object graph looks like a secret (password, token, parola, ...).
+function ConvertTo-FoldedText {
+    # Lower case in compatibility form without combining marks or invisible format characters (S-cedilla to s, dotless i to i,
+    # full-width letters to ASCII, zero-width space and soft hyphen removed), so other spellings meet the same words.
+    param([string]$Text)
+    $folded = [System.Text.StringBuilder]::new($Text.Length)
+    foreach ($c in $Text.Normalize([System.Text.NormalizationForm]::FormKD).ToCharArray()) {
+        $category = [System.Globalization.CharUnicodeInfo]::GetUnicodeCategory($c)
+        if ($category -eq [System.Globalization.UnicodeCategory]::NonSpacingMark -or $category -eq [System.Globalization.UnicodeCategory]::Format) { continue }
+        if ($c -eq [char]0x0131) { [void]$folded.Append('i') } else { [void]$folded.Append([char]::ToLowerInvariant($c)) }
+    }
+
+    return $folded.ToString()
+}
+
+function Find-SecretContent {
+    # First reason a document must not leave the workstation, or $null: a password-like property name ('Name'), a text value
+    # longer than the module reads ('TooLong') or a value that looks like a secret assignment ('Value'). A check that cannot
+    # finish refuses the document as well.
     param($Value)
-    if ($null -eq $Value -or $Value -is [string] -or $Value -is [ValueType]) { return $false }
+    if ($null -eq $Value -or $Value -is [ValueType]) { return $null }
+    if ($Value -is [string]) {
+        if ($Value.Length -gt $maxGuardedText) { return 'TooLong' }
+        try {
+            $found = [regex]::IsMatch((ConvertTo-FoldedText -Text $Value), $secretAssignment,
+                [System.Text.RegularExpressions.RegexOptions]::CultureInvariant, [TimeSpan]::FromMilliseconds(100))
+        }
+        catch { return 'Value' }
+        if ($found) { return 'Value' }
+        return $null
+    }
+
     if ($Value -is [System.Collections.IEnumerable]) {
-        foreach ($item in $Value) { if (Test-SecretName -Value $item) { return $true } }
-        return $false
+        foreach ($item in $Value) {
+            $reason = Find-SecretContent -Value $item
+            if ($reason) { return $reason }
+        }
+
+        return $null
     }
 
     foreach ($property in $Value.PSObject.Properties) {
-        if ($property.Name -match $secretPattern) { return $true }
-        if (Test-SecretName -Value $property.Value) { return $true }
+        if ($property.Name.Length -gt $maxGuardedText) { return 'TooLong' }
+        if (((ConvertTo-FoldedText -Text $property.Name) -replace '[^a-z0-9]', '') -cmatch $secretWords) { return 'Name' }
+        $reason = Find-SecretContent -Value $property.Value
+        if ($reason) { return $reason }
     }
 
-    return $false
+    return $null
 }
 
 function Read-UsageDocument {
@@ -152,8 +190,10 @@ function Assert-UsageDocument {
         throw "$Origin is not a service-account-usage-v1 document from Get-ServiceAccountUsage.ps1."
     }
 
-    if (Test-SecretName -Value $Document) {
-        throw "$Origin contains a password-like property. Do not upload it; run Get-ServiceAccountUsage.ps1 again."
+    switch (Find-SecretContent -Value $Document) {
+        'Name' { throw "$Origin contains a password-like property. Do not upload it; run Get-ServiceAccountUsage.ps1 again." }
+        'Value' { throw "$Origin contains a value that looks like a password assignment (for example password=). Do not upload it; run Get-ServiceAccountUsage.ps1 again." }
+        'TooLong' { throw "$Origin contains a text longer than $maxGuardedText characters, which the module refuses. Run Get-ServiceAccountUsage.ps1 again." }
     }
 
     if ("$($Document.serverName)" -notmatch $serverPattern) { throw "$Origin has no valid serverName." }

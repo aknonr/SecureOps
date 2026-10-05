@@ -141,6 +141,61 @@ public sealed class ServiceAccountUsageScanScriptTests
         File.Exists(folder.File("scan.json")).Should().BeFalse("nothing is written when a document is refused");
     }
 
+    // Review 2026-10-05: the combine step checked property names only; a value carrying a password assignment left the
+    // workstation and was refused only by the module. It now applies the module's folded value rule before writing.
+    [Theory]
+    [InlineData("C:\\syn\\run.exe /password:SYN-NEVER-UPLOADED")]
+    [InlineData("syn.exe \"Password\":\"SYN-NEVER-UPLOADED\"")]
+    [InlineData("syn.exe token = SYN-NEVER-UPLOADED")]
+    [InlineData("syn.exe \uFF30\uFF41\uFF53\uFF53\uFF57\uFF4F\uFF52\uFF44=SYN-NEVER-UPLOADED")]
+    [InlineData("syn.exe pass\u200Bword=SYN-NEVER-UPLOADED")]
+    [InlineData("syn.exe \u015Eifre=SYN-NEVER-UPLOADED")]
+    public void Combine_RefusesAPasswordAssignmentInAValue_AsTheModuleDoes(string detail)
+    {
+        using TemporaryFolder folder = new();
+        string document = Detail(Document("SYN-APP01", match: true), detail);
+        File.WriteAllText(folder.File("leaked.json"), document);
+
+        Failure(folder, "leaked.json", "SYN-APP01", "SYN\\svc_synapp").Should().Contain("password assignment").And.NotContain("SYN-NEVER-UPLOADED");
+        File.Exists(folder.File("scan.json")).Should().BeFalse("nothing is written when a document is refused");
+        FluentActions.Invoking(() => UsageScanParser.Parse(Encoding.UTF8.GetBytes(Bundle(document)), 4 * 1024 * 1024, DateTimeOffset.UtcNow))
+            .Should().Throw<UsageScanFileException>().Which.Code.Should().Be(UsageScanFileCodes.SecretValue, "the script and the module refuse the same value");
+    }
+
+    [Fact]
+    public void Combine_AcceptsOrdinaryWordsNearTheSecretWords_AndRefusesOverlongText()
+    {
+        using TemporaryFolder folder = new();
+        File.WriteAllText(folder.File("ordinary.json"), Detail(Document("SYN-APP01", match: true), "LogonType=Password; Password Expiry Notification"));
+        using (PowerShell shell = Shell())
+        {
+            shell.AddCommand(Combine()).AddParameter("CombinePath", folder.File("ordinary.json")).AddParameter("ComputerName", new[] { "SYN-APP01" })
+                .AddParameter("Account", new[] { "SYN\\svc_synapp" }).AddParameter("OutputPath", folder.File("scan.json"));
+            shell.Invoke();
+            shell.HadErrors.Should().BeFalse(string.Join("; ", shell.Streams.Error));
+        }
+
+        UsageScanParser.Parse(File.ReadAllBytes(folder.File("scan.json")), 4 * 1024 * 1024, DateTimeOffset.UtcNow).Items.Should().ContainSingle();
+
+        File.WriteAllText(folder.File("long.json"), Detail(Document("SYN-APP01", match: true), new string('a', 4097)));
+        Failure(folder, "long.json", "SYN-APP01", "SYN\\svc_synapp").Should().Contain("longer than 4096");
+    }
+
+    /// <summary>The document with the first component's Detail replaced.</summary>
+    private static string Detail(string document, string detail)
+    {
+        JsonNode node = JsonNode.Parse(document)!;
+        node["components"]![0]!["Detail"] = detail;
+        return node.ToJsonString();
+    }
+
+    /// <summary>A minimal upload around one document, only to ask the module's parser about the same value.</summary>
+    private static string Bundle(string document)
+    {
+        string server = JsonNode.Parse(document)!["serverName"]!.GetValue<string>();
+        return $$"""{"schema":"service-account-usage-scan-v1","generatedAt":"{{DateTimeOffset.UtcNow:O}}","tool":"Combined","accounts":["SYN\\svc_synapp"],"expectedAccount":null,"plannedServers":["{{server}}"],"notReached":[],"results":[{{document}}]}""";
+    }
+
     private static string Failure(TemporaryFolder folder, string file, string planned, string account)
     {
         using PowerShell shell = Shell();

@@ -58,8 +58,9 @@ dosya yazmaz ve ağ bağlantısı açmaz. Çıktısı **tek satır JSON**'dur.
 
 - Her sunucu belgesi olduğu gibi (bayt bayt) aktarılır; planlı olup belgesi olmayan sunucu `NoResult`, sizin
   `-UnreachableComputerName` ile belirttiğiniz `Unreachable` olur.
-- Plan dışı sunucu, aynı sunucunun iki belgesi, başka hesabı aramış belge veya parola benzeri alan içeren belge burada
-  durdurulur; dosya yazılmaz.
+- Plan dışı sunucu, aynı sunucunun iki belgesi, başka hesabı aramış belge, parola benzeri alan, parola ataması gibi görünen
+  değer (ör. `password=`, `pwd:`, `token=`) veya 4096 karakterden uzun metin içeren belge burada durdurulur; dosya yazılmaz.
+  Modül aynı kuralları uygular.
 - gMSA kontrolünde `-ExpectedAccount` toplayıcıdakiyle aynı olmalıdır.
 
 ## 4. Hesaba bağlayın
