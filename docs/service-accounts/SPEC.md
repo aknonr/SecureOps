@@ -224,13 +224,17 @@ server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR
 4. **Who.** Attaching needs Work and the responsible basis, or the participant basis through one of the caller's own open
    requests (the scan is then evidence on that request). The file must have searched this account (same name; same domain
    when both carry one). Turning a match into a usage, or dismissing it with a reason, needs Work and the responsible basis,
-   once per match and account, never automatically; the created usage is an ordinary manual usage.
+   once per match and account, never automatically; the created usage is an ordinary manual usage. A second decision on
+   the same match is a 409 conflict (`ServiceAccountUsageScanAlreadyDecided`); the first one stays.
 5. **gMSA evidence.** A scan with an expected gMSA yields, per account: former account still configured; incomplete (a
    planned server not fully covered); converted on the covered servers (every planned server fully scanned, no former
    account, the gMSA runs a component); or no components. It is shown as evidence only; the verifier verifies the
    conversion through the existing action verification.
 6. **Append-only.** Scans, servers, matches, links and decisions are never updated or deleted; the same bytes from the same
    person are one scan; every link and decision writes module history and the audit log.
+7. **File names.** Uploaded file names (scan, import, evidence) are stored and shown as the last path segment without
+   control, format (zero-width, bidi override/isolate), line-separator or invisible filler characters, at most 200
+   characters, so a name cannot hide or reorder its extension.
 
 ## Reminders
 
