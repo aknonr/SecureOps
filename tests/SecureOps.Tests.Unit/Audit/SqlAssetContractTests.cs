@@ -63,7 +63,8 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(30)
+            .And.HaveCount(31)
+            .And.ContainSingle(name => name == "031-service-account-requested-gmsa-name.sql")
             .And.ContainSingle(name => name == "030-service-account-usage-scans.sql")
             .And.ContainSingle(name => name == "029-service-account-scope-bootstrap.sql")
             .And.ContainSingle(name => name == "028-admin-service-account-operations.sql")
@@ -335,6 +336,22 @@ public sealed class SqlAssetContractTests
 
         candidate.Should().NotContainEquivalentOf("password").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("ALTER ROLE");
         grants.Should().NotContain("UPDATE").And.NotContain("DELETE").And.NotContain("ALTER ROLE");
+    }
+
+    [Fact]
+    public void RequestedGmsaNameMigration_AddsTwoNullableColumns_RefusesReplay_AndGrantsNothing()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "031-service-account-requested-gmsa-name.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "031-service-account-requested-gmsa-name.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-005-requested-gmsa-name.sql"));
+
+        migration.Should().Contain(":r ../schema/031-service-account-requested-gmsa-name.sql");
+        schema.Should().Contain("requires reviewed 025 and 030").And.Contain(":r ../pending/service-accounts/SA-005-requested-gmsa-name.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay")
+            .And.Contain("ALTER TABLE svcacct.WorkRequests ADD RequestedGmsaName nvarchar(256) NULL;")
+            .And.Contain("ALTER TABLE svcacct.IdentityTransitions ADD RequestedGmsaName nvarchar(256) NULL;")
+            .And.NotContain("DEFAULT").And.NotContain("UPDATE svcacct").And.NotContain("DROP ").And.NotContain("GRANT ").And.NotContain("ALTER ROLE");
     }
 
     private static string FindRepositoryRoot()

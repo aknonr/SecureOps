@@ -99,6 +99,28 @@ public sealed partial class SqlServiceAccountRepository
         return parameters;
     }
 
+    /// <summary>SQL Server error number for "chosen as deadlock victim".</summary>
+    private const int _deadlockVictim = 1205;
+
+    /// <summary>
+    /// Runs a read made only of SELECTs outside any transaction once more when SQL Server chose it as a deadlock victim: the
+    /// victim holds nothing and changed nothing, so a repeat is safe. A wide scoped read (account list and export, detail,
+    /// report facts) can deadlock with a concurrent ownership decision under locking READ COMMITTED (seen 2026-10-05 between
+    /// the 5 000-account export and DecideOwnership); the person should get the data instead of a 503. Writes are never
+    /// retried here, and a second deadlock still fails closed.
+    /// </summary>
+    private static async Task<T> RetryReadOnDeadlockAsync<T>(Func<Task<T>> read)
+    {
+        try
+        {
+            return await read();
+        }
+        catch (SqlException exception) when (exception.Number == _deadlockVictim)
+        {
+            return await read();
+        }
+    }
+
     private async Task<SqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
         SqlConnection connection = new(_connectionString);

@@ -69,17 +69,26 @@
     {
         <SoEmptyState Title="Bu hesaba bağlı tarama yok" Description="Tarama yüklenene kadar sunucu bazında bilgi yoktur; bu, hesabın kullanılmadığı anlamına gelmez." />
     }
-    else if (Detail.UsageScans is { } shown && Detail.UsageScanTotal > shown.Count)
+    else if (Detail.UsageScans is not null)
     {
-        <p class="so-panel-text--sm mt-2">En yeni @shown.Count tarama gösteriliyor; bu hesaba toplam @Detail.UsageScanTotal tarama bağlı.</p>
+        <p class="so-panel-text--sm mt-2">
+            Bu hesaba @Detail.UsageScanTotal tarama bağlı@(Detail.UsageScanPending > 0 ? $"; tüm taramalarda {Detail.UsageScanPending} bileşen karar bekliyor (karar bekleyenler her taramada en üstte)" : "; karar bekleyen bileşen yok").
+        </p>
+        @if (Detail.UsageScanTotal > UsageScanPaging.ScanPageSize)
+        {
+            @Pager("Taramalar", _scanPage, UsageScanPaging.ScanPageSize, Detail.UsageScanTotal, "tarama", ScanPageAsync)
+        }
     }
 </section>
 
-@foreach (UsageScanView scan in Detail.UsageScans ?? [])
+@foreach (UsageScanView scan in ShownScans)
 {
     string headingId = $"sa-scan-{scan.LinkId:N}";
-    UsageScanItemView[] former = [.. scan.Items.Where(i => i.Role == "Former")];
-    UsageScanItemView[] gmsa = [.. scan.Items.Where(i => i.Role == "Expected")];
+    ItemView formerView = View(scan, "Former");
+    ItemView gmsaView = View(scan, "Expected");
+    UsageScanItemView[] former = [.. formerView.Data?.Items ?? scan.Items.Where(i => i.Role == "Former")];
+    UsageScanItemView[] gmsa = [.. gmsaView.Data?.Items ?? scan.Items.Where(i => i.Role == "Expected")];
+    int formerShownTotal = formerView.Data?.Total ?? scan.FormerTotal;
     UsageScanServerView[] gaps = [.. scan.Servers.Where(s => s.Outcome is "NotCovered" or "Uncertain")];
     <section class="so-panel" aria-labelledby="@headingId">
         <div class="so-panel-head sa-scan-head">
@@ -127,11 +136,23 @@
             </MudAlert>
         }
 
-        <h3 class="sa-scan-subtitle">Bu hesabın bulunduğu bileşenler (@former.Length)</h3>
-        @if (former.Length == 0)
+        <h3 class="sa-scan-subtitle">
+            Bu hesabın bulunduğu bileşenler (@scan.FormerTotal)@(scan.FormerPending > 0 ? $" · {scan.FormerPending} karar bekliyor" : "")
+        </h3>
+        @if (scan.FormerTotal > 0 && (scan.FormerPending > 0 || formerView.PendingOnly))
+        {
+            @* Paging and this filter only change which rows are listed; coverage and outcomes above are computed over every item. *@
+            <MudCheckBox T="bool" Value="@formerView.PendingOnly" ValueChanged="@(v => FilterAsync(scan, v))" Disabled="Busy"
+                Label="@($"Yalnız karar bekleyenleri göster ({scan.FormerPending})")" />
+        }
+        @if (scan.FormerTotal == 0)
         {
             @* "Not found" only for the servers that were fully scanned; with none, nothing is known (SPEC rule 15). *@
             <p class="so-panel-text--sm">@NoMatchText(scan.Coverage, gaps.Length)</p>
+        }
+        else if (former.Length == 0)
+        {
+            <p class="so-panel-text--sm">Bu taramada karar bekleyen bileşen kalmadı.</p>
         }
         else
         {
@@ -171,6 +192,11 @@
                     </div></MudTd>
                 </RowTemplate>
             </MudTable>
+            @if (formerShownTotal > UsageScanPaging.DefaultItemPageSize)
+            {
+                @Pager(formerView.PendingOnly ? "Karar bekleyen bileşenler" : "Bileşenler", formerView.Page, UsageScanPaging.DefaultItemPageSize, formerShownTotal,
+                    "bileşen", page => ItemPageAsync(scan, "Former", page))
+            }
         }
 
         @* Only while the item is still undecided in the server's current view: after a 409 the reloaded decision is shown instead. *@
@@ -194,7 +220,7 @@
                     <MudButton OnClick="@(() => _selected = null)" Disabled="Busy" Variant="Variant.Text">Vazgeç</MudButton>
                 </div>
                 <MudGrid Spacing="2" Class="mt-2">
-                    <MudItem xs="12" md="8"><MudTextField @bind-Value="_reason" Label="Kayda almama gerekçesi" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="8"><MudTextField @bind-Value="_reason" Label="Kayda almama gerekçesi" MaxLength="1000" Variant="Variant.Outlined" Immediate="true" /></MudItem>
                     <MudItem xs="12" md="4" Class="d-flex align-center">
                         <MudButton OnClick="@(() => DismissAsync(item))" Disabled="@(Busy || string.IsNullOrWhiteSpace(_reason))" Variant="Variant.Outlined">Kayda almadan kapat</MudButton>
                     </MudItem>
@@ -203,15 +229,19 @@
             </div>
         }
 
-        @if (gmsa.Length > 0)
+        @if (scan.ExpectedTotal > 0)
         {
-            <h3 class="sa-scan-subtitle">Beklenen gMSA ile çalışan bileşenler (@gmsa.Length)</h3>
+            <h3 class="sa-scan-subtitle">Beklenen gMSA ile çalışan bileşenler (@scan.ExpectedTotal)</h3>
             <ul class="sa-scan-list">
                 @foreach (UsageScanItemView g in gmsa)
                 {
                     <li class="sa-scan-wrap">@g.ServerName · @g.ComponentTypeLabel: @g.ComponentName (@g.ConfiguredIdentity)</li>
                 }
             </ul>
+            @if (scan.ExpectedTotal > UsageScanPaging.DefaultItemPageSize)
+            {
+                @Pager("gMSA bileşenleri", gmsaView.Page, UsageScanPaging.DefaultItemPageSize, scan.ExpectedTotal, "bileşen", page => ItemPageAsync(scan, "Expected", page))
+            }
         }
 
         <SaDisclosure Class="mt-2" Title="@($"Sunucu bazında kapsam ({scan.Servers.Count} sunucu)")">
@@ -262,6 +292,27 @@
     /// <summary>Command sink for decisions.</summary>
     [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
 
+    /// <summary>Loads one page of scans (null when the call failed; the page shows the problem).</summary>
+    [Parameter] public Func<int, Task<UsageScanPage?>>? LoadScans { get; set; }
+
+    /// <summary>Loads one page of a scan's items: link, role, undecided only, page (null when the call failed).</summary>
+    [Parameter] public Func<Guid, string, bool, int, Task<UsageScanItemPage?>>? LoadItems { get; set; }
+
+    /// <summary>Which page of one scan's items (per role) is listed; the default is the first page carried by the detail.</summary>
+    private sealed record ItemView(int Page, bool PendingOnly, UsageScanItemPage? Data)
+    {
+        public bool IsDefault => Page == 1 && !PendingOnly;
+    }
+
+    private readonly Dictionary<(Guid Link, string Role), ItemView> _views = [];
+    private int _scanPage = 1;
+    private UsageScanPage? _scanPageData;
+    private Guid? _accountId;
+
+    private IReadOnlyList<UsageScanView> ShownScans => _scanPage > 1 && _scanPageData is { } loaded ? loaded.Scans : Detail.UsageScans ?? [];
+
+    private ItemView View(UsageScanView scan, string role) => _views.GetValueOrDefault((scan.LinkId, role)) ?? new ItemView(1, false, null);
+
     private IEnumerable<RequestView> ParticipantRequests =>
         Detail.Requests.Where(r => r.Status == "Open" && (Detail.Permissions.ParticipantRequestIds?.Contains(r.Id) ?? false));
 
@@ -270,12 +321,102 @@
 
     private bool CanSend => !Busy && _file is not null && _statement is { } s && s.Trim().Length >= 5 && (Detail.Permissions.Work || _request is not null);
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
+        if (_accountId != Detail.Summary.Id)
+        {
+            (_accountId, _scanPage, _scanPageData) = (Detail.Summary.Id, 1, null);
+            _views.Clear();
+        }
+
         if (_seenRevision != Revision)
         {
+            bool saved = _seenRevision >= 0;
             (_seenRevision, _file, _statement, _fileError, _request, _selected, _notes, _reason) = (Revision, null, null, null, null, null, null, null);
+            if (saved)
+            {
+                await RefreshAsync();
+            }
         }
+    }
+
+    /// <summary>After a saved command, re-reads the pages a person moved to so they stay where they were (server state wins).</summary>
+    private async Task RefreshAsync()
+    {
+        if (_scanPage > 1 && LoadScans is not null)
+        {
+            _scanPageData = await LoadScans(_scanPage) ?? _scanPageData;
+        }
+
+        foreach (((Guid link, string role), ItemView view) in _views.Where(v => !v.Value.IsDefault).ToArray())
+        {
+            if (LoadItems is not null && await LoadItems(link, role, view.PendingOnly, view.Page) is { } data)
+            {
+                // The list may have shrunk (a decision leaves "undecided only"): go back to the last page that still has rows.
+                ItemView next = view with { Data = data };
+                int page = ServiceAccountUiText.ClampPage(view.Page, data.Total, data.PageSize);
+                if (page != view.Page && await LoadItems(link, role, view.PendingOnly, page) is { } clamped)
+                {
+                    next = view with { Page = page, Data = clamped };
+                }
+
+                if (next.IsDefault)
+                {
+                    _views.Remove((link, role));
+                }
+                else
+                {
+                    _views[(link, role)] = next;
+                }
+            }
+        }
+    }
+
+    private async Task ScanPageAsync(int page)
+    {
+        if (page == 1)
+        {
+            (_scanPage, _scanPageData) = (1, null);
+            return;
+        }
+
+        if (LoadScans is not null && await LoadScans(page) is { } data)
+        {
+            (_scanPage, _scanPageData, _selected) = (page, data, null);
+        }
+    }
+
+    private Task ItemPageAsync(UsageScanView scan, string role, int page) => ShowItemsAsync(scan, role, View(scan, role).PendingOnly, page);
+
+    private Task FilterAsync(UsageScanView scan, bool pendingOnly) => ShowItemsAsync(scan, "Former", pendingOnly, 1);
+
+    private async Task ShowItemsAsync(UsageScanView scan, string role, bool pendingOnly, int page)
+    {
+        if (page == 1 && !pendingOnly)
+        {
+            _views.Remove((scan.LinkId, role));
+            return;
+        }
+
+        if (LoadItems is not null && await LoadItems(scan.LinkId, role, pendingOnly, page) is { } data)
+        {
+            _views[(scan.LinkId, role)] = new ItemView(page, pendingOnly, data);
+        }
+    }
+
+    /// <summary>Previous/next buttons with the visible range; plain buttons so Tab, Enter and Space work and 390 px wraps.</summary>
+    private RenderFragment Pager(string label, int current, int size, int total, string unit, Func<int, Task> go)
+    {
+        int pages = (total + size - 1) / size;
+        int from = ((current - 1) * size) + 1;
+        int to = Math.Min(total, current * size);
+        return @<div class="sa-scan-pager" role="group" aria-label="@($"{label}: sayfa {current} / {pages}")">
+            <span class="so-panel-text--sm" aria-live="polite">@label: @from–@to / @total @unit (sayfa @current / @pages)</span>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(Busy || current <= 1)" OnClick="@(() => go(current - 1))"
+                StartIcon="@Icons.Material.Filled.ChevronLeft">Önceki</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(Busy || current >= pages)" OnClick="@(() => go(current + 1))"
+                EndIcon="@Icons.Material.Filled.ChevronRight">Sonraki</MudButton>
+        </div>;
     }
 
     private async Task ChooseAsync(InputFileChangeEventArgs args)

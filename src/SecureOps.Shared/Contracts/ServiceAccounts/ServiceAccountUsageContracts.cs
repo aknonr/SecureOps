@@ -56,14 +56,16 @@ public sealed record DirectoryNameMatch(string DisplayName, string Account, stri
 public sealed record DirectoryNameSearchResponse(IReadOnlyList<DirectoryNameMatch> Matches, bool Truncated, int MinimumLetters, int MaximumResults);
 
 /// <summary>
-/// A usage scan attached to this account (ADR-0027): evidence a person produced under their own authority. Only the items
-/// matched to this account's searched name and the per-server coverage are included; nothing here closes, frees or
-/// verifies the account.
+/// A usage scan attached to this account (ADR-0027): evidence a person produced under their own authority. Coverage, per-server
+/// counts and the gMSA evidence are computed over ALL items matched to this account's searched name; <c>Items</c> holds only the
+/// first page of each role (former-account items undecided first, then the expected-gMSA items), and the totals say how many
+/// exist (<see cref="UsageScanItemPage"/> pages through the rest). Nothing here closes, frees or verifies the account.
 /// </summary>
 public sealed record UsageScanView(Guid ScanId, Guid LinkId, string Purpose, string MatchedAccount, string? ExpectedAccount, string FileName, string Sha256,
     string Tool, DateTimeOffset CombinedAt, DateTimeOffset? FirstScannedAt, DateTimeOffset? LastScannedAt, string RunStatement, string UploadedBy,
     DateTimeOffset UploadedAt, Guid? RequestId, DateTimeOffset LinkedAt, UsageScanCoverageView Coverage, UsageScanGmsaView? Gmsa,
-    IReadOnlyList<UsageScanServerView> Servers, IReadOnlyList<UsageScanItemView> Items);
+    IReadOnlyList<UsageScanServerView> Servers, IReadOnlyList<UsageScanItemView> Items, int FormerTotal = 0, int FormerPending = 0,
+    int ExpectedTotal = 0);
 
 /// <summary>Planned servers by result and by what the scan says about this account.</summary>
 public sealed record UsageScanCoverageView(int Planned, int Success, int Partial, int Failed, int Unreachable, int NoResult, int Found, int NotFound,
@@ -90,3 +92,23 @@ public sealed record RecordScanUsageRequest(string Kind, string? DatabaseEngine 
 
 /// <summary>Leaves a matched component out of the usage records, with a reason (kept as a decision).</summary>
 public sealed record DismissScanItemRequest(string Reason);
+
+/// <summary>Paging bounds for usage scans on the account page (server-side; the UI only asks for pages).</summary>
+public static class UsageScanPaging
+{
+    /// <summary>Scans per page, newest first (the account detail carries the first page).</summary>
+    public const int ScanPageSize = 5;
+    /// <summary>Items per page and role when the caller does not ask for another size.</summary>
+    public const int DefaultItemPageSize = 25;
+    /// <summary>Largest item page.</summary>
+    public const int MaxItemPageSize = 100;
+}
+
+/// <summary>One page of the scans attached to an account (newest first); <c>Pending</c> counts undecided items across all of them.</summary>
+public sealed record UsageScanPage(IReadOnlyList<UsageScanView> Scans, int Total, int Page, int PageSize, int Pending);
+
+/// <summary>
+/// One page of a scan's matched items for this account. <c>Role</c> is <c>Former</c> (undecided first) or <c>Expected</c>;
+/// <c>PendingOnly</c> keeps only former-account items still waiting for a decision. Paging never changes coverage or outcomes.
+/// </summary>
+public sealed record UsageScanItemPage(IReadOnlyList<UsageScanItemView> Items, int Total, int Page, int PageSize, string Role, bool PendingOnly);

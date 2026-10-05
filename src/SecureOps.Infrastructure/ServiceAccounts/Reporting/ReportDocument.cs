@@ -101,6 +101,12 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
             ]),
         ];
         sections.AddRange(VersionTwo(report));
+        if (report.GmsaNames is { } names)
+        {
+            sections.Add(new("İstenen gMSA adları", ["Hesap", "Kaynak", "İstenen gMSA adı", $"Karakter (en çok {ServiceAccountGmsaName.Limit})", "Durum"],
+                [.. names.Select(n => Row(n.Account, n.Source, n.RequestedName, n.Length, n.Status))]));
+        }
+
         sections.Add(new("Tanımlar ve notlar", ["Not"], [.. report.Notes.Select(n => Row(n))]));
         string period = $"{report.WeekStart:dd.MM.yyyy} – {report.WeekEndExclusive.AddDays(-1):dd.MM.yyyy}";
         ReportDashboard dashboard = new($"{report.ScopeLabel} · {period}",

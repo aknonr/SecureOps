@@ -3,6 +3,47 @@
 Dated session records moved verbatim from `PROGRESS.md` on 2026-10-04 to keep the current-state file short.
 Newest first. Read only when a question needs the history; the current state is in [PROGRESS.md](PROGRESS.md).
 
+## PR #11 branch state, moved from PROGRESS.md on 2026-10-05 (merged into master as `fb87c20`)
+
+### On this branch (done)
+
+One-time first scope grant (ADR-0026, migration 029); approved-user picker; no-scope explanation on list/detail/import;
+guided import; page guides; role bundles ([TEAM-ROLE-SETUP-TR.md](TEAM-ROLE-SETUP-TR.md)) and the
+Service-Accounts-only landing redirect from `/`; report charts on screen, XLSX (native) and PDF (vector page); XLSX
+"Yönetici özeti"; Liberation Mono (OFL) embedded in PDFs; serializable name-check deadlock fixed (`UPDLOCK`);
+harness `-SkipRoleScripts` exits 0; Windows-only execution-policy race in the unit tests fixed (module PowerShell tests
+in a non-parallel collection). ADR-0024 discovery module exists as PROPOSED only (shelved).
+
+**Usage scan (2026-10-04, ADR-0027, migration 030):** a person runs the read-only collector
+(`scripts/powershell/Get-ServiceAccountUsage.ps1`) under their own authority, combines the results on their workstation
+(`Invoke-ServiceAccountUsageScan.ps1 -CombinePath`) and uploads the file on the account ("Kullanım taraması" tab). Strict
+parser with a secret guard (file refused, nothing stored), append-only scan tables, honest per-server outcomes, per-match
+human decision into a usage, derived gMSA evidence (never verification). Operator guide:
+[USAGE-SCAN-TR.md](USAGE-SCAN-TR.md).
+
+**Review merge (2026-10-05):** cloud review — value-guard bypasses closed (quoted keys, token/secret/api-key, full-width and
+zero-width spellings; text over 4 096 characters refused, no more 500), `\z` instead of `$`, searched-name rule with
+`accountAmbiguousInScan`, "not found" only for fully scanned servers, every `MudExpansionPanel` replaced by `SaDisclosure`,
+non-blocking 15-character gMSA name hint. Windows follow-ups: focus ring inside `SaDisclosure`; a second scan decision is
+409 `ServiceAccountUsageScanAlreadyDecided` and the stale decision box closes; invisible and bidi characters stripped from
+stored file names; the combine script refuses password assignments in values too; MudTabs headers made keyboard reachable
+(`SaTabTitle`, account and admin tabs) and every module page gives MudBlazor buttons a focus ring; SQL test for the
+searched-name rule.
+
+### Verified (Windows workstation, 2026-10-05, after the review merge, HEAD `9629101`, SDK 9.0.317, LocalDB)
+
+Build 0/0 · unit 1883 passed, 1 intentional skip · integration 303 passed / 113 skipped (SQL-gated and opt-in) · format clean ·
+harness 001–030 exit 0 on fresh `SecureOps_SaMerge1005b`, module SQL 58/58 on the first run, diagnostics only the 4
+intentional `Number=51091` probes and 3 synthetic provider failures,
+no `Number=1205` (also 57/57 earlier on fresh `SecureOps_SaMerge1005a` before the new SQL test) · the new searched-name SQL
+test fails on the code before `c2601a7` and passes after it · combine value guard under Windows PowerShell 5.1 · local Demo
+(identity bridge, not OIDC) keyboard only: every account tab, admin tab and all 13 `SaDisclosure` summaries reached with Tab,
+Enter/Space switch tabs and open sections, focus ring visible; 390 px and 640 px (emulated 200 %), light and dark, all forms
+open: no horizontal scroll; gMSA hint (`role="status"`, submit stays enabled, contrast 4.92:1 light / 7.40:1 dark on the
+form surface); second decision 409 end to end. Older runs (2026-10-04 Windows and Linux, 2026-10-05 before the merge):
+[PROGRESS-HISTORY.md](PROGRESS-HISTORY.md).
+
+
 ## Original header (2026-09-28 baseline)
 
 Branch `feature/service-accounts-20260928`, temporary baseline `a3037175bb0bb9ecc7ab5c36c7c28607726469ce`

@@ -55,6 +55,7 @@ public static class ServiceAccountMetrics
                 "Geciken iş: açık talebin plan bitişi rapor tarihinden önce (takvim günü).",
                 "Bulgular ve başarısız taramalar tamamlanan iş sayılmaz."
             ], period);
+        report = report with { GmsaNames = facts.RequestedGmsaNames ? GmsaNames(facts, accounts) : null };
         if (facts.Insights is not { } insight)
         {
             return report;
@@ -71,6 +72,24 @@ public static class ServiceAccountMetrics
             Risk = ServiceAccountInsights.Risk(facts, insight, risk),
             Directorate = ServiceAccountInsights.Directorate(facts, insight, rules, funnel, risk, reportDate)
         };
+    }
+
+    /// <summary>
+    /// Requested gMSA names on open requests and on gMSA transitions in scope, ordered by account. The length is counted by the
+    /// shared rule (<see cref="ServiceAccountGmsaName"/>), so a name Active Directory would shorten stands out in the report.
+    /// </summary>
+    public static IReadOnlyList<GmsaNameLine> GmsaNames(ReportFacts facts, IReadOnlyDictionary<Guid, AccountFact> accounts)
+    {
+        IEnumerable<GmsaNameLine> requests = facts.Requests
+            .Where(r => r.Status == ServiceAccountRequestStatus.Open && r.RequestedGmsaName is not null && accounts.ContainsKey(r.AccountId))
+            .Select(r => new GmsaNameLine(accounts[r.AccountId].Label, ServiceAccountLabels.Action(r.ActionType) + " talebi", r.RequestedGmsaName!,
+                ServiceAccountGmsaName.Length(r.RequestedGmsaName), "Açık talep"));
+        IEnumerable<GmsaNameLine> transitions = facts.Transitions
+            .Where(t => t.RequestedGmsaName is not null && accounts.ContainsKey(t.AccountId))
+            .Select(t => new GmsaNameLine(accounts[t.AccountId].Label, "gMSA geçiş izlemesi", t.RequestedGmsaName!, ServiceAccountGmsaName.Length(t.RequestedGmsaName),
+                t.Completed ? "Geçiş tamamlandı" : "Uygunluk: " + ServiceAccountLabels.Suitability(t.Suitability)));
+        return [.. requests.Concat(transitions).OrderBy(l => l.Account, StringComparer.Ordinal).ThenBy(l => l.Source, StringComparer.Ordinal)
+            .ThenBy(l => l.RequestedName, StringComparer.Ordinal).Take(_maxDetailLines)];
     }
 
     /// <summary>True when an open request has a valid plan range and a determined action.</summary>

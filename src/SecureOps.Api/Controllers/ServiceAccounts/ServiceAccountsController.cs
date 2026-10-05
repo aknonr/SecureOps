@@ -235,6 +235,25 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
             requestId, cancellationToken));
     }
 
+    /// <summary>
+    /// One page of the scans attached to the account (newest first, <see cref="UsageScanPaging.ScanPageSize"/> per page), read
+    /// only and under the same scope as the account detail. Coverage and outcomes are computed over every matched item.
+    /// </summary>
+    [HttpGet("accounts/{id:guid}/usage-scans")]
+    [ProducesResponseType(typeof(UsageScanPage), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsageScanPage>> UsageScanPageAsync(Guid id, [FromQuery] int page = 1, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.UsageScanPageAsync(User, Context(), id, page, cancellationToken));
+
+    /// <summary>
+    /// One page of a linked scan's matched items for this account: <c>role=Former</c> (default, undecided first; <c>pending=true</c>
+    /// keeps only undecided items) or <c>role=Expected</c>. Read only; paging never changes coverage or outcomes.
+    /// </summary>
+    [HttpGet("accounts/{id:guid}/usage-scans/{linkId:guid}/items")]
+    [ProducesResponseType(typeof(UsageScanItemPage), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsageScanItemPage>> UsageScanItemsAsync(Guid id, Guid linkId, [FromQuery] string? role = null, [FromQuery] bool pending = false,
+        [FromQuery] int page = 1, [FromQuery] int? pageSize = null, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.UsageScanItemsAsync(User, Context(), id, linkId, role, pending, page, pageSize, cancellationToken));
+
     /// <summary>Records a matched component of an attached scan as a usage (a person's decision, never automatic).</summary>
     [HttpPost("accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage")]
     [Authorize(Policy = ServiceAccountPolicies.Work)]
