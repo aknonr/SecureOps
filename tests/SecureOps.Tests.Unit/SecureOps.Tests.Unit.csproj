@@ -13,8 +13,6 @@
     <AssemblyName>SecureOps.Tests.Unit</AssemblyName>
     <IsPackable>false</IsPackable>
     <OutputType>Exe</OutputType>
-    <!-- xunit v3 analyzer: passing TestContext.Current.CancellationToken is a separate follow-up, not part of the package move. -->
-    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

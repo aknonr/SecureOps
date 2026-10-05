@@ -32,15 +32,15 @@ public sealed class DirectoryNameSearchHostedTests
         ControlledAudit audit = new();
         using WebApplicationFactory<Program> factory = Factory(directory, audit);
         using HttpClient client = await ApprovedClientAsync(factory, "Lead");
-        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
         access.AccessStatus.Should().Be("Approved");
         access.Capabilities.Should().Contain(Capabilities.IdentityLookup).And.NotContain(ServiceAccountCapabilities.View);
-        HttpResponseMessage response = await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest(query));
+        HttpResponseMessage response = await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest(query), cancellationToken: TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        DirectoryNameSearchResponse found = (await response.Content.ReadFromJsonAsync<DirectoryNameSearchResponse>())!;
+        DirectoryNameSearchResponse found = (await response.Content.ReadFromJsonAsync<DirectoryNameSearchResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         found.Matches.Should().NotBeEmpty().And.OnlyContain(match => match.ServiceAccountId == null);
         found.Matches.Count.Should().BeLessThanOrEqualTo(10);
-        (await client.GetAsync("/api/v1/service-accounts/me")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.GetAsync("/api/v1/service-accounts/me", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         directory.Calls.Should().Be(1);
         string details = JsonSerializer.Serialize(audit.Events.Where(e => e.Action.StartsWith("Identity.DirectoryNameSearch", StringComparison.Ordinal)));
         details.Should().NotContain(query).And.NotContain("syn.ayse").And.Contain("QueryHash");
@@ -54,10 +54,10 @@ public sealed class DirectoryNameSearchHostedTests
         CountingDirectory directory = new();
         using WebApplicationFactory<Program> factory = Factory(directory, new ControlledAudit());
         using HttpClient client = await ApprovedClientAsync(factory, role);
-        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"))).StatusCode.Should().Be(expected);
+        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(expected);
         directory.Calls.Should().Be(expected == HttpStatusCode.OK ? 1 : 0);
         using HttpClient anonymous = factory.CreateClient();
-        (await anonymous.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await anonymous.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Theory]
@@ -70,7 +70,7 @@ public sealed class DirectoryNameSearchHostedTests
         ControlledAudit audit = new();
         using WebApplicationFactory<Program> factory = Factory(directory, audit);
         using HttpClient client = await ApprovedClientAsync(factory, "Lead");
-        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest(query))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest(query), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         directory.Calls.Should().Be(0);
         audit.Events.Should().ContainSingle(e => e.Action == "Identity.DirectoryNameSearchRejected");
     }
@@ -84,9 +84,9 @@ public sealed class DirectoryNameSearchHostedTests
         CountingDirectory directory = new() { Fail = stage == "Failed" };
         using WebApplicationFactory<Program> factory = Factory(directory, new ControlledAudit(stage));
         using HttpClient client = await ApprovedClientAsync(factory, "Lead");
-        HttpResponseMessage response = await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"));
+        HttpResponseMessage response = await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"), cancellationToken: TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        (await response.Content.ReadAsStringAsync()).Should().Contain("AuditStoreUnavailable").And.NotContain("ayse");
+        (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().Contain("AuditStoreUnavailable").And.NotContain("ayse");
         directory.Calls.Should().Be(expectedCalls);
     }
 
@@ -96,9 +96,9 @@ public sealed class DirectoryNameSearchHostedTests
         ControlledAudit audit = new();
         using WebApplicationFactory<Program> factory = Factory(new CountingDirectory { Fail = true }, audit);
         using HttpClient client = await ApprovedClientAsync(factory, "Lead");
-        HttpResponseMessage response = await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"));
+        HttpResponseMessage response = await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"), cancellationToken: TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        (await response.Content.ReadAsStringAsync()).Should().NotContain("displayName=");
+        (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().NotContain("displayName=");
         audit.Events.Should().ContainSingle(e => e.Action == "Identity.DirectoryNameSearchFailed");
     }
 
@@ -113,7 +113,7 @@ public sealed class DirectoryNameSearchHostedTests
                 services.AddSingleton<IAuditWriter>(new QueueAcknowledgementOnly());
             }));
         using HttpClient client = await ApprovedClientAsync(factory, "Lead");
-        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"))).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         directory.Calls.Should().Be(0, "durable requested audit must complete before a directory read");
     }
 
@@ -123,8 +123,8 @@ public sealed class DirectoryNameSearchHostedTests
         CountingDirectory directory = new();
         using WebApplicationFactory<Program> factory = Factory(directory, new ControlledAudit(), 1);
         using HttpClient client = await ApprovedClientAsync(factory, "Lead");
-        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"))).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"))).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         directory.Calls.Should().Be(1);
     }
 

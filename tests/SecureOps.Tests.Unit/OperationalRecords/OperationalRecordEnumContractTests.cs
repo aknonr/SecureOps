@@ -48,7 +48,7 @@ public sealed class OperationalRecordEnumContractTests
     public async Task SetClassificationAsync_AfterPreview_DoesNotRegressWorkflowState()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         WorkflowAcquireResult previewed = await repository.MarkPreviewedAsync(
             record.Id,
             "mapping-v1",
@@ -73,7 +73,7 @@ public sealed class OperationalRecordEnumContractTests
     public async Task SetClassificationAsync_WhenReconciliationRequired_DoesNotRegressWorkflowState()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         string transferKey = OperationalRecordIdempotency.Create(record.SourceRecordId, "mapping-v1");
         _ = await repository.MarkPreviewedAsync(record.Id, "mapping-v1", transferKey, "test:publisher", "correlation-preview", CancellationToken.None);
         _ = await repository.TryClaimAsync(record.Id, "test:publisher", TimeSpan.FromMinutes(2), "correlation-claim", CancellationToken.None);

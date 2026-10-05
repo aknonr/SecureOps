@@ -62,7 +62,7 @@ public sealed class DemoApiAuthenticationTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await client.GetAsync("/api/v1/health");
+        HttpResponseMessage response = await client.GetAsync("/api/v1/health", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -74,7 +74,7 @@ public sealed class DemoApiAuthenticationTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
-        SqlPersistenceHealthResponse response = (await client.GetFromJsonAsync<SqlPersistenceHealthResponse>("/api/v1/health/persistence"))!;
+        SqlPersistenceHealthResponse response = (await client.GetFromJsonAsync<SqlPersistenceHealthResponse>("/api/v1/health/persistence", cancellationToken: TestContext.Current.CancellationToken))!;
 
         response.Should().Be(new SqlPersistenceHealthResponse("NotConfigured", false, null));
     }
@@ -86,9 +86,9 @@ public sealed class DemoApiAuthenticationTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage process = await client.GetAsync("/api/v1/health");
-        HttpResponseMessage persistence = await client.GetAsync("/api/v1/health/persistence");
-        SqlPersistenceHealthResponse response = (await persistence.Content.ReadFromJsonAsync<SqlPersistenceHealthResponse>())!;
+        HttpResponseMessage process = await client.GetAsync("/api/v1/health", TestContext.Current.CancellationToken);
+        HttpResponseMessage persistence = await client.GetAsync("/api/v1/health/persistence", TestContext.Current.CancellationToken);
+        SqlPersistenceHealthResponse response = (await persistence.Content.ReadFromJsonAsync<SqlPersistenceHealthResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
 
         process.StatusCode.Should().Be(HttpStatusCode.OK);
         persistence.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
@@ -102,7 +102,7 @@ public sealed class DemoApiAuthenticationTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
-        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
 
         access.Should().NotBeNull();
         access.AccessStatus.Should().Be("Approved");
@@ -116,7 +116,7 @@ public sealed class DemoApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
         using HttpClient client = factory.CreateClient();
 
-        HttpResponseMessage response = await client.GetAsync("/api/v1/health");
+        HttpResponseMessage response = await client.GetAsync("/api/v1/health", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -140,10 +140,10 @@ public sealed class DemoApiAuthenticationTests
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true, swaggerEnabled: true);
         using HttpClient client = factory.CreateClient();
-        HttpResponseMessage response = await client.GetAsync("/swagger/v1/swagger.json");
+        HttpResponseMessage response = await client.GetAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        string document = await response.Content.ReadAsStringAsync();
+        string document = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         document.Should().Contain("DemoActor").And.Contain("X-SecureOps-Demo-Actor");
     }
 
@@ -153,8 +153,8 @@ public sealed class DemoApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
         using HttpClient client = factory.CreateClient();
 
-        HttpResponseMessage index = await client.GetAsync("/swagger/index.html");
-        HttpResponseMessage document = await client.GetAsync("/swagger/v1/swagger.json");
+        HttpResponseMessage index = await client.GetAsync("/swagger/index.html", TestContext.Current.CancellationToken);
+        HttpResponseMessage document = await client.GetAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken);
 
         index.StatusCode.Should().Be(HttpStatusCode.OK);
         document.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -166,12 +166,12 @@ public sealed class DemoApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
         using HttpClient client = factory.CreateClient();
 
-        string actualJson = await client.GetStringAsync("/swagger/v1/swagger.json");
+        string actualJson = await client.GetStringAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken);
         string snapshotPath = Path.Combine(FindRepositoryRoot(), "docs", "contracts", "secureops-api-v1.openapi.json");
         if (Environment.GetEnvironmentVariable("SECUREOPS_UPDATE_OPENAPI") == "1")
         {
             // Explicit local generation from the same deterministic host used by the compatibility gate.
-            await File.WriteAllTextAsync(snapshotPath, actualJson);
+            await File.WriteAllTextAsync(snapshotPath, actualJson, TestContext.Current.CancellationToken);
         }
         string expectedJson = File.ReadAllText(snapshotPath);
 
@@ -185,8 +185,8 @@ public sealed class DemoApiAuthenticationTests
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
-        (await client.GetAsync("/swagger/index.html")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await client.GetAsync("/swagger/v1/swagger.json")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.GetAsync("/swagger/index.html", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.GetAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -195,8 +195,8 @@ public sealed class DemoApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
         using HttpClient client = factory.CreateClient();
 
-        (await client.GetAsync("/swagger/v1/swagger.json")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "sample.user", purpose = "Approved operational lookup" })).StatusCode
+        (await client.GetAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "sample.user", purpose = "Approved operational lookup" }, cancellationToken: TestContext.Current.CancellationToken)).StatusCode
             .Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -210,10 +210,10 @@ public sealed class DemoApiAuthenticationTests
         using HttpClient admin = factory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
-        (await anonymous.GetAsync("/api/v1/access/users")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        HttpResponseMessage forbidden = await lead.GetAsync("/api/v1/access/users");
+        (await anonymous.GetAsync("/api/v1/access/users", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        HttpResponseMessage forbidden = await lead.GetAsync("/api/v1/access/users", TestContext.Current.CancellationToken);
         await AssertProblemAsync(forbidden, HttpStatusCode.Forbidden, "AccessDenied", "authorization", retryable: false);
-        (await admin.GetAsync("/api/v1/access/users")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await admin.GetAsync("/api/v1/access/users", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -226,23 +226,15 @@ public sealed class DemoApiAuthenticationTests
         await SeedAdminAsync(factory, "demo:platform-admin", "demo-api-bridge");
         using HttpClient subject = factory.CreateClient();
         subject.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.TeamLeadActor);
-        CurrentAccessResponse pending = (await subject.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        CurrentAccessResponse pending = (await subject.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
         using HttpClient admin = factory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
-        _ = await admin.GetAsync("/api/v1/access/me");
+        _ = await admin.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken);
 
-        HttpResponseMessage validation = await admin.PostAsJsonAsync(
-            $"/api/v1/access/requests/{pending.LatestRequest!.Id}/approve",
-            new AccessDecisionRequest("Approved for test.", ["Lead"], ExpectedVersion: 0));
-        HttpResponseMessage concurrency = await admin.PostAsJsonAsync(
-            $"/api/v1/access/requests/{pending.LatestRequest.Id}/approve",
-            new AccessDecisionRequest("Approved for test.", ["Lead"], pending.LatestRequest.Version + 1));
-        HttpResponseMessage approved = await admin.PostAsJsonAsync(
-            $"/api/v1/access/requests/{pending.LatestRequest.Id}/approve",
-            new AccessDecisionRequest("Approved for test.", ["Lead"], pending.LatestRequest.Version));
-        HttpResponseMessage lifecycle = await admin.PostAsJsonAsync(
-            $"/api/v1/access/requests/{pending.LatestRequest.Id}/reject",
-            new AccessDecisionRequest("Rejected too late.", null, pending.LatestRequest.Version));
+        HttpResponseMessage validation = await admin.PostAsJsonAsync($"/api/v1/access/requests/{pending.LatestRequest!.Id}/approve", new AccessDecisionRequest("Approved for test.", ["Lead"], ExpectedVersion: 0), cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage concurrency = await admin.PostAsJsonAsync($"/api/v1/access/requests/{pending.LatestRequest.Id}/approve", new AccessDecisionRequest("Approved for test.", ["Lead"], pending.LatestRequest.Version + 1), cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage approved = await admin.PostAsJsonAsync($"/api/v1/access/requests/{pending.LatestRequest.Id}/approve", new AccessDecisionRequest("Approved for test.", ["Lead"], pending.LatestRequest.Version), cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage lifecycle = await admin.PostAsJsonAsync($"/api/v1/access/requests/{pending.LatestRequest.Id}/reject", new AccessDecisionRequest("Rejected too late.", null, pending.LatestRequest.Version), cancellationToken: TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(validation, HttpStatusCode.BadRequest, "AccessValidationFailed", "validation", retryable: false);
         await AssertProblemAsync(concurrency, HttpStatusCode.Conflict, "AccessConcurrencyConflict", "concurrency", retryable: true);
@@ -257,7 +249,7 @@ public sealed class DemoApiAuthenticationTests
         using HttpClient admin = factory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/access/requests?status=99");
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/access/requests?status=99", TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, "AccessValidationFailed", "validation", retryable: false);
     }

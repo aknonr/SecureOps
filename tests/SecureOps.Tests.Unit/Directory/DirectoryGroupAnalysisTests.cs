@@ -16,7 +16,7 @@ public sealed class DirectoryGroupAnalysisTests
     [Fact]
     public async Task SecurityGlobalFixture_PreservesTwelveDirectUsers()
     {
-        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync("security-global-12", default))!;
+        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync("security-global-12", TestContext.Current.CancellationToken))!;
 
         result.Overview.Category.Should().Be("Security");
         result.Overview.Scope.Should().Be("Global");
@@ -30,7 +30,7 @@ public sealed class DirectoryGroupAnalysisTests
     [Fact]
     public async Task NestedFixture_SeparatesDirectNestedEffectiveAndTopologyEvidence()
     {
-        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync("group-a", default))!;
+        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync("group-a", TestContext.Current.CancellationToken))!;
 
         result.DirectMembers.Select(member => member.MemberType).Should().BeEquivalentTo("User", "Group");
         result.DirectNestedGroups.Select(group => group.SamAccountName).Should().Equal("group-b");
@@ -46,7 +46,7 @@ public sealed class DirectoryGroupAnalysisTests
     [Fact]
     public async Task MixedFixture_PreservesUserComputerAndNestedGroupTypes()
     {
-        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync("mixed-group", default))!;
+        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync("mixed-group", TestContext.Current.CancellationToken))!;
 
         result.DirectMembers.Select(member => member.MemberType)
             .Should().BeEquivalentTo("User", "Computer", "Group");
@@ -56,7 +56,7 @@ public sealed class DirectoryGroupAnalysisTests
     [Fact]
     public async Task ParentFixture_SeparatesDirectAndTransitiveParentsWithoutFalseCycle()
     {
-        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync("group-a", default))!;
+        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync("group-a", TestContext.Current.CancellationToken))!;
 
         result.ParentMemberships.DirectParents.Select(group => group.Group.SamAccountName)
             .Should().Equal("parent-one");
@@ -70,10 +70,10 @@ public sealed class DirectoryGroupAnalysisTests
     [Fact]
     public async Task CycleAndLargeFixtures_ReportExplicitPartialEvidence()
     {
-        DirectoryGroupAnalysisResponse cycle = (await Builder().BuildAsync("cycle-a", default))!;
+        DirectoryGroupAnalysisResponse cycle = (await Builder().BuildAsync("cycle-a", TestContext.Current.CancellationToken))!;
         DirectoryExplorerOptions bounded = Options();
         bounded.MaxEffectiveMembers = 2;
-        DirectoryGroupAnalysisResponse large = (await Builder(bounded).BuildAsync("large-group", default))!;
+        DirectoryGroupAnalysisResponse large = (await Builder(bounded).BuildAsync("large-group", TestContext.Current.CancellationToken))!;
 
         cycle.DescendantTraversal.CycleDetected.Should().BeTrue();
         cycle.IsComplete.Should().BeTrue();
@@ -88,7 +88,7 @@ public sealed class DirectoryGroupAnalysisTests
     [InlineData("distribution-group", "Distribution")]
     public async Task EmptyAndDistributionFixtures_AreSuccessfulEmptyEvidence(string group, string category)
     {
-        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync(group, default))!;
+        DirectoryGroupAnalysisResponse result = (await Builder().BuildAsync(group, TestContext.Current.CancellationToken))!;
 
         result.Overview.Category.Should().Be(category);
         result.DirectMembers.Should().BeEmpty();
@@ -111,10 +111,7 @@ public sealed class DirectoryGroupAnalysisTests
             options,
             NullLogger<DirectoryGroupAnalysisService>.Instance);
 
-        DirectoryQueryResult<DirectoryGroupExportResult> result = await service.ExportAsync(
-            new DirectoryGroupExportRequest("csv-safe", "DirectMembers", "Csv"),
-            new DirectoryQueryExecutionContext("CONTOSO\\admin", "192.0.2.10", "analysis-test"),
-            default);
+        DirectoryQueryResult<DirectoryGroupExportResult> result = await service.ExportAsync(new DirectoryGroupExportRequest("csv-safe", "DirectMembers", "Csv"), new DirectoryQueryExecutionContext("CONTOSO\\admin", "192.0.2.10", "analysis-test"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(DirectoryQueryStatus.Success);
         result.Value!.RowCount.Should().Be(2);
@@ -141,10 +138,7 @@ public sealed class DirectoryGroupAnalysisTests
             options,
             NullLogger<DirectoryGroupAnalysisService>.Instance);
 
-        DirectoryQueryResult<DirectoryGroupExportResult> result = await service.ExportAsync(
-            new DirectoryGroupExportRequest("large-group", "EffectiveMembers", "Csv"),
-            new DirectoryQueryExecutionContext("CONTOSO\\admin", null, "analysis-test"),
-            default);
+        DirectoryQueryResult<DirectoryGroupExportResult> result = await service.ExportAsync(new DirectoryGroupExportRequest("large-group", "EffectiveMembers", "Csv"), new DirectoryQueryExecutionContext("CONTOSO\\admin", null, "analysis-test"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(DirectoryQueryStatus.LimitExceeded);
         result.ErrorCode.Should().Be("DirectoryTraversalPartial");
@@ -165,10 +159,7 @@ public sealed class DirectoryGroupAnalysisTests
             options,
             NullLogger<DirectoryGroupAnalysisService>.Instance);
 
-        DirectoryQueryResult<DirectoryGroupAnalysisResponse> result = await service.AnalyzeAsync(
-            new DirectoryGroupAnalysisRequest("blocking-group"),
-            new DirectoryQueryExecutionContext("CONTOSO\\admin", null, "analysis-timeout"),
-            default);
+        DirectoryQueryResult<DirectoryGroupAnalysisResponse> result = await service.AnalyzeAsync(new DirectoryGroupAnalysisRequest("blocking-group"), new DirectoryQueryExecutionContext("CONTOSO\\admin", null, "analysis-timeout"), TestContext.Current.CancellationToken);
 
         result.Status.Should().Be(DirectoryQueryStatus.ProviderTimeout);
         result.ErrorCode.Should().Be("DirectoryProviderTimeout");

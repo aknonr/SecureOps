@@ -29,13 +29,13 @@ public sealed class ApiRateLimitingHostedTests
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         object request = new { account = "sample.user", purpose = "Approved synthetic rate-limit test" };
 
-        HttpResponseMessage first = await client.PostAsJsonAsync("/api/v1/identity/lookup", request);
-        HttpResponseMessage second = await client.PostAsJsonAsync("/api/v1/identity/lookup", request);
+        HttpResponseMessage first = await client.PostAsJsonAsync("/api/v1/identity/lookup", request, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage second = await client.PostAsJsonAsync("/api/v1/identity/lookup", request, cancellationToken: TestContext.Current.CancellationToken);
 
         first.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
         second.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         second.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
-        using var problem = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+        using var problem = JsonDocument.Parse(await second.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         problem.RootElement.GetProperty("code").GetString().Should().Be("RateLimitExceeded");
         problem.RootElement.GetProperty("stage").GetString().Should().Be("rate-limit");
         problem.RootElement.GetProperty("correlationId").GetString().Should().NotBeNullOrWhiteSpace();
@@ -48,14 +48,14 @@ public sealed class ApiRateLimitingHostedTests
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
 
-        (await admin.GetAsync("/api/v1/access/me")).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
-        (await admin.GetAsync("/api/v1/access/me")).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
-        HttpResponseMessage limited = await admin.GetAsync("/api/v1/access/me");
+        (await admin.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken)).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        (await admin.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken)).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        HttpResponseMessage limited = await admin.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken);
 
         limited.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
-        using var problem = JsonDocument.Parse(await limited.Content.ReadAsStringAsync());
+        using var problem = JsonDocument.Parse(await limited.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         problem.RootElement.GetProperty("code").GetString().Should().Be("RateLimitExceeded");
-        (await lead.GetAsync("/api/v1/access/me")).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        (await lead.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken)).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
     }
 
     [Fact]
@@ -65,8 +65,8 @@ public sealed class ApiRateLimitingHostedTests
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         object request = new { sessionId = Guid.NewGuid(), reason = "Synthetic rate-limit test" };
 
-        HttpResponseMessage first = await admin.PostAsJsonAsync("/api/v1/sessions/revoke", request);
-        HttpResponseMessage second = await admin.PostAsJsonAsync("/api/v1/sessions/revoke", request);
+        HttpResponseMessage first = await admin.PostAsJsonAsync("/api/v1/sessions/revoke", request, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage second = await admin.PostAsJsonAsync("/api/v1/sessions/revoke", request, cancellationToken: TestContext.Current.CancellationToken);
 
         first.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
         second.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);

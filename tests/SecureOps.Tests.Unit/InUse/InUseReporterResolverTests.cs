@@ -43,14 +43,14 @@ public sealed class InUseReporterResolverTests
             "00123", user.Id, "source-owner-review-1", mode == "expired" ? now : now.AddDays(1));
         var options = new InUseReporterMappingOptions { Revision = mode == "unconfigured" ? "" : "review-v1", Links = mode == "ambiguous" ? [link, link] : [link] };
         var resolver = new InUseReporterResolver(Options.Create(options), users);
-        InUseReporterSuggestion proposal = await resolver.ResolveAsync(record, now, default);
+        InUseReporterSuggestion proposal = await resolver.ResolveAsync(record, now, TestContext.Current.CancellationToken);
         proposal.State.Should().Be(expected);
         if (expected == "Matched")
         {
             proposal.Candidate!.Id.Should().Be(user.Id);
             proposal.Candidate.Label.Should().StartWith("Different display name");
             proposal.Fingerprint.Should().HaveLength(64);
-            InUseReporterSuggestion changed = await resolver.ResolveAsync(record with { Version = record.Version + 1 }, now, default);
+            InUseReporterSuggestion changed = await resolver.ResolveAsync(record with { Version = record.Version + 1 }, now, TestContext.Current.CancellationToken);
             changed.Fingerprint.Should().NotBe(proposal.Fingerprint);
         }
         else

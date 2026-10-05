@@ -104,7 +104,7 @@ public sealed class JiraTransferServiceTests
         TestFixture fixture = await TestFixture.CreateAsync(jira);
 
         Task<OperationalRecordResult<OperationalRecord>> firstTask = fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
-        await jira.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await jira.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         OperationalRecordResult<OperationalRecord> second = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
         jira.Release.TrySetResult();
         OperationalRecordResult<OperationalRecord> first = await firstTask;
@@ -247,7 +247,7 @@ public sealed class JiraTransferServiceTests
     public async Task PreviewAsync_WhenMappingChangesForExistingTransfer_ReturnsConflict()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         string firstKey = OperationalRecordIdempotency.Create(record.SourceRecordId, "mapping-v1");
         string secondKey = OperationalRecordIdempotency.Create(record.SourceRecordId, "mapping-v2");
 

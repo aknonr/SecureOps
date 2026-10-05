@@ -25,19 +25,15 @@ public sealed class DirectoryExplorerHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, DemoApiAuthentication.TeamLeadActor);
 
-        HttpResponseMessage groupsResponse = await client.PostAsJsonAsync(
-            "/api/v1/directory/principals/groups",
-            new { account = "CONTOSO\\pam12356", pageSize = 1 });
-        HttpResponseMessage detailResponse = await client.PostAsJsonAsync(
-            "/api/v1/directory/groups/lookup",
-            new { group = "ops-read" });
+        HttpResponseMessage groupsResponse = await client.PostAsJsonAsync("/api/v1/directory/principals/groups", new { account = "CONTOSO\\pam12356", pageSize = 1 }, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage detailResponse = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", new { group = "ops-read" }, cancellationToken: TestContext.Current.CancellationToken);
 
         groupsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        DirectoryGroupPageResponse? groups = await groupsResponse.Content.ReadFromJsonAsync<DirectoryGroupPageResponse>();
+        DirectoryGroupPageResponse? groups = await groupsResponse.Content.ReadFromJsonAsync<DirectoryGroupPageResponse>(cancellationToken: TestContext.Current.CancellationToken);
         groups!.Items.Should().ContainSingle();
         groups.ContinuationToken.Should().NotBeNullOrWhiteSpace();
         detailResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        DirectoryGroupDetailResponse? detail = await detailResponse.Content.ReadFromJsonAsync<DirectoryGroupDetailResponse>();
+        DirectoryGroupDetailResponse? detail = await detailResponse.Content.ReadFromJsonAsync<DirectoryGroupDetailResponse>(cancellationToken: TestContext.Current.CancellationToken);
         detail!.Group.Category.Should().Be("Security");
         detail.Group.Scope.Should().Be("Global");
     }
@@ -48,16 +44,12 @@ public sealed class DirectoryExplorerHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage overviewResponse = await client.PostAsJsonAsync(
-            "/api/v1/directory/groups/lookup",
-            new DirectoryGroupLookupRequest("Operations Readers", _purpose));
+        HttpResponseMessage overviewResponse = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", new DirectoryGroupLookupRequest("Operations Readers", _purpose), cancellationToken: TestContext.Current.CancellationToken);
         DirectoryGroupDetailResponse overview = (await overviewResponse.Content
-            .ReadFromJsonAsync<DirectoryGroupDetailResponse>())!;
-        HttpResponseMessage membersResponse = await client.PostAsJsonAsync(
-            "/api/v1/directory/groups/members",
-            new DirectoryGroupMembersRequest(overview.Group.LookupKey, _purpose, 25));
+            .ReadFromJsonAsync<DirectoryGroupDetailResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
+        HttpResponseMessage membersResponse = await client.PostAsJsonAsync("/api/v1/directory/groups/members", new DirectoryGroupMembersRequest(overview.Group.LookupKey, _purpose, 25), cancellationToken: TestContext.Current.CancellationToken);
         DirectoryMemberPageResponse members = (await membersResponse.Content
-            .ReadFromJsonAsync<DirectoryMemberPageResponse>())!;
+            .ReadFromJsonAsync<DirectoryMemberPageResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
 
         overviewResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         overview.Group.Name.Should().Be("Operations Readers");
@@ -74,14 +66,10 @@ public sealed class DirectoryExplorerHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage firstResponse = await client.PostAsJsonAsync(
-            "/api/v1/directory/groups/members",
-            new { group = "ops-read", purpose = _purpose, pageSize = 2 });
-        DirectoryMemberPageResponse? first = await firstResponse.Content.ReadFromJsonAsync<DirectoryMemberPageResponse>();
-        HttpResponseMessage secondResponse = await client.PostAsJsonAsync(
-            "/api/v1/directory/groups/members",
-            new { group = "ops-read", purpose = _purpose, pageSize = 2, continuationToken = first!.ContinuationToken });
-        DirectoryMemberPageResponse? second = await secondResponse.Content.ReadFromJsonAsync<DirectoryMemberPageResponse>();
+        HttpResponseMessage firstResponse = await client.PostAsJsonAsync("/api/v1/directory/groups/members", new { group = "ops-read", purpose = _purpose, pageSize = 2 }, cancellationToken: TestContext.Current.CancellationToken);
+        DirectoryMemberPageResponse? first = await firstResponse.Content.ReadFromJsonAsync<DirectoryMemberPageResponse>(cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage secondResponse = await client.PostAsJsonAsync("/api/v1/directory/groups/members", new { group = "ops-read", purpose = _purpose, pageSize = 2, continuationToken = first!.ContinuationToken }, cancellationToken: TestContext.Current.CancellationToken);
+        DirectoryMemberPageResponse? second = await secondResponse.Content.ReadFromJsonAsync<DirectoryMemberPageResponse>(cancellationToken: TestContext.Current.CancellationToken);
 
         firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         secondResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -97,8 +85,8 @@ public sealed class DirectoryExplorerHostedTests
         using HttpClient client = Client(factory, DemoApiAuthentication.TeamLeadActor);
         object request = new { group = "ops-read" };
 
-        HttpResponseMessage cached = await admin.PostAsJsonAsync("/api/v1/directory/groups/members", request);
-        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/directory/groups/members", request);
+        HttpResponseMessage cached = await admin.PostAsJsonAsync("/api/v1/directory/groups/members", request, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/directory/groups/members", request, cancellationToken: TestContext.Current.CancellationToken);
 
         cached.StatusCode.Should().Be(HttpStatusCode.OK);
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -112,10 +100,8 @@ public sealed class DirectoryExplorerHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await client.PostAsJsonAsync(
-            "/api/v1/directory/groups/lookup",
-            new { group, purpose = _purpose });
-        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync());
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", new { group, purpose = _purpose }, cancellationToken: TestContext.Current.CancellationToken);
+        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
 
         response.StatusCode.Should().Be(status);
         problem!["code"]!.GetValue<string>().Should().Be(code);
@@ -130,12 +116,12 @@ public sealed class DirectoryExplorerHostedTests
         object firstRequest = new { group = "ops-read", purpose = "first optional context" };
         object secondRequest = new { group = "ops-read", purpose = "different optional context" };
 
-        HttpResponseMessage first = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", firstRequest);
-        HttpResponseMessage second = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", secondRequest);
+        HttpResponseMessage first = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", firstRequest, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage second = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", secondRequest, cancellationToken: TestContext.Current.CancellationToken);
 
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         second.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
-        var problem = JsonNode.Parse(await second.Content.ReadAsStringAsync());
+        var problem = JsonNode.Parse(await second.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         problem!["code"]!.GetValue<string>().Should().Be(OperationalErrorCodes.RateLimitExceeded);
         factory.Services.GetRequiredService<InMemoryAuditWriter>().Events
             .Should().Contain(item => item.Action == AuditActions.DirectoryGroupQueryRateLimited);
@@ -149,7 +135,7 @@ public sealed class DirectoryExplorerHostedTests
         using HttpClient client = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         using StringContent payload = new("{\"group\":", Encoding.UTF8, "application/json");
 
-        HttpResponseMessage response = await client.PostAsync("/api/v1/directory/groups/lookup", payload);
+        HttpResponseMessage response = await client.PostAsync("/api/v1/directory/groups/lookup", payload, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         provider.Calls.Should().Be(0);
@@ -161,10 +147,8 @@ public sealed class DirectoryExplorerHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(provider: new UnavailableProvider());
         using HttpClient client = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await client.PostAsJsonAsync(
-            "/api/v1/directory/groups/lookup",
-            new { group = "ops-read", purpose = _purpose });
-        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync());
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", new { group = "ops-read", purpose = _purpose }, cancellationToken: TestContext.Current.CancellationToken);
+        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         problem!["code"]!.GetValue<string>().Should().Be(OperationalErrorCodes.DirectoryProviderUnavailable);
@@ -178,10 +162,8 @@ public sealed class DirectoryExplorerHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(provider: provider, enrichmentProvider: provider);
         using HttpClient client = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage group = await client.PostAsJsonAsync(
-            "/api/v1/directory/groups/lookup", new { group = "shared-principal" });
-        HttpResponseMessage health = await client.PostAsJsonAsync(
-            "/api/v1/directory/principals/account-health", new { account = "shared-principal" });
+        HttpResponseMessage group = await client.PostAsJsonAsync("/api/v1/directory/groups/lookup", new { group = "shared-principal" }, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage health = await client.PostAsJsonAsync("/api/v1/directory/principals/account-health", new { account = "shared-principal" }, cancellationToken: TestContext.Current.CancellationToken);
 
         group.StatusCode.Should().Be(HttpStatusCode.OK);
         health.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -198,9 +180,9 @@ public sealed class DirectoryExplorerHostedTests
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         object request = new { group = "shared-group" };
 
-        Task<HttpResponseMessage> first = lead.PostAsJsonAsync("/api/v1/directory/groups/lookup", request);
-        Task<HttpResponseMessage> second = admin.PostAsJsonAsync("/api/v1/directory/groups/lookup", request);
-        await provider.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Task<HttpResponseMessage> first = lead.PostAsJsonAsync("/api/v1/directory/groups/lookup", request, cancellationToken: TestContext.Current.CancellationToken);
+        Task<HttpResponseMessage> second = admin.PostAsJsonAsync("/api/v1/directory/groups/lookup", request, cancellationToken: TestContext.Current.CancellationToken);
+        await provider.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         provider.Release();
         HttpResponseMessage[] responses = await Task.WhenAll(first, second);
 
@@ -226,7 +208,7 @@ public sealed class DirectoryExplorerHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(swagger: true);
         using HttpClient client = factory.CreateClient();
 
-        string openApi = await client.GetStringAsync("/swagger/v1/swagger.json");
+        string openApi = await client.GetStringAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken);
 
         openApi.Should().Contain("/api/v1/directory/principals/groups")
             .And.Contain("/api/v1/directory/groups/lookup")

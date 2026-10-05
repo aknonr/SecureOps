@@ -42,7 +42,7 @@ public sealed partial class UiSignOutTests
         session.SetOidcAccessToken("synthetic-token", DateTimeOffset.UtcNow.AddHours(1));
         store.RequireReauthentication(key);
 
-        using HttpResponseMessage landing = await browser.GetAsync(path);
+        using HttpResponseMessage landing = await browser.GetAsync(path, TestContext.Current.CancellationToken);
 
         landing.StatusCode.Should().Be(HttpStatusCode.OK);
         landing.Headers.GetValues("Set-Cookie").Should().Contain(value => value.StartsWith("__Host-SecureOpsUi.Session=;", StringComparison.Ordinal));
@@ -55,7 +55,7 @@ public sealed partial class UiSignOutTests
             BaseAddress = new Uri("https://localhost/")
         });
         replay.DefaultRequestHeaders.Add("Cookie", cookie);
-        using HttpResponseMessage replayed = await replay.GetAsync("/session-expired");
+        using HttpResponseMessage replayed = await replay.GetAsync("/session-expired", TestContext.Current.CancellationToken);
         replayed.Headers.GetValues("Set-Cookie").Should().Contain(value => value.StartsWith("__Host-SecureOpsUi.Session=;", StringComparison.Ordinal));
         store.GetOrCreate(key).RequiresReauthentication.Should().BeTrue();
 
@@ -73,7 +73,7 @@ public sealed partial class UiSignOutTests
         RecordingAccessApiClient accessApi = new();
         using SignOutUiFactory factory = new(accessApi);
 
-        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out");
+        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out", TestContext.Current.CancellationToken);
 
         accessApi.LogoutCalls.Should().Be(1);
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
@@ -102,7 +102,7 @@ public sealed partial class UiSignOutTests
 
         using SignOutUiFactory factory = new(accessApi);
 
-        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out");
+        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out", TestContext.Current.CancellationToken);
 
         accessApi.LogoutCalls.Should().Be(1);
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
@@ -115,7 +115,7 @@ public sealed partial class UiSignOutTests
         RecordingAccessApiClient accessApi = new();
         using SignOutUiFactory factory = new(accessApi);
 
-        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out");
+        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out", TestContext.Current.CancellationToken);
         string headers = response.Headers.ToString();
 
         // The application-session handle is a credential. It is carried server-side and must never

@@ -36,7 +36,7 @@ public sealed class ServiceAccountApiCompositionTests
         using HttpClient anonymous = factory.CreateClient();
         foreach (string route in _moduleReads)
         {
-            (await anonymous.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Unauthorized, route);
+            (await anonymous.GetAsync(route, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized, route);
         }
     }
 
@@ -52,7 +52,7 @@ public sealed class ServiceAccountApiCompositionTests
             client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
             if (actor == DemoApiAuthentication.PlatformAdminActor)
             {
-                (await client.GetAsync("/api/v1/access/users")).StatusCode.Should().Be(HttpStatusCode.OK, "the identity is approved and authorized for platform administration");
+                (await client.GetAsync("/api/v1/access/users", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK, "the identity is approved and authorized for platform administration");
             }
 
             foreach (string route in _moduleReads)
@@ -61,10 +61,10 @@ public sealed class ServiceAccountApiCompositionTests
                     or "/api/v1/service-accounts/accounts" or "/api/v1/service-accounts/reminders";
                 HttpStatusCode expected = actor == DemoApiAuthentication.PlatformAdminActor && navigation
                     ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden;
-                (await client.GetAsync(route)).StatusCode.Should().Be(expected, $"{actor} {route}");
+                (await client.GetAsync(route, TestContext.Current.CancellationToken)).StatusCode.Should().Be(expected, $"{actor} {route}");
             }
 
-            (await client.PostAsync("/api/v1/service-accounts/scope-grants", JsonContent.Create(new { corporateIdentity = "x", scopeKind = "All", reason = "x" })))
+            (await client.PostAsync("/api/v1/service-accounts/scope-grants", JsonContent.Create(new { corporateIdentity = "x", scopeKind = "All", reason = "x" }), TestContext.Current.CancellationToken))
                 .StatusCode.Should().Be(actor == DemoApiAuthentication.PlatformAdminActor ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden,
                     $"{actor}: page access does not activate the module");
         }
@@ -79,14 +79,14 @@ public sealed class ServiceAccountApiCompositionTests
         const string route = "/api/v1/service-accounts/directory/name-search";
         using (HttpClient anonymous = factory.CreateClient())
         {
-            (await anonymous.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            (await anonymous.PostAsync(route, JsonContent.Create(new { query = "ayşe" }), TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         foreach (string actor in new[] { DemoApiAuthentication.PlatformAdminActor, DemoApiAuthentication.TeamLeadActor })
         {
             using HttpClient client = factory.CreateClient();
             client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
-            (await client.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode
+            (await client.PostAsync(route, JsonContent.Create(new { query = "ayşe" }), TestContext.Current.CancellationToken)).StatusCode
                 .Should().Be(actor == DemoApiAuthentication.PlatformAdminActor ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden,
                     $"{actor}: module search still requires View and activation");
         }

@@ -122,7 +122,7 @@ public sealed partial class InUseTests
         record = record with { Draft = new(record.SourceVersion, [], "", f.User.Id, DateTimeOffset.UtcNow) };
         InUseReport report = InUseWorkbook.Create(record, f.User.Id, DateTimeOffset.UtcNow);
         if (failure == "file")
-        { await File.WriteAllTextAsync(directory, "synthetic obstruction"); }
+        { await File.WriteAllTextAsync(directory, "synthetic obstruction", TestContext.Current.CancellationToken); }
         if (failure == "pending")
         { Directory.CreateDirectory(Path.Combine(directory, record.Id.ToString("D"), record.Version + ".json.pending")); }
         Func<Task> write = async () => await archive.AccessAsync(record.Id, record.Version, report, _ => Task.FromResult(true), _token);
@@ -310,7 +310,7 @@ public sealed partial class InUseTests
         var f = new Fixture(role);
         (await f.Service.QueryAsync(_principal, _context, new(), _token)).Error.Should().Be("AccessDenied");
         (await f.Service.RefreshAsync(_principal, _context, new(Guid.NewGuid()), _token)).Error.Should().Be("AccessDenied");
-        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(default);
+        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(TestContext.Current.CancellationToken);
         AccessRoleCatalog.GetCapabilities(["InUseCoordinator"]).Should().NotContain(Capabilities.OperationalRecordsCreateJira)
             .And.NotContain(Capabilities.ResourcesManage);
     }
@@ -392,7 +392,7 @@ public sealed partial class InUseTests
         saved.Draft!.ReviewedBy.Should().Be(f.User.Id);
         (await f.Service.ExportAsync(_principal, _context, record.Id, new(saved.Version), _token)).Value!.PreparedBy.Should().Be(f.User.Id);
         (await f.Service.AssignAsync(_principal, _context, record.Id, new(saved.Version, null, "Not authorized"), _token)).Error.Should().Be("AccessDenied");
-        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(default);
+        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]

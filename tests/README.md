@@ -8,7 +8,9 @@ waived. See docs/26-ui-backend-contract-gaps.md, G-30.
 
 Test stack (2026-10-03): xunit v3 via `xunit.v3.mtp-off` + `xunit.runner.visualstudio` 4 (VSTest; test
 projects are `Exe`), FluentAssertions 7.2, NSubstitute 6, Test SDK 18, coverlet 10. `xUnit1051`
-(pass `TestContext.Current.CancellationToken`) is suppressed in both test projects pending a separate change.
+(pass `TestContext.Current.CancellationToken`) is enforced in both test projects as of 2026-10-05.
+Ordinary calls with omitted optional tokens now use the current test token; dedicated cancellation
+inputs remain explicit. The build has no replacement suppression for this rule.
 
 Numbered-release SQL selection has a focused Windows runner at
 `release/Test-PairedReleaseSqlSelection.ps1`. A new private evidence directory

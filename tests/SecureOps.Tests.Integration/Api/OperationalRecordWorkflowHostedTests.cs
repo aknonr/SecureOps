@@ -26,24 +26,24 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         const string route = "/api/v1/operational-records/stored";
-        (await admin.GetFromJsonAsync<OperationalRecordPageResponse>(route))!.Total.Should().Be(0);
+        (await admin.GetFromJsonAsync<OperationalRecordPageResponse>(route, cancellationToken: TestContext.Current.CancellationToken))!.Total.Should().Be(0);
         OperationalRecordResponse imported = await GetRecordAsync(admin, "SYN-OR-100");
-        OperationalRecordPageResponse page = (await admin.GetFromJsonAsync<OperationalRecordPageResponse>(route + "?pageSize=1&sort=code"))!;
+        OperationalRecordPageResponse page = (await admin.GetFromJsonAsync<OperationalRecordPageResponse>(route + "?pageSize=1&sort=code", cancellationToken: TestContext.Current.CancellationToken))!;
         page.Items.Should().ContainSingle();
         page.Total.Should().BeGreaterThan(0);
         foreach (string query in new[] { "page=0", "pageSize=101", "sort=unknown", "state=unknown", "search=" + new string('x', 101) })
         {
-            (await admin.GetAsync(route + "?" + query)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await admin.GetAsync(route + "?" + query, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         }
-        (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{imported.Id}"))!.Version.Should().Be(imported.Version);
+        (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{imported.Id}", cancellationToken: TestContext.Current.CancellationToken))!.Version.Should().Be(imported.Version);
         using HttpClient denied = Client(factory, DemoApiAuthentication.TeamLeadActor);
-        JsonElement access = await denied.GetFromJsonAsync<JsonElement>("/api/v1/access/me");
+        JsonElement access = await denied.GetFromJsonAsync<JsonElement>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken);
         string userId = access.GetProperty("userId").GetString()!;
-        JsonElement user = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/users/" + userId);
+        JsonElement user = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/users/" + userId, cancellationToken: TestContext.Current.CancellationToken);
         (await admin.PutAsJsonAsync("/api/v1/access/users/" + userId + "/roles", new
-        { roles = new[] { "ResourceCurator" }, expectedVersion = user.GetProperty("version").GetInt64() })).EnsureSuccessStatusCode();
+        { roles = new[] { "ResourceCurator" }, expectedVersion = user.GetProperty("version").GetInt64() }, cancellationToken: TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
         using HttpClient refreshed = Client(factory, DemoApiAuthentication.TeamLeadActor);
-        (await refreshed.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await refreshed.GetAsync(route, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -52,23 +52,22 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         using HttpClient initial = Client(factory, DemoApiAuthentication.TeamLeadActor);
-        JsonElement access = await initial.GetFromJsonAsync<JsonElement>("/api/v1/access/me");
+        JsonElement access = await initial.GetFromJsonAsync<JsonElement>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken);
         string userId = access.GetProperty("userId").GetString()!;
         OperationalRecordResponse record = await GetRecordAsync(admin, "SYN-OR-100");
         string route = $"/api/v1/operational-records/{record.Id}/jira-review";
         foreach (string role in new[] { "Operator", "ReadOnly" })
         {
-            JsonElement user = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/users/" + userId);
-            (await admin.PutAsJsonAsync("/api/v1/access/users/" + userId + "/roles",
-                new { roles = new[] { role }, expectedVersion = user.GetProperty("version").GetInt64(), reason = "Synthetic review authorization" })).EnsureSuccessStatusCode();
+            JsonElement user = await admin.GetFromJsonAsync<JsonElement>("/api/v1/access/users/" + userId, cancellationToken: TestContext.Current.CancellationToken);
+            (await admin.PutAsJsonAsync("/api/v1/access/users/" + userId + "/roles", new { roles = new[] { role }, expectedVersion = user.GetProperty("version").GetInt64(), reason = "Synthetic review authorization" }, cancellationToken: TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
             using HttpClient actor = Client(factory, DemoApiAuthentication.TeamLeadActor);
             foreach (OperationalRecordClassification type in new[] { OperationalRecordClassification.ServerRequest, OperationalRecordClassification.SoftwareInstallation })
             {
-                HttpResponseMessage response = await actor.PostAsJsonAsync(route, new JiraReviewRequest(type, record.Version));
+                HttpResponseMessage response = await actor.PostAsJsonAsync(route, new JiraReviewRequest(type, record.Version), cancellationToken: TestContext.Current.CancellationToken);
                 response.StatusCode.Should().Be(role == "ReadOnly" ? HttpStatusCode.Forbidden : HttpStatusCode.OK);
                 if (role == "Operator")
                 {
-                    JiraPreviewResponse review = (await response.Content.ReadFromJsonAsync<JiraPreviewResponse>())!;
+                    JiraPreviewResponse review = (await response.Content.ReadFromJsonAsync<JiraPreviewResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
                     review.ReviewOnly.Should().BeTrue();
                     review.RequestType.Should().Be(type);
                     review.BlockingConditions.Should().Contain("CategoryPolicyPending");
@@ -78,12 +77,12 @@ public sealed class OperationalRecordWorkflowHostedTests
                     }
                 }
             }
-            (await actor.PostAsync($"/api/v1/operational-records/{record.Id}/jira", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            (await actor.PostAsync($"/api/v1/operational-records/{record.Id}/jira", null, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         }
-        (await admin.PostAsJsonAsync(route, new JiraReviewRequest(OperationalRecordClassification.ServerRequest, 0))).StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await admin.PostAsJsonAsync(route, new JiraReviewRequest(OperationalRecordClassification.ConfigurationRequest, record.Version))).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira", null)).StatusCode.Should().Be(HttpStatusCode.Conflict);
-        OperationalRecordResponse unchanged = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
+        (await admin.PostAsJsonAsync(route, new JiraReviewRequest(OperationalRecordClassification.ServerRequest, 0), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await admin.PostAsJsonAsync(route, new JiraReviewRequest(OperationalRecordClassification.ConfigurationRequest, record.Version), cancellationToken: TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira", null, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        OperationalRecordResponse unchanged = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         unchanged.Classification.Should().Be(record.Classification);
         unchanged.JiraIssueKey.Should().BeNull();
     }
@@ -114,68 +113,64 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateSimulationFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        EnterpriseIntegrationHealthResponse health = (await admin.GetFromJsonAsync<EnterpriseIntegrationHealthResponse>(
-            "/api/v1/health/enterprise-integrations"))!;
+        EnterpriseIntegrationHealthResponse health = (await admin.GetFromJsonAsync<EnterpriseIntegrationHealthResponse>("/api/v1/health/enterprise-integrations", cancellationToken: TestContext.Current.CancellationToken))!;
         health.SimulationMode.Should().BeTrue();
         health.OperatorNotice.Should().Contain("no real Jira issue");
 
         OperationalRecordResponse happy = await GetRecordAsync(admin, "SIM-OR-100");
         happy.SimulationMode.Should().BeTrue();
         happy.PresentationState.Should().Be(OperationalRecordPresentationStates.Actionable);
-        JiraPreviewResponse preview = (await (await admin.PostAsync(
-            $"/api/v1/operational-records/{happy.Id}/jira-preview", null)).Content.ReadFromJsonAsync<JiraPreviewResponse>())!;
+        JiraPreviewResponse preview = (await (await admin.PostAsync($"/api/v1/operational-records/{happy.Id}/jira-preview", null, TestContext.Current.CancellationToken)).Content.ReadFromJsonAsync<JiraPreviewResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         preview.SimulationMode.Should().BeTrue();
         preview.SimulationNotice.Should().Contain("no real Jira issue");
         HttpResponseMessage created = await PostCommandAsync(
             admin, $"/api/v1/operational-records/{happy.Id}/jira", "simulation-happy");
-        JiraTransferResponse createdBody = (await created.Content.ReadFromJsonAsync<JiraTransferResponse>())!;
+        JiraTransferResponse createdBody = (await created.Content.ReadFromJsonAsync<JiraTransferResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         HttpResponseMessage replay = await PostCommandAsync(
             admin, $"/api/v1/operational-records/{happy.Id}/jira", "simulation-happy");
-        JiraTransferResponse replayBody = (await replay.Content.ReadFromJsonAsync<JiraTransferResponse>())!;
+        JiraTransferResponse replayBody = (await replay.Content.ReadFromJsonAsync<JiraTransferResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         created.StatusCode.Should().Be(HttpStatusCode.OK);
         replay.StatusCode.Should().Be(HttpStatusCode.OK);
         replayBody.JiraIssueKey.Should().Be(createdBody.JiraIssueKey);
 
         OperationalRecordResponse stale = await GetRecordAsync(admin, "SIM-OR-200");
-        await admin.PostAsync($"/api/v1/operational-records/{stale.Id}/jira-preview", null);
+        await admin.PostAsync($"/api/v1/operational-records/{stale.Id}/jira-preview", null, TestContext.Current.CancellationToken);
         await AssertProblemAsync(
             await PostCommandAsync(admin, $"/api/v1/operational-records/{stale.Id}/jira", "simulation-stale"),
             HttpStatusCode.Conflict,
             OperationalErrorCodes.OperationalRecordChanged);
 
         OperationalRecordResponse jiraFailure = await GetRecordAsync(admin, "SIM-OR-300");
-        await admin.PostAsync($"/api/v1/operational-records/{jiraFailure.Id}/jira-preview", null);
+        await admin.PostAsync($"/api/v1/operational-records/{jiraFailure.Id}/jira-preview", null, TestContext.Current.CancellationToken);
         await AssertProblemAsync(
             await PostCommandAsync(admin, $"/api/v1/operational-records/{jiraFailure.Id}/jira", "simulation-jira-failure"),
             HttpStatusCode.ServiceUnavailable,
             OperationalErrorCodes.JiraCreateFailed);
-        (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{jiraFailure.Id}"))!
+        (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{jiraFailure.Id}", cancellationToken: TestContext.Current.CancellationToken))!
             .RetryEligible.Should().BeTrue();
 
         OperationalRecordResponse unknown = await GetRecordAsync(admin, "SIM-OR-400");
-        await admin.PostAsync($"/api/v1/operational-records/{unknown.Id}/jira-preview", null);
+        await admin.PostAsync($"/api/v1/operational-records/{unknown.Id}/jira-preview", null, TestContext.Current.CancellationToken);
         await AssertProblemAsync(
             await PostCommandAsync(admin, $"/api/v1/operational-records/{unknown.Id}/jira", "simulation-jira-unknown"),
             HttpStatusCode.ServiceUnavailable,
             OperationalErrorCodes.JiraCreateFailed);
-        OperationalRecordResponse unknownState = (await admin.GetFromJsonAsync<OperationalRecordResponse>(
-            $"/api/v1/operational-records/{unknown.Id}"))!;
+        OperationalRecordResponse unknownState = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{unknown.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         unknownState.ReconciliationRequired.Should().BeTrue();
         unknownState.RetryEligible.Should().BeFalse();
 
         OperationalRecordResponse closeFailure = await GetRecordAsync(admin, "SIM-OR-500");
-        await admin.PostAsync($"/api/v1/operational-records/{closeFailure.Id}/jira-preview", null);
+        await admin.PostAsync($"/api/v1/operational-records/{closeFailure.Id}/jira-preview", null, TestContext.Current.CancellationToken);
         await AssertProblemAsync(
             await PostCommandAsync(admin, $"/api/v1/operational-records/{closeFailure.Id}/jira", "simulation-close-failure"),
             HttpStatusCode.ServiceUnavailable,
             OperationalErrorCodes.OperationalRecordCloseFailed);
-        OperationalRecordResponse pendingClose = (await admin.GetFromJsonAsync<OperationalRecordResponse>(
-            $"/api/v1/operational-records/{closeFailure.Id}"))!;
+        OperationalRecordResponse pendingClose = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{closeFailure.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         pendingClose.JiraExists.Should().BeTrue();
         pendingClose.RetryEligible.Should().BeTrue();
         HttpResponseMessage closeRetry = await PostCommandAsync(
             admin, $"/api/v1/operational-records/{closeFailure.Id}/retry", "simulation-close-retry");
-        JiraTransferResponse closeRetryBody = (await closeRetry.Content.ReadFromJsonAsync<JiraTransferResponse>())!;
+        JiraTransferResponse closeRetryBody = (await closeRetry.Content.ReadFromJsonAsync<JiraTransferResponse>(cancellationToken: TestContext.Current.CancellationToken))!;
         closeRetry.StatusCode.Should().Be(HttpStatusCode.OK);
         closeRetryBody.JiraIssueKey.Should().Be(pendingClose.JiraIssueKey);
         closeRetryBody.WorkflowState.Should().Be(OperationalRecordWorkflowState.Completed);
@@ -210,9 +205,9 @@ public sealed class OperationalRecordWorkflowHostedTests
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        (await lead.GetAsync("/api/v1/health/enterprise-integrations")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/health/enterprise-integrations");
-        string body = await response.Content.ReadAsStringAsync();
+        (await lead.GetAsync("/api/v1/health/enterprise-integrations", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/health/enterprise-integrations", TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         body.Should().Contain("Configured").And.Contain("Fake");
@@ -227,9 +222,9 @@ public sealed class OperationalRecordWorkflowHostedTests
         using HttpClient admin = factory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
-        (await anonymous.GetAsync("/api/v1/operational-records")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await anonymous.GetAsync("/api/v1/operational-records", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        OperationalRecordResponse[] records = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records"))!;
+        OperationalRecordResponse[] records = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records", cancellationToken: TestContext.Current.CancellationToken))!;
         records.Should().HaveCount(4);
         OperationalRecordResponse eligible = records.Single(record => record.OrCode == "SYN-OR-100");
         eligible.WorkflowState.Should().Be(OperationalRecordWorkflowState.Eligible);
@@ -237,18 +232,18 @@ public sealed class OperationalRecordWorkflowHostedTests
         eligible.Claimed.Should().BeFalse();
         eligible.ReconciliationRequired.Should().BeFalse();
 
-        OperationalRecordResponse detail = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{eligible.Id}"))!;
+        OperationalRecordResponse detail = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{eligible.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         detail.Should().BeEquivalentTo(eligible);
 
-        HttpResponseMessage preview = await admin.PostAsync($"/api/v1/operational-records/{eligible.Id}/jira-preview", null);
+        HttpResponseMessage preview = await admin.PostAsync($"/api/v1/operational-records/{eligible.Id}/jira-preview", null, TestContext.Current.CancellationToken);
         preview.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using HttpRequestMessage createRequest = new(HttpMethod.Post, $"/api/v1/operational-records/{eligible.Id}/jira");
         createRequest.Headers.Add("Idempotency-Key", "synthetic-e2e-create");
-        HttpResponseMessage create = await admin.SendAsync(createRequest);
+        HttpResponseMessage create = await admin.SendAsync(createRequest, TestContext.Current.CancellationToken);
         create.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        OperationalRecordResponse completed = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{eligible.Id}"))!;
+        OperationalRecordResponse completed = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{eligible.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         completed.WorkflowState.Should().Be(OperationalRecordWorkflowState.Completed);
         completed.JiraExists.Should().BeTrue();
         completed.JiraIssueKey.Should().Be("FAKE-1");
@@ -257,7 +252,7 @@ public sealed class OperationalRecordWorkflowHostedTests
 
         using HttpRequestMessage duplicateRequest = new(HttpMethod.Post, $"/api/v1/operational-records/{eligible.Id}/jira");
         duplicateRequest.Headers.Add("Idempotency-Key", "synthetic-e2e-duplicate");
-        HttpResponseMessage duplicate = await admin.SendAsync(duplicateRequest);
+        HttpResponseMessage duplicate = await admin.SendAsync(duplicateRequest, TestContext.Current.CancellationToken);
         await AssertProblemAsync(duplicate, HttpStatusCode.Conflict, "WorkflowAlreadyCompleted");
     }
 
@@ -267,14 +262,14 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = factory.CreateClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
-        OperationalRecordResponse[] records = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records"))!;
+        OperationalRecordResponse[] records = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records", cancellationToken: TestContext.Current.CancellationToken))!;
         OperationalRecordResponse stale = records.Single(record => record.OrCode == "SYN-OR-200");
-        (await admin.PostAsync($"/api/v1/operational-records/{stale.Id}/jira-preview", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await admin.PostAsync($"/api/v1/operational-records/{stale.Id}/jira-preview", null, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        HttpResponseMessage create = await admin.PostAsync($"/api/v1/operational-records/{stale.Id}/jira", null);
+        HttpResponseMessage create = await admin.PostAsync($"/api/v1/operational-records/{stale.Id}/jira", null, TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(create, HttpStatusCode.Conflict, "OperationalRecordChanged");
-        OperationalRecordResponse detail = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{stale.Id}"))!;
+        OperationalRecordResponse detail = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{stale.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         detail.JiraExists.Should().BeFalse();
     }
 
@@ -286,7 +281,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         OperationalRecordResponse record = await GetRecordAsync(admin, orCode);
-        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         HttpResponseMessage create = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", $"synthetic-{orCode}-create");
 
@@ -300,12 +295,12 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(jiraClient: jira);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         OperationalRecordResponse record = await GetRecordAsync(admin, "SYN-OR-100");
-        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         HttpResponseMessage first = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-unknown-create");
         ProblemDetails firstProblem = await AssertProblemAsync(first, HttpStatusCode.ServiceUnavailable, OperationalErrorCodes.JiraUnavailable);
-        OperationalRecordResponse detail = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
-        OperationalRecordResponse refreshed = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records"))!
+        OperationalRecordResponse detail = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
+        OperationalRecordResponse refreshed = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records", cancellationToken: TestContext.Current.CancellationToken))!
             .Single(item => item.Id == record.Id);
         HttpResponseMessage replay = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-unknown-create");
         HttpResponseMessage secondCreate = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-unknown-new-create");
@@ -331,13 +326,13 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(jiraClient: jira);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         OperationalRecordResponse record = await GetRecordAsync(admin, "SYN-OR-100");
-        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         HttpResponseMessage first = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-retryable-create");
         ProblemDetails firstProblem = await AssertProblemAsync(first, HttpStatusCode.ServiceUnavailable, OperationalErrorCodes.JiraUnavailable);
-        OperationalRecordResponse failed = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
+        OperationalRecordResponse failed = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         HttpResponseMessage retry = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/retry", "synthetic-permitted-retry");
-        OperationalRecordResponse completed = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
+        OperationalRecordResponse completed = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
 
         bool.Parse(firstProblem.Extensions["retryable"]!.ToString()!).Should().BeTrue();
         failed.WorkflowState.Should().Be(OperationalRecordWorkflowState.JiraCreateFailed);
@@ -360,7 +355,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
         OperationalRecordResponse record = await GetRecordAsync(admin, "SYN-OR-100");
-        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await admin.PostAsync($"/api/v1/operational-records/{record.Id}/jira-preview", null, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         Task<HttpResponseMessage> firstTask = PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-overlap-a");
         OperationalRecordResponse during;
@@ -368,10 +363,10 @@ public sealed class OperationalRecordWorkflowHostedTests
         OperationalRecordResponse afterConflict;
         try
         {
-            await jira.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            during = (await lead.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
+            await jira.Started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            during = (await lead.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
             conflict = await PostCommandAsync(lead, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-overlap-b");
-            afterConflict = (await lead.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
+            afterConflict = (await lead.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         }
         finally
         {
@@ -403,9 +398,9 @@ public sealed class OperationalRecordWorkflowHostedTests
         WorkflowClaimResult first = await repository.TryClaimAsync(record.Id, "demo:platform-admin", TimeSpan.FromSeconds(30), "synthetic-claim-a", CancellationToken.None);
         time.Advance(TimeSpan.FromSeconds(31));
 
-        OperationalRecordResponse expired = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
+        OperationalRecordResponse expired = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
         WorkflowClaimResult recovered = await repository.TryClaimAsync(record.Id, "demo:team-lead", TimeSpan.FromSeconds(30), "synthetic-claim-b", CancellationToken.None);
-        OperationalRecordResponse active = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
+        OperationalRecordResponse active = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}", cancellationToken: TestContext.Current.CancellationToken))!;
 
         first.Disposition.Should().Be(WorkflowAcquireDisposition.Acquired);
         expired.Claimed.Should().BeFalse();
@@ -422,7 +417,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(sourceProvider: "Disabled");
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/operational-records");
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/operational-records", TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, OperationalErrorCodes.OperationalSourceUnavailable);
     }
@@ -447,7 +442,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateReadOnlyEnterpriseFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/health");
+        HttpResponseMessage response = await admin.GetAsync("/api/v1/health", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -458,7 +453,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        using var document = JsonDocument.Parse(await admin.GetStringAsync("/api/v1/operational-records"));
+        using var document = JsonDocument.Parse(await admin.GetStringAsync("/api/v1/operational-records", TestContext.Current.CancellationToken));
         JsonElement record = document.RootElement.EnumerateArray().Single(item => item.GetProperty("orCode").GetString() == "SYN-OR-100");
 
         record.GetProperty("classification").GetInt32().Should().Be(4);

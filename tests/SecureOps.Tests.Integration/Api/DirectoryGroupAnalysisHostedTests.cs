@@ -21,17 +21,13 @@ public sealed class DirectoryGroupAnalysisHostedTests
         var analysisRequest = new { group = "dist-universal" };
         var exportRequest = new { group = "dist-universal", mode = "DirectMembers", format = "Csv" };
 
-        HttpResponseMessage analysis = await admin.PostAsJsonAsync(
-            "/api/v1/directory/groups/analysis", analysisRequest);
-        HttpResponseMessage export = await admin.PostAsJsonAsync(
-            "/api/v1/directory/groups/export", exportRequest);
-        HttpResponseMessage forbiddenAnalysis = await lead.PostAsJsonAsync(
-            "/api/v1/directory/groups/analysis", analysisRequest);
-        HttpResponseMessage forbiddenExport = await lead.PostAsJsonAsync(
-            "/api/v1/directory/groups/export", exportRequest);
+        HttpResponseMessage analysis = await admin.PostAsJsonAsync("/api/v1/directory/groups/analysis", analysisRequest, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage export = await admin.PostAsJsonAsync("/api/v1/directory/groups/export", exportRequest, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage forbiddenAnalysis = await lead.PostAsJsonAsync("/api/v1/directory/groups/analysis", analysisRequest, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage forbiddenExport = await lead.PostAsJsonAsync("/api/v1/directory/groups/export", exportRequest, cancellationToken: TestContext.Current.CancellationToken);
 
         analysis.StatusCode.Should().Be(HttpStatusCode.OK);
-        DirectoryGroupAnalysisResponse? response = await analysis.Content.ReadFromJsonAsync<DirectoryGroupAnalysisResponse>();
+        DirectoryGroupAnalysisResponse? response = await analysis.Content.ReadFromJsonAsync<DirectoryGroupAnalysisResponse>(cancellationToken: TestContext.Current.CancellationToken);
         response!.Overview.Category.Should().Be("Distribution");
         response.DirectMembers.Should().BeEmpty();
         response.DirectMembersIncludePrimaryGroupMembers.Should().BeFalse();
@@ -47,14 +43,12 @@ public sealed class DirectoryGroupAnalysisHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(analysisLimit: 1);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage first = await admin.PostAsJsonAsync(
-            "/api/v1/directory/groups/analysis", new { group = "dist-universal", purpose = "first" });
-        HttpResponseMessage second = await admin.PostAsJsonAsync(
-            "/api/v1/directory/groups/analysis", new { group = "dist-universal", purpose = "different" });
+        HttpResponseMessage first = await admin.PostAsJsonAsync("/api/v1/directory/groups/analysis", new { group = "dist-universal", purpose = "first" }, cancellationToken: TestContext.Current.CancellationToken);
+        HttpResponseMessage second = await admin.PostAsJsonAsync("/api/v1/directory/groups/analysis", new { group = "dist-universal", purpose = "different" }, cancellationToken: TestContext.Current.CancellationToken);
 
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         second.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
-        var problem = JsonNode.Parse(await second.Content.ReadAsStringAsync());
+        var problem = JsonNode.Parse(await second.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         problem!["code"]!.GetValue<string>().Should().Be(OperationalErrorCodes.RateLimitExceeded);
     }
 
@@ -64,12 +58,10 @@ public sealed class DirectoryGroupAnalysisHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.PostAsJsonAsync(
-            "/api/v1/directory/groups/export",
-            new { group = "dist-universal", mode = "RecursiveMaybe", format = "Csv" });
+        HttpResponseMessage response = await admin.PostAsJsonAsync("/api/v1/directory/groups/export", new { group = "dist-universal", mode = "RecursiveMaybe", format = "Csv" }, cancellationToken: TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync());
+        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         problem!["code"]!.GetValue<string>().Should().Be(OperationalErrorCodes.DirectoryInvalidInput);
     }
 
@@ -79,7 +71,7 @@ public sealed class DirectoryGroupAnalysisHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory(swagger: true);
         using HttpClient client = factory.CreateClient();
 
-        string openApi = await client.GetStringAsync("/swagger/v1/swagger.json");
+        string openApi = await client.GetStringAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken);
 
         openApi.Should().Contain("/api/v1/directory/groups/analysis")
             .And.Contain("/api/v1/directory/groups/export")

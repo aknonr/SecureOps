@@ -28,7 +28,7 @@ public sealed class ApplicationSessionServiceTests
 
         result.Disposition.Should().Be(ApplicationSessionDisposition.IdleExpired);
         result.ErrorCode.Should().Be(OperationalErrorCodes.SessionExpired);
-        (await fixture.Repository.GetAsync(started.Session.SessionId, default))!.EndReason.Should().Be(SessionEndReason.IdleTimeout);
+        (await fixture.Repository.GetAsync(started.Session.SessionId, TestContext.Current.CancellationToken))!.EndReason.Should().Be(SessionEndReason.IdleTimeout);
         fixture.Audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionIdleTimedOut).Should().Be(1);
     }
 
@@ -53,7 +53,7 @@ public sealed class ApplicationSessionServiceTests
 
         active.Session!.AbsoluteExpiresAtUtc.Should().Be(absoluteExpiry);
         expired.Disposition.Should().Be(ApplicationSessionDisposition.AbsoluteExpired);
-        (await fixture.Repository.GetAsync(started.Session.SessionId, default))!.EndReason.Should().Be(SessionEndReason.AbsoluteTimeout);
+        (await fixture.Repository.GetAsync(started.Session.SessionId, TestContext.Current.CancellationToken))!.EndReason.Should().Be(SessionEndReason.AbsoluteTimeout);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class ApplicationSessionServiceTests
         _ = await fixture.ValidateAsync(started.Session.SessionId);
 
         fixture.Repository.TouchCalls.Should().Be(1);
-        (await fixture.Repository.GetAsync(started.Session.SessionId, default))!.LastSeenAtUtc.Should().Be(Fixture.StartTime.AddMinutes(5));
+        (await fixture.Repository.GetAsync(started.Session.SessionId, TestContext.Current.CancellationToken))!.LastSeenAtUtc.Should().Be(Fixture.StartTime.AddMinutes(5));
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public sealed class ApplicationSessionServiceTests
         ApplicationSessionResult result = await fixture.ValidateAsync(started.Session!.SessionId);
 
         result.Disposition.Should().Be(ApplicationSessionDisposition.AccessDisabled);
-        (await fixture.Repository.GetAsync(started.Session.SessionId, default))!.EndReason.Should().Be(SessionEndReason.AccessDisabled);
+        (await fixture.Repository.GetAsync(started.Session.SessionId, TestContext.Current.CancellationToken))!.EndReason.Should().Be(SessionEndReason.AccessDisabled);
         fixture.Audit.Events.Should().Contain(item => item.Action == AuditActions.ApplicationSessionAccessDisabled);
     }
 
@@ -105,7 +105,7 @@ public sealed class ApplicationSessionServiceTests
 
         result.Disposition.Should().Be(ApplicationSessionDisposition.AccessChanged);
         result.ErrorCode.Should().Be(OperationalErrorCodes.SessionRevoked);
-        (await fixture.Repository.GetAsync(started.Session.SessionId, default))!.EndReason
+        (await fixture.Repository.GetAsync(started.Session.SessionId, TestContext.Current.CancellationToken))!.EndReason
             .Should().Be(SessionEndReason.AccessChanged);
         fixture.Audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(1);
         fixture.Audit.Events.Should().Contain(item => item.Action == AuditActions.ApplicationSessionAccessChanged);
@@ -118,7 +118,7 @@ public sealed class ApplicationSessionServiceTests
         ApplicationSessionResult started = await fixture.StartAsync();
         const string reason = "Approved operational revocation reference SECRET-VALUE";
 
-        ApplicationSessionResult revoked = await fixture.Service.RevokeAsync(started.Session!.SessionId, reason, Fixture.Context, default);
+        ApplicationSessionResult revoked = await fixture.Service.RevokeAsync(started.Session!.SessionId, reason, Fixture.Context, TestContext.Current.CancellationToken);
         ApplicationSessionResult replay = await fixture.ValidateAsync(started.Session.SessionId);
         string auditJson = JsonSerializer.Serialize(fixture.Audit.Events);
 
@@ -151,11 +151,11 @@ public sealed class ApplicationSessionServiceTests
         ApplicationSessionResult started = await fixture.StartAsync();
         fixture.Time.Advance(TimeSpan.FromMinutes(30));
 
-        ApplicationSessionListResult result = await fixture.Service.ListActiveAsync(1, 50, Fixture.Context, default);
+        ApplicationSessionListResult result = await fixture.Service.ListActiveAsync(1, 50, Fixture.Context, TestContext.Current.CancellationToken);
 
         result.IsSuccess.Should().BeTrue();
         result.Sessions.Should().BeEmpty();
-        (await fixture.Repository.GetAsync(started.Session!.SessionId, default))!.EndReason
+        (await fixture.Repository.GetAsync(started.Session!.SessionId, TestContext.Current.CancellationToken))!.EndReason
             .Should().Be(SessionEndReason.IdleTimeout);
         fixture.Audit.Events.Should().Contain(item => item.Action == AuditActions.ApplicationSessionIdleTimedOut);
     }

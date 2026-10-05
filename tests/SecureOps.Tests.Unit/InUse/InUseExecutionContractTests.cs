@@ -42,7 +42,7 @@ public sealed class InUseExecutionContractTests
         var client = new TuruncuHatInUseMutationClient(factory, sessions, Options.Create(new TuruncuHatOptions
         { BaseUrl = "https://source.example.invalid/ws/DataRest.svc/json", Authorization = "Basic synthetic", TenantId = 218 }),
             writes, Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat" }));
-        (await client.SendAsync(step, lease, null, "789", null, default)).Outcome.Should().Be(expected);
+        (await client.SendAsync(step, lease, null, "789", null, TestContext.Current.CancellationToken)).Outcome.Should().Be(expected);
         handler.Count.Should().Be(1);
         using var body = JsonDocument.Parse(handler.Body!);
         if (step == "Upload")
@@ -55,7 +55,7 @@ public sealed class InUseExecutionContractTests
             handler.Target.Should().Be("https://source.example.invalid/ws/DataRest.svc/json/update");
             body.RootElement.GetProperty("req").GetProperty("BaseObject").GetString().Should().Be("BPM_Actvty");
             body.RootElement.GetProperty("req").GetProperty("Filters")[0].GetString().Should().Contain("789").And.Contain("000123").And.Contain("m_status%#=1");
-            (await client.SendAsync(step, lease with { Evidence = lease.Evidence.Where(e => e.Step != "Attachment").ToArray() }, null, "789", null, default))
+            (await client.SendAsync(step, lease with { Evidence = lease.Evidence.Where(e => e.Step != "Attachment").ToArray() }, null, "789", null, TestContext.Current.CancellationToken))
                 .Code.Should().Be("VerifiedPreconditionsRequired");
             handler.Count.Should().Be(1);
         }
@@ -63,7 +63,7 @@ public sealed class InUseExecutionContractTests
         if (status == 401)
         { sessions.Received(1).Invalidate("synthetic-session"); }
         writes.Value.ReadOnlyIntegrationMode = true;
-        (await client.SendAsync(step, lease, null, "789", null, default)).Outcome.Should().Be("Rejected");
+        (await client.SendAsync(step, lease, null, "789", null, TestContext.Current.CancellationToken)).Outcome.Should().Be("Rejected");
         handler.Count.Should().Be(1);
     }
 
@@ -129,7 +129,7 @@ public sealed class InUseExecutionContractTests
             }),
             Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat" }));
 
-        InUseRemoteResult result = await client.SendAsync("Property4464", lease, "500", null, proposed, default);
+        InUseRemoteResult result = await client.SendAsync("Property4464", lease, "500", null, proposed, TestContext.Current.CancellationToken);
         result.Outcome.Should().Be(expected);
         if (expected == "Rejected")
         { handler.Count.Should().Be(0); return; }
@@ -199,7 +199,7 @@ public sealed class InUseExecutionContractTests
         Uri standard = new("https://source.example.invalid/turuncuhat/ws/DataRest.svc/json/");
         Uri secure = new("https://source.example.invalid/turuncuhat/ws/DataRestSecure.svc/json/uploadattachment");
         using HttpRequestMessage request = TuruncuHatInUseWireContract.Attachment(standard, secure, lease, "synthetic-session", 218, "Basic synthetic");
-        using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+        using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken));
         JsonElement req = body.RootElement.GetProperty("req");
         req.GetProperty("fId").GetString().Should().Be("000123");
         req.GetProperty("fName").GetString().Should().Be("OR-000123_InUse.xlsx");
@@ -209,7 +209,7 @@ public sealed class InUseExecutionContractTests
         Action mixed = () => TuruncuHatInUseWireContract.Property("121", 4464, "Mixed", "session", 218, "Basic synthetic");
         mixed.Should().Throw<InvalidDataException>();
         using HttpRequestMessage bpm = TuruncuHatInUseWireContract.Activity("567", source.Id, "session", 218, "Basic synthetic");
-        (await bpm.Content!.ReadAsStringAsync()).Should().Contain("103626").And.Contain("103627").And.Contain("000123").And.Contain("567");
+        (await bpm.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().Contain("103626").And.Contain("103627").And.Contain("000123").And.Contain("567");
     }
 
     [Fact]

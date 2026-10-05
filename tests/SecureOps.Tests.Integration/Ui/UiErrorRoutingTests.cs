@@ -45,8 +45,8 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
         // state the middleware produces. The middleware's own decision logic is covered against real
         // HttpContext objects in UiHttpsOffloadTests, and the cleartext end-to-end behaviour was
         // verified against a running host over plain HTTP.
-        HttpResponseMessage response = await CreateClient().GetAsync("/login?returnUrl=dashboard");
-        string body = await response.Content.ReadAsStringAsync();
+        HttpResponseMessage response = await CreateClient().GetAsync("/login?returnUrl=dashboard", TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         // The sign-in action itself, rather than a heading: the card now leads with the product
@@ -58,7 +58,7 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
     [Fact]
     public async Task Root_WhileAnonymous_RoutesToTheSignInFlow_AndNotToNotFound()
     {
-        HttpResponseMessage response = await CreateClient().GetAsync("/");
+        HttpResponseMessage response = await CreateClient().GetAsync("/", TestContext.Current.CancellationToken);
 
         // Either an immediate redirect to sign-in or the prerendered shell that performs it — both
         // are the sign-in flow. What matters is that it is not reported as a missing page.
@@ -69,7 +69,7 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
         }
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync()).Should().NotContain("Sayfa bulunamadı");
+        (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().NotContain("Sayfa bulunamadı");
     }
 
     [Fact]
@@ -77,8 +77,8 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
     {
         // The fallback route answers 200 for everything; the router state must correct that, or a
         // missing page is advertised to browsers and monitoring as a success.
-        HttpResponseMessage response = await CreateClient().GetAsync("/definitely-not-a-real-route");
-        string body = await response.Content.ReadAsStringAsync();
+        HttpResponseMessage response = await CreateClient().GetAsync("/definitely-not-a-real-route", TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         body.Should().Contain("Sayfa bulunamadı");
@@ -100,7 +100,7 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
         // Both are [Authorize]. Anonymously they must route into sign-in — never be reported as
         // missing pages, which is what the catch-all fallback would otherwise make them look like
         // once the router finds no match for a signed-out visitor.
-        HttpResponseMessage response = await CreateClient().GetAsync(path);
+        HttpResponseMessage response = await CreateClient().GetAsync(path, TestContext.Current.CancellationToken);
 
         if (response.StatusCode is HttpStatusCode.Redirect or HttpStatusCode.Found)
         {
@@ -109,7 +109,7 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
         }
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync()).Should().NotContain("Sayfa bulunamadı");
+        (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().NotContain("Sayfa bulunamadı");
     }
 
     [Theory]
@@ -117,8 +117,8 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
     [InlineData("/signed-out", "Oturumunuz kapatıldı")]
     public async Task SessionStates_AreDistinctFromNotFound(string path, string marker)
     {
-        HttpResponseMessage response = await CreateClient().GetAsync(path);
-        string body = await response.Content.ReadAsStringAsync();
+        HttpResponseMessage response = await CreateClient().GetAsync(path, TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         body.Should().Contain(marker);
@@ -128,8 +128,8 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
     [Fact]
     public async Task ForbiddenState_IsDistinctFromNotFound()
     {
-        HttpResponseMessage response = await CreateClient().GetAsync("/access-denied");
-        string body = await response.Content.ReadAsStringAsync();
+        HttpResponseMessage response = await CreateClient().GetAsync("/access-denied", TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         body.Should().NotContain("Sayfa bulunamadı");
@@ -138,8 +138,8 @@ public sealed class UiErrorRoutingTests : IClassFixture<UiErrorRoutingTests.Offl
     [Fact]
     public async Task ErrorState_IsDistinctFromNotFound()
     {
-        HttpResponseMessage response = await CreateClient().GetAsync("/error");
-        string body = await response.Content.ReadAsStringAsync();
+        HttpResponseMessage response = await CreateClient().GetAsync("/error", TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         body.Should().NotContain("Sayfa bulunamadı");
     }

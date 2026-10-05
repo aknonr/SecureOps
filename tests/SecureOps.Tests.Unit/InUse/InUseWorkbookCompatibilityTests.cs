@@ -11,7 +11,7 @@ public sealed class InUseWorkbookCompatibilityTests
     [Fact]
     public async Task CorporateWorkbook_FourSheets_ReadableTextAndSeparateEvidence()
     {
-        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(default)).Records[0];
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(TestContext.Current.CancellationToken)).Records[0];
         var actor = Guid.NewGuid();
         var record = new InUseRecord(Guid.NewGuid(), source, "synthetic-hash", 1, 2, null, null,
             new(1, [], "Review evidence retained", actor, DateTimeOffset.UtcNow), DateTimeOffset.UtcNow);
