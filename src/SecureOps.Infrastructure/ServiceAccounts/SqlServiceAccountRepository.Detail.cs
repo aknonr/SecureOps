@@ -12,7 +12,10 @@ public sealed partial class SqlServiceAccountRepository
     private const int _sourceRowLimit = 60;
 
     /// <summary>Full account detail (caller has already passed the scope check). Permissions are added by the service.</summary>
-    public async Task<AccountDetail?> AccountDetailAsync(Guid id, DateOnly today, CancellationToken cancellationToken)
+    public Task<AccountDetail?> AccountDetailAsync(Guid id, DateOnly today, CancellationToken cancellationToken) =>
+        RetryReadOnDeadlockAsync(() => AccountDetailOnceAsync(id, today, cancellationToken));
+
+    private async Task<AccountDetail?> AccountDetailOnceAsync(Guid id, DateOnly today, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         bool names = await GmsaNameColumnsAsync(connection, null, cancellationToken);

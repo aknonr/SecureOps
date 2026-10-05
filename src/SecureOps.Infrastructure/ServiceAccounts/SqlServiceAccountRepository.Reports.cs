@@ -16,7 +16,11 @@ public sealed partial class SqlServiceAccountRepository
     /// filters applied in SQL. One communication is one row regardless of how many accounts it links. An account filter
     /// narrows the same facts to one account so the account detail evaluates rules with the report implementation.
     /// </summary>
-    public async Task<(ReportFacts Facts, string Watermark)> ReportFactsAsync(ServiceAccountScope scope, Guid? organizationId, Guid? teamId,
+    public Task<(ReportFacts Facts, string Watermark)> ReportFactsAsync(ServiceAccountScope scope, Guid? organizationId, Guid? teamId,
+        RiskThresholds thresholds, Guid? accountId, CancellationToken cancellationToken) =>
+        RetryReadOnDeadlockAsync(() => ReportFactsOnceAsync(scope, organizationId, teamId, thresholds, accountId, cancellationToken));
+
+    private async Task<(ReportFacts Facts, string Watermark)> ReportFactsOnceAsync(ServiceAccountScope scope, Guid? organizationId, Guid? teamId,
         RiskThresholds thresholds, Guid? accountId, CancellationToken cancellationToken)
     {
         DynamicParameters parameters = ScopeParameters(scope, new { organizationId, teamId, accountId, coordination = ServiceAccountImportProfiles.CoordinationList });
