@@ -115,19 +115,34 @@ public sealed class ServiceAccountApiCompositionTests
 
         RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
             .Where(e => e.RoutePattern.RawText?.Contains("usage-scan", StringComparison.Ordinal) == true)];
-        endpoints.Select(e => e.RoutePattern.RawText).Should().BeEquivalentTo(
+        static string[] Methods(RouteEndpoint e) => [.. e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods];
+        RouteEndpoint[] writes = [.. endpoints.Where(e => !Methods(e).Contains("GET"))];
+        RouteEndpoint[] reads = [.. endpoints.Where(e => Methods(e).Contains("GET"))];
+        writes.Select(e => e.RoutePattern.RawText).Should().BeEquivalentTo(
         [
             "api/v1/service-accounts/accounts/{id:guid}/usage-scans",
             "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage",
             "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/dismiss"
-        ], "evidence is attached and decided per account; there is no scan start, list or download route");
-        foreach (RouteEndpoint endpoint in endpoints)
+        ], "evidence is attached and decided per account; there is no scan start route");
+        foreach (RouteEndpoint endpoint in writes)
         {
             endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.Work);
-            endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods.Should().Equal("POST");
+            Methods(endpoint).Should().Equal("POST");
         }
 
-        endpoints.Single(e => e.RoutePattern.RawText!.EndsWith("usage-scans", StringComparison.Ordinal)).Metadata
+        // Read-only paging of what the account detail already shows (same scope, searched name only); never the stored file.
+        reads.Select(e => e.RoutePattern.RawText).Should().BeEquivalentTo(
+        [
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scans",
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scans/{linkId:guid}/items"
+        ], "scans are paged on the account; there is no download route");
+        foreach (RouteEndpoint endpoint in reads)
+        {
+            Methods(endpoint).Should().Equal("GET");
+            endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.View).And.NotContain(ServiceAccountPolicies.Work);
+        }
+
+        writes.Single(e => e.RoutePattern.RawText!.EndsWith("usage-scans", StringComparison.Ordinal)).Metadata
             .GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize.Should().Be(5L * 1024 * 1024);
     }
 
