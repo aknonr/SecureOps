@@ -15,6 +15,7 @@ public partial class ServiceAccountDetail
     private bool _directoryRequested;
     private IReadOnlyList<TeamView> _teams = [];
     private int _revision;
+    private int _tab;
     private Guid? _loadedId;
 
     /// <summary>Account id.</summary>
@@ -25,6 +26,14 @@ public partial class ServiceAccountDetail
 
     private string? Lead => _detail is null ? null
         : $"{_detail.Summary.Domain ?? "Domain bilinmiyor"} · {(_detail.Summary.IdentityState == "Confirmed" ? "kimlik teyitli" : "kimlik geçici")}";
+
+    private string WorkTabText => $"İşler ({_detail?.Requests.Count(r => r.Status == "Open") ?? 0} açık)";
+
+    private string MailTabText => $"Yazışmalar ({_detail?.Communications.Count ?? 0})";
+
+    private string FindingsTabText => $"Bulgular ({_detail?.Findings.Count ?? 0})";
+
+    private string EvidenceTabText => $"Kanıtlar ({_detail?.Evidence.Count ?? 0})";
 
     /// <summary>Usage tab title with the rule state so an against-rule account stands out without opening the tab.</summary>
     private string UsageTabText => _detail?.Rule is { } rule && rule.Conformance == "Unplanned"

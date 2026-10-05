@@ -1,0 +1,14 @@
+@* Keyboard target for a MudTabs header (Windows 2026-10-05). MudBlazor 6.16 renders a tab header as a plain div with a click
+   handler and no tab stop, so a keyboard user could not switch the account or admin tabs. This native button inside the
+   header is a tab stop; Enter and Space click it and the click reaches the header, so MudTabs switches the panel as for a
+   mouse click. The selected tab is announced with aria-current, not by colour alone. *@
+
+<button type="button" class="sa-tab-title" aria-current="@(Selected ? "true" : null)">@Text</button>
+
+@code {
+    /// <summary>Visible tab name.</summary>
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+
+    /// <summary>True for the tab whose panel is shown.</summary>
+    [Parameter] public bool Selected { get; set; }
+}

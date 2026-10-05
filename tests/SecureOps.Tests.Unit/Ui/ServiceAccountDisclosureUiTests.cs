@@ -93,6 +93,49 @@ public sealed class ServiceAccountDisclosureUiTests
             .Should().BeEmpty("MudBlazor 6.16 panel headers take no keyboard focus; use SaDisclosure (native details/summary)");
     }
 
+    // Windows 2026-10-05: MudBlazor 6.16 tab headers are divs without a tab stop, so the account and admin tabs (including
+    // "Kullanım taraması") could not be reached by keyboard. Each header now holds a native button.
+    [Fact]
+    public async Task TabHeaders_AreNativeButtonsInsideMudTabs_AndTheSelectedOneIsAnnounced()
+    {
+        string html = await RenderAsync(typeof(SyntheticTabs), []);
+
+        Regex.Matches(html, @"<div[^>]*class=""mud-tab[ ""][^>]*>\s*<button type=""button"" class=""sa-tab-title""( aria-current=""true"")?>([^<]+)</button>")
+            .Select(m => (m.Groups[2].Value, m.Groups[1].Success)).Should().Equal(("Birinci", true), ("İkinci", false));
+    }
+
+    [Fact]
+    public void EveryServiceAccountsTab_HasAKeyboardTitle()
+    {
+        string pages = Path.Combine(Root(), "src", "SecureOps.Ui", "Pages", "ServiceAccounts");
+        string[] withTabs = [.. Directory.GetFiles(pages, "*.razor").Where(f => File.ReadAllText(f).Contains("<MudTabPanel ", StringComparison.Ordinal))];
+
+        withTabs.Select(Path.GetFileName).Should().BeEquivalentTo(["ServiceAccountDetail.razor", "ServiceAccountAdmin.razor"]);
+        foreach (string file in withTabs)
+        {
+            string text = File.ReadAllText(file);
+            Regex.Count(text, "<MudTabPanel ").Should().Be(Regex.Count(text, @"<TabContent><SaTabTitle "), Path.GetFileName(file));
+            text.Should().Contain("@bind-ActivePanelIndex=\"_tab\"", "the selected title is announced from the active index");
+        }
+    }
+
+    [Fact]
+    public void EveryServiceAccountsPage_GivesItsButtonsAVisibleKeyboardFocusRing()
+    {
+        // Windows 2026-10-05: "Hesaplar", "Nasıl kullanılır?", "Güncelle / kapat" and the tab scroll arrows drew no focus indicator.
+        string pages = Path.Combine(Root(), "src", "SecureOps.Ui", "Pages", "ServiceAccounts");
+        string[] razor = Directory.GetFiles(pages, "*.razor");
+
+        razor.Should().NotBeEmpty();
+        foreach (string page in razor)
+        {
+            File.ReadAllText(page).Should().Contain("class=\"so-page so-page--wide sa-page\"", Path.GetFileName(page));
+            string css = page + ".css";
+            File.Exists(css).Should().BeTrue(Path.GetFileName(css));
+            File.ReadAllText(css).Should().MatchRegex(@"\.sa-page ::deep \.mud-button-root:focus-visible\s*\{[^}]*outline:\s*2px solid", Path.GetFileName(css));
+        }
+    }
+
     /// <summary>The title is the text of a native summary inside a details element, and no MudBlazor panel header is rendered.</summary>
     private static void AssertDisclosure(string html, string title)
     {
@@ -123,6 +166,36 @@ public sealed class ServiceAccountDisclosureUiTests
         string html = await renderer.Dispatcher.InvokeAsync(async () =>
             (await renderer.RenderComponentAsync(component, ParameterView.FromDictionary(parameters))).ToHtmlString());
         return WebUtility.HtmlDecode(Regex.Replace(html, " b-[a-z0-9]{10}", string.Empty));
+    }
+
+    /// <summary>Two MudTabs panels with SaTabTitle headers, the first one selected.</summary>
+    private sealed class SyntheticTabs : ComponentBase
+    {
+        protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+        {
+            builder.OpenComponent<MudBlazor.MudTabs>(0);
+            builder.AddAttribute(1, nameof(MudBlazor.MudTabs.ChildContent), (RenderFragment)(tabs =>
+            {
+                tabs.AddContent(0, Panel("Birinci", true));
+                tabs.AddContent(1, Panel("İkinci", false));
+            }));
+            builder.CloseComponent();
+        }
+
+        private static RenderFragment Panel(string text, bool selected) => builder =>
+        {
+            builder.OpenComponent<MudBlazor.MudTabPanel>(0);
+            builder.AddAttribute(1, nameof(MudBlazor.MudTabPanel.Text), text);
+            builder.AddAttribute(2, nameof(MudBlazor.MudTabPanel.TabContent), (RenderFragment)(title =>
+            {
+                title.OpenComponent<SaTabTitle>(0);
+                title.AddAttribute(1, nameof(SaTabTitle.Text), text);
+                title.AddAttribute(2, nameof(SaTabTitle.Selected), selected);
+                title.CloseComponent();
+            }));
+            builder.AddAttribute(3, nameof(MudBlazor.MudTabPanel.ChildContent), (RenderFragment)(body => body.AddContent(0, "Sentetik " + text)));
+            builder.CloseComponent();
+        };
     }
 
     private sealed class SyntheticNavigation : NavigationManager

@@ -19,6 +19,7 @@ public partial class ServiceAccountAdmin
     private OrgForm _org = new();
     private TeamForm _team = new();
     private int _revision;
+    private int _tab;
 
     /// <inheritdoc />
     protected override string RequiredCapability => ServiceAccountCapabilities.Administer;
