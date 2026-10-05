@@ -3,8 +3,9 @@
 **Status:** Proposed — draft for review. Not accepted, not implemented, nothing deployed. **Shelved by the project owner on
 2026-10-04** (Bilgi Güvenliği approval and the server pilot are open). The person-run scan and its import are decided
 separately in ADR-0027, which reuses this ADR's read-only functions in a self-contained collector and needs no JEA
-endpoint or Worker job. The JEA/Worker parts below remain proposed only.
-**Date:** 2026-10-01
+endpoint or Worker job. The JEA/Worker parts below remain proposed only. **Revision 2 (2026-10-06)** at the end of this
+file is the version prepared for the approval decision; it stays shelved until the owner takes it to Bilgi Güvenliği.
+**Date:** 2026-10-01 (revision 2: 2026-10-06)
 **Decision makers (required):** project owner; Bilgi Güvenliği and Siber Güvenlik approval (JEA change); target server owners for the pilot list.
 
 ## Context
@@ -151,3 +152,59 @@ list. What it drops: writes, the GUI, per-item SID translation, repeated IIS rea
 2. Pilot server list (10–15 servers) with owner sign-off.
 3. Codex: Worker job contract, migration number (if the finding/usage link needs a column), OpenAPI.
 4. Synthetic test fixtures only; no real server or account names in the repository.
+
+## Revision 2 (2026-10-06, PROPOSED — prepared for the approval decision)
+
+Why now: the team's own tool (analysis in `docs/service-accounts/ops-research/01-script-farki.md`) is fast at reaching
+servers but runs unconstrained sessions, drops servers silently and trusts a stale cache. The project owner wants the
+platform to do this work better. Reading is the part that gives most of the value and needs no write, so it is proposed
+first and separately from any change (ADR-0028). Everything above stays valid unless changed here.
+
+**R2-1 Identities.** The Worker connects as a **group managed service account** used only for this endpoint
+(placeholder `CONTOSO\gmsa-so-sa-read$`), member of a dedicated group (placeholder `CONTOSO\SecureOps-SaRead`) that the
+session configuration maps to the role. No person's credentials, no password anywhere. A change endpoint, if ever
+approved, uses a different gMSA and group (ADR-0028), so the read identity can never write.
+
+**R2-2 What the function reads (one visible function, unchanged name).**
+
+| Source | Status | Read | Never read |
+|---|---|---|---|
+| Windows services, scheduled tasks, IIS (as above) | unchanged | as above | passwords |
+| COM+ application identity | **added, opt-in parameter** | application name, `Identity` | `Password` (write-only in the COM+ catalog) |
+| "Log on as a service" / "Log on as a batch job" holders | **added, opt-in, method decided in the pilot** | SIDs holding the two rights | anything else in the security policy |
+| Endpoint version | added | module version, so the platform knows which sources a result can contain | — |
+
+The user-rights read has no clean read-only API in Windows PowerShell 5.1 without either compiling code (`Add-Type`) or
+`secedit /export` to a temporary file. The pilot decides between the two; until then the source is reported as
+`NotInstalled` and the gap stays visible. It is needed by ADR-0028 as a pre-check (a gMSA must hold the right before a
+service or task is switched to it), never to change rights.
+
+**R2-3 gMSA readiness is checked in AD, not on the server.** Whether a server may retrieve a gMSA's password
+(`msDS-GroupMSAMembership`, i.e. `PrincipalsAllowedToRetrieveManagedPassword`, including nested groups) is read by the
+platform from AD under its existing read-only directory access, so servers need no RSAT module. A server whose computer
+account was added to the allowed group recently may still need its Kerberos tickets refreshed (reboot or purge); the
+result says "AD allows; the host has not proven it yet" until a post-change scan shows the component running.
+
+**R2-4 Product flow (on demand, bounded, no sweep).**
+
+- Started by a person with `ServiceAccounts.Work` and the responsible basis on every selected account, for 1–20 accounts and
+  1–500 planned servers (pasted list, saved server set, or later the ITSM/vCenter adapters behind fakes first, rule 8).
+- One Hangfire job per scan; one call per server carrying all accounts; bounded parallelism (default 32), open timeout
+  15 s, operation timeout 180 s, cancellable by the starter or an administrator; at most one running scan per account.
+- Each server's document is validated by the same parser as an uploaded scan (ADR-0027 §2) and stored in the same
+  append-only tables with `tool = Jea`; the account page shows servers as they finish.
+- Reasons for "no information" are kept apart: `Unreachable` (no WinRM answer), `NoEndpoint` (WinRM answers, the endpoint
+  is not registered — **schema addition**), `NoResult` (connected, no valid document). None is "not used" (SPEC rule 15),
+  none excludes the server from the next scan. There is no reachability cache that hides a server.
+- The person-run path of ADR-0027 stays for servers without the endpoint.
+
+**R2-5 Audit.** `ServiceAccount.UsageScanRequested` / `…Completed` / `…Cancelled` with counts and the plan hash; server
+names live in the scan record, not in the audit text. JEA transcripts stay on each server.
+
+**R2-6 Approvals needed (unchanged list, made explicit).** Bilgi Güvenliği and Siber Güvenlik: the function, the two
+opt-in sources and the gMSA identity; PAM / BeyondTrust team and team lead: the Worker access path (open decision in
+`docs/15-system-landscape.md`; this revision assumes direct WinRM + Kerberos + JEA and does not decide it); server owners:
+the 10–15 server pilot. **Before deployment** the diagnostic allow-list finding above must be closed by its own ADR.
+
+**R2-7 Estimate.** About 10–15 developer days after approval (Worker JEA runner with fake, job, storage reuse, UI progress,
+tests) plus the pilot. Split in `docs/service-accounts/ops-research/05-yol-haritasi.md` (aşama B).
