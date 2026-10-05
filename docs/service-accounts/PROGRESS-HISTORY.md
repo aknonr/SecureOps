@@ -13,6 +13,70 @@ ancestor of the integrated head, so this branch needs **reconciliation by Codex,
 it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
 activation, no corporate SQL/source/Jira/AD/SMTP call.
 
+## Windows session 2026-10-05 (afternoon): review merge (`525b5c6` … `9629101`)
+
+Owner's workstation, SDK 9.0.317 user-local, LocalDB, synthetic data only, nothing applied to the TEST system.
+
+- Two sessions forked from `63e6d5d` and both pushed: this branch at `15cf2bb` (Windows: rows 69–74, focus fix `9fc5ee3`,
+  DBA note) and `claude/sa-review-20261005` at `0ecc728` (Linux cloud with SDK 10, no SQL Server: value-guard bypasses,
+  `\z`, searched-name rule, "not found" only for fully scanned servers, `SaDisclosure`, gMSA name hint). Merged with
+  `git merge --no-ff` (`525b5c6`); no textual conflict. Both sides' tests in `ServiceAccountUsageScanUiTests.cs` kept;
+  `SaUsageScanPanel.razor.css` keeps the `9fc5ee3` ring, and `7a1969d` extends it to buttons inside every `SaDisclosure`.
+- Owner-approved small fixes, one commit each with tests: `6d54e69` second scan decision 409
+  `ServiceAccountUsageScanAlreadyDecided` (was 400 `ServiceAccountValidationFailed`); `b4623dd` file names without control,
+  format (zero-width, bidi), separator or invisible filler characters (pure `ServiceAccountText.FileName`, SPEC usage-scan
+  rule 7); `a8660cc` the combine script applies the module's folded name and value rules and the 4 096-character limit.
+- The cloud's searched-name rule had never run against SQL. New module SQL test `c76faf1` (account without a domain shows the
+  SYN and the OTHER match under the bare name; a SYN account shows only its own; two domains without a bare name refused,
+  nothing stored). Passed; with the pre-`c2601a7` selection put back temporarily it failed (the account was attached under
+  `SYN\name`), then the file was restored and its timestamp updated.
+- Browser (local Demo API on the earlier synthetic database `SecureOps_SaW1005ui`, whose role assignment the owner had
+  approved; no new role needed): walking the account page **keyboard only** showed that MudTabs headers are divs without a
+  tab stop — Tab went from the first tab's content back to the top, so "Kullanım taraması" and the disclosures in the other
+  tabs were unreachable. Fixed in `7c14ee3` (`SaTabTitle` button in every account/admin tab header, `aria-current`; every
+  module page gives `.mud-button-root` a focus ring, because "Hesaplar", "Nasıl kullanılır?", "Güncelle / kapat" and the tab
+  scroll arrows had none). After the fix: every tab reached with Tab, Enter and Space switch it (after the Blazor round trip;
+  pressing Tab immediately after Enter walks the old panel), all 13 summaries reached and opened with Enter/Space, focus
+  ring visible; admin tabs likewise. 390 × 844 light and dark and 640 × 900 (emulated 200 %) dark, every tab with all forms
+  open: `scrollWidth` equals the viewport. At 390 px a focused header can sit partly outside the MudTabs scroll strip
+  (e.g. 89 of 310 px visible), never fully hidden.
+- 409 end to end: two API dismissals on one synthetic match gave 200 then 409 (`code`, `stage=usage-scan-decision`,
+  `retryable=false`, `field=alreadyDecided`); a dismissal sent from a stale screen showed "Karar zaten verilmiş", reloaded the
+  first decision, and after `9629101` also closes the stale decision box. Synthetic rows added to `SecureOps_SaW1005ui`:
+  two dismissals and one re-dated copy of the synthetic scan (`scan-syn-1005.json`, attached through the API).
+- gMSA hint at registration (keyboard only, 390 px): 23 characters → advice text in `role="status"`, with `$` the gMSA text,
+  a short name clears it, submit stays enabled; contrast 4.92:1 (light) and 7.40:1 (dark) on the form surface.
+- Combine script under Windows PowerShell 5.1.26100 with synthetic documents: `LogonType=Password; Password Expiry
+  Notification` accepted; `/password:`, `"Password":"…"`, full-width and zero-width spellings refused, no file written, the
+  message never echoes the value; text over 4 096 characters refused.
+- Final run at `9629101`: build 0/0; unit 1883 passed, 1 intentional skip; integration 303 passed, 113 skipped; format clean;
+  harness on fresh `SecureOps_SaMerge1005b` exit 0 ("candidate 4 replay refused as expected"); module SQL 58/58 on the first
+  run; diagnostics 4 × `Number=51091` and 3 synthetic provider failures, no `Number=1205`.
+- Fresh databases created (synthetic, kept): `SecureOps_SaMerge1005a` (57/57 first run before the new SQL test),
+  `SecureOps_SaMerge1005b` (final run).
+- Cloud's open items written to PROGRESS.md (collector without administrator rights may skip tasks silently, scan size on the
+  account page, requested gMSA name / 031, low-priority notes).
+
+Moved here from PROGRESS.md (superseded by the run above):
+
+> **Verified (Windows workstation, 2026-10-04, SDK 9.0.317, LocalDB):** Build 0/0 · unit 1741/1741 five runs in a row after
+> the race fix · integration 301 passed / 107 SQL-gated skipped · format clean · module SQL 50/50 on a fresh 001–029 database
+> at the first run, no `Number=1205` · harness exit 0 · desktop Excel opens the synthetic snapshot XLSX without repair,
+> charts equal "Grafik verisi" · PDF embeds `LiberationMono` and `LiberationMono-Bold` · ADR-0024 pure helpers pass under
+> Windows PowerShell 5.1.
+>
+> **Verified (Linux cloud, 2026-10-04, usage scan, SDK 9.0.317, SQL Server 2022 container):** Build 0/0 · unit 1803/1805
+> (the 2 failures also fail on `e6b3e03`: audit path validator and a Windows-only execution policy test) · module SQL 53
+> passed + 2 LocalDB-only on a fresh 001–030 database, also as an `svcacct_api_runtime`-only user, no `Number=1205` · other
+> integration failures are the 7 SkiaSharp announcement tests that also fail on `e6b3e03` · format clean on a CRLF copy ·
+> OpenAPI additions only · scan tab checked on a static render at 390/640/1280 px light/dark and by keyboard.
+>
+> **Verified (Windows workstation, 2026-10-05, usage scan, `63e6d5d` + fix `9fc5ee3`, SDK 9.0.317, LocalDB):** Build 0/0 ·
+> unit 1806 passed (1 intentional skip) · integration 302 passed / 112 skipped · format clean · harness 001–030 exit 0,
+> module SQL 56/56 on the first run, no `Number=1205` · collector and combine under Windows PowerShell 5.1 · local Demo:
+> upload, refused `Password` file, usage/dismiss decisions, participant upload only through its own request, 390 px,
+> emulated 200 %, light/dark, keyboard · one defect fixed (`9fc5ee3`) · 029/030 rehearsal on a synthetic copy.
+
 ## Windows session 2026-10-05: usage scan acceptance, rows 67–75 (`63e6d5d`, fix `9fc5ee3`)
 
 Owner's workstation, SDK 9.0.317 user-local, LocalDB `SecureOpsResourcesV1`, synthetic data only, nothing applied to the TEST
