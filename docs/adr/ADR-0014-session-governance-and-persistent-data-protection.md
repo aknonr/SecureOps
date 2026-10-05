@@ -62,5 +62,37 @@ silent continuation. There is no durable SQL browser correlation in this change.
   neither allows an old correlation to start another API session. These are deterministic hosted
   tests, not IIS recycle or browser acceptance.
 
-F1 atomic session termination/audit is the next approved follow-up. F3 concurrent termination
+F1 atomic session termination/audit follows in Amendment 3. F3 concurrent termination
 results and F4 already-running validation boundaries remain open and outside this change.
+
+## Amendment 3 - Atomic session termination and audit, 2026-10-05
+
+Owner-approved F1 policy: logout, administrative revoke, idle/absolute expiry and terminal
+bulk operations commit their session changes and required append-only audit together.
+
+- The SQL repository owns the transaction and directly inserts into the existing `audit.AuditLog`
+  on the same connection/transaction as the session update. Queued audit cannot enlist and is
+  not used for these terminal events. No schema, grant, audit update/delete or migration changes.
+- Expiry sweeps and access-disable/change batches commit all affected state and terminal events
+  together. Any update/audit failure rolls back the batch; the caller receives an unavailable
+  result. Caller cancellation propagates and an uncommitted transaction is disposed/rolled back.
+- InMemory prepares replacement state under its repository gate before publishing an atomic
+  audit batch, then publishes state without another failing/cancellable operation. The local
+  audit writer prepares all events and reserves capacity before appending them as one batch.
+  This is process-local test behavior, not durable crash-recovery evidence.
+- Unsupported mixed InMemory session/File or queued audit compositions cannot satisfy atomicity:
+  termination fails closed with `AuditStoreUnavailable`, leaving state and terminal audit unchanged.
+  Existing shipped defaults are not changed; supported local acceptance uses InMemory/InMemory,
+  and durable acceptance uses SQL sessions and the same SQL audit table.
+- Audit failures are translated to safe unavailable responses; internal exceptions are retained
+  but their payloads, identity and handles are not logged by the new terminal-audit error paths.
+- The repository still returns whether an active row actually transitioned. Service response
+  policy and requested audit on a losing single-session transition are unchanged: F3 remains open.
+  Touch/validation and in-flight revocation boundaries are unchanged: F4 remains open.
+- Initial session creation and its existing failed-start audit compensation are outside this F1
+  termination change. The administrative list-view attempt audit remains separate from terminal
+  batch audit. Explicit UI/logout cookie cleanup and API terminal-handle semantics are unchanged.
+
+Evidence includes unit failure/success/cancellation tests, hosted API 503 behavior, and actual
+isolated LocalDB update/audit failure triggers, second-insert rollback and transaction cancellation.
+The full guarded Resource SQL harness also proves the existing append-only restrictions remain.

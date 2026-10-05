@@ -22,6 +22,50 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class ApplicationSessionHostedTests
 {
     [Theory]
+    [InlineData("Logout")]
+    [InlineData("Revoke")]
+    [InlineData("Expiry")]
+    public async Task TerminalAuditFailure_ReturnsRetryableUnavailableAndKeepsPersistedSessionActive(string path)
+    {
+        RejectingTerminalAudit audit = new();
+        SessionClock time = new(DateTimeOffset.UtcNow);
+        using WebApplicationFactory<Program> factory = CreateFactory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IAuditWriter>(audit);
+            services.AddSingleton<TimeProvider>(time);
+        }));
+        using HttpClient browser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse session, string cookie) = await StartAsync(browser);
+        audit.Reject = true;
+        if (path == "Expiry")
+        {
+            time.Advance(TimeSpan.FromMinutes(30));
+        }
+
+        using HttpRequestMessage request = Request(path == "Expiry" ? HttpMethod.Get : HttpMethod.Post, path switch
+        {
+            "Logout" => "/api/v1/access/logout",
+            "Revoke" => "/api/v1/sessions/revoke",
+            _ => "/api/v1/sessions/current"
+        }, cookie);
+        if (path == "Revoke")
+        {
+            request.Content = JsonContent.Create(new RevokeApplicationSessionRequest(session.SessionId, "Synthetic approved revoke"));
+        }
+
+        using HttpResponseMessage response = await browser.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        ProblemDetails problem = (await response.Content.ReadFromJsonAsync<ProblemDetails>(cancellationToken: TestContext.Current.CancellationToken))!;
+        problem.Extensions["code"]!.ToString().Should().Be("AuditStoreUnavailable");
+        ((JsonElement)problem.Extensions["retryable"]!).GetBoolean().Should().BeTrue();
+        response.Headers.Contains(ApplicationSessionHeaders.ReauthenticationRequired).Should().BeFalse();
+        (await factory.Services.GetRequiredService<IApplicationSessionRepository>().GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        audit.Inner.Events.Should().NotContain(item => item.Action == AuditActions.ApplicationSessionLoggedOut
+            || item.Action == AuditActions.ApplicationSessionRevoked || item.Action == AuditActions.ApplicationSessionIdleTimedOut);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task UiStoreLoss_ExistingCorrelationCannotStartAnotherApiSession(bool restart)
@@ -435,5 +479,23 @@ public sealed class ApplicationSessionHostedTests
         response.StatusCode.Should().Be(status);
         ProblemDetails problem = (await response.Content.ReadFromJsonAsync<ProblemDetails>())!;
         problem.Extensions["code"]!.ToString().Should().Be(code);
+    }
+
+    private sealed class RejectingTerminalAudit : IAtomicAuditWriter
+    {
+        public InMemoryAuditWriter Inner { get; } = new();
+        public bool Reject { get; set; }
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken) => WriteBatchAsync([auditEvent], cancellationToken);
+        public Task WriteBatchAsync(IReadOnlyCollection<AuditEvent> events, CancellationToken cancellationToken) =>
+            Reject && events.Any(item => item.Action is AuditActions.ApplicationSessionLoggedOut or AuditActions.ApplicationSessionRevoked or AuditActions.ApplicationSessionIdleTimedOut)
+                ? Task.FromException(new AuditWriteUnavailableException("Synthetic terminal audit failure."))
+                : Inner.WriteBatchAsync(events, cancellationToken);
+    }
+
+    private sealed class SessionClock(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset _now = now;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan duration) => _now = _now.Add(duration);
     }
 }

@@ -235,6 +235,12 @@ the actual migration upgrade and then runs SQL round-trip, concurrency,
 transactional audit rollback, append-only, and SDM persistence tests. Corporate
 SQL/AD/HTTP endpoints remain forbidden. Offline SQL asset assertions are separate.
 
+`ResourceSqlTests.Sessions_*` also runs through this guarded harness: logout, revoke,
+idle/absolute expiry, expiry sweep and access-disable termination are checked for update/audit
+failure rollback and success. Second-audit insert failure rolls back earlier audit and state;
+cancellation inside a transaction also leaves both unchanged. No test disables append-only
+triggers. InMemory and hosted API equivalents cover safe unavailable responses and atomic batches.
+
 In Use recovery acceptance uses `tests/browser/in-use-recovery.cjs` with arguments
 `<playwright-core> <ui-loopback> <api-loopback> <fresh-evidence-directory> <proxy-port>`.
 Use the same fresh LocalDB harness and foreground Demo/paired Simulation composition

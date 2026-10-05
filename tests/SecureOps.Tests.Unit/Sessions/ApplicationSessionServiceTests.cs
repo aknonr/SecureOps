@@ -17,6 +17,134 @@ namespace SecureOps.Tests.Unit.Sessions;
 
 public sealed class ApplicationSessionServiceTests
 {
+    [Theory]
+    [InlineData("Logout")]
+    [InlineData("Revoke")]
+    [InlineData("Idle")]
+    [InlineData("Absolute")]
+    [InlineData("Sweep")]
+    [InlineData("AccessDisabled")]
+    public async Task Termination_AuditFailureLeavesSessionActive(string path)
+    {
+        ToggleAuditWriter audit = new();
+        Fixture fixture = new(auditWriter: audit);
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+        audit.FailTerminalWrite = true;
+
+        string? error = await fixture.TerminateAsync(path, session.SessionId);
+
+        error.Should().Be(OperationalErrorCodes.AuditStoreUnavailable);
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        audit.Inner.Events.Should().NotContain(item => IsTerminal(item.Action));
+    }
+
+    [Theory]
+    [InlineData("Logout")]
+    [InlineData("Revoke")]
+    [InlineData("Idle")]
+    [InlineData("Absolute")]
+    [InlineData("Sweep")]
+    [InlineData("AccessDisabled")]
+    public async Task Termination_UpdateFailureWritesNoTerminalAudit(string path)
+    {
+        Fixture fixture = new();
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+        fixture.Repository.FailTermination = true;
+
+        string? error = await fixture.TerminateAsync(path, session.SessionId);
+
+        error.Should().Be(OperationalErrorCodes.SessionStoreUnavailable);
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        fixture.Audit.Events.Should().NotContain(item => IsTerminal(item.Action));
+    }
+
+    [Theory]
+    [InlineData("Logout")]
+    [InlineData("Revoke")]
+    [InlineData("Idle")]
+    [InlineData("Absolute")]
+    [InlineData("Sweep")]
+    [InlineData("AccessDisabled")]
+    public async Task Termination_SuccessCommitsStateAndExactlyOneAudit(string path)
+    {
+        Fixture fixture = new();
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+
+        string? error = await fixture.TerminateAsync(path, session.SessionId);
+
+        error.Should().Be(path is "Idle" or "Absolute" ? OperationalErrorCodes.SessionExpired : null);
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeFalse();
+        fixture.Audit.Events.Should().ContainSingle(item => IsTerminal(item.Action));
+    }
+
+    private static bool IsTerminal(string action) => action != AuditActions.ApplicationSessionStarted
+        && action != AuditActions.ApplicationSessionsViewed;
+
+    [Theory]
+    [InlineData("Sweep")]
+    [InlineData("AccessDisabled")]
+    public async Task BatchTermination_AuditFailurePublishesNeitherSession(string path)
+    {
+        ToggleAuditWriter audit = new();
+        Fixture fixture = new(auditWriter: audit);
+        ApplicationSession first = (await fixture.StartAsync()).Session!;
+        ApplicationSession second = (await fixture.StartAsync()).Session!;
+        audit.FailTerminalWrite = true;
+
+        (await fixture.TerminateAsync(path, first.SessionId)).Should().Be(OperationalErrorCodes.AuditStoreUnavailable);
+
+        (await fixture.Repository.GetAsync(first.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        (await fixture.Repository.GetAsync(second.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        audit.Inner.Events.Should().NotContain(item => IsTerminal(item.Action));
+    }
+
+    [Fact]
+    public async Task BatchTermination_CancellationBeforeAuditPublishesNeitherStateNorAudit()
+    {
+        Fixture fixture = new();
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        Func<Task> terminate = () => fixture.Repository.EndActiveForUserAsync(fixture.User.Id, fixture.Time.GetUtcNow(), SessionEndReason.AccessDisabled,
+            _ =>
+            {
+                cancellation.Cancel();
+                return new AuditEvent { Actor = "synthetic", Action = AuditActions.ApplicationSessionAccessDisabled };
+            }, cancellation.Token);
+
+        await terminate.Should().ThrowAsync<OperationCanceledException>();
+
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        fixture.Audit.Events.Should().NotContain(item => IsTerminal(item.Action));
+    }
+
+    [Fact]
+    public async Task Termination_NonAtomicAuditWriterFailsClosedBeforePublishingState()
+    {
+        IAuditWriter writer = Substitute.For<IAuditWriter>();
+        Fixture fixture = new(auditWriter: writer);
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+
+        (await fixture.TerminateAsync("Logout", session.SessionId)).Should().Be(OperationalErrorCodes.AuditStoreUnavailable);
+
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.IsActive.Should().BeTrue();
+        await writer.DidNotReceive().WriteAsync(Arg.Is<AuditEvent>(item => item.Action == AuditActions.ApplicationSessionLoggedOut), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RepositoryTermination_PreservesActualTransitionBooleanWithoutChangingLosingResultPolicy()
+    {
+        Fixture fixture = new();
+        ApplicationSession session = (await fixture.StartAsync()).Session!;
+        AuditEvent audit = new() { Actor = "synthetic", Action = AuditActions.ApplicationSessionLoggedOut };
+
+        bool first = await fixture.Repository.EndWithAuditAsync(session.SessionId, fixture.Time.GetUtcNow(), SessionEndReason.Logout, audit, TestContext.Current.CancellationToken);
+        bool second = await fixture.Repository.EndWithAuditAsync(session.SessionId, fixture.Time.GetUtcNow(), SessionEndReason.Revoked, audit, TestContext.Current.CancellationToken);
+
+        first.Should().BeTrue();
+        second.Should().BeFalse();
+        (await fixture.Repository.GetAsync(session.SessionId, TestContext.Current.CancellationToken))!.EndReason.Should().Be(SessionEndReason.Logout);
+    }
+
     [Fact]
     public async Task Validate_IdleTimeoutEndsSessionAndAuditsOnce()
     {
@@ -185,7 +313,7 @@ public sealed class ApplicationSessionServiceTests
             options ??= new SessionSecurityOptions();
             Time = new ManualTimeProvider(StartTime);
             Audit = new InMemoryAuditWriter();
-            Repository = new CountingRepository();
+            Repository = new CountingRepository(auditWriter ?? Audit);
             User = new ApplicationUser(
                 Guid.NewGuid(),
                 "CONTOSO\\session.user",
@@ -219,6 +347,29 @@ public sealed class ApplicationSessionServiceTests
 
         public Task<ApplicationSessionResult> StartAsync() => Service.ValidateOrStartAsync(Principal, null, Context, default);
         public Task<ApplicationSessionResult> ValidateAsync(Guid sessionId) => Service.ValidateOrStartAsync(Principal, sessionId, Context, default);
+
+        public async Task<string?> TerminateAsync(string path, Guid sessionId)
+        {
+            CancellationToken token = TestContext.Current.CancellationToken;
+            switch (path)
+            {
+                case "Logout":
+                    return (await Service.LogoutAsync(sessionId, Context, token)).ErrorCode;
+                case "Revoke":
+                    return (await Service.RevokeAsync(sessionId, "Synthetic approved termination", Context, token)).ErrorCode;
+                case "Idle":
+                case "Absolute":
+                    Time.Advance(path == "Idle" ? TimeSpan.FromMinutes(30) : TimeSpan.FromHours(12));
+                    return (await ValidateAsync(sessionId)).ErrorCode;
+                case "Sweep":
+                    Time.Advance(TimeSpan.FromMinutes(30));
+                    return (await Service.ListActiveAsync(1, 50, Context, token)).ErrorCode;
+                case "AccessDisabled":
+                    return (await Service.EndUserSessionsAsync(User.Id, SessionEndReason.AccessDisabled, Context, token)).ErrorCode;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(path));
+            }
+        }
     }
 
     private sealed class FailingAuditWriter : IAuditWriter
@@ -227,10 +378,26 @@ public sealed class ApplicationSessionServiceTests
             Task.FromException(new AuditWriteUnavailableException("Synthetic audit failure."));
     }
 
-    private sealed class CountingRepository : IApplicationSessionRepository
+    private sealed class ToggleAuditWriter : IAtomicAuditWriter
     {
-        private readonly InMemoryApplicationSessionRepository _inner = new();
+        public InMemoryAuditWriter Inner { get; } = new();
+        public bool FailTerminalWrite { get; set; }
+        public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken) =>
+            FailTerminalWrite && IsTerminal(auditEvent.Action)
+                ? Task.FromException(new AuditWriteUnavailableException("Synthetic terminal audit failure."))
+                : Inner.WriteAsync(auditEvent, cancellationToken);
+
+        public Task WriteBatchAsync(IReadOnlyCollection<AuditEvent> events, CancellationToken cancellationToken) =>
+            FailTerminalWrite && events.Any(item => IsTerminal(item.Action))
+                ? Task.FromException(new AuditWriteUnavailableException("Synthetic terminal audit failure."))
+                : Inner.WriteBatchAsync(events, cancellationToken);
+    }
+
+    private sealed class CountingRepository(IAuditWriter auditWriter) : IApplicationSessionRepository
+    {
+        private readonly InMemoryApplicationSessionRepository _inner = new(auditWriter);
         public int TouchCalls { get; private set; }
+        public bool FailTermination { get; set; }
         public Guid? LastInsertedSessionId { get; private set; }
         public Task InsertAsync(ApplicationSession session, CancellationToken cancellationToken)
         {
@@ -243,9 +410,18 @@ public sealed class ApplicationSessionServiceTests
             TouchCalls++;
             return _inner.TouchAsync(sessionId, lastSeenAtUtc, persistBeforeUtc, cancellationToken);
         }
-        public Task<bool> EndAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken) => _inner.EndAsync(sessionId, endedAtUtc, reason, cancellationToken);
-        public Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken) => _inner.EndActiveForUserAsync(userId, endedAtUtc, reason, cancellationToken);
-        public Task<IReadOnlyList<ApplicationSession>> EndExpiredAsync(DateTimeOffset nowUtc, DateTimeOffset idleCutoffUtc, int maximumCount, CancellationToken cancellationToken) => _inner.EndExpiredAsync(nowUtc, idleCutoffUtc, maximumCount, cancellationToken);
+        public Task<bool> EndAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken) => FailTermination
+            ? Task.FromException<bool>(new InvalidOperationException("Synthetic session update failure."))
+            : _inner.EndAsync(sessionId, endedAtUtc, reason, cancellationToken);
+        public Task<bool> EndWithAuditAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, AuditEvent auditEvent, CancellationToken cancellationToken) => FailTermination
+            ? Task.FromException<bool>(new InvalidOperationException("Synthetic session update failure."))
+            : _inner.EndWithAuditAsync(sessionId, endedAtUtc, reason, auditEvent, cancellationToken);
+        public Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, Func<ApplicationSession, AuditEvent> auditFactory, CancellationToken cancellationToken) => FailTermination
+            ? Task.FromException<IReadOnlyList<ApplicationSession>>(new InvalidOperationException("Synthetic session update failure."))
+            : _inner.EndActiveForUserAsync(userId, endedAtUtc, reason, auditFactory, cancellationToken);
+        public Task<IReadOnlyList<ApplicationSession>> EndExpiredAsync(DateTimeOffset nowUtc, DateTimeOffset idleCutoffUtc, int maximumCount, Func<ApplicationSession, AuditEvent> auditFactory, CancellationToken cancellationToken) => FailTermination
+            ? Task.FromException<IReadOnlyList<ApplicationSession>>(new InvalidOperationException("Synthetic session update failure."))
+            : _inner.EndExpiredAsync(nowUtc, idleCutoffUtc, maximumCount, auditFactory, cancellationToken);
         public Task<IReadOnlyList<ApplicationSession>> ListActiveAsync(DateTimeOffset absoluteCutoffUtc, DateTimeOffset idleCutoffUtc, int skip, int take, CancellationToken cancellationToken) => _inner.ListActiveAsync(absoluteCutoffUtc, idleCutoffUtc, skip, take, cancellationToken);
     }
 
