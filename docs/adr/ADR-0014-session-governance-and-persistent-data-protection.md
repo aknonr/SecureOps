@@ -21,3 +21,27 @@ Negotiate currently authenticates each request and application access is revalid
 ## Consequences
 
 An App Pool recycle does not invalidate application-session cookies or continuation tokens when the same key ring is available. Negotiate behind a reverse proxy still requires a supported end-to-end authentication topology; application-session state cannot repair a load balancer that terminates or fails to pass Windows authentication.
+
+## Amendment 1 - Session v2 revocation, 2026-10-05
+
+Implements the owner's 2026-10-02 decision in `docs/decisions-log.md`.
+
+- A revoked browser authentication session must end. The UI clears its server-held API
+  cookies and OIDC tokens, signals its existing circuit navigation, and rejects and deletes
+  the UI authentication cookie on the next HTTP request, for both interim and OIDC sign-in.
+- A terminal correlation marker remains in the UI process store after credential removal.
+  Requests from another tab or a replayed old UI cookie cannot recreate an API session;
+  late responses cannot restore cookies or tokens. Explicit sign-in creates a new correlation.
+- API validation retains invalid and terminal handles rather than deleting them and making
+  a later authenticated request appear to be a first visit. Self-revocation does the same.
+  The safe response header `X-SecureOps-Session-Reauthentication: required` carries no handle
+  or identity and also signals successful self-revocation. UI transport additionally recognizes
+  `SessionRevoked` and `SessionExpired` ProblemDetails and older API deletion signals.
+- Store/audit unavailability is retryable and retains the existing API handle; it does not
+  itself mean administrative revocation. Explicit logout retains its documented handle deletion.
+- Revocation affects the exact application session, not the person's account, provider session,
+  or separate browser. Access is still decided by the API. An idle browser observes revocation
+  on its next API operation; no polling, provider logout or session-policy redesign is introduced.
+
+The UI marker and tokens remain process-local. Persistent multi-node/recycle correlation and
+actual Windows/IIS/provider/browser behavior require separate validation and owner decisions.

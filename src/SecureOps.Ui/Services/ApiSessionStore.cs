@@ -55,7 +55,7 @@ public sealed class BrowserApiSession : IDisposable
     private int _requiresReauthentication;
 
     /// <summary>Cookies the API has issued to this browser session.</summary>
-    public CookieContainer Cookies { get; } = new();
+    public CookieContainer Cookies { get; private set; } = new();
 
     /// <summary>Returns API cookies applicable to the outbound request.</summary>
     /// <remarks>
@@ -63,11 +63,25 @@ public sealed class BrowserApiSession : IDisposable
     /// loopback HTTP binding. The handle never leaves the host in that topology. Remote cleartext
     /// endpoints are rejected by startup validation rather than having Secure semantics bypassed.
     /// </remarks>
-    public string GetApiCookieHeader(Uri requestUri) => Cookies.GetCookieHeader(CookieOrigin(requestUri));
+    public string GetApiCookieHeader(Uri requestUri)
+    {
+        lock (_tokenLock)
+        {
+            return RequiresReauthentication ? string.Empty : Cookies.GetCookieHeader(CookieOrigin(requestUri));
+        }
+    }
 
     /// <summary>Applies an API Set-Cookie header to this browser session's server-side jar.</summary>
-    public void SetApiCookies(Uri requestUri, string setCookie) =>
-        Cookies.SetCookies(CookieOrigin(requestUri), setCookie);
+    public void SetApiCookies(Uri requestUri, string setCookie)
+    {
+        lock (_tokenLock)
+        {
+            if (!RequiresReauthentication)
+            {
+                Cookies.SetCookies(CookieOrigin(requestUri), setCookie);
+            }
+        }
+    }
 
     /// <summary>
     /// Serializes requests made before this browser session has an application-session cookie.
@@ -86,8 +100,20 @@ public sealed class BrowserApiSession : IDisposable
     public bool RequiresReauthentication => Volatile.Read(ref _requiresReauthentication) != 0;
 
     /// <summary>Transitions this browser session to the terminal state once.</summary>
-    public bool TryRequireReauthentication() =>
-        Interlocked.Exchange(ref _requiresReauthentication, 1) == 0;
+    public bool TryRequireReauthentication()
+    {
+        lock (_tokenLock)
+        {
+            if (Interlocked.Exchange(ref _requiresReauthentication, 1) != 0)
+            {
+                return false;
+            }
+
+            Cookies = new CookieContainer();
+            _oidcTokens = null;
+            return true;
+        }
+    }
 
     /// <summary>Stores a validated OIDC access token only in server process memory.</summary>
     public void SetOidcAccessToken(string token, DateTimeOffset expiresAtUtc) =>
@@ -99,7 +125,10 @@ public sealed class BrowserApiSession : IDisposable
         ArgumentNullException.ThrowIfNull(tokens);
         lock (_tokenLock)
         {
-            _oidcTokens = tokens;
+            if (!RequiresReauthentication)
+            {
+                _oidcTokens = tokens;
+            }
         }
     }
 
@@ -179,7 +208,9 @@ public sealed class BrowserApiSession : IDisposable
             }
 
             SetOidcTokens(replacement!);
-            return new OidcAccessTokenResult(replacement!.AccessToken, false);
+            return RequiresReauthentication
+                ? new OidcAccessTokenResult(null, true)
+                : new OidcAccessTokenResult(replacement!.AccessToken, false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

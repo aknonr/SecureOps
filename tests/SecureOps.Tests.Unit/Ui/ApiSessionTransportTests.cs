@@ -196,9 +196,9 @@ public sealed class ApiSessionTransportTests
         await client.GetAsync("api/v1/access/me");
         await client.GetAsync("api/v1/access/me");
 
-        handler.SentCookies.Should().HaveCount(3);
+        handler.SentCookies.Should().HaveCount(2);
         handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
-        handler.SentCookies[2].Should().Contain(_apiCookie + "=session-1");
+        store.GetOrCreate("browser-a").GetApiCookieHeader(new Uri("https://localhost/")).Should().BeEmpty();
         reauthenticationKey.Should().Be("browser-a");
         store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
     }
@@ -216,11 +216,63 @@ public sealed class ApiSessionTransportTests
         await client.GetAsync("api/v1/access/me");
 
         revoke.StatusCode.Should().Be(HttpStatusCode.OK);
-        handler.SentCookies.Should().HaveCount(3);
+        handler.SentCookies.Should().HaveCount(2);
         handler.SentCookies[1].Should().Contain(_apiCookie + "=session-1");
-        handler.SentCookies[2].Should().Contain(_apiCookie + "=session-1");
+        store.GetOrCreate("browser-a").GetApiCookieHeader(new Uri("https://localhost/")).Should().BeEmpty();
         reauthenticationKey.Should().Be("browser-a");
         store.GetOrCreate("browser-a").RequiresReauthentication.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RevocationSignal_ClearsCredentialsAndBlocksEveryClientForOnlyThatBrowser()
+    {
+        IApiSessionStore store = NewStore();
+        (HttpClient first, RecordingHandler handler, _) = Create("browser-a", true, store);
+        (HttpClient tab, RecordingHandler tabHandler, _) = Create("browser-a", true, store);
+        (HttpClient separate, RecordingHandler separateHandler, _) = Create("browser-b", true, store);
+        await first.GetAsync("api/v1/access/me");
+        store.GetOrCreate("browser-a").SetOidcTokens(new OidcServerTokenSet(
+            "synthetic-access", DateTimeOffset.UtcNow.AddHours(1), "synthetic-refresh",
+            DateTimeOffset.UtcNow.AddHours(2), "synthetic-id", new Uri("https://identity.example.test/token")));
+        int signals = 0;
+        store.ReauthenticationRequired += _ => signals++;
+        handler.RequireReauthentication = true;
+
+        await first.GetAsync("api/v1/access/me");
+        HttpResponseMessage blocked = await tab.GetAsync("api/v1/access/me");
+        HttpResponseMessage other = await separate.GetAsync("api/v1/access/me");
+        store.RequireReauthentication("browser-a");
+
+        blocked.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await ApiResponseReader.ToExceptionAsync(blocked, TestContext.Current.CancellationToken)).Problem.Code.Should().Be("SessionRevoked");
+        tabHandler.SentCookies.Should().BeEmpty();
+        other.StatusCode.Should().Be(HttpStatusCode.OK);
+        separateHandler.SentCookies.Should().ContainSingle();
+        signals.Should().Be(1);
+        BrowserApiSession terminal = store.GetOrCreate("browser-a");
+        terminal.GetApiCookieHeader(new Uri("https://localhost/")).Should().BeEmpty();
+        terminal.GetOidcAccessToken(DateTimeOffset.UtcNow).Should().BeNull();
+        terminal.GetOidcIdToken().Should().BeNull();
+        terminal.SetApiCookies(new Uri("https://localhost/"), _apiCookie + "=late-response; Path=/; Secure");
+        terminal.SetOidcAccessToken("late-refresh", DateTimeOffset.UtcNow.AddHours(1));
+        terminal.GetApiCookieHeader(new Uri("https://localhost/")).Should().BeEmpty();
+        terminal.GetOidcAccessToken(DateTimeOffset.UtcNow).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("SessionRevoked", true)]
+    [InlineData("SessionExpired", true)]
+    [InlineData("AccessDenied", false)]
+    public async Task ForbiddenProblem_OnlyTerminalSessionCodesEndBrowserAuthentication(string code, bool terminal)
+    {
+        (HttpClient client, RecordingHandler handler, IApiSessionStore store) = Create("browser-a", true);
+        await client.GetAsync("api/v1/access/me");
+        handler.ProblemCode = code;
+
+        HttpResponseMessage response = await client.GetAsync("api/v1/access/me");
+
+        (await ApiResponseReader.ToExceptionAsync(response, TestContext.Current.CancellationToken)).Problem.Code.Should().Be(code);
+        store.GetOrCreate("browser-a").RequiresReauthentication.Should().Be(terminal);
     }
 
     [Fact]
@@ -363,6 +415,29 @@ public sealed class ApiSessionTransportTests
     }
 
     [Fact]
+    public async Task OidcSession_RevokedDuringRefresh_DoesNotRestoreTokenMaterial()
+    {
+        IApiSessionStore store = NewStore();
+        BrowserApiSession session = store.GetOrCreate("browser-a");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        session.SetOidcTokens(new OidcServerTokenSet("expired", now, "synthetic-refresh",
+            now.AddHours(1), "synthetic-id", new Uri("https://identity.example.test/token")));
+        TaskCompletionSource<OpenIdConnectMessage> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        IOidcBackchannelClient backchannel = Substitute.For<IOidcBackchannelClient>();
+        backchannel.PostTokenAsync(Arg.Any<Uri>(), Arg.Any<IReadOnlyDictionary<string, string>>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
+        Task<OidcAccessTokenResult> refresh = session.GetOidcAccessTokenAsync(now,
+            new OidcOptions { ClientId = "synthetic-client", ClientAuthenticationMethod = "None" }, backchannel, TestContext.Current.CancellationToken);
+
+        store.RequireReauthentication("browser-a");
+        pending.SetResult(new OpenIdConnectMessage { AccessToken = "late-access", RefreshToken = "late-refresh", ExpiresIn = "900" });
+        OidcAccessTokenResult result = await refresh;
+
+        result.Should().Be(new OidcAccessTokenResult(null, true));
+        session.GetOidcAccessToken(now).Should().BeNull();
+        session.GetOidcIdToken().Should().BeNull();
+    }
+
+    [Fact]
     public async Task OidcSession_RefreshFailure_ClearsTokensAndRequiresReauthenticationWithoutRetryLoop()
     {
         var now = DateTimeOffset.Parse("2026-09-01T08:15:00Z");
@@ -461,6 +536,10 @@ public sealed class ApiSessionTransportTests
 
         public bool DeleteExistingSession { get; set; }
 
+        public bool RequireReauthentication { get; set; }
+
+        public string? ProblemCode { get; set; }
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -474,6 +553,17 @@ public sealed class ApiSessionTransportTests
             HttpResponseMessage response = new(RejectExistingSession && SentCookies[^1] is not null
                 ? HttpStatusCode.Forbidden
                 : HttpStatusCode.OK);
+
+            if (RequireReauthentication)
+            {
+                response.Headers.Add(SecureOps.Shared.Contracts.Sessions.ApplicationSessionHeaders.ReauthenticationRequired, "required");
+            }
+
+            if (ProblemCode is not null)
+            {
+                response.StatusCode = HttpStatusCode.Forbidden;
+                response.Content = System.Net.Http.Json.JsonContent.Create(new { code = ProblemCode });
+            }
 
             if ((RejectExistingSession || DeleteExistingSession) && SentCookies[^1] is not null)
             {

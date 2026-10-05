@@ -75,13 +75,20 @@ public static class UiOidcAuthentication
                 context.ShouldRenew = true;
             }
 
+            IApiSessionStore sessions = context.HttpContext.RequestServices.GetRequiredService<IApiSessionStore>();
+            if (sessions.GetOrCreate(browserSession.Value).RequiresReauthentication)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
             bool oidcPrincipal = string.Equals(
                 identity.FindFirst(SignedInUserService.AuthenticationSourceClaim)?.Value,
                 "oidc",
                 StringComparison.Ordinal);
             if (oidcPrincipal)
             {
-                IApiSessionStore sessions = context.HttpContext.RequestServices.GetRequiredService<IApiSessionStore>();
                 TimeProvider timeProvider = context.HttpContext.RequestServices.GetRequiredService<TimeProvider>();
                 OidcAccessTokenResult token = oidcEnabled
                     ? await sessions.GetOrCreate(browserSession.Value).GetOidcAccessTokenAsync(
@@ -92,7 +99,7 @@ public static class UiOidcAuthentication
                     : new OidcAccessTokenResult(null, true);
                 if (token.RequiresReauthentication)
                 {
-                    sessions.Remove(browserSession.Value);
+                    sessions.RequireReauthentication(browserSession.Value);
                     context.RejectPrincipal();
                     await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 }

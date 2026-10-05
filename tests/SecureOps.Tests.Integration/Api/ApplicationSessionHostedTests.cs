@@ -231,13 +231,60 @@ public sealed class ApplicationSessionHostedTests
         audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionRevoked).Should().Be(1);
         store.GetOrCreate("self-revoked-browser").RequiresReauthentication.Should().BeTrue();
 
-        store.Remove("self-revoked-browser");
-        store.GetOrCreate("self-revoked-browser").RequiresReauthentication.Should().BeFalse();
+        store.GetOrCreate("self-revoked-browser").GetApiCookieHeader(new Uri("http://localhost/")).Should().BeEmpty();
+        browser.DefaultRequestHeaders.Remove(ApiSessionHeaders.BrowserSession);
+        browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "explicit-new-authentication");
         ApplicationSessionResponse reauthenticated = (await (await browser.GetAsync("/api/v1/sessions/current")).Content
             .ReadFromJsonAsync<ApplicationSessionResponse>())!;
 
         reauthenticated.SessionId.Should().NotBe(current.SessionId);
         audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task AdminRevocation_RepeatedCookieRequestsCannotSilentlyStartAnotherSession()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        using HttpClient browser = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        (ApplicationSessionResponse adminSession, string adminCookie) = await StartAsync(admin);
+        (ApplicationSessionResponse ended, string cookie) = await StartAsync(browser);
+        using HttpRequestMessage revoke = Request(HttpMethod.Post, "/api/v1/sessions/revoke", adminCookie);
+        revoke.Content = JsonContent.Create(new RevokeApplicationSessionRequest(ended.SessionId, "Synthetic administrative revocation."));
+        (await admin.SendAsync(revoke)).EnsureSuccessStatusCode();
+
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            using HttpRequestMessage request = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
+            using HttpResponseMessage response = await browser.SendAsync(request);
+            await AssertProblemAsync(response, HttpStatusCode.Forbidden, "SessionRevoked");
+            response.Headers.Contains("Set-Cookie").Should().BeFalse();
+            response.Headers.GetValues(ApplicationSessionHeaders.ReauthenticationRequired).Should().ContainSingle("required");
+        }
+
+        InMemoryAuditWriter audit = factory.Services.GetRequiredService<InMemoryAuditWriter>();
+        audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(2);
+        audit.Events.Count(item => item.Action == AuditActions.ApplicationSessionRevoked).Should().Be(1);
+        using HttpRequestMessage list = Request(HttpMethod.Get, "/api/v1/sessions/active", adminCookie);
+        ActiveApplicationSessionsResponse active = (await (await admin.SendAsync(list)).Content.ReadFromJsonAsync<ActiveApplicationSessionsResponse>())!;
+        active.Items.Should().ContainSingle(item => item.SessionId == adminSession.SessionId);
+    }
+
+    [Fact]
+    public async Task SelfRevocation_RetainsApiHandleAndRepeatedRequestsRemainTerminal()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient browser = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        (ApplicationSessionResponse ended, string cookie) = await StartAsync(browser);
+        using HttpRequestMessage revoke = Request(HttpMethod.Post, "/api/v1/sessions/revoke", cookie);
+        revoke.Content = JsonContent.Create(new RevokeApplicationSessionRequest(ended.SessionId, "Synthetic self-revocation."));
+        using HttpResponseMessage response = await browser.SendAsync(revoke);
+        response.EnsureSuccessStatusCode();
+        response.Headers.Contains("Set-Cookie").Should().BeFalse();
+        response.Headers.GetValues(ApplicationSessionHeaders.ReauthenticationRequired).Should().ContainSingle("required");
+        using HttpRequestMessage next = Request(HttpMethod.Get, "/api/v1/sessions/current", cookie);
+        await AssertProblemAsync(await browser.SendAsync(next), HttpStatusCode.Forbidden, "SessionRevoked");
+        factory.Services.GetRequiredService<InMemoryAuditWriter>().Events.Count(item => item.Action == AuditActions.ApplicationSessionStarted).Should().Be(1);
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -240,6 +241,32 @@ public sealed partial class UiOidcAuthenticationTests
         callback.Headers.Location!.OriginalString.Should().Be("/login?error=sign-in-failed");
         callback.Headers.GetValues("Set-Cookie").Should().NotContain(value =>
             value.Contains("__Host-SecureOpsUi.Session", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RevokedOidcSession_NextHttpRequestDeletesUiCookieWithoutProviderSignOut()
+    {
+        using OidcUiFactory factory = new();
+        using HttpClient browser = CreateClient(factory);
+        HttpResponseMessage challenge = await ChallengeAsync(browser);
+        Dictionary<string, string> query = Query(challenge.Headers.Location!);
+        factory.Provider.Nonce = query["nonce"];
+        HttpResponseMessage callback = await browser.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
+        string cookie = callback.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("__Host-SecureOpsUi.Session=", StringComparison.Ordinal)).Split(';')[0];
+        CookieAuthenticationOptions options = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(CookieAuthenticationDefaults.AuthenticationScheme);
+        string key = options.TicketDataFormat.Unprotect(cookie.Split('=', 2)[1])!.Principal.FindFirst(SignedInUserService.BrowserSessionClaim)!.Value;
+        IApiSessionStore store = factory.Services.GetRequiredService<IApiSessionStore>();
+        store.RequireReauthentication(key);
+        int tokenRequests = factory.Provider.TokenRequests;
+
+        HttpResponseMessage landing = await browser.GetAsync("/session-expired");
+
+        landing.StatusCode.Should().Be(HttpStatusCode.OK);
+        landing.Headers.Location.Should().BeNull();
+        landing.Headers.GetValues("Set-Cookie").Should().Contain(value => value.StartsWith("__Host-SecureOpsUi.Session=;", StringComparison.Ordinal));
+        factory.Provider.TokenRequests.Should().Be(tokenRequests);
+        store.GetOrCreate(key).GetOidcAccessToken(DateTimeOffset.UtcNow).Should().BeNull();
+        store.GetOrCreate(key).GetOidcIdToken().Should().BeNull();
     }
 
     [Fact]
