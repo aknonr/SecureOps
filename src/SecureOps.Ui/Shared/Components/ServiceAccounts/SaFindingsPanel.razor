@@ -34,7 +34,7 @@
 
     @if (Detail.Permissions.Work)
     {
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Bulgu ekle">
+        <SaDisclosure Class="mt-2" Title="Bulgu ekle">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4"><MudTextField @bind-Value="_m.Server" Label="Sunucu" MaxLength="256" Variant="Variant.Outlined" /></MudItem>
                 <MudItem xs="6" md="4"><MudTextField @bind-Value="_m.ComponentType" Label="Bileşen türü (servis, görev, IIS...)" MaxLength="64" Variant="Variant.Outlined" /></MudItem>
@@ -54,7 +54,7 @@
                 <MudItem xs="12"><MudTextField @bind-Value="_m.EvidenceNote" Label="Kanıt notu" MaxLength="2000" Variant="Variant.Outlined" /></MudItem>
             </MudGrid>
             <MudButton OnClick="CreateAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Bulguyu kaydet</MudButton>
-        </MudExpansionPanel></MudExpansionPanels>
+        </SaDisclosure>
     }
 </section>
 

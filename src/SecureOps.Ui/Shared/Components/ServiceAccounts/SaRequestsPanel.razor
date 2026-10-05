@@ -93,7 +93,7 @@
 
     @if (Detail.Permissions.Work)
     {
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Yeni iş (talep) aç">
+        <SaDisclosure Class="mt-2" Title="Yeni iş (talep) aç">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
                     <MudSelect T="string" @bind-Value="_create.ActionType" Label="Beklenen iş" Variant="Variant.Outlined">
@@ -113,7 +113,7 @@
                 <MudItem xs="12"><MudTextField @bind-Value="_create.Notes" Label="Not" MaxLength="4000" Lines="2" Variant="Variant.Outlined" /></MudItem>
             </MudGrid>
             <MudButton OnClick="CreateAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Talebi aç</MudButton>
-        </MudExpansionPanel></MudExpansionPanels>
+        </SaDisclosure>
     }
 </section>
 

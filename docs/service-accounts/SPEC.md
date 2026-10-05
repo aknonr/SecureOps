@@ -281,8 +281,8 @@ bounded retry and a visible dead-letter list are required.
     shared-formula XML and dates are checked; PDF and XLSX reconcile to the same snapshot.
 19. A usage scan whose servers were all fully scanned without a match leaves the account, its requests, actions and
     closure unchanged and says "not found in the scanned sources"; an unreachable server stays "no information".
-20. A scan file with a `Password` (or `parola`, `şifre`, `token`, `connection_string`, …) property or a `password=` value
-    is refused and nothing from it is stored.
+20. A scan file with a `Password` (or `parola`, `şifre`, `token`, `connection_string`, …) property or a `password=`
+    (`"Password":`, `token:`, `api-key=`, full-width or zero-width spellings, …) value is refused and nothing from it is stored.
 21. A gMSA check with one unreachable server is never "converted"; the verifier still verifies the conversion action.
 
 Legacy ownership reconciliation control: the main account inputs name a responsible person for

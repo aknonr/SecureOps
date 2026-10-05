@@ -2,44 +2,42 @@
 @using SecureOps.Shared.Contracts.ServiceAccounts
 @using SecureOps.Ui.Services.ServiceAccounts
 
-<MudExpansionPanels Class="mt-2">
-    <MudExpansionPanel Text="Hesap bilgilerini düzenle">
-        <MudGrid Spacing="2">
-            <MudItem xs="12" md="4">
-                <MudSelect T="Guid?" @bind-Value="_organization" Label="Rapor kurumu (kurum kapsamı gerekir)" Clearable="true" Variant="Variant.Outlined">
-                    @foreach (OrganizationView org in Organizations) { <MudSelectItem T="Guid?" Value="@((Guid?)org.Id)">@org.Name</MudSelectItem> }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" md="4">
-                <MudSelect T="Guid?" @bind-Value="_consumer" Label="Kullanan ekip" Clearable="true" Variant="Variant.Outlined">
-                    @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" md="4">
-                <MudTextField @bind-Value="_domain" Label="Domain" MaxLength="128" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_notes" Label="Notlar" MaxLength="2000" Lines="3" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="6" md="2">
-                <MudSelect T="string" @bind-Value="_refType" Label="Referans türü" Variant="Variant.Outlined">
-                    @foreach (string type in _refTypes) { <MudSelectItem T="string" Value="@type">@type</MudSelectItem> }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="6" md="4">
-                <MudTextField @bind-Value="_refNumber" Label="Referans numarası (isteğe bağlı)" MaxLength="64" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" md="6" Class="d-flex flex-wrap align-center gap-3">
-                <MudCheckBox T="bool" @bind-Value="_clearNotes" Label="Notları temizle" />
-                <MudCheckBox T="bool" @bind-Value="_clearConsumer" Label="Kullanan ekibi temizle" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_reason" Label="Gerekçe (temizleme için zorunlu)" MaxLength="1000" Variant="Variant.Outlined" />
-            </MudItem>
-        </MudGrid>
-        <MudButton OnClick="SubmitAsync" Disabled="@(Busy || !HasChange)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Değişiklikleri kaydet</MudButton>
-    </MudExpansionPanel>
-</MudExpansionPanels>
+<SaDisclosure Class="mt-2" Title="Hesap bilgilerini düzenle">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="4">
+            <MudSelect T="Guid?" @bind-Value="_organization" Label="Rapor kurumu (kurum kapsamı gerekir)" Clearable="true" Variant="Variant.Outlined">
+                @foreach (OrganizationView org in Organizations) { <MudSelectItem T="Guid?" Value="@((Guid?)org.Id)">@org.Name</MudSelectItem> }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudSelect T="Guid?" @bind-Value="_consumer" Label="Kullanan ekip" Clearable="true" Variant="Variant.Outlined">
+                @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="_domain" Label="Domain" MaxLength="128" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12">
+            <MudTextField @bind-Value="_notes" Label="Notlar" MaxLength="2000" Lines="3" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudSelect T="string" @bind-Value="_refType" Label="Referans türü" Variant="Variant.Outlined">
+                @foreach (string type in _refTypes) { <MudSelectItem T="string" Value="@type">@type</MudSelectItem> }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="4">
+            <MudTextField @bind-Value="_refNumber" Label="Referans numarası (isteğe bağlı)" MaxLength="64" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="6" Class="d-flex flex-wrap align-center gap-3">
+            <MudCheckBox T="bool" @bind-Value="_clearNotes" Label="Notları temizle" />
+            <MudCheckBox T="bool" @bind-Value="_clearConsumer" Label="Kullanan ekibi temizle" />
+        </MudItem>
+        <MudItem xs="12">
+            <MudTextField @bind-Value="_reason" Label="Gerekçe (temizleme için zorunlu)" MaxLength="1000" Variant="Variant.Outlined" />
+        </MudItem>
+    </MudGrid>
+    <MudButton OnClick="SubmitAsync" Disabled="@(Busy || !HasChange)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Değişiklikleri kaydet</MudButton>
+</SaDisclosure>
 
 @code {
     private static readonly string[] _refTypes = ["OR", "OCO", "JIRA", "OTHER"];

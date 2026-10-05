@@ -71,7 +71,9 @@ Hesap sayfası → **Kullanım taraması** sekmesi → **Tarama dosyası yükle 
 3. Hesaptan sorumlu ekip değil de ekibinize atanmış bir talep üzerinden çalışıyorsanız (ör. gMSA yürütücü ekip) **o talebi**
   seçin; tarama o talebin kanıtı olur.
 
-Dosya bu hesabı aramış olmalıdır (aynı ad; iki tarafta da domain varsa aynı domain). Aynı dosyayı tekrar yüklemek yeni kayıt
+Dosya bu hesabı aramış olmalıdır (aynı ad; iki tarafta da domain varsa aynı domain). Dosya aynı adı birden çok
+biçimde aramışsa hesabın kendi domain'iyle yazılan kullanılır; hesapta domain yoksa domain'siz ad kullanılır (her
+domain'i kapsar, eşleşme gizlenmez); farklı domain'lerle iki ad olup domain'siz ad yoksa dosya reddedilir. Aynı dosyayı tekrar yüklemek yeni kayıt
 oluşturmaz. Birden çok hesabı aramış bir dosyayı her hesabın sayfasından ayrı ayrı bağlayabilirsiniz; her hesap yalnız
 kendi bileşenlerini görür.
 
@@ -125,6 +127,7 @@ Kapsam dışı hesap "bulunamadı" gibi görünür. Yüklenen dosyanın kendisi 
 | Planlanan sunucu sayısı tutmuyor / plan dışı sunucu | Planlı listeyi ve sonuç dosyalarını kontrol edip yeniden birleştirin |
 | Bir belge çelişiyor / ileri tarih | Taramayı yeniden üretin; sunucu saatini kontrol edin |
 | Bu dosya bu hesabı aramamış | Doğru hesabın sayfasından yükleyin ya da doğru `-Account` ile yeniden tarayın |
+| Ad farklı domain'lerle aranmış, hesapta domain yok | Hesaba domain bilgisi girildikten sonra yükleyin ya da taramayı tek adla yeniden üretin |
 | Veritabanı güncellemesi 030 uygulanmamış | Ortam yöneticisine bildirin; hesabın diğer bilgileri çalışır |
 
 Sınırlar: 4 MB dosya, 500 sunucu, 20 hesap, sunucu başına 2.000 ve toplam 10.000 bileşen, sunucu başına 20 uyarı.

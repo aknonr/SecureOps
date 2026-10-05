@@ -55,8 +55,11 @@ frees or verifies anything; secrets are never read, stored or shown; the server 
    depth ≤ 12, no duplicate property names.
 2. **Secret guard before anything else is read or stored:** any property name that contains `password`, `passwd`, `pwd`,
    `secret`, `credential`, `token`, `apikey`, `privatekey`, `connectionstring`, `parola` or `şifre/sifre` (any case,
-   anywhere in the file), or any string value of the form `password=`/`pwd=`/`parola:` …, rejects the whole file with
-   `secretField`/`secretValue`. A rejected file is not stored, hashed into a record or echoed back; nothing is audited
+   anywhere in the file), or any string value that assigns one of these words (`password=`, `pwd=`, `parola:`,
+   `"Password":`, `token:`, `client_secret=`, `api-key=` …; checked after compatibility folding, so full-width letters and
+   invisible characters such as a zero-width space or a soft hyphen do not split the word), rejects the whole file with
+   `secretField`/`secretValue`. Any text longer than 4 096 characters is refused before it is searched (`scanSchema`), so
+   no file can make the guard slow. A rejected file is not stored, hashed into a record or echoed back; nothing is audited
    from its content.
 3. Closed schema: unknown properties, wrong types, patterns, lengths and enums are rejected; counts are bounded
    (≤ 2 000 components per server, ≤ 10 000 in total, ≤ 20 warnings per server).
@@ -86,8 +89,10 @@ second account adds only a link. Another person uploading the same bytes creates
 - **Attach a scan to an account** (`POST accounts/{id}/usage-scans`, multipart): `ServiceAccounts.Work` and either the
   *responsible* basis on that account, or the *participant* basis with one of the caller's own open requests named
   (`requestId`) — the scan is then evidence on that request, which SPEC already allows a participant. The file must have
-  searched this account (same name; when both sides carry a domain, the same domain). Out of scope and missing are
-  indistinguishable (404).
+  searched this account (same name; when both sides carry a domain, the same domain). When several searched names refer to
+  the account, the one qualified with the account's domain is used; with no domain on the account the bare name is used
+  (it matches every domain, so no match is hidden), and two names with different domains and no bare name refuse the
+  upload (`accountAmbiguousInScan`). Out of scope and missing are indistinguishable (404).
 - **Turn a matched component into a usage** or **dismiss it with a reason**: `ServiceAccounts.Work` with the responsible
   basis, one decision per item and account, never automatic. The person chooses the usage kind (a suggestion is shown).
 - **Read**: everyone who can see the account sees its attached scans — only the items matched to that account's searched

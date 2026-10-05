@@ -41,12 +41,10 @@ public sealed partial class ServiceAccountService
                 return SaResult<Guid>.Fail(SaErrors.UsageScanFile, rejected.Code);
             }
 
-            string? matched = parsed.Accounts.FirstOrDefault(a => UsageScanOutcomes.NameMatches(a, detail.Summary.AccountName, detail.Summary.Domain)
-                    && a.Contains('\\', StringComparison.Ordinal))
-                ?? parsed.Accounts.FirstOrDefault(a => UsageScanOutcomes.NameMatches(a, detail.Summary.AccountName, detail.Summary.Domain));
+            (string? matched, bool ambiguous) = UsageScanOutcomes.SearchedName(parsed.Accounts, detail.Summary.AccountName, detail.Summary.Domain);
             if (matched is null)
             {
-                return SaResult<Guid>.Fail(SaErrors.Invalid, "accountNotInScan");
+                return SaResult<Guid>.Fail(SaErrors.Invalid, ambiguous ? "accountAmbiguousInScan" : "accountNotInScan");
             }
 
             string sha = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();

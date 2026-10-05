@@ -1,0 +1,23 @@
+@* A collapsible section built on native details/summary (review 2026-10-05). MudBlazor 6.16 renders an expansion panel header
+   as a plain div with a click handler and no tab stop; a summary is a tab stop that Enter and Space toggle without script, and
+   assistive technology announces it as expandable. The browser keeps the open state, so a re-render never closes a form the
+   person is filling in. *@
+
+<details class="@($"sa-disclosure {Class}".TrimEnd())" open="@Open">
+    <summary>@Title</summary>
+    <div class="sa-disclosure-body">@ChildContent</div>
+</details>
+
+@code {
+    /// <summary>Visible summary text (the section's name).</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    /// <summary>Initially open; afterwards the person decides.</summary>
+    [Parameter] public bool Open { get; set; }
+
+    /// <summary>Extra classes (spacing utilities such as <c>mt-2</c>).</summary>
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Section content.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

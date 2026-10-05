@@ -13,25 +13,13 @@
     margin-top: 0.5rem;
 }
 
-.sa-scan-section {
-    border: 1px solid var(--mud-palette-lines-default);
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
-}
-
-.sa-scan-limits summary,
-.sa-scan-section summary {
+.sa-scan-limits summary {
     cursor: pointer;
     width: fit-content;
     font-weight: 600;
 }
 
-.sa-scan-section[open] summary {
-    margin-bottom: 0.5rem;
-}
-
-.sa-scan-limits summary:focus-visible,
-.sa-scan-section summary:focus-visible {
+.sa-scan-limits summary:focus-visible {
     outline: 2px solid var(--so-text);
     outline-offset: 2px;
 }

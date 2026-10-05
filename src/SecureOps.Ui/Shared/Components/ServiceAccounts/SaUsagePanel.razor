@@ -120,7 +120,7 @@
 
     @if (Detail.Permissions.Work)
     {
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Kullanım ekle">
+        <SaDisclosure Class="mt-2" Title="Kullanım ekle">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
                     <MudSelect T="string" @bind-Value="_m.Kind" Label="Kullanım türü" Variant="Variant.Outlined">
@@ -153,7 +153,7 @@
             </MudGrid>
             <p class="so-panel-text--sm mt-1">Kullanım bilgisi ekipten, incelemeden veya bir kişinin kendi yetkisiyle çalıştırıp "Kullanım taraması" sekmesine yüklediği taramadan gelir; sistem sunuculara bağlanıp otomatik tarama yapmaz.</p>
             <MudButton OnClick="CreateAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Kullanımı kaydet</MudButton>
-        </MudExpansionPanel></MudExpansionPanels>
+        </SaDisclosure>
     }
 </section>
 

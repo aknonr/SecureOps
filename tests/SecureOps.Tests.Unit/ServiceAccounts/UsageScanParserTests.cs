@@ -88,6 +88,86 @@ public sealed class UsageScanParserTests
         Code(Bytes(file)).Should().Be(UsageScanFileCodes.SecretValue);
     }
 
+    // Review 2026-10-05: spellings that slipped past the value guard (a quoted key, other secret words, width and invisible
+    // characters). Each refuses the whole file in every free-text field the contract has.
+    [Theory]
+    [InlineData("{\"Password\":\"x1\"}")]
+    [InlineData("'pwd' : 'x1'")]
+    [InlineData("<add key=\"x\" password=\"x1\" />")]
+    [InlineData("client_secret=x1")]
+    [InlineData("Token: x1")]
+    [InlineData("api-key=x1")]
+    [InlineData("ApiKey=x1")]
+    [InlineData("credential=x1")]
+    [InlineData("ConnectionString=Server=syn-db")]
+    [InlineData("\uFF50\uFF41\uFF53\uFF53\uFF57\uFF4F\uFF52\uFF44\uFF1Dx1")]
+    [InlineData("pass\u200Bword=x1")]
+    [InlineData("pass\u00ADword=x1")]
+    [InlineData("pass\u2060word=x1")]
+    public void EmbeddedSecret_InOtherSpellings_RefusesTheFileInEveryTextField(string text)
+    {
+        foreach (string field in new[] { "ComponentName", "Identity", "State", "Detail" })
+        {
+            JsonNode file = Example();
+            file["results"]![0]!["components"]![0]![field] = text;
+            Code(Bytes(file)).Should().Be(UsageScanFileCodes.SecretValue, field);
+        }
+
+        JsonNode warning = Example();
+        warning["results"]![2]!["warnings"]![0] = text;
+        Code(Bytes(warning)).Should().Be(UsageScanFileCodes.SecretValue, "warnings");
+    }
+
+    [Theory]
+    [InlineData("LogonType=Password")]
+    [InlineData("LogonType=InteractiveTokenOrPassword")]
+    [InlineData("\\Syn\\Password Expiry Notification")]
+    [InlineData("TokenBroker")]
+    [InlineData("Syn Secret Server Agent")]
+    [InlineData("D:\\syn\\credentials-ui")]
+    public void OrdinaryNames_ThatOnlyMentionASecretWord_AreAccepted(string text)
+    {
+        JsonNode file = Example();
+        file["results"]![0]!["components"]![0]!["Detail"] = text;
+
+        UsageScanParser.Parse(Bytes(file), _max, _now).Items.Should().Contain(i => i.Detail == text);
+    }
+
+    [Fact]
+    public void AValueFarLongerThanAnyContractField_IsRefusedQuickly_WithAStableCode()
+    {
+        JsonNode file = Example();
+        file["results"]![0]!["components"]![0]!["Detail"] = string.Concat(Enumerable.Repeat("pwd pwd password ", 230_000));
+        byte[] bytes = Bytes(file);
+        bytes.Length.Should().BeLessThan(_max);
+
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        Code(bytes).Should().Be(UsageScanFileCodes.Schema);
+        timer.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2));
+    }
+
+    // Review 2026-10-05: in .NET "$" also matches before a final line feed, so a name ending in "\n" passed the patterns.
+    [Fact]
+    public void NamesEndingInALineFeed_AreNotTheContract()
+    {
+        JsonNode server = Example();
+        server["plannedServers"]![0] = "SYN-APP01\n";
+        server["results"]![0]!["serverName"] = "SYN-APP01\n";
+        Code(Bytes(server)).Should().Be(UsageScanFileCodes.Schema);
+
+        JsonNode account = Example();
+        account["accounts"]![0] = "SYN\\svc_synapp\n";
+        Code(Bytes(account)).Should().Be(UsageScanFileCodes.Schema);
+
+        JsonNode matched = Example();
+        matched["results"]![0]!["components"]![0]!["MatchedAccount"] = "SYN\\svc_synapp\n";
+        Code(Bytes(matched)).Should().Be(UsageScanFileCodes.Schema);
+
+        JsonNode date = Example();
+        date["generatedAt"] = date["generatedAt"]!.GetValue<string>() + "\n";
+        Code(Bytes(date)).Should().Be(UsageScanFileCodes.Schema);
+    }
+
     [Fact]
     public void Contract_IsClosed_AndDuplicatesDepthAndSizeFailClosed()
     {
@@ -250,6 +330,23 @@ public sealed class UsageScanParserTests
         UsageScanOutcomes.Conclusion([ScanGmsaServerState.NoComponents]).Should().Be(ScanGmsaConclusion.NoComponents);
         UsageScanOutcomes.Conclusion([]).Should().Be(ScanGmsaConclusion.Incomplete);
     }
+
+    // Review 2026-10-05: the searched name decides which matches the account shows; choosing one that hides matches of
+    // another searched name would turn a server with a match into "not found".
+    [Theory]
+    [InlineData("SYN\\svc_synapp|svc_synapp", "SYN", "SYN\\svc_synapp")]
+    [InlineData("svc_synapp|SYN\\svc_synapp", "SYN", "SYN\\svc_synapp")]
+    [InlineData("OTHER\\svc_synapp|svc_synapp", "SYN", "svc_synapp")]
+    [InlineData("SYN\\svc_synapp", null, "SYN\\svc_synapp")]
+    [InlineData("SYN\\svc_synapp|svc_synapp", null, "svc_synapp")]
+    [InlineData("svc_other|svc_synapp", null, "svc_synapp")]
+    [InlineData("svc_other", "SYN", null)]
+    public void SearchedName_PrefersTheAccountsOwnDomain_AndNeverHidesMatchesWhenTheDomainIsUnknown(string file, string? domain, string? expected) =>
+        UsageScanOutcomes.SearchedName(file.Split('|'), "svc_synapp", domain).Should().Be((expected, false));
+
+    [Fact]
+    public void SearchedName_WithTwoDomainsAndNoDomainOnTheAccount_IsAmbiguous() =>
+        UsageScanOutcomes.SearchedName(["SYN\\svc_synapp", "OTHER\\svc_synapp"], "svc_synapp", null).Should().Be(((string?)null, true));
 
     [Theory]
     [InlineData("SYN\\svc_synapp", "svc_synapp", "SYN", true)]

@@ -31,9 +31,8 @@
     }
     else if (CanUpload)
     {
-        @* Native details/summary: keyboard operable without script (MudBlazor 6 panel headers take no focus). *@
-        <details class="sa-scan-section mt-2">
-            <summary>Tarama dosyası yükle ve bu hesaba bağla</summary>
+        @* Native details/summary (SaDisclosure): keyboard operable without script (MudBlazor 6 panel headers take no focus). *@
+        <SaDisclosure Class="mt-2" Title="Tarama dosyası yükle ve bu hesaba bağla">
             <p class="so-panel-text--sm">
                 Dosya, her sunucuda çalıştırılan <code>Get-ServiceAccountUsage.ps1</code> çıktılarından kendi makinenizde
                 <code>Invoke-ServiceAccountUsageScan.ps1 -CombinePath</code> ile üretilir (JSON, en çok 4 MB). Dosya bu hesabı aramış olmalı.
@@ -63,7 +62,7 @@
             @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
             <MudButton OnClick="UploadAsync" Disabled="@(!CanSend)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
                 StartIcon="@Icons.Material.Filled.UploadFile">Yükle ve bu hesaba bağla</MudButton>
-        </details>
+        </SaDisclosure>
     }
 
     @if (Detail.UsageScans is { Count: 0 })
@@ -131,7 +130,8 @@
         <h3 class="sa-scan-subtitle">Bu hesabın bulunduğu bileşenler (@former.Length)</h3>
         @if (former.Length == 0)
         {
-            <p class="so-panel-text--sm">Taranan kaynaklarda bu hesapla çalışan bileşen bulunmadı. Bu, hesabın kullanılmadığını göstermez.</p>
+            @* "Not found" only for the servers that were fully scanned; with none, nothing is known (SPEC rule 15). *@
+            <p class="so-panel-text--sm">@NoMatchText(scan.Coverage, gaps.Length)</p>
         }
         else
         {
@@ -213,8 +213,7 @@
             </ul>
         }
 
-        <details class="sa-scan-section mt-2">
-            <summary>Sunucu bazında kapsam (@scan.Servers.Count sunucu)</summary>
+        <SaDisclosure Class="mt-2" Title="@($"Sunucu bazında kapsam ({scan.Servers.Count} sunucu)")">
             <MudTable Items="scan.Servers" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageScanServerView">
                 <HeaderContent>
                     <MudTh>Sunucu</MudTh><MudTh>Tarama</MudTh><MudTh>Bu hesap için</MudTh>
@@ -234,7 +233,7 @@
                     </MudTd>
                 </RowTemplate>
             </MudTable>
-        </details>
+        </SaDisclosure>
     </section>
 }
 
@@ -315,6 +314,13 @@
 
     private static string CoverageLabel(UsageScanCoverageView c) =>
         c.Success == c.Planned ? $"{c.Planned} sunucunun tamamı tam tarandı" : $"{c.Planned} sunucudan {c.Success} tanesi tam tarandı";
+
+    private static string NoMatchText(UsageScanCoverageView c, int gaps) =>
+        c.Success == 0
+            ? "Hiçbir sunucu tam taranmadı; bu hesabın bu sunucularda çalışıp çalışmadığı bilinmiyor. Eksik sunucuları yeniden tarayın."
+            : gaps == 0
+                ? "Taranan kaynaklarda bu hesapla çalışan bileşen bulunmadı. Bu, hesabın kullanılmadığını göstermez."
+                : $"Tam taranan {c.Success} sunucuda bu hesapla çalışan bileşen bulunmadı; {gaps} sunucu için sonuç eksik. Bu, hesabın kullanılmadığını göstermez.";
 
     private static string ScanTimes(UsageScanView scan) => scan.FirstScannedAt is null
         ? "Hiçbir sunucudan sonuç gelmedi"
