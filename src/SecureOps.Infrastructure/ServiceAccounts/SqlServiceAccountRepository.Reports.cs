@@ -27,6 +27,7 @@ public sealed partial class SqlServiceAccountRepository
               AND (@teamId IS NULL OR a.CurrentOwnerTeamId = @teamId OR EXISTS (SELECT 1 FROM svcacct.WorkRequests tr WHERE tr.AccountId = a.Id AND tr.TargetTeamId = @teamId))
             """;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
+        bool names = await GmsaNameColumnsAsync(connection, null, cancellationToken);
         using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd($"""
             SELECT Id INTO #scoped FROM ({accounts}) s;
             SELECT a.Id, CASE WHEN a.Domain IS NULL THEN a.AccountName ELSE a.Domain + N'\' + a.AccountName END AS Label, a.CurrentOwnerTeamId AS OwnerTeamId, a.CurrentOwnerPersonId AS ConfirmedPersonId,
@@ -35,7 +36,7 @@ public sealed partial class SqlServiceAccountRepository
             FROM svcacct.Accounts a JOIN #scoped s ON s.Id = a.Id;
             SELECT r.Id, r.AccountId, r.ActionType, r.Status, r.TargetTeamId, r.PlanStart, r.PlanEnd, r.FollowupPersonId,
                 CONCAT(COALESCE(r.LegacyDisplayId, N''), N'|', CONVERT(nvarchar(40), r.CreatedAt, 126), N'|', CONVERT(nvarchar(36), r.Id)) AS OrderKey,
-                r.CreatedAt, r.ClosedAt
+                r.CreatedAt, r.ClosedAt, {GmsaNameColumn("r", names)}
             FROM svcacct.WorkRequests r JOIN #scoped s ON s.Id = r.AccountId;
             SELECT e.Id, e.AccountId, e.ActionType, e.Result, e.RecordKind, e.ActualOn, e.VerifiedOn,
                 CAST(CASE WHEN e.VerifiedByUserId IS NOT NULL OR e.VerifiedByPersonId IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasVerifier,
@@ -57,7 +58,7 @@ public sealed partial class SqlServiceAccountRepository
             FROM svcacct.Handovers h JOIN #scoped s ON s.Id = h.AccountId;
             SELECT t.AccountId, t.Suitability,
                 CAST(CASE WHEN EXISTS (SELECT 1 FROM svcacct.ActionEvents e WHERE e.Id = t.CompletedActionId AND e.ActionType = 'GmsaConversion'
-                    AND e.Result IN ('Performed','Verified') AND e.VoidedAt IS NULL) THEN 1 ELSE 0 END AS bit)
+                    AND e.Result IN ('Performed','Verified') AND e.VoidedAt IS NULL) THEN 1 ELSE 0 END AS bit), {GmsaNameColumn("t", names)}
             FROM svcacct.IdentityTransitions t JOIN #scoped s ON s.Id = t.AccountId WHERE t.Target = 'gMSA';
             SELECT f.AccountId, f.Status FROM svcacct.Findings f JOIN #scoped s ON s.Id = f.AccountId;
             SELECT Id, Name FROM svcacct.Teams;
@@ -81,7 +82,7 @@ public sealed partial class SqlServiceAccountRepository
         AccountFact[] accountFacts = [.. await grid.ReadAsync<AccountFact>()];
         RequestFact[] requests = [.. (await grid.ReadAsync<RequestFactRow>())
             .Select(r => new RequestFact(r.Id, r.AccountId, Enum.Parse<ServiceAccountActionType>(r.ActionType), Enum.Parse<ServiceAccountRequestStatus>(r.Status),
-                r.TargetTeamId, r.PlanStart, r.PlanEnd, r.FollowupPersonId, r.OrderKey, r.CreatedAt, r.ClosedAt))];
+                r.TargetTeamId, r.PlanStart, r.PlanEnd, r.FollowupPersonId, r.OrderKey, r.CreatedAt, r.ClosedAt, r.RequestedGmsaName))];
         ActionFact[] actions = [.. (await grid.ReadAsync<ActionFactRow>()).Select(a => new ActionFact(a.Id, a.AccountId,
             new ActionFacts(Enum.Parse<ServiceAccountActionType>(a.ActionType), Enum.Parse<ServiceAccountActionResult>(a.Result),
                 Enum.Parse<ServiceAccountRecordKind>(a.RecordKind), a.ActualOn, a.VerifiedOn, a.HasVerifier, a.HasEvidence, a.HasOr, a.Voided),
@@ -91,8 +92,8 @@ public sealed partial class SqlServiceAccountRepository
                 Enum.Parse<TimePrecision>(c.Precision), c.On, c.At, c.Links))];
         HandoverFact[] handovers = [.. (await grid.ReadAsync<(Guid AccountId, string Status, bool Evidence)>())
             .Select(h => new HandoverFact(h.AccountId, Enum.Parse<HandoverStatus>(h.Status), h.Evidence))];
-        TransitionFact[] transitions = [.. (await grid.ReadAsync<(Guid AccountId, string Suitability, bool Completed)>())
-            .Select(t => new TransitionFact(t.AccountId, Enum.Parse<GmsaSuitability>(t.Suitability), t.Completed))];
+        TransitionFact[] transitions = [.. (await grid.ReadAsync<(Guid AccountId, string Suitability, bool Completed, string? Name)>())
+            .Select(t => new TransitionFact(t.AccountId, Enum.Parse<GmsaSuitability>(t.Suitability), t.Completed, t.Name))];
         FindingFact[] findings = [.. (await grid.ReadAsync<(Guid AccountId, string Status)>()).Select(f => new FindingFact(f.AccountId, Enum.Parse<FindingStatus>(f.Status)))];
         var teams = (await grid.ReadAsync<(Guid Id, string Name)>()).ToDictionary(t => t.Id, t => t.Name);
         string watermark = await grid.ReadSingleAsync<string>();
@@ -106,11 +107,11 @@ public sealed partial class SqlServiceAccountRepository
         HashSet<Guid> closed = [.. await grid.ReadAsync<Guid>()];
         var organizations = (await grid.ReadAsync<(Guid Id, string Name)>()).ToDictionary(t => t.Id, t => t.Name);
         InsightFacts insight = new(usages, sqlTeamAccounts, executor, observations, closed, organizations, thresholds);
-        return (new ReportFacts(accountFacts, requests, actions, communications, handovers, transitions, findings, teams, insight), watermark);
+        return (new ReportFacts(accountFacts, requests, actions, communications, handovers, transitions, findings, teams, insight, names), watermark);
     }
 
     private sealed record RequestFactRow(Guid Id, Guid AccountId, string ActionType, string Status, Guid? TargetTeamId, DateOnly? PlanStart, DateOnly? PlanEnd,
-        Guid? FollowupPersonId, string OrderKey, DateTimeOffset CreatedAt, DateTimeOffset? ClosedAt);
+        Guid? FollowupPersonId, string OrderKey, DateTimeOffset CreatedAt, DateTimeOffset? ClosedAt, string? RequestedGmsaName);
 
     private sealed record ActionFactRow(Guid Id, Guid AccountId, string ActionType, string Result, string RecordKind, DateOnly? ActualOn, DateOnly? VerifiedOn,
         bool HasVerifier, bool HasEvidence, bool HasOr, bool Voided, string ActualPrecision, DateTimeOffset? ActualAt, Guid? PerformerTeamId);
