@@ -206,6 +206,7 @@ public sealed partial class ServiceAccountService
                 : !ValidText(request.Notes, 4000) ? "notes"
                 : References(request.AddReferences) is null ? "addReferences"
                 : RequestedGmsaNameError(request.RequestedGmsaName, type ?? Enum.Parse<ServiceAccountActionType>(current.ActionType)) is { } name ? name
+                : StoredNameBlocksType(current.RequestedGmsaName, clear, type) ? "requestedGmsaNameTypeConflict"
                 : !clear.Contains("plan") && ServiceAccountRules.ValidatePlan(request.PlanStart ?? current.PlanStart, request.PlanEnd ?? current.PlanEnd) is { } plan ? plan
                 : null;
             if (invalid is not null)
@@ -285,6 +286,14 @@ public sealed partial class ServiceAccountService
             ? "requestedGmsaName"
             : null;
     }
+
+    /// <summary>
+    /// A request that already records a requested gMSA name cannot be moved to a work type that is not gMSA work; the name is never
+    /// dropped silently. The caller clears the name first (clearFields requestedGmsaName with a reason), then changes the type.
+    /// </summary>
+    private static bool StoredNameBlocksType(string? storedName, IReadOnlyList<string> clear, ServiceAccountActionType? newType) =>
+        newType is not null and not (ServiceAccountActionType.GmsaHandover or ServiceAccountActionType.GmsaConversion)
+        && !clear.Contains("requestedGmsaName") && ServiceAccountText.Clean(storedName) is not null;
 
     /// <summary>Validates external references: known type, bounded number, Jira key format for JIRA, HTTPS links only.</summary>
     private static IReadOnlyList<SaExternalRef>? References(IReadOnlyList<SaExternalRef>? references)

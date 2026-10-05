@@ -44,6 +44,7 @@ public sealed class ServiceAccountRequestedGmsaNameTests
     [Theory]
     [InlineData("requestedGmsaName", "en çok 15 karakter")]
     [InlineData("gmsaNameColumnsMissing", "031")]
+    [InlineData("requestedGmsaNameTypeConflict", "önce adı gerekçeyle temizleyin")]
     public void ServerRefusals_AreExplainedInTurkish(string field, string expected)
     {
         UiProblem problem = UiProblemFactory.FromResponse(400, new ProblemDetailsPayload { Code = "ServiceAccountValidationFailed", Fields = [field] });

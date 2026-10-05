@@ -71,6 +71,23 @@ public sealed class ServiceAccountRequestedGmsaNameSqlTests
         cleared.Requests.Single().RequestedGmsaName.Should().BeNull();
         (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.History WHERE AccountId = @id AND Action = 'RequestUpdated' AND ChangesJson LIKE @n",
             new { id, n = "%gmsa_r" + fx.Suffix[..6] + "%" })).Should().Be(1);
+
+        // A recorded name is never dropped silently by a type change: refuse it, keep the name, and allow it once the name is cleared with a reason.
+        AccountDetail second = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, id,
+            new CreateWorkRequest("GmsaHandover", RequestedGmsaName: "gmsa_keep$"), _token));
+        RequestView named = second.Requests.Single(r => r.RequestedGmsaName == "gmsa_keep$");
+        SaResult<AccountDetail> blocked = await fx.Service.UpdateRequestAsync(coordinator.Principal, fx.Context, named.Id,
+            new UpdateWorkRequest(named.Version, ActionType: "Review"), _token);
+        blocked.ErrorCode.Should().Be(SaErrors.Invalid);
+        blocked.Field.Should().Be("requestedGmsaNameTypeConflict");
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.WorkRequests WHERE Id = @id AND ActionType = 'GmsaHandover' AND RequestedGmsaName = 'gmsa_keep$'",
+            new { id = named.Id })).Should().Be(1, "a refused type change writes nothing");
+        (await fx.Service.UpdateRequestAsync(coordinator.Principal, fx.Context, named.Id,
+            new UpdateWorkRequest(named.Version, ActionType: "GmsaConversion"), _token)).IsSuccess.Should().BeTrue("a move between gMSA work types keeps the name");
+        RequestView moved = Ok(await fx.Service.AccountAsync(coordinator.Principal, fx.Context, id, _token)).Requests.Single(r => r.Id == named.Id);
+        AccountDetail changed = Ok(await fx.Service.UpdateRequestAsync(coordinator.Principal, fx.Context, named.Id,
+            new UpdateWorkRequest(moved.Version, ActionType: "Review", ClearFields: ["requestedGmsaName"], Reason: "Sentetik: tür değişiyor"), _token));
+        changed.Requests.Single(r => r.Id == named.Id).Should().Match<RequestView>(r => r.ActionType == "Review" && r.RequestedGmsaName == null);
     }
 
     [ServiceAccountSqlFact]
