@@ -208,6 +208,42 @@ public sealed class ServiceAccountUsageScanSqlTests
         after.Transitions.Should().BeEmpty();
     }
 
+    // Review 2026-10-05 (c2601a7): the searched name a scan is attached under decides which matches the account shows. The
+    // collector writes one match per searched name that fits, so the bare name of an account without a domain shows every
+    // domain's matches, a known domain shows only its own, and two domains without a bare name are refused with nothing stored.
+    [ServiceAccountSqlFact]
+    public async Task SearchedName_BareNameHidesNothing_KnownDomainShowsItsOwn_TwoDomainsAreRefused()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        string unknown = $"SYN_SCAN_NODOM_{fx.Suffix}", known = $"SYN_SCAN_DOM_{fx.Suffix}", twice = $"SYN_SCAN_TWO_{fx.Suffix}";
+        Guid unknownId = Ok(await fx.Service.CreateAccountAsync(coordinator.Principal, fx.Context,
+            new CreateAccountRequest(unknown, null, org, "Sentetik: domain bilinmiyor"), _token)).Summary.Id;
+        Guid knownId = (await CreateAccountAsync(fx, coordinator, org, "DOM")).Summary.Id;
+        Guid twiceId = Ok(await fx.Service.CreateAccountAsync(coordinator.Principal, fx.Context,
+            new CreateAccountRequest(twice, null, org, "Sentetik: domain bilinmiyor"), _token)).Summary.Id;
+
+        UsageScanView bare = Ok(await Attach(fx, coordinator, unknownId, Discovery([$"SYN\\{unknown}", unknown],
+            ("SYN-APP01", "WindowsService", "SynSvc", $"SYN\\{unknown}", [$"SYN\\{unknown}", unknown]),
+            ("SYN-APP02", "ScheduledTask", "\\SynOther", $"OTHER\\{unknown}", [unknown])), null)).UsageScans![0];
+        bare.MatchedAccount.Should().Be(unknown, "without a domain the bare name matches every domain");
+        bare.Items.Select(i => $"{i.ServerName}:{i.ConfiguredIdentity}").Should().BeEquivalentTo([$"SYN-APP01:SYN\\{unknown}", $"SYN-APP02:OTHER\\{unknown}"]);
+        bare.Servers.Select(s => s.Outcome).Should().Equal("Found", "Found");
+
+        UsageScanView own = Ok(await Attach(fx, coordinator, knownId, Discovery([$"SYN\\{known}", known],
+            ("SYN-APP01", "WindowsService", "SynSvc", $"SYN\\{known}", [$"SYN\\{known}", known]),
+            ("SYN-APP02", "ScheduledTask", "\\SynOther", $"OTHER\\{known}", [known])), null)).UsageScans![0];
+        own.MatchedAccount.Should().Be($"SYN\\{known}");
+        own.Items.Should().ContainSingle().Which.ConfiguredIdentity.Should().Be($"SYN\\{known}", "OTHER\\name is another account");
+        own.Servers.Select(s => s.Outcome).Should().Equal("Found", "NotFound");
+
+        SaResult<AccountDetail> ambiguous = await Attach(fx, coordinator, twiceId, Discovery([$"SYN\\{twice}", $"OTHER\\{twice}"],
+            ("SYN-APP01", "WindowsService", "SynSvc", $"SYN\\{twice}", [$"SYN\\{twice}"])), null);
+        (ambiguous.ErrorCode, ambiguous.Field).Should().Be((SaErrors.Invalid, "accountAmbiguousInScan"));
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.UsageScanLinks WHERE AccountId = @twiceId", new { twiceId })).Should().Be(0);
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.UsageScans WHERE UploadedBy = @u", new { u = coordinator.User.Id }))
+            .Should().Be(2, "the refused file is not stored");
+    }
+
     private static async Task<UsageScanView> GmsaAsync(ServiceAccountSqlFixture fx, SynUser user, Guid id, string name, params (string Server, string State)[] servers)
     {
         AccountDetail detail = Ok(await fx.Service.AttachUsageScanAsync(user.Principal, fx.Context, id, "gmsa.json", GmsaCheck(name, servers), _statement, null,
@@ -275,6 +311,52 @@ public sealed class ServiceAccountUsageScanSqlTests
         };
         // Distinct bytes per call: otherwise the same person uploading the same content is one scan.
         bundle["generatedAt"] = DateTimeOffset.UtcNow.AddMinutes(-1).AddTicks(Random.Shared.Next(1, 1_000_000)).ToString("o");
+        return Encoding.UTF8.GetBytes(bundle.ToJsonString());
+    }
+
+    /// <summary>A complete discovery scan of SYN-APP01 and SYN-APP02; each configured component is written once per searched name it matched.</summary>
+    private static byte[] Discovery(string[] searched, params (string Server, string Type, string Component, string Identity, string[] Matched)[] configured)
+    {
+        JsonArray results = [];
+        foreach (string server in new[] { "SYN-APP01", "SYN-APP02" })
+        {
+            JsonArray components = [];
+            foreach ((string _, string type, string component, string identity, string[] matched) in configured.Where(c => c.Server == server))
+            {
+                foreach (string name in matched)
+                {
+                    JsonObject entry = Component(type, component, identity);
+                    entry["MatchedAccount"] = name;
+                    components.Add(entry);
+                }
+            }
+
+            results.Add(new JsonObject
+            {
+                ["schema"] = "service-account-usage-v1",
+                ["serverName"] = server,
+                ["generatedAt"] = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("o"),
+                ["durationMs"] = 700,
+                ["accounts"] = new JsonArray([.. searched.Select(s => (JsonNode)JsonValue.Create(s)!)]),
+                ["scanResult"] = "Success",
+                ["sources"] = new JsonObject { ["WindowsServices"] = "Success", ["ScheduledTasks"] = "Success", ["Iis"] = "NotInstalled" },
+                ["components"] = components,
+                ["verification"] = null,
+                ["warnings"] = new JsonArray()
+            });
+        }
+
+        JsonObject bundle = new()
+        {
+            ["schema"] = "service-account-usage-scan-v1",
+            ["generatedAt"] = DateTimeOffset.UtcNow.AddMinutes(-1).ToString("o"),
+            ["tool"] = "Combined",
+            ["accounts"] = new JsonArray([.. searched.Select(s => (JsonNode)JsonValue.Create(s)!)]),
+            ["expectedAccount"] = null,
+            ["plannedServers"] = new JsonArray("SYN-APP01", "SYN-APP02"),
+            ["results"] = results,
+            ["notReached"] = new JsonArray()
+        };
         return Encoding.UTF8.GetBytes(bundle.ToJsonString());
     }
 
