@@ -40,6 +40,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-31 — No per-owner usage signal for frequently used links | Open — needs an audit-framing decision before a contract |
 | G-32 — Favourites view has no server-side paging | Open — low |
 | G-34 — Concurrent first registrations can deadlock in the access store | Open — platform defect candidate (Access owner); module tests serialised |
+| G-35 — Unsafe API requests lack a central CSRF guard | Repair designed; implementation and local verification pending |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1069,6 +1070,26 @@ disposable database and expects every call to succeed with exactly one pending r
 apply to the installed TEST system; do not change the Service Accounts module (its tests already run serially for G-34).
 
 ---
+
+## G-35 — Unsafe API requests lack a central CSRF guard
+
+**Raised:** 2026-10-07, two independent reviews of PR #18.
+**Owner:** Platform/API; minimal shared UI transport update authorized by the owner.
+
+Windows Negotiate can automatically authenticate cross-origin CORS-simple forms.
+There is no central Origin/antiforgery check before API form binding, including
+Service Accounts usage-scan uploads. Authentication/capability checks alone do
+not prevent this request from executing as the user.
+
+**Decision:** [ADR-0029](adr/ADR-0029-api-csrf-origin-guard.md). All unsafe methods
+require `X-SecureOps-Csrf: 1`; browser source headers must match explicitly
+configured `ApiCsrf:AllowedOrigins`, and cross-site Fetch Metadata is denied.
+The server-side Blazor API client supplies the header centrally, without inventing
+Origin or forwarding browser headers. Scripts must adopt the same contract.
+
+**Status:** Design recorded before code. Local verification pending. Real
+Negotiate/IIS/F5 and deployment origin configuration remain unverified. No
+installed TEST, corporate systems, provider writes or merge is authorized.
 
 ## Note: enums cross the wire as numbers
 
