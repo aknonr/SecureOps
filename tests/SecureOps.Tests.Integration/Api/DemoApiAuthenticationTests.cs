@@ -45,7 +45,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Demo_WithDemoAuthEnabled_RegistersDemoSchemeAndNotNegotiate()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
-        _ = factory.CreateClient();
+        _ = factory.CreateApiClient();
 
         IAuthenticationSchemeProvider schemes = factory.Services.GetRequiredService<IAuthenticationSchemeProvider>();
         AuthenticationScheme? defaultScheme = await schemes.GetDefaultAuthenticateSchemeAsync();
@@ -59,7 +59,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Demo_WithDemoActor_CanCallProtectedHealthEndpoint()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         HttpResponseMessage response = await client.GetAsync("/api/v1/health");
@@ -71,7 +71,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Demo_PersistenceHealth_DistinguishesProcessFromUnconfiguredSql()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         SqlPersistenceHealthResponse response = (await client.GetFromJsonAsync<SqlPersistenceHealthResponse>("/api/v1/health/persistence"))!;
@@ -83,7 +83,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Demo_SqlOutage_LeavesProcessLivenessIndependentFromPersistenceReadiness()
     {
         using WebApplicationFactory<Program> factory = CreateSqlOutageFactory();
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         HttpResponseMessage process = await client.GetAsync("/api/v1/health");
@@ -99,7 +99,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task DemoActor_ReceivesApplicationRoleThroughAccessCompatibilityPath()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
@@ -114,7 +114,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Demo_WithoutDemoActor_IsUnauthorized()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
 
         HttpResponseMessage response = await client.GetAsync("/api/v1/health");
 
@@ -125,7 +125,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task NonDemo_WithDemoAuthFlagStillUsesNegotiate()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Staging", demoAuthEnabled: true);
-        _ = factory.CreateClient();
+        _ = factory.CreateApiClient();
 
         IAuthenticationSchemeProvider schemes = factory.Services.GetRequiredService<IAuthenticationSchemeProvider>();
         AuthenticationScheme? defaultScheme = await schemes.GetDefaultAuthenticateSchemeAsync();
@@ -139,7 +139,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Demo_WithSwaggerExplicitlyEnabled_ExposesAuthenticatedOpenApiWithDemoActorScheme()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true, swaggerEnabled: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         HttpResponseMessage response = await client.GetAsync("/swagger/v1/swagger.json");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -151,7 +151,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Test_WithSwaggerExplicitlyEnabled_ExposesSwaggerIndexAndRequiredJsonPath()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
 
         HttpResponseMessage index = await client.GetAsync("/swagger/index.html");
         HttpResponseMessage document = await client.GetAsync("/swagger/v1/swagger.json");
@@ -164,7 +164,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Test_OpenApiDocument_MatchesCheckedInUiContractSnapshot()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
 
         string actualJson = await client.GetStringAsync("/swagger/v1/swagger.json");
         string snapshotPath = Path.Combine(FindRepositoryRoot(), "docs", "contracts", "secureops-api-v1.openapi.json");
@@ -182,7 +182,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Test_WithSwaggerDisabled_DoesNotExposeSwaggerRoutes()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: false);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         (await client.GetAsync("/swagger/index.html")).StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -193,7 +193,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task Test_WithAnonymousSwaggerDocument_StillProtectsApiOperations()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Test", demoAuthEnabled: true, swaggerEnabled: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
 
         (await client.GetAsync("/swagger/v1/swagger.json")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "sample.user", purpose = "Approved operational lookup" })).StatusCode
@@ -204,10 +204,10 @@ public sealed class DemoApiAuthenticationTests
     public async Task AccessUsers_RequiresManageUsersCapability()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
-        using HttpClient anonymous = factory.CreateClient();
-        using HttpClient lead = factory.CreateClient();
+        using HttpClient anonymous = factory.CreateApiClient();
+        using HttpClient lead = factory.CreateApiClient();
         lead.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.TeamLeadActor);
-        using HttpClient admin = factory.CreateClient();
+        using HttpClient admin = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         (await anonymous.GetAsync("/api/v1/access/users")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -224,10 +224,10 @@ public sealed class DemoApiAuthenticationTests
             demoAuthEnabled: true,
             demoCompatibilityEnabled: false);
         await SeedAdminAsync(factory, "demo:platform-admin", "demo-api-bridge");
-        using HttpClient subject = factory.CreateClient();
+        using HttpClient subject = factory.CreateApiClient();
         subject.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.TeamLeadActor);
         CurrentAccessResponse pending = (await subject.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
-        using HttpClient admin = factory.CreateClient();
+        using HttpClient admin = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         _ = await admin.GetAsync("/api/v1/access/me");
 
@@ -254,7 +254,7 @@ public sealed class DemoApiAuthenticationTests
     public async Task AccessRequestFilter_RejectsUndefinedNumericStatusAsValidation()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", demoAuthEnabled: true);
-        using HttpClient admin = factory.CreateClient();
+        using HttpClient admin = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         HttpResponseMessage response = await admin.GetAsync("/api/v1/access/requests?status=99");

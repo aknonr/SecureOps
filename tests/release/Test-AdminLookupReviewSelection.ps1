@@ -5,6 +5,14 @@ $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if (Test-Path -LiteralPath $EvidenceDirectory) { throw 'Refuse existing evidence.' }
 New-Item -ItemType Directory -Path $EvidenceDirectory | Out-Null
 $source=(& git -C $root rev-parse HEAD).Trim()
+$selectionRoot=Join-Path $EvidenceDirectory 'source-027'
+foreach ($folder in @('migrations','schema','pending/service-accounts')) {
+    $target=Join-Path $selectionRoot "sql/$folder"
+    New-Item -ItemType Directory -Path $target -Force | Out-Null
+    Get-ChildItem (Join-Path $root "sql/$folder") -File -Filter '*.sql' | Where-Object {
+        $folder -eq 'pending/service-accounts' -or [int]$_.Name.Substring(0,3) -le 27
+    } | Copy-Item -Destination $target
+}
 $paths=@('sql/migrations/027-admin-service-account-navigation.sql','sql/schema/027-admin-service-account-navigation.sql',
     'sql/pending/service-accounts/SA-API-permissions.sql','sql/pending/service-accounts/SA-002-API-permissions.sql')
 $review=[ordered]@{Schema='wasas.sql-upgrade-review.v1';Source=$source;Baseline026Verified=$true;AdminNavigation027Reviewed=$true;
@@ -12,7 +20,7 @@ $review=[ordered]@{Schema='wasas.sql-upgrade-review.v1';Source=$source;Baseline0
     Files=@($paths | ForEach-Object { @{Path=$_;Sha256=(Get-FileHash -LiteralPath (Join-Path $root $_)).Hash} })}
 $file=Join-Path $EvidenceDirectory 'review.json'
 function Save-Review { $review | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $file -Encoding UTF8 }
-function Select-Plan { & "$root/scripts/release/Get-ReleaseSqlPlan.ps1" -RepositoryRoot $root -UpgradeFromInstalled026 -IncludeServiceAccounts -ExpectedSource $source -SqlUpgradeReview $file }
+function Select-Plan { & "$root/scripts/release/Get-ReleaseSqlPlan.ps1" -RepositoryRoot $selectionRoot -UpgradeFromInstalled026 -IncludeServiceAccounts -ExpectedSource $source -SqlUpgradeReview $file }
 $checks=[Collections.Generic.List[string]]::new()
 function Check([string]$Name,[bool]$Condition) { if (!$Condition) { throw "Failed: $Name" }; $checks.Add($Name); Write-Output "PASS: $Name" }
 function Reject([string]$Name,[scriptblock]$Action) { $failed=$false; try { & $Action | Out-Null } catch { $failed=$true }; Check $Name $failed }

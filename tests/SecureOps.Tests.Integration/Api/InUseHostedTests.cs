@@ -32,9 +32,9 @@ public sealed class InUseHostedTests
             })
             { builder.UseSetting(key, value); }
         });
-        using HttpClient admin = factory.CreateClient();
+        using HttpClient admin = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
-        using HttpClient denied = factory.CreateClient();
+        using HttpClient denied = factory.CreateApiClient();
         denied.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "team-lead");
         (await admin.GetFromJsonAsync<InUsePage>("/api/v1/in-use"))!.Total.Should().Be(0);
         var command = new RefreshInUseRequest(Guid.NewGuid());

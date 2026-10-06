@@ -77,7 +77,7 @@ public sealed class DirectoryGroupAnalysisHostedTests
     public async Task OpenApiContainsAdditiveGroupAnalysisContracts()
     {
         using WebApplicationFactory<Program> factory = CreateFactory(swagger: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
 
         string openApi = await client.GetStringAsync("/swagger/v1/swagger.json");
 
@@ -105,7 +105,7 @@ public sealed class DirectoryGroupAnalysisHostedTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
         return client;
     }

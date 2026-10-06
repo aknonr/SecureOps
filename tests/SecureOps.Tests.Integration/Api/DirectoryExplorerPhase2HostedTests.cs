@@ -7,11 +7,71 @@ using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Api.Security;
 using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Shared.Contracts.Directory;
+using SecureOps.Shared.Contracts.Identity;
 
 namespace SecureOps.Tests.Integration.Api;
 
 public sealed class DirectoryExplorerPhase2HostedTests
 {
+    [Theory]
+    [InlineData("CONTOSO\\SYN.GMSA$", "GroupManagedServiceAccount")]
+    [InlineData("syn.msa$", "ManagedServiceAccount")]
+    [InlineData("pam12356", "User")]
+    [InlineData("pam12356@contoso.local", "User")]
+    public async Task ExactAccount_IdentityAndDirectoryRoutes_ReturnSafeClassEvidence(string account, string evidence)
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient client = Client(factory, DemoApiAuthentication.TeamLeadActor);
+        IdentityLookupResponse identity = await PostAsync<IdentityLookupResponse>(client,
+            "/api/v1/identity/lookup", new { account });
+        DirectoryServiceEvidenceResponse service = await PostAsync<DirectoryServiceEvidenceResponse>(client,
+            "/api/v1/directory/principals/service-evidence", new { account });
+        DirectoryAccountHealthResponse health = await PostAsync<DirectoryAccountHealthResponse>(client,
+            "/api/v1/directory/principals/account-health", new { account });
+        DirectoryGroupPageResponse groups = await PostAsync<DirectoryGroupPageResponse>(client,
+            "/api/v1/directory/principals/groups", new { account });
+        DirectoryPrincipalMembershipsResponse memberships = await PostAsync<DirectoryPrincipalMembershipsResponse>(client,
+            "/api/v1/directory/principals/memberships", new { account });
+        DirectoryMembershipPathResponse paths = await PostAsync<DirectoryMembershipPathResponse>(client,
+            "/api/v1/directory/principals/membership-paths", new { account, targetGroup = "platform-privileged" });
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        DirectoryPrivilegedMembershipResponse privileged = await PostAsync<DirectoryPrivilegedMembershipResponse>(admin,
+            "/api/v1/directory/principals/privileged-memberships", new { account });
+
+        identity.User!.AccountTypeEvidence.Should().Be(evidence);
+        service.AccountTypeEvidence.Should().Be(evidence);
+        health.Enabled.Should().BeTrue();
+        groups.Items.Should().NotBeEmpty();
+        memberships.DirectGroups.Should().ContainSingle(group => group.Group.MembershipKind == "Primary");
+        paths.IsMember.Should().BeTrue();
+        privileged.Groups.Should().ContainSingle(group => group.ConfiguredIdentifier == "ops-read" && group.Direct);
+    }
+
+    [Theory]
+    [InlineData("missing.gmsa$", HttpStatusCode.NotFound)]
+    [InlineData("syn.gmsa", HttpStatusCode.NotFound)]
+    [InlineData("$", HttpStatusCode.BadRequest)]
+    [InlineData("syn$gmsa", HttpStatusCode.BadRequest)]
+    [InlineData("syn.gmsa$$", HttpStatusCode.BadRequest)]
+    [InlineData("syn.gmsa$@example.invalid", HttpStatusCode.BadRequest)]
+    [InlineData("syn.gmsa*$", HttpStatusCode.BadRequest)]
+    [InlineData("syn.gmsa?", HttpStatusCode.BadRequest)]
+    [InlineData("syn.gmsa%", HttpStatusCode.BadRequest)]
+    [InlineData("syn.gmsa$)(objectClass=*)", HttpStatusCode.BadRequest)]
+    public async Task ExactAccount_MissingOrUnsafeInput_RejectsOnIdentityAndDirectoryRoutes(string account, HttpStatusCode status)
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient client = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        foreach (string route in new[] { "identity/lookup", "directory/principals/service-evidence",
+            "directory/principals/account-health", "directory/principals/groups", "directory/principals/memberships",
+            "directory/principals/membership-paths", "directory/principals/privileged-memberships" })
+        {
+            using HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/" + route,
+                new { account, targetGroup = "platform-privileged" });
+            response.StatusCode.Should().Be(status);
+        }
+    }
+
     [Fact]
     public async Task TeamLead_CanUseGeneralReadOnlyEnrichmentEndpoints()
     {
@@ -133,7 +193,7 @@ public sealed class DirectoryExplorerPhase2HostedTests
     public async Task OpenApi_ContainsPhase2Routes()
     {
         using WebApplicationFactory<Program> factory = CreateFactory(swagger: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
 
         string openApi = await client.GetStringAsync("/swagger/v1/swagger.json");
 
@@ -172,7 +232,7 @@ public sealed class DirectoryExplorerPhase2HostedTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
         return client;
     }

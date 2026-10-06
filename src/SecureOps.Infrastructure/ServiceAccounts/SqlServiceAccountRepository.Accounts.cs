@@ -122,22 +122,22 @@ public sealed partial class SqlServiceAccountRepository
     private static string Status(string lifecycle, bool overdue, int open) =>
         lifecycle == "ClosureVerified" ? "Kapanış doğrulandı" : overdue ? "Geciken iş" : open > 0 ? "Açık iş" : "Açık iş yok";
 
-    /// <summary>Scope anchor and version of one account (null when missing).</summary>
-    public async Task<(AccountScopeAnchor Anchor, string Version, string Name)?> AnchorAsync(Guid accountId, CancellationToken cancellationToken)
+    /// <summary>Scope anchor, version, name and domain of one account (null when missing).</summary>
+    public async Task<(AccountScopeAnchor Anchor, string Version, string Name, string? Domain)?> AnchorAsync(Guid accountId, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         return await AnchorAsync(connection, null, accountId, cancellationToken);
     }
 
-    private static async Task<(AccountScopeAnchor Anchor, string Version, string Name)?> AnchorAsync(SqlConnection connection, SqlTransaction? transaction,
+    private static async Task<(AccountScopeAnchor Anchor, string Version, string Name, string? Domain)?> AnchorAsync(SqlConnection connection, SqlTransaction? transaction,
         Guid accountId, CancellationToken cancellationToken)
     {
         using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
-            SELECT ReportOrganizationId, CurrentOwnerTeamId, RowVer, AccountName FROM svcacct.Accounts WHERE Id = @accountId;
+            SELECT ReportOrganizationId, CurrentOwnerTeamId, RowVer, AccountName, Domain FROM svcacct.Accounts WHERE Id = @accountId;
             SELECT TargetTeamId FROM svcacct.WorkRequests WHERE AccountId = @accountId AND Status = 'Open' AND TargetTeamId IS NOT NULL;
             SELECT TargetTeamId FROM svcacct.Handovers WHERE AccountId = @accountId AND Status IN ('Proposed','Accepted');
             """, new { accountId }, transaction, cancellationToken));
-        (Guid? Org, Guid? Owner, byte[] RowVer, string Name)? account = await grid.ReadSingleOrDefaultAsync<(Guid? Org, Guid? Owner, byte[] RowVer, string Name)?>();
+        (Guid? Org, Guid? Owner, byte[] RowVer, string Name, string? Domain)? account = await grid.ReadSingleOrDefaultAsync<(Guid? Org, Guid? Owner, byte[] RowVer, string Name, string? Domain)?>();
         if (account is not { } a)
         {
             return null;
@@ -145,6 +145,6 @@ public sealed partial class SqlServiceAccountRepository
 
         Guid[] requestTeams = [.. await grid.ReadAsync<Guid>()];
         Guid[] handoverTeams = [.. await grid.ReadAsync<Guid>()];
-        return (new AccountScopeAnchor(a.Org, a.Owner, requestTeams, handoverTeams), Version(a.RowVer), a.Name);
+        return (new AccountScopeAnchor(a.Org, a.Owner, requestTeams, handoverTeams), Version(a.RowVer), a.Name, a.Domain);
     }
 }

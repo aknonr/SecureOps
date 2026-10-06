@@ -63,8 +63,8 @@ frees or verifies anything; secrets are never read, stored or shown; the server 
    from its content.
 3. Closed schema: unknown properties, wrong types, patterns, lengths and enums are rejected; counts are bounded
    (≤ 2 000 components per server, ≤ 10 000 in total, ≤ 20 warnings per server).
-4. Consistency: every server document has the bundle's account list and expected account, comes from a planned server and
-   appears once; every planned server is either in `results` or `notReached`, never both; `scanResult` agrees with the
+4. Consistency: every server document has the bundle's account list (the same set, no repeated name) and expected
+   account, comes from a planned server and appears once; every planned server is either in `results` or `notReached`, never both; `scanResult` agrees with the
    per-source statuses; each matched component names a searched account; the gMSA block agrees with the components; no
    timestamp is in the future (10 minutes of clock skew) or after the combination time.
 
@@ -93,6 +93,24 @@ second account adds only a link. Another person uploading the same bytes creates
   the account, the one qualified with the account's domain is used; with no domain on the account the bare name is used
   (it matches every domain, so no match is hidden), and two names with different domains and no bare name refuse the
   upload (`accountAmbiguousInScan`). Out of scope and missing are indistinguishable (404).
+- **Attach one scan to several accounts** (`POST usage-scans`, multipart: `file`, `runStatement`, 1–20 distinct
+  `accountIds`; added 2026-10-06, no migration): `ServiceAccounts.Work`; the file is validated once and completely (secret
+  guard first) before any account is looked at, so a refused file stores nothing for anyone. Each account is then checked
+  on its own under the rules above with the *responsible* basis only (a participant uses its own request on the account
+  page) and answered separately: `Attached`, `AlreadyAttached`, `NotInScan`, `Ambiguous`, `Unavailable` (missing, out of
+  scope or not the caller's to work on — indistinguishable, and returned without the account's name when out of scope) or
+  `Failed` (storage error; repeating the upload is safe). One refusal or failure never blocks another (each account has its
+  own failure boundary, so earlier links stand and later accounts are still tried); the scan is stored once and linked per
+  account in its own transaction, with history and audit per link. Every refusal after the capability check — a refused
+  request field or file, or an upload where some accounts were not linked — writes one `ServiceAccount.UsageScanBatchRefused`
+  audit row with a stable reason (`accountIds`, `runStatement`, the file code, or `accounts`) and counts only (requested and
+  per outcome): no account name or id, no file name, hash or content (2026-10-07).
+- **Authority is re-checked inside the write** (both upload routes, 2026-10-07): the link's transaction locks the account
+  row (and the request row when attaching through a request) and re-reads the caller's active scope grants and the
+  organization/team tree under HOLDLOCK. A revocation or owner-team/organization change that commits after the service's
+  check but before the link is seen there and refuses the link with nothing written (out of scope = not found; a
+  participant without its open request = forbidden; in a multi-account upload `Unavailable` without the name). The
+  capability itself comes from the platform access service and is not re-read inside the SQL transaction.
 - **Turn a matched component into a usage** or **dismiss it with a reason**: `ServiceAccounts.Work` with the responsible
   basis, one decision per item and account, never automatic. The person chooses the usage kind (a suggestion is shown).
 - **Read**: everyone who can see the account sees its attached scans — only the items matched to that account's searched

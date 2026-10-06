@@ -14,8 +14,8 @@ Service account usage scan (ADR-0027), run by a person under their own authority
 `service-account-usage-scan-v1` from the collected documents and the planned server list). Operator guide:
 `docs/service-accounts/USAGE-SCAN-TR.md`.
 
-Proposed, **not deployable** until ADR-0024 is accepted and Bilgi Güvenliği approves the role capability (shelved by the
-owner on 2026-10-04): `jea/proposed/SecureOps.ServiceAccountUsage/` (one visible function, module, role capability and
+Proposed, **not deployable**: ADR-0024 revision 2 is accepted (owner, 2026-10-06) but Bilgi Güvenliği has not approved the
+role capability and the endpoint registration: `jea/proposed/SecureOps.ServiceAccountUsage/` (one visible function, module, role capability and
 session configuration; the collector above carries its functions verbatim) and the dormant `-UseJeaEndpoint` mode of
 `Invoke-ServiceAccountUsageScan.ps1`.
 

@@ -27,6 +27,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SecureOps.Tests.Unit" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Data access -->
     <PackageReference Include="MimeKit" />
     <PackageReference Include="MailKit" />

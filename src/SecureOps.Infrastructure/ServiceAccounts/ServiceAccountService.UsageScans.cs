@@ -164,7 +164,7 @@ public sealed partial class ServiceAccountService
                 return SaResult<Guid>.Fail(SaErrors.Forbidden, "requestId");
             }
 
-            if (runStatement is null || runStatement.Trim().Length < 5 || runStatement.Length > 400 || runStatement.Any(char.IsControl))
+            if (!ValidRunStatement(runStatement))
             {
                 return SaResult<Guid>.Fail(SaErrors.Invalid, "runStatement");
             }
@@ -188,7 +188,9 @@ public sealed partial class ServiceAccountService
 
             string sha = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
             UsageScanUpload upload = new(parsed, content, sha, SafeName(fileName), runStatement.Trim(), matched);
-            SaResult<(Guid ScanId, bool Attached)> attached = await repository!.AttachUsageScanAsync(accountId, upload, requestId, caller.Actor, cancellationToken);
+            // Re-checked inside the write: still responsible, or (through the request) the request still targets a team in scope.
+            SaResult<(Guid ScanId, bool Attached)> attached = await repository!.AttachUsageScanAsync(accountId, upload, requestId, caller.Actor,
+                (scope, anchor, requestTeam) => Responsible(scope, anchor) || requestId is not null && scope.CoversTeam(requestTeam), cancellationToken);
             return attached.IsSuccess ? attached.Value.ScanId : SaResult<Guid>.Fail(attached.ErrorCode!, attached.Field);
         }, cancellationToken);
 

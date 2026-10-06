@@ -33,12 +33,12 @@ public static class IdentityProviderInputGuard
             throw new IdentityProviderInputRejectedException("BulkLookupRejected", "Provider input is not a single exact account.");
         }
 
-        if (normalizedAccount.IndexOfAny(_forbiddenCharacters) >= 0)
+        if (normalizedAccount.Any(char.IsControl) || normalizedAccount.IndexOfAny(_forbiddenCharacters) >= 0)
         {
             throw new IdentityProviderInputRejectedException("SearchPatternRejected", "Provider input contains search-style characters.");
         }
 
-        if (!Regex.IsMatch(
+        if (!HasSafeDollarSuffix(normalizedAccount) || !Regex.IsMatch(
                 normalizedAccount,
                 options.AllowedAccountPattern,
                 RegexOptions.CultureInvariant,
@@ -46,6 +46,13 @@ public static class IdentityProviderInputGuard
         {
             throw new IdentityProviderInputRejectedException("AccountPatternRejected", "Provider input is outside the configured allow-list.");
         }
+    }
+
+    /// <summary>Allows a dollar sign only as a single suffix of a nonempty sAMAccountName.</summary>
+    public static bool HasSafeDollarSuffix(string account)
+    {
+        int index = account.IndexOf('$');
+        return index < 0 || (index > 0 && index == account.Length - 1 && !account.Contains('@'));
     }
 
     private static bool ContainsBulkSeparator(string value)

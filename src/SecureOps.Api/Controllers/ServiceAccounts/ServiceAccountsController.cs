@@ -236,6 +236,33 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     }
 
     /// <summary>
+    /// Attaches one usage-scan file (ADR-0027) to 1–20 distinct accounts (<c>accountIds</c>, repeated form field). The whole file
+    /// is checked once (secret-like fields refuse it before anything is stored); each account is then checked on its own and
+    /// answered separately, so one refusal never blocks another. Only the responsible basis attaches here; a participant
+    /// attaches from the account page through its own request. Nothing here contacts a server or changes an account.
+    /// </summary>
+    [HttpPost("usage-scans")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [RequestSizeLimit(_maxUsageScanRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = _maxUsageScanRequestBytes)]
+    [ProducesResponseType(typeof(UsageScanBatchResult), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsageScanBatchResult>> UsageScanBatchUploadAsync([FromForm] IFormFile file, [FromForm] string? runStatement,
+        [FromForm] List<Guid>? accountIds, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length is 0 or > _maxUsageScanRequestBytes)
+        {
+            return ServiceAccountReplies.Reply(this, SaResult<UsageScanBatchResult>.Fail(SaErrors.UsageScanFile,
+                file is { Length: > 0 } ? Infrastructure.ServiceAccounts.UsageScans.UsageScanFileCodes.TooLarge
+                    : Infrastructure.ServiceAccounts.UsageScans.UsageScanFileCodes.Empty));
+        }
+
+        using MemoryStream buffer = new();
+        await file.CopyToAsync(buffer, cancellationToken);
+        return ServiceAccountReplies.Reply(this, await service.AttachUsageScanToAccountsAsync(User, Context(), accountIds, file.FileName, buffer.ToArray(),
+            runStatement, cancellationToken));
+    }
+
+    /// <summary>
     /// One page of the scans attached to the account (newest first, <see cref="UsageScanPaging.ScanPageSize"/> per page), read
     /// only and under the same scope as the account detail. Coverage and outcomes are computed over every matched item.
     /// </summary>

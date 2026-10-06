@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.Data.SqlClient;
 using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Infrastructure.ServiceAccounts;
+using SecureOps.Infrastructure.ServiceAccounts.UsageScans;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
@@ -137,6 +138,19 @@ public sealed class ServiceAccountUsageScanSqlTests
             "the same name in another domain is another account");
         (await fx.Service.AttachUsageScanAsync(coordinator.Principal, fx.Context, id, "scan.json", file, " ", null, _token)).Field.Should().Be("runStatement");
         (await Attach(fx, coordinator, id, Example(account.Summary.AccountName), Guid.NewGuid())).ErrorCode.Should().Be(SaErrors.Forbidden);
+
+        // A server list that repeats one name instead of the bundle's other name is refused here too (shared parser).
+        JsonNode repeated = JsonNode.Parse(Example(account.Summary.AccountName))!;
+        string searched = $"SYN\\{account.Summary.AccountName}";
+        repeated["accounts"] = new JsonArray(searched, "SYN\\svc_never_searched");
+        foreach (JsonNode? server in repeated["results"]!.AsArray())
+        {
+            server!["accounts"] = new JsonArray(searched, "SYN\\svc_never_searched");
+        }
+
+        repeated["results"]![1]!["accounts"] = new JsonArray(searched, searched);
+        SaResult<AccountDetail> refused = await Attach(fx, coordinator, id, Encoding.UTF8.GetBytes(repeated.ToJsonString()), null);
+        (refused.ErrorCode, refused.Field).Should().Be((SaErrors.UsageScanFile, UsageScanFileCodes.Inconsistent));
     }
 
     [ServiceAccountSqlFact]

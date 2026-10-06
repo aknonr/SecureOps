@@ -5,6 +5,9 @@ namespace SecureOps.Shared.Audit;
 /// </summary>
 public static class AuditActions
 {
+    /// <summary>An unsafe API request was rejected by the central request-intent guard.</summary>
+    public const string ApiCsrfRejected = "ApiCsrfRejected";
+
     /// <summary>
     /// A privileged identity lookup was requested.
     /// </summary>

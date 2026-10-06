@@ -24,7 +24,7 @@ public sealed class ApiRateLimitingHostedTests
                 builder.UseSetting("RateLimiting:IdentityLookup:PermitLimit", "1");
                 builder.UseSetting("RateLimiting:IdentityLookup:WindowSeconds", "60");
             });
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         object request = new { account = "sample.user", purpose = "Approved synthetic rate-limit test" };
 

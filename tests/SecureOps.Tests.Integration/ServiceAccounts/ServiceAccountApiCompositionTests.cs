@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Api.Security;
 using SecureOps.Api.ServiceAccounts;
 using SecureOps.Domain.Access;
+using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
@@ -37,7 +39,7 @@ public sealed class ServiceAccountApiCompositionTests
     public async Task Unauthenticated_IsChallenged_OnEveryModuleRoute()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using HttpClient anonymous = factory.CreateClient();
+        using HttpClient anonymous = factory.CreateApiClient();
         foreach (string route in _moduleReads)
         {
             (await anonymous.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Unauthorized, route);
@@ -52,7 +54,7 @@ public sealed class ServiceAccountApiCompositionTests
         await ApproveAsync(factory, "demo:team-lead", "Lead");
         foreach (string actor in new[] { DemoApiAuthentication.PlatformAdminActor, DemoApiAuthentication.TeamLeadActor })
         {
-            using HttpClient client = factory.CreateClient();
+            using HttpClient client = factory.CreateApiClient();
             client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
             if (actor == DemoApiAuthentication.PlatformAdminActor)
             {
@@ -79,14 +81,14 @@ public sealed class ServiceAccountApiCompositionTests
         await ApproveAsync(factory, "demo:platform-admin", "Admin");
         await ApproveAsync(factory, "demo:team-lead", "Lead");
         const string route = "/api/v1/service-accounts/directory/name-search";
-        using (HttpClient anonymous = factory.CreateClient())
+        using (HttpClient anonymous = factory.CreateApiClient())
         {
             (await anonymous.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         foreach (string actor in new[] { DemoApiAuthentication.PlatformAdminActor, DemoApiAuthentication.TeamLeadActor })
         {
-            using HttpClient client = factory.CreateClient();
+            using HttpClient client = factory.CreateApiClient();
             client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
             (await client.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode
                 .Should().Be(actor == DemoApiAuthentication.PlatformAdminActor ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden,
@@ -105,12 +107,13 @@ public sealed class ServiceAccountApiCompositionTests
     public async Task UsageScanRoutes_NeedTheWorkCapability_AndBoundTheUpload()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using (HttpClient anonymous = factory.CreateClient())
+        using (HttpClient anonymous = factory.CreateApiClient())
         {
             using MultipartFormDataContent form = [];
             form.Add(new ByteArrayContent("{}"u8.ToArray()), "file", "scan.json");
             (await anonymous.PostAsync($"/api/v1/service-accounts/accounts/{Guid.NewGuid()}/usage-scans", form)).StatusCode
                 .Should().Be(HttpStatusCode.Unauthorized);
+            (await anonymous.PostAsync("/api/v1/service-accounts/usage-scans", form)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
@@ -122,8 +125,9 @@ public sealed class ServiceAccountApiCompositionTests
         [
             "api/v1/service-accounts/accounts/{id:guid}/usage-scans",
             "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage",
-            "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/dismiss"
-        ], "evidence is attached and decided per account; there is no scan start route");
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/dismiss",
+            "api/v1/service-accounts/usage-scans"
+        ], "evidence is attached (to one account, or to several accounts in one upload) and decided per account; there is no scan start route");
         foreach (RouteEndpoint endpoint in writes)
         {
             endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.Work);
@@ -143,8 +147,8 @@ public sealed class ServiceAccountApiCompositionTests
             endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.View).And.NotContain(ServiceAccountPolicies.Work);
         }
 
-        writes.Single(e => e.RoutePattern.RawText!.EndsWith("usage-scans", StringComparison.Ordinal)).Metadata
-            .GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize.Should().Be(5L * 1024 * 1024);
+        writes.Where(e => e.RoutePattern.RawText!.EndsWith("usage-scans", StringComparison.Ordinal)).Select(e =>
+            e.Metadata.GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize).Should().Equal(5L * 1024 * 1024, 5L * 1024 * 1024);
     }
 
     [Fact]
@@ -165,7 +169,7 @@ public sealed class ServiceAccountApiCompositionTests
     public void EveryModuleEndpoint_RequiresAModuleCapabilityPolicy()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using HttpClient _ = factory.CreateClient();
+        using HttpClient _ = factory.CreateApiClient();
         HashSet<string> modulePolicies = [.. ServiceAccountPolicies.Map.Select(m => m.Policy)];
         RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
             .Where(e => e.RoutePattern.RawText?.StartsWith("api/v1/service-accounts", StringComparison.OrdinalIgnoreCase) == true)];
@@ -179,10 +183,38 @@ public sealed class ServiceAccountApiCompositionTests
         }
     }
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    [Fact]
+    public async Task UsageScanUploads_OpenApiDescribesTheFormAsSent()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory(swagger: true);
+        using HttpClient client = factory.CreateClient();
+        JsonNode document = JsonNode.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"))!;
+
+        foreach ((string path, string[] required, string[] optional) in new[]
+        {
+            ("/api/v1/service-accounts/accounts/{id}/usage-scans", new[] { "file", "runStatement" }, new[] { "requestId" }),
+            ("/api/v1/service-accounts/usage-scans", ["file", "runStatement", "accountIds"], Array.Empty<string>())
+        })
+        {
+            JsonNode schema = document["paths"]![path]!["post"]!["requestBody"]!["content"]!["multipart/form-data"]!["schema"]!;
+            JsonObject properties = schema["properties"]!.AsObject();
+            properties.Select(p => p.Key).Should().BeEquivalentTo([.. required, .. optional], $"{path}: the form fields, not IFormFile's own properties");
+            schema["required"]!.AsArray().Select(r => (string?)r).Should().BeEquivalentTo(required, path);
+            ((string?)properties["file"]!["type"], (string?)properties["file"]!["format"]).Should().Be(("string", "binary"), path);
+            ((int?)properties["runStatement"]!["minLength"], (int?)properties["runStatement"]!["maxLength"]).Should().Be((5, 400), path);
+        }
+
+        JsonNode ids = document["paths"]!["/api/v1/service-accounts/usage-scans"]!["post"]!["requestBody"]!["content"]!["multipart/form-data"]!["schema"]!
+            ["properties"]!["accountIds"]!;
+        ((string?)ids["type"], (int?)ids["minItems"], (int?)ids["maxItems"], (bool?)ids["uniqueItems"], (string?)ids["items"]!["format"])
+            .Should().Be(("array", 1, UsageScanBatch.MaxAccounts, true, "uuid"));
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(bool swagger = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Test");
+            builder.UseSetting("Swagger:Enabled", swagger ? "true" : "false");
             builder.UseSetting("DemoAuth:Enabled", "true");
             builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
             builder.UseSetting("Access:DemoCompatibilityEnabled", "false");

@@ -1,6 +1,11 @@
-[CmdletBinding()]
-param([Parameter(Mandatory)][ValidatePattern('^\d{4}-\d{2}-\d{2}-pilot-rc6\.\d+$')][string]$ReleaseName,
+[CmdletBinding(DefaultParameterSetName='Release')]
+param([Parameter(Mandatory,ParameterSetName='Release')][ValidatePattern('^\d{4}-\d{2}-\d{2}-pilot-rc6\.\d+$')][string]$ReleaseName,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedSource,
+    [Parameter(Mandatory,ParameterSetName='Review')][switch]$ReviewCandidate,
+    [Parameter(Mandatory,ParameterSetName='Review')][string]$OutputDirectory,
+    [Parameter(Mandatory,ParameterSetName='Review')][ValidatePattern('^[0-9a-f]{40}$')][string]$TestedProductSource,
+    [Parameter(ParameterSetName='Review')][switch]$UpgradeFromInstalled027,
+    [Parameter(ParameterSetName='Review')][switch]$UpgradeFromInstalled028,
     [string]$BrandingDirectory,
     [switch]$UpgradeFromRc621,
     [switch]$UpgradeFromRc622,
@@ -10,6 +15,14 @@ param([Parameter(Mandatory)][ValidatePattern('^\d{4}-\d{2}-\d{2}-pilot-rc6\.\d+$
     [string]$SqlUpgradeReview)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if ($ReviewCandidate) {
+    if (!$IncludeServiceAccounts -or !$SqlUpgradeReview -or $BrandingDirectory -or $UpgradeFromRc621 -or $UpgradeFromRc622 -or $UpgradeFromRc624 -or $UpgradeFromRc626 -or
+        (@($UpgradeFromInstalled027,$UpgradeFromInstalled028 | Where-Object { $_ }).Count -ne 1)) { throw 'Review requires exactly one installed 027/028 baseline and explicit source-bound SQL review.' }
+    & "$PSScriptRoot/New-ServiceAccountsTestReview.ps1" -FromExactSource -ApiUiOnly -ExpectedSource $ExpectedSource `
+        -TestedProductSource $TestedProductSource -OutputDirectory $OutputDirectory -SqlUpgradeReview $SqlUpgradeReview `
+        -UpgradeFromInstalled027:$UpgradeFromInstalled027 -UpgradeFromInstalled028:$UpgradeFromInstalled028
+    return
+}
 if ($UpgradeFromRc621 -or (@($UpgradeFromRc622,$UpgradeFromRc624,$UpgradeFromRc626 | Where-Object { $_ }).Count -gt 1)) { throw 'Choose one reviewed upgrade baseline: rc6.22 (022-024), rc6.24/022 (023-024), or rc6.26/023 (024 only).' }
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $destination = Join-Path 'C:\SecureOpsBuild\release' $ReleaseName

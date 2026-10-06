@@ -407,7 +407,7 @@ have to be invented.
 | `/resources` | Uygulama Bağlantıları: search, favourites, add to a personal group | `Resources.View` |
 | `/resources/sets` | Bağlantı Gruplarım: personal ordered groups, preferred group, opening | `Resources.View` |
 | `/admin/resources` | Bağlantı Yönetimi: shared categories and links | `Resources.View` and `Resources.Manage` |
-| `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters; bounded directory name search panel (ADR-0025) | `ServiceAccounts.View` and scope grant; the name search also needs `Identity.Lookup` |
+| `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters; selected accounts take one mail record or one usage-scan file; bounded directory name search panel (ADR-0025) | `ServiceAccounts.View` and scope grant; the name search also needs `Identity.Lookup` |
 | `/service-accounts/{id}` | Account detail, work, usages with the explained knowledge-base rule, evidence and history | `ServiceAccounts.View`; commands require their own capability (rule exception: `ServiceAccounts.Verify`) |
 | `/service-accounts/work` | Entry work summary, in-app reminders and unsent coordinator drafts | `ServiceAccounts.View` |
 | `/service-accounts/imports` | Import guide (tracking workbook once, weekly list, DBA list), preview, decisions and idempotent commit; without organization scope it explains how another module administrator grants it | `ServiceAccounts.Import` and organization scope |
@@ -2271,6 +2271,26 @@ Migrations 001-010 and the reviewed object grants must be applied, and an API bu
 happened yet. `ResourceCurator` is assigned by an existing Admin through
 `PUT /api/v1/access/users/{id}/roles`; no migration or task assigns it.
 
+## Service Accounts multi-account scan upload (2026-10-06)
+
+On `/service-accounts`, selecting accounts (Work capability) offers "Tek tarama dosyasını bu hesaplara bağla":
+`SaUsageScanBatchForm` sends one file, the run statement and the selected ids (repeated `accountIds` field) to
+`POST /api/v1/service-accounts/usage-scans` and shows the server's answer per account: a short text badge (Bağlandı, Zaten
+bağlıydı, Aranmamış, Belirsiz, Bulunamadı / yetki yok, Kaydedilemedi; never colour alone) plus the server's own wording.
+An account the server returns without a name is shown as "Bulunamadı veya kapsamınızda değil" (or "Hesap bilgisi okunamadı"
+for a `Failed` row whose account could not be read, since 2026-10-07), never with the list label.
+A refused file uses the existing usage-scan problem texts; nothing is stored. The selection stays after an upload so a
+failed row can be retried. Tests: `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUsageScanBatchUiTests.cs`.
+
+2026-10-07 review fixes: the badge for `NotInScan` reads "Aranmamış" (the file did not search the account; earlier "Dosyada
+yok"). A new upload clears the previous answer first; a failed upload is shown inside the form (`Problem` parameter, shared
+`SaProblem`) and its "Tekrar dene" repeats the upload with the current file, statement and selection — the page-level
+problem panel (whose retry reloads the list) is kept only for session/access problems. The send button is never
+`disabled`: while not ready it is `aria-disabled="true"`, stays in the tab order (typing the statement and pressing Tab
+reaches it even before the server re-renders), does nothing when activated, and points with `aria-describedby` to a line
+that says what is missing (selection, more than 20, file, statement of at least 5 characters, upload in progress). The
+"Tek e-posta kaydını…" and "Tek tarama dosyasını…" toggles carry `aria-expanded`.
+
 ## HTTPS offload behind the corporate load balancer
 
 TLS terminates at the F5 and the backend hop to IIS is cleartext HTTP. Antiforgery and the session
@@ -2358,6 +2378,11 @@ See `docs/agent-guides/060-ui.md`. Highlights:
 - No remediation controls.
 
 ## Running locally
+
+All shared server-side API clients send the public `X-SecureOps-Csrf: 1` request
+intent header (ADR-0029). Browser Origin/Fetch Metadata is not forwarded. Direct
+unsafe API scripts need this header too; a headerless client receives 403. The UI's
+existing antiforgery, authentication and API session transport remain required.
 
 Two hosts. Start the API first:
 

@@ -357,8 +357,11 @@ public static partial class UsageScanParser
             throw new UsageScanFileException(UsageScanFileCodes.Schema);
         }
 
+        // The server searched exactly the bundle's names: no repeats and the same set (bundle names are distinct), so a name the
+        // server never searched cannot read as "not found" there.
         string[] searched = [.. Array(document.GetProperty("accounts"), 1, 20).Select(a => Pattern(a, AccountPattern(), 100))];
-        if (searched.Length != accounts.Length || !searched.All(a => accounts.Contains(a, StringComparer.OrdinalIgnoreCase)))
+        if (searched.Length != accounts.Length || searched.Distinct(StringComparer.OrdinalIgnoreCase).Count() != searched.Length
+            || !searched.All(a => accounts.Contains(a, StringComparer.OrdinalIgnoreCase)))
         {
             throw new UsageScanFileException(UsageScanFileCodes.Inconsistent);
         }
