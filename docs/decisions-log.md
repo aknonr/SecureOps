@@ -1,5 +1,14 @@
 # Decisions Log
 
+## 2026-10-06 - Concurrent session termination (ADR-0014 Amendment 4)
+
+Owner-approved F3: first committed termination owns the reason/timestamp and terminal audit.
+Concurrent single-session losers write no audit and reread that state; logout/revoke return it,
+validation denies using its winning reason, and unverifiable rereads fail closed. SQL and
+InMemory share the policy. F4 already-running request/Touch boundaries remain open and outside
+this change. Local parallel SQL/InMemory evidence is in
+`docs/validation/dotnet10-followups-2-sessions-20261006.md`; no corporate or UI change.
+
 ## 2026-10-03 - OR request type: text suggestion, one-click confirm (ADR-0018 Amendment 1)
 
 Owner decision: the operator should not start from an empty "operator declaration" select. The API suggests

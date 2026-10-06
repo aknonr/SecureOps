@@ -19,7 +19,7 @@ public interface IApplicationSessionRepository
     public Task<bool> EndAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken);
 
     /// <summary>Commits one termination and its append-only audit in one operation.</summary>
-    /// <returns>Whether this operation actually ended an active session; concurrent-loser semantics remain caller-owned.</returns>
+    /// <returns>Whether this operation ended an active session and wrote its audit. A loser writes no audit; the caller rereads the winning state.</returns>
     public Task<bool> EndWithAuditAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, AuditEvent auditEvent, CancellationToken cancellationToken);
 
     /// <summary>Atomically ends all active sessions for one user with their required audit and returns the affected sessions.</summary>

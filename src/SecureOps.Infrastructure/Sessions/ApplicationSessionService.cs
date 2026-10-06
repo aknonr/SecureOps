@@ -128,13 +128,21 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         try
         {
             ApplicationSession? session = await _repository.GetAsync(sessionId, cancellationToken);
-            if (session is null || !session.IsActive)
+            if (session is null)
             {
                 return Failure(ApplicationSessionDisposition.Revoked, OperationalErrorCodes.SessionRevoked);
             }
+            if (!session.IsActive)
+            {
+                return CommittedEndResult(session, forValidation: false);
+            }
 
-            _ = await _repository.EndWithAuditAsync(sessionId, now, SessionEndReason.Logout,
+            bool ended = await _repository.EndWithAuditAsync(sessionId, now, SessionEndReason.Logout,
                 CreateAudit(AuditActions.ApplicationSessionLoggedOut, session, SessionEndReason.Logout, context, null), cancellationToken);
+            if (!ended)
+            {
+                return await ReadConcurrentEndAsync(sessionId, forValidation: false, cancellationToken);
+            }
 
             return new ApplicationSessionResult(ApplicationSessionDisposition.Ended, session with { EndedAtUtc = now, EndReason = SessionEndReason.Logout }, null);
         }
@@ -204,14 +212,22 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         try
         {
             ApplicationSession? session = await _repository.GetAsync(sessionId, cancellationToken);
-            if (session is null || !session.IsActive)
+            if (session is null)
             {
                 return Failure(ApplicationSessionDisposition.Revoked, OperationalErrorCodes.SessionNotFound);
             }
+            if (!session.IsActive)
+            {
+                return CommittedEndResult(session, forValidation: false);
+            }
 
             DateTimeOffset now = _timeProvider.GetUtcNow();
-            _ = await _repository.EndWithAuditAsync(sessionId, now, SessionEndReason.Revoked,
+            bool ended = await _repository.EndWithAuditAsync(sessionId, now, SessionEndReason.Revoked,
                 CreateAudit(AuditActions.ApplicationSessionRevoked, session, SessionEndReason.Revoked, context, reason.Trim()), cancellationToken);
+            if (!ended)
+            {
+                return await ReadConcurrentEndAsync(sessionId, forValidation: false, cancellationToken);
+            }
 
             return new ApplicationSessionResult(ApplicationSessionDisposition.Ended, session with { EndedAtUtc = now, EndReason = SessionEndReason.Revoked }, null);
         }
@@ -310,7 +326,11 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         };
         try
         {
-            _ = await _repository.EndWithAuditAsync(session.SessionId, now, reason, CreateAudit(action, session, reason, context, null), cancellationToken);
+            bool ended = await _repository.EndWithAuditAsync(session.SessionId, now, reason, CreateAudit(action, session, reason, context, null), cancellationToken);
+            if (!ended)
+            {
+                return await ReadConcurrentEndAsync(session.SessionId, forValidation: true, cancellationToken);
+            }
         }
         catch (AuditWriteUnavailableException)
         {
@@ -319,6 +339,22 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         }
 
         return Failure(disposition, errorCode, session with { EndedAtUtc = now, EndReason = reason });
+    }
+
+    private async Task<ApplicationSessionResult> ReadConcurrentEndAsync(Guid sessionId, bool forValidation, CancellationToken cancellationToken)
+    {
+        ApplicationSession? winner = await _repository.GetAsync(sessionId, cancellationToken);
+        return CommittedEndResult(winner, forValidation);
+    }
+
+    private static ApplicationSessionResult CommittedEndResult(ApplicationSession? winner, bool forValidation)
+    {
+        if (winner is null || winner.IsActive || winner.EndReason is null)
+        {
+            return Failure(ApplicationSessionDisposition.StoreUnavailable, OperationalErrorCodes.SessionStoreUnavailable);
+        }
+
+        return forValidation ? EndedFailure(winner) : new ApplicationSessionResult(ApplicationSessionDisposition.Ended, winner, null);
     }
 
     private async Task<bool> TryAuditAsync(
