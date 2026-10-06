@@ -28,11 +28,13 @@ public sealed partial class ServiceAccountService
             Guid[] ids = [.. accountIds ?? []];
             if (ids.Length is 0 or > UsageScanBatch.MaxAccounts || ids.Contains(Guid.Empty) || ids.Distinct().Count() != ids.Length)
             {
+                await AuditBatchRefusalAsync(caller, context, new UsageScanBatchRefusal("accountIds", ids.Length), cancellationToken);
                 return SaResult<UsageScanBatchResult>.Fail(SaErrors.Invalid, "accountIds");
             }
 
             if (!ValidRunStatement(runStatement))
             {
+                await AuditBatchRefusalAsync(caller, context, new UsageScanBatchRefusal("runStatement", ids.Length), cancellationToken);
                 return SaResult<UsageScanBatchResult>.Fail(SaErrors.Invalid, "runStatement");
             }
 
@@ -43,7 +45,8 @@ public sealed partial class ServiceAccountService
             }
             catch (UsageScanFileException rejected)
             {
-                // Only the stable code leaves this method; the file content is neither logged nor stored.
+                // Only the stable code leaves this method (and the audit record); the file content is neither logged nor stored.
+                await AuditBatchRefusalAsync(caller, context, new UsageScanBatchRefusal(rejected.Code, ids.Length), cancellationToken);
                 return SaResult<UsageScanBatchResult>.Fail(SaErrors.UsageScanFile, rejected.Code);
             }
 
@@ -93,8 +96,33 @@ public sealed partial class ServiceAccountService
                     linked ? matched : null));
             }
 
+            int Count(UsageScanBatchOutcome outcome) => results.Count(r => r.Outcome == outcome.ToString());
+            if (Count(UsageScanBatchOutcome.Attached) + Count(UsageScanBatchOutcome.AlreadyAttached) < results.Count)
+            {
+                await AuditBatchRefusalAsync(caller, context, new UsageScanBatchRefusal("accounts", ids.Length, Count(UsageScanBatchOutcome.Attached),
+                    Count(UsageScanBatchOutcome.AlreadyAttached), Count(UsageScanBatchOutcome.NotInScan), Count(UsageScanBatchOutcome.Ambiguous),
+                    Count(UsageScanBatchOutcome.Unavailable), Count(UsageScanBatchOutcome.Failed)), cancellationToken);
+            }
+
             return new SaResult<UsageScanBatchResult>(new UsageScanBatchResult(scanId, parsed.Purpose, parsed.Servers.Count, parsed.AnsweredServers, results));
         }, cancellationToken);
+
+    /// <summary>
+    /// Puts a refused (or partly refused) multi-account upload on record: reason and counts only. The answer does not depend on
+    /// it — the refusal stands and committed links already carry their own audit — so a failure here is logged, not returned.
+    /// </summary>
+    private async Task AuditBatchRefusalAsync(SaCaller caller, AccessOperationContext context, UsageScanBatchRefusal refusal, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await repository!.RecordUsageScanBatchRefusalAsync(refusal, caller.Actor, cancellationToken);
+        }
+        catch (Exception exception) when (exception is DbException or IOException or InvalidOperationException or TimeoutException)
+        {
+            logger.LogError("Service Accounts multi-account usage-scan refusal could not be audited. FailureType: {FailureType} Number={SqlNumber} Origin={Origin} CorrelationId={CorrelationId}",
+                exception.GetType().Name, (exception as SqlException)?.Number, Origin(exception), context.CorrelationId);
+        }
+    }
 
     /// <summary>Organization-level scope or the confirmed owner team: may work on the whole account (not only through a request).</summary>
     private static bool Responsible(ServiceAccountScope scope, AccountScopeAnchor anchor) =>

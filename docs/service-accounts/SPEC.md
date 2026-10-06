@@ -248,7 +248,8 @@ server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR
    answers each account on its own with the single-account rules and the responsible basis only: `Attached`,
    `AlreadyAttached`, `NotInScan`, `Ambiguous`, `Unavailable` (missing / out of scope / no responsible basis, without the
    name when out of scope) or `Failed` (storage error; repeating is safe). One refusal or failure never blocks another
-   (per-account failure boundary); history and audit per link. Both upload routes re-check scope and basis inside the
+   (per-account failure boundary); history and audit per link; each refusal (request, file, or some accounts not linked)
+   adds one `ServiceAccount.UsageScanBatchRefused` audit row with reason and counts only. Both upload routes re-check scope and basis inside the
    link's write transaction (locked account/request rows, HOLDLOCK on grants and the tree), so a change after the check
    writes nothing. ADR-0027 §4.
 

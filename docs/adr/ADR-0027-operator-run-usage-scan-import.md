@@ -101,7 +101,10 @@ second account adds only a link. Another person uploading the same bytes creates
   scope or not the caller's to work on — indistinguishable, and returned without the account's name when out of scope) or
   `Failed` (storage error; repeating the upload is safe). One refusal or failure never blocks another (each account has its
   own failure boundary, so earlier links stand and later accounts are still tried); the scan is stored once and linked per
-  account in its own transaction, with history and audit per link.
+  account in its own transaction, with history and audit per link. Every refusal after the capability check — a refused
+  request field or file, or an upload where some accounts were not linked — writes one `ServiceAccount.UsageScanBatchRefused`
+  audit row with a stable reason (`accountIds`, `runStatement`, the file code, or `accounts`) and counts only (requested and
+  per outcome): no account name or id, no file name, hash or content (2026-10-07).
 - **Authority is re-checked inside the write** (both upload routes, 2026-10-07): the link's transaction locks the account
   row (and the request row when attaching through a request) and re-reads the caller's active scope grants and the
   organization/team tree under HOLDLOCK. A revocation or owner-team/organization change that commits after the service's

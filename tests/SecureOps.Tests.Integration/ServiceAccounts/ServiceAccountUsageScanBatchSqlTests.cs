@@ -76,6 +76,15 @@ public sealed class ServiceAccountUsageScanBatchSqlTests
                 new { id = "%" + id.ToString("D") + "%" })).Should().Be(1);
         }
 
+        string refusal = (await RefusalAuditsAsync(fx, coordinator)).Single();
+        JsonNode counts = JsonNode.Parse(refusal)!;
+        ((string?)counts["Reason"], (int?)counts["Requested"], (int?)counts["Attached"], (int?)counts["AlreadyAttached"], (int?)counts["NotInScan"],
+            (int?)counts["Ambiguous"], (int?)counts["Unavailable"], (int?)counts["Failed"]).Should().Be(("accounts", 6, 2, 0, 1, 1, 2, 0));
+        foreach (string withheld in new[] { outside.Summary.AccountName, outside.Summary.Id.ToString("D"), first.Summary.AccountName, "SYN\\\\" })
+        {
+            refusal.Should().NotContain(withheld, "the refusal record carries counts only: no account name or id, nothing from the file");
+        }
+
         UsageScanBatchResult replay = Ok(await fx.Service.AttachUsageScanToAccountsAsync(coordinator.Principal, fx.Context,
             [second.Summary.Id, notSearched.Summary.Id, first.Summary.Id], "again.json", file, "Sentetik: aynı dosya ikinci kez", _token));
         replay.ScanId.Should().Be(result.ScanId);
@@ -124,6 +133,23 @@ public sealed class ServiceAccountUsageScanBatchSqlTests
             .Should().Be(0);
         (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.History WHERE EntityType = 'UsageScan' AND AccountId IN @ids", new { ids })).Should().Be(0);
         (await fx.CountAsync("SELECT COUNT(*) FROM audit.AuditLog WHERE DetailsJson LIKE @s", new { s = "%" + secret + "%" })).Should().Be(0);
+
+        // Every refusal after the capability check is on record with its stable reason and the requested count only.
+        string[] refusals = await RefusalAuditsAsync(fx, coordinator);
+        refusals.Select(r => ((string?)JsonNode.Parse(r)!["Reason"], (int?)JsonNode.Parse(r)!["Requested"])).Should().Equal(
+            ("scanSecretField", 2), ("accountIds", 0), ("accountIds", 0), ("accountIds", 2), ("accountIds", 2), ("accountIds", 21),
+            ("runStatement", 2), ("runStatement", 2));
+        refusals.Should().AllSatisfy(r => r.Should().NotContain(first.Summary.AccountName).And.NotContain(first.Summary.Id.ToString("D")));
+        (await RefusalAuditsAsync(fx, viewer)).Should().BeEmpty("a caller without the Work capability is refused before the module looks at anything");
+    }
+
+    /// <summary>The caller's multi-account refusal records, oldest first.</summary>
+    private static async Task<string[]> RefusalAuditsAsync(ServiceAccountSqlFixture fx, SynUser caller)
+    {
+        await using SqlConnection connection = fx.Connection();
+        return [.. await connection.QueryAsync<string>("""
+            SELECT DetailsJson FROM audit.AuditLog WHERE Action = 'ServiceAccount.UsageScanBatchRefused' AND Actor = @actor ORDER BY OccurredAt, AuditLogId;
+            """, new { actor = caller.User.Id.ToString("D") })];
     }
 
     [ServiceAccountSqlFact]
