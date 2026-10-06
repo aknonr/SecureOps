@@ -56,7 +56,7 @@ public sealed class DirectoryNameSearchHostedTests
         using HttpClient client = await ApprovedClientAsync(factory, role);
         (await client.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"))).StatusCode.Should().Be(expected);
         directory.Calls.Should().Be(expected == HttpStatusCode.OK ? 1 : 0);
-        using HttpClient anonymous = factory.CreateClient();
+        using HttpClient anonymous = factory.CreateApiClient();
         (await anonymous.PostAsJsonAsync(_route, new DirectoryNameSearchRequest("ayse"))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -156,7 +156,7 @@ public sealed class DirectoryNameSearchHostedTests
         EnsureAccessUserResult pending = await users.EnsureUserAsync(new CorporatePrincipal("demo:team-lead", "test"), true, TimeSpan.Zero, default);
         (await users.DecideRequestAsync(pending.PendingRequest!.Id, AccessRequestStatus.Approved, pending.PendingRequest.Version,
             "system:test-seed", [role], "Synthetic approval", default)).Disposition.Should().Be(AccessMutationDisposition.Applied);
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "team-lead");
         return client;
     }

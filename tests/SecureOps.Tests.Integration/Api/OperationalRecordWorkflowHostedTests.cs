@@ -223,8 +223,8 @@ public sealed class OperationalRecordWorkflowHostedTests
     public async Task FakeSource_ListDetailPreviewCreate_UsesRealWorkflowStateMachine()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using HttpClient anonymous = factory.CreateClient();
-        using HttpClient admin = factory.CreateClient();
+        using HttpClient anonymous = factory.CreateApiClient();
+        using HttpClient admin = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         (await anonymous.GetAsync("/api/v1/operational-records")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -265,7 +265,7 @@ public sealed class OperationalRecordWorkflowHostedTests
     public async Task FakeSource_ChangedRecord_IsRejectedBeforeJiraCreate()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using HttpClient admin = factory.CreateClient();
+        using HttpClient admin = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         OperationalRecordResponse[] records = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records"))!;
         OperationalRecordResponse stale = records.Single(record => record.OrCode == "SYN-OR-200");
@@ -434,7 +434,7 @@ public sealed class OperationalRecordWorkflowHostedTests
 
         Func<Task> act = async () =>
         {
-            using HttpClient client = factory.CreateClient();
+            using HttpClient client = factory.CreateApiClient();
             _ = await client.GetAsync("/api/v1/health");
         };
 
@@ -566,7 +566,7 @@ public sealed class OperationalRecordWorkflowHostedTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
         return client;
     }

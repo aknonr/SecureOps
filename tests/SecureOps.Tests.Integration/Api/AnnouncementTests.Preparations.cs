@@ -81,7 +81,7 @@ public sealed partial class AnnouncementTests
             foreach (string role in _roles)
             { b.UseSetting("Announcements:Bundles:bundle-v1:Assets:" + role, "synthetic-v1"); }
         });
-        using HttpClient admin = factory.CreateClient(), denied = factory.CreateClient(), anonymous = factory.CreateClient();
+        using HttpClient admin = factory.CreateApiClient(), denied = factory.CreateApiClient(), anonymous = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
         denied.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "team-lead");
         await SeedSenderAsync(admin, connection);
