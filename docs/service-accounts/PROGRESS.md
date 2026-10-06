@@ -82,7 +82,9 @@ warning, server refusal and saved value, transition, report list, scan paging wi
 
 ## Decisions (owner, 2026-10-04)
 
-- ADR-0024 read-only discovery: **shelved** (Bilgi Güvenliği approval and the 10–15 server pilot are with the owner).
+- ADR-0024 read-only discovery: shelved on 2026-10-04; **Revision 2 accepted as an owner decision on 2026-10-06**
+  (read-only JEA scan; no server writes, ADR-0028 stays Proposed). Bilgi Güvenliği and server-owner approval are NOT
+  obtained and are required before a pilot; the Worker access path (direct WinRM+Kerberos or BeyondTrust) is open.
   Replaced for now by the person-run scan of ADR-0027 (no JEA, no Worker). A product-side fan-out over the default WinRM
   endpoint would be an exception to AGENTS.md rule 3 and is not built.
 - JEA allow-list finding (raw `Get-WebConfigurationProperty`/`Get-Content` can return IIS-stored service account
