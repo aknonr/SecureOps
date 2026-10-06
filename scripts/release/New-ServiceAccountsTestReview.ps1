@@ -3,13 +3,24 @@ param([Parameter(Mandatory)][ValidatePattern('^[A-Za-z]:[\\/]')][string]$OutputD
     [Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{40}$')][string]$TestedProductSource,
     [switch]$ResumeFailedReview,
     [switch]$FromVerifiedMaster,
+    [switch]$FromExactSource,
+    [ValidatePattern('^[a-f0-9]{40}$')][string]$ExpectedSource,
     [switch]$ApiUiOnly,
     [switch]$UpgradeFromInstalled026,
+    [switch]$UpgradeFromInstalled027, [switch]$UpgradeFromInstalled028,
     [Parameter(Mandatory)][string]$SqlUpgradeReview)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $destination = [IO.Path]::GetFullPath($OutputDirectory)
+$current = $UpgradeFromInstalled027 -or $UpgradeFromInstalled028
+if ($current -and (!$FromExactSource -or !$ApiUiOnly -or !$ExpectedSource -or $ResumeFailedReview -or $FromVerifiedMaster)) {
+    throw '028-032 review requires exact ExpectedSource, API/UI-only, fresh output and FromExactSource.'
+}
+if ($FromExactSource -and !$current) { throw 'Exact-source mode is reserved for explicit installed 027/028 review.' }
+if ($destination.StartsWith($repo + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or $destination -ieq $repo) {
+    throw 'Candidate output must be outside the source tree.'
+}
 if (Test-Path $destination) {
     if (!$ResumeFailedReview -or (Test-Path (Join-Path $destination 'candidate.json')) -or
         @(Get-ChildItem $destination -File -Recurse -Filter '*.zip').Count -ne 0) {
@@ -20,18 +31,28 @@ Push-Location $repo
 try {
     $preparation = (& git rev-parse HEAD).Trim()
     $branch = (& git branch --show-current).Trim()
-    if ($FromVerifiedMaster) {
+    if ($FromExactSource) {
+        if ($branch -cnotin @('master','fix/release-packaging-028-032-20261007') -or $preparation -cne $ExpectedSource) {
+            throw 'Expected authorized branch and exact preparation source.'
+        }
+        $master = (& git rev-parse origin/master).Trim()
+        if ($LASTEXITCODE -ne 0 -or $TestedProductSource -cne $master) { throw 'Tested product source must equal verified remote master.' }
+        & git merge-base --is-ancestor $TestedProductSource HEAD
+        if ($LASTEXITCODE -ne 0) { throw 'Preparation must descend from tested master.' }
+    } elseif ($FromVerifiedMaster) {
         if ($branch -cne 'master' -or $preparation -cne $TestedProductSource -or
             $preparation -cne (& git rev-parse origin/master).Trim()) { throw 'Expected clean exact verified remote master.' }
     } elseif ($branch -ne 'feature/service-accounts-pinned-integration-20260929') {
         throw 'Unexpected review source branch.'
     }
-    if (@(& git status --porcelain).Count -ne 0) { throw 'Commit the scoped preparation before publishing.' }
+    $dirty = @(& git status --porcelain)
+    if ($LASTEXITCODE -ne 0 -or $dirty.Count -ne 0) { throw 'Commit the scoped preparation before publishing.' }
     if (!(& git ls-files -- scripts/release/New-ServiceAccountsTestReview.ps1)) { throw 'Review generator must be tracked.' }
     & git diff --quiet $TestedProductSource HEAD -- src contracts Directory.Build.props Directory.Build.targets Directory.Packages.props global.json NuGet.config
     if ($LASTEXITCODE -ne 0) { throw 'Product inputs differ from tested source; new verification is required.' }
     if ($UpgradeFromInstalled026 -and (!$FromVerifiedMaster -or !$ApiUiOnly)) { throw '027 review requires exact master and API/UI-only selection.' }
-    $baseline = if ($UpgradeFromInstalled026) { @{ UpgradeFromInstalled026=$true } } else { @{ UpgradeFromRc626=$true } }
+    $baseline = if ($UpgradeFromInstalled027) { @{ UpgradeFromInstalled027=$true } } elseif ($UpgradeFromInstalled028) { @{ UpgradeFromInstalled028=$true } } elseif ($UpgradeFromInstalled026) { @{ UpgradeFromInstalled026=$true } } else { @{ UpgradeFromRc626=$true } }
+    if (@($UpgradeFromInstalled026,$UpgradeFromInstalled027,$UpgradeFromInstalled028 | Where-Object { $_ }).Count -gt 1) { throw 'Choose exactly one upgrade baseline.' }
     $sqlPlan = & "$PSScriptRoot/Get-ReleaseSqlPlan.ps1" -RepositoryRoot $repo @baseline -IncludeServiceAccounts `
         -ExpectedSource $preparation -SqlUpgradeReview $SqlUpgradeReview
     $directories = @('API','UI','manifests','staging/api','staging/ui','payload/api','payload/ui','DBA/sql/migrations','DBA/sql/schema','DBA/sql/pending/service-accounts','configuration')
@@ -84,24 +105,37 @@ try {
     }
     Copy-Item sql/README.md (Join-Path $destination 'DBA/README.md')
     Copy-Item "$PSScriptRoot/configuration/AdminLookupRecovery.delta.xml" (Join-Path $destination 'configuration/recovery.delta.xml')
-    & "$PSScriptRoot/../powershell/Export-CompletionGuidance.ps1" -OutputDirectory (Join-Path $destination 'operator')
-    foreach ($relative in @('docs/service-accounts/WINDOWS-ACCEPTANCE.md','docs/service-accounts/SPEC.md','docs/service-accounts/INTEGRATION-FOLLOWUP-20261001.md',
+    $operatorEntry = 'operator/docs/service-accounts/ADMIN-LOOKUP-OPERATOR-CHECKLIST-20261003.md'
+    if ($current) {
+        $operatorEntry = 'operator/docs/release/TEST-028-032-OPERATOR-TR.md'
+        $guidance = @('docs/release/TEST-028-032-OPERATOR-TR.md','docs/service-accounts/DBA-029-030-TR.md',
+            'docs/access-registration-dba-032.md','docs/adr/ADR-0029-api-csrf-origin-guard.md')
+        Copy-Item 'scripts/diagnostics/Get-InstalledMigrationInventory025To032.sql' (Join-Path $destination 'DBA/Get-InstalledMigrationInventory025To032.sql')
+    } else {
+        & "$PSScriptRoot/../powershell/Export-CompletionGuidance.ps1" -OutputDirectory (Join-Path $destination 'operator')
+        $guidance = @('docs/service-accounts/WINDOWS-ACCEPTANCE.md','docs/service-accounts/SPEC.md','docs/service-accounts/INTEGRATION-FOLLOWUP-20261001.md',
         'docs/service-accounts/COMBINED-INTEGRATION-20261002.md',
         'docs/service-accounts/ADMIN-ACCESS-AND-GENERAL-LOOKUP-20261002.md',
         'docs/service-accounts/ADMIN-LOOKUP-DELIVERY-20261003.md',
-        'docs/service-accounts/ADMIN-LOOKUP-OPERATOR-CHECKLIST-20261003.md')) {
+        'docs/service-accounts/ADMIN-LOOKUP-OPERATOR-CHECKLIST-20261003.md')
+    }
+    foreach ($relative in $guidance) {
+        $source = Get-Item -LiteralPath $relative
+        if ($source.PSIsContainer -or $source.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Expected ordinary source guidance.' }
         $target = Join-Path $destination "operator/$relative"
         New-Item -ItemType Directory (Split-Path $target -Parent) -Force | Out-Null
         Copy-Item $relative $target
+        if ((Get-FileHash -LiteralPath $relative).Hash -cne (Get-FileHash -LiteralPath $target).Hash) { throw 'Guidance copy hash mismatch.' }
     }
     $support = @(Get-ChildItem (Join-Path $destination 'DBA'),(Join-Path $destination 'operator'),(Join-Path $destination 'configuration') -File -Recurse | Sort-Object FullName | ForEach-Object {
         [ordered]@{path=$_.FullName.Substring($destination.Length+1).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash}
     })
     $sequence = if ($UpgradeFromInstalled026) { @('preserve installed 024-026; verify baseline','027 only if not already satisfied','API grant scripts are existing references, not replay or membership commands') } else { @('024 after verified 023','025 if missing','026 after 025','separate reviewed API/Worker roles and 026 API grants') }
+    if ($current) { $sequence = $sqlPlan.ExecutionFiles }
     $record = [ordered]@{kind='Matched TEST review candidate, not a numbered release';readyForInstallation=$false;
-        testedProductSource=$TestedProductSource;preparationSource=$preparation;requiredSchema=$sqlPlan.RequiredSchema;
+        testedProductSource=$TestedProductSource;preparationSource=$preparation;expectedSource=$ExpectedSource;requiredSchema=$sqlPlan.RequiredSchema;
         sqlReview=$sqlPlan.Review;sqlSequence=$sequence;components=$components;
-        operatorEntry='operator/docs/service-accounts/ADMIN-LOOKUP-OPERATOR-CHECKLIST-20261003.md';
+        operatorEntry=$operatorEntry;
         targetChanged=$false;corporateAcceptance='Not executed';payloads=$payloads;supportingFiles=$support;
         exclusions=@('appsettings*.json','web.config','secrets','private evidence','local test outputs','diagnostic package');
         releaseGuard='Numbered release requires the existing combined branch, clean exact ExpectedSource and explicit source-bound 023/024/025/026 SQL review; not run'}
