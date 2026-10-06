@@ -2359,6 +2359,11 @@ See `docs/agent-guides/060-ui.md`. Highlights:
 
 ## Running locally
 
+All shared server-side API clients send the public `X-SecureOps-Csrf: 1` request
+intent header (ADR-0029). Browser Origin/Fetch Metadata is not forwarded. Direct
+unsafe API scripts need this header too; a headerless client receives 403. The UI's
+existing antiforgery, authentication and API session transport remain required.
+
 Two hosts. Start the API first:
 
 ```powershell
