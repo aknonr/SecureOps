@@ -9,3 +9,9 @@ Use these snapshots for project context, rule rationales, the full reference map
 operator vocabulary. Existing hard rules, approved decisions and ownership semantics
 remain binding; moving text here grants no new approval. Historical task authorizations
 retain their original scope. Repository paths inside preserved text refer to the repo root.
+
+[Pre-October decisions](decisions-before-202610.md) preserve the full moved entries and
+handoffs from `docs/decisions-log.md`; archived approved decisions still bind.
+[Original test README](tests-README.before.md) preserves every detailed feature handoff,
+runner argument and dated verification boundary from `tests/README.md` at `8b891fb`.
+Their compact entry points link here. No historical acceptance becomes current by this move.
