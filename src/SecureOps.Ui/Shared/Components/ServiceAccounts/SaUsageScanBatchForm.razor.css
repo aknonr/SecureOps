@@ -17,3 +17,8 @@
     min-width: 0;
     overflow-wrap: anywhere;
 }
+
+/* The reason beside a not-ready send button (aria-describedby target). */
+.sa-batch-why {
+    margin: 0.25rem 0 0;
+}

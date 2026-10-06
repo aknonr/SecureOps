@@ -2276,11 +2276,19 @@ happened yet. `ResourceCurator` is assigned by an existing Admin through
 On `/service-accounts`, selecting accounts (Work capability) offers "Tek tarama dosyasını bu hesaplara bağla":
 `SaUsageScanBatchForm` sends one file, the run statement and the selected ids (repeated `accountIds` field) to
 `POST /api/v1/service-accounts/usage-scans` and shows the server's answer per account: a short text badge (Bağlandı, Zaten
-bağlıydı, Dosyada yok, Belirsiz, Bulunamadı / yetki yok, Kaydedilemedi; never colour alone) plus the server's own wording.
+bağlıydı, Aranmamış, Belirsiz, Bulunamadı / yetki yok, Kaydedilemedi; never colour alone) plus the server's own wording.
 An account the server returns without a name is shown as "Bulunamadı veya kapsamınızda değil", never with the list label.
-More than 20 selected accounts disables sending. A refused file uses the existing usage-scan problem texts; nothing is
-stored. The selection stays after an upload so a failed row can be retried. Tests:
-`tests/SecureOps.Tests.Unit/Ui/ServiceAccountUsageScanBatchUiTests.cs`.
+A refused file uses the existing usage-scan problem texts; nothing is stored. The selection stays after an upload so a
+failed row can be retried. Tests: `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUsageScanBatchUiTests.cs`.
+
+2026-10-07 review fixes: the badge for `NotInScan` reads "Aranmamış" (the file did not search the account; earlier "Dosyada
+yok"). A new upload clears the previous answer first; a failed upload is shown inside the form (`Problem` parameter, shared
+`SaProblem`) and its "Tekrar dene" repeats the upload with the current file, statement and selection — the page-level
+problem panel (whose retry reloads the list) is kept only for session/access problems. The send button is never
+`disabled`: while not ready it is `aria-disabled="true"`, stays in the tab order (typing the statement and pressing Tab
+reaches it even before the server re-renders), does nothing when activated, and points with `aria-describedby` to a line
+that says what is missing (selection, more than 20, file, statement of at least 5 characters, upload in progress). The
+"Tek e-posta kaydını…" and "Tek tarama dosyasını…" toggles carry `aria-expanded`.
 
 ## HTTPS offload behind the corporate load balancer
 

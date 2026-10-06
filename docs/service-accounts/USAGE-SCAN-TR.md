@@ -79,9 +79,11 @@ oluşturmaz. Her hesap yalnız kendi bileşenlerini görür.
 
 **Birden çok hesabı aramış dosya:** Servis Hesapları listesinde hesapları seçip (en çok 20) **Tek tarama dosyasını bu
 hesaplara bağla** ile dosyayı bir kez yükleyin. Dosyanın tamamı bir kez denetlenir (reddedilirse hiçbir hesaba hiçbir şey
-kaydedilmez); sonra her hesap ayrı kontrol edilir ve sonuç hesap bazında gösterilir: *Bağlandı*, *Zaten bağlıydı*, *Dosyada
-yok*, *Belirsiz* (ad iki domainde aranmış, hesapta domain yok), *Bulunamadı / yetki yok*, *Kaydedilemedi* (aynı yüklemeyi
-tekrarlamak güvenlidir). Bir hesabın reddi diğerlerini engellemez. Bu yol yalnız hesaptan sorumlu olduğunuz hesaplar
+kaydedilmez); sonra her hesap ayrı kontrol edilir ve sonuç hesap bazında gösterilir: *Bağlandı*, *Zaten bağlıydı*,
+*Aranmamış* (dosya bu hesabı aramamış; "kullanılmıyor" demek değildir), *Belirsiz* (ad iki domainde aranmış, hesapta
+domain yok), *Bulunamadı / yetki yok*, *Kaydedilemedi* (aynı yüklemeyi tekrarlamak güvenlidir). Bir hesabın reddi veya
+kaydedilememesi diğerlerini engellemez. Yükleme tümden başarısız olursa önceki sonuç silinir, hata formun içinde görünür ve
+**Tekrar dene** aynı dosya, beyan ve seçimle yüklemeyi tekrarlar. Düğme pasifken neyin eksik olduğu altında yazar. Bu yol yalnız hesaptan sorumlu olduğunuz hesaplar
 içindir; ekibinize atanmış talep üzerinden çalışıyorsanız hesabın kendi sayfasından talebi seçerek yükleyin. Her hesabın
 sayfasından ayrı ayrı bağlamak da mümkündür.
 

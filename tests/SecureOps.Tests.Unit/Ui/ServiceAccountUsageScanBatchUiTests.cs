@@ -10,6 +10,7 @@ using MudBlazor.Services;
 using NSubstitute;
 using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
+using SecureOps.Ui.Services;
 using SecureOps.Ui.Services.ServiceAccounts;
 using SecureOps.Ui.Shared.Components.ServiceAccounts;
 
@@ -45,7 +46,44 @@ public sealed class ServiceAccountUsageScanBatchUiTests
         string html = await RenderAsync(ids, [.. ids.Select((_, n) => $"svc_syn_{n}")], null);
 
         Words(html).Should().Contain("en çok 20 hesap seçilebilir; 21 hesap seçili");
-        Regex.IsMatch(html, @"<button[^>]*disabled[^>]*>(?:(?!</button>).)*Yükle ve seçili hesaplara bağla", RegexOptions.Singleline).Should().BeTrue();
+        SendButton(html).Should().Contain("aria-disabled=\"true\"").And.NotContain(" disabled", "a not-ready button stays in the tab order");
+        Words(html).Should().Contain("Gönderilemiyor: seçimi en çok 20 hesaba indirin");
+    }
+
+    [Fact]
+    public async Task NotReady_ButtonStaysFocusable_AndSaysWhy()
+    {
+        string html = await RenderAsync([_a], ["svc_syn_a"], null);
+
+        string button = SendButton(html);
+        button.Should().Contain("aria-disabled=\"true\"").And.Contain("aria-describedby=\"sa-batch-scan-why\"").And.NotContain(" disabled",
+            "typing the statement and pressing Tab must reach the button even before the server re-renders");
+        Words(html).Should().Contain("Gönderilemiyor: tarama dosyasını seçin; çalıştırma beyanını yazın (en az 5 karakter).");
+        html.Should().Contain("id=\"sa-batch-scan-why\"");
+    }
+
+    [Fact]
+    public async Task UploadFailed_ShowsTheProblemInsideTheForm_WithRetry_AndNoEarlierResult()
+    {
+        UiProblem problem = new(UiProblemKind.UpstreamUnavailable, "ServiceAccountPersistenceUnavailable", "Servis hesabı verisine şu an ulaşılamıyor",
+            "Yükleme kaydedilmedi.", ["Tekrar deneyin."], true, false, "sa-corr-1", null, 503);
+
+        string html = await RenderAsync([_a], ["svc_syn_a"], null, problem);
+
+        string form = html[html.IndexOf("sa-batch-scan-title", StringComparison.Ordinal)..html.LastIndexOf("</section>", StringComparison.Ordinal)];
+        Words(form).Should().Contain("Servis hesabı verisine şu an ulaşılamıyor").And.Contain("Tekrar dene");
+        Words(form).Should().NotContain("Son yüklemenin sonucu");
+    }
+
+    [Fact]
+    public void ListPage_TogglesSayExpanded_ClearsTheOldResult_AndKeepsUploadErrorsInTheForm()
+    {
+        string page = File.ReadAllText(Path.Combine([Root(), "src", "SecureOps.Ui", "Pages", "ServiceAccounts", "ServiceAccountList.razor"]));
+
+        page.Should().Contain("aria-expanded=\"@(_scanOpen ? \"true\" : \"false\")\"").And.Contain("aria-expanded=\"@(_mailOpen ? \"true\" : \"false\")\"");
+        page.Should().Contain("(_scanResult, _scanProblem) = (null, null);", "a new upload never shows the previous answer");
+        page.Should().Contain("Problem=\"_scanProblem\"").And.Contain("(_scanProblem, Problem) = (problem, null);",
+            "an upload failure is shown in the form, not as a page problem whose retry reloads the list");
     }
 
     [Fact]
@@ -65,20 +103,21 @@ public sealed class ServiceAccountUsageScanBatchUiTests
 
         html.Should().Contain("6 hesaptan 1 tanesine bağlandı, 1 tanesi zaten bağlıydı, 3 tanesine bağlanmadı, 1 tanesi kaydedilemedi")
             .And.Contain("Kullanım taraması, 4 planlanan sunucudan 3 tanesinden sonuç var");
-        foreach (string label in new[] { "Bağlandı", "Zaten bağlıydı", "Dosyada yok", "Belirsiz", "Bulunamadı / yetki yok", "Kaydedilemedi" })
+        foreach (string label in new[] { "Bağlandı", "Zaten bağlıydı", "Aranmamış", "Belirsiz", "Bulunamadı / yetki yok", "Kaydedilemedi" })
         {
             html.Should().Contain(label);
         }
 
         html.Should().Contain("Bulunamadı veya kapsamınızda değil").And.Contain("Dosyadaki ad: SYN\\svc_syn_a");
         html.Should().Contain(UsageScanBatch.Label(UsageScanBatchOutcome.Ambiguous), "the row carries the server's own wording");
-        html.Should().NotContain("kullanılmıyor");
+        html.Should().NotContain("kullanılmıyor").And.NotContain("Dosyada yok", "the badge says the file did not search the account");
     }
 
     private static UsageScanBatchAccountResult Row(Guid id, string? name, UsageScanBatchOutcome outcome, string? matched) =>
         new(id, name, name is null ? null : "SYN", outcome.ToString(), UsageScanBatch.Label(outcome), matched);
 
-    private static async Task<string> RenderAsync(IReadOnlyList<Guid> ids, IReadOnlyList<string> labels, UsageScanBatchResult? result)
+    private static async Task<string> RenderAsync(IReadOnlyList<Guid> ids, IReadOnlyList<string> labels, UsageScanBatchResult? result,
+        UiProblem? problem = null)
     {
         ServiceCollection registrations = new();
         registrations.AddLogging();
@@ -88,7 +127,7 @@ public sealed class ServiceAccountUsageScanBatchUiTests
         await using ServiceProvider services = registrations.BuildServiceProvider();
         await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
         string html = await renderer.Dispatcher.InvokeAsync(async () => (await renderer.RenderComponentAsync<SaUsageScanBatchForm>(ParameterView.FromDictionary(
-            new Dictionary<string, object?> { ["AccountIds"] = ids, ["AccountLabels"] = labels, ["Busy"] = false, ["Result"] = result }))).ToHtmlString());
+            new Dictionary<string, object?> { ["AccountIds"] = ids, ["AccountLabels"] = labels, ["Busy"] = false, ["Result"] = result, ["Problem"] = problem }))).ToHtmlString());
         return WebUtility.HtmlDecode(Regex.Replace(html, " b-[a-z0-9]{10}", string.Empty));
     }
 
@@ -96,6 +135,21 @@ public sealed class ServiceAccountUsageScanBatchUiTests
     {
         public SyntheticNavigation() => Initialize("http://localhost/", "http://localhost/service-accounts");
         protected override void NavigateToCore(string uri, bool forceLoad) => throw new InvalidOperationException("Unexpected navigation.");
+    }
+
+    /// <summary>The opening tag and text of the send button.</summary>
+    private static string SendButton(string html) =>
+        Regex.Match(html, @"<button(?:(?!<button).)*?Yükle ve seçili hesaplara bağla", RegexOptions.Singleline).Value;
+
+    private static string Root()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Repository root not found.");
     }
 
     private static string Words(string html) => Regex.Replace(Regex.Replace(html, "<[^>]+>", " "), @"\s+", " ");

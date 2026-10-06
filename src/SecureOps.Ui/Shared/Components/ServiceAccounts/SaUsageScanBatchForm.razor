@@ -31,8 +31,13 @@
         </MudItem>
     </MudGrid>
     @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
-    <MudButton OnClick="UploadAsync" Disabled="@(!CanSend)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
-        StartIcon="@Icons.Material.Filled.UploadFile">Yükle ve seçili hesaplara bağla</MudButton>
+    @* Not ready is aria-disabled, never disabled: the button stays in the tab order (typing the statement and pressing Tab
+       reaches it before the server re-renders) and says why it cannot send yet. *@
+    <MudButton OnClick="UploadAsync" Variant="@(CanSend ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Class="mt-2"
+        StartIcon="@Icons.Material.Filled.UploadFile" aria-disabled="@(CanSend ? "false" : "true")"
+        aria-describedby="@(CanSend ? null : "sa-batch-scan-why")">Yükle ve seçili hesaplara bağla</MudButton>
+    @if (!CanSend) { <p id="sa-batch-scan-why" class="so-panel-text--sm sa-batch-why">@WhyNot</p> }
+    <SaProblem Problem="Problem" OnRetry="UploadAsync" />
 
     @if (Result is { } result)
     {
@@ -82,10 +87,32 @@
     /// <summary>What the server answered for the last upload (null before the first one).</summary>
     [Parameter] public UsageScanBatchResult? Result { get; set; }
 
+    /// <summary>Why the last upload failed (shown here, with retry); null when it did not fail.</summary>
+    [Parameter] public UiProblem? Problem { get; set; }
+
     /// <summary>Upload sink.</summary>
     [Parameter] public EventCallback<SaUsageScanBatchUpload> OnUpload { get; set; }
 
     private bool CanSend => !Busy && _file is not null && _statement?.Trim().Length >= 5 && AccountIds.Count is > 0 and <= UsageScanBatch.MaxAccounts;
+
+    /// <summary>What is still missing before the upload can be sent.</summary>
+    private string WhyNot
+    {
+        get
+        {
+            if (Busy)
+            {
+                return "Yükleme sürüyor; sunucunun yanıtını bekleyin.";
+            }
+
+            List<string> missing = [];
+            if (AccountIds.Count == 0) { missing.Add("listeden en az bir hesap seçin"); }
+            if (AccountIds.Count > UsageScanBatch.MaxAccounts) { missing.Add($"seçimi en çok {UsageScanBatch.MaxAccounts} hesaba indirin"); }
+            if (_file is null) { missing.Add("tarama dosyasını seçin"); }
+            if (!(_statement?.Trim().Length >= 5)) { missing.Add("çalıştırma beyanını yazın (en az 5 karakter)"); }
+            return "Gönderilemiyor: " + string.Join("; ", missing) + ".";
+        }
+    }
 
     private async Task ChooseAsync(InputFileChangeEventArgs args)
     {
@@ -109,7 +136,9 @@
         _file = (file.Name, buffer.ToArray());
     }
 
-    private Task UploadAsync() => OnUpload.InvokeAsync(new SaUsageScanBatchUpload(_file!.Value.Name, _file.Value.Content, _statement!.Trim(), [.. AccountIds]));
+    /// <summary>Sends the current file, statement and selection (also the retry after a failed upload); does nothing while not ready.</summary>
+    private Task UploadAsync() => !CanSend ? Task.CompletedTask
+        : OnUpload.InvokeAsync(new SaUsageScanBatchUpload(_file!.Value.Name, _file.Value.Content, _statement!.Trim(), [.. AccountIds]));
 
     /// <summary>Counts by what happened; the per-account rows carry the server's own wording.</summary>
     internal static string Summary(UsageScanBatchResult result)
@@ -126,7 +155,7 @@
     {
         nameof(UsageScanBatchOutcome.Attached) => "Bağlandı",
         nameof(UsageScanBatchOutcome.AlreadyAttached) => "Zaten bağlıydı",
-        nameof(UsageScanBatchOutcome.NotInScan) => "Dosyada yok",
+        nameof(UsageScanBatchOutcome.NotInScan) => "Aranmamış",
         nameof(UsageScanBatchOutcome.Ambiguous) => "Belirsiz",
         nameof(UsageScanBatchOutcome.Unavailable) => "Bulunamadı / yetki yok",
         _ => "Kaydedilemedi"
