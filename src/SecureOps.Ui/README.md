@@ -2413,7 +2413,7 @@ This is not target activation or an employee productivity ranking. See
 
 `SaNextStepCard` on `/service-accounts/{id}` lists what is open, most important first, from the already loaded
 `AccountDetail` (`ServiceAccountNextStep.Compute`; UI only, no API or contract change). Order: ownership proposal or missing
-owner, overdue requests, scan matches awaiting a decision, performed actions awaiting verification, rule conformance
+owner, overdue requests, scan matches awaiting a decision (server total `UsageScanPending` since PR #12 paged the items), performed actions awaiting verification, rule conformance
 (`Unplanned`, `ManualReviewPending`, `IncompleteInformation`), handover proposals, unknown usage. Each step carries a text kind
 (Sizden bekleniyor / Başkasından bekleniyor / Bilgi eksik; never colour alone) and a button that only switches the tab. A step
 the server-computed `AccountPermissions` does not allow is shown as waiting for someone else. An empty list says only that

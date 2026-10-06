@@ -67,7 +67,8 @@ public static class ServiceAccountNextStep
                 can.CanWorkAnyRequest ? SaNextStepKind.Act : SaNextStepKind.Wait));
         }
 
-        int pendingScan = (detail.UsageScans ?? []).SelectMany(s => s.Items).Count(i => i.Role == "Former" && i.Decision is null);
+        // Server total across every attached scan (the detail carries only the first page of scans and items).
+        int pendingScan = detail.UsageScans is null ? 0 : detail.UsageScanPending;
         if (pendingScan > 0)
         {
             steps.Add(new("scan-decide", "Tarama eşleşmelerine karar verin", $"{pendingScan} eşleşme kullanım kaydına alınmayı veya gerekçeli bırakılmayı bekliyor.",
@@ -102,7 +103,7 @@ public static class ServiceAccountNextStep
                 can.DecideHandover ? SaNextStepKind.Act : SaNextStepKind.Wait));
         }
 
-        if (!(detail.Usages ?? []).Any(u => !u.Removed) && (detail.UsageScans ?? []).Count == 0)
+        if (!(detail.Usages ?? []).Any(u => !u.Removed) && detail.UsageScanTotal == 0)
         {
             steps.Add(new("usage-unknown", "Kullanımı belirleyin", "Kayıtlı kullanım ve tarama yok. Bu, hesabın kullanılmadığı anlamına gelmez; bilgi eksik.",
                 SaTab.Usage, can.Work ? SaNextStepKind.Unknown : SaNextStepKind.Wait));

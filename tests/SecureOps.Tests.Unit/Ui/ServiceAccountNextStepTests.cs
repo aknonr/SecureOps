@@ -51,22 +51,37 @@ public sealed class ServiceAccountNextStepTests
     }
 
     [Fact]
-    public void PendingScanDecisionAndPerformedAction_AreCountedFromRecords()
+    public void PendingScanDecisionAndPerformedAction_AreCountedFromServerTotals()
     {
+        // The detail carries only the first page of items (PR #12); the pending count is the server's total, not the page.
         UsageScanView scan = Scan(Item("Former"), Item("Expected"));
-        AccountDetail detail = Detail(_responsible, owner: true) with { UsageScans = [scan], Actions = [Action("Performed"), Action("Verified")] };
+        AccountDetail detail = Detail(_responsible, owner: true) with
+        {
+            UsageScans = [scan],
+            UsageScanTotal = 7,
+            UsageScanPending = 64,
+            Actions = [Action("Performed"), Action("Verified")]
+        };
 
         IReadOnlyList<SaNextStep> steps = ServiceAccountNextStep.Compute(detail);
 
-        steps.Single(s => s.Code == "scan-decide").Reason.Should().StartWith("1 eşleşme", "only a Former item without a decision waits");
+        steps.Single(s => s.Code == "scan-decide").Reason.Should().StartWith("64 eşleşme");
         steps.Single(s => s.Code == "actions-verify").Reason.Should().StartWith("1 işlem");
         steps.Should().NotContain(s => s.Code == "usage-unknown", "a scan exists, so usage is not unknown");
     }
 
     [Fact]
+    public void NoPendingTotal_NoScanStep_EvenWhenAPageItemLooksUndecided()
+    {
+        AccountDetail detail = Detail(_responsible, owner: true, usages: true) with { UsageScans = [Scan(Item("Former"))], UsageScanTotal = 1, UsageScanPending = 0 };
+
+        ServiceAccountNextStep.Compute(detail).Should().NotContain(s => s.Code == "scan-decide");
+    }
+
+    [Fact]
     public void Viewer_SeesPendingWorkAsWaiting()
     {
-        AccountDetail detail = Detail(_viewer, owner: true) with { UsageScans = [Scan(Item("Former"))] };
+        AccountDetail detail = Detail(_viewer, owner: true) with { UsageScans = [Scan(Item("Former"))], UsageScanTotal = 1, UsageScanPending = 1 };
 
         ServiceAccountNextStep.Compute(detail).Where(s => s.Code == "scan-decide").Should().OnlyContain(s => s.Kind == SaNextStepKind.Wait);
     }
