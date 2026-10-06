@@ -44,7 +44,7 @@
         <MudTable Items="result.Results" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageScanBatchAccountResult" Elevation="0">
             <HeaderContent><MudTh>Hesap</MudTh><MudTh>Sonuç</MudTh><MudTh>Açıklama</MudTh></HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Hesap" Class="sa-batch-wrap">
+                <MudTd DataLabel="Hesap"><div class="sa-batch-cell">
                     @if (context.AccountName is { } name)
                     {
                         <MudLink Href="@($"service-accounts/{context.AccountId}")">@name</MudLink>
@@ -54,12 +54,12 @@
                     {
                         <span>Bulunamadı veya kapsamınızda değil</span>
                     }
-                </MudTd>
+                </div></MudTd>
                 <MudTd DataLabel="Sonuç"><SoStatusBadge Label="@Short(context.Outcome)" Tone="@Tone(context.Outcome)" Icon="@Icon(context.Outcome)" /></MudTd>
-                <MudTd DataLabel="Açıklama" Class="sa-batch-wrap">
+                <MudTd DataLabel="Açıklama"><div class="sa-batch-cell">
                     @context.OutcomeLabel
                     @if (context.MatchedAccount is { } matched) { <div class="so-panel-text--sm">Dosyadaki ad: @matched</div> }
-                </MudTd>
+                </div></MudTd>
             </RowTemplate>
         </MudTable>
     }

@@ -37,7 +37,7 @@ public static class UsageScanBatch
     /// <summary>Turkish label of an outcome; "not in the file" never means "not used".</summary>
     public static string Label(UsageScanBatchOutcome value) => value switch
     {
-        UsageScanBatchOutcome.Attached => "Bağlandı",
+        UsageScanBatchOutcome.Attached => "Bağlandı; sonuç hesabın Kullanım taraması bölümünde",
         UsageScanBatchOutcome.AlreadyAttached => "Bu dosyayı bu hesaba daha önce bağlamıştınız; değişiklik yok",
         UsageScanBatchOutcome.NotInScan => "Dosya bu hesabı aramamış; bağlanmadı",
         UsageScanBatchOutcome.Ambiguous => "Belirsiz: dosya bu adı iki farklı domainde aramış ve hesabın domaini kayıtlı değil; bağlanmadı",

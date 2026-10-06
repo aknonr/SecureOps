@@ -5,8 +5,15 @@
 }
 
 /* Account names and searched names are long and unbroken; they must wrap at 390 px and 200 % zoom. */
-.sa-batch-wrap,
-::deep .sa-batch-wrap {
+.sa-batch-wrap {
     overflow-wrap: anywhere;
     min-width: 0;
+}
+
+/* The stacked (mobile) table cell is a flex row: one shrinkable block per cell, so the label keeps its width and the value
+   wraps instead of widening the table. */
+.sa-batch-cell {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
