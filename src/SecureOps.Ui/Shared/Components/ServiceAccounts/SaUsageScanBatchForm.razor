@@ -1,0 +1,152 @@
+@* Attaches one usage-scan file (ADR-0027) to the accounts selected in the list. The API validates the whole file once and
+   answers every account on its own; this form only collects the file and the run statement and shows what the server
+   said per account. Nothing here contacts a server; "not in the file" never means "not used". *@
+@using SecureOps.Domain.ServiceAccounts
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel" aria-labelledby="sa-batch-scan-title">
+    <h2 id="sa-batch-scan-title" class="so-panel-title">Tek tarama dosyasını seçili hesaplara bağla</h2>
+    <p class="so-panel-text--sm">
+        Birden çok hesabı aramış bir tarama dosyasını (<code>Invoke-ServiceAccountUsageScan.ps1 -CombinePath</code> çıktısı, JSON,
+        en çok 4 MB) bir kez yükleyin; sunucu dosyanın tamamını bir kez denetler, sonra her hesabı ayrı ayrı kontrol eder. Bir hesabın
+        reddi diğerlerini engellemez. Yalnız hesaptan sorumlu olduğunuz hesaplara bağlanır; ekibinize atanmış talep üzerinden
+        çalışıyorsanız hesabın kendi sayfasından yükleyin. Parola veya gizli değer gibi görünen alan içeren dosyanın tamamı reddedilir.
+    </p>
+    <p class="so-panel-text sa-batch-wrap">Seçili hesaplar (@AccountIds.Count): @string.Join(", ", AccountLabels)</p>
+    @if (AccountIds.Count > UsageScanBatch.MaxAccounts)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" role="alert">
+            Bir yüklemede en çok @UsageScanBatch.MaxAccounts hesap seçilebilir; @AccountIds.Count hesap seçili. Seçimi azaltın.
+        </MudAlert>
+    }
+    <MudGrid Spacing="2" Class="mt-1">
+        <MudItem xs="12" md="4">
+            <label class="so-panel-text" for="sa-batch-scan-file">Tarama dosyası (.json)</label>
+            <InputFile id="sa-batch-scan-file" OnChange="ChooseAsync" accept=".json,application/json" />
+        </MudItem>
+        <MudItem xs="12" md="8">
+            <MudTextField @bind-Value="_statement" Label="Çalıştırma beyanı (zorunlu)" MaxLength="400" Variant="Variant.Outlined" Immediate="true"
+                HelperText="Nerede ve hangi yetkiyle çalıştırdınız? Ör. kendi yönetici hesabımla, atlama sunucusundan, değişiklik kaydı numarası." />
+        </MudItem>
+    </MudGrid>
+    @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
+    <MudButton OnClick="UploadAsync" Disabled="@(!CanSend)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
+        StartIcon="@Icons.Material.Filled.UploadFile">Yükle ve seçili hesaplara bağla</MudButton>
+
+    @if (Result is { } result)
+    {
+        <h3 class="sa-batch-subtitle">Son yüklemenin sonucu</h3>
+        <p role="status" class="so-panel-text">
+            @Summary(result) @(result.Purpose == "GmsaCheck" ? "gMSA kontrol taraması" : "Kullanım taraması"),
+            @result.PlannedServers planlanan sunucudan @result.AnsweredServers tanesinden sonuç var.
+        </p>
+        <MudTable Items="result.Results" Dense="true" Breakpoint="Breakpoint.Sm" T="UsageScanBatchAccountResult" Elevation="0">
+            <HeaderContent><MudTh>Hesap</MudTh><MudTh>Sonuç</MudTh><MudTh>Açıklama</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Hesap" Class="sa-batch-wrap">
+                    @if (context.AccountName is { } name)
+                    {
+                        <MudLink Href="@($"service-accounts/{context.AccountId}")">@name</MudLink>
+                        <div class="so-panel-text--sm">@(context.Domain ?? "Domain bilinmiyor")</div>
+                    }
+                    else
+                    {
+                        <span>Bulunamadı veya kapsamınızda değil</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Sonuç"><SoStatusBadge Label="@Short(context.Outcome)" Tone="@Tone(context.Outcome)" Icon="@Icon(context.Outcome)" /></MudTd>
+                <MudTd DataLabel="Açıklama" Class="sa-batch-wrap">
+                    @context.OutcomeLabel
+                    @if (context.MatchedAccount is { } matched) { <div class="so-panel-text--sm">Dosyadaki ad: @matched</div> }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</section>
+
+@code {
+    private const long MaxBytes = 4L * 1024 * 1024;
+    private (string Name, byte[] Content)? _file;
+    private string? _statement, _fileError;
+
+    /// <summary>Selected account ids, in selection order.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<Guid> AccountIds { get; set; } = [];
+
+    /// <summary>Names of the selected accounts as listed (display only).</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> AccountLabels { get; set; } = [];
+
+    /// <summary>Call in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>What the server answered for the last upload (null before the first one).</summary>
+    [Parameter] public UsageScanBatchResult? Result { get; set; }
+
+    /// <summary>Upload sink.</summary>
+    [Parameter] public EventCallback<SaUsageScanBatchUpload> OnUpload { get; set; }
+
+    private bool CanSend => !Busy && _file is not null && _statement?.Trim().Length >= 5 && AccountIds.Count is > 0 and <= UsageScanBatch.MaxAccounts;
+
+    private async Task ChooseAsync(InputFileChangeEventArgs args)
+    {
+        (_file, _fileError) = (null, null);
+        IBrowserFile file = args.File;
+        if (!string.Equals(Path.GetExtension(file.Name), ".json", StringComparison.OrdinalIgnoreCase))
+        {
+            _fileError = "Yalnız birleştirme adımının ürettiği .json dosyası yüklenir.";
+            return;
+        }
+
+        if (file.Size is 0 or > MaxBytes)
+        {
+            _fileError = "Dosya boş veya 4 MB sınırını aşıyor.";
+            return;
+        }
+
+        using MemoryStream buffer = new();
+        await using Stream stream = file.OpenReadStream(MaxBytes);
+        await stream.CopyToAsync(buffer);
+        _file = (file.Name, buffer.ToArray());
+    }
+
+    private Task UploadAsync() => OnUpload.InvokeAsync(new SaUsageScanBatchUpload(_file!.Value.Name, _file.Value.Content, _statement!.Trim(), [.. AccountIds]));
+
+    /// <summary>Counts by what happened; the per-account rows carry the server's own wording.</summary>
+    internal static string Summary(UsageScanBatchResult result)
+    {
+        int attached = result.Results.Count(r => r.Outcome == nameof(UsageScanBatchOutcome.Attached));
+        int already = result.Results.Count(r => r.Outcome == nameof(UsageScanBatchOutcome.AlreadyAttached));
+        int failed = result.Results.Count(r => r.Outcome == nameof(UsageScanBatchOutcome.Failed));
+        int refused = result.Results.Count - attached - already - failed;
+        return $"{result.Results.Count} hesaptan {attached} tanesine bağlandı, {already} tanesi zaten bağlıydı, {refused} tanesine bağlanmadı"
+            + (failed > 0 ? $", {failed} tanesi kaydedilemedi (aynı yüklemeyi tekrarlamak güvenlidir)." : ".");
+    }
+
+    internal static string Short(string outcome) => outcome switch
+    {
+        nameof(UsageScanBatchOutcome.Attached) => "Bağlandı",
+        nameof(UsageScanBatchOutcome.AlreadyAttached) => "Zaten bağlıydı",
+        nameof(UsageScanBatchOutcome.NotInScan) => "Dosyada yok",
+        nameof(UsageScanBatchOutcome.Ambiguous) => "Belirsiz",
+        nameof(UsageScanBatchOutcome.Unavailable) => "Bulunamadı / yetki yok",
+        _ => "Kaydedilemedi"
+    };
+
+    private static SoStatusBadge.BadgeTone Tone(string outcome) => outcome switch
+    {
+        nameof(UsageScanBatchOutcome.Attached) => SoStatusBadge.BadgeTone.Positive,
+        nameof(UsageScanBatchOutcome.AlreadyAttached) => SoStatusBadge.BadgeTone.Info,
+        nameof(UsageScanBatchOutcome.Failed) => SoStatusBadge.BadgeTone.Critical,
+        nameof(UsageScanBatchOutcome.Unavailable) => SoStatusBadge.BadgeTone.Neutral,
+        _ => SoStatusBadge.BadgeTone.Caution
+    };
+
+    private static string Icon(string outcome) => outcome switch
+    {
+        nameof(UsageScanBatchOutcome.Attached) => Icons.Material.Filled.CheckCircle,
+        nameof(UsageScanBatchOutcome.AlreadyAttached) => Icons.Material.Filled.Link,
+        nameof(UsageScanBatchOutcome.Failed) => Icons.Material.Filled.Error,
+        nameof(UsageScanBatchOutcome.Unavailable) => Icons.Material.Filled.Block,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+}

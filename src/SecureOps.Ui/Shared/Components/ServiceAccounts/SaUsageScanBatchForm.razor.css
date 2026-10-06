@@ -1,0 +1,12 @@
+.sa-batch-subtitle {
+    margin: 1rem 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Account names and searched names are long and unbroken; they must wrap at 390 px and 200 % zoom. */
+.sa-batch-wrap,
+::deep .sa-batch-wrap {
+    overflow-wrap: anywhere;
+    min-width: 0;
+}

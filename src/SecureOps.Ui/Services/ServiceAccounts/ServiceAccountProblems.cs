@@ -91,6 +91,7 @@ public static class ServiceAccountProblems
         "scanFutureDate" => "Dosyadaki bir tarama zamanı ileri tarihte; sunucu saatlerini kontrol edin.",
         "accountAmbiguousInScan" => "Dosya bu hesabın adını farklı domain'lerle aramış ve hesapta domain kayıtlı değil; hangi eşleşmenin bu hesaba ait olduğu belli değil. Hesaba domain bilgisi girildikten sonra yeniden yükleyin veya taramayı tek adla yeniden üretin.",
         "accountNotInScan" => "Bu dosya bu hesabı aramamış (hesap adı veya domain farklı). Doğru hesabın sayfasından yükleyin.",
+        "accountIds" => "Bir yüklemede 1–20 farklı hesap seçin.",
         "runStatement" => "Çalıştırma beyanı gerekli (5–400 karakter): taramayı nerede ve hangi yetkiyle çalıştırdığınızı yazın.",
         "scanTablesMissing" => "Bu ortamda tarama kaydı için veritabanı güncellemesi (030) uygulanmamış.",
         "requestedGmsaName" => "İstenen gMSA adı kaydedilmedi: en çok 15 karakter olabilir (domain öneki, UPN eki ve sondaki $ sayılmaz) ve yalnız gMSA ile devir veya gMSA geçişi işlerinde girilir.",

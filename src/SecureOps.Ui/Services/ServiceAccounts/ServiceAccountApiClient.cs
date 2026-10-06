@@ -48,8 +48,8 @@ public sealed class ServiceAccountApiClient
             return Task.FromResult(request);
         }, ReadAsync<T>, token);
 
-    /// <summary>Uploads one file with form fields (import staging or evidence).</summary>
-    public Task<T> UploadAsync<T>(string path, string fileName, string contentType, byte[] content, IReadOnlyDictionary<string, string?> fields,
+    /// <summary>Uploads one file with form fields (import staging, evidence or a usage scan); a name may repeat (e.g. <c>accountIds</c>).</summary>
+    public Task<T> UploadAsync<T>(string path, string fileName, string contentType, byte[] content, IEnumerable<KeyValuePair<string, string?>> fields,
         CancellationToken token) =>
         ExecuteAsync(() =>
         {
