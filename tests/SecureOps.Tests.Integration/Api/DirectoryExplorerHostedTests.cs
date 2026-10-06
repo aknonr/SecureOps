@@ -224,7 +224,7 @@ public sealed class DirectoryExplorerHostedTests
     public async Task OpenApi_ContainsStableDirectoryExplorerRoutes()
     {
         using WebApplicationFactory<Program> factory = CreateFactory(swagger: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
 
         string openApi = await client.GetStringAsync("/swagger/v1/swagger.json");
 
@@ -276,7 +276,7 @@ public sealed class DirectoryExplorerHostedTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
         return client;
     }

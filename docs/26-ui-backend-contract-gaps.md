@@ -39,7 +39,8 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-30 — The solution builds only with a specific SDK/language combination | Repair implemented — pinned SDK/language; Windows verification below |
 | G-31 — No per-owner usage signal for frequently used links | Open — needs an audit-framing decision before a contract |
 | G-32 — Favourites view has no server-side paging | Open — low |
-| G-34 — Concurrent first registrations can deadlock in the access store | Open — platform defect candidate (Access owner); module tests serialised |
+| G-34 — Concurrent first registrations can deadlock in the access store | Fixed in source and synthetic LocalDB — 032 index / one registration retry; installed TEST unchanged; module tests remain serialised |
+| G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1039,26 +1040,28 @@ bağlantılar pages on the server. Both show the same range and page wording. **
 
 **Code:** `SqlAccessRepository.EnsureUserAsync` (`src/SecureOps.Infrastructure/Access/SqlAccessRepository.cs`, latest-request read)
 **Severity:** Medium (a first sign-in can fail once under concurrency; no data is corrupted)
-**Status:** Open — platform (Access) owner; not changed by the Service Accounts module
+**Status:** Fixed in source and synthetic LocalDB on `fix/access-user-registration-deadlock-20261006`.
+Installed TEST has not been upgraded; the Service Accounts module and its serial test collections are unchanged.
 
 **Observed (2026-10-06, local LocalDB, synthetic data).** `ServiceAccountPersistedAccessSqlTests` failed once in a full
 integration run (6 s instead of about 1 s, i.e. the SQL Server deadlock-detection interval). Reproduced under contention:
 `SqlException 1205 … chosen as the deadlock victim` thrown from `EnsureUserAsync` (stack: `SqlAccessRepository.cs` line 102,
 called from the test's `ApprovedAsync`) while another class registered users at the same time.
 
-**Likely cause.** Inside the registration transaction,
+**Confirmed local cause (2026-10-06).** Inside the registration transaction,
 `SELECT TOP (1) AccessRequestId FROM security.AccessRequests WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @UserId ORDER BY RequestedAt DESC`
 has no index on `UserId` for all statuses (only the filtered `UX_SecurityAccessRequests_Pending` and
 `IX_AccessRequests_StatusPage (Status, RequestedAt, AccessRequestId)`), so it scans and takes range locks well beyond the
-user's rows; two new users registering at once both hold those range locks and then both insert a pending request, which
-is a classic conversion deadlock. Not verified with a captured deadlock graph.
+user's rows. Captured engine graphs show RangeS-U lock cycles on `IX_AccessRequests_StatusPage` at this exact read,
+including cycles between concurrent scans before request insertion. The original scan hypothesis is confirmed;
+the earlier insertion/conversion explanation was more specific than the evidence supported.
 
 **What would resolve it (platform owner).** An index on `security.AccessRequests (UserId, RequestedAt DESC)` (numbered
 migration), and/or one retry of the whole registration transaction on 1205. **Module side (done, test only):** the module
 classes that call `EnsureUserAsync` run in one serial xUnit collection so the module suite does not trip over it; no
 retry was added that could hide the defect.
 
-**Task for Codex (Access owner), ready to paste.** In `SqlAccessRepository.EnsureUserAsync`
+**Original requested scope (implemented by the Access owner).** In `SqlAccessRepository.EnsureUserAsync`
 (`src/SecureOps.Infrastructure/Access/SqlAccessRepository.cs`), two concurrent first registrations can deadlock (SQL error 1205)
 on `SELECT TOP (1) … FROM security.AccessRequests WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @UserId ORDER BY RequestedAt DESC`,
 because no index covers `UserId` for all statuses. Add the next numbered migration with
@@ -1068,7 +1071,43 @@ a SQL integration test that runs at least 8 concurrent `EnsureUserAsync` calls f
 disposable database and expects every call to succeed with exactly one pending request per user. Synthetic data only; do not
 apply to the installed TEST system; do not change the Service Accounts module (its tests already run serially for G-34).
 
+**Local evidence.** The original red test (`4acbb10`, 001-031) ran ten rounds of eight concurrent new identities:
+73 succeeded, seven failed with 1205, and seven matching deadlock graphs were captured. A test-only 50 ms user-insert
+delay ensures overlap; it is always removed. Migration 032 alone, before adding the retry, passed 80/80 with zero graphs.
+The registration transaction now retries once on 1205 after connection/transaction disposal; post-commit reads and
+other operations remain outside the retry. SQL probes verify one real victim recovers, a second victim propagates,
+and a non-deadlock SQL error is not retried. Existing Pending/no-capability and durable rejection guards remain.
+See [DBA note](access-registration-dba-032.md) for preflight, replay refusal, unchanged row/permission hashes,
+reproduction commands and target approval requirements. Full validation results are recorded in the task's acceptance note.
+
 ---
+
+## G-35 — Unsafe API requests lack a central CSRF guard
+
+**Raised:** 2026-10-07, two independent reviews of PR #18.
+**Owner:** Platform/API; minimal shared UI transport update authorized by the owner.
+
+Windows Negotiate can automatically authenticate cross-origin CORS-simple forms.
+There is no central Origin/antiforgery check before API form binding, including
+Service Accounts usage-scan uploads. Authentication/capability checks alone do
+not prevent this request from executing as the user.
+
+**Decision:** [ADR-0029](adr/ADR-0029-api-csrf-origin-guard.md). All unsafe methods
+require `X-SecureOps-Csrf: 1`; browser source headers must match explicitly
+configured `ApiCsrf:AllowedOrigins`, and cross-site Fetch Metadata is denied.
+The server-side Blazor API client supplies the header centrally, without inventing
+Origin or forwarding browser headers. Scripts must adopt the same contract.
+
+**Status:** Design recorded before code in `7fee54c`. Central API guard and
+minimal shared UI transport implemented and locally verified. Release build 0/0,
+full format verification, 1918 unit passes (1 skip), 356 integration passes
+(117 skips), all 99 unsafe OpenAPI operations, real loopback cross-origin multipart
+403 and interactive UI writes passed. See
+[local evidence and limitations](api-csrf-local-acceptance-20261007.md).
+Real Negotiate/IIS/F5 and deployment origin configuration remain unverified.
+The no-write assertion concerns business/provider state, excluding required denial
+audit and existing authentication/access/session lifecycle writes. Installed TEST,
+corporate systems, provider writes, merge and deployment remain outside scope.
 
 ## Note: enums cross the wire as numbers
 
