@@ -85,7 +85,7 @@ public sealed partial class ServiceAccountService
                 return SaResult<Guid>.Fail(SaErrors.Forbidden, "requestId");
             }
 
-            if (runStatement is null || runStatement.Trim().Length < 5 || runStatement.Length > 400 || runStatement.Any(char.IsControl))
+            if (!ValidRunStatement(runStatement))
             {
                 return SaResult<Guid>.Fail(SaErrors.Invalid, "runStatement");
             }

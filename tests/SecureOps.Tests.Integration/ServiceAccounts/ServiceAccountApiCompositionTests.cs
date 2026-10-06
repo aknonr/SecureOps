@@ -111,6 +111,7 @@ public sealed class ServiceAccountApiCompositionTests
             form.Add(new ByteArrayContent("{}"u8.ToArray()), "file", "scan.json");
             (await anonymous.PostAsync($"/api/v1/service-accounts/accounts/{Guid.NewGuid()}/usage-scans", form)).StatusCode
                 .Should().Be(HttpStatusCode.Unauthorized);
+            (await anonymous.PostAsync("/api/v1/service-accounts/usage-scans", form)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
@@ -122,8 +123,9 @@ public sealed class ServiceAccountApiCompositionTests
         [
             "api/v1/service-accounts/accounts/{id:guid}/usage-scans",
             "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage",
-            "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/dismiss"
-        ], "evidence is attached and decided per account; there is no scan start route");
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/dismiss",
+            "api/v1/service-accounts/usage-scans"
+        ], "evidence is attached (to one account, or to several accounts in one upload) and decided per account; there is no scan start route");
         foreach (RouteEndpoint endpoint in writes)
         {
             endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.Work);
@@ -142,8 +144,8 @@ public sealed class ServiceAccountApiCompositionTests
             endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.View).And.NotContain(ServiceAccountPolicies.Work);
         }
 
-        writes.Single(e => e.RoutePattern.RawText!.EndsWith("usage-scans", StringComparison.Ordinal)).Metadata
-            .GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize.Should().Be(5L * 1024 * 1024);
+        writes.Where(e => e.RoutePattern.RawText!.EndsWith("usage-scans", StringComparison.Ordinal)).Select(e =>
+            e.Metadata.GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize).Should().Equal(5L * 1024 * 1024, 5L * 1024 * 1024);
     }
 
     [Fact]

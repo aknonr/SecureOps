@@ -42,7 +42,7 @@ public sealed partial class ServiceAccountService
     private static AccountPermissions Permissions(SaCaller caller, AccountScopeAnchor anchor, IReadOnlyList<RequestView> requests)
     {
         bool orgLevel = caller.Scope.CoversAtOrganizationLevel(anchor);
-        bool responsible = orgLevel || caller.Scope.CoversTeam(anchor.OwnerTeamId);
+        bool responsible = Responsible(caller.Scope, anchor);
         Guid[] participant = responsible ? [] : [.. requests.Where(r => r.Status == "Open" && caller.Scope.CoversTeam(r.TargetTeam?.Id)).Select(r => r.Id)];
         bool incomingHandover = anchor.IncomingHandoverTeamIds.Any(t => caller.Scope.CoversTeam(t));
         bool work = caller.Can(ServiceAccountCapabilities.Work);
