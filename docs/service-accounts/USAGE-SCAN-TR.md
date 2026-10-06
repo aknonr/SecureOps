@@ -75,8 +75,15 @@ Hesap sayfası → **Kullanım taraması** sekmesi → **Tarama dosyası yükle 
 Dosya bu hesabı aramış olmalıdır (aynı ad; iki tarafta da domain varsa aynı domain). Dosya aynı adı birden çok
 biçimde aramışsa hesabın kendi domain'iyle yazılan kullanılır; hesapta domain yoksa domain'siz ad kullanılır (her
 domain'i kapsar, eşleşme gizlenmez); farklı domain'lerle iki ad olup domain'siz ad yoksa dosya reddedilir. Aynı dosyayı tekrar yüklemek yeni kayıt
-oluşturmaz. Birden çok hesabı aramış bir dosyayı her hesabın sayfasından ayrı ayrı bağlayabilirsiniz; her hesap yalnız
-kendi bileşenlerini görür.
+oluşturmaz. Her hesap yalnız kendi bileşenlerini görür.
+
+**Birden çok hesabı aramış dosya:** Servis Hesapları listesinde hesapları seçip (en çok 20) **Tek tarama dosyasını bu
+hesaplara bağla** ile dosyayı bir kez yükleyin. Dosyanın tamamı bir kez denetlenir (reddedilirse hiçbir hesaba hiçbir şey
+kaydedilmez); sonra her hesap ayrı kontrol edilir ve sonuç hesap bazında gösterilir: *Bağlandı*, *Zaten bağlıydı*, *Dosyada
+yok*, *Belirsiz* (ad iki domainde aranmış, hesapta domain yok), *Bulunamadı / yetki yok*, *Kaydedilemedi* (aynı yüklemeyi
+tekrarlamak güvenlidir). Bir hesabın reddi diğerlerini engellemez. Bu yol yalnız hesaptan sorumlu olduğunuz hesaplar
+içindir; ekibinize atanmış talep üzerinden çalışıyorsanız hesabın kendi sayfasından talebi seçerek yükleyin. Her hesabın
+sayfasından ayrı ayrı bağlamak da mümkündür.
 
 ## 5. Sonucu okuyun
 
@@ -121,6 +128,7 @@ kanıt) onaylar. Son kontrolün sonucu "Devir ve gMSA" sekmesinde de görünür.
 |---|---|
 | Taramayı görmek | Hesabı görme kapsamı (yalnız o hesabın bileşenleri ve sunucu kapsamı) |
 | Taramayı hesaba bağlamak | `ServiceAccounts.Work` + hesaptan sorumlu kapsam, ya da ekibinize atanmış açık talep |
+| Tek dosyayı birden çok hesaba bağlamak (listeden) | `ServiceAccounts.Work` + her hesapta sorumlu kapsam (talep yolu yok) |
 | Kullanım kaydı oluşturmak / kayda almamak | `ServiceAccounts.Work` + hesaptan sorumlu kapsam |
 
 Kapsam dışı hesap "bulunamadı" gibi görünür. Yüklenen dosyanın kendisi API'den indirilemez.

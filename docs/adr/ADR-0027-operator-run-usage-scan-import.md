@@ -93,6 +93,14 @@ second account adds only a link. Another person uploading the same bytes creates
   the account, the one qualified with the account's domain is used; with no domain on the account the bare name is used
   (it matches every domain, so no match is hidden), and two names with different domains and no bare name refuse the
   upload (`accountAmbiguousInScan`). Out of scope and missing are indistinguishable (404).
+- **Attach one scan to several accounts** (`POST usage-scans`, multipart: `file`, `runStatement`, 1–20 distinct
+  `accountIds`; added 2026-10-06, no migration): `ServiceAccounts.Work`; the file is validated once and completely (secret
+  guard first) before any account is looked at, so a refused file stores nothing for anyone. Each account is then checked
+  on its own under the rules above with the *responsible* basis only (a participant uses its own request on the account
+  page) and answered separately: `Attached`, `AlreadyAttached`, `NotInScan`, `Ambiguous`, `Unavailable` (missing, out of
+  scope or not the caller's to work on — indistinguishable, and returned without the account's name when out of scope) or
+  `Failed` (storage error; repeating the upload is safe). One refusal never blocks another; the scan is stored once and
+  linked per account in its own transaction, with history and audit per link.
 - **Turn a matched component into a usage** or **dismiss it with a reason**: `ServiceAccounts.Work` with the responsible
   basis, one decision per item and account, never automatic. The person chooses the usage kind (a suggestion is shown).
 - **Read**: everyone who can see the account sees its attached scans — only the items matched to that account's searched
