@@ -1,5 +1,16 @@
 # sql/
 
+## Access Registration Index 032, 2026-10-06
+
+Current numbered inventory is 001-032. `032-access-request-user-index.sql` adds
+`IX_AccessRequests_UserRequested (UserId, RequestedAt DESC) INCLUDE (Status)` for
+the serializable latest-request read. It requires access objects through 019,
+refuses replay (51381), and changes no rows, guards or runtime grants. Only fresh
+synthetic LocalDB was used for this task; installed TEST was not upgraded.
+See [DBA preflight and recovery](../docs/access-registration-dba-032.md) and
+`tests/sql/access-registration/Test-AccessRegistrationSql.ps1` for the regression
+harness, captured deadlock/plan evidence and predecessor-preservation checks.
+
 ## Service Account Requested gMSA Name 031, 2026-10-05
 
 Inventory is 001-031. **031-service-account-requested-gmsa-name** requires reviewed 025 and 030 and includes the retained
