@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 
 namespace SecureOps.Tests.Integration.Sql;
 
-public sealed class AccessRegistrationSqlTests(ITestOutputHelper output)
+public sealed partial class AccessRegistrationSqlTests(ITestOutputHelper output)
 {
     [AccessRegistrationSqlFact]
     public async Task EnsureUserAsync_ConcurrentFirstRegistrations_OnePendingRequestAndHistoryPerUser()
@@ -34,6 +34,7 @@ public sealed class AccessRegistrationSqlTests(ITestOutputHelper output)
         }
 
         await using var sql = new SqlConnection(connectionString);
+        await sql.ExecuteAsync("ALTER EVENT SESSION SecureOpsAccessG34 ON SERVER STATE = STOP; ALTER EVENT SESSION SecureOpsAccessG34 ON SERVER STATE = START;");
         // Keep first registrations overlapping even when LocalDB answers faster than task scheduling.
         await sql.ExecuteAsync($"""
             CREATE TRIGGER security.TR_G34_RegistrationOverlap ON security.Users AFTER INSERT AS
@@ -100,6 +101,7 @@ public sealed class AccessRegistrationSqlTests(ITestOutputHelper output)
             result.RequestCreated.Should().BeTrue();
             result.User.Status.Should().Be(AccessStatus.Pending);
             result.User.Roles.Should().BeEmpty();
+            result.User.Capabilities.Should().BeEmpty();
             IReadOnlyList<ApplicationAccessRequest> requests = await repository.ListRequestsForUserAsync(result.User.Id, default);
             requests.Should().ContainSingle().Which.Status.Should().Be(AccessRequestStatus.Pending);
             (await sql.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM security.AccessRequestHistory WHERE AccessRequestId=@Id", new { Id = result.LatestRequest!.Id })).Should().Be(1);
