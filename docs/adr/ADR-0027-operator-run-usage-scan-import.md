@@ -63,7 +63,8 @@ frees or verifies anything; secrets are never read, stored or shown; the server 
    from its content.
 3. Closed schema: unknown properties, wrong types, patterns, lengths and enums are rejected; counts are bounded
    (≤ 2 000 components per server, ≤ 10 000 in total, ≤ 20 warnings per server).
-4. Consistency: every server document has the bundle's account list and expected account, comes from a planned server and
+4. Consistency: every server document has the bundle's account list (the same set, no repeated name) and expected account,
+   comes from a planned server and
    appears once; every planned server is either in `results` or `notReached`, never both; `scanResult` agrees with the
    per-source statuses; each matched component names a searched account; the gMSA block agrees with the components; no
    timestamp is in the future (10 minutes of clock skew) or after the combination time.
