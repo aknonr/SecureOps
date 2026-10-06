@@ -40,6 +40,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-31 — No per-owner usage signal for frequently used links | Open — needs an audit-framing decision before a contract |
 | G-32 — Favourites view has no server-side paging | Open — low |
 | G-33 — Usage-scan comparison cannot be computed correctly in the UI once items are paged | Implemented on `feature/service-accounts-scan-diff-20261006` (not merged) |
+| G-34 — Concurrent first registrations can deadlock in the access store | Open — platform defect candidate (Access owner); module tests serialised |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1077,6 +1078,39 @@ comparison. The UI must not page through every item of two scans to rebuild the 
 opened), shows the same wording from `change` codes, pages the component list with the existing pager, and keeps the
 client-side server list for the "yeniden taranacak sunucu" download (servers are not paged). Until then the section
 compares only the loaded first-page items and must say so once PR #12 pages them.
+
+## G-34 — Concurrent first registrations can deadlock in the access store
+
+**Code:** `SqlAccessRepository.EnsureUserAsync` (`src/SecureOps.Infrastructure/Access/SqlAccessRepository.cs`, latest-request read)
+**Severity:** Medium (a first sign-in can fail once under concurrency; no data is corrupted)
+**Status:** Open — platform (Access) owner; not changed by the Service Accounts module
+
+**Observed (2026-10-06, local LocalDB, synthetic data).** `ServiceAccountPersistedAccessSqlTests` failed once in a full
+integration run (6 s instead of about 1 s, i.e. the SQL Server deadlock-detection interval). Reproduced under contention:
+`SqlException 1205 … chosen as the deadlock victim` thrown from `EnsureUserAsync` (stack: `SqlAccessRepository.cs` line 102,
+called from the test's `ApprovedAsync`) while another class registered users at the same time.
+
+**Likely cause.** Inside the registration transaction,
+`SELECT TOP (1) AccessRequestId FROM security.AccessRequests WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @UserId ORDER BY RequestedAt DESC`
+has no index on `UserId` for all statuses (only the filtered `UX_SecurityAccessRequests_Pending` and
+`IX_AccessRequests_StatusPage (Status, RequestedAt, AccessRequestId)`), so it scans and takes range locks well beyond the
+user's rows; two new users registering at once both hold those range locks and then both insert a pending request, which
+is a classic conversion deadlock. Not verified with a captured deadlock graph.
+
+**What would resolve it (platform owner).** An index on `security.AccessRequests (UserId, RequestedAt DESC)` (numbered
+migration), and/or one retry of the whole registration transaction on 1205. **Module side (done, test only):** the module
+classes that call `EnsureUserAsync` run in one serial xUnit collection so the module suite does not trip over it; no
+retry was added that could hide the defect.
+
+**Task for Codex (Access owner), ready to paste.** In `SqlAccessRepository.EnsureUserAsync`
+(`src/SecureOps.Infrastructure/Access/SqlAccessRepository.cs`), two concurrent first registrations can deadlock (SQL error 1205)
+on `SELECT TOP (1) … FROM security.AccessRequests WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @UserId ORDER BY RequestedAt DESC`,
+because no index covers `UserId` for all statuses. Add the next numbered migration with
+`CREATE INDEX IX_AccessRequests_UserRequested ON security.AccessRequests (UserId, RequestedAt DESC) INCLUDE (Status)` (additive,
+refuses replay, DBA guide note), and make the whole registration transaction retry once on 1205 (nothing else retried); add
+a SQL integration test that runs at least 8 concurrent `EnsureUserAsync` calls for distinct new identities against a
+disposable database and expects every call to succeed with exactly one pending request per user. Synthetic data only; do not
+apply to the installed TEST system; do not change the Service Accounts module (its tests already run serially for G-34).
 
 ---
 
