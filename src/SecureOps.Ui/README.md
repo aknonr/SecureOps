@@ -2277,7 +2277,8 @@ On `/service-accounts`, selecting accounts (Work capability) offers "Tek tarama 
 `SaUsageScanBatchForm` sends one file, the run statement and the selected ids (repeated `accountIds` field) to
 `POST /api/v1/service-accounts/usage-scans` and shows the server's answer per account: a short text badge (Bağlandı, Zaten
 bağlıydı, Aranmamış, Belirsiz, Bulunamadı / yetki yok, Kaydedilemedi; never colour alone) plus the server's own wording.
-An account the server returns without a name is shown as "Bulunamadı veya kapsamınızda değil", never with the list label.
+An account the server returns without a name is shown as "Bulunamadı veya kapsamınızda değil" (or "Hesap bilgisi okunamadı"
+for a `Failed` row whose account could not be read, since 2026-10-07), never with the list label.
 A refused file uses the existing usage-scan problem texts; nothing is stored. The selection stays after an upload so a
 failed row can be retried. Tests: `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUsageScanBatchUiTests.cs`.
 

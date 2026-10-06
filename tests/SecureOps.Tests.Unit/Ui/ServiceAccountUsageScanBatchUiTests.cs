@@ -113,6 +113,20 @@ public sealed class ServiceAccountUsageScanBatchUiTests
         html.Should().NotContain("kullanılmıyor").And.NotContain("Dosyada yok", "the badge says the file did not search the account");
     }
 
+    [Fact]
+    public async Task FailedRowWithoutName_SaysTheAccountCouldNotBeRead_NotThatItIsMissing()
+    {
+        UsageScanBatchResult result = new(Guid.NewGuid(), "Discovery", 2, 2,
+            [Row(_a, "svc_syn_a", UsageScanBatchOutcome.Attached, "SYN\\svc_syn_a"), Row(_b, null, UsageScanBatchOutcome.Failed, null)]);
+
+        string page = Words(await RenderAsync([_a, _b], ["svc_syn_a", "svc_syn_b"], result));
+        string html = page[page.IndexOf("Son yüklemenin sonucu", StringComparison.Ordinal)..];
+
+        html.Should().Contain("Hesap bilgisi okunamadı").And.NotContain("Bulunamadı veya kapsamınızda değil",
+            "a storage failure says nothing about whether the account exists or is in scope");
+        html.Should().NotContain("svc_syn_b", "the list label is never put on a row the server returned without a name");
+    }
+
     private static UsageScanBatchAccountResult Row(Guid id, string? name, UsageScanBatchOutcome outcome, string? matched) =>
         new(id, name, name is null ? null : "SYN", outcome.ToString(), UsageScanBatch.Label(outcome), matched);
 

@@ -55,6 +55,11 @@
                         <MudLink Href="@($"service-accounts/{context.AccountId}")">@name</MudLink>
                         <div class="so-panel-text--sm">@(context.Domain ?? "Domain bilinmiyor")</div>
                     }
+                    else if (context.Outcome == nameof(UsageScanBatchOutcome.Failed))
+                    {
+                        @* The account could not be read: says nothing about whether it exists or is in scope. *@
+                        <span>Hesap bilgisi okunamadı</span>
+                    }
                     else
                     {
                         <span>Bulunamadı veya kapsamınızda değil</span>
