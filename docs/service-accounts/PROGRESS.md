@@ -37,10 +37,10 @@ Order c, b, a, d from `ops-research/05-yol-haritasi.md`. **c merged** (PR #14, `
   write transaction (both routes); `ServiceAccount.UsageScanBatchRefused` audit (reason and counts only); OpenAPI form
   schema for both uploads; UI: error in the form with retry, old answer cleared, focusable `aria-disabled` send button with
   its reason, `aria-expanded` toggles, badge "Aranmamış", "Hesap bilgisi okunamadı" for an unread failed row. Verified:
-  build 0/0, format clean, unit 1933 + 1 intentional skip, integration 365 / 62 skipped on fresh `SecureOps_SaFix1007b`
-  (harness 001–031 exit 0; module SQL 61 + the 030-copy test 3/3 on `SecureOps_SaFix1007b030`), Windows row 87. Not run:
-  module SQL as the least-privilege runtime principal (`SECUREOPS_SA_SQL_RUNTIME_CONNECTION`), repeated integration runs
-  for Open work 9.
+  build 0/0, format clean, unit 1933 + 1 intentional skip; before merging master `304788f`: integration 365 / 62 skipped on
+  fresh `SecureOps_SaFix1007b` (harness 001–031 exit 0; the 030-copy test 3/3 on `SecureOps_SaFix1007b030`); after the
+  merge: five full runs, 419 / 67 skipped in four (two on fresh databases), one failed run (Open work 9). Windows row 87.
+  Not run: module SQL as the least-privilege runtime principal (`SECUREOPS_SA_SQL_RUNTIME_CONNECTION`).
 - PR #12 (031 + scan paging) is merged (`50c0528`); the section below is its record.
 
 ## On this branch (done, 2026-10-05)
@@ -88,6 +88,15 @@ warning, server refusal and saved value, transition, report list, scan paging wi
    (module SQL on, `SecureOps_SaBatch1006a`) reported 1 failed / 360 passed; the next four runs passed 361/361 and the failing
    test's name and message were not captured. Cause unknown. Next: run the integration suite repeatedly with a trx logger
    and `SECUREOPS_SA_SQL_DIAGNOSTICS`, record the test name and SQL number, then decide.
+   2026-10-07 (trx captured, five runs after merging master `304788f`): the first run on fresh `SecureOps_SaFix1007d` took
+   3 m 43 s; `ServiceAccountImportSqlTests.ConfirmingOwnershipInImport_RequiresAssignCapability` passed but took 2 m 16 s
+   (normally 0.5 s) while holding the import-commit gate, and two writes waiting behind it failed:
+   `ServiceAccountWorkflowSqlTests.ClosureVerification_DuringImportCommit_WaitsInsteadOfDeadlocking` (SqlClient timeout)
+   and `ManualAccounts_StayProvisional_EvenWithATypedDomain` (persistence unavailable). system_health had no deadlock in
+   that window; the gated access-registration tests were skipped. The next four runs (one on fresh `…1007e`) passed
+   419/419, about 1 min each. Also found and fixed that day: the new middle-account test held a raw row lock outside the
+   write gate and deadlocked (1205) with a parallel serializable import commit; its class now runs in the serial
+   "Service Accounts write gate" collection. Cause of the slow import commit still unknown.
 
 ## Decisions (owner, 2026-10-04)
 

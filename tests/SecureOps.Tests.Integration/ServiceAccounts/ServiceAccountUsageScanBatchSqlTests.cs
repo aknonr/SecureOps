@@ -14,8 +14,10 @@ namespace SecureOps.Tests.Integration.ServiceAccounts;
 /// file is checked once and a refused file stores nothing for anyone; each account is answered on its own (attached,
 /// already attached, not in the file, ambiguous, unavailable) and one refusal never blocks another; an account outside the
 /// caller's scope comes back without its name; the scan is stored once with one link, history row and audit row per
-/// account. Synthetic data only.
+/// account. Synthetic data only. Runs alone: the middle-account test holds a raw row lock on an account outside the module's
+/// write gate, which deadlocks with a concurrent serializable import commit (seen 2026-10-07, 1205 on PK_SaAccounts).
 /// </summary>
+[Collection(ServiceAccountWriteGateCollection.Name)]
 public sealed class ServiceAccountUsageScanBatchSqlTests
 {
     private const string _statement = "Sentetik: kendi yönetici hesabımla SYN-JUMP01 üzerinden çalıştırdım";

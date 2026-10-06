@@ -7,7 +7,10 @@ using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
 
-/// <summary>Tests that hold the module's import-commit gate exclusively; they stall every other module write, so they run alone.</summary>
+/// <summary>
+/// Tests that hold the module's import-commit gate exclusively (stalling every other module write) or hold raw row locks
+/// outside that gate (which can deadlock with a concurrent serializable import commit); they run alone.
+/// </summary>
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class ServiceAccountWriteGateCollection
 {
