@@ -1058,6 +1058,16 @@ migration), and/or one retry of the whole registration transaction on 1205. **Mo
 classes that call `EnsureUserAsync` run in one serial xUnit collection so the module suite does not trip over it; no
 retry was added that could hide the defect.
 
+**Task for Codex (Access owner), ready to paste.** In `SqlAccessRepository.EnsureUserAsync`
+(`src/SecureOps.Infrastructure/Access/SqlAccessRepository.cs`), two concurrent first registrations can deadlock (SQL error 1205)
+on `SELECT TOP (1) … FROM security.AccessRequests WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @UserId ORDER BY RequestedAt DESC`,
+because no index covers `UserId` for all statuses. Add the next numbered migration with
+`CREATE INDEX IX_AccessRequests_UserRequested ON security.AccessRequests (UserId, RequestedAt DESC) INCLUDE (Status)` (additive,
+refuses replay, DBA guide note), and make the whole registration transaction retry once on 1205 (nothing else retried); add
+a SQL integration test that runs at least 8 concurrent `EnsureUserAsync` calls for distinct new identities against a
+disposable database and expects every call to succeed with exactly one pending request per user. Synthetic data only; do not
+apply to the installed TEST system; do not change the Service Accounts module (its tests already run serially for G-34).
+
 ---
 
 ## Note: enums cross the wire as numbers
