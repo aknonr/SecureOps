@@ -217,7 +217,7 @@ public sealed class ServiceAccountUsageScanBatchSqlTests
     }
 
     /// <summary>A complete discovery scan of SYN-APP01 and SYN-APP02 that searched <paramref name="searched"/>; each component runs as one name.</summary>
-    private static byte[] Discovery(string[] searched, params (string Server, string Type, string Component, string Identity)[] configured)
+    internal static byte[] Discovery(string[] searched, params (string Server, string Type, string Component, string Identity)[] configured)
     {
         JsonArray Names() => [.. searched.Select(s => (JsonNode)JsonValue.Create(s)!)];
         JsonArray results = [];

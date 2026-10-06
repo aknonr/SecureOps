@@ -70,8 +70,8 @@ warning, server refusal and saved value, transition, report list, scan paging wi
    stored password, also as a non-administrator; check whether it silently skips scheduled tasks it cannot see.
 7. Not re-walked in the browser: the keyboard dismissal after its fix (row 85a, source test only) and the request-update
    name field with "temizle" (SQL tests only).
-8. Low priority: participant basis is not re-checked inside the write transaction (same pattern as the rest of the module);
-   the warning colour is 4.37:1 on the page background (4.92:1 on the form surface where it is used); secret words written
+8. Low priority: the usage-scan attach (both routes) now re-checks scope and basis inside its write transaction
+   (2026-10-07); the module's other writes still check before their transaction (unchanged, not this branch); the warning colour is 4.37:1 on the page background (4.92:1 on the form surface where it is used); secret words written
    with Cyrillic look-alike letters are not caught; at 390 px a focused tab header can be partly outside the MudTabs scroll
    strip; the app shell brand link and "Hesap menüsü" have no focus ring (outside the module); the server list of a scan
    (up to 500 rows) is not paged (it sits in a closed section).

@@ -66,8 +66,10 @@ public sealed partial class ServiceAccountService
                     outcome = UsageScanBatch.Precheck(known is not null, anchor is not null && Responsible(caller.Scope, anchor), matched, ambiguous);
                     if (outcome == UsageScanBatchOutcome.Attached)
                     {
+                        // The write re-reads scope and responsibility under its own locks; a change after this check refuses it.
                         SaResult<(Guid ScanId, bool Attached)> attached = await repository.AttachUsageScanAsync(id,
-                            new UsageScanUpload(parsed, content, sha, SafeName(fileName), runStatement.Trim(), matched!), null, caller.Actor, cancellationToken);
+                            new UsageScanUpload(parsed, content, sha, SafeName(fileName), runStatement.Trim(), matched!), null, caller.Actor,
+                            (scope, current, _) => Responsible(scope, current), cancellationToken);
                         if (attached.Field == "scanTablesMissing")
                         {
                             return SaResult<UsageScanBatchResult>.Fail(SaErrors.Invalid, "scanTablesMissing");
@@ -76,6 +78,7 @@ public sealed partial class ServiceAccountService
                         scanId = attached.IsSuccess ? attached.Value.ScanId : scanId;
                         outcome = !attached.IsSuccess ? UsageScanBatchOutcome.Unavailable
                             : attached.Value.Attached ? UsageScanBatchOutcome.Attached : UsageScanBatchOutcome.AlreadyAttached;
+                        known = attached.IsSuccess ? known : null;
                     }
                 }
                 catch (Exception exception) when (exception is DbException or IOException or InvalidOperationException or TimeoutException)

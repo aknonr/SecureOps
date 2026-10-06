@@ -247,8 +247,10 @@ server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR
    distinct `accountIds`) validates the file once (secret guard first; a refused file stores nothing for anyone) and then
    answers each account on its own with the single-account rules and the responsible basis only: `Attached`,
    `AlreadyAttached`, `NotInScan`, `Ambiguous`, `Unavailable` (missing / out of scope / no responsible basis, without the
-   name when out of scope) or `Failed` (storage error; repeating is safe). One refusal never blocks another; history and
-   audit per link. ADR-0027 §4.
+   name when out of scope) or `Failed` (storage error; repeating is safe). One refusal or failure never blocks another
+   (per-account failure boundary); history and audit per link. Both upload routes re-check scope and basis inside the
+   link's write transaction (locked account/request rows, HOLDLOCK on grants and the tree), so a change after the check
+   writes nothing. ADR-0027 §4.
 
 ## Requested gMSA name (migration 031, 2026-10-05)
 
