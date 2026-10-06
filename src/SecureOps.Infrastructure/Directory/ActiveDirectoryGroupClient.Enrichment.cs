@@ -3,6 +3,7 @@ using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Globalization;
 using System.Security.Principal;
+using SecureOps.Infrastructure.Identity;
 
 namespace SecureOps.Infrastructure.DirectoryExplorer;
 
@@ -59,6 +60,26 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
         IdentityType identityType,
         int maxSpns)
     {
+        if (value.EndsWith('$'))
+        {
+            ManagedServiceAccountRecord? account = identityType == IdentityType.SamAccountName
+                ? ManagedServiceAccountLookup.Find(value, _options) : null;
+            if (account is null)
+            {
+                return null;
+            }
+
+            string[] spns = account.Strings("servicePrincipalName").Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(spn => spn, StringComparer.OrdinalIgnoreCase).ToArray();
+            return new DirectoryPrincipalEnrichmentRecord(
+                account.Value("objectSid") is byte[] sid ? new SecurityIdentifier(sid, 0).Value : null,
+                account.Text("displayName"), account.Text("sAMAccountName"), account.Text("userPrincipalName"),
+                account.Enabled, account.Locked, account.Time("pwdLastSet"), account.Flag("userAccountControl", 65536),
+                account.Time("accountExpires"), account.Number("pwdLastSet") is long lastSet ? lastSet == 0 : null,
+                account.Time("lastLogonTimestamp"), account.Text("managedBy"), spns.Take(maxSpns).ToArray(),
+                spns.Length, spns.Length > maxSpns, account.AccountTypeEvidence!);
+        }
+
         using PrincipalContext context = CreateContext();
         using var user = UserPrincipal.FindByIdentity(context, identityType, value);
         if (user is null || !ExactUser(user, value, identityType))
@@ -97,6 +118,20 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
         int maxResults,
         CancellationToken cancellationToken)
     {
+        if (value.EndsWith('$'))
+        {
+            ManagedServiceAccountRecord? account = identityType == IdentityType.SamAccountName
+                ? ManagedServiceAccountLookup.Find(value, _options) : null;
+            if (account is null)
+            {
+                return null;
+            }
+
+            using PrincipalContext managedContext = CreateContext();
+            PrincipalMembershipSet managedMemberships = ReadManagedMemberships(managedContext, account, maxResults, cancellationToken);
+            return new DirectoryProviderPage<DirectoryGroupRecord>(managedMemberships.Groups, false, managedMemberships.IsPartial);
+        }
+
         using PrincipalContext context = CreateContext();
         using var user = UserPrincipal.FindByIdentity(context, identityType, value);
         if (user is null || !ExactUser(user, value, identityType))
@@ -175,11 +210,23 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
         CancellationToken cancellationToken)
     {
         using var entry = user.GetUnderlyingObject() as DirectoryEntry;
+        return ReadMemberships(context, FindPrimaryGroup(context, entry), entry?.Properties["primaryGroupID"]?.Value is not null,
+            Values(entry, "memberOf"), maxResults, cancellationToken);
+    }
+
+    private static PrincipalMembershipSet ReadManagedMemberships(
+        PrincipalContext context, ManagedServiceAccountRecord account, int maxResults, CancellationToken cancellationToken) =>
+        ReadMemberships(context, FindPrimaryGroup(context, account.Value("objectSid") as byte[], account.Value("primaryGroupID")),
+            account.Value("primaryGroupID") is not null, account.Strings("memberOf"), maxResults, cancellationToken);
+
+    private static PrincipalMembershipSet ReadMemberships(
+        PrincipalContext context, GroupPrincipal? primaryGroup, bool hasPrimaryGroup,
+        IEnumerable<string> memberOf, int maxResults, CancellationToken cancellationToken)
+    {
         var records = new Dictionary<string, DirectoryGroupRecord>(StringComparer.OrdinalIgnoreCase);
         bool partial = false;
         int resolutionFailures = 0;
 
-        GroupPrincipal? primaryGroup = FindPrimaryGroup(context, entry);
         if (primaryGroup is not null)
         {
             using (primaryGroup)
@@ -192,13 +239,13 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
                 }
             }
         }
-        else if (entry?.Properties["primaryGroupID"]?.Value is not null)
+        else if (hasPrimaryGroup)
         {
             partial = true;
             resolutionFailures++;
         }
 
-        foreach (string distinguishedName in Values(entry, "memberOf"))
+        foreach (string distinguishedName in memberOf)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (records.Count >= maxResults)
@@ -247,10 +294,12 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
         return null;
     }
 
-    private static GroupPrincipal? FindPrimaryGroup(PrincipalContext context, DirectoryEntry? entry)
+    private static GroupPrincipal? FindPrimaryGroup(PrincipalContext context, DirectoryEntry? entry) =>
+        FindPrimaryGroup(context, entry?.Properties["objectSid"]?.Value as byte[], entry?.Properties["primaryGroupID"]?.Value);
+
+    private static GroupPrincipal? FindPrimaryGroup(PrincipalContext context, byte[]? objectSid, object? primaryGroupId)
     {
-        if (entry?.Properties["objectSid"]?.Value is not byte[] objectSid
-            || entry.Properties["primaryGroupID"]?.Value is null)
+        if (objectSid is null || primaryGroupId is null)
         {
             return null;
         }
@@ -260,7 +309,7 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryEnrichm
             var principalSid = new SecurityIdentifier(objectSid, 0);
             SecurityIdentifier? domainSid = principalSid.AccountDomainSid;
             int primaryGroupRid = Convert.ToInt32(
-                entry.Properties["primaryGroupID"].Value, CultureInfo.InvariantCulture);
+                primaryGroupId, CultureInfo.InvariantCulture);
             return domainSid is null
                 ? null
                 : GroupPrincipal.FindByIdentity(

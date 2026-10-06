@@ -87,6 +87,7 @@ public sealed class IdentityControllerMetadataTests
             nameof(IdentityLookupUserDto.Title),
             nameof(IdentityLookupUserDto.ManagerDisplayName),
             nameof(IdentityLookupUserDto.Enabled),
-            nameof(IdentityLookupUserDto.Locked));
+            nameof(IdentityLookupUserDto.Locked),
+            nameof(IdentityLookupUserDto.AccountTypeEvidence));
     }
 }

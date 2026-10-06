@@ -27409,6 +27409,10 @@
           "locked": {
             "type": "boolean",
             "nullable": true
+          },
+          "accountTypeEvidence": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
