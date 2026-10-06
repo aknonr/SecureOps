@@ -106,3 +106,40 @@ sessions with non-atomic writers, as specified below; SQL transaction guarantees
 Evidence includes unit failure/success/cancellation tests, hosted API 503 behavior, and actual
 isolated LocalDB update/audit failure triggers, second-insert rollback and transaction cancellation.
 The full guarded Resource SQL harness also proves the existing append-only restrictions remain.
+
+## Amendment 4 - Concurrent terminal transitions (F3), 2026-10-06
+
+Owner-approved F3: the first committed terminal transition owns the session's end timestamp,
+reason and terminal audit. A concurrent operation that affects no active session appends no
+terminal audit and must not report its requested reason as the persisted outcome.
+
+- SQL checks the affected-row count inside the existing state/audit transaction. Only an
+  actual transition inserts the terminal audit; a zero-row update commits without an insert.
+  InMemory checks active state under its existing gate before preparing state or calling either
+  an atomic or non-atomic audit writer. Existing failure, cancellation and rollback policies stay.
+- Logout/revoke losers reread the exact session and return its committed reason and timestamp
+  through the existing Ended result/response. This confirms terminal state, not that the losing
+  requested reason was applied. Validation losers map the winning reason to the existing terminal
+  disposition/error (`SessionExpired`, `SessionRevoked` or `AccessDisabled`) and deny the request.
+  Missing, still-active or reasonless rereads fail closed as `SessionStoreUnavailable`; read failures
+  follow the same unavailable handling and caller cancellation propagates.
+  A logout/revoke whose first read already finds an ended row returns that same committed state
+  without another audit; an actually missing row keeps its existing missing-session response.
+- User-wide and expiry-sweep operations retain their affected-session semantics. Their existing
+  locking/update predicates audit only transitions they actually won. A losing batch contributes
+  no terminal event; the separate administrative list-view attempt audit is unchanged.
+- No reason precedence is invented: first committed transition wins. No schema, grant, migration,
+  API shape, UI or cookie-cleanup change. The InMemory/non-atomic batch audit-prefix limitation in
+  Amendment 3 remains; suppressing concurrent loser events is not a new durability guarantee.
+
+F4 remains OPEN and outside this change: an already-running request can hold an Active snapshot
+while another operation ends its session. This amendment does not cancel running requests,
+strengthen Touch/validation boundaries or add an execution-time authorization boundary.
+
+Evidence: coordinated parallel tasks reach real repositories with Active snapshots before
+contending, across logout, revoke, idle/absolute validation, access change, access-disable batch
+and expiry sweep. SQL uses independent repository instances/connections; eight concurrent direct
+repository contenders separately prove one transition/one matching audit. The unchanged F3
+implementation failed 34 of 45 cases in the corrected fresh-database red run (including
+unverifiable-reread cases). Fresh SQL and full gates are recorded
+in `../validation/dotnet10-followups-2-sessions-20261006.md`.
