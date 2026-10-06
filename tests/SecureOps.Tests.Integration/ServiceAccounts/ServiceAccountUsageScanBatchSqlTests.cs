@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using Dapper;
 using FluentAssertions;
+using Microsoft.Data.SqlClient;
 using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
@@ -154,6 +156,44 @@ public sealed class ServiceAccountUsageScanBatchSqlTests
         byOwner.Results.Select(r => r.Outcome).Should().Equal("Attached", "Unavailable");
         Ok(await fx.Service.AccountAsync(coordinator.Principal, fx.Context, owned.Summary.Id, _token)).UsageScans.Should().ContainSingle()
             .Which.RequestId.Should().BeNull("a multi-account upload never goes through a request");
+    }
+
+    [ServiceAccountSqlFact]
+    public async Task MiddleAccountFails_EarlierLinkStands_LaterAccountIsTried_AndTheAnswerIs200()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        AccountDetail a19 = await CreateAccountAsync(fx, coordinator, org, "A19");
+        AccountDetail a20 = await CreateAccountAsync(fx, coordinator, org, "A20");
+        AccountDetail a21 = await CreateAccountAsync(fx, coordinator, org, "A21");
+        string Searched(AccountDetail a) => $"SYN\\{a.Summary.AccountName}";
+        byte[] file = Discovery([Searched(a19), Searched(a20), Searched(a21)], ("SYN-APP01", "WindowsService", "SynSvc", Searched(a20)));
+        Guid[] ids = [a19.Summary.Id, a20.Summary.Id, a21.Summary.Id];
+
+        UsageScanBatchResult result;
+        await using (SqlConnection holder = fx.Connection())
+        {
+            // Another session holds an uncommitted change on A20's account row longer than the module's command timeout. The
+            // account row is read by primary key, so only A20 waits (a request row would block every account on a small,
+            // scanned table and test the lock instead of the per-account boundary).
+            await holder.OpenAsync(_token);
+            await using SqlTransaction hold = holder.BeginTransaction();
+            await holder.ExecuteAsync("UPDATE svcacct.Accounts SET Notes = CONCAT(Notes, N' ') WHERE Id = @id;", new { id = a20.Summary.Id }, hold);
+            result = Ok(await fx.Service.AttachUsageScanToAccountsAsync(coordinator.Principal, fx.Context, ids, "multi.json", file, _statement, _token));
+            await hold.RollbackAsync(_token);
+        }
+
+        result.Results.Select(r => (r.AccountId, r.Outcome)).Should().Equal(
+            (a19.Summary.Id, "Attached"), (a20.Summary.Id, "Failed"), (a21.Summary.Id, "Attached"));
+        result.ScanId.Should().NotBeNull();
+        UsageScanBatchAccountResult failed = result.Results[1];
+        failed.OutcomeLabel.Should().StartWith("Kaydedilemedi");
+        failed.MatchedAccount.Should().BeNull("nothing was linked for the failed account");
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.UsageScanLinks WHERE AccountId IN @ids", new { ids })).Should().Be(2);
+
+        UsageScanBatchResult retry = Ok(await fx.Service.AttachUsageScanToAccountsAsync(coordinator.Principal, fx.Context, ids, "multi.json", file,
+            _statement, _token));
+        retry.Results.Select(r => r.Outcome).Should().Equal("AlreadyAttached", "Attached", "AlreadyAttached");
+        retry.ScanId.Should().Be(result.ScanId);
     }
 
     private static async Task<(ServiceAccountSqlFixture, SynUser, Guid)> SetupAsync()

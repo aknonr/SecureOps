@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Infrastructure.Access;
@@ -47,19 +48,23 @@ public sealed partial class ServiceAccountService
             }
 
             string sha = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
-            IReadOnlyDictionary<Guid, (string Name, string? Domain)> names = await repository!.AccountNamesAsync(ids, cancellationToken);
             Guid? scanId = null;
             List<UsageScanBatchAccountResult> results = [];
             foreach (Guid id in ids)
             {
-                AccountScopeAnchor? anchor = (await repository.AnchorAsync(id, cancellationToken))?.Anchor;
-                (string Name, string? Domain)? known = anchor is not null && caller.Scope.Covers(anchor) && names.TryGetValue(id, out (string Name, string? Domain) n) ? n : null;
-                (string? matched, bool ambiguous) = known is { } k ? UsageScanOutcomes.SearchedName(parsed.Accounts, k.Name, k.Domain) : (null, false);
-                UsageScanBatchOutcome outcome = UsageScanBatch.Precheck(known is not null,
-                    anchor is not null && Responsible(caller.Scope, anchor), matched, ambiguous);
-                if (outcome == UsageScanBatchOutcome.Attached)
+                // One failure boundary per account (same filter as RunAsync): reading, checking and linking this account may
+                // fail without undoing earlier links or skipping later accounts; links are committed one by one.
+                (string Name, string? Domain)? known = null;
+                string? matched = null;
+                UsageScanBatchOutcome outcome;
+                try
                 {
-                    try
+                    (AccountScopeAnchor Anchor, string Version, string Name, string? Domain)? read = await repository!.AnchorAsync(id, cancellationToken);
+                    AccountScopeAnchor? anchor = read?.Anchor;
+                    known = read is { } r && caller.Scope.Covers(r.Anchor) ? (r.Name, r.Domain) : null;
+                    (matched, bool ambiguous) = known is { } k ? UsageScanOutcomes.SearchedName(parsed.Accounts, k.Name, k.Domain) : (null, false);
+                    outcome = UsageScanBatch.Precheck(known is not null, anchor is not null && Responsible(caller.Scope, anchor), matched, ambiguous);
+                    if (outcome == UsageScanBatchOutcome.Attached)
                     {
                         SaResult<(Guid ScanId, bool Attached)> attached = await repository.AttachUsageScanAsync(id,
                             new UsageScanUpload(parsed, content, sha, SafeName(fileName), runStatement.Trim(), matched!), null, caller.Actor, cancellationToken);
@@ -72,12 +77,12 @@ public sealed partial class ServiceAccountService
                         outcome = !attached.IsSuccess ? UsageScanBatchOutcome.Unavailable
                             : attached.Value.Attached ? UsageScanBatchOutcome.Attached : UsageScanBatchOutcome.AlreadyAttached;
                     }
-                    catch (Exception exception) when (exception is DbException or TimeoutException)
-                    {
-                        logger.LogError("Service Accounts usage-scan link failed for one account of a multi-account upload. FailureType: {FailureType} Origin={Origin} CorrelationId={CorrelationId}",
-                            exception.GetType().Name, Origin(exception), context.CorrelationId);
-                        outcome = UsageScanBatchOutcome.Failed;
-                    }
+                }
+                catch (Exception exception) when (exception is DbException or IOException or InvalidOperationException or TimeoutException)
+                {
+                    logger.LogError("Service Accounts usage-scan link failed for one account of a multi-account upload. FailureType: {FailureType} Number={SqlNumber} Origin={Origin} CorrelationId={CorrelationId}",
+                        exception.GetType().Name, (exception as SqlException)?.Number, Origin(exception), context.CorrelationId);
+                    outcome = UsageScanBatchOutcome.Failed;
                 }
 
                 bool linked = outcome is UsageScanBatchOutcome.Attached or UsageScanBatchOutcome.AlreadyAttached;
