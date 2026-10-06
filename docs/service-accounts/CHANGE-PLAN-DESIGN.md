@@ -46,7 +46,10 @@ Hiçbir işaret planı engellemez; onay ekranında sayılarıyla gösterilir.
 **Durumlar:** `Draft → Previewed → Approved → InProgress → Completed`, her durumdan `Cancelled`. Önizleme sonrası plan
 değişirse `Draft`'a döner.
 
-## Migration 032 (yalnız ekleme; a bu numarayı kullanmaz)
+## Migration 033 (yalnız ekleme; a bu numarayı kullanmaz)
+
+032 Access'e aittir (G-34, `032-access-request-user-index.sql`, AccessRequests indeksi; Access sahibinin işi, master'a
+girer). Servis Hesapları'nın sıradaki numarası 033. DBA kılavuzu sırası: **029 → 030 → 031 → 032 (Access) → 033**.
 
 `svcacct` şemasında; geçmiş + `audit.AuditLog` her geçişte aynı işlemde. Silme/güncelleme yalnız `ChangePlans.Status`,
 `RowVer` ve `UpdatedAt/By` için; diğer tablolar ekleme-yalnız.
@@ -98,7 +101,7 @@ Hata kodları mevcut `SaErrors` deseninde; OpenAPI anlık görüntüsü yalnız 
 ## Güvenlik tehdit tablosu (PR 1–2 için bağlayıcı)
 
 Her satırın testi, ilgili PR'da **önce** yazılır; test adı dalda değişirse bu tablo aynı commit'te güncellenir. "SQL" =
-`ServiceAccountChangePlanSqlTests` (gerçek `svcacct` şeması, harness 001–032, sentetik veri), "Birim" = saf domain testi,
+`ServiceAccountChangePlanSqlTests` (gerçek `svcacct` şeması, harness 001–033, sentetik veri), "Birim" = saf domain testi,
 "API" = `ServiceAccountApiCompositionTests`, "Harness" = `sa-sql-harness.ps1` adımı.
 
 | # | Tehdit | Kontrol (sunucu + veritabanı) | Yakalayan test |
@@ -120,7 +123,7 @@ Notlar:
 
 ## Testler
 
-- SQL harness 001–032 (ikinci çalıştırma reddedilir; 031'de bırakılmış kopyaya ileri uygulama).
+- SQL harness 001–033 (ikinci çalıştırma reddedilir; 032'de bırakılmış kopyaya ileri uygulama).
 - Entegrasyon: planlayan onaylayamaz (servis ve DB kısıtı); bayat önizleme 409; kısmi kapsamlı plan görünmez; `NoScan`,
   `StaleScan`, `NotCovered`, `ManualOnly` işaretleri; reddedilen istek hiçbir şey yazmaz; onay öncesi işaret 409; pencere
   dışı işaret kabul edilir ve `OutsideWindow` taşır; açık plandaki hesap ikinci planda reddedilir (kapanmış/iptal plandaki
@@ -130,7 +133,8 @@ Notlar:
 
 ## Üç PR
 
-1. **032 + plan/önizleme/onay API** (domain kuralları, SQL, servis, controller, OpenAPI, DBA kılavuzu eki). ~3 gün.
+1. **033 + plan/önizleme/onay API** (domain kuralları, SQL, servis, controller, OpenAPI, DBA kılavuzu eki; sıra 029 →
+   030 → 031 → 032 (Access) → 033). ~3 gün.
 2. **Kontrol listesi + kanıt + kapanış/iptal** (API ve testleri). ~2 gün.
 3. **Arayüz** (liste, plan sayfası, hesap sayfası bağlantısı, sıradaki adım). ~2–3 gün.
 
