@@ -698,7 +698,25 @@
         await LoadAsync(force: false);
     }
 
-    private Task RefreshAsync() => LoadAsync(force: true);
+    // The page is prerendered, and the server holds the HTML until OnInitializedAsync completes. The
+    // access snapshot is quick and decides what the page is, so it is awaited here. The management
+    // report and the provider check are separate API calls that can take seconds: awaiting them here
+    // sent a blank page until they finished. They load after the first render instead, so the page
+    // arrives at once with its loading state and fills in.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _snapshot is { IsApproved: true })
+        {
+            await LoadDetailAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync(force: true);
+        await LoadDetailAsync();
+    }
 
     private async Task LoadAsync(bool force)
     {
@@ -708,8 +726,11 @@
 
         _available = BuildTasks(_snapshot);
         _managementView = _snapshot.IsApproved && _snapshot.Can(Capabilities.ManagementReportingView);
+    }
 
-        if (!_snapshot.IsApproved)
+    private async Task LoadDetailAsync()
+    {
+        if (_snapshot is not { IsApproved: true })
         {
             return;
         }
