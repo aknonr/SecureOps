@@ -8,7 +8,7 @@ namespace SecureOps.Infrastructure.ServiceAccounts;
 public sealed partial class ServiceAccountService
 {
     private static readonly string[] _accountClearable = ["notes", "consumerTeam"];
-    private static readonly string[] _requestClearable = ["targetTeam", "followupPerson", "contactPerson", "plan", "planAnnouncedOn", "nextFollowupOn", "notes"];
+    private static readonly string[] _requestClearable = ["targetTeam", "followupPerson", "contactPerson", "plan", "planAnnouncedOn", "nextFollowupOn", "notes", "requestedGmsaName"];
 
     /// <summary>Scoped, server-paged account list.</summary>
     public Task<SaResult<AccountPage>> AccountsAsync(ClaimsPrincipal principal, AccessOperationContext context, AccountListQuery query,
@@ -175,6 +175,11 @@ public sealed partial class ServiceAccountService
                 return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, planError));
             }
 
+            if (RequestedGmsaNameError(request.RequestedGmsaName, type) is { } nameError)
+            {
+                return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, nameError));
+            }
+
             return !ValidText(request.Notes, 4000) || References(request.References) is null
                 ? Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "notes"))
                 : repository!.CreateRequestAsync(accountId, request, type, caller.Actor, cancellationToken);
@@ -200,6 +205,8 @@ public sealed partial class ServiceAccountService
                 : clear.Count > 0 && !ValidText(request.Reason, 1000, true) ? "reason"
                 : !ValidText(request.Notes, 4000) ? "notes"
                 : References(request.AddReferences) is null ? "addReferences"
+                : RequestedGmsaNameError(request.RequestedGmsaName, type ?? Enum.Parse<ServiceAccountActionType>(current.ActionType)) is { } name ? name
+                : StoredNameBlocksType(current.RequestedGmsaName, clear, type) ? "requestedGmsaNameTypeConflict"
                 : !clear.Contains("plan") && ServiceAccountRules.ValidatePlan(request.PlanStart ?? current.PlanStart, request.PlanEnd ?? current.PlanEnd) is { } plan ? plan
                 : null;
             if (invalid is not null)
@@ -211,7 +218,8 @@ public sealed partial class ServiceAccountService
 
             return repository!.UpdateRequestAsync(accountId, requestId, new RequestChange(request.ExpectedVersion, type, request.TargetTeamId, request.FollowupPersonId,
                 request.ContactPersonId, request.PlanStart, request.PlanEnd, request.PlanAnnouncedOn, request.NextFollowupOn, request.FirstSentOn, request.LastReplyOn,
-                request.Notes, clear.ToHashSet(StringComparer.Ordinal), request.Reason, references), caller.Actor, cancellationToken);
+                request.Notes, clear.ToHashSet(StringComparer.Ordinal), request.Reason, references, request.RequestedGmsaName), caller.Actor,
+                cancellationToken);
         }, cancellationToken);
 
     /// <summary>Explicitly closes one request after checking its completion conditions (rule 9).</summary>
@@ -260,6 +268,32 @@ public sealed partial class ServiceAccountService
             SaResult<AccountDetail> after = await DetailAsync(caller, accountId, cancellationToken);
             return result.IsSuccess ? after : SaResult<AccountDetail>.Fail(result.ErrorCode!, result.Field, result.ErrorCode == SaErrors.Conflict ? after.Value : result.Current);
         }, cancellationToken);
+
+    /// <summary>
+    /// Requested gMSA name rule (the server decides; the UI only warns): blank means none, otherwise only on gMSA work, at most
+    /// <see cref="ServiceAccountGmsaName.Limit"/> counted characters (no domain prefix, UPN suffix or trailing $) and at most
+    /// <see cref="ServiceAccountGmsaName.MaxStoredLength"/> stored. Returns the invalid field or null.
+    /// </summary>
+    private static string? RequestedGmsaNameError(string? value, ServiceAccountActionType? type)
+    {
+        if (ServiceAccountText.Clean(value) is not { } name)
+        {
+            return null;
+        }
+
+        return name.Length > ServiceAccountGmsaName.MaxStoredLength || ServiceAccountGmsaName.Length(name) is 0 or > ServiceAccountGmsaName.Limit
+            || type is not null and not (ServiceAccountActionType.GmsaHandover or ServiceAccountActionType.GmsaConversion)
+            ? "requestedGmsaName"
+            : null;
+    }
+
+    /// <summary>
+    /// A request that already records a requested gMSA name cannot be moved to a work type that is not gMSA work; the name is never
+    /// dropped silently. The caller clears the name first (clearFields requestedGmsaName with a reason), then changes the type.
+    /// </summary>
+    private static bool StoredNameBlocksType(string? storedName, IReadOnlyList<string> clear, ServiceAccountActionType? newType) =>
+        newType is not null and not (ServiceAccountActionType.GmsaHandover or ServiceAccountActionType.GmsaConversion)
+        && !clear.Contains("requestedGmsaName") && ServiceAccountText.Clean(storedName) is not null;
 
     /// <summary>Validates external references: known type, bounded number, Jira key format for JIRA, HTTPS links only.</summary>
     private static IReadOnlyList<SaExternalRef>? References(IReadOnlyList<SaExternalRef>? references)

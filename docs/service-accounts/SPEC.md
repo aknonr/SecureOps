@@ -236,6 +236,32 @@ server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR
    control, format (zero-width, bidi override/isolate), line-separator or invisible filler characters, at most 200
    characters, so a name cannot hide or reorder its extension.
 
+8. **Paging (2026-10-05).** The account page carries the newest 5 scans and, per scan, the first 25 matches of each role
+   (former-account matches still waiting for a decision first). Per-server counts, coverage, outcomes and the gMSA
+   evidence are computed over every match of the searched name, so a page or the "undecided only" filter never changes
+   them and "not found" still needs a fully scanned server. Older scans and further matches are read-only pages
+   (`GET accounts/{id}/usage-scans?page=`, `GET accounts/{id}/usage-scans/{linkId}/items?role=&pending=&page=&pageSize=`,
+   at most 100 per page) under the same scope rule as the detail; only this account's searched-name matches are returned
+   and the stored file is never downloadable.
+
+## Requested gMSA name (migration 031, 2026-10-05)
+
+The gMSA name a conversion will use is recorded where the work is requested (`GmsaHandover`, `GmsaConversion` requests) and
+where the transition is tracked, so a name that Active Directory would shorten is caught before the conversion.
+
+1. **One rule.** `ServiceAccountGmsaName` counts the name without a `DOMAIN\` prefix, a UPN suffix or the trailing `$`; at
+   most 15 characters. The account-registration hint, the request/transition hint and the server use this one rule.
+2. **The server decides.** The UI shows the count and a warning while typing and never disables sending; the API refuses a
+   longer name, an empty counted name, more than 256 stored characters, or a name on any other work type
+   (400 `requestedGmsaName`). Nothing is written when it refuses.
+3. **Change and history.** A request update may change the name or clear it (`ClearFields: requestedGmsaName`, with a
+   reason); on a transition a blank name leaves the stored one unchanged. Every change is in module history.
+4. **Reports.** The report lists requested names on open requests and on transitions with their counted length
+   ("İstenen gMSA adları"); older snapshots and databases without 031 have no such list (unknown, not empty).
+5. **Before 031.** New binaries keep working on a database without the columns: names are unknown
+   (`RequestedGmsaNameAvailable` false, the form explains it), a write with a name is refused with `gmsaNameColumnsMissing`
+   and writes nothing, a write without a name succeeds.
+
 ## Reminders
 
 In-app notifications and coordinator message drafts only. Automatic mail requires a configured

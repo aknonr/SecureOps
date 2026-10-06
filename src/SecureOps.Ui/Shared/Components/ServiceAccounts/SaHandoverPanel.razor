@@ -1,5 +1,6 @@
 @* Handover cohort and gMSA transition tracking. Being listed in a handover is not acceptance; acceptance is an
    explicit decision with a real date and note. The application never converts an account to gMSA. *@
+@using SecureOps.Domain.ServiceAccounts
 @using SecureOps.Shared.Contracts.ServiceAccounts
 @using SecureOps.Ui.Services.ServiceAccounts
 
@@ -65,6 +66,7 @@
                 <SoField Label="Uygunluk" Value="@ServiceAccountUiText.Suitability(t.Suitability)" />
                 <SoField Label="Plan" Value="@ServiceAccountUiText.Date(t.PlannedOn, "planlanmadı")" />
                 <SoField Label="Tamamlanma" Value="@(t.CompletedActionId is null ? "Tamamlanma kanıtı yok" : "Gerçekleşen gMSA geçişi bildirimine bağlı")" />
+                <SoField Label="İstenen gMSA adı" Value="@(t.RequestedGmsaName is { } n ? $"{n} ({ServiceAccountGmsaName.Length(n)}/{ServiceAccountGmsaName.Limit} karakter)" : Detail.RequestedGmsaNameAvailable ? "Kaydedilmedi" : "Bu ortamda kullanılamıyor (031 uygulanmamış)")" />
             </SoFieldGrid>
             @if (t.DecisionNote is not null) { <p class="so-panel-text--sm">@t.DecisionNote</p> }
             @if (Detail.Permissions.AssignTeam || Detail.Permissions.AssignPerson)
@@ -83,6 +85,7 @@
                         </MudSelect>
                     </MudItem>
                     <MudItem xs="12" md="3"><MudTextField @bind-Value="_decisionNote" Label="Karar notu (uygun/uygun değil için zorunlu)" MaxLength="2000" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="6"><SaGmsaNameField @bind-Value="_gmsaName" Available="@Detail.RequestedGmsaNameAvailable" Label="İstenen gMSA adı (boş: değişmez)" /></MudItem>
                 </MudGrid>
                 <MudButton OnClick="@(() => UpdateTransitionAsync(t))" Disabled="Busy" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">İzlemeyi güncelle</MudButton>
             }
@@ -93,7 +96,7 @@
 @code {
     private static readonly string[] _suitabilities = ["Unknown", "Review", "Eligible", "Ineligible"];
     private DateTime? _decidedOn, _plannedOn;
-    private string? _note, _cohort, _decisionNote;
+    private string? _note, _cohort, _decisionNote, _gmsaName;
     private string _suitability = "Review";
     private Guid? _target, _completedAction;
     private bool _trackGmsa;
@@ -121,8 +124,8 @@
         if (_seenRevision != Revision)
         {
             _seenRevision = Revision;
-            (_decidedOn, _plannedOn, _note, _cohort, _decisionNote, _suitability, _target, _completedAction, _trackGmsa) =
-                (null, null, null, null, null, Detail.Transitions.FirstOrDefault()?.Suitability ?? "Review", null, null, false);
+            (_decidedOn, _plannedOn, _note, _cohort, _decisionNote, _gmsaName, _suitability, _target, _completedAction, _trackGmsa) =
+                (null, null, null, null, null, Detail.Transitions.FirstOrDefault()?.RequestedGmsaName, Detail.Transitions.FirstOrDefault()?.Suitability ?? "Review", null, null, false);
         }
     }
 
@@ -135,5 +138,6 @@
 
     private Task UpdateTransitionAsync(TransitionView transition) => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Patch, $"/transitions/{transition.Id}",
         new TransitionUpdateRequest(transition.Version, _suitability, string.IsNullOrWhiteSpace(_decisionNote) ? null : _decisionNote.Trim(),
-            ServiceAccountUiText.ToDate(_plannedOn), _completedAction)));
+            ServiceAccountUiText.ToDate(_plannedOn), _completedAction,
+            string.IsNullOrWhiteSpace(_gmsaName) || _gmsaName.Trim() == transition.RequestedGmsaName ? null : _gmsaName.Trim())));
 }

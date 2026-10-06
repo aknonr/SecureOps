@@ -3,14 +3,14 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix,
-    [ValidateRange(26, 30)]
-    [int]$ThroughMigration = 30,
+    [ValidateRange(26, 31)]
+    [int]$ThroughMigration = 31,
     [switch]$SkipRoleScripts
 )
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-030; 029 numbers SA-003, 030 numbers SA-004), verifies module replay refusal, and
+# numbered migrations in order (now 001-031; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005), verifies module replay refusal, and
 # (unless -SkipRoleScripts) the module role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
@@ -70,6 +70,18 @@ try {
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-004-usage-scans.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate 4 replay was not refused.' }
     Write-Host 'candidate 4 replay refused as expected'
+    # -ThroughMigration 30 leaves the database like an installed 030 system (no requested gMSA name columns).
+    $hasGmsaName = if ($ThroughMigration -ge 31) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH(N'svcacct.WorkRequests', N'RequestedGmsaName') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasGmsaName -eq 'skip') { Write-Host 'Requested gMSA name (031) left out: -ThroughMigration below 31' }
+    elseif ($hasGmsaName -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-005-requested-gmsa-name.sql'
+        Write-Host 'applied SA-005-requested-gmsa-name.sql (candidate 5)'
+    } else { Write-Host 'Requested gMSA name installed through numbered 031' }
+    if ($hasGmsaName -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-005-requested-gmsa-name.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 5 replay was not refused.' }
+        Write-Host 'candidate 5 replay refused as expected'
+    }
     if (-not $SkipRoleScripts) {
         Invoke-SaSql -Database $database -File 'SA-API-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-Worker-permissions.sql'
