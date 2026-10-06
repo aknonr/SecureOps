@@ -237,6 +237,18 @@ public sealed class UsageScanParserTests
         otherAccounts["results"]![1]!["accounts"] = new JsonArray("SYN\\svc_other");
         Code(Bytes(otherAccounts)).Should().Be(UsageScanFileCodes.Inconsistent);
 
+        // Same length, but one server did not search B: B must not be reported "not found" there.
+        JsonNode both = Example();
+        both["accounts"] = new JsonArray("SYN\\svc_synapp", "SYN\\svc_other");
+        foreach (JsonNode? result in both["results"]!.AsArray())
+        {
+            result!["accounts"] = new JsonArray("SYN\\svc_synapp", "SYN\\svc_other");
+        }
+
+        UsageScanParser.Parse(Bytes(both), _max, _now).Accounts.Should().HaveCount(2, "the two-account file itself is valid");
+        both["results"]![1]!["accounts"] = new JsonArray("SYN\\svc_synapp", "syn\\SVC_SYNAPP");
+        Code(Bytes(both)).Should().Be(UsageScanFileCodes.Inconsistent, "a repeated name hides that the server never searched the other account");
+
         JsonNode failedWithMatches = Example();
         failedWithMatches["results"]![0]!["sources"] = new JsonObject { ["WindowsServices"] = "Failed", ["ScheduledTasks"] = "Failed", ["Iis"] = "Failed" };
         failedWithMatches["results"]![0]!["scanResult"] = "Failed";

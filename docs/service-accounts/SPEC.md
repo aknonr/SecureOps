@@ -243,6 +243,15 @@ server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR
    (`GET accounts/{id}/usage-scans?page=`, `GET accounts/{id}/usage-scans/{linkId}/items?role=&pending=&page=&pageSize=`,
    at most 100 per page) under the same scope rule as the detail; only this account's searched-name matches are returned
    and the stored file is never downloadable.
+9. **One file, several accounts (2026-10-06, no migration).** `POST usage-scans` (multipart `file`, `runStatement`, 1–20
+   distinct `accountIds`) validates the file once (secret guard first; a refused file stores nothing for anyone) and then
+   answers each account on its own with the single-account rules and the responsible basis only: `Attached`,
+   `AlreadyAttached`, `NotInScan`, `Ambiguous`, `Unavailable` (missing / out of scope / no responsible basis, without the
+   name when out of scope) or `Failed` (storage error; repeating is safe). One refusal or failure never blocks another
+   (per-account failure boundary); history and audit per link; each refusal (request, file, or some accounts not linked)
+   adds one `ServiceAccount.UsageScanBatchRefused` audit row with reason and counts only. Both upload routes re-check scope and basis inside the
+   link's write transaction (locked account/request rows, HOLDLOCK on grants and the tree), so a change after the check
+   writes nothing. ADR-0027 §4.
 
 ## Requested gMSA name (migration 031, 2026-10-05)
 

@@ -17,22 +17,70 @@ public sealed partial class SqlServiceAccountRepository
     /// Stores the scan once per uploader and file hash (append-only) and links it to the account, optionally through an open
     /// request of that account. Returns the scan id and whether a new link was written (false = this file was already
     /// attached to this account; nothing changes).
+    /// <para>
+    /// The caller's authority is decided again inside the write transaction, after the service's own check: the account row
+    /// and the request row are locked (UPDLOCK, HOLDLOCK) and the caller's active scope grants and the organization/team tree
+    /// are read with HOLDLOCK, so a revocation, an owner-team or organization change, or a re-parented team either committed
+    /// before (and is seen here) or waits until this link is committed. Outside the re-read scope is NotFound (same as
+    /// missing); in scope but <paramref name="allowed"/> refuses (scope, account anchor, the request's target team) is
+    /// Forbidden. Nothing is written in either case.
+    /// </para>
     /// </summary>
     public async Task<SaResult<(Guid ScanId, bool Attached)>> AttachUsageScanAsync(Guid accountId, UsageScanUpload upload, Guid? requestId, SaActor actor,
-        CancellationToken cancellationToken)
+        Func<ServiceAccountScope, AccountScopeAnchor, Guid?, bool> allowed, CancellationToken cancellationToken)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken);
-        int anchor = await connection.ExecuteScalarAsync<int>(Cmd("""
-            SELECT CASE WHEN OBJECT_ID(N'svcacct.UsageScans', N'U') IS NULL THEN -1
-                WHEN NOT EXISTS (SELECT 1 FROM svcacct.Accounts WHERE Id = @accountId) THEN 0
-                WHEN @requestId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM svcacct.WorkRequests WITH (UPDLOCK)
-                    WHERE Id = @requestId AND AccountId = @accountId AND Status = 'Open') THEN 1 ELSE 2 END;
-            """, new { accountId, requestId }, transaction, cancellationToken));
-        if (anchor < 2)
+        int state = await connection.ExecuteScalarAsync<int>(Cmd("""
+            IF OBJECT_ID(N'svcacct.UsageScans', N'U') IS NULL
+                SELECT -1;
+            ELSE
+                SELECT COUNT(*) FROM svcacct.Accounts WITH (UPDLOCK, HOLDLOCK) WHERE Id = @accountId;
+            """, new { accountId }, transaction, cancellationToken));
+        if (state < 1)
         {
-            return SaResult<(Guid, bool)>.Fail(anchor == 0 ? SaErrors.NotFound : SaErrors.Invalid, anchor switch { -1 => "scanTablesMissing", 0 => null, _ => "requestId" });
+            return SaResult<(Guid, bool)>.Fail(state == 0 ? SaErrors.NotFound : SaErrors.Invalid, state == 0 ? null : "scanTablesMissing");
+        }
+
+        Guid? requestTeam = null;
+        if (requestId is not null)
+        {
+            (bool Open, Guid? TargetTeamId)? request = await connection.QuerySingleOrDefaultAsync<(bool Open, Guid? TargetTeamId)?>(Cmd("""
+                SELECT CAST(CASE WHEN Status = 'Open' THEN 1 ELSE 0 END AS bit), TargetTeamId
+                FROM svcacct.WorkRequests WITH (UPDLOCK, HOLDLOCK) WHERE Id = @requestId AND AccountId = @accountId;
+                """, new { accountId, requestId }, transaction, cancellationToken));
+            if (request is not { Open: true } open)
+            {
+                return SaResult<(Guid, bool)>.Fail(SaErrors.Invalid, "requestId");
+            }
+
+            requestTeam = open.TargetTeamId;
+        }
+
+        ServiceAccountScope scope;
+        using (SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
+            SELECT ScopeKind, OrganizationId, TeamId FROM svcacct.ScopeGrants WITH (HOLDLOCK) WHERE UserId = @UserId AND RevokedAt IS NULL;
+            SELECT Id, ParentId FROM svcacct.Organizations WITH (HOLDLOCK);
+            SELECT Id, OrganizationId FROM svcacct.Teams WITH (HOLDLOCK);
+            """, new { actor.UserId }, transaction, cancellationToken)))
+        {
+            ScopeGrant[] grants = [.. (await grid.ReadAsync<(string Kind, Guid? OrganizationId, Guid? TeamId)>())
+                .Select(g => new ScopeGrant(Enum.Parse<ScopeKind>(g.Kind), g.OrganizationId, g.TeamId))];
+            OrganizationNode[] orgs = [.. (await grid.ReadAsync<(Guid Id, Guid? ParentId)>()).Select(o => new OrganizationNode(o.Id, o.ParentId))];
+            TeamNode[] teams = [.. (await grid.ReadAsync<(Guid Id, Guid? OrganizationId)>()).Select(t => new TeamNode(t.Id, t.OrganizationId))];
+            scope = ServiceAccountScope.Resolve(grants, orgs, teams);
+        }
+
+        AccountScopeAnchor anchor = (await AnchorAsync(connection, transaction, accountId, cancellationToken))!.Value.Anchor;
+        if (!scope.Covers(anchor))
+        {
+            return SaResult<(Guid, bool)>.Fail(SaErrors.NotFound);
+        }
+
+        if (!allowed(scope, anchor, requestTeam))
+        {
+            return SaResult<(Guid, bool)>.Fail(SaErrors.Forbidden, "requestId");
         }
 
         Guid? existing = await connection.QuerySingleOrDefaultAsync<Guid?>(Cmd("""
