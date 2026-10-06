@@ -54,7 +54,7 @@ değişirse `Draft`'a döner.
 | Tablo | Kolonlar (özet) |
 |---|---|
 | `ChangePlans` | Id, Kind (`GmsaConversion`), Title, Status, CurrentPreviewVersion, CreatedBy/At, UpdatedBy/At, RowVer |
-| `ChangePlanAccounts` | PlanId, AccountId, TargetGmsaName nvarchar(256), RequestId NULL (bağlı açık talep), AddedAt; PK (PlanId, AccountId) |
+| `ChangePlanAccounts` | Id (PK), PlanId, AccountId, Action (`Added`/`Removed`/`Renamed`), TargetGmsaName nvarchar(256), RequestId NULL (bağlı açık talep), At, By (ekleme-yalnız; geçerli hesap kümesi her hesabın son satırından okunur; indeks (PlanId, AccountId, At)) |
 | `ChangePlanPreviews` | Id, PlanId, Version, Sha256, ScanFreshDays (7), CreatedBy/At; UQ (PlanId, Version) |
 | `ChangePlanItems` | Id, PreviewId, AccountId, ScanLinkId NULL, ServerName, ComponentType, ComponentName, CurrentIdentity, TargetIdentity, Flag, ScanAt NULL |
 | `ChangePlanApprovals` | Id, PlanId, PreviewId, Sha256, OcoNumber, WindowStart, WindowEnd, Reason, ApprovedBy/At |
@@ -95,6 +95,29 @@ Hata kodları mevcut `SaErrors` deseninde; OpenAPI anlık görüntüsü yalnız 
 - 390 px, %200 yakınlaştırma, klavye, açık/koyu; ortak bileşenler (`SoPageHeader`, `SoProblemPanel`, `SoEmptyState`,
   `SoStatusBadge`).
 
+## Güvenlik tehdit tablosu (PR 1–2 için bağlayıcı)
+
+Her satırın testi, ilgili PR'da **önce** yazılır; test adı dalda değişirse bu tablo aynı commit'te güncellenir. "SQL" =
+`ServiceAccountChangePlanSqlTests` (gerçek `svcacct` şeması, harness 001–032, sentetik veri), "Birim" = saf domain testi,
+"API" = `ServiceAccountApiCompositionTests`, "Harness" = `sa-sql-harness.ps1` adımı.
+
+| # | Tehdit | Kontrol (sunucu + veritabanı) | Yakalayan test |
+|---|---|---|---|
+| T1 | **Bayat onay:** önizlemeden sonra plan değişir (hesap/ad eklenir, çıkarılır) ama onay eski önizlemeye verilir | Onay isteği `previewVersion` + `sha256` taşır; onay işleminde plan satırı `UPDLOCK` ile kilitlenir, durum `Previewed`, `CurrentPreviewVersion = previewVersion` ve kayıtlı özet = istekteki özet değilse 409 `previewStale`, hiçbir satır yazılmaz. `PATCH` planı `Draft`'a döndürür, önizleme sürümünü geçersiz kılar | SQL `Approve_AfterPlanChanged_IsStale_AndWritesNothing` (PATCH sonrası eski sürüm/özetle onay → 409; `ChangePlanApprovals`, olay, geçmiş, audit sayıları değişmez) |
+| T2 | **Yeniden oynatılan onay:** aynı onay isteği ikinci kez (çift tıklama, ağ tekrarı) veya onaylanmış/iptal edilmiş plana eski istek | Onay yalnız `Previewed` durumundan; `ChangePlanApprovals` üzerinde tekil indeks `UQ (PreviewId)` (bir önizlemeye en çok bir onay); ikinci istek 409 `planNotPreviewed`, tekil indeks yarışta ikinci yazmayı DB'de reddeder | SQL `Approve_Replayed_IsRefused_OneApprovalRow` (ardışık iki aynı istek → 200 + 409, tek onay satırı); SQL `Approve_AfterCancel_IsRefused`; Harness: `UQ (PreviewId)` ihlali doğrudan INSERT ile 2627 verir |
+| T3 | **Planlayan = onaylayan atlatma:** planlayan kendi planını onaylar; ya da başka biri planı değiştirir, değiştiren onaylar | Servis: onaylayan ≠ `ChangePlans.CreatedBy` → 403 `approverIsPlanner`. DB: onay INSERT'inde tetikleyici aynı kuralı uygular (servis atlansa da). **Sahip kararı (2026-10-06):** onaylayan, onaylanan önizlemeyi üreten veya plan oluşturulduktan sonra `PATCH` ile değiştiren kişi de olamaz (`ChangePlanEvents.Actor` üzerinden) → 403 `approverChangedPlan` | SQL `Approve_ByPlanner_Is403_AndWritesNothing`; SQL `ApprovalTrigger_RefusesPlannerEvenWhenServiceIsBypassed` (doğrudan INSERT → tetikleyici hatası, satır yok); SQL `Approve_ByEditorOfPlan_Is403` (öneri onaylanırsa) |
+| T4 | **Eşzamanlı onay ve iptal** (veya iki onaylayıcı aynı anda): plan hem onaylı hem iptal görünür, iki onay satırı oluşur | Onay, iptal, `PATCH`, önizleme ve kapanış aynı işlemde plan satırını `UPDLOCK, HOLDLOCK` ile kilitler, durumu kilit altında yeniden okur; `RowVer` beklenen sürümle karşılaştırılır; geçiş + olay + geçmiş + audit tek işlemde. Kazanan bir tanedir, diğeri 409 ile güncel görünümü alır | SQL `ConcurrentApproveAndCancel_ExactlyOneWins` (20 tur, `Task.WhenAll`; her turda tam bir başarı, son durum ile `ChangePlanEvents` son satırı tutarlı, en çok bir onay satırı); SQL `TwoApproversAtOnce_OneApprovalRow`; tanılama günlüğünde `Number=1205` olursa test başarısız sayılır |
+| T5 | **Kapsamı olmayan hesabın plana sızması:** kapsam dışı/katılımcı hesap plana eklenir; kapsam sonradan daralır; kısmi kapsamlı biri planı görür veya onaylar | Oluşturma ve `PATCH`'te hesap bazında sorumlu dayanak (a'daki `Responsible` kuralı); kapsam dışı hesap `Unavailable`, **adı dönmez**. Önizleme, onay, işaret ve kapanışta çağıranın kapsamı planın **tüm** hesaplarını yeniden kapsamalı; kapsamamıyorsa 404 (yok ile aynı). Liste ve ayrıntı yalnız tüm hesapları kapsanan planları döndürür | SQL `CreatePlan_OutOfScopeAccount_RefusedPerAccount_NoName`; SQL `ScopeShrinksAfterPlan_PreviewApproveAndChecks_Are404`; SQL `PartialScope_PlanInvisibleInListAndDetail`; SQL `ParticipantBasis_CannotAddAccount` |
+| T6 | **IDOR:** başka planın kalemi (`itemId`), başka planın önizlemesi veya hesap kimliği tahmin edilerek işlem | Her rota kaynağı üst kaynağına bağlı okur: kalem `ChangePlanItems → ChangePlanPreviews.PlanId = {id}` ve **planın güncel onaylı önizlemesine** ait olmalı; değilse 404. Kanıt yükleme/indirme mevcut `Evidence` kapsam denetiminden geçer, sahip varlık türü + kimlik plana bağlı doğrulanır. 404 gövdesi var olan/olmayan ayrımı yapmaz | SQL `Check_ItemOfAnotherPlan_Is404_AndWritesNothing`; SQL `Check_ItemOfOlderPreview_Is404`; SQL `Get_PlanOutsideScope_Is404_SameBodyAsMissing`; API `ChangePlanRoutes_PoliciesAndMethods` (her rota doğru politika: View/Work/Verify, yazma rotaları yalnız POST/PATCH) |
+| T7 | **Önizleme sürümü/özet doğrulaması:** istemci kendi özetini üretir; aynı içerik farklı sırayla farklı özet verir; kayıtlı kalemler sonradan değişir | Özet yalnız sunucuda, kalemlerin kanonik dizilişinden (sabit alan sırası, `AccountId, ServerName, ComponentType, ComponentName` sıralı, UTF-8, ayraçlı) SHA-256. Onayda istekteki özet kayıtlı özetle **ve** kalemlerden yeniden hesaplanan özetle karşılaştırılır; uyuşmazlık 409 `previewStale` (yeniden hesap farkı ayrıca `logger.LogError`, içerik yazılmadan) | Birim `PreviewDigest_IsCanonical_IndependentOfRowOrder` ve `PreviewDigest_ChangesWhenAnyFieldChanges`; SQL `Approve_WrongSha_Is409`; SQL `Approve_RecomputesDigestFromStoredItems` (yalnız test veritabanında tetikleyici geçici kapatılıp bir kalem değiştirilir; onay 409 alır, onay satırı yazılmaz) |
+| T8 | **Ekleme-yalnız kayıtların bozulması:** önizleme kalemi, onay, işaret, olay veya hesap listesi sonradan güncellenir/silinir; `ChangePlans`'ta izinli olmayan kolon değiştirilir | `ChangePlanPreviews`, `ChangePlanItems`, `ChangePlanApprovals`, `ChangeItemChecks`, `ChangePlanEvents` üzerinde UPDATE/DELETE engelleyen tetikleyiciler (modülün mevcut 513xx deseni); `ChangePlans`'ta yalnız `Status`, `CurrentPreviewVersion`, `UpdatedAt/By` (`RowVer` otomatik) güncellenebilir, `Kind`/`CreatedBy`/`CreatedAt` değişimi tetikleyiciyle reddedilir; silme yok. `svcacct_api_runtime` yeni tablolarda yalnız SELECT/INSERT (+ `ChangePlans` UPDATE); DELETE izni yok. Her geçişte audit aynı işlemde | Harness: her ekleme-yalnız tabloda UPDATE ve DELETE doğrudan denenir → beklenen tetikleyici hata numarası; `ChangePlans.CreatedBy` UPDATE → hata; API rolüyle (`EXECUTE AS USER`) DELETE → izin hatası. SQL `FailureBeforeCommit_LeavesNoPlanNoEventNoAudit` (enjekte hata) |
+
+Notlar:
+- Tüm 409/403/404 yanıtları planın veya kapsam dışı hesabın içeriğini taşımaz; 409 yalnız çağıranın zaten görebildiği
+  güncel görünümü döndürür (modülün mevcut deseni).
+- T1–T8 testleri PR 1'de (T6 kalem/işaret ve T8 `ChangeItemChecks` kısmı PR 2'de) yazılır; satır karşılığı yeşil olmadan
+  PR açılmaz.
+
 ## Testler
 
 - SQL harness 001–032 (ikinci çalıştırma reddedilir; 031'de bırakılmış kopyaya ileri uygulama).
@@ -115,4 +138,7 @@ Her PR ayrı dal, küçük commit'ler, build/test/format/SQL harness; push edili
 
 ## Açık sorular
 
-Yok: 2026-10-06 sahip kararları 4–7 önceki dört soruyu kapattı. Uygulamada çıkan soru buraya eklenir.
+Yok. Tehdit tablosundan çıkan iki soru 2026-10-06 sahip kararıyla kapandı:
+
+1. **Onaylayanın kapsamı (T3):** Evet. Onaylayan, planı oluşturan kişi olmadığı gibi, onaylanan önizlemeyi üreten veya planı sonradan `PATCH` ile değiştiren kişi de olamaz (`ChangePlanEvents.Actor` üzerinden, 403 `approverChangedPlan`).
+2. **`ChangePlanAccounts` ekleme-yalnız (T8):** Evet. Her ekleme, çıkarma ve ad değişikliği yeni satırdır; hiçbir satır güncellenmez veya silinmez. Şema tablosu ve T8 testleri buna göre okunur.
