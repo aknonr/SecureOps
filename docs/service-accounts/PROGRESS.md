@@ -17,6 +17,18 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Multi-account scan upload (branch `feature/service-accounts-multi-account-scan-20261006`, from master `50c0528`)
+
+- `POST usage-scans` (multipart `file`, `runStatement`, 1–20 distinct `accountIds`), no migration: file validated once (secret
+  guard first), then each account on its own (scope, responsible basis, searched by the file); outcomes Attached /
+  AlreadyAttached / NotInScan / Ambiguous / Unavailable (no name out of scope) / Failed. UI: list selection → "Tek tarama
+  dosyasını bu hesaplara bağla". Rules: SPEC "Usage scans" 9, ADR-0027 §4. Windows row 86.
+- Verified 2026-10-06: build 0/0, unit 1919 + 1 intentional skip, integration 361 / 62 skipped with module SQL on fresh
+  `SecureOps_SaBatch1006a` (harness 001–031 exit 0), format clean, OpenAPI additions only (+261/−0). One integration run of five
+  had one failure that did not repeat and was not captured (suspect: the persisted-access race fixed on
+  `test/service-accounts-persisted-access-serial-20261006`, not on master yet).
+- PR #12 (031 + scan paging) is merged (`50c0528`); the section below is its record.
+
 ## On this branch (done, 2026-10-05)
 
 - **Requested gMSA name (migration 031, SA-005).** `RequestedGmsaName` on gMSA requests (create, update, reasoned clear) and
