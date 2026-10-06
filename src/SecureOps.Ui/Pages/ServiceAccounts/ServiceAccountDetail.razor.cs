@@ -117,6 +117,9 @@ public partial class ServiceAccountDetail
         await AfterCommandAsync(saved);
     }
 
+    /// <summary>Opens the tab a next step points to; it only switches the view.</summary>
+    private void OpenTab(int tab) => _tab = tab;
+
     /// <summary>Older scans (read only); a failure shows the problem and keeps the current page.</summary>
     private async Task<UsageScanPage?> LoadScanPageAsync(int page)
     {

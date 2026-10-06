@@ -17,6 +17,12 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Ops-research UI work (2026-10-06, separate branches from master, not merged)
+
+Order c, b, a, d from `ops-research/05-yol-haritasi.md`. **c merged** (PR #14, `87df0c3`):
+"Sıradaki adım" card on the account page, computed in the UI from the loaded detail only (no API change); missing data reads
+"bilgi eksik", never "not used"; a step the caller may not take reads "başkasından bekleniyor".
+
 ## Multi-account scan upload (branch `feature/service-accounts-multi-account-scan-20261006`, from master `50c0528`)
 
 - `POST usage-scans` (multipart `file`, `runStatement`, 1–20 distinct `accountIds`), no migration: file validated once (secret
