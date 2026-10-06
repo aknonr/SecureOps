@@ -13,7 +13,8 @@ public sealed record AccountChange(string ExpectedVersion, string? Notes, Guid? 
 /// <summary>Validated request change (null = unchanged; listed fields are cleared).</summary>
 public sealed record RequestChange(string ExpectedVersion, ServiceAccountActionType? ActionType, Guid? TargetTeamId, Guid? FollowupPersonId,
     Guid? ContactPersonId, DateOnly? PlanStart, DateOnly? PlanEnd, DateOnly? PlanAnnouncedOn, DateOnly? NextFollowupOn, DateOnly? FirstSentOn,
-    DateOnly? LastReplyOn, string? Notes, IReadOnlySet<string> Clear, string? Reason, IReadOnlyList<SaExternalRef> References);
+    DateOnly? LastReplyOn, string? Notes, IReadOnlySet<string> Clear, string? Reason, IReadOnlyList<SaExternalRef> References,
+    string? RequestedGmsaName = null);
 
 public sealed partial class SqlServiceAccountRepository
 {
@@ -36,6 +37,35 @@ public sealed partial class SqlServiceAccountRepository
         // Table name comes only from the closed switch above.
         return await connection.QuerySingleOrDefaultAsync<Guid?>(Cmd($"SELECT AccountId FROM {table} WHERE Id = @id;", new { id }, null, cancellationToken));
     }
+
+    /// <summary>Write result: a requested gMSA name was sent but migration 031 is not applied (nothing is written).</summary>
+    private const int _gmsaNameColumnsMissing = -2;
+
+    /// <summary>Set once both requested gMSA name columns (migration 031) were seen; a column is never dropped again.</summary>
+    private volatile bool _gmsaNameColumns;
+
+    /// <summary>
+    /// Whether migration 031 is applied. Only a positive answer is cached, so applying 031 to a running system is picked up on
+    /// the next call; before that, binaries with this code keep working and say the name is unavailable.
+    /// </summary>
+    internal async Task<bool> GmsaNameColumnsAsync(SqlConnection connection, IDbTransaction? transaction, CancellationToken cancellationToken)
+    {
+        if (_gmsaNameColumns)
+        {
+            return true;
+        }
+
+        bool present = await connection.ExecuteScalarAsync<int>(Cmd("""
+            SELECT CASE WHEN COL_LENGTH(N'svcacct.WorkRequests', N'RequestedGmsaName') IS NOT NULL
+                AND COL_LENGTH(N'svcacct.IdentityTransitions', N'RequestedGmsaName') IS NOT NULL THEN 1 ELSE 0 END;
+            """, null, transaction, cancellationToken)) == 1;
+        _gmsaNameColumns = present;
+        return present;
+    }
+
+    /// <summary>Requested-name select column: the real column after 031, a typed NULL before it.</summary>
+    private static string GmsaNameColumn(string alias, bool present) =>
+        present ? alias + ".RequestedGmsaName" : "CAST(NULL AS nvarchar(256)) AS RequestedGmsaName";
 
     /// <summary>
     /// Creates an account manually (explicit, audited; no automatic provisioning from names). A typed name and domain are
@@ -207,14 +237,23 @@ public sealed partial class SqlServiceAccountRepository
         var id = Guid.NewGuid();
         return MutateAsync(accountId, "Request", id, "RequestCreated", request with { References = null }, null, actor, async (connection, transaction, now) =>
         {
-            int inserted = await connection.ExecuteAsync(Cmd("""
+            string? name = ServiceAccountText.Clean(request.RequestedGmsaName);
+            bool names = await GmsaNameColumnsAsync(connection, transaction, cancellationToken);
+            if (name is not null && !names)
+            {
+                return _gmsaNameColumnsMissing;
+            }
+
+            // Only the closed column fragment below is interpolated; every value is a parameter.
+            int inserted = await connection.ExecuteAsync(Cmd($"""
                 INSERT INTO svcacct.WorkRequests(Id, AccountId, ActionType, Status, TargetTeamId, FollowupPersonId, ContactPersonId, PlanStart, PlanEnd,
-                    PlanAnnouncedOn, NextFollowupOn, FirstSentOn, LastReplyOn, Notes, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
+                    PlanAnnouncedOn, NextFollowupOn, FirstSentOn, LastReplyOn, Notes, {(names ? "RequestedGmsaName, " : "")}CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
                 SELECT @id, @accountId, @Type, 'Open', @TargetTeamId, @FollowupPersonId, @ContactPersonId, @PlanStart, @PlanEnd, @PlanAnnouncedOn,
-                    @NextFollowupOn, @FirstSentOn, @LastReplyOn, @Notes, @now, @UserId, @now, @UserId
+                    @NextFollowupOn, @FirstSentOn, @LastReplyOn, @Notes, {(names ? "@name, " : "")}@now, @UserId, @now, @UserId
                 WHERE EXISTS (SELECT 1 FROM svcacct.Accounts WHERE Id = @accountId);
                 """, new
             {
+                name,
                 id,
                 accountId,
                 Type = type.ToString(),
@@ -246,10 +285,21 @@ public sealed partial class SqlServiceAccountRepository
             change.PlanEnd,
             change.NextFollowupOn,
             change.LastReplyOn,
+            change.RequestedGmsaName,
             Cleared = change.Clear
         }, change.Reason, actor, async (connection, transaction, now) =>
         {
-            int updated = await connection.ExecuteAsync(Cmd("""
+            string? name = ServiceAccountText.Clean(change.RequestedGmsaName);
+            bool clearName = change.Clear.Contains("requestedGmsaName");
+            bool names = await GmsaNameColumnsAsync(connection, transaction, cancellationToken);
+            if ((name is not null || clearName) && !names)
+            {
+                return _gmsaNameColumnsMissing;
+            }
+
+            // Only the closed column fragment below is interpolated; every value is a parameter.
+            string nameColumn = names ? "RequestedGmsaName = CASE WHEN @cName = 1 THEN NULL ELSE COALESCE(@name, RequestedGmsaName) END," : "";
+            int updated = await connection.ExecuteAsync(Cmd($"""
                 UPDATE svcacct.WorkRequests SET
                     ActionType = COALESCE(@ActionType, ActionType),
                     TargetTeamId = CASE WHEN @cTarget = 1 THEN NULL ELSE COALESCE(@TargetTeamId, TargetTeamId) END,
@@ -262,6 +312,7 @@ public sealed partial class SqlServiceAccountRepository
                     FirstSentOn = COALESCE(@FirstSentOn, FirstSentOn),
                     LastReplyOn = COALESCE(@LastReplyOn, LastReplyOn),
                     Notes = CASE WHEN @cNotes = 1 THEN NULL ELSE COALESCE(@Notes, Notes) END,
+                    {nameColumn}
                     UpdatedAt = @now, UpdatedBy = @UserId
                 WHERE Id = @requestId AND AccountId = @accountId AND Status = 'Open' AND RowVer = @RowVer
                   AND (COALESCE(@PlanEnd, PlanEnd) IS NULL OR COALESCE(@PlanStart, PlanStart) IS NULL OR @cPlan = 1 OR COALESCE(@PlanEnd, PlanEnd) >= COALESCE(@PlanStart, PlanStart));
@@ -285,6 +336,8 @@ public sealed partial class SqlServiceAccountRepository
                 cAnnounced = change.Clear.Contains("planAnnouncedOn"),
                 cNext = change.Clear.Contains("nextFollowupOn"),
                 cNotes = change.Clear.Contains("notes"),
+                cName = clearName,
+                name,
                 now,
                 actor.UserId,
                 requestId,
@@ -473,6 +526,11 @@ public sealed partial class SqlServiceAccountRepository
         if (affected == -1)
         {
             return SaResult<Guid>.Fail(SaErrors.Invalid, duplicateField ?? "duplicate");
+        }
+
+        if (affected == _gmsaNameColumnsMissing)
+        {
+            return SaResult<Guid>.Fail(SaErrors.Invalid, "gmsaNameColumnsMissing");
         }
 
         if (affected < 1)

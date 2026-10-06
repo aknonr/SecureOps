@@ -187,9 +187,19 @@ public sealed partial class SqlServiceAccountRepository
 
     /// <summary>Updates gMSA suitability/plan/completion; completion must reference a valid gMSA conversion action.</summary>
     public Task<SaResult<Guid>> UpdateTransitionAsync(Guid accountId, Guid id, TransitionUpdateRequest request, SaActor actor, CancellationToken cancellationToken) =>
-        MutateAsync(accountId, "Transition", id, "TransitionUpdated", new { request.Suitability, request.PlannedOn, request.CompletedActionId }, request.DecisionNote, actor,
-            (connection, transaction, now) => connection.ExecuteAsync(Cmd("""
-                UPDATE svcacct.IdentityTransitions SET Suitability = @Suitability, DecisionNote = COALESCE(@DecisionNote, DecisionNote),
+        MutateAsync(accountId, "Transition", id, "TransitionUpdated", new { request.Suitability, request.PlannedOn, request.CompletedActionId, request.RequestedGmsaName },
+            request.DecisionNote, actor, async (connection, transaction, now) =>
+            {
+                string? name = ServiceAccountText.Clean(request.RequestedGmsaName);
+                bool names = await GmsaNameColumnsAsync(connection, transaction, cancellationToken);
+                if (name is not null && !names)
+                {
+                    return _gmsaNameColumnsMissing;
+                }
+
+                // Only the closed column fragment below is interpolated; every value is a parameter.
+                return await connection.ExecuteAsync(Cmd($"""
+                UPDATE svcacct.IdentityTransitions SET Suitability = @Suitability, {(names ? "RequestedGmsaName = COALESCE(@name, RequestedGmsaName)," : "")} DecisionNote = COALESCE(@DecisionNote, DecisionNote),
                     DecidedBy = CASE WHEN @Suitability IN ('Eligible','Ineligible') THEN @UserId ELSE DecidedBy END,
                     DecidedAt = CASE WHEN @Suitability IN ('Eligible','Ineligible') THEN @now ELSE DecidedAt END,
                     PlannedOn = COALESCE(@PlannedOn, PlannedOn), CompletedActionId = COALESCE(@CompletedActionId, CompletedActionId), UpdatedAt = @now, UpdatedBy = @UserId
@@ -197,17 +207,19 @@ public sealed partial class SqlServiceAccountRepository
                   AND (@CompletedActionId IS NULL OR EXISTS (SELECT 1 FROM svcacct.ActionEvents e WHERE e.Id = @CompletedActionId AND e.AccountId = @accountId
                         AND e.ActionType = 'GmsaConversion' AND e.Result IN ('Performed','Verified') AND e.VoidedAt IS NULL));
                 """, new
-            {
-                request.Suitability,
-                DecisionNote = ServiceAccountText.Clean(request.DecisionNote),
-                actor.UserId,
-                now,
-                request.PlannedOn,
-                request.CompletedActionId,
-                id,
-                accountId,
-                RowVer = Version(request.ExpectedVersion)
-            }, transaction, cancellationToken)), cancellationToken);
+                {
+                    request.Suitability,
+                    DecisionNote = ServiceAccountText.Clean(request.DecisionNote),
+                    actor.UserId,
+                    now,
+                    request.PlannedOn,
+                    request.CompletedActionId,
+                    name,
+                    id,
+                    accountId,
+                    RowVer = Version(request.ExpectedVersion)
+                }, transaction, cancellationToken));
+            }, cancellationToken);
 
     /// <summary>Stores immutable evidence bytes anchored to an account (or a team for team-scope communications).</summary>
     public Task<SaResult<Guid>> AddEvidenceAsync(string ownerType, Guid ownerId, Guid? accountId, Guid? scopeTeamId, string fileName, string contentType,

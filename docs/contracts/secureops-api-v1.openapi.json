@@ -20156,6 +20156,342 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "ServiceAccounts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageScanPage"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageScanPage"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageScanPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/service-accounts/accounts/{id}/usage-scans/{linkId}/items": {
+      "get": {
+        "tags": [
+          "ServiceAccounts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pending",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageScanItemPage"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageScanItemPage"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageScanItemPage"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/service-accounts/accounts/{id}/usage-scan-items/{itemId}/usage": {
@@ -22238,6 +22574,13 @@
           "usageScanTotal": {
             "type": "integer",
             "format": "int32"
+          },
+          "usageScanPending": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestedGmsaNameAvailable": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -24072,6 +24415,10 @@
               "$ref": "#/components/schemas/SaExternalRef"
             },
             "nullable": true
+          },
+          "requestedGmsaName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -25258,6 +25605,32 @@
             "format": "int32"
           },
           "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "GmsaNameLine": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedName": {
+            "type": "string",
+            "nullable": true
+          },
+          "length": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
             "type": "string",
             "nullable": true
           }
@@ -28260,6 +28633,10 @@
           "version": {
             "type": "string",
             "nullable": true
+          },
+          "requestedGmsaName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -29232,6 +29609,13 @@
               "$ref": "#/components/schemas/DirectorateRow"
             },
             "nullable": true
+          },
+          "gmsaNames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GmsaNameLine"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -29702,6 +30086,10 @@
             "type": "string",
             "format": "uuid",
             "nullable": true
+          },
+          "requestedGmsaName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -29745,6 +30133,10 @@
             "nullable": true
           },
           "version": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedGmsaName": {
             "type": "string",
             "nullable": true
           }
@@ -29997,6 +30389,10 @@
               "$ref": "#/components/schemas/SaExternalRef"
             },
             "nullable": true
+          },
+          "requestedGmsaName": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -30098,6 +30494,38 @@
         },
         "additionalProperties": false
       },
+      "UsageScanItemPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageScanItemView"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "pendingOnly": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "UsageScanItemView": {
         "type": "object",
         "properties": {
@@ -30158,6 +30586,35 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UsageScanPage": {
+        "type": "object",
+        "properties": {
+          "scans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageScanView"
+            },
+            "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -30310,6 +30767,18 @@
               "$ref": "#/components/schemas/UsageScanItemView"
             },
             "nullable": true
+          },
+          "formerTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "formerPending": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectedTotal": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

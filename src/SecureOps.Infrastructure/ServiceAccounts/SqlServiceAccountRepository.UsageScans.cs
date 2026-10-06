@@ -13,9 +13,6 @@ public sealed record UsageScanUpload(ParsedUsageScan Parsed, byte[] Content, str
 
 public sealed partial class SqlServiceAccountRepository
 {
-    /// <summary>Scans shown on one account detail (newest links first); the total is reported separately.</summary>
-    private const int _usageScanLimit = 10;
-
     /// <summary>
     /// Stores the scan once per uploader and file hash (append-only) and links it to the account, optionally through an open
     /// request of that account. Returns the scan id and whether a new link was written (false = this file was already
@@ -150,44 +147,113 @@ public sealed partial class SqlServiceAccountRepository
     }
 
     /// <summary>
-    /// The newest scans attached to the account, each reduced to this account's searched name: its items, the expected-gMSA
-    /// items and the per-server coverage. Also returns how many scans are attached in total. Before migration 030 is applied
-    /// the scans are null (unknown), so binaries can be installed ahead of the schema without breaking the account detail.
+    /// One page of the scans attached to the account (newest links first), each reduced to this account's searched name.
+    /// Per-server counts, coverage and the gMSA evidence are aggregated in SQL over every matched item, so paging the items
+    /// never changes an outcome ("not found" still needs a fully scanned server); only the first page of each role's items
+    /// is loaded. Also returns how many scans are attached and how many former-account items still wait for a decision
+    /// across all of them. Before migration 030 is applied the scans are null (unknown), so binaries can be installed ahead
+    /// of the schema without breaking the account detail.
     /// </summary>
-    public async Task<(IReadOnlyList<UsageScanView>? Scans, int Total)> UsageScansAsync(Guid accountId, CancellationToken cancellationToken)
+    public async Task<(IReadOnlyList<UsageScanView>? Scans, int Total, int Pending)> UsageScansAsync(Guid accountId, int page, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
-        using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd($"""
+        using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
             IF OBJECT_ID(N'svcacct.UsageScanLinks', N'U') IS NULL
             BEGIN
                 SELECT CAST(-1 AS int);
                 RETURN;
             END;
             SELECT COUNT(*) FROM svcacct.UsageScanLinks WHERE AccountId = @accountId;
-            SELECT TOP ({_usageScanLimit}) l.Id AS LinkId, l.ScanId, l.MatchedAccount, l.RequestId, l.LinkedAt, s.Purpose, s.ExpectedAccount, s.FileName, s.Sha256,
+            SELECT COUNT(*) FROM svcacct.UsageScanLinks l
+            JOIN svcacct.UsageScanItems i ON i.ScanId = l.ScanId AND i.Role = 'Former' AND i.MatchedAccount = l.MatchedAccount
+            WHERE l.AccountId = @accountId
+              AND NOT EXISTS (SELECT 1 FROM svcacct.UsageScanDecisions d WHERE d.ItemId = i.Id AND d.AccountId = @accountId);
+            DECLARE @page TABLE(LinkId uniqueidentifier NOT NULL PRIMARY KEY, ScanId uniqueidentifier NOT NULL, MatchedAccount nvarchar(100) NOT NULL, Ord bigint NOT NULL);
+            INSERT INTO @page(LinkId, ScanId, MatchedAccount, Ord)
+            SELECT Id, ScanId, MatchedAccount, ROW_NUMBER() OVER (ORDER BY LinkedAt DESC, Id) FROM svcacct.UsageScanLinks WHERE AccountId = @accountId
+            ORDER BY LinkedAt DESC, Id OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
+            SELECT l.Id AS LinkId, l.ScanId, l.MatchedAccount, l.RequestId, l.LinkedAt, s.Purpose, s.ExpectedAccount, s.FileName, s.Sha256,
                 s.Tool, s.CombinedAt, s.FirstScannedAt, s.LastScannedAt, s.RunStatement, COALESCE(u.DisplayName, u.LoginName, 'Kullanıcı') AS UploadedBy, s.UploadedAt
-            FROM svcacct.UsageScanLinks l JOIN svcacct.UsageScans s ON s.Id = l.ScanId LEFT JOIN security.Users u ON u.UserId = s.UploadedBy
-            WHERE l.AccountId = @accountId ORDER BY l.LinkedAt DESC, l.Id;
-            SELECT v.ScanId, v.ServerName, v.Result, v.WindowsServices, v.ScheduledTasks, v.Iis, v.ScannedAt, v.Warnings
-            FROM svcacct.UsageScanServers v
-            WHERE v.ScanId IN (SELECT TOP ({_usageScanLimit}) ScanId FROM svcacct.UsageScanLinks WHERE AccountId = @accountId ORDER BY LinkedAt DESC, Id);
-            SELECT i.ScanId, i.Id, i.ServerName, i.Role, i.ComponentType, i.ComponentName, i.ConfiguredIdentity, i.State, i.Detail, d.Decision, d.UsageId,
-                d.Reason AS DecisionReason, d.DecidedAt
-            FROM (SELECT TOP ({_usageScanLimit}) ScanId, MatchedAccount FROM svcacct.UsageScanLinks WHERE AccountId = @accountId ORDER BY LinkedAt DESC, Id) l
-            JOIN svcacct.UsageScanItems i ON i.ScanId = l.ScanId AND (i.Role = 'Expected' OR i.MatchedAccount = l.MatchedAccount)
-            LEFT JOIN svcacct.UsageScanDecisions d ON d.ItemId = i.Id AND d.AccountId = @accountId
-            ORDER BY i.ServerName, i.Role DESC, i.ComponentType, i.ComponentName, i.Id;
-            """, new { accountId }, null, cancellationToken));
+            FROM @page p JOIN svcacct.UsageScanLinks l ON l.Id = p.LinkId JOIN svcacct.UsageScans s ON s.Id = l.ScanId
+            LEFT JOIN security.Users u ON u.UserId = s.UploadedBy ORDER BY p.Ord;
+            SELECT v.ScanId, v.ServerName, v.Result, v.WindowsServices, v.ScheduledTasks, v.Iis, v.ScannedAt, v.Warnings,
+                COALESCE(c.Former, 0) AS Former, COALESCE(c.Expected, 0) AS Expected, COALESCE(c.Pending, 0) AS Pending
+            FROM @page p JOIN svcacct.UsageScanServers v ON v.ScanId = p.ScanId
+            LEFT JOIN (
+                SELECT i.ScanId, i.ServerName,
+                    SUM(CASE WHEN i.Role = 'Former' AND i.MatchedAccount = q.MatchedAccount THEN 1 ELSE 0 END) AS Former,
+                    SUM(CASE WHEN i.Role = 'Expected' THEN 1 ELSE 0 END) AS Expected,
+                    SUM(CASE WHEN i.Role = 'Former' AND i.MatchedAccount = q.MatchedAccount AND d.Id IS NULL THEN 1 ELSE 0 END) AS Pending
+                FROM @page q JOIN svcacct.UsageScanItems i ON i.ScanId = q.ScanId
+                LEFT JOIN svcacct.UsageScanDecisions d ON d.ItemId = i.Id AND d.AccountId = @accountId
+                GROUP BY i.ScanId, i.ServerName) c ON c.ScanId = v.ScanId AND c.ServerName = v.ServerName;
+            SELECT x.ScanId, x.Id, x.ServerName, x.Role, x.ComponentType, x.ComponentName, x.ConfiguredIdentity, x.State, x.Detail, x.Decision, x.UsageId,
+                x.DecisionReason, x.DecidedAt
+            FROM (
+                SELECT p.ScanId, i.Id, i.ServerName, i.Role, i.ComponentType, i.ComponentName, i.ConfiguredIdentity, i.State, i.Detail, d.Decision, d.UsageId,
+                    d.Reason AS DecisionReason, d.DecidedAt,
+                    ROW_NUMBER() OVER (PARTITION BY p.ScanId, i.Role ORDER BY CASE WHEN i.Role = 'Former' AND d.Id IS NULL THEN 0 ELSE 1 END,
+                        i.ServerName, i.ComponentType, i.ComponentName, i.Id) AS n
+                FROM @page p JOIN svcacct.UsageScanItems i ON i.ScanId = p.ScanId AND (i.Role = 'Expected' OR i.MatchedAccount = p.MatchedAccount)
+                LEFT JOIN svcacct.UsageScanDecisions d ON d.ItemId = i.Id AND d.AccountId = @accountId) x
+            WHERE x.n <= @itemTake
+            ORDER BY x.ScanId, x.Role DESC, x.n;
+            """, new { accountId, skip = (page - 1) * UsageScanPaging.ScanPageSize, take = UsageScanPaging.ScanPageSize, itemTake = UsageScanPaging.DefaultItemPageSize },
+            null, cancellationToken));
         int total = await grid.ReadSingleAsync<int>();
         if (total < 0)
         {
-            return (null, 0);
+            return (null, 0, 0);
         }
 
+        int pending = await grid.ReadSingleAsync<int>();
         List<ScanLinkRow> links = [.. await grid.ReadAsync<ScanLinkRow>()];
         ILookup<Guid, ScanServerRow> servers = (await grid.ReadAsync<ScanServerRow>()).ToLookup(s => s.ScanId);
         ILookup<Guid, ScanItemRow> items = (await grid.ReadAsync<ScanItemRow>()).ToLookup(i => i.ScanId);
-        return ([.. links.Select(l => ScanView(l, [.. servers[l.ScanId]], [.. items[l.ScanId]]))], total);
+        return ([.. links.Select(l => ScanView(l, [.. servers[l.ScanId]], [.. items[l.ScanId]]))], total, pending);
+    }
+
+    /// <summary>
+    /// One page of a linked scan's items for this account (<c>Former</c>: undecided first; <c>Expected</c>: the expected gMSA).
+    /// The page is null when the link does not belong to the account (the caller's scope was checked on the account);
+    /// <c>Missing</c> is true before migration 030.
+    /// </summary>
+    public async Task<(bool Missing, UsageScanItemPage? Page)> UsageScanItemsAsync(Guid accountId, Guid linkId, string role, bool pendingOnly, int page, int pageSize,
+        CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = await OpenAsync(cancellationToken);
+        using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
+            IF OBJECT_ID(N'svcacct.UsageScanLinks', N'U') IS NULL
+            BEGIN
+                SELECT CAST(-1 AS int);
+                RETURN;
+            END;
+            DECLARE @scan uniqueidentifier, @matched nvarchar(100);
+            SELECT @scan = ScanId, @matched = MatchedAccount FROM svcacct.UsageScanLinks WHERE Id = @linkId AND AccountId = @accountId;
+            IF @scan IS NULL
+            BEGIN
+                SELECT CAST(0 AS int);
+                RETURN;
+            END;
+            SELECT CAST(1 AS int);
+            SELECT COUNT(*) FROM svcacct.UsageScanItems i LEFT JOIN svcacct.UsageScanDecisions d ON d.ItemId = i.Id AND d.AccountId = @accountId
+            WHERE i.ScanId = @scan AND i.Role = @role AND (@role = 'Expected' OR i.MatchedAccount = @matched) AND (@pendingOnly = 0 OR d.Id IS NULL);
+            SELECT i.ScanId, i.Id, i.ServerName, i.Role, i.ComponentType, i.ComponentName, i.ConfiguredIdentity, i.State, i.Detail, d.Decision, d.UsageId,
+                d.Reason AS DecisionReason, d.DecidedAt
+            FROM svcacct.UsageScanItems i LEFT JOIN svcacct.UsageScanDecisions d ON d.ItemId = i.Id AND d.AccountId = @accountId
+            WHERE i.ScanId = @scan AND i.Role = @role AND (@role = 'Expected' OR i.MatchedAccount = @matched) AND (@pendingOnly = 0 OR d.Id IS NULL)
+            ORDER BY CASE WHEN i.Role = 'Former' AND d.Id IS NULL THEN 0 ELSE 1 END, i.ServerName, i.ComponentType, i.ComponentName, i.Id
+            OFFSET @skip ROWS FETCH NEXT @pageSize ROWS ONLY;
+            """, new { accountId, linkId, role, pendingOnly, skip = (page - 1) * pageSize, pageSize }, null, cancellationToken));
+        int state = await grid.ReadSingleAsync<int>();
+        if (state <= 0)
+        {
+            return (state < 0, null);
+        }
+
+        int total = await grid.ReadSingleAsync<int>();
+        UsageScanItemView[] rows = [.. (await grid.ReadAsync<ScanItemRow>()).Select(ItemView)];
+        return (false, new UsageScanItemPage(rows, total, page, pageSize, role, pendingOnly));
     }
 
     internal static UsageScanView ScanView(ScanLinkRow link, IReadOnlyList<ScanServerRow> serverRows, IReadOnlyList<ScanItemRow> itemRows)
@@ -198,17 +264,15 @@ public sealed partial class SqlServiceAccountRepository
         foreach (ScanServerRow row in serverRows.OrderBy(s => s.ServerName, StringComparer.OrdinalIgnoreCase))
         {
             ScanServerResult result = Enum.Parse<ScanServerResult>(row.Result);
-            int former = itemRows.Count(i => i.Role == "Former" && string.Equals(i.ServerName, row.ServerName, StringComparison.OrdinalIgnoreCase));
-            int gmsa = itemRows.Count(i => i.Role == "Expected" && string.Equals(i.ServerName, row.ServerName, StringComparison.OrdinalIgnoreCase));
-            ScanAccountOutcome outcome = UsageScanOutcomes.Outcome(result, former);
-            ScanGmsaServerState? state = gmsaCheck ? UsageScanOutcomes.GmsaState(result, former, gmsa) : null;
+            ScanAccountOutcome outcome = UsageScanOutcomes.Outcome(result, row.Former);
+            ScanGmsaServerState? state = gmsaCheck ? UsageScanOutcomes.GmsaState(result, row.Former, row.Expected) : null;
             if (state is { } s)
             {
                 states.Add(s);
             }
 
             servers.Add(new UsageScanServerView(row.ServerName, row.Result, UsageScanOutcomes.ResultLabel(result), row.WindowsServices, row.ScheduledTasks, row.Iis,
-                row.ScannedAt, row.Warnings, former, outcome.ToString(), UsageScanOutcomes.OutcomeLabel(outcome), state?.ToString(),
+                row.ScannedAt, row.Warnings, row.Former, outcome.ToString(), UsageScanOutcomes.OutcomeLabel(outcome), state?.ToString(),
                 state is { } label ? UsageScanOutcomes.GmsaStateLabel(label) : null));
         }
 
@@ -225,13 +289,14 @@ public sealed partial class SqlServiceAccountRepository
                 states.Count(s => s == ScanGmsaServerState.NoComponents), states.Count(s => s == ScanGmsaServerState.Unknown));
         }
 
-        UsageScanItemView[] items = [.. itemRows.Select(i => new UsageScanItemView(i.Id, i.ServerName, i.Role, i.ComponentType,
-            UsageScanOutcomes.ComponentLabel(i.ComponentType), i.ComponentName, i.ConfiguredIdentity, i.State, i.Detail,
-            UsageScanOutcomes.SuggestedKind(i.ComponentType, i.Detail).ToString(), i.Decision, i.UsageId, i.DecisionReason, i.DecidedAt))];
         return new UsageScanView(link.ScanId, link.LinkId, link.Purpose, link.MatchedAccount, link.ExpectedAccount, link.FileName, link.Sha256, link.Tool,
             link.CombinedAt, link.FirstScannedAt, link.LastScannedAt, link.RunStatement, link.UploadedBy, link.UploadedAt, link.RequestId, link.LinkedAt, coverage,
-            gmsaView, servers, items);
+            gmsaView, servers, [.. itemRows.Select(ItemView)], serverRows.Sum(s => s.Former), serverRows.Sum(s => s.Pending), serverRows.Sum(s => s.Expected));
     }
+
+    private static UsageScanItemView ItemView(ScanItemRow i) => new(i.Id, i.ServerName, i.Role, i.ComponentType, UsageScanOutcomes.ComponentLabel(i.ComponentType),
+        i.ComponentName, i.ConfiguredIdentity, i.State, i.Detail, UsageScanOutcomes.SuggestedKind(i.ComponentType, i.Detail).ToString(), i.Decision, i.UsageId,
+        i.DecisionReason, i.DecidedAt);
 
     private static int Count(IEnumerable<UsageScanServerView> servers, Func<UsageScanServerView, string> field, string value) =>
         servers.Count(s => field(s) == value);
@@ -327,7 +392,7 @@ public sealed partial class SqlServiceAccountRepository
         DateTimeOffset? LastScannedAt, string RunStatement, string UploadedBy, DateTimeOffset UploadedAt);
 
     internal sealed record ScanServerRow(Guid ScanId, string ServerName, string Result, string? WindowsServices, string? ScheduledTasks, string? Iis,
-        DateTimeOffset? ScannedAt, string? Warnings);
+        DateTimeOffset? ScannedAt, string? Warnings, int Former, int Expected, int Pending);
 
     internal sealed record ScanItemRow(Guid ScanId, Guid Id, string ServerName, string Role, string ComponentType, string ComponentName, string ConfiguredIdentity,
         string? State, string? Detail, string? Decision, Guid? UsageId, string? DecisionReason, DateTimeOffset? DecidedAt);

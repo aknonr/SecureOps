@@ -94,6 +94,12 @@ yazıp **Kayda almadan kapat**. Karar bileşen ve hesap başına bir kez verilir
 kullanım kaydıdır: bilgi bankası kuralını besler, sonra gerekçeyle kaldırılabilir. Yanlışlıkla "kayda almadan kapat"
 derseniz kullanımı "Kullanım ve kural" sekmesinden elle ekleyin.
 
+Çok bileşenli taramalarda liste sayfalıdır: her taramada 25 bileşen gösterilir ve karar bekleyenler en üsttedir. Bölüm
+başlığı toplamı ve kaç bileşenin karar beklediğini söyler. **Önceki / Sonraki** ile sayfa değiştirilir, **Yalnız karar
+bekleyenleri göster** yalnız bekleyenleri listeler. Hesapta 5'ten çok tarama varsa eski taramalar da sayfa düğmeleriyle açılır.
+Sayfa ve filtre yalnız listeyi değiştirir. Sunucu bazındaki sonuçlar ve "bulunmadı" bilgisi her zaman taramanın tamamından
+hesaplanır.
+
 ## 7. gMSA dönüşümünden sonra
 
 Dönüşümü ekip sistem dışında, değişiklik kaydıyla yapar. Ardından aynı sunucularda `-ExpectedAccount` ile tarayıp yükleyin.
