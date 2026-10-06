@@ -313,6 +313,21 @@
         "tags": [
           "Access"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -498,6 +513,21 @@
       "post": {
         "tags": [
           "Access"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -933,6 +963,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1052,6 +1095,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -1173,6 +1229,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1293,6 +1362,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1402,6 +1484,21 @@
       "post": {
         "tags": [
           "Access"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "401": {
@@ -1651,6 +1748,19 @@
               "format": "int64",
               "default": 0
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1683,6 +1793,9 @@
           },
           "default": {
             "description": "ProblemDetails: code, fields and correlationId; 400 invalid/incomplete, 401/403 access, 404 not found, 409 conflict/asset changed, 503 unavailable."
+          },
+          "403": {
+            "description": "Access denied or ApiCsrfRejected (ProblemDetails)."
           }
         }
       }
@@ -1691,6 +1804,21 @@
       "post": {
         "tags": [
           "Announcements"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -1730,6 +1858,9 @@
           },
           "default": {
             "description": "ProblemDetails: code, fields and correlationId; 400 invalid/incomplete, 401/403 access, 404 not found, 409 conflict/asset changed, 503 unavailable."
+          },
+          "403": {
+            "description": "Access denied or ApiCsrfRejected (ProblemDetails)."
           }
         }
       }
@@ -1738,6 +1869,21 @@
       "post": {
         "tags": [
           "Announcements"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -1771,6 +1917,9 @@
           },
           "default": {
             "description": "ProblemDetails: code, fields and correlationId; 400 invalid/incomplete, 401/403 access, 404 not found, 409 conflict/asset changed, 503 unavailable."
+          },
+          "403": {
+            "description": "Access denied or ApiCsrfRejected (ProblemDetails)."
           }
         }
       }
@@ -1779,6 +1928,21 @@
       "post": {
         "tags": [
           "Announcements"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -1812,6 +1976,9 @@
           },
           "default": {
             "description": "ProblemDetails: code, fields and correlationId; 400 invalid/incomplete, 401/403 access, 404 not found, 409 conflict/asset changed, 503 unavailable."
+          },
+          "403": {
+            "description": "Access denied or ApiCsrfRejected (ProblemDetails)."
           }
         }
       }
@@ -1934,6 +2101,19 @@
               "type": "integer",
               "format": "int64"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1949,6 +2129,9 @@
           },
           "default": {
             "description": "ProblemDetails: code, fields and correlationId; 400 invalid/incomplete, 401/403 access, 404 not found, 409 conflict/asset changed, 503 unavailable."
+          },
+          "403": {
+            "description": "Access denied or ApiCsrfRejected (ProblemDetails)."
           }
         }
       },
@@ -2022,6 +2205,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2043,6 +2239,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Access denied or ApiCsrfRejected (ProblemDetails)."
           }
         }
       },
@@ -2149,6 +2348,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2170,6 +2382,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Access denied or ApiCsrfRejected (ProblemDetails)."
           }
         }
       }
@@ -2178,6 +2393,21 @@
       "post": {
         "tags": [
           "Directory"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -2310,6 +2540,21 @@
         "tags": [
           "Directory"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2420,6 +2665,21 @@
       "post": {
         "tags": [
           "Directory"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -2552,6 +2812,21 @@
         "tags": [
           "Directory"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2662,6 +2937,21 @@
       "post": {
         "tags": [
           "Directory"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -2774,6 +3064,21 @@
         "tags": [
           "Directory"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2884,6 +3189,21 @@
       "post": {
         "tags": [
           "Directory"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -2996,6 +3316,21 @@
         "tags": [
           "Directory"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3106,6 +3441,21 @@
       "post": {
         "tags": [
           "Directory"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -3237,6 +3587,21 @@
       "post": {
         "tags": [
           "Directory"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -3470,6 +3835,21 @@
         "tags": [
           "Identity"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3630,6 +4010,21 @@
         "tags": [
           "Identity"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3669,6 +4064,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Access denied or ApiCsrfRejected (ProblemDetails)."
           }
         }
       }
@@ -3677,6 +4075,21 @@
       "post": {
         "tags": [
           "Identity"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -4112,6 +4525,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -4271,6 +4697,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -4571,6 +5010,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -4730,6 +5182,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -5198,6 +5663,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -5357,6 +5835,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -5969,6 +6460,21 @@
         "tags": [
           "InUse"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -6126,6 +6632,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -6287,6 +6806,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -6446,6 +6978,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -7261,6 +7806,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -7422,6 +7980,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -7568,6 +8139,19 @@
             "in": "header",
             "style": "simple",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
               "type": "string"
             }
           }
@@ -7737,6 +8321,19 @@
             "in": "header",
             "style": "simple",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
               "type": "string"
             }
           }
@@ -7998,6 +8595,21 @@
         "tags": [
           "Resources"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -8165,6 +8777,21 @@
       "post": {
         "tags": [
           "Resources"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -8519,6 +9146,21 @@
         "tags": [
           "Resources"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -8853,6 +9495,21 @@
         "tags": [
           "Resources"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -9030,6 +9687,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -9417,6 +10087,21 @@
         "tags": [
           "Resources"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -9762,6 +10447,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -10091,6 +10789,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -10260,6 +10971,21 @@
       "post": {
         "tags": [
           "Resources"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -10438,6 +11164,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -10625,6 +11364,19 @@
             "schema": {
               "type": "integer",
               "format": "int64"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -11245,6 +11997,21 @@
         "tags": [
           "ServiceAccountAdmin"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -11385,6 +12152,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -11635,6 +12415,21 @@
         "tags": [
           "ServiceAccountAdmin"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -11775,6 +12570,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -12035,6 +12843,21 @@
         "tags": [
           "ServiceAccountAdmin"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -12175,6 +12998,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -12318,6 +13154,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -12567,6 +13416,21 @@
       "post": {
         "tags": [
           "ServiceAccountAdmin"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -12924,6 +13788,21 @@
         "tags": [
           "ServiceAccountAdmin"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -13064,6 +13943,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -13314,6 +14206,21 @@
         "tags": [
           "ServiceAccountAdmin"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -13455,6 +14362,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -13587,6 +14507,21 @@
       "post": {
         "tags": [
           "ServiceAccountImports"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -14307,6 +15242,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -14467,6 +15415,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -14614,6 +15575,19 @@
             "in": "header",
             "style": "simple",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
               "type": "string"
             }
           }
@@ -14932,6 +15906,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -15084,6 +16071,21 @@
       "post": {
         "tags": [
           "ServiceAccountReminders"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "400": {
@@ -15377,6 +16379,21 @@
       "post": {
         "tags": [
           "ServiceAccountReports"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -16472,6 +17489,21 @@
         "tags": [
           "ServiceAccounts"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -16769,6 +17801,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -16928,6 +17973,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -17099,6 +18157,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -17258,6 +18329,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -17419,6 +18503,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -17578,6 +18675,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -17739,6 +18849,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -17898,6 +19021,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -18059,6 +19195,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -18219,6 +19368,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -18369,6 +19531,21 @@
         "tags": [
           "ServiceAccounts"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -18516,6 +19693,21 @@
       "post": {
         "tags": [
           "ServiceAccounts"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -18674,6 +19866,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -18835,6 +20040,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -18995,6 +20213,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -19144,6 +20375,21 @@
       "post": {
         "tags": [
           "ServiceAccounts"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -19323,6 +20569,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -19482,6 +20741,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -19643,6 +20915,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -19803,6 +21088,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -19962,6 +21260,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -20519,6 +21830,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -20689,6 +22013,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -20849,6 +22186,19 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -21008,6 +22358,19 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
             }
           }
         ],
@@ -21519,6 +22882,21 @@
         "tags": [
           "Sessions"
         ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -21626,6 +23004,21 @@
       "post": {
         "tags": [
           "WorkflowReports"
+        ],
+        "parameters": [
+          {
+            "name": "X-SecureOps-Csrf",
+            "in": "header",
+            "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
