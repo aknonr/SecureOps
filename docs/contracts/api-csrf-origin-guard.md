@@ -34,6 +34,8 @@ ApiCsrf__AllowedOrigins__1=https://api.example.invalid:8443
 The default list is empty. Values contain scheme, host and optional non-default
 port, with no trailing slash, path, credentials, wildcard, query or fragment.
 Invalid configuration stops startup without printing the rejected value.
+The allow-list is loaded at startup; changing it requires restarting the API
+process through the approved deployment procedure.
 No origin is inferred from backend HTTP, Host or forwarded host/protocol headers.
 IIS/F5 must preserve the public browser source headers; no IIS/F5 change is made by
 this implementation. The server-to-server UI hop needs no allow-list entry.

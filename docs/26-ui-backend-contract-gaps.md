@@ -40,7 +40,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-31 — No per-owner usage signal for frequently used links | Open — needs an audit-framing decision before a contract |
 | G-32 — Favourites view has no server-side paging | Open — low |
 | G-34 — Concurrent first registrations can deadlock in the access store | Open — platform defect candidate (Access owner); module tests serialised |
-| G-35 — Unsafe API requests lack a central CSRF guard | Repair designed; implementation and local verification pending |
+| G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1087,9 +1087,16 @@ configured `ApiCsrf:AllowedOrigins`, and cross-site Fetch Metadata is denied.
 The server-side Blazor API client supplies the header centrally, without inventing
 Origin or forwarding browser headers. Scripts must adopt the same contract.
 
-**Status:** Design recorded before code. Local verification pending. Real
-Negotiate/IIS/F5 and deployment origin configuration remain unverified. No
-installed TEST, corporate systems, provider writes or merge is authorized.
+**Status:** Design recorded before code in `7fee54c`. Central API guard and
+minimal shared UI transport implemented and locally verified. Release build 0/0,
+full format verification, 1918 unit passes (1 skip), 356 integration passes
+(117 skips), all 99 unsafe OpenAPI operations, real loopback cross-origin multipart
+403 and interactive UI writes passed. See
+[local evidence and limitations](api-csrf-local-acceptance-20261007.md).
+Real Negotiate/IIS/F5 and deployment origin configuration remain unverified.
+The no-write assertion concerns business/provider state, excluding required denial
+audit and existing authentication/access/session lifecycle writes. Installed TEST,
+corporate systems, provider writes, merge and deployment remain outside scope.
 
 ## Note: enums cross the wire as numbers
 

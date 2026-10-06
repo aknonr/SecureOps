@@ -71,6 +71,24 @@ public sealed class ApiCsrfHostedTests
     }
 
     [Fact]
+    public async Task AllowedOrigin_ValidMultipart_ReachesModuleWithoutCsrfDenial()
+    {
+        using WebApplicationFactory<Program> factory = Factory();
+        using HttpClient client = Client(factory);
+        client.DefaultRequestHeaders.Add("Origin", "https://trusted.example.invalid");
+        client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "same-origin");
+        using MultipartFormDataContent form = new()
+        {
+            { new StringContent("Synthetic file, no real scan"), "file", "synthetic.json" },
+            { new StringContent("Synthetic operator statement"), "runStatement" }
+        };
+        using HttpResponseMessage response = await client.PostAsync(
+            "/api/v1/service-accounts/accounts/00000000-0000-0000-0000-000000000001/usage-scans", form);
+        await AssertProblem(response, HttpStatusCode.ServiceUnavailable, "ServiceAccountsNotConfigured");
+        factory.Services.GetRequiredService<InMemoryAuditWriter>().Events.Should().NotContain(item => item.Action == AuditActions.ApiCsrfRejected);
+    }
+
+    [Fact]
     public async Task CrossSite_AllowedOriginAndHeader_IsStillRejected()
     {
         using WebApplicationFactory<Program> factory = Factory();
