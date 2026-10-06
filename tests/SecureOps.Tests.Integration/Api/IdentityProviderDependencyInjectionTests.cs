@@ -72,7 +72,7 @@ public sealed class IdentityProviderDependencyInjectionTests
     public async Task Lookup_WithMockProvider_ResolvesSeededPamAccountInAllowedEnvironment(string environment)
     {
         using WebApplicationFactory<Program> factory = CreateFactory(environment);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -89,7 +89,7 @@ public sealed class IdentityProviderDependencyInjectionTests
     public async Task Capabilities_WithMockProvider_AdvertisesWorkingExactUpnLookup()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", enableUpnLookup: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(
@@ -108,7 +108,7 @@ public sealed class IdentityProviderDependencyInjectionTests
     public async Task Capabilities_WithMockProviderAndUpnDisabled_DoesNotAdvertiseUpnLookup()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", enableUpnLookup: false);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(
@@ -121,7 +121,7 @@ public sealed class IdentityProviderDependencyInjectionTests
     public async Task Lookup_WithUnknownExactUpn_ReturnsLegitimateNotFound()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo");
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -142,7 +142,7 @@ public sealed class IdentityProviderDependencyInjectionTests
             "Demo",
             identityProvider: "ActiveDirectory",
             enableUpnLookup: enableUpnLookup);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>(

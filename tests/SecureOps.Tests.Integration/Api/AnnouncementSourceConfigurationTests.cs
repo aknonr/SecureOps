@@ -27,7 +27,7 @@ public sealed class AnnouncementSourceConfigurationTests
             builder.UseSetting("Hangfire:Enabled", "false");
             builder.UseSetting("ConnectionStrings:SecureOpsDb", "");
         });
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/announcements/" + Guid.NewGuid() + "/source/jobs",
             new { profile = "NonProd", ocoReference = "OCO-TEST", submissionKey = "test-key" });

@@ -17,7 +17,7 @@ public sealed class ResourcesApiTests
         using WebApplicationFactory<Program> factory = Factory();
         using HttpClient admin = Client(factory, "platform-admin");
         using HttpClient lead = Client(factory, "team-lead");
-        using HttpClient anonymous = factory.CreateClient();
+        using HttpClient anonymous = factory.CreateApiClient();
         (await anonymous.GetAsync("/api/v1/resources/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await lead.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Denied"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         ResourceCategory category = await ReadAsync<ResourceCategory>(await admin.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Synthetic")));
@@ -65,7 +65,7 @@ public sealed class ResourcesApiTests
     public async Task OpenApi_AllResourceOperationsExposeSuccessSchemasAndNullableDefaults()
     {
         using WebApplicationFactory<Program> factory = Factory();
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         using var document = JsonDocument.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"));
         JsonElement root = document.RootElement;
         int count = 0;
@@ -156,7 +156,7 @@ public sealed class ResourcesApiTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
         return client;
     }

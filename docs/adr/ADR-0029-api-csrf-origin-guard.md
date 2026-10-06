@@ -8,7 +8,9 @@
 With OIDC disabled, the API uses Windows Negotiate. Browser-supplied credentials
 can authenticate a cross-origin CORS-simple multipart/form POST. CORS alone does
 not prevent the server from executing that request. This affects all unsafe API
-methods, including Service Accounts `POST /api/v1/service-accounts/usage-scans`.
+methods, including Service Accounts usage-scan multipart uploads. Current master
+uses `POST /api/v1/service-accounts/accounts/{id}/usage-scans`; PR #18 proposes
+the standalone `POST /api/v1/service-accounts/usage-scans` route.
 The API currently has no central CSRF check. Authentication and capability
 authorization remain necessary but do not establish the request's intent.
 

@@ -37,7 +37,7 @@ public sealed class ServiceAccountApiCompositionTests
     public async Task Unauthenticated_IsChallenged_OnEveryModuleRoute()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using HttpClient anonymous = factory.CreateClient();
+        using HttpClient anonymous = factory.CreateApiClient();
         foreach (string route in _moduleReads)
         {
             (await anonymous.GetAsync(route)).StatusCode.Should().Be(HttpStatusCode.Unauthorized, route);
@@ -52,7 +52,7 @@ public sealed class ServiceAccountApiCompositionTests
         await ApproveAsync(factory, "demo:team-lead", "Lead");
         foreach (string actor in new[] { DemoApiAuthentication.PlatformAdminActor, DemoApiAuthentication.TeamLeadActor })
         {
-            using HttpClient client = factory.CreateClient();
+            using HttpClient client = factory.CreateApiClient();
             client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
             if (actor == DemoApiAuthentication.PlatformAdminActor)
             {
@@ -79,14 +79,14 @@ public sealed class ServiceAccountApiCompositionTests
         await ApproveAsync(factory, "demo:platform-admin", "Admin");
         await ApproveAsync(factory, "demo:team-lead", "Lead");
         const string route = "/api/v1/service-accounts/directory/name-search";
-        using (HttpClient anonymous = factory.CreateClient())
+        using (HttpClient anonymous = factory.CreateApiClient())
         {
             (await anonymous.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         }
 
         foreach (string actor in new[] { DemoApiAuthentication.PlatformAdminActor, DemoApiAuthentication.TeamLeadActor })
         {
-            using HttpClient client = factory.CreateClient();
+            using HttpClient client = factory.CreateApiClient();
             client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
             (await client.PostAsync(route, JsonContent.Create(new { query = "ayşe" }))).StatusCode
                 .Should().Be(actor == DemoApiAuthentication.PlatformAdminActor ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.Forbidden,
@@ -105,7 +105,7 @@ public sealed class ServiceAccountApiCompositionTests
     public async Task UsageScanRoutes_NeedTheWorkCapability_AndBoundTheUpload()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using (HttpClient anonymous = factory.CreateClient())
+        using (HttpClient anonymous = factory.CreateApiClient())
         {
             using MultipartFormDataContent form = [];
             form.Add(new ByteArrayContent("{}"u8.ToArray()), "file", "scan.json");
@@ -164,7 +164,7 @@ public sealed class ServiceAccountApiCompositionTests
     public void EveryModuleEndpoint_RequiresAModuleCapabilityPolicy()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using HttpClient _ = factory.CreateClient();
+        using HttpClient _ = factory.CreateApiClient();
         HashSet<string> modulePolicies = [.. ServiceAccountPolicies.Map.Select(m => m.Policy)];
         RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
             .Where(e => e.RoutePattern.RawText?.StartsWith("api/v1/service-accounts", StringComparison.OrdinalIgnoreCase) == true)];

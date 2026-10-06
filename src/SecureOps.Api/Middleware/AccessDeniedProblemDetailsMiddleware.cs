@@ -18,7 +18,8 @@ public sealed class AccessDeniedProblemDetailsMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         await _next(context);
-        if (!context.Response.HasStarted && context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        if (!context.Response.HasStarted && !context.Items.ContainsKey(ApiCsrfMiddleware.RejectionItem)
+            && context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             int status = context.Response.StatusCode;
             string code = context.Items.TryGetValue(CapabilityAuthorizationHandler.DenialCodeItem, out object? value)

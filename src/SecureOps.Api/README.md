@@ -16,6 +16,13 @@ from the browser. See ADR-0020 and `docs/post-rc626-continuation-tr.md`.
 
 ASP.NET Core Web API. Hosted on IIS in-process.
 
+Unsafe requests require `X-SecureOps-Csrf: 1` after authorization and before body
+binding. Browser Origin (or Referer fallback) must match `ApiCsrf:AllowedOrigins`;
+cross-site Fetch Metadata is always denied. Empty configuration denies browser
+origins. Server clients without source headers still require the custom header.
+GET/HEAD/OPTIONS are unaffected. See ADR-0029 and
+`docs/contracts/api-csrf-origin-guard.md` for rollout and denial/audit behavior.
+
 Planned-announcement source/editor/preparation integration and local evidence:
 `docs/contracts/planned-announcement-integration.md`. Optional mail routes are
 implemented behind default-off deployment fences and persisted SelfTest/Send
