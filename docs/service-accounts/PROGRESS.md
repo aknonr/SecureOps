@@ -32,6 +32,15 @@ Order c, b, a, d from `ops-research/05-yol-haritasi.md`. **c merged** (PR #14, `
 - Verified 2026-10-06: build 0/0, unit 1919 + 1 intentional skip, integration 361 / 62 skipped with module SQL on fresh
   `SecureOps_SaBatch1006a` (harness 001–031 exit 0), format clean, OpenAPI additions only (+261/−0). One integration run of five
   had one failure that did not repeat; its name and cause were not captured (Open work 9).
+- Review fixes 2026-10-07 (two independent reviews of PR #18): per-account failure boundary, names from the scope read (no
+  separate name query); per-server account list must equal the bundle's set; scope and basis re-checked inside the link's
+  write transaction (both routes); `ServiceAccount.UsageScanBatchRefused` audit (reason and counts only); OpenAPI form
+  schema for both uploads; UI: error in the form with retry, old answer cleared, focusable `aria-disabled` send button with
+  its reason, `aria-expanded` toggles, badge "Aranmamış", "Hesap bilgisi okunamadı" for an unread failed row. Verified:
+  build 0/0, format clean, unit 1933 + 1 intentional skip, integration 365 / 62 skipped on fresh `SecureOps_SaFix1007b`
+  (harness 001–031 exit 0; module SQL 61 + the 030-copy test 3/3 on `SecureOps_SaFix1007b030`), Windows row 87. Not run:
+  module SQL as the least-privilege runtime principal (`SECUREOPS_SA_SQL_RUNTIME_CONNECTION`), repeated integration runs
+  for Open work 9.
 - PR #12 (031 + scan paging) is merged (`50c0528`); the section below is its record.
 
 ## On this branch (done, 2026-10-05)
