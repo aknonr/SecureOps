@@ -1,6 +1,6 @@
 # Toplu gMSA geçiş planı ve rehberli manuel değişiklik — tasarım (d)
 
-Durum: **tasarım, onaylı kararlarla (sahip, 2026-10-06); kod yok.** Kaynak: `ops-research/04-tasarim-secenekleri.md`
+Durum: **tasarım, sahip kararları 1–7 işlendi (2026-10-06); kod yok.** Kaynak: `ops-research/04-tasarim-secenekleri.md`
 (Karar 2 / M1, toplu işlem akışı), `ops-research/05-yol-haritasi.md` A6–A7. Modül sahibi Claude (2026-10-03 kararı).
 
 ## Sınırlar (değişmez)
@@ -20,16 +20,22 @@ Durum: **tasarım, onaylı kararlarla (sahip, 2026-10-06); kod yok.** Kaynak: `o
    rol paketleri değişmez.
 2. Tek plan türü: **gMSA'ya geçiş** (`GmsaConversion`). Parola planı yok.
 3. Tarama tazeliği **7 gün**: daha eski taramadan gelen satır "eski bilgi" işaretlenir; plan **engellenmez**.
+4. OCO numarası **yalnız biçim** olarak doğrulanır (mevcut `SaExternalRef` "OCO" kuralı); ITSM'e sorgu yok.
+5. Bakım penceresi geçtikten sonra da kontrol listesi **işaretlenebilir**; pencere dışında yapılan işaret kayıtta ve
+   arayüzde **"pencere dışında"** etiketini taşır (engellenmez).
+6. Bir hesap aynı anda **yalnız bir açık planda** olabilir (açık = `Completed`/`Cancelled` dışı); ikinci plan o hesabı
+   hesap bazında reddeder (`accountInOpenPlan`).
+7. Plan kapanınca bağlı açık talep (`RequestId`) **otomatik kapanmaz**; kişi mevcut talep kapatma akışını kullanır.
 
 ## Akış
 
 | Adım | Ne olur | Kim | Kural |
 |---|---|---|---|
-| 1. Plan (taslak) | 1–20 hesap; hesap başına hedef gMSA adı (031 kuralı, 15 karakter) | `Work` + her hesapta sorumlu dayanak | Kapsam dışı / katılımcı hesap reddedilir (hesap bazında sonuç) |
+| 1. Plan (taslak) | 1–20 hesap; hesap başına hedef gMSA adı (031 kuralı, 15 karakter) | `Work` + her hesapta sorumlu dayanak | Kapsam dışı / katılımcı hesap ve başka açık plandaki hesap reddedilir (hesap bazında sonuç) |
 | 2. Önizleme | Her hesabın **son** Discovery taramasından bileşen satırları: sunucu, tür, ad, mevcut kimlik, hedef kimlik, işaret | Sistem (`Work` ile istenir) | Sürüm + SHA-256 özet; plan değişirse yeni sürüm, eski onay geçersiz |
-| 3. Onay | OCO numarası, bakım penceresi (başlangıç–bitiş), gerekçe | `Verify`, planlayan değil | Belirli önizleme sürümüne ve özete bağlı; bayat ise 409 |
-| 4. Rehberli uygulama | Bileşen başına `Done / Skipped / Failed / RolledBack` + not; kanıt dosyası | `Work` (onaydan sonra) | Ekleme-yalnız; son işaret geçerli; sistem hiçbir sunucuya bağlanmaz |
-| 5. Doğrulama ve kapanış | gMSA kontrol taraması yüklenir (mevcut yol); plan kapatılır; hesap başına `GmsaConversion` **Performed** eylemi açık kullanıcı komutuyla kaydedilir | `Work`; doğrulama `Verify` (mevcut akış) | Kapanış hesabı doğrulanmış saymaz; doğrulama ayrı |
+| 3. Onay | OCO numarası (yalnız biçim), bakım penceresi (başlangıç–bitiş), gerekçe | `Verify`, planlayan değil | Belirli önizleme sürümüne ve özete bağlı; bayat ise 409 |
+| 4. Rehberli uygulama | Bileşen başına `Done / Skipped / Failed / RolledBack` + not; kanıt dosyası | `Work` (onaydan sonra) | Ekleme-yalnız; son işaret geçerli; pencere dışındaki işaret `OutsideWindow` ile kaydedilir, engellenmez; sistem hiçbir sunucuya bağlanmaz |
+| 5. Doğrulama ve kapanış | gMSA kontrol taraması yüklenir (mevcut yol); plan kapatılır; hesap başına `GmsaConversion` **Performed** eylemi açık kullanıcı komutuyla kaydedilir | `Work`; doğrulama `Verify` (mevcut akış) | Kapanış hesabı doğrulanmış saymaz; doğrulama ayrı; bağlı talep açık kalır (kişi kapatır) |
 | İptal | Gerekçeyle, onaydan önce veya sonra | `Work` (planlayan) veya `Verify` | Kayıtlar kalır |
 
 **Önizleme satır işaretleri:** `Ok` · `StaleScan` (tarama 7 günden eski) · `NoScan` (hesapta Discovery taraması yok;
@@ -52,11 +58,12 @@ değişirse `Draft`'a döner.
 | `ChangePlanPreviews` | Id, PlanId, Version, Sha256, ScanFreshDays (7), CreatedBy/At; UQ (PlanId, Version) |
 | `ChangePlanItems` | Id, PreviewId, AccountId, ScanLinkId NULL, ServerName, ComponentType, ComponentName, CurrentIdentity, TargetIdentity, Flag, ScanAt NULL |
 | `ChangePlanApprovals` | Id, PlanId, PreviewId, Sha256, OcoNumber, WindowStart, WindowEnd, Reason, ApprovedBy/At |
-| `ChangeItemChecks` | Id, ItemId, State, Note NULL, CheckedBy/At (ekleme-yalnız; son satır geçerli) |
+| `ChangeItemChecks` | Id, ItemId, State, Note NULL, OutsideWindow bit, CheckedBy/At (ekleme-yalnız; son satır geçerli) |
 | `ChangePlanEvents` | Id, PlanId, Event, FromStatus, ToStatus, Reason NULL, Actor, At |
 
 Kısıtlar: `ApprovedBy <> ChangePlans.CreatedBy` hem serviste hem tetikleyici/CHECK ile; `WindowEnd > WindowStart`;
-`OcoNumber` mevcut OCO referans biçimi. Yeni rol/izin yok: `svcacct_api_runtime` yeni tablolarda SELECT/INSERT (+ Plans için
+`OcoNumber` mevcut OCO referans biçimi. "Bir hesap yalnız bir açık planda" kuralı serviste, aynı işlemde hesap
+satırları kilitlenerek (`UPDLOCK, HOLDLOCK`) denetlenir (durum `ChangePlans`'ta olduğu için filtreli tekil indeks yok). Yeni rol/izin yok: `svcacct_api_runtime` yeni tablolarda SELECT/INSERT (+ Plans için
 UPDATE). Tekrar çalıştırmayı reddeder; geri alma betiği yok. Kanıt dosyaları mevcut `Evidence` tablosunda (`OwnerEntityType`
 `ChangePlan` / `ChangePlanItem`).
 
@@ -70,8 +77,8 @@ UPDATE). Tekrar çalıştırmayı reddeder; geri alma betiği yok. Kanıt dosyal
 | `PATCH change-plans/{id}` | Work | Hesap ekle/çıkar, ad değiştir (`expectedVersion`); `Previewed`'dan `Draft`'a döner |
 | `POST change-plans/{id}/preview` | Work | Yeni önizleme sürümü + özet + işaret sayıları |
 | `POST change-plans/{id}/approve` | Verify | `{ previewVersion, sha256, ocoNumber, windowStart, windowEnd, reason }`; planlayan → 403 `approverIsPlanner`; bayat → 409 `previewStale` |
-| `POST change-plans/{id}/items/{itemId}/checks` | Work | `{ state, note }`; onay öncesi 409 |
-| `POST change-plans/{id}/complete` | Work | Hesap başına `GmsaConversion` Performed eylemi (mevcut eylem kaydı yolu) |
+| `POST change-plans/{id}/items/{itemId}/checks` | Work | `{ state, note }`; onay öncesi 409; pencere dışındaysa kabul edilir, `outsideWindow: true` döner |
+| `POST change-plans/{id}/complete` | Work | Hesap başına `GmsaConversion` Performed eylemi (mevcut eylem kaydı yolu); bağlı talep kapanmaz |
 | `POST change-plans/{id}/cancel` | Work (planlayan) / Verify | `{ reason }` |
 
 Hata kodları mevcut `SaErrors` deseninde; OpenAPI anlık görüntüsü yalnız ekleme; route envanteri testine eklenir.
@@ -82,7 +89,8 @@ Hata kodları mevcut `SaErrors` deseninde; OpenAPI anlık görüntüsü yalnız 
   planı oluştur".
 - `/service-accounts/plans/{id}`: adım göstergesi (Plan → Önizleme → Onay → Kontrol listesi → Doğrulama), her adımda neyin
   eksik olduğu açıkça; önizleme tablosu işaretlerle (renk tek başına sinyal değil); onay ekranı planlayana gösterilmez,
-  sunucu da reddeder; kontrol listesi sunucu → bileşen gruplu, sayfalı; kanıt yükleme.
+  sunucu da reddeder; kontrol listesi sunucu → bileşen gruplu, sayfalı, pencere dışı işaretler "pencere dışında"
+  metniyle (yalnız renk değil); kanıt yükleme; kapanışta "bağlı talep açık kalır, talepten kapatın" notu.
 - Hesap sayfasında: hesabın bağlı olduğu açık plan bağlantısı. "Sıradaki adım" kartına "Onay bekleyen plan" adımı.
 - 390 px, %200 yakınlaştırma, klavye, açık/koyu; ortak bileşenler (`SoPageHeader`, `SoProblemPanel`, `SoEmptyState`,
   `SoStatusBadge`).
@@ -91,8 +99,9 @@ Hata kodları mevcut `SaErrors` deseninde; OpenAPI anlık görüntüsü yalnız 
 
 - SQL harness 001–032 (ikinci çalıştırma reddedilir; 031'de bırakılmış kopyaya ileri uygulama).
 - Entegrasyon: planlayan onaylayamaz (servis ve DB kısıtı); bayat önizleme 409; kısmi kapsamlı plan görünmez; `NoScan`,
-  `StaleScan`, `NotCovered`, `ManualOnly` işaretleri; reddedilen istek hiçbir şey yazmaz; onay öncesi işaret 409; kapanış
-  eylemleri yazar ama doğrulamaz; iptal kayıtları korur; yanıtlarda parola/gizli alan yok.
+  `StaleScan`, `NotCovered`, `ManualOnly` işaretleri; reddedilen istek hiçbir şey yazmaz; onay öncesi işaret 409; pencere
+  dışı işaret kabul edilir ve `OutsideWindow` taşır; açık plandaki hesap ikinci planda reddedilir (kapanmış/iptal plandaki
+  kabul); OCO biçimi hatalıysa 400; kapanış eylemleri yazar ama doğrulamaz, bağlı talebi kapatmaz; iptal kayıtları korur; yanıtlarda parola/gizli alan yok.
 - Birim: önizleme işaret kuralları (saf domain), adım göstergesi, 390 px yerleşim testleri; route envanteri; OpenAPI.
 - Yerel Demo (kendi portunda): 390 px açık/koyu, klavye.
 
@@ -106,8 +115,4 @@ Her PR ayrı dal, küçük commit'ler, build/test/format/SQL harness; push edili
 
 ## Açık sorular
 
-1. OCO numarası biçimi: mevcut `SaExternalRef` "OCO" doğrulaması yeterli mi, yoksa ITSM'den doğrulama mı (entegrasyon yok;
-   şimdilik biçim)?
-2. Bakım penceresi geçtikten sonra kontrol listesi işaretlenebilir mi? Öneri: evet, ama "pencere dışında" etiketiyle.
-3. Bir hesap aynı anda iki açık planda olabilir mi? Öneri: hayır (ikinci plan o hesabı reddeder).
-4. Plan kapanışında bağlı açık talep (`RequestId`) otomatik kapanmasın; kişi mevcut kapatma akışıyla kapatır (öneri).
+Yok: 2026-10-06 sahip kararları 4–7 önceki dört soruyu kapattı. Uygulamada çıkan soru buraya eklenir.
