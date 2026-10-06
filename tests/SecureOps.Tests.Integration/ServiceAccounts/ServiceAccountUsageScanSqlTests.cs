@@ -315,10 +315,15 @@ public sealed class ServiceAccountUsageScanSqlTests
     }
 
     /// <summary>A complete discovery scan of SYN-APP01 and SYN-APP02; each configured component is written once per searched name it matched.</summary>
-    private static byte[] Discovery(string[] searched, params (string Server, string Type, string Component, string Identity, string[] Matched)[] configured)
+    private static byte[] Discovery(string[] searched, params (string Server, string Type, string Component, string Identity, string[] Matched)[] configured) =>
+        Discovery(searched, [], configured);
+
+    /// <summary>As above; servers in <paramref name="unreachable"/> are planned but reported as not reached.</summary>
+    private static byte[] Discovery(string[] searched, string[] unreachable, params (string Server, string Type, string Component, string Identity, string[] Matched)[] configured)
     {
         JsonArray results = [];
-        foreach (string server in new[] { "SYN-APP01", "SYN-APP02" })
+        JsonArray notReached = [.. unreachable.Select(s => (JsonNode)new JsonObject { ["serverName"] = s, ["reason"] = "Unreachable" })];
+        foreach (string server in new[] { "SYN-APP01", "SYN-APP02" }.Except(unreachable))
         {
             JsonArray components = [];
             foreach ((string _, string type, string component, string identity, string[] matched) in configured.Where(c => c.Server == server))
@@ -355,7 +360,7 @@ public sealed class ServiceAccountUsageScanSqlTests
             ["expectedAccount"] = null,
             ["plannedServers"] = new JsonArray("SYN-APP01", "SYN-APP02"),
             ["results"] = results,
-            ["notReached"] = new JsonArray()
+            ["notReached"] = notReached
         };
         return Encoding.UTF8.GetBytes(bundle.ToJsonString());
     }
@@ -430,6 +435,58 @@ public sealed class ServiceAccountUsageScanSqlTests
         older.Scans.Select(s => s.FileName).Should().Equal(["small0.json", "big.json"], "older scans come on the next page, newest first");
         older.Scans.Single(s => s.FileName == "big.json").Should().Match<UsageScanView>(s => s.FormerTotal == 60 && s.FormerPending == 59);
         many.UsageScans!.Select(s => s.LinkId).Should().NotIntersectWith(older.Scans.Select(s => s.LinkId));
+    }
+
+    [ServiceAccountSqlFact]
+    public async Task Diff_ComparesEveryMatchedComponent_NotTheLoadedPage_AndKeepsUnknownApartFromNotFound()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        AccountDetail account = await CreateAccountAsync(fx, coordinator, org, "DIFF");
+        Guid id = account.Summary.Id;
+        string searched = $"SYN\\{account.Summary.AccountName}";
+        (string, string, string, string, string[])[] Tasks(params int[] numbers) =>
+            [.. numbers.Select(n => ("SYN-APP01", "ScheduledTask", $"\\SynTask{n:00}", searched, new[] { searched }))];
+
+        // Older: 30 tasks on SYN-APP01 and one service on SYN-APP02. Newer: task 30 gone, task 31 new, SYN-APP02 unreachable.
+        AccountDetail first = Ok(await fx.Service.AttachUsageScanAsync(coordinator.Principal, fx.Context, id, "old.json",
+            Discovery([searched], [.. Tasks([.. Enumerable.Range(1, 30)]), ("SYN-APP02", "WindowsService", "SynSvc", searched, [searched])]), _statement, null, _token));
+        Guid oldLink = first.UsageScans!.Single().LinkId;
+        AccountDetail second = Ok(await fx.Service.AttachUsageScanAsync(coordinator.Principal, fx.Context, id, "new.json",
+            Discovery([searched], ["SYN-APP02"], Tasks([.. Enumerable.Range(1, 29), 31])), _statement, null, _token));
+        Guid newLink = second.UsageScans!.First().LinkId;
+        second.UsageScans!.First().Items.Count(i => i.Role == "Former").Should().Be(UsageScanPaging.DefaultItemPageSize, "the detail carries only the first page");
+
+        UsageScanDiffView diff = Ok(await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, id, newLink, null, 1, null, _token));
+        (diff.Current.LinkId, diff.Previous!.LinkId).Should().Be((newLink, oldLink), "the default is the next older scan of the same purpose");
+        diff.Components.Counts.Should().Be(new UsageScanComponentDiffCounts(1, 1, 1, 0), "items 26-29 are only on page 2 of the newer scan and stay unchanged");
+        diff.Components.Total.Should().Be(3);
+        diff.Components.Items.Select(c => (c.ComponentName, c.Change)).Should().Equal(
+            ("\\SynTask31", "Added"), ("\\SynTask30", "NotFoundNow"), ("SynSvc", "UnknownNow"));
+        diff.Components.Items.Single(c => c.Change == "NotFoundNow").Text.Should().Contain("kullanılmadığını göstermez");
+        diff.Servers.Should().ContainSingle().Which.Should().Match<UsageScanServerDiffView>(s =>
+            s.ServerName == "SYN-APP02" && s.Change == "InformationLost" && s.PreviousOutcome == "Found" && s.CurrentOutcome == "NotCovered");
+        diff.UnchangedServers.Should().Be(1);
+
+        UsageScanDiffView paged = Ok(await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, id, newLink, null, 2, 1, _token));
+        (paged.Components.Total, paged.Components.Page, paged.Components.PageSize, paged.Components.Items.Single().ComponentName).Should().Be((3, 2, 1, "\\SynTask30"));
+
+        Ok(await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, id, oldLink, null, 1, null, _token)).Previous.Should().BeNull("no older scan");
+        Ok(await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, id, oldLink, newLink, 1, null, _token)).Components.Counts
+            .Should().Be(new UsageScanComponentDiffCounts(2, 1, 0, 0), "against picks the other link; SYN-APP02 was unreachable in the 'previous' side, so SynSvc may not be new");
+
+        Guid gmsaLink = (await GmsaAsync(fx, coordinator, id, account.Summary.AccountName, ("SYN-APP01", "former"))).LinkId;
+        (await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, id, newLink, gmsaLink, 1, null, _token)).Field.Should().Be("againstPurpose");
+        (await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, id, newLink, newLink, 1, null, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
+        (await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, id, newLink, null, 0, null, _token)).Field.Should().Be("page");
+        (await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, id, newLink, null, 1, 101, _token)).Field.Should().Be("pageSize");
+
+        AccountDetail other = await CreateAccountAsync(fx, coordinator, org, "DIFF2");
+        (await fx.Service.UsageScanDiffAsync(coordinator.Principal, fx.Context, other.Summary.Id, newLink, null, 1, null, _token))
+            .Should().Match<SaResult<UsageScanDiffView>>(r => r.ErrorCode == SaErrors.NotFound && r.Field == "linkId", "a link belongs to one account");
+        SynUser outsider = await fx.UserAsync(_all);
+        await fx.GrantAsync(outsider, ScopeKind.Team, team: await fx.TeamAsync("SYN SCAN FARK " + fx.Suffix, null));
+        (await fx.Service.UsageScanDiffAsync(outsider.Principal, fx.Context, id, newLink, null, 1, null, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
+        (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.UsageScanDecisions WHERE AccountId = @id", new { id })).Should().Be(0, "comparing writes nothing");
     }
 
     private static async Task<(ServiceAccountSqlFixture, SynUser, Guid)> SetupAsync()
