@@ -42,6 +42,21 @@ public sealed class ServiceAccountUsageScanUiTests
     }
 
     [Fact]
+    public async Task LargeScan_ShowsTotals_PendingFilter_AndPagers_WithoutChangingCoverage()
+    {
+        AccountPermissions work = new(true, true, true, true, true, true, ServiceAccountAccessBasis.Responsible);
+        UsageScanView big = Discovery() with { FormerTotal = 60, FormerPending = 59 };
+
+        string html = Words(await RenderAsync(Detail(work, [big], total: 7, pending: 65)));
+
+        html.Should().Contain("Bu hesaba 7 tarama bağlı; tüm taramalarda 65 bileşen karar bekliyor")
+            .And.Contain("Taramalar: 1–5 / 7 tarama (sayfa 1 / 2)");
+        html.Should().Contain("Bu hesabın bulunduğu bileşenler (60) · 59 karar bekliyor").And.Contain("Yalnız karar bekleyenleri göster (59)")
+            .And.Contain("Bileşenler: 1–25 / 60 bileşen (sayfa 1 / 3)").And.Contain("Önceki").And.Contain("Sonraki");
+        html.Should().Contain("4 sunucudan 2 tanesi tam tarandı", "coverage comes from the server, not from the listed page");
+    }
+
+    [Fact]
     public async Task Participant_UploadsOnlyThroughItsOwnRequest_AndCannotDecide()
     {
         AccountPermissions participant = new(false, false, false, false, false, true, ServiceAccountAccessBasis.Participant, [_request]);
@@ -49,6 +64,24 @@ public sealed class ServiceAccountUsageScanUiTests
 
         html.Should().Contain("Tarama dosyası yükle ve bu hesaba bağla");
         html.Should().NotContain("Karar ver").And.Contain("Karar bekliyor (hesaptan sorumlu ekip)");
+    }
+
+    [Theory]
+    [InlineData(2, 25, 25, 1)]   // 25 undecided left, the person was on page 2 and decided one more
+    [InlineData(2, 26, 25, 2)]   // still a page 2 with one row
+    [InlineData(3, 50, 25, 2)]   // 51 -> 50: page 3 vanished
+    [InlineData(3, 0, 25, 1)]    // nothing undecided left: page 1 with the honest "none left" text
+    [InlineData(1, 10, 25, 1)]
+    public void ClampPage_PullsBackToTheLastPageWithRows(int page, int total, int size, int expected) =>
+        ServiceAccountUiText.ClampPage(page, total, size).Should().Be(expected);
+
+    [Fact]
+    public void RefreshAfterADecision_ClampsThePageInsteadOfShowingAnEmptyRange()
+    {
+        // A decision removes an item from "undecided only"; the refresh must go back to the last page that has rows
+        // (no "26–25 / 25" range and no false "no undecided component left" on a page past the end).
+        string source = File.ReadAllText(Path.Combine(Root(), "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaUsageScanPanel.razor"));
+        source.Should().Contain("ServiceAccountUiText.ClampPage(view.Page, data.Total, data.PageSize)");
     }
 
     [Fact]
@@ -121,7 +154,10 @@ public sealed class ServiceAccountUsageScanUiTests
         File.ReadAllText(Path.Combine(root, "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaHandoverPanel.razor"))
             .Should().Contain("Tarama kanıttır; dönüşümü işlem doğrulamasında doğrulayıcı onaylar.");
         File.ReadAllText(Path.Combine(root, "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaUsageScanPanel.razor"))
-            .Should().Contain("else if (Detail.Permissions.Work)").And.Contain("@if (!Detail.Permissions.Work)").And.NotContain("HttpMethod.Delete");
+            .Should().Contain("else if (Detail.Permissions.Work)").And.Contain("@if (!Detail.Permissions.Work)").And.NotContain("HttpMethod.Delete")
+            // Measured with the keyboard only (2026-10-05): without Immediate the dismiss button was still disabled when Tab left
+            // the reason field, so focus skipped it.
+            .And.Contain("Label=\"Kayda almama gerekçesi\" MaxLength=\"1000\" Variant=\"Variant.Outlined\" Immediate=\"true\"");
     }
 
     [Fact]
@@ -144,13 +180,13 @@ public sealed class ServiceAccountUsageScanUiTests
         css.Should().MatchRegex(@"\.so-panel ::deep \.mud-button-root:focus-visible\s*\{[^}]*outline:\s*2px solid");
     }
 
-    private static AccountDetail Detail(AccountPermissions permissions, IReadOnlyList<UsageScanView>? scans)
+    private static AccountDetail Detail(AccountPermissions permissions, IReadOnlyList<UsageScanView>? scans, int? total = null, int pending = 0)
     {
         AccountSummaryView summary = new(_account, "svc_synapp", "SYN", null, "Provisional", null, null, null, null, "Active", null, null, null, 1, null, [],
             null, "AAAAAAAAAAA=");
         RequestView request = new(_request, _account, "svc_synapp", "GmsaHandover", "gMSA ile devir", "Open", null, new SaRef(Guid.NewGuid(), "SYN GMSA"),
             null, null, null, null, null, null, null, null, null, false, true, [], null, null, "AAAAAAAAAAA=");
-        return new AccountDetail(summary, [], [request], [], [], [], [], [], [], [], [], [], permissions, [], null, scans, scans?.Count ?? 0);
+        return new AccountDetail(summary, [], [request], [], [], [], [], [], [], [], [], [], permissions, [], null, scans, total ?? scans?.Count ?? 0, pending);
     }
 
     private static UsageScanView Discovery()
@@ -170,7 +206,7 @@ public sealed class ServiceAccountUsageScanUiTests
         ];
         return new UsageScanView(Guid.NewGuid(), Guid.NewGuid(), "Discovery", "SYN\\svc_synapp", null, "scan.json", new string('a', 64), "Combined",
             DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "Sentetik beyan", "Sentetik kullanıcı", DateTimeOffset.UnixEpoch, null,
-            DateTimeOffset.UnixEpoch, new UsageScanCoverageView(4, 2, 1, 0, 1, 0, 1, 1, 1, 1), null, servers, items);
+            DateTimeOffset.UnixEpoch, new UsageScanCoverageView(4, 2, 1, 0, 1, 0, 1, 1, 1, 1), null, servers, items, 2, 1, 0);
     }
 
     /// <summary>A discovery scan without any match, over the given servers.</summary>
@@ -196,7 +232,7 @@ public sealed class ServiceAccountUsageScanUiTests
         return new UsageScanView(Guid.NewGuid(), Guid.NewGuid(), "GmsaCheck", "SYN\\svc_synapp", "SYN\\gmsa_synapp$", "gmsa.json", new string('b', 64), "Combined",
             DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "Sentetik beyan", "Sentetik kullanıcı", DateTimeOffset.UnixEpoch, null,
             DateTimeOffset.UnixEpoch, new UsageScanCoverageView(1, 1, 0, 0, 0, 0, 1, 0, 0, 0),
-            new UsageScanGmsaView("SYN\\gmsa_synapp$", "StillFormer", "Dönüşüm tamamlanmamış: eski hesap hâlâ en az bir bileşende", 1, 0, 0, 0), servers, items);
+            new UsageScanGmsaView("SYN\\gmsa_synapp$", "StillFormer", "Dönüşüm tamamlanmamış: eski hesap hâlâ en az bir bileşende", 1, 0, 0, 0), servers, items, 1, 1, 1);
     }
 
     private static UsageScanServerView Server(string name, string result, string resultLabel, int matches, string outcome, string label) =>

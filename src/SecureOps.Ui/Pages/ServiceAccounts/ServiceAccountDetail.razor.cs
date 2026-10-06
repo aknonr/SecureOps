@@ -40,11 +40,10 @@ public partial class ServiceAccountDetail
         ? $"Kullanım ve kural ({(_detail.Usages ?? []).Count(u => !u.Removed)}) · kurala aykırı"
         : $"Kullanım ve kural ({(_detail?.Usages ?? []).Count(u => !u.Removed)})";
 
-    /// <summary>Scan tab title with the matches still waiting for a person's decision.</summary>
-    private string ScanTabText => _detail?.UsageScans is not { Count: > 0 } scans ? "Kullanım taraması"
-        : scans.SelectMany(s => s.Items).Count(i => i.Role == "Former" && i.Decision is null) is var pending and > 0
-            ? $"Kullanım taraması ({scans.Count}) · {pending} karar bekliyor"
-            : $"Kullanım taraması ({scans.Count})";
+    /// <summary>Scan tab title with every attached scan and the matches still waiting for a decision (server totals, not the page).</summary>
+    private string ScanTabText => _detail is not { UsageScans: not null, UsageScanTotal: > 0 } detail ? "Kullanım taraması"
+        : detail.UsageScanPending > 0 ? $"Kullanım taraması ({detail.UsageScanTotal}) · {detail.UsageScanPending} karar bekliyor"
+        : $"Kullanım taraması ({detail.UsageScanTotal})";
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
@@ -116,6 +115,26 @@ public partial class ServiceAccountDetail
                 ["requestId"] = upload.RequestId?.ToString("D")
             }, token));
         await AfterCommandAsync(saved);
+    }
+
+    /// <summary>Opens the tab a next step points to; it only switches the view.</summary>
+    private void OpenTab(int tab) => _tab = tab;
+
+    /// <summary>Older scans (read only); a failure shows the problem and keeps the current page.</summary>
+    private async Task<UsageScanPage?> LoadScanPageAsync(int page)
+    {
+        UsageScanPage? result = null;
+        await RunAsync(async token => result = await Api.GetAsync<UsageScanPage>($"/accounts/{Id}/usage-scans?page={page}", token));
+        return result;
+    }
+
+    /// <summary>One page of a scan's items (read only); a failure shows the problem and keeps the current page.</summary>
+    private async Task<UsageScanItemPage?> LoadScanItemsAsync(Guid linkId, string role, bool pendingOnly, int page)
+    {
+        UsageScanItemPage? result = null;
+        await RunAsync(async token => result = await Api.GetAsync<UsageScanItemPage>(
+            $"/accounts/{Id}/usage-scans/{linkId}/items?role={role}&pending={(pendingOnly ? "true" : "false")}&page={page}", token));
+        return result;
     }
 
     private Task DownloadAsync(Guid evidenceId) => RunAsync(async token => await SaveFileAsync(await Api.DownloadAsync($"/evidence/{evidenceId}", token)));

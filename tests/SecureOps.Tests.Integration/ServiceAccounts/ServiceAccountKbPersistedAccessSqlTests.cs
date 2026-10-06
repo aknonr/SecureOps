@@ -19,7 +19,10 @@ using static SecureOps.Tests.Integration.ServiceAccounts.ServiceAccountPersisted
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
 
-/// <summary>Team roles are module-wide; tests that configure the gMSA executing team run one at a time.</summary>
+/// <summary>
+/// Team roles are module-wide; tests that configure the gMSA executing team run one at a time. Classes that register platform
+/// users through the SQL access store (<c>EnsureUserAsync</c>) also run here, because concurrent registrations can deadlock (G-34).
+/// </summary>
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class ServiceAccountTeamRoleCollection
 {

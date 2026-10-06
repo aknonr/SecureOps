@@ -1,5 +1,16 @@
 # sql/
 
+## Service Account Requested gMSA Name 031, 2026-10-05
+
+Inventory is 001-031. **031-service-account-requested-gmsa-name** requires reviewed 025 and 030 and includes the retained
+`pending/service-accounts/SA-005-requested-gmsa-name.sql` unchanged: two nullable columns, `WorkRequests.RequestedGmsaName`
+and `IdentityTransitions.RequestedGmsaName` (`nvarchar(256) NULL`, no default), so existing rows are not rewritten and stay
+NULL. No grant changes: `svcacct_api_runtime` already has table-level SELECT, INSERT, UPDATE on both tables; the Worker role
+needs nothing new. Replay is refused (51370). Binaries with this code keep working before 031: names show as unavailable,
+writes without a name succeed and a write with a name is refused with `gmsaNameColumnsMissing`. 031 was reserved after
+checking every published branch (all end at 030 or earlier). Apply only after separate owner approval, first on a copy of
+the installed database. Rollback: older binaries ignore the columns; keep them and their values.
+
 ## Service Account Usage Scans 030, 2026-10-04
 
 Inventory is 001-030. **030-service-account-usage-scans** (ADR-0027) requires reviewed 025/026 and includes the retained

@@ -212,13 +212,18 @@ public sealed partial class ServiceAccountService
                 : repository!.DecideHandoverAsync(accountId, id, request, request.Decision == "Accept", caller.Actor, cancellationToken);
         }, cancellationToken);
 
-    /// <summary>Updates gMSA suitability/plan; a suitability decision needs a note and completion needs a real gMSA action.</summary>
+    /// <summary>
+    /// Updates gMSA suitability/plan and the requested gMSA name; a suitability decision needs a note and completion needs a real
+    /// gMSA action. The name follows the shared 15-character rule.
+    /// </summary>
     public Task<SaResult<AccountDetail>> UpdateTransitionAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id, TransitionUpdateRequest request,
         CancellationToken cancellationToken) =>
         EntityAsync(principal, context, "Transition", id, ServiceAccountCapabilities.Assign, p => p.AssignPerson || p.DecideHandover, (caller, _, accountId) =>
             !Enum.TryParse(request.Suitability, false, out GmsaSuitability suitability) || !ValidText(request.DecisionNote, 2000)
                 || suitability is GmsaSuitability.Eligible or GmsaSuitability.Ineligible && string.IsNullOrWhiteSpace(request.DecisionNote)
                 ? Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "decisionNote"))
+                : RequestedGmsaNameError(request.RequestedGmsaName, null) is { } nameError
+                ? Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, nameError))
                 : repository!.UpdateTransitionAsync(accountId, id, request, caller.Actor, cancellationToken), cancellationToken);
 
     /// <summary>Stores evidence for an in-scope entity (type and size bounded, hash recorded).</summary>

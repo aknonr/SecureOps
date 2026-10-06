@@ -42,16 +42,17 @@ internal sealed class ServiceAccountSqlFixture
     /// <summary>Optional runtime connection for the repository under test (least-privilege runs).</summary>
     public const string RuntimeVariable = "SECUREOPS_SA_SQL_RUNTIME_CONNECTION";
 
-    public ServiceAccountSqlFixture()
+    /// <param name="connection">Another disposable database (e.g. one left at migration 030); the runtime connection is then not used.</param>
+    public ServiceAccountSqlFixture(string? connection = null)
     {
         Configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:SecureOpsDb"] = Environment.GetEnvironmentVariable(ServiceAccountSqlFactAttribute.Variable),
+            ["ConnectionStrings:SecureOpsDb"] = connection ?? Environment.GetEnvironmentVariable(ServiceAccountSqlFactAttribute.Variable),
             ["ServiceAccounts:Provider"] = "SqlServer"
         }).Build();
         // Optional least-privilege run: synthetic setup keeps the privileged connection, while the module under test
         // connects as a principal that is only a member of the reviewed runtime role (SECUREOPS_SA_SQL_RUNTIME_CONNECTION).
-        string? runtime = Environment.GetEnvironmentVariable(RuntimeVariable);
+        string? runtime = connection is null ? Environment.GetEnvironmentVariable(RuntimeVariable) : null;
         Repository = new SqlServiceAccountRepository(string.IsNullOrWhiteSpace(runtime) ? Configuration
             : new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {

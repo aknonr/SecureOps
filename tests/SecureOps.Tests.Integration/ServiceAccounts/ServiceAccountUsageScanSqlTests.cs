@@ -370,6 +370,68 @@ public sealed class ServiceAccountUsageScanSqlTests
         ["Detail"] = null
     };
 
+    [ServiceAccountSqlFact]
+    public async Task LargeScan_IsPaged_UndecidedFirst_WhileCoverageAndScopeStayTheSame()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        AccountDetail account = await CreateAccountAsync(fx, coordinator, org, "PAGE");
+        Guid id = account.Summary.Id;
+        string searched = $"SYN\\{account.Summary.AccountName}";
+        byte[] file = Discovery([searched], [.. Enumerable.Range(1, 60).Select(n => ("SYN-APP01", "ScheduledTask", $"\\SynTask{n:00}", searched, new[] { searched }))]);
+
+        AccountDetail attached = Ok(await fx.Service.AttachUsageScanAsync(coordinator.Principal, fx.Context, id, "big.json", file, _statement, null, _token));
+        UsageScanView scan = attached.UsageScans.Should().ContainSingle().Subject;
+        (scan.FormerTotal, scan.FormerPending, scan.ExpectedTotal, attached.UsageScanPending).Should().Be((60, 60, 0, 60));
+        scan.Items.Should().HaveCount(UsageScanPaging.DefaultItemPageSize, "only the first page is loaded with the account");
+        scan.Coverage.Should().Be(new UsageScanCoverageView(2, 2, 0, 0, 0, 0, 1, 1, 0, 0), "coverage is computed over every item, not the page");
+        scan.Servers.Single(s => s.ServerName == "SYN-APP01").Matches.Should().Be(60);
+        scan.Servers.Single(s => s.ServerName == "SYN-APP02").Outcome.Should().Be("NotFound");
+
+        UsageScanItemView first = scan.Items[0];
+        AccountDetail decided = Ok(await fx.Service.DismissScanItemAsync(coordinator.Principal, fx.Context, id, first.Id,
+            new DismissScanItemRequest("Sentetik: kayda alınmadı"), _token));
+        UsageScanView after = decided.UsageScans!.Single();
+        (after.FormerTotal, after.FormerPending, decided.UsageScanPending).Should().Be((60, 59, 59));
+        after.Items.Should().OnlyContain(i => i.Decision == null, "undecided items come first");
+
+        UsageScanItemPage last = Ok(await fx.Service.UsageScanItemsAsync(coordinator.Principal, fx.Context, id, scan.LinkId, null, false, 3, null, _token));
+        (last.Total, last.Page, last.PageSize, last.Items.Count, last.Role).Should().Be((60, 3, 25, 10, "Former"));
+        last.Items[^1].Id.Should().Be(first.Id, "the decided item is listed after every undecided one");
+        UsageScanItemPage pending = Ok(await fx.Service.UsageScanItemsAsync(coordinator.Principal, fx.Context, id, scan.LinkId, "Former", true, 1, 100, _token));
+        (pending.Total, pending.Items.Count).Should().Be((59, 59));
+        pending.Items.Should().NotContain(i => i.Id == first.Id);
+        Ok(await fx.Service.UsageScanItemsAsync(coordinator.Principal, fx.Context, id, scan.LinkId, "Expected", false, 1, null, _token)).Total.Should().Be(0);
+        foreach ((string? role, bool onlyPending, int page, int? size, string field) in new (string?, bool, int, int?, string)[]
+        {
+            ("Other", false, 1, null, "role"), ("Expected", true, 1, null, "pending"), (null, false, 0, null, "page"), (null, false, 1, 101, "pageSize")
+        })
+        {
+            (await fx.Service.UsageScanItemsAsync(coordinator.Principal, fx.Context, id, scan.LinkId, role, onlyPending, page, size, _token)).Field.Should().Be(field);
+        }
+
+        AccountDetail other = await CreateAccountAsync(fx, coordinator, org, "PAGE2");
+        (await fx.Service.UsageScanItemsAsync(coordinator.Principal, fx.Context, other.Summary.Id, scan.LinkId, null, false, 1, null, _token))
+            .Should().Match<SaResult<UsageScanItemPage>>(r => r.ErrorCode == SaErrors.NotFound && r.Field == "linkId", "a link belongs to one account");
+        SynUser outsider = await fx.UserAsync(_all);
+        await fx.GrantAsync(outsider, ScopeKind.Team, team: await fx.TeamAsync("SYN SCAN SAYFA " + fx.Suffix, null));
+        (await fx.Service.UsageScanItemsAsync(outsider.Principal, fx.Context, id, scan.LinkId, null, false, 1, null, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
+        (await fx.Service.UsageScanPageAsync(outsider.Principal, fx.Context, id, 1, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
+
+        for (int n = 0; n < 6; n++)
+        {
+            Ok(await fx.Service.AttachUsageScanAsync(coordinator.Principal, fx.Context, id, $"small{n}.json",
+                Discovery([searched], ("SYN-APP02", "WindowsService", $"SynSvc{n}", searched, [searched])), _statement, null, _token));
+        }
+
+        AccountDetail many = Ok(await fx.Service.AccountAsync(coordinator.Principal, fx.Context, id, _token));
+        (many.UsageScanTotal, many.UsageScans!.Count, many.UsageScanPending).Should().Be((7, UsageScanPaging.ScanPageSize, 65));
+        UsageScanPage older = Ok(await fx.Service.UsageScanPageAsync(coordinator.Principal, fx.Context, id, 2, _token));
+        (older.Total, older.Page, older.Pending).Should().Be((7, 2, 65));
+        older.Scans.Select(s => s.FileName).Should().Equal(["small0.json", "big.json"], "older scans come on the next page, newest first");
+        older.Scans.Single(s => s.FileName == "big.json").Should().Match<UsageScanView>(s => s.FormerTotal == 60 && s.FormerPending == 59);
+        many.UsageScans!.Select(s => s.LinkId).Should().NotIntersectWith(older.Scans.Select(s => s.LinkId));
+    }
+
     private static async Task<(ServiceAccountSqlFixture, SynUser, Guid)> SetupAsync()
     {
         ServiceAccountSqlFixture fx = new();

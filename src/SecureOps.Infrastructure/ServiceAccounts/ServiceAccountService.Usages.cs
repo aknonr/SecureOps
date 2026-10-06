@@ -25,8 +25,8 @@ public sealed partial class ServiceAccountService
     {
         Guid id = detail.Summary.Id;
         IReadOnlyList<UsageView> usages = await repository!.UsagesAsync(id, cancellationToken);
-        (IReadOnlyList<UsageScanView>? scans, int scanTotal) = await repository.UsageScansAsync(id, cancellationToken);
-        detail = detail with { UsageScans = scans, UsageScanTotal = scanTotal };
+        (IReadOnlyList<UsageScanView>? scans, int scanTotal, int scanPending) = await repository.UsageScansAsync(id, 1, cancellationToken);
+        detail = detail with { UsageScans = scans, UsageScanTotal = scanTotal, UsageScanPending = scanPending };
         (ReportFacts facts, _) = await repository.ReportFactsAsync(_accountOnlyScope, null, null, Thresholds, id, cancellationToken);
         Dictionary<Guid, AccountRuleEvaluation> rules = ServiceAccountInsights.Evaluate(facts, facts.Insights!);
         if (!rules.TryGetValue(id, out AccountRuleEvaluation? rule))

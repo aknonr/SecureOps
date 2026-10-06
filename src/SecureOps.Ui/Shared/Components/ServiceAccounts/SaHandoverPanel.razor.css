@@ -1,0 +1,2 @@
+/* A requested gMSA name (up to 256 characters with prefix/suffix) wraps instead of widening the row at 390 px. */
+.sa-wrap-anywhere { overflow-wrap: anywhere; }

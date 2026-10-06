@@ -32,7 +32,10 @@ public sealed partial class SqlServiceAccountRepository
     public static bool ValidListQuery(AccountListQuery query) => _sorts.ContainsKey(query.Sort) && (query.Status is null || _statusFilters.ContainsKey(query.Status));
 
     /// <summary>Server-paged scoped account list with stable ordering (sort key, then ID) before OFFSET.</summary>
-    public async Task<AccountPage> ListAccountsAsync(ServiceAccountScope scope, AccountListQuery query, DateOnly today, CancellationToken cancellationToken)
+    public Task<AccountPage> ListAccountsAsync(ServiceAccountScope scope, AccountListQuery query, DateOnly today, CancellationToken cancellationToken) =>
+        RetryReadOnDeadlockAsync(() => ListAccountsOnceAsync(scope, query, today, cancellationToken));
+
+    private async Task<AccountPage> ListAccountsOnceAsync(ServiceAccountScope scope, AccountListQuery query, DateOnly today, CancellationToken cancellationToken)
     {
         string order = _sorts[query.Sort] + (query.Descending ? " DESC" : " ASC");
         string status = query.Status is null ? "1 = 1" : _statusFilters[query.Status];

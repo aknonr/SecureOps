@@ -57,3 +57,6 @@
     outline: 2px solid var(--so-text);
     outline-offset: 2px;
 }
+
+/* Previous/next paging for scans and items: wraps at 390 px, keyboard-operable MudBlazor buttons. */
+.sa-scan-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }

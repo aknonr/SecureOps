@@ -1,5 +1,6 @@
 @* Expected work (requests). A request closes only by an explicit command whose rule the API checks: completion
    needs a matching performed action (and a verified closure for deletion/gMSA handover); other outcomes need a reason. *@
+@using SecureOps.Domain.ServiceAccounts
 @using SecureOps.Shared.Contracts.ServiceAccounts
 @using SecureOps.Ui.Services.ServiceAccounts
 
@@ -14,7 +15,12 @@
         <MudTable Items="Detail.Requests" Dense="true" Breakpoint="Breakpoint.Sm" T="RequestView">
             <HeaderContent><MudTh>İş</MudTh><MudTh>Durum</MudTh><MudTh>Hedef / takip</MudTh><MudTh>Plan</MudTh><MudTh>Yazışma</MudTh><MudTh>İşlem</MudTh></HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="İş">@context.ActionLabel<div class="so-panel-text--sm">@ServiceAccountUiText.References(context.References)</div></MudTd>
+                <MudTd DataLabel="İş">@context.ActionLabel<div class="so-panel-text--sm">@ServiceAccountUiText.References(context.References)</div>
+                    @if (context.RequestedGmsaName is { } gmsaName)
+                    {
+                        <div class="so-panel-text--sm sa-wrap-anywhere">İstenen gMSA adı: @gmsaName (@ServiceAccountGmsaName.Length(gmsaName)/@ServiceAccountGmsaName.Limit)</div>
+                    }
+                </MudTd>
                 <MudTd DataLabel="Durum">
                     @if (context.Status == "Open")
                     {
@@ -59,10 +65,18 @@
                 <MudItem xs="6" md="3"><MudDatePicker Editable="true" @bind-Date="_edit.FirstSentOn" Label="İlk gönderim" DateFormat="dd.MM.yyyy" Variant="Variant.Outlined" /></MudItem>
                 <MudItem xs="6" md="3"><MudDatePicker Editable="true" @bind-Date="_edit.LastReplyOn" Label="Son yanıt" DateFormat="dd.MM.yyyy" Variant="Variant.Outlined" /></MudItem>
                 <MudItem xs="12" md="6"><SaPersonPicker Label="Takipçi kişi" @bind-Value="_edit.FollowupPersonId" /></MudItem>
+                @if (IsGmsaWork(selected.ActionType))
+                {
+                    <MudItem xs="12" md="6"><SaGmsaNameField @bind-Value="_edit.RequestedGmsaName" Available="@Detail.RequestedGmsaNameAvailable" /></MudItem>
+                }
                 <MudItem xs="12"><MudTextField @bind-Value="_edit.Notes" Label="Not" MaxLength="4000" Lines="2" Variant="Variant.Outlined" /></MudItem>
                 <MudItem xs="12" md="6" Class="d-flex flex-wrap gap-3">
                     <MudCheckBox T="bool" @bind-Value="_edit.ClearPlan" Label="Plan tarihlerini temizle" />
                     <MudCheckBox T="bool" @bind-Value="_edit.ClearFollowup" Label="Sonraki takibi temizle" />
+                    @if (IsGmsaWork(selected.ActionType) && selected.RequestedGmsaName is not null && Detail.RequestedGmsaNameAvailable)
+                    {
+                        <MudCheckBox T="bool" @bind-Value="_edit.ClearGmsaName" Label="İstenen gMSA adını temizle" />
+                    }
                 </MudItem>
                 <MudItem xs="12" md="6"><MudTextField @bind-Value="_edit.Reason" Label="Gerekçe (temizleme için zorunlu)" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
             </MudGrid>
@@ -110,6 +124,10 @@
                 <MudItem xs="6" md="3"><MudDatePicker Editable="true" @bind-Date="_create.PlanEnd" Label="Plan bitişi" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" /></MudItem>
                 <MudItem xs="6" md="3"><MudDatePicker Editable="true" @bind-Date="_create.NextFollowupOn" Label="Sonraki takip" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" /></MudItem>
                 <MudItem xs="6" md="3"><MudTextField @bind-Value="_create.OrNumber" Label="@(_create.ActionType == "Deletion" ? "OR numarası (silme kapanışı için gerekli)" : "OR numarası")" MaxLength="64" Variant="Variant.Outlined" /></MudItem>
+                @if (IsGmsaWork(_create.ActionType))
+                {
+                    <MudItem xs="12" md="6"><SaGmsaNameField @bind-Value="_create.RequestedGmsaName" Available="@Detail.RequestedGmsaNameAvailable" /></MudItem>
+                }
                 <MudItem xs="12"><MudTextField @bind-Value="_create.Notes" Label="Not" MaxLength="4000" Lines="2" Variant="Variant.Outlined" /></MudItem>
             </MudGrid>
             <MudButton OnClick="CreateAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Talebi aç</MudButton>
@@ -166,7 +184,8 @@
             FirstSentOn = ServiceAccountUiText.ToPicker(request.FirstSentOn),
             LastReplyOn = ServiceAccountUiText.ToPicker(request.LastReplyOn),
             FollowupPersonId = request.FollowupPerson?.Id,
-            Notes = request.Notes
+            Notes = request.Notes,
+            RequestedGmsaName = request.RequestedGmsaName
         };
     }
 
@@ -176,6 +195,7 @@
         List<string> clear = [];
         if (_edit.ClearPlan) { clear.Add("plan"); }
         if (_edit.ClearFollowup) { clear.Add("nextFollowupOn"); }
+        if (_edit.ClearGmsaName) { clear.Add("requestedGmsaName"); }
         UpdateWorkRequest body = new(request.Version,
             FollowupPersonId: Changed(_edit.FollowupPersonId, request.FollowupPerson?.Id),
             PlanStart: _edit.ClearPlan ? null : Changed(ServiceAccountUiText.ToDate(_edit.PlanStart), request.PlanStart),
@@ -186,7 +206,9 @@
             LastReplyOn: Changed(ServiceAccountUiText.ToDate(_edit.LastReplyOn), request.LastReplyOn),
             Notes: string.IsNullOrWhiteSpace(_edit.Notes) || _edit.Notes == request.Notes ? null : _edit.Notes.Trim(),
             ClearFields: clear.Count > 0 ? clear : null,
-            Reason: string.IsNullOrWhiteSpace(_edit.Reason) ? null : _edit.Reason.Trim());
+            Reason: string.IsNullOrWhiteSpace(_edit.Reason) ? null : _edit.Reason.Trim(),
+            RequestedGmsaName: _edit.ClearGmsaName || string.IsNullOrWhiteSpace(_edit.RequestedGmsaName) || _edit.RequestedGmsaName.Trim() == request.RequestedGmsaName
+                ? null : _edit.RequestedGmsaName.Trim());
         return OnCommand.InvokeAsync(new SaCommand(HttpMethod.Patch, $"/requests/{request.Id}", body));
     }
 
@@ -197,7 +219,11 @@
         new CreateWorkRequest(_create.ActionType, _create.TargetTeamId, _create.FollowupPersonId, null, ServiceAccountUiText.ToDate(_create.PlanStart),
             ServiceAccountUiText.ToDate(_create.PlanEnd), null, ServiceAccountUiText.ToDate(_create.NextFollowupOn), null, null,
             string.IsNullOrWhiteSpace(_create.Notes) ? null : _create.Notes.Trim(),
-            string.IsNullOrWhiteSpace(_create.OrNumber) ? null : [new SaExternalRef("OR", _create.OrNumber.Trim())])));
+            string.IsNullOrWhiteSpace(_create.OrNumber) ? null : [new SaExternalRef("OR", _create.OrNumber.Trim())],
+            IsGmsaWork(_create.ActionType) && !string.IsNullOrWhiteSpace(_create.RequestedGmsaName) ? _create.RequestedGmsaName.Trim() : null)));
+
+    /// <summary>The requested gMSA name belongs to gMSA work only (the server enforces the same).</summary>
+    private static bool IsGmsaWork(string actionType) => actionType is "GmsaHandover" or "GmsaConversion";
 
     /// <summary>Only a changed, non-empty value is sent: blank never erases (clearing is explicit).</summary>
     private static T? Changed<T>(T? value, T? current) where T : struct => value is { } v && !v.Equals(current) ? v : null;
@@ -214,6 +240,8 @@
         public string? Notes { get; set; }
         public bool ClearPlan { get; set; }
         public bool ClearFollowup { get; set; }
+        public bool ClearGmsaName { get; set; }
+        public string? RequestedGmsaName { get; set; }
         public string? Reason { get; set; }
     }
 
@@ -226,6 +254,7 @@
         public DateTime? PlanEnd { get; set; }
         public DateTime? NextFollowupOn { get; set; }
         public string? OrNumber { get; set; }
+        public string? RequestedGmsaName { get; set; }
         public string? Notes { get; set; }
     }
 }
