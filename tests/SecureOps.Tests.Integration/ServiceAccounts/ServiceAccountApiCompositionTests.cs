@@ -130,12 +130,13 @@ public sealed class ServiceAccountApiCompositionTests
             Methods(endpoint).Should().Equal("POST");
         }
 
-        // Read-only paging of what the account detail already shows (same scope, searched name only); never the stored file.
+        // Read-only paging and comparison of what the account detail already shows (same scope, searched name only); never the stored file.
         reads.Select(e => e.RoutePattern.RawText).Should().BeEquivalentTo(
         [
             "api/v1/service-accounts/accounts/{id:guid}/usage-scans",
-            "api/v1/service-accounts/accounts/{id:guid}/usage-scans/{linkId:guid}/items"
-        ], "scans are paged on the account; there is no download route");
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scans/{linkId:guid}/items",
+            "api/v1/service-accounts/accounts/{id:guid}/usage-scans/{linkId:guid}/diff"
+        ], "scans are paged and compared on the account (G-33); there is no download route");
         foreach (RouteEndpoint endpoint in reads)
         {
             Methods(endpoint).Should().Equal("GET");
