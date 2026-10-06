@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SecureOps.Api.Security;
 using SecureOps.Api.ServiceAccounts;
 using SecureOps.Domain.Access;
+using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
@@ -180,10 +182,38 @@ public sealed class ServiceAccountApiCompositionTests
         }
     }
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    [Fact]
+    public async Task UsageScanUploads_OpenApiDescribesTheFormAsSent()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory(swagger: true);
+        using HttpClient client = factory.CreateClient();
+        JsonNode document = JsonNode.Parse(await client.GetStringAsync("/swagger/v1/swagger.json"))!;
+
+        foreach ((string path, string[] required, string[] optional) in new[]
+        {
+            ("/api/v1/service-accounts/accounts/{id}/usage-scans", new[] { "file", "runStatement" }, new[] { "requestId" }),
+            ("/api/v1/service-accounts/usage-scans", ["file", "runStatement", "accountIds"], Array.Empty<string>())
+        })
+        {
+            JsonNode schema = document["paths"]![path]!["post"]!["requestBody"]!["content"]!["multipart/form-data"]!["schema"]!;
+            JsonObject properties = schema["properties"]!.AsObject();
+            properties.Select(p => p.Key).Should().BeEquivalentTo([.. required, .. optional], $"{path}: the form fields, not IFormFile's own properties");
+            schema["required"]!.AsArray().Select(r => (string?)r).Should().BeEquivalentTo(required, path);
+            ((string?)properties["file"]!["type"], (string?)properties["file"]!["format"]).Should().Be(("string", "binary"), path);
+            ((int?)properties["runStatement"]!["minLength"], (int?)properties["runStatement"]!["maxLength"]).Should().Be((5, 400), path);
+        }
+
+        JsonNode ids = document["paths"]!["/api/v1/service-accounts/usage-scans"]!["post"]!["requestBody"]!["content"]!["multipart/form-data"]!["schema"]!
+            ["properties"]!["accountIds"]!;
+        ((string?)ids["type"], (int?)ids["minItems"], (int?)ids["maxItems"], (bool?)ids["uniqueItems"], (string?)ids["items"]!["format"])
+            .Should().Be(("array", 1, UsageScanBatch.MaxAccounts, true, "uuid"));
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(bool swagger = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Test");
+            builder.UseSetting("Swagger:Enabled", swagger ? "true" : "false");
             builder.UseSetting("DemoAuth:Enabled", "true");
             builder.UseSetting("DemoAuth:HeaderName", "X-SecureOps-Demo-Actor");
             builder.UseSetting("Access:DemoCompatibilityEnabled", "false");

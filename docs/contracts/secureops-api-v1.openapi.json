@@ -19969,70 +19969,33 @@
           "content": {
             "multipart/form-data": {
               "schema": {
+                "required": [
+                  "file",
+                  "runStatement"
+                ],
                 "type": "object",
                 "properties": {
-                  "ContentType": {
-                    "type": "string"
-                  },
-                  "ContentDisposition": {
-                    "type": "string"
-                  },
-                  "Headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "Length": {
-                    "type": "integer",
-                    "format": "int64"
-                  },
-                  "Name": {
-                    "type": "string"
-                  },
-                  "FileName": {
-                    "type": "string"
+                  "file": {
+                    "type": "string",
+                    "description": "Combined usage-scan JSON (Invoke-ServiceAccountUsageScan.ps1 -CombinePath).",
+                    "format": "binary"
                   },
                   "runStatement": {
-                    "type": "string"
+                    "maxLength": 400,
+                    "minLength": 5,
+                    "type": "string",
+                    "description": "Where and under which authority the scan ran; no control characters."
                   },
                   "requestId": {
                     "type": "string",
+                    "description": "Open request of this account (participant basis).",
                     "format": "uuid"
                   }
                 }
-              },
-              "encoding": {
-                "ContentType": {
-                  "style": "form"
-                },
-                "ContentDisposition": {
-                  "style": "form"
-                },
-                "Headers": {
-                  "style": "form"
-                },
-                "Length": {
-                  "style": "form"
-                },
-                "Name": {
-                  "style": "form"
-                },
-                "FileName": {
-                  "style": "form"
-                },
-                "runStatement": {
-                  "style": "form"
-                },
-                "requestId": {
-                  "style": "form"
-                }
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "400": {
@@ -20316,73 +20279,46 @@
           "content": {
             "multipart/form-data": {
               "schema": {
+                "required": [
+                  "file",
+                  "runStatement",
+                  "accountIds"
+                ],
                 "type": "object",
                 "properties": {
-                  "ContentType": {
-                    "type": "string"
-                  },
-                  "ContentDisposition": {
-                    "type": "string"
-                  },
-                  "Headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "Length": {
-                    "type": "integer",
-                    "format": "int64"
-                  },
-                  "Name": {
-                    "type": "string"
-                  },
-                  "FileName": {
-                    "type": "string"
+                  "file": {
+                    "type": "string",
+                    "description": "Combined usage-scan JSON (Invoke-ServiceAccountUsageScan.ps1 -CombinePath).",
+                    "format": "binary"
                   },
                   "runStatement": {
-                    "type": "string"
+                    "maxLength": 400,
+                    "minLength": 5,
+                    "type": "string",
+                    "description": "Where and under which authority the scan ran; no control characters."
                   },
                   "accountIds": {
+                    "maxItems": 20,
+                    "minItems": 1,
+                    "uniqueItems": true,
                     "type": "array",
                     "items": {
                       "type": "string",
                       "format": "uuid"
-                    }
+                    },
+                    "description": "Repeated form field, one account id per value."
                   }
                 }
               },
               "encoding": {
-                "ContentType": {
-                  "style": "form"
-                },
-                "ContentDisposition": {
-                  "style": "form"
-                },
-                "Headers": {
-                  "style": "form"
-                },
-                "Length": {
-                  "style": "form"
-                },
-                "Name": {
-                  "style": "form"
-                },
-                "FileName": {
-                  "style": "form"
-                },
-                "runStatement": {
-                  "style": "form"
-                },
                 "accountIds": {
-                  "style": "form"
+                  "style": "form",
+                  "explode": true
                 }
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "400": {
