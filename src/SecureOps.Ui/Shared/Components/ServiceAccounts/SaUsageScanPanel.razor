@@ -133,7 +133,23 @@
             <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
                 @gaps.Length sunucu için sonuç eksik: @string.Join(", ", gaps.Take(20).Select(s => $"{s.ServerName} ({s.ResultLabel})"))@(gaps.Length > 20 ? $" ve {gaps.Length - 20} sunucu daha" : "").
                 Bu sunucularda hesap çalışıyor olabilir; yeniden tarayın.
+                @if (OnSaveFile.HasDelegate)
+                {
+                    <div class="mt-1">
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="Busy" StartIcon="@Icons.Material.Filled.Download" OnClick="@(() => SaveRescanAsync(scan))">
+                            Yeniden taranacak sunucu listesini indir (.txt)
+                        </MudButton>
+                    </div>
+                }
             </MudAlert>
+        }
+
+        @if (LoadDiff is not null && Detail.UsageScanTotal > 1)
+        {
+            @* Computed by the server over every matched component (G-33); loaded only when asked, never from the paged items. *@
+            <SaDisclosure Class="mt-2" Title="Önceki taramaya göre fark">
+                <SaScanDiffLoader @key="scan.LinkId" LinkId="scan.LinkId" Load="LoadDiff" Busy="Busy" />
+            </SaDisclosure>
         }
 
         <h3 class="sa-scan-subtitle">
@@ -297,6 +313,15 @@
 
     /// <summary>Loads one page of a scan's items: link, role, undecided only, page (null when the call failed).</summary>
     [Parameter] public Func<Guid, string, bool, int, Task<UsageScanItemPage?>>? LoadItems { get; set; }
+
+    /// <summary>Loads one page of the server-side comparison with the previous scan of the same purpose: link, page (null when the call failed).</summary>
+    [Parameter] public Func<Guid, int, Task<UsageScanDiffView?>>? LoadDiff { get; set; }
+
+    /// <summary>Hands a locally built file (the re-scan server list) to the browser.</summary>
+    [Parameter] public EventCallback<ServiceAccountFile> OnSaveFile { get; set; }
+
+    private Task SaveRescanAsync(UsageScanView scan) => OnSaveFile.InvokeAsync(new ServiceAccountFile("yeniden-taranacak-sunucular.txt", "text/plain",
+        System.Text.Encoding.UTF8.GetBytes(ServiceAccountRescanList.File(scan))));
 
     /// <summary>Which page of one scan's items (per role) is listed; the default is the first page carried by the detail.</summary>
     private sealed record ItemView(int Page, bool PendingOnly, UsageScanItemPage? Data)

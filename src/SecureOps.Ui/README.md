@@ -2411,16 +2411,17 @@ This is not target activation or an employee productivity ranking. See
 `docs/integrated-test-activation.md` and `docs/integrated-activation-tr.md`.
 ## Service Accounts scan comparison (2026-10-06)
 
-Under every usage scan that has an older scan of the same purpose on the account, `SaScanDiffView` shows "Önceki taramaya
-göre fark" (`ServiceAccountScanDiff`; UI only, from the already loaded `UsageScans`, no API change). Per planned server:
-newly found, not found now, information arrived, information lost, added to or absent from the plan. Per matched component:
-new, not found now, unknown now, identity changed; plus a changed gMSA conclusion. Rules kept: "not found" only follows a fully
-scanned server and never means "not used"; a server or component the newer scan did not cover is "unknown", never "gone"; an
-unchanged result is not a usage verdict. Lists are capped at 50 rows with a count of the rest. The gap alert gets
-"Yeniden taranacak sunucu listesini indir (.txt)": servers without a usable result, in the collector's `ComputerListPath`
-format (one name per line, `#` comments), built in the browser from the scan; nothing is sent. Tests:
-`tests/SecureOps.Tests.Unit/Ui/ServiceAccountScanDiffTests.cs`. Checked locally (Demo API + UI, synthetic LocalDB) at 390 px,
-light and dark, no horizontal scroll.
+Every usage scan section offers "Önceki taramaya göre fark" when the account has more than one scan. `SaScanDiffLoader` asks the
+server only when the person presses "Önceki taramayla karşılaştır" (no extra calls when the tab opens) and `SaScanDiffView`
+shows the answer of `GET /api/v1/service-accounts/accounts/{id}/usage-scans/{linkId}/diff` (G-33): changed servers, a
+paged list of component changes with counts, and a changed gMSA conclusion. The server compares every matched component, so
+the paged item list (PR #12) never changes the answer; the former client-side diff (`ServiceAccountScanDiff`) is removed.
+Wording comes from the server's change codes and texts: "not found" only on a fully scanned server and never "not used";
+what the newer scan did not cover is "unknown", never "gone"; "no older scan" and "no difference" are separate states and
+neither is a usage verdict. The gap alert keeps "Yeniden taranacak sunucu listesini indir (.txt)"
+(`ServiceAccountRescanList`, collector `-ComputerListPath` format, built in the browser from the full server list).
+Tests: `tests/SecureOps.Tests.Unit/Ui/ServiceAccountScanDiffUiTests.cs`, domain rules
+`tests/SecureOps.Tests.Unit/ServiceAccounts/UsageScanDiffTests.cs`, SQL `ServiceAccountUsageScanSqlTests.Diff_*`.
 
 ## E-08 In Use activity review
 

@@ -39,7 +39,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-30 — The solution builds only with a specific SDK/language combination | Repair implemented — pinned SDK/language; Windows verification below |
 | G-31 — No per-owner usage signal for frequently used links | Open — needs an audit-framing decision before a contract |
 | G-32 — Favourites view has no server-side paging | Open — low |
-| G-33 — Usage-scan comparison cannot be computed correctly in the UI once items are paged | Open — design below; needs PR #12 merged first |
+| G-33 — Usage-scan comparison cannot be computed correctly in the UI once items are paged | Implemented on `feature/service-accounts-scan-diff-20261006` (not merged) |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1039,7 +1039,7 @@ bağlantılar pages on the server. Both show the same range and page wording. **
 
 **Endpoint (proposed):** `GET /api/v1/service-accounts/accounts/{id}/usage-scans/{linkId}/diff`
 **Severity:** Medium (wrong answer, not a crash)
-**Status:** Open — design only; implement after PR #12 is merged (module owner decision 2026-10-06)
+**Status:** Implemented on `feature/service-accounts-scan-diff-20261006` (2026-10-06, not merged). Differences from the design below: changed servers only plus an `unchangedServers` count; the comparison runs in the service over every matched component read from SQL (bounded by the upload limits) through one pure domain rule (`UsageScanDiff`); a component missing on a partially scanned server is `UnknownNow` even when the server outcome is Found; `against` equal to the link itself answers 404.
 
 **Why.** The UI comparison ("Önceki taramaya göre fark", `ServiceAccountScanDiff`, branch
 `feature/service-accounts-scan-diff-20261006`) compares the matched items of two scans that the account detail already

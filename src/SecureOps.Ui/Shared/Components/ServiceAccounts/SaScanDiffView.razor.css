@@ -22,3 +22,18 @@
 .sa-diff-name {
     margin-left: 0.5rem;
 }
+
+/* Wraps at 390 px; plain buttons so Tab, Enter and Space work. */
+.sa-diff-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* MudBlazor 6.16 outlined buttons draw no keyboard focus ring of their own. */
+.sa-diff ::deep .mud-button-root:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
