@@ -1,5 +1,29 @@
 # API Release Packaging
 
+## Installed 027/028 to 032 Review Candidate
+
+Use `New-PairedTestRelease.ps1 -ReviewCandidate -UpgradeFromInstalled028`
+(or `-UpgradeFromInstalled027`) `-IncludeServiceAccounts -ExpectedSource <clean-preparation-SHA>
+-TestedProductSource <verified-origin/master-SHA> -SqlUpgradeReview <private-review.json>
+-OutputDirectory <fresh-absolute-directory>`. This delegates to
+`New-ServiceAccountsTestReview.ps1 -FromExactSource -ApiUiOnly` on master or the
+authorized `fix/release-packaging-028-032-20261007` branch. Preparation must descend
+from the tested master with identical product inputs. Existing master/numbered
+release guards remain unchanged; no numbered release promotion is added.
+
+The selector requires an exact 001-032 source inventory and source-bound typed
+review gates described in `docs/release/TEST-028-032-OPERATOR-TR.md`. A 027 baseline
+selects separately reviewed, unapplied 028 first; 028 baseline never exports 028.
+Both select 029, 030, SA-004 API permissions, 031, 032 in that order with the three
+SQLCMD includes. No installed migrations, legacy grants, Worker or Hangfire are
+delivered. Missing/ambiguous target inventory blocks installation. Future source
+migrations still fail closed. SQL selection never connects to a database.
+
+DBA inventory: `scripts/diagnostics/Get-InstalledMigrationInventory025To032.sql`.
+The candidate includes it, the 029-031 and separate 032 DBA notes, ADR-0029 and
+one current Turkish operator checklist, all hashed. API/UI remain paired and
+`readyForInstallation=false`. Synthetic evidence is not installed TEST evidence.
+
 ## Admin / Lookup 027 API/UI Review
 
 For this correction, `New-ServiceAccountsTestReview.ps1 -FromVerifiedMaster
