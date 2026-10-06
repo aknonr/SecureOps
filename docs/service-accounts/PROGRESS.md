@@ -25,8 +25,7 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
   dosyasını bu hesaplara bağla". Rules: SPEC "Usage scans" 9, ADR-0027 §4. Windows row 86.
 - Verified 2026-10-06: build 0/0, unit 1919 + 1 intentional skip, integration 361 / 62 skipped with module SQL on fresh
   `SecureOps_SaBatch1006a` (harness 001–031 exit 0), format clean, OpenAPI additions only (+261/−0). One integration run of five
-  had one failure that did not repeat and was not captured (suspect: the persisted-access race fixed on
-  `test/service-accounts-persisted-access-serial-20261006`, not on master yet).
+  had one failure that did not repeat; its name and cause were not captured (Open work 9).
 - PR #12 (031 + scan paging) is merged (`50c0528`); the section below is its record.
 
 ## On this branch (done, 2026-10-05)
@@ -70,6 +69,10 @@ warning, server refusal and saved value, transition, report list, scan paging wi
    with Cyrillic look-alike letters are not caught; at 390 px a focused tab header can be partly outside the MudTabs scroll
    strip; the app shell brand link and "Hesap menüsü" have no focus ring (outside the module); the server list of a scan
    (up to 500 rows) is not paged (it sits in a closed section).
+9. **Unexplained integration failure (2026-10-06):** on the multi-account scan branch one of five full integration runs
+   (module SQL on, `SecureOps_SaBatch1006a`) reported 1 failed / 360 passed; the next four runs passed 361/361 and the failing
+   test's name and message were not captured. Cause unknown. Next: run the integration suite repeatedly with a trx logger
+   and `SECUREOPS_SA_SQL_DIAGNOSTICS`, record the test name and SQL number, then decide.
 
 ## Decisions (owner, 2026-10-04)
 
