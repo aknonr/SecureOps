@@ -262,13 +262,21 @@ One browser authentication session must present one stable application-session h
 |---|---|---|---|---|
 | `GET /api/v1/identity/me` | Authenticated | none | current caller metadata | 401 |
 | `GET /api/v1/identity/lookup/capabilities` | `Identity.Lookup` | none | validation limits, returned fields, and effective active-provider `supportsUpnLookup` | `AccessPending`, `AccessDisabled`, `AccessDenied` |
-| `POST /api/v1/identity/lookup` | `Identity.Lookup` | `{ "account": "sample.user", "purpose": null }`; purpose is optional; legacy `alertId`/`turuncuhatEvtId` are deprecated and optional | `IdentityLookupResponse` | `InvalidIdentityInput`, `IdentityNotFound`, `IdentityProviderTimeout`, `IdentityProviderUnavailable`, `AuditStoreUnavailable` |
+| `POST /api/v1/identity/lookup` | `Identity.Lookup` | `{ "account": "sample.user", "purpose": null }`; purpose is optional; legacy `alertId`/`turuncuhatEvtId` are deprecated and optional | `IdentityLookupResponse`; `user.accountTypeEvidence`: `User`, `ManagedServiceAccount`, `GroupManagedServiceAccount` | `InvalidIdentityInput`, `IdentityNotFound`, `IdentityProviderTimeout`, `IdentityProviderUnavailable`, `AuditStoreUnavailable` |
 | `POST /api/v1/identity/bulk-lookup` | `Identity.Lookup` | `accounts` array plus optional purpose, maximum configured count | ordered `BulkIdentityLookupResponse` | `InvalidIdentityInput`, 429 |
 | `GET /api/v1/identity/lookup/cache-diagnostics` | `SystemDiagnostics` | none | aggregate counters without account labels | 403 |
 | `GET /api/v1/health/identity-provider` | Authenticated outside Development | none | provider name and real-provider flag | 401 |
 | `GET /api/v1/health/persistence` | Authenticated outside Development | none | `NotConfigured`, `Healthy`, or `Unhealthy` SQL readiness without connection details | 401, 503 |
 
 ## Directory Explorer
+
+Identity and Directory Explorer principal inputs accept one trailing `$` on a nonempty
+sAMAccountName (for example `syn.gmsa$`). Dollars elsewhere, managed-account UPN forms,
+wildcards and LDAP grammar are rejected. Managed accounts are resolved only by exact
+sAMAccountName within the two managed object classes; ordinary computer accounts do not
+match. `accountTypeEvidence` reports class evidence, never a name-based classification.
+No password or secret value is read or returned. Runtime overrides using the old
+`IdentityLookup:AllowedAccountPattern` must be updated separately; see G-26.
 
 Phase 1 routes remain unchanged. Directory requests are exact-only POST bodies with `account` or `group`, optional `purpose`, and optional `refresh`; membership-path requests also require `targetGroup`. Negative membership-path results are conclusive only when traversal metadata reports no limit or truncation.
 

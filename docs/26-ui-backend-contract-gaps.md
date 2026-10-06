@@ -32,7 +32,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-23 — Service Accounts scope grants are not readable from access screens | Open — UI shows a scope note |
 | G-24 — Provider health has no check time and no connectivity result | Open — UI labels "sınanmadı" |
 | G-25 — SQL, audit-store and Worker state are not in the System Status contract | Open — UI lists them as unknown |
-| G-26 — gMSA/MSA accounts cannot be looked up | Open — defect candidate, verify in TEST |
+| G-26 — gMSA/MSA accounts cannot be looked up | Backend fixed — UI follow-up and real AD validation pending |
 | G-27 — Lookup purpose is unreadable in audit | Open — needs ADR-0008 / docs/27 decision |
 | G-28 — No bounded way to resolve an account from a person's name | Open — needs ADR decision |
 | G-29 — AD lookup does not show the Service Accounts inventory record | Open |
@@ -896,7 +896,9 @@ contract (state, observed-at, safe reason code) for these components.
 
 **Endpoints:** `POST /api/v1/identity/lookup`, `POST /api/v1/directory/principals/*`
 **Severity:** High for the Service Accounts work (gMSA transition)
-**Status:** Open — found by reading code (2026-10-01); confirm with a non-sensitive TEST gMSA
+**Status:** Backend fixed (2026-10-07); UI follow-up and non-sensitive real AD validation pending
+
+**Original defect (2026-10-01).**
 
 `IdentityLookup:AllowedAccountPattern` (`^[a-zA-Z0-9._@-]+$`) and the Directory Explorer input
 pattern (`^[a-zA-Z0-9._@ -]+$`) reject `$`, but every gMSA/MSA `sAMAccountName` ends in `$`.
@@ -909,6 +911,35 @@ rejects Turkish letters, parentheses and `&`, which real group names may contain
 with an objectClass-bound search (or `ComputerPrincipal`); optionally return who may retrieve the
 managed password (`msDS-GroupMSAMembership`, resolved names) as evidence. Revisit the group pattern
 against the corporate naming standard. The UI would label the type from the existing evidence field.
+
+**Implemented backend scope (2026-10-07).** Both input guards accept only one trailing `$`
+on a nonempty sAMAccountName; wildcard/LDAP/bulk inputs and managed-account UPN forms remain
+rejected. Identity lookup and all Directory Explorer principal paths resolve managed accounts
+by exact sAMAccountName with only `msDS-GroupManagedServiceAccount` / `msDS-ManagedServiceAccount`
+classes. A fixed LDAP metadata projection excludes all password/secret attributes; no result
+DirectoryEntry is hydrated. Search is bounded, referrals disabled, result name/class verified,
+and ambiguous results fail closed. Direct/primary membership handling and ordinary user/UPN
+lookup behavior are preserved. `AccountTypeEvidence` is returned by service evidence and
+additively by identity lookup. Mock seeds: `syn.gmsa$`, `syn.msa$`.
+
+**Remaining.** UI files were not changed: the UI owner must update
+`src/SecureOps.Ui/Services/AccountInputRules.cs:130` to accept the same trailing suffix.
+`DirectoryView.cs:305` and `SoDirectoryService.razor:88` already label the directory evidence;
+the identity overview must also display `user.accountTypeEvidence`. A non-sensitive real AD gMSA/MSA
+under the configured domain/container still needs separate authorized validation. Existing
+runtime `AllowedAccountPattern` overrides must be updated; no live settings were changed.
+Turkish/parenthesis/ampersand group-name support is a separate naming-policy question.
+Optional password-retriever names (`msDS-GroupMSAMembership`) are deferred and not read.
+
+**Local verification (Windows, SDK 9.0.317).** Solution build: 0 warnings/errors.
+Unit suite: 1,946 passed, 1 Windows machine-dependent collector test skipped.
+Selected identity/directory/bulk identity/OpenAPI integration suite: 88 passed, 0 skipped.
+Coverage includes dollar boundaries (also with permissive configuration), wildcard/LDAP
+rejection, exact object-class/result projection, gMSA/MSA found/not-found, ordinary user/UPN
+regression, and HTTP execution through every principal route using synthetic Mock data.
+No real AD, IIS, corporate system or database validation was performed.
+Repository-wide `dotnet format SecureOps.sln --verify-no-changes --no-restore` and
+`git diff --check` passed. UI source files and SQL assets were not changed.
 
 ---
 

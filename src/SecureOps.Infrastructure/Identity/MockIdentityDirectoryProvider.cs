@@ -78,6 +78,8 @@ public sealed class MockIdentityDirectoryProvider : IIdentityDirectoryProvider
     {
         return
         [
+            new DirectoryUserRecord("Synthetic gMSA", "syn.gmsa$", null, null, null, null, null, true, false, "Mock", "GroupManagedServiceAccount"),
+            new DirectoryUserRecord("Synthetic MSA", "syn.msa$", null, null, null, null, null, true, false, "Mock", "ManagedServiceAccount"),
             new DirectoryUserRecord(
                 "Example Admin",
                 "pam12356",

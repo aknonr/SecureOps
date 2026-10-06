@@ -3,6 +3,7 @@ using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Options;
+using SecureOps.Infrastructure.Identity;
 using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Infrastructure.DirectoryExplorer;
@@ -47,6 +48,24 @@ public sealed partial class ActiveDirectoryGroupClient : IActiveDirectoryGroupCl
         int resultLimit,
         CancellationToken cancellationToken)
     {
+        if (value.EndsWith('$'))
+        {
+            if (identityType != IdentityType.SamAccountName)
+            {
+                return null;
+            }
+
+            ManagedServiceAccountRecord? account = ManagedServiceAccountLookup.Find(value, _options);
+            if (account is null)
+            {
+                return null;
+            }
+
+            using PrincipalContext managedContext = CreateContext();
+            PrincipalMembershipSet managedMemberships = ReadManagedMemberships(managedContext, account, resultLimit, cancellationToken);
+            return Page(managedMemberships.Groups, offset, pageSize, managedMemberships.IsPartial);
+        }
+
         using PrincipalContext context = CreateContext();
         using var user = UserPrincipal.FindByIdentity(context, identityType, value);
         if (user is null || !ExactUser(user, value, identityType))

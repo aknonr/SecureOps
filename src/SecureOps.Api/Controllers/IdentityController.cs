@@ -33,7 +33,8 @@ public sealed partial class IdentityController : ControllerBase
         nameof(IdentityLookupUserDto.Title),
         nameof(IdentityLookupUserDto.ManagerDisplayName),
         nameof(IdentityLookupUserDto.Enabled),
-        nameof(IdentityLookupUserDto.Locked)
+        nameof(IdentityLookupUserDto.Locked),
+        nameof(IdentityLookupUserDto.AccountTypeEvidence)
     ];
 
     private static readonly string[] _rejectedInputClasses =
