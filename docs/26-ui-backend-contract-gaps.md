@@ -39,7 +39,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-30 — The solution builds only with a specific SDK/language combination | Repair implemented — pinned SDK/language; Windows verification below |
 | G-31 — No per-owner usage signal for frequently used links | Open — needs an audit-framing decision before a contract |
 | G-32 — Favourites view has no server-side paging | Open — low |
-| G-33 — Usage-scan comparison cannot be computed correctly in the UI once items are paged | Implemented on `feature/service-accounts-scan-diff-20261006` (not merged) |
+| G-33 — Usage-scan comparison cannot be computed correctly in the UI once items are paged | Implemented on `feature/service-accounts-scan-diff-20261006` (not merged); local Demo verified 2026-10-07 (WINDOWS-ACCEPTANCE row 88) |
 | G-34 — Concurrent first registrations can deadlock in the access store | Fixed in source and synthetic LocalDB — 032 index / one registration retry; installed TEST unchanged; module tests remain serialised |
 | G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |

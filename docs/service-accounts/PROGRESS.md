@@ -22,6 +22,10 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 Order c, b, a, d from `ops-research/05-yol-haritasi.md`. **c merged** (PR #14, `87df0c3`):
 "Sıradaki adım" card on the account page, computed in the UI from the loaded detail only (no API change); missing data reads
 "bilgi eksik", never "not used"; a step the caller may not take reads "başkasından bekleniyor".
+**b** (branch `feature/service-accounts-scan-diff-20261006`, no PR yet): server-side scan comparison (G-33,
+`GET accounts/{id}/usage-scans/{linkId}/diff`, read only, no migration) and the "Önceki taramaya göre fark" UI. Verified
+2026-10-07 at `b2d02b3` (contains master): build 0/0, format clean, unit 1972 + 1 intentional skip, integration 434/434
+(67 skipped) twice on fresh `SecureOps_SaDiff1007a`, local Demo WINDOWS-ACCEPTANCE row 88.
 
 ## Multi-account scan upload (branch `feature/service-accounts-multi-account-scan-20261006`, from master `50c0528`)
 
