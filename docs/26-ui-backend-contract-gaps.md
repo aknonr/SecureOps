@@ -935,7 +935,10 @@ Optional password-retriever names (`msDS-GroupMSAMembership`) are deferred and n
 mirrors `IdentityProviderInputGuard.HasSafeDollarSuffix`: one `$`, last, after a nonempty name, never with `@`; any other
 `$` gets its own message. The identity overview (`DirectoryUser.razor`, Genel tab) shows "Dizin nesne türü" from
 `accountTypeEvidence` through the existing `DirectoryView.AccountTypeEvidenceLabel`. Still open: real AD validation and
-runtime `AllowedAccountPattern` overrides (above).
+runtime `AllowedAccountPattern` overrides (above). Local Demo (Mock identity provider, own ports, 2026-10-07): `gm$sa`
+refused in the field with the new message; `syn.gmsa$` → "Grup yönetilen servis hesabı nesnesi (gMSA)", `syn.msa$` →
+"Yönetilen servis hesabı nesnesi (MSA)", `pam12356` → "Standart kullanıcı nesnesi"; 390 px dark and light without
+horizontal scroll. Input was set by page script because the browser pane was hidden (no keyboard check this time).
 
 **Local verification (Windows, SDK 9.0.317).** Solution build: 0 warnings/errors.
 Unit suite: 1,946 passed, 1 Windows machine-dependent collector test skipped.
