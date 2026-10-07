@@ -17,6 +17,16 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Change plan d, PR 1 (branch `feature/service-accounts-change-plan-api-20261007`, from master `78a94b1`, not merged)
+
+- Contract first (`0400d58`, pushed for the UI (F) and security-test (G) sessions): `/api/v1/service-accounts/change-plans` list/detail/
+  items, create, PATCH (full account list), preview, approve, cancel; DTOs in `ServiceAccountChangePlanContracts.cs`.
+- Migration 033 (SA-006, `DBA-033-TR.md`): seven tables, append-only guards, approval separation trigger, `UQ(PreviewId)`;
+  grants SELECT/INSERT (+UPDATE ChangePlans), no DELETE. Harness 001–033 + `sa-033-guards.sql`. Design deviations and threat
+  test names: `CHANGE-PLAN-DESIGN.md`. Added flag `NothingFound` (scan answered, account found nowhere).
+- Open: release tool `Get-ReleaseSqlPlan.ps1` refuses a 001–033 chain (by design, needs a reviewed update before merge);
+  `Evidence.OwnerEntityType` cannot hold plan evidence without changing an existing CHECK (PR 2 question).
+
 ## Ops-research UI work (2026-10-06, separate branches from master, not merged)
 
 Order c, b, a, d from `ops-research/05-yol-haritasi.md`. **c merged** (PR #14, `87df0c3`):
