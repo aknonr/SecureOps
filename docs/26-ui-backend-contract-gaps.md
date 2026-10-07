@@ -32,7 +32,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-23 — Service Accounts scope grants are not readable from access screens | Open — UI shows a scope note |
 | G-24 — Provider health has no check time and no connectivity result | Open — UI labels "sınanmadı" |
 | G-25 — SQL, audit-store and Worker state are not in the System Status contract | Open — UI lists them as unknown |
-| G-26 — gMSA/MSA accounts cannot be looked up | Backend fixed — UI follow-up and real AD validation pending |
+| G-26 — gMSA/MSA accounts cannot be looked up | Backend fixed; UI follow-up on `feature/ui-g26-managed-account-input-20261007` (not merged) — real AD validation pending |
 | G-27 — Lookup purpose is unreadable in audit | Open — needs ADR-0008 / docs/27 decision |
 | G-28 — No bounded way to resolve an account from a person's name | Open — needs ADR decision |
 | G-29 — AD lookup does not show the Service Accounts inventory record | Open |
@@ -930,6 +930,12 @@ under the configured domain/container still needs separate authorized validation
 runtime `AllowedAccountPattern` overrides must be updated; no live settings were changed.
 Turkish/parenthesis/ampersand group-name support is a separate naming-policy question.
 Optional password-retriever names (`msDS-GroupMSAMembership`) are deferred and not read.
+
+**UI follow-up (2026-10-07, branch `feature/ui-g26-managed-account-input-20261007`, not merged).** `AccountInputRules`
+mirrors `IdentityProviderInputGuard.HasSafeDollarSuffix`: one `$`, last, after a nonempty name, never with `@`; any other
+`$` gets its own message. The identity overview (`DirectoryUser.razor`, Genel tab) shows "Dizin nesne türü" from
+`accountTypeEvidence` through the existing `DirectoryView.AccountTypeEvidenceLabel`. Still open: real AD validation and
+runtime `AllowedAccountPattern` overrides (above).
 
 **Local verification (Windows, SDK 9.0.317).** Solution build: 0 warnings/errors.
 Unit suite: 1,946 passed, 1 Windows machine-dependent collector test skipped.

@@ -2434,6 +2434,14 @@ open the exact owned draft; access/synthetic/historical limitations stay visible
 An unavailable response retains the previous cut and restores its applied filters.
 This is not target activation or an employee productivity ranking. See
 `docs/integrated-test-activation.md` and `docs/integrated-activation-tr.md`.
+## gMSA/MSA lookup input (G-26 UI, 2026-10-07)
+
+`AccountInputRules` accepts a gMSA/MSA `sAMAccountName` with one trailing `$` (e.g. `syn.gmsa$`, also after `DOMAIN\`),
+mirroring the server guard: `$` anywhere else, alone, twice or together with `@` is refused with its own message, and the
+character list is otherwise unchanged. The identity result's Genel tab shows "Dizin nesne türü" from the server's
+`accountTypeEvidence` (gMSA / MSA / standart kullanıcı nesnesi), worded as what the directory object is, never how it is
+used. Tests: `AccountInputRulesTests`, `IdentityLookupManagedAccountUiTests`.
+
 ## Service Accounts next-step card (2026-10-06)
 
 `SaNextStepCard` on `/service-accounts/{id}` lists what is open, most important first, from the already loaded
