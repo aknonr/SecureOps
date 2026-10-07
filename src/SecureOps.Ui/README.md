@@ -2448,6 +2448,14 @@ neither is a usage verdict. The gap alert keeps "Yeniden taranacak sunucu listes
 Tests: `tests/SecureOps.Tests.Unit/Ui/ServiceAccountScanDiffUiTests.cs`, domain rules
 `tests/SecureOps.Tests.Unit/ServiceAccounts/UsageScanDiffTests.cs`, SQL `ServiceAccountUsageScanSqlTests.Diff_*`.
 
+## gMSA/MSA lookup input (G-26 UI, 2026-10-07)
+
+`AccountInputRules` accepts a gMSA/MSA `sAMAccountName` with one trailing `$` (e.g. `syn.gmsa$`, also after `DOMAIN\`),
+mirroring the server guard: `$` anywhere else, alone, twice or together with `@` is refused with its own message, and the
+character list is otherwise unchanged. The identity result's Genel tab shows "Dizin nesne türü" from the server's
+`accountTypeEvidence` (gMSA / MSA / standart kullanıcı nesnesi), worded as what the directory object is, never how it is
+used. Tests: `AccountInputRulesTests`, `IdentityLookupManagedAccountUiTests`.
+
 ## Service Accounts next-step card (2026-10-06)
 
 `SaNextStepCard` on `/service-accounts/{id}` lists what is open, most important first, from the already loaded
