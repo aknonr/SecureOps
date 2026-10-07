@@ -86,6 +86,24 @@ UPDATE). Tekrar çalıştırmayı reddeder; geri alma betiği yok. Kanıt dosyal
 
 Hata kodları mevcut `SaErrors` deseninde; OpenAPI anlık görüntüsü yalnız ekleme; route envanteri testine eklenir.
 
+### Sabitlenen sözleşme (PR 1, 2026-10-07)
+
+DTO'lar `src/SecureOps.Shared/Contracts/ServiceAccounts/ServiceAccountChangePlanContracts.cs`, rotalar
+`ServiceAccountChangePlansController`, OpenAPI `docs/contracts/secureops-api-v1.openapi.json`. Tablodan farklar ve netleşenler:
+
+- `GET change-plans?status=&accountId=&page=&pageSize=` (hesap sayfası bağlantısı için `accountId`); önizleme satırları
+  ayrı ve sayfalı: `GET change-plans/{id}/items?page=&pageSize=` (yalnız planın **güncel** önizlemesi).
+- `PATCH` hesap listesinin **tamamını** alır (`{ expectedVersion, accounts }`); sunucu farkı ekleme/çıkarma/ad değişikliği
+  satırlarına çevirir. Başlık değişmez (T8). `preview` ve `cancel` de `expectedVersion` taşır (T4); `approve` önizleme
+  sürümü + özetle bağlanır.
+- `cancel` rotada `View`; planlayan (`Work`) veya `Verify` olduğu serviste karar verilir.
+- Hata kodları: `ServiceAccountChangePlanAccountsRefused` (400; `current` = hesap bazında sonuç, kapsam dışı hesabın adı
+  yok), `ServiceAccountChangePlanStateConflict` (409; `field` = `previewStale` / `planNotPreviewed` / `planNotEditable` /
+  `planClosed`), 403 `ServiceAccountAccessDenied` + `field` = `approverIsPlanner` / `approverChangedPlan` / `scope`,
+  `ServiceAccountChangePlansNotInstalled` (503; 033 kurulu değil). Bayat `expectedVersion` mevcut 409
+  `ServiceAccountConcurrencyConflict`.
+- Kontrol listesi ve kapanış rotaları (`items/{itemId}/checks`, `complete`) PR 2'de eklenir.
+
 ## Arayüz
 
 - `/service-accounts/plans`: liste (durum, hesap sayısı, OCO, pencere); hesap listesinde seçili hesaplardan "gMSA geçiş

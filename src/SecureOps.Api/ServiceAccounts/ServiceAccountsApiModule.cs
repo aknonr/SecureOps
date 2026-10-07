@@ -55,6 +55,9 @@ public static class ServiceAccountReplies
             SaErrors.DecisionsRequired => (409, "import-decisions", false, "Karar bekleyen satırlar var."),
             SaErrors.AlreadyImported => (409, "import-replay", false, "Bu dosya aynı dönem ve kapsam için zaten aktarıldı."),
             SaErrors.AlreadyDecided => (409, "usage-scan-decision", false, "Bu bileşen için bu hesapta karar zaten verilmiş."),
+            SaErrors.ChangePlanAccountsRefused => (400, "change-plan-accounts", false, "Bazı hesaplar plana alınamadı; hiçbir şey kaydedilmedi."),
+            SaErrors.ChangePlanState => (409, "change-plan", true, "Plan siz incelerken değişti veya bu adım için uygun durumda değil; güncel planı inceleyin."),
+            SaErrors.ChangePlansNotInstalled => (503, "change-plan-schema", false, "Değişiklik planı tabloları (033) bu ortamda kurulu değil."),
             SaErrors.NotConfigured => (503, "configuration", false, "Servis hesapları modülü bu ortamda etkin değil."),
             SaErrors.DirectoryUnavailable => (503, "directory", true, "Dizin sağlayıcısına şu an ulaşılamıyor."),
             _ => (503, "persistence", true, "Kayıt deposuna şu an ulaşılamıyor.")
