@@ -94,13 +94,18 @@ warning, server refusal and saved value, transition, report list, scan paging wi
    and `SECUREOPS_SA_SQL_DIAGNOSTICS`, record the test name and SQL number, then decide.
    2026-10-07 (trx captured, five runs after merging master `304788f`): the first run on fresh `SecureOps_SaFix1007d` took
    3 m 43 s; `ServiceAccountImportSqlTests.ConfirmingOwnershipInImport_RequiresAssignCapability` passed but took 2 m 16 s
-   (normally 0.5 s) while holding the import-commit gate, and two writes waiting behind it failed:
+   (normally 0.5 s). This is the whole test duration, not a measured commit duration: that test stages a workbook and
+   checks assignment denial; it never calls commit. The original gate holder was not captured. Two writes failed:
    `ServiceAccountWorkflowSqlTests.ClosureVerification_DuringImportCommit_WaitsInsteadOfDeadlocking` (SqlClient timeout)
    and `ManualAccounts_StayProvisional_EvenWithATypedDomain` (persistence unavailable). system_health had no deadlock in
    that window; the gated access-registration tests were skipped. The next four runs (one on fresh `…1007e`) passed
    419/419, about 1 min each. Also found and fixed that day: the new middle-account test held a raw row lock outside the
    write gate and deadlocked (1205) with a parallel serializable import commit; its class now runs in the serial
-   "Service Accounts write gate" collection. Cause of the slow import commit still unknown.
+   "Service Accounts write gate" collection. Cause of the slow test still unknown.
+   2026-10-07 follow-up from master `13b5703`: 21 full integration runs on 21 fresh synthetic LocalDB databases,
+   432 passed / 68 gated skips each; eleven runs also correlated SQL SPIDs with exact test names. No unexpected failure
+   or deadlock reproduced. Controlled deadlock capture verified separately. No scheduling, module, UI or migration
+   fix inferred. **Open work 9 remains open**; evidence and limitations: [INTERMITTENT-LOCK-20261007.md](INTERMITTENT-LOCK-20261007.md).
 
 ## Decisions (owner, 2026-10-04)
 
