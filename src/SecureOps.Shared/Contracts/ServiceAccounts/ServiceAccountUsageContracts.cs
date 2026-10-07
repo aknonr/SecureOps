@@ -107,6 +107,30 @@ public static class UsageScanPaging
 /// <summary>One page of the scans attached to an account (newest first); <c>Pending</c> counts undecided items across all of them.</summary>
 public sealed record UsageScanPage(IReadOnlyList<UsageScanView> Scans, int Total, int Page, int PageSize, int Pending);
 
+/// <summary>One side of a scan comparison.</summary>
+public sealed record UsageScanDiffSide(Guid LinkId, Guid ScanId, string Purpose, string FileName, DateTimeOffset? ScannedAt, DateTimeOffset LinkedAt);
+
+/// <summary>A server whose result changed between the two scans; outcomes are Found / NotFound / Uncertain / NotCovered (null = not planned).</summary>
+public sealed record UsageScanServerDiffView(string ServerName, string? PreviousOutcome, string? CurrentOutcome, string Change, string ChangeLabel, string Text);
+
+/// <summary>A matched component that changed; <c>NotFoundNow</c> only on a fully scanned server, otherwise <c>UnknownNow</c>.</summary>
+public sealed record UsageScanComponentDiffView(string ServerName, string ComponentType, string ComponentTypeLabel, string ComponentName, string Change,
+    string ChangeLabel, string Text, string? PreviousIdentity, string? CurrentIdentity);
+
+/// <summary>Component changes by kind, over every matched component of both scans.</summary>
+public sealed record UsageScanComponentDiffCounts(int Added, int NotFoundNow, int UnknownNow, int IdentityChanged);
+
+/// <summary>One page of component changes (ordered by change, server, component).</summary>
+public sealed record UsageScanComponentDiffPage(IReadOnlyList<UsageScanComponentDiffView> Items, int Total, int Page, int PageSize, UsageScanComponentDiffCounts Counts);
+
+/// <summary>
+/// Comparison of a linked scan with an older scan of the same account and purpose (G-33), computed on the server over every matched
+/// component. <c>Previous</c> is null when there is no older scan. Only changed servers are listed; <c>UnchangedServers</c> counts
+/// the rest. Evidence only: nothing here closes, frees or verifies the account, and "not found" never means "not used".
+/// </summary>
+public sealed record UsageScanDiffView(UsageScanDiffSide Current, UsageScanDiffSide? Previous, IReadOnlyList<UsageScanServerDiffView> Servers,
+    int UnchangedServers, UsageScanComponentDiffPage Components, string? PreviousGmsaConclusion, string? CurrentGmsaConclusion, string? GmsaText);
+
 /// <summary>
 /// One page of a scan's matched items for this account. <c>Role</c> is <c>Former</c> (undecided first) or <c>Expected</c>;
 /// <c>PendingOnly</c> keeps only former-account items still waiting for a decision. Paging never changes coverage or outcomes.

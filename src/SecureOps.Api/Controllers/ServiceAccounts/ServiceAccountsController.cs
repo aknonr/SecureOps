@@ -281,6 +281,17 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
         [FromQuery] int page = 1, [FromQuery] int? pageSize = null, CancellationToken cancellationToken = default) =>
         ServiceAccountReplies.Reply(this, await service.UsageScanItemsAsync(User, Context(), id, linkId, role, pending, page, pageSize, cancellationToken));
 
+    /// <summary>
+    /// Compares a linked scan with an older scan of the same purpose (default: the next older one; <c>against</c> picks another
+    /// link of the account). Read only, same scope as the account detail, computed over every matched component; component
+    /// changes are paged. "Not found" only follows a fully scanned server and never means "not used" (G-33).
+    /// </summary>
+    [HttpGet("accounts/{id:guid}/usage-scans/{linkId:guid}/diff")]
+    [ProducesResponseType(typeof(UsageScanDiffView), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsageScanDiffView>> UsageScanDiffAsync(Guid id, Guid linkId, [FromQuery] Guid? against = null, [FromQuery] int page = 1,
+        [FromQuery] int? pageSize = null, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.UsageScanDiffAsync(User, Context(), id, linkId, against, page, pageSize, cancellationToken));
+
     /// <summary>Records a matched component of an attached scan as a usage (a person's decision, never automatic).</summary>
     [HttpPost("accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage")]
     [Authorize(Policy = ServiceAccountPolicies.Work)]

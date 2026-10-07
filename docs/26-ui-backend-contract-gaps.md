@@ -39,6 +39,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-30 — The solution builds only with a specific SDK/language combination | Repair implemented — pinned SDK/language; Windows verification below |
 | G-31 — No per-owner usage signal for frequently used links | Open — needs an audit-framing decision before a contract |
 | G-32 — Favourites view has no server-side paging | Open — low |
+| G-33 — Usage-scan comparison cannot be computed correctly in the UI once items are paged | Implemented on `feature/service-accounts-scan-diff-20261006` (not merged); local Demo verified 2026-10-07 (WINDOWS-ACCEPTANCE row 88) |
 | G-34 — Concurrent first registrations can deadlock in the access store | Fixed in source and synthetic LocalDB — 032 index / one registration retry; installed TEST unchanged; module tests remain serialised |
 | G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
@@ -1066,6 +1067,49 @@ bağlantılar pages on the server. Both show the same range and page wording. **
 `favouritesOnly` parameter on `GET /api/v1/resources/links` so both views share one paging path.
 
 ---
+
+## G-33 — Usage-scan comparison cannot be computed correctly in the UI once items are paged
+
+**Endpoint (proposed):** `GET /api/v1/service-accounts/accounts/{id}/usage-scans/{linkId}/diff`
+**Severity:** Medium (wrong answer, not a crash)
+**Status:** Implemented on `feature/service-accounts-scan-diff-20261006` (2026-10-06, not merged). Differences from the design below: changed servers only plus an `unchangedServers` count; the comparison runs in the service over every matched component read from SQL (bounded by the upload limits) through one pure domain rule (`UsageScanDiff`); a component missing on a partially scanned server is `UnknownNow` even when the server outcome is Found; `against` equal to the link itself answers 404.
+
+**Why.** The UI comparison ("Önceki taramaya göre fark", `ServiceAccountScanDiff`, branch
+`feature/service-accounts-scan-diff-20261006`) compares the matched items of two scans that the account detail already
+carries. PR #12 pages those items: the detail holds only the first 25 former-account items per scan. A scan with more
+matches would then show missing items as "not found now" or "new" although they are only on another page, which breaks
+"bulunamadı ≠ kullanılmıyor". Per-server outcomes are not affected (the server counts every item), only the component
+comparison. The UI must not page through every item of two scans to rebuild the answer.
+
+**Proposed contract (additive, read only, no migration).**
+
+- Query: `against` (optional link id). Default: the next older link of the same account with the same `Purpose`
+  (`LinkedAt DESC, Id`, the order the detail uses). The link must belong to the account and share the purpose with `{linkId}`;
+  otherwise `404` (link unknown or out of scope, indistinguishable) or `400 against` (other purpose). When there is no older
+  scan, `200` with `previous: null`.
+- Scope and permission exactly as the account detail: `ServiceAccounts.View` and `Scope.Covers(anchor)`.
+- Response `UsageScanDiffView`:
+  - `current` and `previous`: `{ linkId, scanId, fileName, scannedAt, purpose }`.
+  - `servers[]`: every planned server of either scan (at most 500): `{ serverName, previousOutcome?, currentOutcome?, change }`.
+    `change` is one of `Unchanged`, `NewlyFound`, `NoLongerFound`, `InformationArrived`, `InformationLost`, `NewlyPlanned`,
+    `NotPlannedNow` (same vocabulary and rules as the UI today). Outcomes are the existing `Found / NotFound / Uncertain /
+    NotCovered`; `NotFound` only follows a fully scanned server.
+  - `components`: `{ total, counts{added, notFoundNow, unknownNow, identityChanged}, page, pageSize, items[] }` with
+    `items[]` `{ serverName, componentType, componentName, change, previousIdentity?, currentIdentity? }`, ordered by
+    change then server, component; query `page`, `pageSize` (default 25, at most 100). Computed in SQL over **all** former
+    items matched to each link's `MatchedAccount`. `notFoundNow` only when the server is fully scanned in the newer scan,
+    otherwise `unknownNow`.
+  - `gmsa?`: `{ previousConclusion, currentConclusion }` for `GmsaCheck` scans.
+- No new tables, columns or grants: a SELECT over `svcacct.UsageScanLinks`, `UsageScanServers`, `UsageScanItems`; nothing
+  is written and nothing is audited beyond the usual request logging. Rows keep being append-only evidence.
+- Tests: SQL harness case with two synthetic scans of more than one item page, including a component only on page 2 of the
+  newer scan (must not be "not found now"), a server uncovered in the newer scan (component "unknown now"), scope denial and
+  a link of another account (404).
+
+**UI after the endpoint exists.** The panel calls it per scan (lazily, when the "Önceki taramaya göre fark" section is
+opened), shows the same wording from `change` codes, pages the component list with the existing pager, and keeps the
+client-side server list for the "yeniden taranacak sunucu" download (servers are not paged). Until then the section
+compares only the loaded first-page items and must say so once PR #12 pages them.
 
 ## G-34 — Concurrent first registrations can deadlock in the access store
 

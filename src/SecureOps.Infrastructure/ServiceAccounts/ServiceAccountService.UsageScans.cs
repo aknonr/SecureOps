@@ -66,6 +66,85 @@ public sealed partial class ServiceAccountService
                 : new SaResult<UsageScanItemPage>(items);
         }, cancellationToken);
 
+    /// <summary>
+    /// Compares a linked scan with an older scan of the same account and purpose (G-33): by default the next older one, or
+    /// <paramref name="against"/>. Read only, same scope rule as the detail; computed over every matched component, so paging the
+    /// items never changes the answer. Component changes are paged; changed servers are listed in full (at most 500 per scan).
+    /// </summary>
+    public Task<SaResult<UsageScanDiffView>> UsageScanDiffAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid accountId, Guid linkId,
+        Guid? against, int page, int? pageSize, CancellationToken cancellationToken) =>
+        RunAsync(principal, context, ServiceAccountCapabilities.View, async caller =>
+        {
+            int size = pageSize ?? UsageScanPaging.DefaultItemPageSize;
+            if (page is < 1 or > _maxScanPage || size is < 1 or > UsageScanPaging.MaxItemPageSize)
+            {
+                return SaResult<UsageScanDiffView>.Fail(SaErrors.Invalid, page is < 1 or > _maxScanPage ? "page" : "pageSize");
+            }
+
+            if (!await AccountVisibleAsync(caller, accountId, cancellationToken))
+            {
+                return SaResult<UsageScanDiffView>.Fail(SaErrors.NotFound);
+            }
+
+            (bool missing, string? error, SqlServiceAccountRepository.ScanDiffData? data) =
+                await repository!.UsageScanDiffDataAsync(accountId, linkId, against, cancellationToken);
+            if (missing)
+            {
+                return SaResult<UsageScanDiffView>.Fail(SaErrors.Invalid, "scanTablesMissing");
+            }
+
+            return error switch
+            {
+                "linkId" or "against" => SaResult<UsageScanDiffView>.Fail(SaErrors.NotFound, error),
+                not null => SaResult<UsageScanDiffView>.Fail(SaErrors.Invalid, error),
+                _ => new SaResult<UsageScanDiffView>(DiffView(data!, page, size))
+            };
+        }, cancellationToken);
+
+    private static UsageScanDiffView DiffView(SqlServiceAccountRepository.ScanDiffData data, int page, int size)
+    {
+        UsageScanDiffSide current = Side(data.Current);
+        if (data.Previous is not { } previousLink)
+        {
+            return new UsageScanDiffView(current, null, [], 0, new UsageScanComponentDiffPage([], 0, page, size, new UsageScanComponentDiffCounts(0, 0, 0, 0)),
+                null, null, null);
+        }
+
+        ScanDiffResult diff = UsageScanDiff.Compute(Servers(data.PreviousServers), Items(data.PreviousItems), Servers(data.CurrentServers), Items(data.CurrentItems));
+        UsageScanServerDiffView[] changed = [.. diff.Servers.Where(s => s.Change != ScanServerChange.Unchanged).Select(s => new UsageScanServerDiffView(s.ServerName,
+            s.Previous?.ToString(), s.Current?.ToString(), s.Change.ToString(), UsageScanDiff.ServerChangeLabel(s.Change), s.Text))];
+        UsageScanComponentDiffView[] rows = [.. diff.Components.Skip((page - 1) * size).Take(size).Select(c => new UsageScanComponentDiffView(c.ServerName,
+            c.ComponentType, UsageScanOutcomes.ComponentLabel(c.ComponentType), c.ComponentName, c.Change.ToString(), UsageScanDiff.ComponentChangeLabel(c.Change),
+            c.Text, c.PreviousIdentity, c.CurrentIdentity))];
+        UsageScanComponentDiffCounts counts = new(Count(ScanComponentChange.Added), Count(ScanComponentChange.NotFoundNow), Count(ScanComponentChange.UnknownNow),
+            Count(ScanComponentChange.IdentityChanged));
+
+        ScanGmsaConclusion? before = Conclusion(previousLink, data.PreviousServers);
+        ScanGmsaConclusion? after = Conclusion(data.Current, data.CurrentServers);
+        string? gmsaText = before is { } b && after is { } a && a != b
+            ? $"gMSA kanıtı: önceki tarama \"{UsageScanOutcomes.ConclusionLabel(b)}\", bu tarama \"{UsageScanOutcomes.ConclusionLabel(a)}\". Bu tarama doğrulama değildir."
+            : null;
+        return new UsageScanDiffView(current, Side(previousLink), changed, diff.Servers.Count - changed.Length,
+            new UsageScanComponentDiffPage(rows, diff.Components.Count, page, size, counts), before?.ToString(), after?.ToString(), gmsaText);
+
+        int Count(ScanComponentChange change) => diff.Components.Count(c => c.Change == change);
+    }
+
+    private static UsageScanDiffSide Side(SqlServiceAccountRepository.ScanDiffLink link) =>
+        new(link.LinkId, link.ScanId, link.Purpose, link.FileName, link.LastScannedAt, link.LinkedAt);
+
+    private static IEnumerable<ScanDiffServer> Servers(IEnumerable<SqlServiceAccountRepository.DiffServerRow> rows) =>
+        rows.Select(r => new ScanDiffServer(r.ServerName, Enum.Parse<ScanServerResult>(r.Result), r.Former));
+
+    private static IEnumerable<ScanDiffItem> Items(IEnumerable<SqlServiceAccountRepository.DiffItemRow> rows) =>
+        rows.Select(r => new ScanDiffItem(r.ServerName, r.ComponentType, r.ComponentName, r.ConfiguredIdentity));
+
+    /// <summary>gMSA conclusion of one side (gMSA check scans only), with the same rules as the scan view.</summary>
+    private static ScanGmsaConclusion? Conclusion(SqlServiceAccountRepository.ScanDiffLink link, IEnumerable<SqlServiceAccountRepository.DiffServerRow> servers) =>
+        link.Purpose == "GmsaCheck"
+            ? UsageScanOutcomes.Conclusion(servers.Select(s => UsageScanOutcomes.GmsaState(Enum.Parse<ScanServerResult>(s.Result), s.Former, s.Expected)))
+            : null;
+
     private async Task<bool> AccountVisibleAsync(SaCaller caller, Guid accountId, CancellationToken cancellationToken) =>
         await repository!.AnchorAsync(accountId, cancellationToken) is { } anchor && caller.Scope.Covers(anchor.Anchor);
 

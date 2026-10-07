@@ -304,6 +304,91 @@ public sealed partial class SqlServiceAccountRepository
         return (false, new UsageScanItemPage(rows, total, page, pageSize, role, pendingOnly));
     }
 
+    /// <summary>
+    /// Everything needed to compare a linked scan with an older scan of the same account and purpose (G-33): both links, every
+    /// planned server with its former-account match count, and every former-account item matched to each link's searched name.
+    /// Bounded by the upload limits (500 servers, 10 000 components per scan). Read only. <c>Missing</c> is true before migration
+    /// 030; <c>Error</c> is <c>linkId</c> / <c>against</c> (unknown for this account: not found) or <c>againstPurpose</c>.
+    /// </summary>
+    public Task<(bool Missing, string? Error, ScanDiffData? Data)> UsageScanDiffDataAsync(Guid accountId, Guid linkId, Guid? againstLinkId,
+        CancellationToken cancellationToken) =>
+        RetryReadOnDeadlockAsync(() => UsageScanDiffDataOnceAsync(accountId, linkId, againstLinkId, cancellationToken));
+
+    private async Task<(bool Missing, string? Error, ScanDiffData? Data)> UsageScanDiffDataOnceAsync(Guid accountId, Guid linkId, Guid? againstLinkId,
+        CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = await OpenAsync(cancellationToken);
+        if (await connection.ExecuteScalarAsync<int>(Cmd("SELECT CASE WHEN OBJECT_ID(N'svcacct.UsageScanLinks', N'U') IS NULL THEN 0 ELSE 1 END;", null, null,
+            cancellationToken)) == 0)
+        {
+            return (true, null, null);
+        }
+
+        const string side = """
+            SELECT l.Id AS LinkId, l.ScanId, l.MatchedAccount, l.LinkedAt, s.Purpose, s.FileName, s.LastScannedAt, s.ExpectedAccount
+            FROM svcacct.UsageScanLinks l JOIN svcacct.UsageScans s ON s.Id = l.ScanId
+            """;
+        ScanDiffLink? current = await connection.QuerySingleOrDefaultAsync<ScanDiffLink>(Cmd(side + " WHERE l.Id = @linkId AND l.AccountId = @accountId;",
+            new { linkId, accountId }, null, cancellationToken));
+        if (current is null)
+        {
+            return (false, "linkId", null);
+        }
+
+        ScanDiffLink? previous;
+        if (againstLinkId is { } against)
+        {
+            previous = against == linkId ? null : await connection.QuerySingleOrDefaultAsync<ScanDiffLink>(Cmd(side + " WHERE l.Id = @against AND l.AccountId = @accountId;",
+                new { against, accountId }, null, cancellationToken));
+            if (previous is null)
+            {
+                return (false, "against", null);
+            }
+
+            if (previous.Purpose != current.Purpose)
+            {
+                return (false, "againstPurpose", null);
+            }
+        }
+        else
+        {
+            // The next older link in the order the account detail uses (LinkedAt DESC, Id).
+            previous = await connection.QuerySingleOrDefaultAsync<ScanDiffLink>(Cmd(side + """
+                 WHERE l.AccountId = @accountId AND s.Purpose = @Purpose AND l.Id <> @LinkId
+                   AND (l.LinkedAt < @LinkedAt OR (l.LinkedAt = @LinkedAt AND l.Id > @LinkId))
+                ORDER BY l.LinkedAt DESC, l.Id OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY;
+                """, new { accountId, current.Purpose, current.LinkId, current.LinkedAt }, null, cancellationToken));
+        }
+
+        if (previous is null)
+        {
+            return (false, null, new ScanDiffData(current, null, [], [], [], []));
+        }
+
+        using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
+            SELECT v.ScanId, v.ServerName, v.Result,
+                (SELECT COUNT(*) FROM svcacct.UsageScanItems i WHERE i.ScanId = v.ScanId AND i.ServerName = v.ServerName AND i.Role = 'Former'
+                    AND i.MatchedAccount = CASE WHEN v.ScanId = @curScan THEN @curMatched ELSE @prevMatched END) AS Former,
+                (SELECT COUNT(*) FROM svcacct.UsageScanItems i WHERE i.ScanId = v.ScanId AND i.ServerName = v.ServerName AND i.Role = 'Expected') AS Expected
+            FROM svcacct.UsageScanServers v WHERE v.ScanId IN (@curScan, @prevScan);
+            SELECT i.ScanId, i.ServerName, i.ComponentType, i.ComponentName, i.ConfiguredIdentity
+            FROM svcacct.UsageScanItems i
+            WHERE i.Role = 'Former' AND ((i.ScanId = @curScan AND i.MatchedAccount = @curMatched) OR (i.ScanId = @prevScan AND i.MatchedAccount = @prevMatched));
+            """, new
+        {
+            curScan = current.ScanId,
+            curMatched = current.MatchedAccount,
+            prevScan = previous.ScanId,
+            prevMatched = previous.MatchedAccount
+        }, null, cancellationToken));
+        DiffServerRow[] servers = [.. await grid.ReadAsync<DiffServerRow>()];
+        DiffItemRow[] items = [.. await grid.ReadAsync<DiffItemRow>()];
+
+        // The same scan file can be linked twice only to different accounts (UQ ScanId, AccountId), so both sides differ here.
+        return (false, null, new ScanDiffData(current, previous, [.. servers.Where(s => s.ScanId == current.ScanId)], [.. items.Where(i => i.ScanId == current.ScanId)],
+            [.. servers.Where(s => s.ScanId == previous.ScanId)], [.. items.Where(i => i.ScanId == previous.ScanId)]));
+    }
+
     internal static UsageScanView ScanView(ScanLinkRow link, IReadOnlyList<ScanServerRow> serverRows, IReadOnlyList<ScanItemRow> itemRows)
     {
         bool gmsaCheck = link.Purpose == "GmsaCheck";
@@ -444,6 +529,20 @@ public sealed partial class SqlServiceAccountRepository
 
     internal sealed record ScanItemRow(Guid ScanId, Guid Id, string ServerName, string Role, string ComponentType, string ComponentName, string ConfiguredIdentity,
         string? State, string? Detail, string? Decision, Guid? UsageId, string? DecisionReason, DateTimeOffset? DecidedAt);
+
+    /// <summary>One side of a scan comparison as stored.</summary>
+    public sealed record ScanDiffLink(Guid LinkId, Guid ScanId, string MatchedAccount, DateTimeOffset LinkedAt, string Purpose, string FileName,
+        DateTimeOffset? LastScannedAt, string? ExpectedAccount);
+
+    /// <summary>A planned server with its match counts for the side's searched name.</summary>
+    public sealed record DiffServerRow(Guid ScanId, string ServerName, string Result, int Former, int Expected);
+
+    /// <summary>A former-account item matched to the side's searched name.</summary>
+    public sealed record DiffItemRow(Guid ScanId, string ServerName, string ComponentType, string ComponentName, string ConfiguredIdentity);
+
+    /// <summary>Raw comparison input; <c>Previous</c> null when there is no older scan of the same purpose.</summary>
+    public sealed record ScanDiffData(ScanDiffLink Current, ScanDiffLink? Previous, IReadOnlyList<DiffServerRow> CurrentServers,
+        IReadOnlyList<DiffItemRow> CurrentItems, IReadOnlyList<DiffServerRow> PreviousServers, IReadOnlyList<DiffItemRow> PreviousItems);
 
     private sealed record DecidableItem(Guid ScanId, string ServerName, string ComponentType, string ComponentName);
 }

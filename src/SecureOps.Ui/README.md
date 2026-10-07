@@ -2434,6 +2434,20 @@ open the exact owned draft; access/synthetic/historical limitations stay visible
 An unavailable response retains the previous cut and restores its applied filters.
 This is not target activation or an employee productivity ranking. See
 `docs/integrated-test-activation.md` and `docs/integrated-activation-tr.md`.
+## Service Accounts scan comparison (2026-10-06)
+
+Every usage scan section offers "Önceki taramaya göre fark" when the account has more than one scan. `SaScanDiffLoader` asks the
+server only when the person presses "Önceki taramayla karşılaştır" (no extra calls when the tab opens) and `SaScanDiffView`
+shows the answer of `GET /api/v1/service-accounts/accounts/{id}/usage-scans/{linkId}/diff` (G-33): changed servers, a
+paged list of component changes with counts, and a changed gMSA conclusion. The server compares every matched component, so
+the paged item list (PR #12) never changes the answer; the former client-side diff (`ServiceAccountScanDiff`) is removed.
+Wording comes from the server's change codes and texts: "not found" only on a fully scanned server and never "not used";
+what the newer scan did not cover is "unknown", never "gone"; "no older scan" and "no difference" are separate states and
+neither is a usage verdict. The gap alert keeps "Yeniden taranacak sunucu listesini indir (.txt)"
+(`ServiceAccountRescanList`, collector `-ComputerListPath` format, built in the browser from the full server list).
+Tests: `tests/SecureOps.Tests.Unit/Ui/ServiceAccountScanDiffUiTests.cs`, domain rules
+`tests/SecureOps.Tests.Unit/ServiceAccounts/UsageScanDiffTests.cs`, SQL `ServiceAccountUsageScanSqlTests.Diff_*`.
+
 ## Service Accounts next-step card (2026-10-06)
 
 `SaNextStepCard` on `/service-accounts/{id}` lists what is open, most important first, from the already loaded

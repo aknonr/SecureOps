@@ -137,6 +137,14 @@ public partial class ServiceAccountDetail
         return result;
     }
 
+    /// <summary>One page of the server-side comparison of a scan with the previous one (read only); a failure shows the problem.</summary>
+    private async Task<UsageScanDiffView?> LoadScanDiffAsync(Guid linkId, int page)
+    {
+        UsageScanDiffView? result = null;
+        await RunAsync(async token => result = await Api.GetAsync<UsageScanDiffView>($"/accounts/{Id}/usage-scans/{linkId}/diff?page={page}", token));
+        return result;
+    }
+
     private Task DownloadAsync(Guid evidenceId) => RunAsync(async token => await SaveFileAsync(await Api.DownloadAsync($"/evidence/{evidenceId}", token)));
 
     /// <summary>Success clears section forms; a conflict reloads the authoritative view while keeping typed input.</summary>
