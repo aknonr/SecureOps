@@ -8,7 +8,9 @@ namespace SecureOps.Shared.Contracts.ServiceAccounts;
 //           preview returns the plan to Draft and invalidates the preview (and with it any approval request built on it).
 //   Flag    Ok · StaleScan (scan older than ScanFreshDays) · NoScan (no Discovery scan on the account; one "no information"
 //           row) · NotCovered (server not scanned or partly scanned: the component list may be incomplete) · ManualOnly
-//           (IIS site/application/virtual directory "connect as": not supported with a gMSA or unclear) · NameTooLong.
+//           (IIS site/application/virtual directory "connect as": not supported with a gMSA or unclear) · NameTooLong ·
+//           NothingFound (the latest scan answered but found the account on no scanned server; one row keeps the account
+//           visible — never "not used").
 //           No flag blocks the plan; the approver sees the counts.
 
 /// <summary>One account of a plan as sent by the client: the account and the gMSA name it will use (at most 15 counted characters).</summary>
@@ -57,7 +59,7 @@ public sealed record ChangePlanAccountView(Guid AccountId, string AccountName, s
     DateTimeOffset ChangedAt);
 
 /// <summary>How many preview rows carry each flag.</summary>
-public sealed record ChangePlanFlagCounts(int Ok, int StaleScan, int NoScan, int NotCovered, int ManualOnly, int NameTooLong);
+public sealed record ChangePlanFlagCounts(int Ok, int StaleScan, int NoScan, int NotCovered, int ManualOnly, int NameTooLong, int NothingFound = 0);
 
 /// <summary>
 /// The plan's current preview: version, server-computed SHA-256 of its rows (the approval binds to both), freshness rule,

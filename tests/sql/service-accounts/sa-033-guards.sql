@@ -119,9 +119,26 @@ BEGIN
         BEGIN TRY UPDATE svcacct.ChangePlans SET CreatedBy = @approver WHERE Id = @bare; SET @failure = N'API role CreatedBy UPDATE was not refused.'; END TRY
         BEGIN CATCH IF ERROR_NUMBER() <> 51394 SET @failure = N'API role CreatedBy UPDATE failed with ' + CONVERT(nvarchar(12), ERROR_NUMBER()); END CATCH;
     END;
+    -- Everything the change-plan repository issues is granted (it reads scans, accounts, scope and users; writes history and audit).
+    IF @failure IS NULL AND EXISTS (SELECT 1 FROM (VALUES
+        (N'svcacct.ChangePlans', N'SELECT'), (N'svcacct.ChangePlans', N'INSERT'), (N'svcacct.ChangePlans', N'UPDATE'),
+        (N'svcacct.ChangePlanAccounts', N'INSERT'), (N'svcacct.ChangePlanPreviews', N'INSERT'), (N'svcacct.ChangePlanItems', N'INSERT'),
+        (N'svcacct.ChangePlanApprovals', N'INSERT'), (N'svcacct.ChangeItemChecks', N'INSERT'), (N'svcacct.ChangePlanEvents', N'INSERT'),
+        (N'svcacct.ChangePlanAccounts', N'SELECT'), (N'svcacct.ChangePlanPreviews', N'SELECT'), (N'svcacct.ChangePlanItems', N'SELECT'),
+        (N'svcacct.ChangePlanApprovals', N'SELECT'), (N'svcacct.ChangeItemChecks', N'SELECT'), (N'svcacct.ChangePlanEvents', N'SELECT'),
+        (N'svcacct.UsageScans', N'SELECT'), (N'svcacct.UsageScanServers', N'SELECT'), (N'svcacct.UsageScanItems', N'SELECT'),
+        (N'svcacct.UsageScanLinks', N'SELECT'), (N'svcacct.Accounts', N'SELECT'), (N'svcacct.WorkRequests', N'SELECT'),
+        (N'svcacct.Handovers', N'SELECT'), (N'svcacct.ScopeGrants', N'SELECT'), (N'svcacct.Organizations', N'SELECT'),
+        (N'svcacct.Teams', N'SELECT'), (N'security.Users', N'SELECT'), (N'svcacct.History', N'INSERT'), (N'audit.AuditLog', N'INSERT')
+        ) p(ObjectName, Permission) WHERE HAS_PERMS_BY_NAME(p.ObjectName, 'OBJECT', p.Permission) <> 1)
+        SET @failure = N'API role lacks a permission the change-plan repository uses.';
+    IF @failure IS NULL AND EXISTS (SELECT 1 FROM (VALUES (N'svcacct.ChangePlans'), (N'svcacct.ChangePlanAccounts'), (N'svcacct.ChangePlanPreviews'),
+        (N'svcacct.ChangePlanItems'), (N'svcacct.ChangePlanApprovals'), (N'svcacct.ChangeItemChecks'), (N'svcacct.ChangePlanEvents')) p(ObjectName)
+        WHERE HAS_PERMS_BY_NAME(p.ObjectName, 'OBJECT', 'DELETE') = 1)
+        SET @failure = N'API role may DELETE a change-plan table.';
     REVERT;
     ALTER ROLE svcacct_api_runtime DROP MEMBER sa_guard_runtime;
     DROP USER sa_guard_runtime;
     IF @failure IS NOT NULL THROW 51000, @failure, 1;
-    PRINT 'API runtime role cannot DELETE (229) and cannot change fixed plan columns (51394)';
+    PRINT 'API runtime role holds every verb the repository uses, cannot DELETE (229) and cannot change fixed plan columns (51394)';
 END;

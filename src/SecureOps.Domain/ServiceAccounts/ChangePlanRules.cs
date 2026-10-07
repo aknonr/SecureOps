@@ -35,7 +35,9 @@ public enum ChangePlanFlag
     /// <summary>IIS site/application/virtual directory "connect as": not supported with a gMSA or unclear; done by hand.</summary>
     ManualOnly,
     /// <summary>The target name is longer than Active Directory accepts (031 rule).</summary>
-    NameTooLong
+    NameTooLong,
+    /// <summary>The latest scan answered but found the account on no scanned server: one row keeps it visible (never "not used").</summary>
+    NothingFound
 }
 
 /// <summary>One account to preview: its target gMSA name and its latest Discovery scan (null when it has none).</summary>
@@ -78,6 +80,14 @@ public static class ChangePlanRules
     /// <summary>Whether the plan still holds its accounts (owner decision 6: an account is in at most one open plan).</summary>
     public static bool IsOpen(ChangePlanStatus status) => status is not (ChangePlanStatus.Completed or ChangePlanStatus.Cancelled);
 
+    /// <summary>
+    /// Normalized target gMSA name (031 rule): at most ServiceAccountGmsaName.Limit counted characters (no domain prefix, UPN
+    /// suffix or trailing $) and at most ServiceAccountGmsaName.MaxStoredLength stored; null when invalid.
+    /// </summary>
+    public static string? TargetName(string? value) =>
+        ServiceAccountText.Clean(value) is { Length: <= ServiceAccountGmsaName.MaxStoredLength } name
+        && ServiceAccountGmsaName.Length(name) is > 0 and <= ServiceAccountGmsaName.Limit ? name : null;
+
     /// <summary>Normalized OCO number, or null when it does not have the external-reference format (owner decision 4: format only).</summary>
     public static string? OcoNumber(string? value) =>
         ServiceAccountText.RecordNumber(value) is { Length: <= MaxOcoNumber } number ? number : null;
@@ -95,7 +105,8 @@ public static class ChangePlanRules
     /// <summary>
     /// Preview rows from each account's latest Discovery scan, in canonical order. An account without a scan gets one NoScan
     /// row; a server the scan did not fully answer flags its components NotCovered, or gets one NotCovered row when nothing
-    /// was found there. A server that answered and found nothing has no row: absence from a scan is not a component.
+    /// was found there. A server that answered and found nothing has no row: absence from a scan is not a component. An
+    /// account whose scan has no row at all gets one NothingFound row, so the approver still sees it.
     /// </summary>
     public static IReadOnlyList<ChangePlanPreviewRow> BuildPreview(IEnumerable<ChangePlanPreviewAccount> accounts, DateTimeOffset now)
     {
@@ -126,6 +137,11 @@ public static class ChangePlanRules
             {
                 rows.Add(new ChangePlanPreviewRow(account.AccountId, scan.LinkId, server, null, null, null, account.TargetGmsaName, ChangePlanFlag.NotCovered, scan.ScanAt));
             }
+
+            if (scan.Components.Count == 0 && uncovered.Count == 0)
+            {
+                rows.Add(new ChangePlanPreviewRow(account.AccountId, scan.LinkId, null, null, null, null, account.TargetGmsaName, ChangePlanFlag.NothingFound, scan.ScanAt));
+            }
         }
 
         return Canonical(rows);
@@ -155,6 +171,7 @@ public static class ChangePlanRules
         ChangePlanFlag.NoScan => "Bilgi yok: hesapta keşif taraması yok (kullanılmıyor anlamına gelmez)",
         ChangePlanFlag.NotCovered => "Sunucu taranamadı veya kısmen tarandı: liste eksik olabilir",
         ChangePlanFlag.ManualOnly => "Elle: IIS \"connect as\" kimliği gMSA ile desteklenmiyor veya belirsiz",
+        ChangePlanFlag.NothingFound => "Son tarama bu hesabı taranan sunucularda bulmadı (kullanılmıyor anlamına gelmez)",
         _ => $"gMSA adı {ServiceAccountGmsaName.Limit} karakterden uzun"
     };
 

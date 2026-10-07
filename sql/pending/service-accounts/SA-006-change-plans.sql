@@ -86,10 +86,12 @@ CREATE TABLE svcacct.ChangePlanItems(
     ComponentName nvarchar(1024) NULL,
     CurrentIdentity nvarchar(256) NULL,
     TargetIdentity nvarchar(256) NOT NULL,
-    Flag varchar(16) NOT NULL CONSTRAINT CK_SaChangePlanItems_Flag CHECK (Flag IN ('Ok','StaleScan','NoScan','NotCovered','ManualOnly','NameTooLong')),
+    Flag varchar(16) NOT NULL CONSTRAINT CK_SaChangePlanItems_Flag CHECK (Flag IN ('Ok','StaleScan','NoScan','NotCovered','ManualOnly','NameTooLong',
+        'NothingFound')),
     ScanAt datetimeoffset(7) NULL,
-    CONSTRAINT CK_SaChangePlanItems_NoScan CHECK ((Flag = 'NoScan' AND ScanLinkId IS NULL AND ServerName IS NULL AND ComponentType IS NULL)
-        OR (Flag <> 'NoScan' AND ScanLinkId IS NOT NULL AND ServerName IS NOT NULL))
+    CONSTRAINT CK_SaChangePlanItems_Shape CHECK ((Flag = 'NoScan' AND ScanLinkId IS NULL AND ServerName IS NULL AND ComponentType IS NULL)
+        OR (Flag = 'NothingFound' AND ScanLinkId IS NOT NULL AND ServerName IS NULL AND ComponentType IS NULL)
+        OR (Flag NOT IN ('NoScan','NothingFound') AND ScanLinkId IS NOT NULL AND ServerName IS NOT NULL))
 );
 CREATE INDEX IX_SaChangePlanItems_Preview ON svcacct.ChangePlanItems(PreviewId, AccountId);
 

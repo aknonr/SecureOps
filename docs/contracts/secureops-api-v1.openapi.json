@@ -34689,6 +34689,10 @@
           "nameTooLong": {
             "type": "integer",
             "format": "int32"
+          },
+          "nothingFound": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

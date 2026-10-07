@@ -111,6 +111,17 @@ public sealed class ChangePlanRulesTests
         ChangePlanRules.BuildPreview([new ChangePlanPreviewAccount(_a, "gmsaSyn1", scan)], _now).Select(r => r.ServerName).Should().Equal("SYN-APP-01");
     }
 
+    [Fact]
+    public void Preview_ScanThatFoundNothing_KeepsTheAccountVisible_AsNothingFound_NotAsUnused()
+    {
+        ChangePlanScanSource scan = new(_link, _now, [new("SYN-APP-01", "Success")], []);
+
+        ChangePlanPreviewRow row = ChangePlanRules.BuildPreview([new ChangePlanPreviewAccount(_a, "gmsaSyn1", scan)], _now).Single();
+
+        row.Should().Be(new ChangePlanPreviewRow(_a, _link, null, null, null, null, "gmsaSyn1", ChangePlanFlag.NothingFound, _now));
+        ChangePlanRules.FlagLabel(ChangePlanFlag.NothingFound).Should().Contain("kullanılmıyor anlamına gelmez");
+    }
+
     [Theory]
     [InlineData("planner", "approverIsPlanner")]
     [InlineData("previewer", "approverChangedPlan")]
@@ -134,6 +145,14 @@ public sealed class ChangePlanRulesTests
         (ChangePlanRules.OcoNumber(value) is not null).Should().Be(valid);
         ChangePlanRules.OcoNumber(new string('9', 65)).Should().BeNull();
     }
+
+    [Theory]
+    [InlineData("gmsaSyn1", "gmsaSyn1")]
+    [InlineData(@" SYN\gmsaSyn14chars$ ", @"SYN\gmsaSyn14chars$")]
+    [InlineData("gmsaSynNameTooLong16", null)]
+    [InlineData("   ", null)]
+    [InlineData(@"SYN\$", null)]
+    public void TargetName_FollowsThe031Rule(string value, string? expected) => ChangePlanRules.TargetName(value).Should().Be(expected);
 
     [Fact]
     public void OpenStatuses_AreAllButCompletedAndCancelled()
