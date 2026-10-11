@@ -32,6 +32,9 @@ public abstract class ServiceAccountPageBase : ComponentBase, IDisposable
     /// <summary>Last failure, rendered with SoProblemPanel.</summary>
     protected UiProblem? Problem { get; set; }
 
+    /// <summary>Raw current extension of the last failure (plan view on a 409, per-account results on a plan 400); null otherwise.</summary>
+    protected string? ProblemCurrentJson { get; private set; }
+
     /// <summary>A command or read is in flight.</summary>
     protected bool Busy { get; private set; }
 
@@ -107,6 +110,7 @@ public abstract class ServiceAccountPageBase : ComponentBase, IDisposable
         if (clearProblem)
         {
             Problem = null;
+            ProblemCurrentJson = null;
         }
 
         int generation = _generation;
@@ -120,6 +124,7 @@ public abstract class ServiceAccountPageBase : ComponentBase, IDisposable
             if (generation == _generation)
             {
                 Problem = ex.Problem;
+                ProblemCurrentJson = ex.CurrentJson;
                 if (ex.Problem.Kind is UiProblemKind.AccessDisabled or UiProblemKind.AccessPending or UiProblemKind.SessionExpired)
                 {
                     AccessRejected = true;

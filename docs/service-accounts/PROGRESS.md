@@ -27,6 +27,24 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Open: release tool `Get-ReleaseSqlPlan.ps1` refuses a 001–033 chain (by design, needs a reviewed update before merge);
   `Evidence.OwnerEntityType` cannot hold plan evidence without changing an existing CHECK (PR 2 question).
 
+## Change plan d, PR 3 — UI (branch `feature/service-accounts-change-plan-ui-20261012`, from the API branch `db56856`, not merged)
+
+- `/service-accounts/plans` (scoped list, status and `?accountId=` filter, create a Draft plan from searched accounts) and
+  `/service-accounts/plans/{id}` (Plan → Önizleme → Onay → Kontrol listesi → Doğrulama). Details and wording rules:
+  `src/SecureOps.Ui/README.md` ("gMSA change plan UI"). Checklist marking, evidence and closing are **not offered** (no API until PR 2: G-36).
+- F2 (2026-10-12): PR 1 branch (E-fix `2c245ad`) merged into this branch without conflict; OCO text corrected to the server rule
+  (validated, upper-cased; 400 `ocoNumber` shown under the field). Verified on a fresh 001–033 DB: invalid OCO refused under the field with the
+  draft kept, `oco-9000124` saved as `OCO-9000124`; build 0/0, unit 2052 passed / 1 existing skip, scoped format clean.
+- Shared pager `SaPager` replaces the four hand-written pagers (keyboard focus no longer falls to the page when a page changes).
+- Verified 2026-10-12 on the local Demo (API :5330, UI :5331/:5332, synthetic LocalDB `SecureOps_SaPlanUi1012`, migrations 001–033 applied
+  by the harness without role scripts): create refused → per-account answers and draft kept; create; preview (counters 2/0/1/0/1/2/0:
+  found, stale, no info, partial, manual, not found, long name); planner sees the server's `approverIsPlanner` reason and no form; a second actor
+  approves; approving a version the planner had just replaced → 409 `previewStale`, current plan adopted, nothing saved; PATCH rename; cancel;
+  390 px and 320 px without horizontal overflow, light and dark; account-list pager keeps focus on the last page (31 accounts).
+  Build 0/0, unit 2035 passed / 1 skipped (existing), scoped format clean.
+- Not verified: integration/SQL suites (no backend change), repo-wide format, real 200 % browser zoom (narrow viewports used), screen reader,
+  full Tab traversal of every control, Windows/IIS/corporate TEST, Playwright journey (not written).
+
 ## Ops-research UI work (2026-10-06, separate branches from master, not merged)
 
 Order c, b, a, d from `ops-research/05-yol-haritasi.md`. **c merged** (PR #14, `87df0c3`):

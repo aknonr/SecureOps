@@ -432,16 +432,8 @@
     /// <summary>Previous/next buttons with the visible range; plain buttons so Tab, Enter and Space work and 390 px wraps.</summary>
     private RenderFragment Pager(string label, int current, int size, int total, string unit, Func<int, Task> go)
     {
-        int pages = (total + size - 1) / size;
-        int from = ((current - 1) * size) + 1;
-        int to = Math.Min(total, current * size);
-        return @<div class="sa-scan-pager" role="group" aria-label="@($"{label}: sayfa {current} / {pages}")">
-            <span class="so-panel-text--sm" aria-live="polite">@label: @from–@to / @total @unit (sayfa @current / @pages)</span>
-            <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(Busy || current <= 1)" OnClick="@(() => go(current - 1))"
-                StartIcon="@Icons.Material.Filled.ChevronLeft">Önceki</MudButton>
-            <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(Busy || current >= pages)" OnClick="@(() => go(current + 1))"
-                EndIcon="@Icons.Material.Filled.ChevronRight">Sonraki</MudButton>
-        </div>;
+        return @<SaPager Label="@label" Page="current" PageSize="size" Total="total" Unit="@unit" Busy="Busy" AlwaysVisible="true"
+                         OnPage="EventCallback.Factory.Create<int>(this, go)" />;
     }
 
     private async Task ChooseAsync(InputFileChangeEventArgs args)

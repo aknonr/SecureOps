@@ -116,6 +116,11 @@ DTO'lar `src/SecureOps.Shared/Contracts/ServiceAccounts/ServiceAccountChangePlan
 
 ## Arayüz
 
+**Durum (2026-10-12, PR 3 dalda `feature/service-accounts-change-plan-ui-20261012`, merge edilmedi):** liste ve adım adım plan sayfası
+sabitlenen sözleşmeye karşı yazıldı (`src/SecureOps.Ui/README.md` → "gMSA change plan UI"). Kontrol listesi işaretleme, kanıt ve kapanış
+sunucuda henüz yok (PR 2); ekran bunları sunmaz, onaylanan satırları salt okunur yapılacaklar listesi olarak gösterir (G-36). Hesap sayfasındaki
+"açık plan" bağlantısı ve "Sıradaki adım"a "Onay bekleyen plan" henüz yapılmadı (`GET change-plans?accountId=` yeterli, API değişikliği gerekmez).
+
 - `/service-accounts/plans`: liste (durum, hesap sayısı, OCO, pencere); hesap listesinde seçili hesaplardan "gMSA geçiş
   planı oluştur".
 - `/service-accounts/plans/{id}`: adım göstergesi (Plan → Önizleme → Onay → Kontrol listesi → Doğrulama), her adımda neyin

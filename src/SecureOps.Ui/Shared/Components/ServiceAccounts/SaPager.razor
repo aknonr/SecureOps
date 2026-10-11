@@ -1,0 +1,75 @@
+@* The module's one page switcher (Önceki / Sonraki with the visible range).
+   Keyboard focus must survive a page change. A button that turns Disabled while the next page loads (or on the first/last
+   page) is dropped from the tab order and the browser sends focus to <body>, so the person loses their place. These buttons
+   therefore stay enabled and focusable: while busy, or when there is no such page, the click does nothing and
+   aria-disabled says so. The range is a polite live region, so the new page is announced without moving focus. *@
+
+@if (Visible)
+{
+    <div class="sa-pager" role="group" aria-label="@($"{Label}: sayfa {_page} / {_pages}")">
+        <span class="so-panel-text--sm sa-pager-range" role="status" aria-live="polite">@Summary</span>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ChevronLeft"
+                   Class="@ButtonClass(CanGoPrevious)" OnClick="PreviousAsync" UserAttributes="@Attributes(CanGoPrevious)">Önceki</MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.ChevronRight"
+                   Class="@ButtonClass(CanGoNext)" OnClick="NextAsync" UserAttributes="@Attributes(CanGoNext)">Sonraki</MudButton>
+    </div>
+}
+
+@code {
+    private int _page;
+    private int _pages;
+
+    /// <summary>What is paged (for example "Bileşen farkları"); names the group and starts the range text.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+
+    /// <summary>Current page, 1-based.</summary>
+    [Parameter, EditorRequired] public int Page { get; set; } = 1;
+
+    /// <summary>Rows per page.</summary>
+    [Parameter, EditorRequired] public int PageSize { get; set; } = 25;
+
+    /// <summary>Total rows the server reports.</summary>
+    [Parameter, EditorRequired] public int Total { get; set; }
+
+    /// <summary>Optional unit shown after the total (for example "bileşen").</summary>
+    [Parameter] public string? Unit { get; set; }
+
+    /// <summary>True while a call is in flight; clicks are ignored but the buttons keep focus.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Show the pager even when everything fits on one page.</summary>
+    [Parameter] public bool AlwaysVisible { get; set; }
+
+    /// <summary>Asked to show another page (1-based); the caller fetches it.</summary>
+    [Parameter, EditorRequired] public EventCallback<int> OnPage { get; set; }
+
+    private bool Visible => AlwaysVisible || _pages > 1;
+
+    private bool CanGoPrevious => !Busy && _page > 1;
+
+    private bool CanGoNext => !Busy && _page < _pages;
+
+    private string Summary
+    {
+        get
+        {
+            int from = Total == 0 ? 0 : ((_page - 1) * PageSize) + 1;
+            int to = Math.Min(Total, _page * PageSize);
+            return $"{Label}: {from}–{to} / {Total}{(Unit is null ? "" : " " + Unit)} (sayfa {_page} / {_pages})";
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        _pages = Math.Max(1, (Total + Math.Max(1, PageSize) - 1) / Math.Max(1, PageSize));
+        _page = Math.Max(1, Page);
+    }
+
+    private static string ButtonClass(bool enabled) => enabled ? "sa-pager-button" : "sa-pager-button sa-pager-button--off";
+
+    private static Dictionary<string, object> Attributes(bool enabled) => enabled ? [] : new() { ["aria-disabled"] = "true" };
+
+    private Task PreviousAsync() => CanGoPrevious ? OnPage.InvokeAsync(_page - 1) : Task.CompletedTask;
+
+    private Task NextAsync() => CanGoNext ? OnPage.InvokeAsync(_page + 1) : Task.CompletedTask;
+}

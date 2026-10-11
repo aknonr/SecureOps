@@ -39,6 +39,31 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## gMSA change plan UI (d, PR 3), 2026-10-12
+
+Branch `feature/service-accounts-change-plan-ui-20261012`, cut from the API branch `feature/service-accounts-change-plan-api-20261007`
+(`db56856`, contract `0400d58`); not merged. Routes `/service-accounts/plans` and `/service-accounts/plans/{id}` (table above), written only
+against the pinned contract; no backend, SQL or DTO change.
+
+- Honest states: loading / empty / error / denied / unknown are separate. A 409 adopts the plan the server returned in `current` and says nothing
+  was saved; a refused create/update shows each account's answer next to its row and keeps what was typed (an answer disappears from a row once its
+  name is edited); a failure is shown next to the action that raised it, not only at the top of a long page.
+- Server decides: edit, preview, approve and cancel appear only when `permissions` allow; the approval form is not shown to a planner, a previewer or an
+  editor (`approveBlockedReason` is explained instead). Approval carries the preview version and SHA-256 and a confirmation that names them.
+- Wording: `NothingFound` is "Taramada bulunamadı" and never "kullanılmıyor"; "Bilgi yok" for no scan; IIS site/application/virtual-directory
+  rows are "Elle yapılacak" in the work list; "Yapıldı kişinin beyanıdır, doğrulama değildir".
+- Not offered because the API does not exist yet (PR 2, [G-36](../../docs/26-ui-backend-contract-gaps.md)): marking checklist rows, evidence,
+  closing the plan. Step 4 reads "Henüz sunulmuyor"; the page shows the approved rows as a read-only work list.
+- Focus: the module's four hand-written pagers now use one component, `SaPager`. Its buttons are never `disabled` (they use `aria-disabled` and
+  ignore the click while busy or at an edge), so keyboard focus is not dropped to the page when a page changes or the last page is reached.
+- OCO number (F2, 2026-10-12): the server validates and upper-cases it (max 64, A-Z 0-9 - _ . /, starts with a letter or digit, at least one
+  digit; else 400 field `ocoNumber`). The form only describes the rule as a hint, has no client-side rule, and shows the server's refusal under the
+  field (the draft stays); after approval the text says the server validated and upper-cased it, and that ITSM was not queried.
+- Dates in the approval window are native `datetime-local` inputs plus an explicit UTC offset (default: the UI host's offset), sent as
+  `DateTimeOffset`; every window is displayed with its offset.
+- Tests: `ServiceAccountChangePlanUiTests` (27 cases: step flow per status, flag wording, counters/rows, work list, pager focus, approval form
+  gating through the real page against a canned API, 404 state, no password field, focus-ring CSS, every pager uses `SaPager`).
+
 ## PR #4 Windows Verification, 2026-10-02
 
 The Resources/personal shift-group source from 286fac7 was verified on Windows
@@ -410,6 +435,8 @@ have to be invented.
 | `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters; selected accounts take one mail record or one usage-scan file; bounded directory name search panel (ADR-0025) | `ServiceAccounts.View` and scope grant; the name search also needs `Identity.Lookup` |
 | `/service-accounts/{id}` | Account detail, work, usages with the explained knowledge-base rule, evidence and history | `ServiceAccounts.View`; commands require their own capability (rule exception: `ServiceAccounts.Verify`) |
 | `/service-accounts/work` | Entry work summary, in-app reminders and unsent coordinator drafts | `ServiceAccounts.View` |
+| `/service-accounts/plans` | gMSA change plans: scoped list (only plans whose every account is in scope), status filter, `?accountId=` filter, create a Draft plan from searched accounts | `ServiceAccounts.View`; creating needs `ServiceAccounts.Work` |
+| `/service-accounts/plans/{id}` | One plan as five steps (Plan → Önizleme → Onay → Kontrol listesi → Doğrulama): account editor, preview with flag counters and paged rows, approval bound to one preview version and digest, read-only work list, cancel, event history | `ServiceAccounts.View`; edit, preview and cancel offered only when the server's `permissions` say so; approval form only when `permissions.approve` |
 | `/service-accounts/imports` | Import guide (tracking workbook once, weekly list, DBA list), preview, decisions and idempotent commit; without organization scope it explains how another module administrator grants it | `ServiceAccounts.Import` and organization scope |
 | `/service-accounts/reports` | Live report (directorate view, rules, gMSA funnel, trend, risk candidates), immutable snapshots, snapshot comparison, XLSX/PDF | `ServiceAccounts.Report` |
 | `/service-accounts/admin` | Scope grants, dictionaries and gMSA routing team roles | `ServiceAccounts.Administer` |

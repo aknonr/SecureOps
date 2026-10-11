@@ -1,0 +1,64 @@
+.sa-plan-subheading {
+    font-size: 1rem;
+    margin: var(--so-space-4) 0 var(--so-space-2);
+}
+
+.sa-plan-sha {
+    overflow-wrap: anywhere;
+}
+
+.sa-plan-counters {
+    list-style: none;
+    margin: 0 0 var(--so-space-3);
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+}
+
+.sa-plan-counter {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    padding: var(--so-space-1) var(--so-space-2);
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius-sm);
+}
+
+/* A zero count stays visible (the approver sees that nothing is hidden) but quieter; the number still says 0. */
+.sa-plan-counter--zero {
+    border-style: dashed;
+}
+
+.sa-plan-counter-count {
+    font-weight: 700;
+    min-width: 1.5ch;
+    text-align: end;
+}
+
+.sa-plan-legend {
+    margin: 0;
+}
+
+.sa-plan-legend dt {
+    font-weight: 600;
+    margin-top: var(--so-space-2);
+}
+
+.sa-plan-legend dd {
+    margin: 0;
+    color: var(--so-text-muted);
+    overflow-wrap: anywhere;
+}
+
+/* Mobile table rows: keep the data label readable instead of letting it shrink letter by letter. */
+.sa-plan-preview ::deep .mud-table-cell::before {
+    flex-shrink: 0;
+    min-width: 6.5rem;
+    word-break: keep-all;
+    overflow-wrap: normal;
+}
+
+.sa-plan-preview ::deep .mud-table-cell {
+    overflow-wrap: anywhere;
+}

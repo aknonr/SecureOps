@@ -4,7 +4,7 @@
 @if (Problem is not null)
 {
     <SoProblemPanel Problem="Problem" OnRetry="OnRetry" />
-    @if (ServiceAccountProblems.FieldMessage(Problem) is { } message)
+    @if (ShowFieldMessage && ServiceAccountProblems.FieldMessage(Problem) is { } message)
     {
         <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" role="alert">@message</MudAlert>
     }
@@ -13,6 +13,9 @@
 @code {
     /// <summary>Current problem.</summary>
     [Parameter] public UiProblem? Problem { get; set; }
+
+    /// <summary>False when the page shows the field's explanation under the field itself.</summary>
+    [Parameter] public bool ShowFieldMessage { get; set; } = true;
 
     /// <summary>Retry handler.</summary>
     [Parameter] public EventCallback OnRetry { get; set; }

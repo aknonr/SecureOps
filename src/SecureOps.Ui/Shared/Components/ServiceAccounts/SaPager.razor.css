@@ -1,0 +1,23 @@
+.sa-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-2);
+}
+
+.sa-pager-range {
+    margin-right: var(--so-space-2);
+}
+
+/* aria-disabled buttons stay focusable on purpose (focus must not fall to the page when the page changes);
+   the dimmed look is a second signal beside aria-disabled and the unchanged range text. */
+.sa-pager ::deep .sa-pager-button--off {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.sa-pager ::deep .mud-button-root:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
