@@ -6,7 +6,10 @@
   approval and the person's checklist; it never connects to a server and no secret column exists. Additive only: seven
   new tables; no existing table, constraint, row, role or grant is changed.
   - ChangePlans: the plan header. Only Status, CurrentPreviewVersion and UpdatedAt/By may change (RowVer follows); Id,
-    Kind, Title, CreatedBy and CreatedAt are fixed and no plan is deleted (TR_SaChangePlans_Fixed, 51394).
+    Kind, Title, CreatedBy and CreatedAt are fixed, compared exactly (letter case, trailing spaces, time offset), and no
+    plan is deleted (TR_SaChangePlans_Fixed, 51394).
+  - Coded text columns (Kind, Status, Action, ComponentType, Flag, State, Event) accept only their exact spelling: the
+    checks use a binary collation and refuse trailing spaces, because the database collation is case-insensitive.
   - ChangePlanAccounts: every add, remove and rename of an account is a new row; the current list is each account's
     latest row (highest Id) that is not Removed.
   - ChangePlanPreviews / ChangePlanItems: one preview version per plan and its rows from the accounts' latest Discovery
@@ -18,7 +21,8 @@
   - ChangeItemChecks: the person's own statement per preview row (latest row wins); not a verification.
   - ChangePlanEvents: every status change and edit with its actor.
   All tables except ChangePlans are append-only (51392). Refuses replay. Run with SQLCMD -I -b. No down script: rollback
-  retains these objects and data. Runtime grants: SA-006-API-permissions.sql (SELECT, INSERT; UPDATE on ChangePlans only).
+  retains these objects and data. Runtime grants: SA-006-API-permissions.sql (SELECT, INSERT; UPDATE only on the four
+  changeable ChangePlans columns).
 */
 SET XACT_ABORT ON;
 SET QUOTED_IDENTIFIER ON;
@@ -35,9 +39,11 @@ BEGIN TRANSACTION;
 
 CREATE TABLE svcacct.ChangePlans(
     Id uniqueidentifier NOT NULL CONSTRAINT PK_SaChangePlans PRIMARY KEY,
-    Kind varchar(24) NOT NULL CONSTRAINT CK_SaChangePlans_Kind CHECK (Kind IN ('GmsaConversion')),
+    Kind varchar(24) NOT NULL CONSTRAINT CK_SaChangePlans_Kind CHECK (Kind COLLATE Latin1_General_BIN2 IN ('GmsaConversion')
+        AND DATALENGTH(Kind) = LEN(Kind)),
     Title nvarchar(200) NOT NULL CONSTRAINT CK_SaChangePlans_Title CHECK (LEN(Title) > 0),
-    Status varchar(16) NOT NULL CONSTRAINT CK_SaChangePlans_Status CHECK (Status IN ('Draft','Previewed','Approved','InProgress','Completed','Cancelled')),
+    Status varchar(16) NOT NULL CONSTRAINT CK_SaChangePlans_Status CHECK (Status COLLATE Latin1_General_BIN2 IN ('Draft','Previewed','Approved',
+        'InProgress','Completed','Cancelled') AND DATALENGTH(Status) = LEN(Status)),
     CurrentPreviewVersion int NULL,
     CreatedBy uniqueidentifier NOT NULL,
     CreatedAt datetimeoffset(7) NOT NULL,
@@ -54,7 +60,8 @@ CREATE TABLE svcacct.ChangePlanAccounts(
     Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_SaChangePlanAccounts PRIMARY KEY,
     PlanId uniqueidentifier NOT NULL CONSTRAINT FK_SaChangePlanAccounts_Plan REFERENCES svcacct.ChangePlans(Id),
     AccountId uniqueidentifier NOT NULL CONSTRAINT FK_SaChangePlanAccounts_Account REFERENCES svcacct.Accounts(Id),
-    Action varchar(16) NOT NULL CONSTRAINT CK_SaChangePlanAccounts_Action CHECK (Action IN ('Added','Removed','Renamed')),
+    Action varchar(16) NOT NULL CONSTRAINT CK_SaChangePlanAccounts_Action CHECK (Action COLLATE Latin1_General_BIN2 IN ('Added','Removed','Renamed')
+        AND DATALENGTH(Action) = LEN(Action)),
     TargetGmsaName nvarchar(256) NOT NULL CONSTRAINT CK_SaChangePlanAccounts_Name CHECK (LEN(TargetGmsaName) > 0),
     RequestId uniqueidentifier NULL CONSTRAINT FK_SaChangePlanAccounts_Request REFERENCES svcacct.WorkRequests(Id),
     ChangedBy uniqueidentifier NOT NULL,
@@ -81,13 +88,13 @@ CREATE TABLE svcacct.ChangePlanItems(
     AccountId uniqueidentifier NOT NULL CONSTRAINT FK_SaChangePlanItems_Account REFERENCES svcacct.Accounts(Id),
     ScanLinkId uniqueidentifier NULL CONSTRAINT FK_SaChangePlanItems_ScanLink REFERENCES svcacct.UsageScanLinks(Id),
     ServerName nvarchar(255) NULL,
-    ComponentType varchar(24) NULL CONSTRAINT CK_SaChangePlanItems_Type CHECK (ComponentType IN ('WindowsService','ScheduledTask','IisAppPool',
-        'IisSite','IisApplication','IisVirtualDirectory')),
+    ComponentType varchar(24) NULL CONSTRAINT CK_SaChangePlanItems_Type CHECK (ComponentType COLLATE Latin1_General_BIN2 IN ('WindowsService',
+        'ScheduledTask','IisAppPool','IisSite','IisApplication','IisVirtualDirectory') AND DATALENGTH(ComponentType) = LEN(ComponentType)),
     ComponentName nvarchar(1024) NULL,
     CurrentIdentity nvarchar(256) NULL,
     TargetIdentity nvarchar(256) NOT NULL,
-    Flag varchar(16) NOT NULL CONSTRAINT CK_SaChangePlanItems_Flag CHECK (Flag IN ('Ok','StaleScan','NoScan','NotCovered','ManualOnly','NameTooLong',
-        'NothingFound')),
+    Flag varchar(16) NOT NULL CONSTRAINT CK_SaChangePlanItems_Flag CHECK (Flag COLLATE Latin1_General_BIN2 IN ('Ok','StaleScan','NoScan','NotCovered',
+        'ManualOnly','NameTooLong','NothingFound') AND DATALENGTH(Flag) = LEN(Flag)),
     ScanAt datetimeoffset(7) NULL,
     CONSTRAINT CK_SaChangePlanItems_Shape CHECK ((Flag = 'NoScan' AND ScanLinkId IS NULL AND ServerName IS NULL AND ComponentType IS NULL)
         OR (Flag = 'NothingFound' AND ScanLinkId IS NOT NULL AND ServerName IS NULL AND ComponentType IS NULL)
@@ -114,7 +121,8 @@ CREATE INDEX IX_SaChangePlanApprovals_Plan ON svcacct.ChangePlanApprovals(PlanId
 CREATE TABLE svcacct.ChangeItemChecks(
     Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_SaChangeItemChecks PRIMARY KEY,
     ItemId uniqueidentifier NOT NULL CONSTRAINT FK_SaChangeItemChecks_Item REFERENCES svcacct.ChangePlanItems(Id),
-    State varchar(16) NOT NULL CONSTRAINT CK_SaChangeItemChecks_State CHECK (State IN ('Done','Skipped','Failed','RolledBack')),
+    State varchar(16) NOT NULL CONSTRAINT CK_SaChangeItemChecks_State CHECK (State COLLATE Latin1_General_BIN2 IN ('Done','Skipped','Failed','RolledBack')
+        AND DATALENGTH(State) = LEN(State)),
     Note nvarchar(1000) NULL,
     OutsideWindow bit NOT NULL,
     CheckedBy uniqueidentifier NOT NULL,
@@ -125,8 +133,8 @@ CREATE INDEX IX_SaChangeItemChecks_Item ON svcacct.ChangeItemChecks(ItemId, Id);
 CREATE TABLE svcacct.ChangePlanEvents(
     Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_SaChangePlanEvents PRIMARY KEY,
     PlanId uniqueidentifier NOT NULL CONSTRAINT FK_SaChangePlanEvents_Plan REFERENCES svcacct.ChangePlans(Id),
-    Event varchar(24) NOT NULL CONSTRAINT CK_SaChangePlanEvents_Event CHECK (Event IN ('Created','Updated','Previewed','Approved','Started',
-        'Checked','Completed','Cancelled')),
+    Event varchar(24) NOT NULL CONSTRAINT CK_SaChangePlanEvents_Event CHECK (Event COLLATE Latin1_General_BIN2 IN ('Created','Updated','Previewed',
+        'Approved','Started','Checked','Completed','Cancelled') AND DATALENGTH(Event) = LEN(Event)),
     FromStatus varchar(16) NULL,
     ToStatus varchar(16) NOT NULL,
     PreviewVersion int NULL,
@@ -139,9 +147,14 @@ GO
 CREATE TRIGGER svcacct.TR_SaChangePlans_Fixed ON svcacct.ChangePlans AFTER UPDATE, DELETE AS
 BEGIN
     SET NOCOUNT ON;
+    -- Fixed columns compare exactly (design T8): the database collation ignores letter case and trailing spaces, and
+    -- datetimeoffset equality ignores the offset, so text compares in a binary collation plus DATALENGTH and time with its offset.
     IF EXISTS (SELECT 1 FROM deleted d WHERE NOT EXISTS (SELECT 1 FROM inserted i WHERE i.Id = d.Id))
         OR EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.Id = i.Id
-                   WHERE i.Kind <> d.Kind OR i.Title <> d.Title OR i.CreatedBy <> d.CreatedBy OR i.CreatedAt <> d.CreatedAt)
+                   WHERE i.Kind COLLATE Latin1_General_BIN2 <> d.Kind COLLATE Latin1_General_BIN2 OR DATALENGTH(i.Kind) <> DATALENGTH(d.Kind)
+                      OR i.Title COLLATE Latin1_General_BIN2 <> d.Title COLLATE Latin1_General_BIN2 OR DATALENGTH(i.Title) <> DATALENGTH(d.Title)
+                      OR i.CreatedBy <> d.CreatedBy
+                      OR i.CreatedAt <> d.CreatedAt OR DATEPART(TZOFFSET, i.CreatedAt) <> DATEPART(TZOFFSET, d.CreatedAt))
         THROW 51394, 'Change plans are never deleted; only status, preview version and update stamp may change.', 1;
 END;
 GO

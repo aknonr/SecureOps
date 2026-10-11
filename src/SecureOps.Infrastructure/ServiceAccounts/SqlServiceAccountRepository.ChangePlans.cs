@@ -71,13 +71,17 @@ public sealed partial class SqlServiceAccountRepository
                     SELECT ca.PlanId, ca.AccountId, ca.Action, ROW_NUMBER() OVER (PARTITION BY ca.PlanId, ca.AccountId ORDER BY ca.Id DESC) AS rn
                     FROM svcacct.ChangePlanAccounts ca) x
                 WHERE x.rn = 1 AND x.Action <> 'Removed'),
+            -- Accounts in any plan that the scope cannot place, evaluated once per account rather than once per plan and
+            -- account (per-plan evaluation took 14 s for a narrow scope over 5,000 accounts and timed tests out).
+            outside AS (
+                SELECT a.Id FROM svcacct.Accounts a
+                WHERE a.Id IN (SELECT ca.AccountId FROM svcacct.ChangePlanAccounts ca) AND CASE WHEN {ScopePredicate} THEN 1 ELSE 0 END = 0),
             visible AS (
                 SELECT p.Id FROM svcacct.ChangePlans p
                 WHERE (@Status IS NULL OR p.Status = @Status)
                   AND (@AccountId IS NULL OR EXISTS (SELECT 1 FROM live l WHERE l.PlanId = p.Id AND l.AccountId = @AccountId))
                   AND EXISTS (SELECT 1 FROM live l WHERE l.PlanId = p.Id)
-                  AND NOT EXISTS (SELECT 1 FROM live l JOIN svcacct.Accounts a ON a.Id = l.AccountId
-                                  WHERE l.PlanId = p.Id AND CASE WHEN {ScopePredicate} THEN 1 ELSE 0 END = 0))
+                  AND NOT EXISTS (SELECT 1 FROM live l JOIN outside o ON o.Id = l.AccountId WHERE l.PlanId = p.Id))
             """;
         return await RetryReadOnDeadlockAsync(async () =>
         {

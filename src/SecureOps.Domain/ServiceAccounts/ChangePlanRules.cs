@@ -110,9 +110,16 @@ public static class ChangePlanRules
         ServiceAccountText.Clean(value) is { Length: <= ServiceAccountGmsaName.MaxStoredLength } name
         && ServiceAccountGmsaName.Length(name) is > 0 and <= ServiceAccountGmsaName.Limit ? name : null;
 
-    /// <summary>Normalized OCO number, or null when it does not have the external-reference format (owner decision 4: format only).</summary>
+    /// <summary>
+    /// Normalized OCO number (trimmed, upper case as every external reference), or null unless it has the change-record format
+    /// (owner decision 4: format only, no ITSM lookup): at most 64 of A–Z, 0–9 and <c>- _ . /</c>, starting with a letter or
+    /// digit and holding at least one digit. No space, no other script, no free text.
+    /// </summary>
     public static string? OcoNumber(string? value) =>
-        ServiceAccountText.RecordNumber(value) is { Length: <= MaxOcoNumber } number ? number : null;
+        ServiceAccountText.RecordNumber(value) is { Length: <= MaxOcoNumber } number && OcoCode(number[0]) && number.Any(char.IsAsciiDigit)
+        && number.All(c => OcoCode(c) || c is '-' or '_' or '.' or '/') ? number : null;
+
+    private static bool OcoCode(char c) => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c);
 
     /// <summary>
     /// Approver separation (design T3): the approver is not the planner (<c>approverIsPlanner</c>) and is not the person who
