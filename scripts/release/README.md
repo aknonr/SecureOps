@@ -52,6 +52,9 @@ Offline regression on a temporary source combined with the change-plan branch:
 -BaselineRepositoryRoot <unchanged-master-root>`. It compares the complete old/new
 028-based plans, selected file sets and actual exported SQL bytes, then checks
 the separate 033 selection and refusal cases. It needs no SQL connection.
+Optional `-ExistingCandidateDirectory <retained-candidate>` also verifies the
+retained candidate's exact DBA SQL file set, manifest identities, actual bytes,
+execution order and false readiness flag without changing that candidate.
 
 ## Admin / Lookup 027 API/UI Review
 

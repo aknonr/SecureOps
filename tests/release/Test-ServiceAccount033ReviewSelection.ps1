@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][string]$EvidenceDirectory,
-    [Parameter(Mandatory)][string]$BaselineRepositoryRoot)
+    [Parameter(Mandatory)][string]$BaselineRepositoryRoot,
+    [string]$ExistingCandidateDirectory)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -64,6 +65,22 @@ $relativeFiles = @('candidate.json') + @($paths | Sort-Object)
 Check '028 exported candidate has exact old file set' (@(Get-ChildItem -LiteralPath $after -File -Recurse).Count -eq $relativeFiles.Count)
 foreach ($relative in $relativeFiles) {
     Check "028 identical bytes $relative" (Same-Bytes (Join-Path $before $relative) (Join-Path $after $relative))
+}
+if ($ExistingCandidateDirectory) {
+    $existingRoot = (Resolve-Path -LiteralPath $ExistingCandidateDirectory).Path
+    $existing = Get-Content -LiteralPath (Join-Path $existingRoot 'candidate.json') -Raw | ConvertFrom-Json
+    $existingSql = @($existing.supportingFiles | Where-Object path -Like 'DBA/sql/*' | Sort-Object path)
+    Check '028 retained candidate exact SQL file set' (($existingSql.path -join '|') -ceq
+        (($paths | Sort-Object | ForEach-Object { "DBA/$_" }) -join '|'))
+    Check '028 retained candidate schema, sequence and readiness' ($existing.requiredSchema -ceq $plan.RequiredSchema -and
+        ($existing.sqlSequence -join '|') -ceq ($plan.ExecutionFiles -join '|') -and
+        $existing.readyForInstallation -is [bool] -and !$existing.readyForInstallation)
+    foreach ($identity in $existingSql) {
+        $oldFile = Join-Path $existingRoot $identity.path
+        $newFile = Join-Path $after $identity.path.Substring(4)
+        Check "028 retained candidate identical bytes $($identity.path)" ((Same-Bytes $oldFile $newFile) -and
+            (Get-FileHash -LiteralPath $oldFile).Hash -ceq $identity.sha256 -and (Get-Item -LiteralPath $oldFile).Length -eq $identity.bytes)
+    }
 }
 Copy-Item -LiteralPath $file -Destination (Join-Path $evidence 'review-028.json')
 $paths033 = @('sql/migrations/033-service-account-change-plans.sql','sql/schema/033-service-account-change-plans.sql',
@@ -164,5 +181,6 @@ $selection.Remove('UpgradeFromInstalled032'); $selection.UpgradeFromInstalled028
 Reject '028 rejects future 034' { Select-Plan } 'exact complete'
 [ordered]@{checks=$checks;count=$checks.Count;baselineSource=$baselineSource;combinedSource=$source;
     sqlCandidateBytesIdentical=$true;readyForInstallation=$false;databaseConnections=$false;corporateActions=$false;
+    retainedCandidateSqlCompared=[bool]$ExistingCandidateDirectory;
     fullApiUiPackagesCreated=$false} | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath (Join-Path $evidence 'result.json') -Encoding UTF8
