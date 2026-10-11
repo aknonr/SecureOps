@@ -58,6 +58,7 @@ public static class ServiceAccountReplies
             SaErrors.ChangePlanAccountsRefused => (400, "change-plan-accounts", false, "Bazı hesaplar plana alınamadı; hiçbir şey kaydedilmedi."),
             SaErrors.ChangePlanState => (409, "change-plan", true, "Plan siz incelerken değişti veya bu adım için uygun durumda değil; güncel planı inceleyin."),
             SaErrors.ChangePlansNotInstalled => (503, "change-plan-schema", false, "Değişiklik planı tabloları (033) bu ortamda kurulu değil."),
+            SaErrors.ChangePlanEvidenceNotInstalled => (503, "change-plan-schema", false, "Plan kanıtı (034) bu ortamda kurulu değil; dosya kaydedilmedi."),
             SaErrors.NotConfigured => (503, "configuration", false, "Servis hesapları modülü bu ortamda etkin değil."),
             SaErrors.DirectoryUnavailable => (503, "directory", true, "Dizin sağlayıcısına şu an ulaşılamıyor."),
             _ => (503, "persistence", true, "Kayıt deposuna şu an ulaşılamıyor.")

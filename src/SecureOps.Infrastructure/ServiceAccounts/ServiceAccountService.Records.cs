@@ -249,8 +249,7 @@ public sealed partial class ServiceAccountService
                 _ => false
             };
             string safeName = SafeName(fileName);
-            if (!owned || content.Length == 0 || content.Length > _options.MaxEvidenceBytes || !_evidenceTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase)
-                || !SignatureMatches(contentType, content) || !ValidText(label, 400))
+            if (!owned || !EvidenceFileAcceptable(contentType, content, label))
             {
                 return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, owned ? "file" : "ownerId"));
             }
@@ -264,7 +263,11 @@ public sealed partial class ServiceAccountService
         RunAsync(principal, context, ServiceAccountCapabilities.View, async caller =>
         {
             EvidenceFile? file = await repository!.EvidenceAsync(id, cancellationToken);
-            bool visible = file is not null && (file.AccountId is { } account
+            // Plan evidence (034) is visible only to a caller whose scope covers every account of the plan; its account anchor
+            // exists only for the database constraint.
+            bool visible = file is not null && (file.OwnerEntityType == SqlServiceAccountRepository.PlanEvidenceOwner
+                ? await VisiblePlanAsync(caller, file.OwnerEntityId, cancellationToken) is not null
+                : file.AccountId is { } account
                 ? await repository.AnchorAsync(account, cancellationToken) is { } anchor && caller.Scope.Covers(anchor.Anchor)
                 : caller.Scope.CoversTeam(file.ScopeTeamId));
             if (!visible)
@@ -275,6 +278,11 @@ public sealed partial class ServiceAccountService
             await repository.AuditReadAsync("EvidenceDownloaded", new { EvidenceId = id, file!.AccountId }, caller.Actor, cancellationToken);
             return new EvidenceDownload(file.FileName, file.ContentType, file.Content);
         }, cancellationToken);
+
+    /// <summary>Shared evidence file checks (account and plan evidence): size, allowed type, signature, label length.</summary>
+    private bool EvidenceFileAcceptable(string? contentType, byte[] content, string? label) =>
+        contentType is not null && content.Length > 0 && content.Length <= _options.MaxEvidenceBytes
+        && _evidenceTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase) && SignatureMatches(contentType, content) && ValidText(label, 400);
 
     private static bool SignatureMatches(string contentType, byte[] content) => contentType.ToLowerInvariant() switch
     {

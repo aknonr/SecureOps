@@ -1,7 +1,8 @@
 # Toplu gMSA geçiş planı ve rehberli manuel değişiklik — tasarım (d)
 
 Durum: **PR 1 dalda (2026-10-07, `feature/service-accounts-change-plan-api-20261007`, merge edilmedi): 033 şeması, plan/önizleme/
-onay/iptal ve okuma uçları; kontrol listesi ve kapanış PR 2.** Sahip kararları 1–7 (2026-10-06). Kaynak: `ops-research/04-tasarim-secenekleri.md`
+onay/iptal ve okuma uçları. PR 2 dalda (2026-10-12, `feature/service-accounts-change-plan-checklist-20261012`, PR 1 dalından):
+kontrol listesi, plan kanıtı (034), kapanış.** Sahip kararları 1–7 (2026-10-06) ve PR 2 cevapları (2026-10-12). Kaynak: `ops-research/04-tasarim-secenekleri.md`
 (Karar 2 / M1, toplu işlem akışı), `ops-research/05-yol-haritasi.md` A6–A7. Modül sahibi Claude (2026-10-03 kararı).
 
 ## Sınırlar (değişmez)
@@ -71,14 +72,16 @@ girer). Servis Hesapları'nın sıradaki numarası 033. DBA kılavuzu sırası: 
 PR 1 uygulamasındaki farklar: `ChangePlanAccounts`, `ChangeItemChecks`, `ChangePlanEvents` kimlikleri `bigint IDENTITY` (son satır =
 en büyük Id); `ChangePlanAccounts` kolonları `ChangedBy/ChangedAt` (`BY` ayrılmış sözcük); önizlemede `ItemCount`; ön koşul
 025 + 030 + 031; hata numaraları 51390 (ön koşul/tekrar), 51391 (izin betiği), 51392 (salt eklenir), 51393 (onay ayrımı ve
-önizleme bağı), 51394 (`ChangePlans` sabit kolon/silme). Kanıt dosyaları için `Evidence.OwnerEntityType` CHECK'i bugün
-`ChangePlan` değerlerini kabul etmiyor; 033 mevcut kısıtı değiştirmediği için bu PR 2'nin açık sorusudur.
+önizleme bağı), 51394 (`ChangePlans` sabit kolon/silme). Kanıt dosyaları için `Evidence.OwnerEntityType` CHECK'i
+`ChangePlan` değerini kabul etmiyordu; sahip kararıyla (2026-10-12) 033 değişmez, **034** (`034-service-account-plan-evidence.sql`,
+SA-007) yalnız bu kısıtı aynı adla yeniden kurar (`'ChangePlan'` eklenir, mevcut satırlar `WITH CHECK` ile doğrulanır; yeni izin
+yok, `ChangePlanItem` türü yok). Ön koşul 033; tekrar çalıştırma ve eksik ön koşul 51396 ile reddedilir. DBA eki `DBA-034-TR.md`.
 
 Kısıtlar: `ApprovedBy <> ChangePlans.CreatedBy` hem serviste hem tetikleyici/CHECK ile; `WindowEnd > WindowStart`;
 `OcoNumber` mevcut OCO referans biçimi. "Bir hesap yalnız bir açık planda" kuralı serviste, aynı işlemde hesap
 satırları kilitlenerek (`UPDLOCK, HOLDLOCK`) denetlenir (durum `ChangePlans`'ta olduğu için filtreli tekil indeks yok). Yeni rol/izin yok: `svcacct_api_runtime` yeni tablolarda SELECT/INSERT (+ Plans için
 UPDATE). Tekrar çalıştırmayı reddeder; geri alma betiği yok. Kanıt dosyaları mevcut `Evidence` tablosunda (`OwnerEntityType`
-`ChangePlan` / `ChangePlanItem`).
+`ChangePlan`, 034; kalem başına ayrı kanıt türü yok, açıklama `label` ve işaret notunda).
 
 ## API (modül, yalnız ekleme; `/api/v1/service-accounts`)
 
@@ -114,6 +117,59 @@ DTO'lar `src/SecureOps.Shared/Contracts/ServiceAccounts/ServiceAccountChangePlan
   `ServiceAccountConcurrencyConflict`.
 - Kontrol listesi ve kapanış rotaları (`items/{itemId}/checks`, `complete`) PR 2'de eklenir.
 
+### Kontrol listesi, kanıt ve kapanış (PR 2, sabitlenen sözleşme 2026-10-12)
+
+Sahip cevapları (2026-10-12): paketleme aracı Codex'te (H), bu PR dokunmaz; plan kanıtı için 033 değişmez, ayrı küçük
+**034** `Evidence.CK_SaEvidence_Owner` kısıtına `'ChangePlan'` ekler (mevcut kanıt kodu, kapsam/IDOR korumaları ve denetim yeniden
+kullanılır); PR 1 varsayılanları kabul; test veritabanlarına dokunulmaz. Sistem yine hiçbir sunucuya bağlanmaz, parola alanı yoktur.
+
+| Yöntem ve yol | Yetki | Not |
+|---|---|---|
+| `GET change-plans/{id}/items/{itemId}/checks` | View | Bir kalemin işaret geçmişi (en yeni önce). Kalem planın **güncel** önizlemesinde değilse 404 |
+| `POST change-plans/{id}/items/{itemId}/checks` | Work | `{ state, note, expectedCheckId }`; yanıt güncel plan görünümü |
+| `POST change-plans/{id}/evidence` | Work | multipart `file`, `label`; mevcut tür/imza/boyut denetimi (11 MB) |
+| `POST change-plans/{id}/complete` | Work | `{ expectedVersion, note }` |
+
+**İşaret (adım 4).** `state` = `Done` (Yapıldı) · `Skipped` (Atlandı) · `Failed` (Başarısız) · `RolledBack` (Geri alındı).
+"Yapıldı" **kişinin beyanıdır**, doğrulama değildir; etiketler bunu söyler. Kurallar:
+- Yalnız `Approved` veya `InProgress` planda (önce 409 `planNotApproved`, kapanmış/iptal 409 `planClosed`). İlk işaret planı
+  `InProgress` yapar (`Started` olayı); sonraki işaretler olay yazmaz, işaret satırının kendisi kayıttır (olay listesi şişmez).
+  `Checked` olay türü 033'te ayrılmış kalır, kullanılmaz.
+- Kalem planın **güncel onaylı** önizlemesine ait olmalı; değilse 404 (yok ile aynı gövde, T6).
+- `expectedCheckId`: kişinin gördüğü son işaretin kimliği (hiç işaret yoksa boş). Arada biri aynı kalemi işaretlediyse 409
+  `checkStale` ve hiçbir şey yazılmaz; farklı kalemler paralel işaretlenebilir. Son satır geçerlidir, eskiler kalır.
+- `Done` dışındaki durumlarda not zorunlu (en çok 1000 karakter). `RolledBack` yalnız son durum `Done` veya `Failed` ise (geri
+  alınacak bir değişiklik olmalı), değilse 409 `nothingToRollBack`.
+- Bakım penceresi dışında (`now < WindowStart` veya `now > WindowEnd`, sunucu saati) işaret **kabul edilir**, satır
+  `OutsideWindow = 1` taşır ve yanıt/arayüz "pencere dışında" der (karar 5).
+- Her işaret aynı işlemde: işaret satırı, plan `UpdatedAt/By` (sürüm değişir), ilgili hesabın geçmiş satırı, audit (yalnız kimlikler).
+
+**Kanıt.** 034 sonrası `Evidence.OwnerEntityType = 'ChangePlan'`, `OwnerEntityId` = plan. `CK_SaEvidence_Anchor` için `AccountId` =
+planın en küçük kimlikli hesabı (yalnız kısıt dayanağı; görünürlük plandan gelir). Kurallar:
+- Yükleme `Approved`, `InProgress` veya `Completed` planda (doğrulama kanıtı kapanıştan sonra da gelebilir); `Draft/Previewed` 409
+  `planNotApproved`, `Cancelled` 409 `planClosed`. Dosya denetimi mevcut hesap kanıtıyla aynı kod.
+- İndirme mevcut `GET evidence/{id}` rotasıyla; `ChangePlan` sahipli dosyada çağıranın kapsamı planın **tüm** hesaplarını
+  kapsamalıdır, değilse 404. İndirme yine denetlenir (`EvidenceDownloaded`).
+- Plan kanıtı **hesap ayrıntısının kanıt listesinde görünmez** (tek hesaba kapsamı olan biri plan dosyasını göremez); planın
+  görünümünde `Evidence` listesiyle gelir. Hesap kanıt rotası `ownerType = ChangePlan` kabul etmez (400 `ownerId`).
+- 034 kurulu değilse yükleme 503 `ServiceAccountChangePlanEvidenceNotInstalled`, hiçbir şey yazılmaz; diğer plan işlevleri çalışır.
+
+**Kapanış (adım 5).** Yalnız `InProgress` ve **her kalemin bir işareti varsa** (yoksa 409 `checklistIncomplete`); `expectedVersion`
+bayatsa mevcut 409. Hesap başına sonuç (saf kural, `ChangePlanRules.AccountOutcome`):
+- `Performed`: hesabın en az bir kalemi `Done` ve hiçbir kalemi `Failed`/`RolledBack` değil → mevcut eylem yoluyla **bir**
+  `GmsaConversion` / `Performed` / `Intermediate` eylemi: `ActualAt` = hesabın son `Done` işaret zamanı, bağlı açık talep varsa
+  `RequestId`, OCO numarası eyleme dış kayıt olarak bağlanır, kanıt notu "plan kontrol listesi; Yapıldı kişinin beyanıdır".
+- `NotPerformed`: başarısız/geri alınmış kalem var veya hiç `Done` yok → eylem yazılmaz.
+Kapanış hesabı **doğrulanmış saymaz** (doğrulama mevcut `Verify` akışı), bağlı talebi **kapatmaz** (karar 7), gMSA geçiş kaydını
+(`IdentityTransitions`) değiştirmez. Plan `Completed` olur (`Completed` olayı, not varsa gerekçe), hesap başına geçmiş
+(`ChangePlanCompleted`, eylem kimliği ve sonuç), eylem başına mevcut `ActionReported` geçmişi ve audit; hepsi tek işlemde.
+Kapanan plan hesapları serbest bırakır (karar 6).
+
+**Görünüm eklemeleri (yalnız ekleme, varsayılanlı):** `ChangePlanItemView.Check` (son işaret), `ChangePlanView.Checklist`
+(toplam/Yapıldı/Atlandı/Başarısız/Geri alındı/işaretsiz/pencere dışı), `ChangePlanView.Evidence`, `ChangePlanAccountView.Outcome`
+ve `ActionId` (kapanıştan sonra), `ChangePlanPermissions.Check/Complete/UploadEvidence`. Yeni 409 alanları: `planNotApproved`,
+`checkStale`, `nothingToRollBack`, `checklistIncomplete`.
+
 ## Arayüz
 
 **Durum (2026-10-12, PR 3 dalda `feature/service-accounts-change-plan-ui-20261012`, merge edilmedi):** liste ve adım adım plan sayfası
@@ -144,9 +200,21 @@ Her satırın testi, ilgili PR'da **önce** yazılır; test adı dalda değişir
 | T3 | **Planlayan = onaylayan atlatma:** planlayan kendi planını onaylar; ya da başka biri planı değiştirir, değiştiren onaylar | Servis: onaylayan ≠ `ChangePlans.CreatedBy` → 403 `approverIsPlanner`. DB: onay INSERT'inde tetikleyici aynı kuralı uygular (servis atlansa da). **Sahip kararı (2026-10-06):** onaylayan, onaylanan önizlemeyi üreten veya plan oluşturulduktan sonra `PATCH` ile değiştiren kişi de olamaz (`ChangePlanEvents.Actor` üzerinden) → 403 `approverChangedPlan` | SQL `Approve_ByPlanner_Is403_AndWritesNothing`; SQL `ApprovalTrigger_RefusesPlannerEvenWhenServiceIsBypassed` (doğrudan INSERT → tetikleyici hatası, satır yok); SQL `Approve_ByEditorOfPlan_Is403`; SQL `Approve_ByPreviewer_Is403` |
 | T4 | **Eşzamanlı onay ve iptal** (veya iki onaylayıcı aynı anda): plan hem onaylı hem iptal görünür, iki onay satırı oluşur | Onay, iptal, `PATCH`, önizleme ve kapanış aynı işlemde plan satırını `UPDLOCK, HOLDLOCK` ile kilitler, durumu kilit altında yeniden okur; `RowVer` beklenen sürümle karşılaştırılır; geçiş + olay + geçmiş + audit tek işlemde. Kazanan bir tanedir, diğeri 409 ile güncel görünümü alır | SQL `ConcurrentApproveAndCancel_ExactlyOneWins` (20 tur, `Task.WhenAll`; her turda tam bir başarı, son durum ile `ChangePlanEvents` son satırı tutarlı, en çok bir onay satırı); SQL `TwoApproversAtOnce_OneApprovalRow`; SQL `ConcurrentPlansForOneAccount_OnlyOneHoldsIt` (karar 6); tanılama günlüğünde `Number=1205` olursa test başarısız sayılır |
 | T5 | **Kapsamı olmayan hesabın plana sızması:** kapsam dışı/katılımcı hesap plana eklenir; kapsam sonradan daralır; kısmi kapsamlı biri planı görür veya onaylar | Oluşturma ve `PATCH`'te hesap bazında sorumlu dayanak (a'daki `Responsible` kuralı); kapsam dışı hesap `Unavailable`, **adı dönmez**. Önizleme, onay, işaret ve kapanışta çağıranın kapsamı planın **tüm** hesaplarını yeniden kapsamalı; kapsamamıyorsa 404 (yok ile aynı). Liste ve ayrıntı yalnız tüm hesapları kapsanan planları döndürür | SQL `CreatePlan_OutOfScopeAccount_RefusedPerAccount_NoName`; SQL `ScopeShrinksAfterPlan_PreviewApproveUpdateAndCancel_Are404` (işaret kısmı PR 2); SQL `PartialScope_PlanInvisibleInListAndDetail`; SQL `List_AccountWithoutOrganizationOrOwner_CountsAsOutsideScope`; SQL `ParticipantBasis_CannotAddAccount` |
-| T6 | **IDOR:** başka planın kalemi (`itemId`), başka planın önizlemesi veya hesap kimliği tahmin edilerek işlem | Her rota kaynağı üst kaynağına bağlı okur: kalem `ChangePlanItems → ChangePlanPreviews.PlanId = {id}` ve **planın güncel onaylı önizlemesine** ait olmalı; değilse 404. Kanıt yükleme/indirme mevcut `Evidence` kapsam denetiminden geçer, sahip varlık türü + kimlik plana bağlı doğrulanır. 404 gövdesi var olan/olmayan ayrımı yapmaz | PR 1: SQL `Items_AreOnlyThePlansCurrentPreview`; SQL `Get_PlanOutsideScope_Is404_SameBodyAsMissing`; PR 2: SQL `Check_ItemOfAnotherPlan_Is404_AndWritesNothing`, `Check_ItemOfOlderPreview_Is404`; API `ChangePlanRoutes_PoliciesAndMethods` (her rota doğru politika: View/Work/Verify, yazma rotaları yalnız POST/PATCH) |
+| T6 | **IDOR:** başka planın kalemi (`itemId`), başka planın önizlemesi veya hesap kimliği tahmin edilerek işlem | Her rota kaynağı üst kaynağına bağlı okur: kalem `ChangePlanItems → ChangePlanPreviews.PlanId = {id}` ve **planın güncel onaylı önizlemesine** ait olmalı; değilse 404. Kanıt yükleme/indirme mevcut `Evidence` kapsam denetiminden geçer, sahip varlık türü + kimlik plana bağlı doğrulanır. 404 gövdesi var olan/olmayan ayrımı yapmaz | PR 1: SQL `Items_AreOnlyThePlansCurrentPreview`; SQL `Get_PlanOutsideScope_Is404_SameBodyAsMissing`; PR 2: SQL `Check_ItemOfAnotherPlan_Is404_AndWritesNothing`, `Check_ItemOfOlderPreview_Is404`, `CheckHistory_ItemOfAnotherPlan_Is404`, `PlanEvidence_DownloadNeedsWholePlanScope_AndStaysOutOfAccountDetail`, `AccountEvidenceRoute_RefusesChangePlanOwner`; API `ChangePlanRoutes_PoliciesAndMethods` (her rota doğru politika: View/Work/Verify, yazma rotaları yalnız POST/PATCH) |
 | T7 | **Önizleme sürümü/özet doğrulaması:** istemci kendi özetini üretir; aynı içerik farklı sırayla farklı özet verir; kayıtlı kalemler sonradan değişir | Özet yalnız sunucuda, kalemlerin kanonik dizilişinden (sabit alan sırası, `AccountId, ServerName, ComponentType, ComponentName` sıralı, UTF-8, ayraçlı) SHA-256. Onayda istekteki özet kayıtlı özetle **ve** kalemlerden yeniden hesaplanan özetle karşılaştırılır; uyuşmazlık 409 `previewStale` (yeniden hesap farkı ayrıca `logger.LogError`, içerik yazılmadan) | Birim `PreviewDigest_IsCanonical_IndependentOfRowOrder` ve `PreviewDigest_ChangesWhenAnyFieldChanges`; SQL `Approve_WrongSha_Is409`; SQL `Approve_RecomputesDigestFromStoredItems` (yalnız test veritabanında tetikleyici geçici kapatılıp bir kalem değiştirilir; onay 409 alır, onay satırı yazılmaz) |
 | T8 | **Ekleme-yalnız kayıtların bozulması:** önizleme kalemi, onay, işaret, olay veya hesap listesi sonradan güncellenir/silinir; `ChangePlans`'ta izinli olmayan kolon değiştirilir | `ChangePlanPreviews`, `ChangePlanItems`, `ChangePlanApprovals`, `ChangeItemChecks`, `ChangePlanEvents` üzerinde UPDATE/DELETE engelleyen tetikleyiciler (modülün mevcut 513xx deseni); `ChangePlans`'ta yalnız `Status`, `CurrentPreviewVersion`, `UpdatedAt/By` (`RowVer` otomatik) güncellenebilir, `Kind`/`Title`/`CreatedBy`/`CreatedAt` değişimi tetikleyiciyle reddedilir; karşılaştırma birebirdir (ikili collation + `DATALENGTH`, saat dilimi ofseti; 2026-10-12 düzeltmesi), kod değerli CHECK'ler yalnız tam yazımı kabul eder; silme yok. `svcacct_api_runtime` yeni tablolarda yalnız SELECT/INSERT (+ `ChangePlans`'ta yalnız dört durum sütununda UPDATE); DELETE izni yok. Her geçişte audit aynı işlemde | Harness (`sa-033-guards.sql`): her ekleme-yalnız tabloda UPDATE ve DELETE doğrudan denenir → 51392; `ChangePlans.CreatedBy`/`Title` UPDATE (harf büyüklüğü, sondaki boşluk, ofset dahil) ve DELETE → 51394; kod değerli sütunda `'draft'`/`'Draft '` → 547; API rolüyle (`EXECUTE AS USER`) DELETE → 229, sabit sütun UPDATE → 230, depo için gereken her izin var, DELETE izni yok. SQL `FailureBeforeCommit_LeavesNoPlanNoEventNoAudit` (enjekte hata) |
+
+PR 2 satırları (aynı kural: önce başarısız test; T5/T6 ekleri yukarıdaki hücrelerde):
+
+| # | Tehdit | Kontrol | Yakalayan test |
+|---|---|---|---|
+| T4b | **Eşzamanlı kapanış/iptal, işaret/kapanış; aynı kaleme iki işaret** | Kapanış, işaret ve kanıt da plan satırını `UPDLOCK, HOLDLOCK` ile kilitler; kapanış `expectedVersion`, işaret `expectedCheckId` taşır | SQL `ConcurrentCompleteAndCancel_ExactlyOneWins` (10 tur); SQL `ConcurrentChecksOnOneItem_OneWins_OtherIsCheckStale`; SQL `CheckAfterComplete_IsPlanClosed` |
+| T5b | **Kapsam daralınca işaret/kapanış/kanıt** | Her komut kapsamı kilit altında yeniden okur; tüm hesaplar kapsanmıyorsa 404 | SQL `ScopeShrinks_CheckCompleteEvidenceAndHistory_Are404` |
+| T9 | **Beyanın doğrulama sanılması / sessiz yan etki:** kapanış hesabı doğrulanmış sayar, talebi kapatır, başarısız hesaba "yapıldı" eylemi yazar | Kapanış yalnız `Performed` yazar (asla `Verified`), `Failed`/`RolledBack` olan hesaba eylem yazmaz, talep ve geçiş kaydı değişmez | SQL `Complete_RecordsPerformedNotVerified_KeepsRequestOpen_SkipsFailedAccount`; Birim `AccountOutcome_*` |
+| T10 | **Onaysız veya eksik iş:** onaydan önce işaret, işaretsiz kalemle kapanış, olmayan değişikliği geri alma | 409 `planNotApproved` / `checklistIncomplete` / `nothingToRollBack`, hiçbir şey yazılmaz | SQL `Check_BeforeApproval_Is409_WritesNothing`; SQL `Complete_WithUncheckedItem_Is409_WritesNothing`; SQL `RolledBack_WithoutChange_Is409` |
+| T11 | **Pencere dışı işaretin gizlenmesi** | Kabul edilir, `OutsideWindow = 1` satırda, görünümde ve sayımda | SQL `Check_OutsideWindow_IsAccepted_AndFlagged` |
+| T12 | **Yarım kalan kapanış** | Eylemler, olay, geçmiş, audit tek işlem | SQL `Complete_FailureBeforeCommit_LeavesNoActionNoEvent` (enjekte audit hatası) |
+| T13 | **034'ün kısıtı gevşetmesi / tekrar** | Kısıt aynı adla, `WITH CHECK`, yalnız `'ChangePlan'` eklenir; tekrar 51396 | Harness `sa-034-guards.sql` (`ChangePlan` kabul, `ChangePlanItem`/bilinmeyen 547, kısıt güvenilir, 034 tekrarı reddedilir); Birim `PlanEvidenceMigration_OnlyWidensOwnerCheck_RefusesReplay`; SQL `PlanEvidence_FollowsMigration034_503WhenMissing` (034'lü ve `-ThroughMigration 33` kopyada ayrı koşulur) |
 
 Notlar:
 - Tüm 409/403/404 yanıtları planın veya kapsam dışı hesabın içeriğini taşımaz; 409 yalnız çağıranın zaten görebildiği
@@ -156,7 +224,7 @@ Notlar:
 
 ## Testler
 
-- SQL harness 001–033 (ikinci çalıştırma reddedilir; 032'de bırakılmış kopyaya ileri uygulama).
+- SQL harness 001–034 (ikinci çalıştırma reddedilir; 032'de ve 033'te bırakılmış kopyaya ileri uygulama).
 - Entegrasyon: planlayan onaylayamaz (servis ve DB kısıtı); bayat önizleme 409; kısmi kapsamlı plan görünmez; `NoScan`,
   `StaleScan`, `NotCovered`, `ManualOnly` işaretleri; reddedilen istek hiçbir şey yazmaz; onay öncesi işaret 409; pencere
   dışı işaret kabul edilir ve `OutsideWindow` taşır; açık plandaki hesap ikinci planda reddedilir (kapanmış/iptal plandaki
@@ -168,7 +236,7 @@ Notlar:
 
 1. **033 + plan/önizleme/onay API** (domain kuralları, SQL, servis, controller, OpenAPI, DBA kılavuzu eki; sıra 029 →
    030 → 031 → 032 (Access) → 033). ~3 gün.
-2. **Kontrol listesi + kanıt + kapanış/iptal** (API ve testleri). ~2 gün.
+2. **Kontrol listesi + kanıt + kapanış** (API, 034, DBA eki, testleri). ~2 gün.
 3. **Arayüz** (liste, plan sayfası, hesap sayfası bağlantısı, sıradaki adım). ~2–3 gün.
 
 Her PR ayrı dal, küçük commit'ler, build/test/format/SQL harness; push edilir, merge sahibe sorulur.

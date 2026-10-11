@@ -40,6 +40,28 @@ public enum ChangePlanFlag
     NothingFound
 }
 
+/// <summary>The person's own statement about one preview row (CHANGE-PLAN-DESIGN.md PR 2). Done is never a verification.</summary>
+public enum ChangePlanCheckState
+{
+    /// <summary>The person states the change was made.</summary>
+    Done,
+    /// <summary>Not done in this plan, with a reason.</summary>
+    Skipped,
+    /// <summary>Tried and failed, with a reason.</summary>
+    Failed,
+    /// <summary>A change that was made or tried was undone, with a reason.</summary>
+    RolledBack
+}
+
+/// <summary>What completion records for one account.</summary>
+public enum ChangePlanAccountOutcome
+{
+    /// <summary>At least one row Done and none Failed or RolledBack: one unverified GmsaConversion Performed action.</summary>
+    Performed,
+    /// <summary>Anything else: no action is recorded.</summary>
+    NotPerformed
+}
+
 /// <summary>One account to preview: its target gMSA name and its latest Discovery scan (null when it has none).</summary>
 public sealed record ChangePlanPreviewAccount(Guid AccountId, string TargetGmsaName, ChangePlanScanSource? Scan);
 
@@ -181,6 +203,47 @@ public static class ChangePlanRules
         ChangePlanFlag.NothingFound => "Son tarama bu hesabı taranan sunucularda bulmadı (kullanılmıyor anlamına gelmez)",
         _ => $"gMSA adı {ServiceAccountGmsaName.Limit} karakterden uzun"
     };
+
+    /// <summary>
+    /// Input refusal of a checklist mark: <c>state</c> when the code is not an exact state, <c>note</c> when a reason is missing
+    /// (every state except Done) or longer than <see cref="MaxReason"/>. Null when the input may be stored.
+    /// </summary>
+    public static string? CheckInputError(string? state, string? note) =>
+        state is null || !Enum.GetNames<ChangePlanCheckState>().Contains(state, StringComparer.Ordinal) ? "state"
+        : ServiceAccountText.Clean(note) is { Length: > MaxReason } || state != nameof(ChangePlanCheckState.Done) && ServiceAccountText.Clean(note) is null ? "note"
+        : null;
+
+    /// <summary>RolledBack needs something to undo: the row's latest state is Done or Failed.</summary>
+    public static bool CanRollBack(ChangePlanCheckState? latest) => latest is ChangePlanCheckState.Done or ChangePlanCheckState.Failed;
+
+    /// <summary>Whether a mark at <paramref name="at"/> falls outside the approved window (both ends inside; owner decision 5: accepted, labelled).</summary>
+    public static bool IsOutsideWindow(DateTimeOffset at, DateTimeOffset windowStart, DateTimeOffset windowEnd) => at < windowStart || at > windowEnd;
+
+    /// <summary>
+    /// Completion outcome of one account from the latest state of each of its rows (null = unmarked): Performed only when at
+    /// least one row is Done and none is Failed or RolledBack.
+    /// </summary>
+    public static ChangePlanAccountOutcome AccountOutcome(IEnumerable<ChangePlanCheckState?> latestStates)
+    {
+        ChangePlanCheckState?[] states = [.. latestStates];
+        return states.Contains(ChangePlanCheckState.Done) && !states.Any(s => s is ChangePlanCheckState.Failed or ChangePlanCheckState.RolledBack)
+            ? ChangePlanAccountOutcome.Performed
+            : ChangePlanAccountOutcome.NotPerformed;
+    }
+
+    /// <summary>Turkish label of a mark; Done says it is the person's statement.</summary>
+    public static string CheckStateLabel(ChangePlanCheckState state) => state switch
+    {
+        ChangePlanCheckState.Done => "Yapıldı (kişinin beyanı, doğrulama değil)",
+        ChangePlanCheckState.Skipped => "Atlandı",
+        ChangePlanCheckState.Failed => "Başarısız",
+        _ => "Geri alındı"
+    };
+
+    /// <summary>Turkish label of a completion outcome.</summary>
+    public static string OutcomeLabel(ChangePlanAccountOutcome outcome) => outcome == ChangePlanAccountOutcome.Performed
+        ? "Yapıldı beyan edildi; gMSA geçiş eylemi 'yapıldı' olarak kaydedildi, doğrulama ayrı"
+        : "Uygulanmadı, başarısız veya geri alındı; eylem kaydedilmedi";
 
     /// <summary>Turkish label of a status.</summary>
     public static string StatusLabel(ChangePlanStatus status) => status switch

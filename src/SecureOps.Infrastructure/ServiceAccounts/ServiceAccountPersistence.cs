@@ -58,6 +58,8 @@ public static class SaErrors
     public const string ChangePlanAccountsRefused = "ServiceAccountChangePlanAccountsRefused";
     /// <summary>The plan is not in the state the command needs, or the approved preview is no longer the current one.</summary>
     public const string ChangePlanState = "ServiceAccountChangePlanStateConflict";
+    /// <summary>Plan evidence (migration 034: Evidence owner type ChangePlan) is not installed on this database.</summary>
+    public const string ChangePlanEvidenceNotInstalled = "ServiceAccountChangePlanEvidenceNotInstalled";
 }
 
 /// <summary>Scope inputs loaded for one caller.</summary>

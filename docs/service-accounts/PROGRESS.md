@@ -17,6 +17,19 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Change plan d, PR 2 (branch `feature/service-accounts-change-plan-checklist-20261012`, from the PR 1 branch `db56856`, not merged)
+
+- Contract first (`a737d2b`, pushed for F and G): `GET/POST change-plans/{id}/items/{itemId}/checks`, `POST .../evidence`,
+  `POST .../complete`; additive DTO members (latest mark per row, checklist summary, plan evidence, completion outcome,
+  `Check/Complete/UploadEvidence` permissions). Design section "Kontrol listesi, kanıt ve kapanış", threat rows T4b–T13.
+- Migration 034 (SA-007, `DBA-034-TR.md`): only `CK_SaEvidence_Owner` gains `'ChangePlan'` (same name, `WITH CHECK`); 51396
+  on replay/missing 033/unexpected definition. Harness 001–034 + `sa-034-guards.sql`.
+- Marks are the person's statement (`Done/Skipped/Failed/RolledBack`, note required except Done, `expectedCheckId` against
+  lost updates, outside-window accepted and flagged). Completion records one unverified `GmsaConversion` Performed action per
+  account whose rows say Done with nothing Failed/RolledBack; never verifies, never closes the linked request, never touches
+  the transition record. Plan evidence: whole-plan scope for download, never listed on one account.
+- Open: release selector must learn 034 too (Codex, H); `sa-sql-harness.sh` (Linux counterpart) still ends at 032.
+
 ## Change plan d, PR 1 (branch `feature/service-accounts-change-plan-api-20261007`, from master `78a94b1`, not merged)
 
 - Contract first (`0400d58`, pushed for the UI (F) and security-test (G) sessions): `/api/v1/service-accounts/change-plans` list/detail/
