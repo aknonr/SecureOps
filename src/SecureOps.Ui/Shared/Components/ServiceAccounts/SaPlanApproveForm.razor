@@ -1,0 +1,93 @@
+@* Approval of exactly one preview: the person confirms they looked at this version and digest, gives the OCO number (format only, never
+   looked up in ITSM) and the maintenance window with an explicit UTC offset, and a reason. The request carries the preview version and
+   SHA-256, so a changed plan is refused as stale. The page shows this form only when the server says the caller may approve. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<div class="sa-plan-approve">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="4">
+            <MudTextField T="string" @bind-Value="_oco" Label="OCO numarası" MaxLength="64" Immediate="true" Variant="Variant.Outlined" Required="true"
+                          HelperText="ITSM'de sorgulanmaz; numara yazıldığı gibi (büyük harfle) kaydedilir." />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudTextField T="string" @bind-Value="_start" Label="Bakım penceresi başlangıcı" InputType="InputType.DateTimeLocal" Variant="Variant.Outlined" Required="true" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudTextField T="string" @bind-Value="_end" Label="Bakım penceresi bitişi" InputType="InputType.DateTimeLocal" Variant="Variant.Outlined" Required="true" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudTextField T="string" @bind-Value="_offset" Label="UTC farkı" MaxLength="6" Immediate="true" Variant="Variant.Outlined"
+                          HelperText="Pencere saatleri bu farkla kaydedilir (ör. +03:00)." />
+        </MudItem>
+        <MudItem xs="12" md="8">
+            <MudTextField T="string" @bind-Value="_reason" Label="Onay gerekçesi" MaxLength="1000" Lines="2" Immediate="true" Variant="Variant.Outlined" Required="true" />
+        </MudItem>
+    </MudGrid>
+    <div role="alert">
+        @if (_error is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_error</MudAlert> }
+    </div>
+    <SoConfirmStatement Text="@($"Önizleme sürüm {Plan.Preview!.Version} (özet {ChangePlanPresentation.ShortDigest(Plan.Preview.Sha256)}…) satırlarını ve işaret sayılarını inceledim; bu sürümü onaylıyorum.")"
+                        Checked="_acknowledged" CheckedChanged="@(v => _acknowledged = v)" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="SubmitAsync" Disabled="@(Busy || !_acknowledged)">Önizlemeyi onayla</MudButton>
+</div>
+
+@code {
+    private string _oco = string.Empty;
+    private string _start = string.Empty;
+    private string _end = string.Empty;
+    private string _offset = DefaultOffset();
+    private string _reason = string.Empty;
+    private bool _acknowledged;
+    private string? _error;
+
+    /// <summary>The previewed plan being approved.</summary>
+    [Parameter, EditorRequired] public ChangePlanView Plan { get; set; } = default!;
+
+    /// <summary>A command is running.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Sends the approval; the form keeps its values until the page confirms the save.</summary>
+    [Parameter, EditorRequired] public EventCallback<ApproveChangePlanRequest> OnApprove { get; set; }
+
+    /// <summary>The server host's current UTC offset as a starting point; the person can change it.</summary>
+    private static string DefaultOffset()
+    {
+        TimeSpan offset = TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.UtcNow);
+        return (offset < TimeSpan.Zero ? "-" : "+") + offset.Duration().ToString(@"hh\:mm");
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+        if (Plan.Preview is not { } preview)
+        {
+            _error = "Önizleme yok; önce önizleme oluşturulmalı.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_oco) || string.IsNullOrWhiteSpace(_reason))
+        {
+            _error = "OCO numarası ve onay gerekçesi gerekli.";
+            return;
+        }
+
+        if (!AnnouncementTime.ValidOffset(_offset.Trim())
+            || !TryInstant(_start, _offset.Trim(), out DateTimeOffset start) || !TryInstant(_end, _offset.Trim(), out DateTimeOffset end))
+        {
+            _error = "Bakım penceresinin başlangıç ve bitişini tarih-saat olarak, UTC farkını +03:00 biçiminde girin.";
+            return;
+        }
+
+        if (end <= start)
+        {
+            _error = "Bakım penceresinin bitişi başlangıçtan sonra olmalı.";
+            return;
+        }
+
+        await OnApprove.InvokeAsync(new ApproveChangePlanRequest(preview.Version, preview.Sha256, _oco.Trim(), start, end, _reason.Trim()));
+    }
+
+    private static bool TryInstant(string local, string offset, out DateTimeOffset instant) =>
+        AnnouncementTime.TryRead(local.Trim() + (local.Trim().Length == 16 ? ":00" : string.Empty) + offset, out instant) && local.Trim().Length >= 16;
+}

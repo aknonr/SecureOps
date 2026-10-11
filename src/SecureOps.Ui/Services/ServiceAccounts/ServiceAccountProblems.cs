@@ -39,11 +39,21 @@ public static class ServiceAccountProblems
             "Bu bileşen için bu hesapta daha önce karar verildi; yeni kayıt oluşmadı. Güncel durum yüklendi.", [], false, true),
         "ServiceAccountIdempotencyKeyRequired" => Build(UiProblemKind.Validation, code, "İşlem anahtarı eksik",
             "Aktarım onayı tekrar gönderimi güvenli kılan anahtarla yapılmalıdır.", ["Sayfayı yenileyip onayı yeniden verin."], false, true),
+        "ServiceAccountChangePlanAccountsRefused" => Build(UiProblemKind.Validation, code, "Bazı hesaplar plana alınamadı",
+            "Hiçbir şey kaydedilmedi. Her hesabın sonucu aşağıda; düzeltip yeniden gönderin.", [], false, false),
+        "ServiceAccountChangePlanStateConflict" => Build(UiProblemKind.Conflict, code, "Plan bu adım için uygun durumda değil",
+            "Plan siz incelerken değişti veya adım bu durumda yapılamıyor. Hiçbir şey kaydedilmedi; güncel plan yüklendi.", _refresh, false, true),
+        "ServiceAccountChangePlansNotInstalled" => Build(UiProblemKind.NotConfigured, code, "Değişiklik planı bu ortamda kurulu değil",
+            "Plan tabloları için veritabanı güncellemesi (033) uygulanmamış. Plan oluşturulamaz ve okunamaz; hiçbir şey değiştirilmedi.",
+            ["Veritabanı sorumlusu 033'ün uygulanma sırasını DBA kılavuzundan kontrol etmelidir."], false, false),
         _ => null
     };
 
     /// <summary>Turkish explanation for the rejected field or business rule the API names (null when not specific).</summary>
-    public static string? FieldMessage(UiProblem? problem) => problem?.Fields.FirstOrDefault() switch
+    public static string? FieldMessage(UiProblem? problem) => FieldText(problem?.Fields.FirstOrDefault());
+
+    /// <summary>Turkish explanation for one field or business rule code (null when it is null).</summary>
+    public static string? FieldText(string? fieldCode) => fieldCode switch
     {
         "ActualDateRequired" => "Doğrulama için işlemin gerçek tarihi gerekir; önce işlem tarihini tamamlayın.",
         "ActualDateInFuture" => "Gerçekleşme tarihi ileri bir gün olamaz.",
@@ -109,6 +119,17 @@ public static class ServiceAccountProblems
         "bootstrapClosed" => "Tek seferlik ilk kurulum kullanılamaz: bu modülde daha önce kapsam verilmiş. Kapsamı başka bir modül yöneticisi vermelidir.",
         "bootstrapSchema" => "Tek seferlik ilk kurulum için gereken veritabanı güncellemesi (SA-003) henüz uygulanmadı.",
         "duplicate" => "Bu kullanıcının bu kapsamda zaten etkin bir yetkisi var.",
+        "previewStale" => "Önizleme siz incelerken yenilendi veya plan değişti. Onay verilmedi; güncel önizlemeyi inceleyip yeniden onaylayın.",
+        "planNotPreviewed" => "Plan şu an onaylanabilir durumda değil (önizlenmemiş, zaten onaylanmış veya kapanmış). Onay verilmedi.",
+        "planNotEditable" => "Plan bu durumda değiştirilemez veya önizlenemez. Hiçbir şey kaydedilmedi.",
+        "planClosed" => "Plan kapanmış (tamamlandı veya iptal edildi); değiştirilemez.",
+        "approverIsPlanner" => "Planı hazırlayan kişi kendi planını onaylayamaz; başka bir doğrulama yetkilisi onaylamalıdır.",
+        "approverChangedPlan" => "Önizlemeyi üreten veya planı değiştiren kişi onaylayamaz; başka bir doğrulama yetkilisi onaylamalıdır.",
+        "ocoNumber" => "OCO numarası gerekli (en çok 64 karakter). Numara ITSM'de sorgulanmaz.",
+        "window" => "Bakım penceresinin bitişi başlangıçtan sonra olmalı.",
+        "previewVersion" or "sha256" => "Onay bir önizleme sürümüne ve özetine bağlıdır; sayfayı yenileyip güncel önizlemeyi onaylayın.",
+        "accounts" => "Plana 1–20 hesap eklenmeli.",
+        "title" => "Plan başlığı gerekli (en çok 200 karakter).",
         "scopeKind" => "Kapsam türünü seçin; kurum için kurum, ekip için ekip seçilmelidir. Gerekçe zorunludur.",
         null => null,
         { } field => "Kontrol edilecek alan: " + field

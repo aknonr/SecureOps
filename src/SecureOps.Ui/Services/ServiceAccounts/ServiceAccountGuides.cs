@@ -112,4 +112,28 @@ public static class ServiceAccountGuides
             ("Birleştir", "Farklı yazımları takma ad olarak ekleyin.")
         ],
         "Kişi kaydı uygulamaya erişim veya yetki vermez; dizinde arama yapmaz.");
+
+    /// <summary>gMSA conversion plans (list).</summary>
+    public static Guide Plans { get; } = new("Değişiklik planları",
+        "gMSA'ya geçiş için hazırlanan planlar. Plan; hesapları, her hesabın son keşif taramasından çıkan bileşenleri, onayı ve sizin işaretlediğiniz kontrol listesini tutar. Değişikliğin kendisini siz, kendi yetkinizle ve değişiklik kaydınızla sunucuda yaparsınız.",
+        [
+            ("Plan hazırla", "1–20 hesap seçin, her biri için hedef gMSA adını yazın."),
+            ("Önizle", "Sistem hesapların son taramasından bileşen satırlarını çıkarır; eski, eksik veya bilgi olmayan satırlar işaretlenir."),
+            ("Onayla", "Planı hazırlamayan bir doğrulama yetkilisi tam bu önizlemeyi OCO numarası ve bakım penceresiyle onaylar."),
+            ("Uygula ve işaretle", "Değişikliği sunucuda ekip yapar; kontrol listesi yaptığınız işi kayda alır."),
+            ("Doğrula", "Değişiklikten sonra gMSA kontrol taraması yüklenir; doğrulama ayrı bir adımdır.")
+        ],
+        "Yalnız tüm hesapları kapsamınızda olan planları listeler. " + _noServerChange + " Parola alanı yoktur; parola değişikliği PAM'ın işidir.");
+
+    /// <summary>One gMSA conversion plan.</summary>
+    public static Guide PlanDetail { get; } = new("Değişiklik planı",
+        "Planın hangi adımda olduğunu, o adımda neyin eksik olduğunu ve kimin ne yapabileceğini gösterir. Her adımın sonucu sunucunun kaydıdır; ekran sunucunun yapmadığı bir sonucu göstermez.",
+        [
+            ("Plan", "Hesaplar ve hedef gMSA adları. Önizlemeden sonra değiştirirseniz plan taslağa döner ve önizleme geçersiz olur."),
+            ("Önizleme", "Her hesabın son taramasındaki bileşenler. \"Bulunamadı\" kullanılmıyor demek değildir; \"bilgi yok\" taramanın o hesabı kapsamadığını söyler."),
+            ("Onay", "Belirli bir önizleme sürümüne ve özetine bağlıdır; planı hazırlayan, önizlemeyi üreten veya planı değiştiren onaylayamaz."),
+            ("Kontrol listesi", "Bileşenleri sunucuda ekip elle yapar. Yapıldı işareti kişinin beyanıdır, doğrulama değildir."),
+            ("Doğrulama", "gMSA kontrol taraması ve hesap sayfasındaki doğrulama ile ayrıca yapılır; plan kapanması hesabı doğrulanmış saymaz.")
+        ],
+        _noServerChange + " Planı kapatmak bağlı talebi kapatmaz.");
 }

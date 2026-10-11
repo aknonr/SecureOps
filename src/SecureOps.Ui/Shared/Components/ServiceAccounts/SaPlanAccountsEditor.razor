@@ -1,0 +1,164 @@
+@* Chooses the accounts of a gMSA conversion plan and the target gMSA name of each (create and edit share it). The draft stays here
+   until the server confirms the save; a refused request shows each account's answer next to its row and keeps everything typed.
+   The 15-character rule is advice only: the server refuses a longer name. No password field exists. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<div class="sa-plan-editor">
+    @if (ShowTitle)
+    {
+        <MudTextField T="string" Value="@Title" ValueChanged="TitleChanged" Label="Plan başlığı" MaxLength="200" Immediate="true" Variant="Variant.Outlined"
+                      Required="true" HelperText="Kısa bir ad: hangi iş için hazırlanıyor?" />
+    }
+
+    <h3 class="sa-plan-editor-heading" id="@_searchTitleId">Hesap ekle</h3>
+    <div class="sa-plan-search" role="search" aria-labelledby="@_searchTitleId">
+        <MudTextField T="string" @bind-Value="_query" Label="Hesap adı veya SID" MaxLength="200" Variant="Variant.Outlined" Immediate="true"
+                      OnKeyDown="SearchOnEnterAsync" aria-label="Eklenecek hesabı ara" />
+        <MudButton Variant="Variant.Outlined" OnClick="SearchAsync" Disabled="@(_searching || Busy)" StartIcon="@Icons.Material.Filled.Search">Ara</MudButton>
+    </div>
+    <div role="status" aria-live="polite">
+        @if (_searching) { <p class="so-panel-text--sm">Hesaplar aranıyor…</p> }
+        else if (_found is { Count: 0 }) { <p class="so-panel-text--sm">Aramaya uyan, kapsamınızda bir hesap bulunamadı. Bulunamadı, hesabın var olmadığı anlamına gelmez; kapsamınız dışında olabilir.</p> }
+    </div>
+    @if (_found is { Count: > 0 })
+    {
+        <ul class="sa-plan-found" aria-label="Arama sonuçları">
+            @foreach (AccountListItem item in _found)
+            {
+                <li>
+                    <span>@item.AccountName@(string.IsNullOrWhiteSpace(item.Domain) ? "" : " · " + item.Domain)</span>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => Add(item))"
+                               Disabled="@(Contains(item.Id) || Rows.Count >= MaxAccounts)"
+                               aria-label="@($"{item.AccountName} hesabını plana ekle")">@(Contains(item.Id) ? "Eklendi" : "Ekle")</MudButton>
+                </li>
+            }
+        </ul>
+    }
+
+    <h3 class="sa-plan-editor-heading">Plandaki hesaplar (@Rows.Count / @MaxAccounts)</h3>
+    @if (Rows.Count == 0)
+    {
+        <p class="so-panel-text--sm">Henüz hesap yok. En az 1, en çok @MaxAccounts hesap gerekir.</p>
+    }
+    else
+    {
+        <ul class="sa-plan-rows" aria-label="Plandaki hesaplar">
+            @foreach (PlanAccountDraft row in Rows)
+            {
+                ChangePlanAccountResult? result = _edited.Contains(row.AccountId) ? null : Results.FirstOrDefault(r => r.AccountId == row.AccountId);
+                <li class="sa-plan-row">
+                    <div class="sa-plan-row-name">
+                        <strong>@row.AccountName</strong>@if (!string.IsNullOrWhiteSpace(row.Domain)) { <span class="so-panel-text--sm"> · @row.Domain</span> }
+                        @if (result is not null)
+                        {
+                            <div><SoStatusBadge Label="@result.OutcomeLabel" Tone="@ChangePlanPresentation.OutcomeTone(result.Outcome)"
+                                                Icon="@(result.Outcome == "Accepted" ? Icons.Material.Filled.CheckCircleOutline : Icons.Material.Filled.ErrorOutline)" /></div>
+                        }
+                    </div>
+                    <div class="sa-plan-row-target">
+                        <SaGmsaNameField Value="@row.TargetGmsaName" ValueChanged="@(v => Rename(row, v))" Available="true" Label="@($"{row.AccountName}: hedef gMSA adı")" />
+                    </div>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.RemoveCircleOutline" OnClick="@(() => Remove(row))"
+                               Disabled="Busy" aria-label="@($"{row.AccountName} hesabını plandan çıkar")">Çıkar</MudButton>
+                </li>
+            }
+        </ul>
+    }
+
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OnSubmit" Disabled="@(Busy || Rows.Count == 0)">@SubmitLabel</MudButton>
+        @if (OnCancel.HasDelegate) { <MudButton Variant="Variant.Text" OnClick="OnCancel" Disabled="Busy">Vazgeç</MudButton> }
+    </div>
+</div>
+
+@code {
+    private const int MaxAccounts = 20;
+    private readonly string _searchTitleId = "sa-plan-search-" + Guid.NewGuid().ToString("N")[..8];
+    private string _query = string.Empty;
+    private bool _searching;
+    private IReadOnlyList<AccountListItem>? _found;
+    private readonly HashSet<Guid> _edited = [];
+    private IReadOnlyList<ChangePlanAccountResult>? _shownResults;
+
+    /// <summary>The draft rows (owned by the page; changed here only by add, remove and typing a name).</summary>
+    [Parameter, EditorRequired] public List<PlanAccountDraft> Rows { get; set; } = [];
+
+    /// <summary>Ask for a title field (create only; a plan's title does not change).</summary>
+    [Parameter] public bool ShowTitle { get; set; }
+
+    /// <summary>Plan title.</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Two-way title sink.</summary>
+    [Parameter] public EventCallback<string?> TitleChanged { get; set; }
+
+    /// <summary>Per-account answers of the last refused request.</summary>
+    [Parameter] public IReadOnlyList<ChangePlanAccountResult> Results { get; set; } = [];
+
+    /// <summary>A command is running.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Label of the submit button.</summary>
+    [Parameter] public string SubmitLabel { get; set; } = "Kaydet";
+
+    /// <summary>Saves the draft.</summary>
+    [Parameter, EditorRequired] public EventCallback OnSubmit { get; set; }
+
+    /// <summary>Closes the editor without saving.</summary>
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    /// <summary>Searches accounts inside the caller's scope (server-side); null when the search failed.</summary>
+    [Parameter, EditorRequired] public Func<string, Task<IReadOnlyList<AccountListItem>?>> Search { get; set; } = _ => Task.FromResult<IReadOnlyList<AccountListItem>?>(null);
+
+    /// <summary>A refused answer describes the name that was sent; once the name is edited the old answer is no longer shown.</summary>
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_shownResults, Results))
+        {
+            _shownResults = Results;
+            _edited.Clear();
+        }
+    }
+
+    private void Rename(PlanAccountDraft row, string? value)
+    {
+        row.TargetGmsaName = value ?? string.Empty;
+        _edited.Add(row.AccountId);
+    }
+
+    private bool Contains(Guid id) => Rows.Any(r => r.AccountId == id);
+
+    private void Add(AccountListItem item)
+    {
+        if (!Contains(item.Id) && Rows.Count < MaxAccounts)
+        {
+            Rows.Add(new PlanAccountDraft { AccountId = item.Id, AccountName = item.AccountName, Domain = item.Domain });
+        }
+    }
+
+    private void Remove(PlanAccountDraft row) => Rows.Remove(row);
+
+    private async Task SearchOnEnterAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter") { await SearchAsync(); }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_query))
+        {
+            return;
+        }
+
+        _searching = true;
+        try
+        {
+            _found = await Search(_query.Trim());
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+}

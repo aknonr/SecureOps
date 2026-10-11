@@ -1,0 +1,49 @@
+.sa-plan-check-account {
+    margin-top: var(--so-space-3);
+}
+
+.sa-plan-check-title {
+    font-size: 1rem;
+    margin: 0 0 var(--so-space-1);
+    overflow-wrap: anywhere;
+}
+
+.sa-plan-check-server {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin: var(--so-space-2) 0 var(--so-space-1);
+    color: var(--so-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.sa-plan-check-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--so-space-2);
+}
+
+.sa-plan-check-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--so-space-2) var(--so-space-3);
+    padding: var(--so-space-2) var(--so-space-3);
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius-sm);
+}
+
+.sa-plan-check-item > div:first-child {
+    flex: 1 1 14rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.sa-plan-check-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-1);
+}

@@ -1,0 +1,83 @@
+@* Work list of an approved plan: the approved preview's rows grouped by account and server. The team makes the change on the server
+   under its own change record; this system never connects to a server. Marking rows (Yapıldı / Atlandı / Başarısız / Geri alındı) needs
+   an API the server does not offer yet (PR 2), so nothing can be marked here and the page says so instead of showing a button that
+   would not save. Whatever is marked later is the person's statement, not a verification. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" role="note">
+    Yapıldı işareti kişinin beyanıdır, doğrulama değildir. İşaretleme için sunucu tarafında henüz bir özellik yok (sonraki sürümle gelecek);
+    bu liste yalnız yapılacakları gösterir ve burada hiçbir şey kaydedilmez. Değişikliği kendi yetkinizle, kendi değişiklik kaydınızla sunucuda siz yaparsınız.
+</MudAlert>
+
+@if (Failed)
+{
+    <p class="so-panel-text" role="note">Satırlar okunamadı; yukarıdaki hata ve yeniden deneme düğmesi geçerlidir.</p>
+}
+else if (Items is null)
+{
+    <SoLoading Message="Kontrol listesi satırları okunuyor" />
+}
+else if (Items.Items.Count == 0)
+{
+    <SoEmptyState Title="Yapılacak satır yok" Description="Sunucu onaylanan önizleme için satır döndürmedi." />
+}
+else
+{
+    @foreach (IGrouping<Guid, ChangePlanItemView> account in Items.Items.GroupBy(i => i.AccountId))
+    {
+        <section class="sa-plan-check-account" aria-label="@($"{account.First().AccountName}: yapılacaklar")">
+            <h4 class="sa-plan-check-title">@account.First().AccountName</h4>
+            @foreach (IGrouping<string, ChangePlanItemView> server in account.GroupBy(i => i.ServerName ?? string.Empty))
+            {
+                <h5 class="sa-plan-check-server">@(server.Key.Length == 0 ? "Sunucu bilgisi yok" : server.Key)</h5>
+                <ul class="sa-plan-check-list">
+                    @foreach (ChangePlanItemView item in server)
+                    {
+                        <li class="sa-plan-check-item">
+                            <div>
+                                @if (item.ComponentName is null)
+                                {
+                                    <strong>Bileşen bilgisi yok</strong>
+                                    <div class="so-panel-text--sm">@item.FlagLabel</div>
+                                }
+                                else
+                                {
+                                    <strong>@item.ComponentName</strong> <span class="so-panel-text--sm">· @(item.ComponentType ?? "tür bilgisi yok")</span>
+                                    <div class="so-panel-text--sm">@(item.CurrentIdentity ?? "şimdiki kimlik bilgisi yok") → @item.TargetIdentity</div>
+                                }
+                            </div>
+                            <div class="sa-plan-check-flags">
+                                @if (item.Flag == "ManualOnly")
+                                {
+                                    <SoStatusBadge Label="Elle yapılacak" Tone="SoStatusBadge.BadgeTone.Info" Icon="@Icons.Material.Filled.PanTool" Title="@item.FlagLabel" />
+                                }
+                                else if (item.Flag != "Ok")
+                                {
+                                    <SoStatusBadge Label="@ChangePlanPresentation.FlagShortLabel(item.Flag)" Tone="@ChangePlanPresentation.FlagTone(item.Flag)"
+                                                   Icon="@ChangePlanPresentation.FlagIcon(item.Flag)" Title="@item.FlagLabel" />
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    }
+
+    <SaPager Label="Kontrol listesi satırları" Page="Items.Page" PageSize="Items.PageSize" Total="Items.Total" Unit="satır" Busy="Busy" OnPage="OnPage" />
+}
+
+@code {
+    /// <summary>The loaded page of the approved preview's rows (null while loading).</summary>
+    [Parameter] public ChangePlanItemPage? Items { get; set; }
+
+    /// <summary>Reading the rows failed.</summary>
+    [Parameter] public bool Failed { get; set; }
+
+    /// <summary>A call is running (the pager keeps focus but ignores clicks).</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Another page of rows was requested (1-based).</summary>
+    [Parameter] public EventCallback<int> OnPage { get; set; }
+}

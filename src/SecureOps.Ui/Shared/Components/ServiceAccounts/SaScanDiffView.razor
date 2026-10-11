@@ -53,18 +53,7 @@
                     </li>
                 }
             </ul>
-            @if (pages > 1)
-            {
-                int from = ((c.Page - 1) * c.PageSize) + 1;
-                int to = Math.Min(c.Total, c.Page * c.PageSize);
-                <div class="sa-diff-pager" role="group" aria-label="@($"Bileşen farkları: sayfa {c.Page} / {pages}")">
-                    <span class="so-panel-text--sm" aria-live="polite">Bileşen farkları: @from–@to / @c.Total (sayfa @c.Page / @pages)</span>
-                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(Busy || c.Page <= 1)" OnClick="@(() => OnPage.InvokeAsync(c.Page - 1))"
-                        StartIcon="@Icons.Material.Filled.ChevronLeft">Önceki</MudButton>
-                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(Busy || c.Page >= pages)" OnClick="@(() => OnPage.InvokeAsync(c.Page + 1))"
-                        EndIcon="@Icons.Material.Filled.ChevronRight">Sonraki</MudButton>
-                </div>
-            }
+            <SaPager Label="Bileşen farkları" Page="c.Page" PageSize="c.PageSize" Total="c.Total" Busy="Busy" OnPage="OnPage" />
         }
         @if (Diff.GmsaText is not null)
         {

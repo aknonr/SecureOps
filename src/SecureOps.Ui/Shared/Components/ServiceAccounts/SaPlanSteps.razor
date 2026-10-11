@@ -1,0 +1,40 @@
+@* The plan flow as an ordered list: Plan → Önizleme → Onay → Kontrol listesi → Doğrulama. Each step carries a text state and an
+   icon besides its colour, and says what is missing; the current step has aria-current="step". Everything comes from the
+   server's plan view (ChangePlanPresentation.Steps); nothing here decides what a person may do. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<nav aria-label="Plan adımları">
+    <ol class="sa-plan-steps">
+        @foreach ((PlanStep step, int index) in _steps.Select((s, i) => (s, i)))
+        {
+            <li class="@($"sa-plan-step sa-plan-step--{step.State.ToString().ToLowerInvariant()}")" aria-current="@(step.State == PlanStepState.Current ? "step" : null)">
+                <a class="sa-plan-step-link" href="@($"#sa-plan-{step.Key}")">
+                    <span class="sa-plan-step-num" aria-hidden="true"><MudIcon Icon="@Icon(step.State)" Size="Size.Small" /></span>
+                    <span class="sa-plan-step-text">
+                        <span class="sa-plan-step-title">@(index + 1). @step.Title</span>
+                        <span class="sa-plan-step-state">@ChangePlanPresentation.StepStateLabel(step.State)</span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ol>
+</nav>
+
+@code {
+    private IReadOnlyList<PlanStep> _steps = [];
+
+    /// <summary>The plan the steps describe.</summary>
+    [Parameter, EditorRequired] public ChangePlanView Plan { get; set; } = default!;
+
+    protected override void OnParametersSet() => _steps = ChangePlanPresentation.Steps(Plan);
+
+    private static string Icon(PlanStepState state) => state switch
+    {
+        PlanStepState.Done => Icons.Material.Filled.CheckCircle,
+        PlanStepState.Current => Icons.Material.Filled.PlayCircleFilled,
+        PlanStepState.Stopped => Icons.Material.Filled.Block,
+        PlanStepState.NotAvailable => Icons.Material.Filled.HourglassEmpty,
+        _ => Icons.Material.Filled.RadioButtonUnchecked
+    };
+}
