@@ -1,5 +1,17 @@
 # sql/
 
+## Service Account Plan Evidence 034, 2026-10-12
+
+Inventory is 001-034 (033, the change-plan tables, is on the same unmerged branch line). **034-service-account-plan-evidence**
+requires reviewed 025 and 033 and includes `pending/service-accounts/SA-007-plan-evidence.sql` unchanged: it recreates
+`svcacct.Evidence.CK_SaEvidence_Owner` under the same name with `'ChangePlan'` added (`WITH CHECK`, trusted), so evidence of a
+gMSA conversion change plan uses the existing immutable table, file checks and download audit. No table, column, row, trigger,
+role or grant changes. It stops before any change (51396) on replay, a missing prerequisite or an owner check that is not the
+eight types of 025. Binaries with this code keep working before 034: plan evidence upload answers 503
+`ServiceAccountChangePlanEvidenceNotInstalled`, everything else works. Synthetic LocalDB only; installed TEST was not upgraded.
+DBA addendum: [DBA-034-TR.md](../docs/service-accounts/DBA-034-TR.md); harness `tests/sql/service-accounts/sa-034-guards.sql`.
+The release selector (`scripts/release/Get-ReleaseSqlPlan.ps1`) is updated separately by its owner.
+
 ## Access Registration Index 032, 2026-10-06
 
 Current numbered inventory is 001-032. `032-access-request-user-index.sql` adds

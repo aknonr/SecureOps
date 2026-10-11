@@ -2,7 +2,8 @@
 
 Tarih: 2026-10-07. Kime: kurulu TEST veritabanından sorumlu DBA. Durum: **hazırlık belgesi; kurulu sisteme bu belgedeki hiçbir
 şey uygulanmadı.** Uygulama için proje sahibinin ayrı onayı gerekir. `DBA-029-030-TR.md` (029–031) ve
-`docs/access-registration-dba-032.md` (032, Access) önce gelir. **Sıra: 029 → 030 → 031 → 032 → 033.** Yedeği DBA kendi
+`docs/access-registration-dba-032.md` (032, Access) önce gelir. **Sıra: 029 → 030 → 031 → 032 → 033** (ardından plan kanıtı
+için 034: `DBA-034-TR.md`). Yedeği DBA kendi
 sürecinde alır; bu belge yedek komutu içermez. Tasarım: `CHANGE-PLAN-DESIGN.md`.
 
 ## Ne uygulanacak

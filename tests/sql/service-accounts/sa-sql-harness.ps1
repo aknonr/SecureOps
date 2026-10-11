@@ -3,15 +3,16 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix,
-    [ValidateRange(26, 33)]
-    [int]$ThroughMigration = 33,
+    [ValidateRange(26, 34)]
+    [int]$ThroughMigration = 34,
     [switch]$SkipRoleScripts
 )
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-033; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005, 032 is Access,
-# 033 numbers SA-006), verifies module replay refusal, the 033 database guards (sa-033-guards.sql) and
+# numbered migrations in order (now 001-034; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005, 032 is Access,
+# 033 numbers SA-006, 034 numbers SA-007), verifies module replay refusal, the 033 and 034 database guards
+# (sa-033-guards.sql, sa-034-guards.sql) and
 # (unless -SkipRoleScripts) the module role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
@@ -112,6 +113,20 @@ try {
         $withRole = if ($SkipRoleScripts) { '0' } else { '1' }
         & $sqlcmd -S $server -d $database -E -I -b -v WithRole=$withRole -i (Join-Path $PSScriptRoot 'sa-033-guards.sql')
         if ($LASTEXITCODE -ne 0) { throw "Service Accounts 033 guard check failed; database $database retained for inspection." }
+    }
+    # -ThroughMigration 33 leaves the database like an installed 033 system (no 'ChangePlan' evidence owner type).
+    $hasPlanEvidence = if ($ThroughMigration -ge 34) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'svcacct.Evidence') AND name = N'CK_SaEvidence_Owner' AND definition LIKE N'%''ChangePlan''%') THEN 1 ELSE 0 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasPlanEvidence -eq 'skip') { Write-Host 'Plan evidence (034) left out: -ThroughMigration below 34' }
+    elseif ($hasPlanEvidence -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-007-plan-evidence.sql'
+        Write-Host 'applied SA-007-plan-evidence.sql (candidate 7)'
+    } else { Write-Host 'Plan evidence installed through numbered 034' }
+    if ($hasPlanEvidence -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-007-plan-evidence.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 7 replay was not refused.' }
+        Write-Host 'candidate 7 replay refused as expected'
+        & $sqlcmd -S $server -d $database -E -I -b -i (Join-Path $PSScriptRoot 'sa-034-guards.sql')
+        if ($LASTEXITCODE -ne 0) { throw "Service Accounts 034 guard check failed; database $database retained for inspection." }
     }
 } finally { Pop-Location }
 
