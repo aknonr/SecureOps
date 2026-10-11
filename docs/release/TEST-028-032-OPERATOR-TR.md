@@ -3,6 +3,10 @@
 Tarih: 2026-10-07. Tek güncel operatör girişi. Bu belge ve paket **gözden geçirme adayıdır**;
 `readyForInstallation=false`. Kurulu TEST'e uygulanmamıştır. Sentetik LocalDB kanıtı hedef kabulü değildir.
 
+Bu teslimin tabanı **028**: sahibin 2026-10-07 tarihinde çalıştırdığı envantere göre 025–028 uygulanmış,
+029–032 uygulanmamıştır. Paket hazırlayan oturum TEST'e veya kurumsal SQL'e bağlanmaz; bu beyan bağımsız
+hedef doğrulaması değildir. Bu aday 028'i içermez; aşağıdaki 027 seçeneği yalnız farklı bir aday içindir.
+
 ## 1. Salt okunur envanter ve durma noktası
 
 - DBA, doğru veritabanında `DBA/Get-InstalledMigrationInventory025To032.sql` çalıştırır.
@@ -66,6 +70,19 @@ DBA ayrıntıları: [029–031 notu](../service-accounts/DBA-029-030-TR.md),
   Wildcard, path, query, fragment veya userinfo kullanılmaz. Boş liste tarayıcı origin'lerini reddeder;
   hatalı değer başlangıcı durdurur. UI sunucu HttpClient çağrısı Origin taşımadığı için origin kaydı gerektirmez,
   fakat CSRF başlığı zorunludur. Gerçek origin'ler pakete yazılmaz; sunucu sahibi onaylı yapılandırmada tutar.
+- [ ] Sunucu sahibi aşağıdaki boş alanları **özel change kaydında** doldurur; gerçek değerler repoya veya
+  paylaşılan pakete eklenmez. Ayarlar API sürecine aittir; dış tarayıcı origin'i backend HTTP adresi değildir.
+
+  | Ayar / kayıt | Sunucu sahibinin dolduracağı alan |
+  |---|---|
+  | `ApiCsrf__AllowedOrigins__0` | `<onaylı dış tarayıcı origin'i: şema + host + gerekiyorsa port>` |
+  | `ApiCsrf__AllowedOrigins__1` (gerekiyorsa) | `<ikinci onaylı dış tarayıcı origin'i veya kullanılmıyor>` |
+  | Ek origin'ler (gerekiyorsa) | `<ardışık indekslerle ayrı kayıtlar veya kullanılmıyor>` |
+  | Ayar sahibi / change referansı | `<özel kayıtta doldur>` |
+  | IIS/F5 başlık koruma ve CSRF kabul kanıtı | `<ayrı hedef kabulünden sonra özel kayıtta doldur>` |
+
+  Boş alanlar kurulum onayı değildir. Yalnız server-side UI çağrıları kullanılıyorsa boş origin listesi
+  bilinçli seçim olarak kaydedilebilir; doğrudan tarayıcı unsafe çağrıları bu durumda reddedilir.
 - F5/IIS Origin, Referer ve Sec-Fetch-* başlıklarını korur; cross-site daima reddedilir.
   Bu ayar CORS izni değildir. CLI/operatör/API istemcileri de başlık sözleşmesine geçirilir.
 - Paket `web.config` ve `appsettings*.json` taşımaz. Sunucuya ait yapılandırma, proxy güveni, dış yazma/no-send
@@ -77,9 +94,31 @@ DBA ayrıntıları: [029–031 notu](../service-accounts/DBA-029-030-TR.md),
   Eklenen tablolar/sütunlar/032 indeksi ve audit korunur; otomatik down migration veya kayıt silme yoktur.
   028 yetki geri dönüşü, audit/AccessVersion etkileri nedeniyle ayrı incelenmiş işlemdir; sessiz JSON geri yazımı yapılmaz.
   DBA restore yalnız önceden onaylı geri dönüş planıyla; yeni audit/iş verisinin kaybı ayrıca değerlendirilir.
-- İlk kabul yalnız sentetik kayıtla: login/rol/kapsam erişimi, eski kayıtların okunması, talep/gMSA adı,
-  tarama yükleme/karar/rapor; başarılı unsafe UI çağrısı, başlıksız istemci 403, cross-site red ve denial audit.
-  Reddedilen istekte business/provider işlemi yoktur; güvenlik session/identity/audit yazıları ayrı tutulur.
+- **029 sonrası sahibin ilk kapsam adımı:** 029 doğrulanıp tüm DBA sırası tamamlandıktan ve eşleşen API/UI
+  birlikte yayınlandıktan sonra yapılır. 029 tek başına kapsam vermez. Bu işlem ürün veritabanına kapsam,
+  geçmiş ve audit kaydı yazar; ayrı hedef uygulama/kabul onayı kapsamındadır, paket hazırlayan oturum yapmaz.
+  Sahip `ServiceAccounts.Administer` yetkisiyle Servis Hesapları → Modül yönetimi → Kapsam yetkileri
+  (`/service-accounts/admin`) ekranını açar. Modülde **hiç kapsam kaydı oluşmamışsa** gerekçeyi girip
+  **“İlk kapsamı al (bir kez)”** işlemini yapar; kendi kapsamı `All` olur. Başarı sonrası “Kapsamımı yeniden
+  kontrol et” ile erişimi yeniden okur ve ilk kapsamın geçmiş/audit kaydını kontrol eder.
+  Eski veya geri alınmış bir kapsam kaydı varsa bootstrap kapalıdır; başka bir modül yöneticisi “Kişi”
+  listesinden onaylı kullanıcıyı seçip kapsam verir. Sonraki kapsamlar da başka yönetici tarafından verilir.
+  Düğme yoksa, şema hazır değilse veya yetki reddedilirse durun; SQL'den kendine kapsam vermeyin.
+- İlk kabul, ayrı onaylı hedef kabulünde ve yalnız sentetik kayıtla, aşağıdaki sırayla kaydedilir.
+  Bu kutular paket hazırlığı sırasında işaretlenmez:
+  - [ ] **Giriş:** onaylı hesapla giriş; Erişimim ekranında gerekli modül yetkileri, Servis Hesapları'na
+    erişim ve mevcut kayıtların okunması kontrol edilir. Giriş başarısı tek başına veri kapsamı değildir.
+  - [ ] **Kapsam:** yukarıdaki ilk-kapsam adımı veya başka yöneticiyle kapsam ataması tamamlanır;
+    içe aktarma için `All` veya kurum düzeyi gerekir, yalnız ekip düzeyi yeterli değildir.
+  - [ ] **İçe aktarma önizlemesi:** `/service-accounts/imports` ekranında yalnız sentetik dosya yüklenir;
+    profil, sütun eşlemesi, kurum/kapsam, uyarılar ve satır kararları gözden geçirilir, önizleme alınır.
+    Önizleme aşaması kayıtların uygulanması değildir; uygulama ayrıca onaylanır.
+  - [ ] **Rapor:** `/service-accounts/reports` ekranında kapsam filtresi ve sentetik kayıtların beklenen
+    durumu doğrulanır; rapor anlık görüntüsü ile PDF/XLSX çıktıları açılarak içerik ve Türkçe karakterler
+    kontrol edilir. Önizleme tek başına yeni hesap oluşturmadığı için raporda aktarılmış sayılmaz.
+  - [ ] **Ek iş akışları:** talep/gMSA adı, tarama yükleme ve karar; başarılı unsafe UI çağrısı,
+    başlıksız yetkili istemci için 403, cross-site red ve denial audit kontrol edilir.
+    Reddedilen istekte business/provider işlemi yoktur; güvenlik session/identity/audit yazıları ayrı tutulur.
 - SQL sonrası envanter, 030 izinleri, 031 sütun tipleri, 032 plan/indeks ve hedef deadlock kanıtı kontrol edilir.
   Gerçek AD/JEA, kurumsal SQL/OIDC/Negotiate/IIS/F5, e-posta/Jira ve kurulu TEST kabulü yerel kanıtla kapanmaz.
   Herhangi bir kurumsal bağlantı veya uygulama için ayrı yetki gerekir. Bu aday `readyForInstallation=false` kalır.
