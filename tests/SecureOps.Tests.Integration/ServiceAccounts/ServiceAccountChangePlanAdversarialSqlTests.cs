@@ -321,15 +321,20 @@ public sealed class ServiceAccountChangePlanAdversarialSqlTests(ITestOutputHelpe
         await connection.OpenAsync();
         string replacement = attack == "case" ? plan.Title.ToLowerInvariant() : plan.Title + " ";
         string before = await SnapshotAsync(s, plan.Id);
-        await MutationRefusedAsync(connection, "UPDATE svcacct.ChangePlans SET Title = @replacement WHERE Id = @id",
-            new { id = plan.Id, replacement }, true, s.Fx.Suffix, 51394, async transaction =>
-            {
-                string? stored = await connection.ExecuteScalarAsync<string>("SELECT Title FROM svcacct.ChangePlans WHERE Id = @id",
-                    new { id = plan.Id }, transaction);
-                stored.Should().Be(replacement);
-                output.WriteLine($"Runtime role accepted {attack} title mutation: before={JsonSerializer.Serialize(plan.Title)} after={JsonSerializer.Serialize(stored)}; probe rolled back.");
-            });
-        (await SnapshotAsync(s, plan.Id)).Should().Be(before);
+        // Two layers: the runtime role may UPDATE only the status columns (230), and the trigger compares fixed columns exactly
+        // even for a principal that holds UPDATE on Title (51394).
+        foreach ((bool runtime, int number) in new[] { (true, 230), (false, 51394) })
+        {
+            await MutationRefusedAsync(connection, "UPDATE svcacct.ChangePlans SET Title = @replacement WHERE Id = @id",
+                new { id = plan.Id, replacement }, runtime, s.Fx.Suffix, number, async transaction =>
+                {
+                    string? stored = await connection.ExecuteScalarAsync<string>("SELECT Title FROM svcacct.ChangePlans WHERE Id = @id",
+                        new { id = plan.Id }, transaction);
+                    stored.Should().Be(replacement);
+                    output.WriteLine($"{(runtime ? "Runtime role" : "Owner")} accepted {attack} title mutation: before={JsonSerializer.Serialize(plan.Title)} after={JsonSerializer.Serialize(stored)}; probe rolled back.");
+                });
+            (await SnapshotAsync(s, plan.Id)).Should().Be(before);
+        }
     }
 
     private static async Task MutationRefusedAsync(SqlConnection connection, string sql, object parameters, bool runtime, string suffix, int number,
@@ -464,7 +469,7 @@ public sealed class ServiceAccountChangePlanAdversarialSqlTests(ITestOutputHelpe
     private static ApproveChangePlanRequest Approval(ChangePlanView plan)
     {
         DateTimeOffset start = DateTimeOffset.UtcNow.AddHours(1);
-        return new ApproveChangePlanRequest(plan.Preview!.Version, plan.Preview.Sha256, "OCO-SYN-ATTACK", start, start.AddHours(2), "Synthetic approval");
+        return new ApproveChangePlanRequest(plan.Preview!.Version, plan.Preview.Sha256, "OCO-SYN-9001", start, start.AddHours(2), "Synthetic approval");
     }
 
     private static Task<SaResult<ChangePlanView>> ApproveAsync(Setup s, SynUser actor, ChangePlanView plan, ApproveChangePlanRequest? request = null) =>

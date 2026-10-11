@@ -138,12 +138,28 @@ public sealed class ChangePlanRulesTests
     [Theory]
     [InlineData("OCO-12345", true)]
     [InlineData(" oco-77 ", true)]
+    [InlineData("CHG0012345", true)]
+    [InlineData("2026/OCO.17_A", true)]
     [InlineData("", false)]
     [InlineData("   ", false)]
+    [InlineData("OCO-SYN", false)]
+    [InlineData("OCO 12345", false)]
+    [InlineData("-12345", false)]
+    [InlineData("OCO-12345;DROP", false)]
+    [InlineData("OCO-12\n345", false)]
+    [InlineData("ÖCO-12345", false)]
+    [InlineData("bakım yapılacak 1", false)]
     public void OcoNumber_IsCheckedForFormatOnly(string value, bool valid)
     {
         (ChangePlanRules.OcoNumber(value) is not null).Should().Be(valid);
+        ChangePlanRules.OcoNumber(new string('9', 64)).Should().NotBeNull();
         ChangePlanRules.OcoNumber(new string('9', 65)).Should().BeNull();
+    }
+
+    [Fact]
+    public void OcoNumber_IsStoredTrimmedAndUpperCase()
+    {
+        ChangePlanRules.OcoNumber(" oco-77 ").Should().Be("OCO-77");
     }
 
     [Theory]

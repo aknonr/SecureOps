@@ -362,7 +362,17 @@ public sealed class SqlAssetContractTests
         candidate.Should().Contain("CREATE TRIGGER svcacct.TR_SaChangePlans_Fixed ON svcacct.ChangePlans AFTER UPDATE, DELETE")
             .And.Contain("CREATE TRIGGER svcacct.TR_SaChangePlanApprovals_Separation ON svcacct.ChangePlanApprovals AFTER INSERT")
             .And.Contain("CONSTRAINT UQ_SaChangePlanApprovals_Preview UNIQUE (PreviewId)");
-        grants.Should().Contain("GRANT SELECT, INSERT, UPDATE ON OBJECT::svcacct.ChangePlans TO svcacct_api_runtime;");
+        // T8: UPDATE only on the status columns; the trigger compares fixed columns exactly (the database collation is CI_AS).
+        grants.Should().Contain("GRANT SELECT, INSERT ON OBJECT::svcacct.ChangePlans TO svcacct_api_runtime;")
+            .And.Contain("GRANT UPDATE ON OBJECT::svcacct.ChangePlans (Status, CurrentPreviewVersion, UpdatedBy, UpdatedAt) TO svcacct_api_runtime;")
+            .And.NotContain("INSERT, UPDATE ON");
+        candidate.Should().Contain("i.Title COLLATE Latin1_General_BIN2 <> d.Title COLLATE Latin1_General_BIN2 OR DATALENGTH(i.Title) <> DATALENGTH(d.Title)")
+            .And.Contain("i.Kind COLLATE Latin1_General_BIN2 <> d.Kind COLLATE Latin1_General_BIN2 OR DATALENGTH(i.Kind) <> DATALENGTH(d.Kind)")
+            .And.Contain("DATEPART(TZOFFSET, i.CreatedAt) <> DATEPART(TZOFFSET, d.CreatedAt)");
+        foreach (string column in new[] { "Kind", "Status", "Action", "ComponentType", "Flag", "State", "Event" })
+        {
+            candidate.Should().MatchRegex($@"CHECK \({column} COLLATE Latin1_General_BIN2 IN \([^)]*\)\s+AND DATALENGTH\({column}\) = LEN\({column}\)\)");
+        }
         // Additive only: no existing object is altered or dropped, no secret column, no role or delete grant.
         candidate.Should().NotContainEquivalentOf("password").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("ALTER ROLE");
         grants.Should().NotContain("DELETE").And.NotContain("ALTER ROLE").And.NotContain("svcacct_worker");

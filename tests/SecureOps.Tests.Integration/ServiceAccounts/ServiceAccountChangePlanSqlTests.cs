@@ -481,6 +481,8 @@ public sealed class ServiceAccountChangePlanSqlTests
         int plans = await PlanCountAsync(s.Fx);
 
         (await ApproveAsync(s, s.Verifier, previewed, oco: "   ")).Should().Match<SaResult<ChangePlanView>>(r => r.ErrorCode == SaErrors.Invalid && r.Field == "ocoNumber");
+        (await ApproveAsync(s, s.Verifier, previewed, oco: "OCO 1001")).Field.Should().Be("ocoNumber");
+        (await ApproveAsync(s, s.Verifier, previewed, oco: "OCO-SYN")).Field.Should().Be("ocoNumber");
         (await ApproveAsync(s, s.Verifier, previewed, windowHours: -1)).Field.Should().Be("window");
         (await ApproveAsync(s, s.Verifier, previewed, reason: "")).Field.Should().Be("reason");
         (await ApproveAsync(s, s.Verifier, previewed, sha: "not-a-digest")).Field.Should().Be("sha256");
