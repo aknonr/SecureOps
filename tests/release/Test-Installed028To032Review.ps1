@@ -27,7 +27,7 @@ foreach ($baseline in @(27,28)) {
     $selection=@{RepositoryRoot=$root;ExpectedSource=$source;IncludeServiceAccounts=$true;SqlUpgradeReview=$file}
     $selection["UpgradeFromInstalled$number"]=$true
     $paths=@(Get-ChildItem (Join-Path $root 'sql/migrations'),(Join-Path $root 'sql/schema') -File -Filter '*.sql' |
-        Where-Object { [int]$_.Name.Substring(0,3) -gt $baseline } |
+        Where-Object { [int]$_.Name.Substring(0,3) -gt $baseline -and [int]$_.Name.Substring(0,3) -le 32 } |
         ForEach-Object { $_.FullName.Substring($root.Length+1).Replace('\','/') })
     $paths+=@('sql/pending/service-accounts/SA-003-scope-bootstrap.sql','sql/pending/service-accounts/SA-004-usage-scans.sql',
         'sql/pending/service-accounts/SA-005-requested-gmsa-name.sql','sql/pending/service-accounts/SA-004-API-permissions.sql')
@@ -78,7 +78,7 @@ foreach ($baseline in @(27,28)) {
         Reject 'include cannot escape source' { Select-Plan } 'escapes repository'
         [IO.File]::WriteAllText((Join-Path $fixtureRoot $wrapper), $original)
         $entry.Sha256=(Get-FileHash (Join-Path $root $wrapper)).Hash; Save-Review
-        [IO.File]::WriteAllText((Join-Path $fixtureRoot 'sql/migrations/033-unreviewed.sql'), 'SELECT 1;')
+        [IO.File]::WriteAllText((Join-Path $fixtureRoot 'sql/migrations/034-unreviewed.sql'), 'SELECT 1;')
         Reject 'future migration cannot be silently accepted' { Select-Plan } 'exact complete'
         $selection.RepositoryRoot=$root
     }

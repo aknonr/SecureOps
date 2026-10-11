@@ -11,18 +11,50 @@ authorized `fix/release-packaging-028-032-20261007` branch. Preparation must des
 from the tested master with identical product inputs. Existing master/numbered
 release guards remain unchanged; no numbered release promotion is added.
 
-The selector requires an exact 001-032 source inventory and source-bound typed
+The selector requires a complete 001-032 source inventory (optionally followed
+by the exact migration/schema pair `033-service-account-change-plans.sql`) and source-bound typed
 review gates described in `docs/release/TEST-028-032-OPERATOR-TR.md`. A 027 baseline
 selects separately reviewed, unapplied 028 first; 028 baseline never exports 028.
 Both select 029, 030, SA-004 API permissions, 031, 032 in that order with the three
 SQLCMD includes. No installed migrations, legacy grants, Worker or Hangfire are
 delivered. Missing/ambiguous target inventory blocks installation. Future source
-migrations still fail closed. SQL selection never connects to a database.
+migrations beyond recognized 033 still fail closed. Recognizing 033 does not
+add it, its include, or its API grants to the installed-027/028 plan. The plan
+still reports `RequiredSchema=001-032`. SQL selection never connects to a database.
 
 DBA inventory: `scripts/diagnostics/Get-InstalledMigrationInventory025To032.sql`.
 The candidate includes it, the 029-031 and separate 032 DBA notes, ADR-0029 and
 one current Turkish operator checklist, all hashed. API/UI remain paired and
 `readyForInstallation=false`. Synthetic evidence is not installed TEST evidence.
+
+## Separate 033 SQL Review Selection
+
+`Get-ReleaseSqlPlan.ps1 -RepositoryRoot <source-root> -UpgradeFromInstalled032
+-IncludeServiceAccounts -ExpectedSource <full-SHA> -SqlUpgradeReview <private-review.json>`
+selects only migration/schema 033, `SA-006-change-plans.sql`, and the separate
+`SA-006-API-permissions.sql`. Execution order is migration 033 then SA-006 API
+permissions; the SQLCMD working directory remains `sql/migrations`. The complete
+source must be exactly 001-033 with the recognized 033 filenames in both folders.
+Combining this switch with any other baseline is refused.
+
+The review uses `wasas.sql-upgrade-review.v1` and the exact `Source`. It requires
+typed-true `Baseline032Verified`, `Inventory025To033Verified`, `Unapplied033Verified`,
+`RuntimeApiRoleVerified`, `Delta033Reviewed`, nonempty string
+`InstalledInventoryEvidenceReference` and `Delta033ReviewReference`, and exact
+Path/Sha256 entries for the four selected files. Missing, false, string-valued,
+stale, extra or changed inputs fail closed. An include of an installed migration
+dependency is refused. This is a separate SQL selector, not a new paired release
+mode or installation approval; existing candidate generators continue to record
+`readyForInstallation=false`. No target inventory, grant or migration is executed.
+
+Offline regression on a temporary source combined with the change-plan branch:
+`tests/release/Test-ServiceAccount033ReviewSelection.ps1 -EvidenceDirectory <fresh-directory>
+-BaselineRepositoryRoot <unchanged-master-root>`. It compares the complete old/new
+028-based plans, selected file sets and actual exported SQL bytes, then checks
+the separate 033 selection and refusal cases. It needs no SQL connection.
+Optional `-ExistingCandidateDirectory <retained-candidate>` also verifies the
+retained candidate's exact DBA SQL file set, manifest identities, actual bytes,
+execution order and false readiness flag without changing that candidate.
 
 ## Admin / Lookup 027 API/UI Review
 
