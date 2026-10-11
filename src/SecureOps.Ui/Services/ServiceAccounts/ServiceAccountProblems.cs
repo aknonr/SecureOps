@@ -125,7 +125,7 @@ public static class ServiceAccountProblems
         "planClosed" => "Plan kapanmış (tamamlandı veya iptal edildi); değiştirilemez.",
         "approverIsPlanner" => "Planı hazırlayan kişi kendi planını onaylayamaz; başka bir doğrulama yetkilisi onaylamalıdır.",
         "approverChangedPlan" => "Önizlemeyi üreten veya planı değiştiren kişi onaylayamaz; başka bir doğrulama yetkilisi onaylamalıdır.",
-        "ocoNumber" => "OCO numarası gerekli (en çok 64 karakter). Numara ITSM'de sorgulanmaz.",
+        "ocoNumber" => "OCO numarası kabul edilmedi: en çok 64 karakter; yalnız A–Z, 0–9 ve - _ . / kullanılabilir (küçük harf büyüğe çevrilir); harf veya rakamla başlamalı ve en az bir rakam içermeli. Numara ITSM'de sorgulanmaz.",
         "window" => "Bakım penceresinin bitişi başlangıçtan sonra olmalı.",
         "previewVersion" or "sha256" => "Onay bir önizleme sürümüne ve özetine bağlıdır; sayfayı yenileyip güncel önizlemeyi onaylayın.",
         "accounts" => "Plana 1–20 hesap eklenmeli.",

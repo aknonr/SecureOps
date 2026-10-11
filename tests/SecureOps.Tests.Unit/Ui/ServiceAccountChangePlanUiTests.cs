@@ -211,6 +211,20 @@ public sealed class ServiceAccountChangePlanUiTests
     }
 
     [Fact]
+    public async Task ApproveForm_ShowsTheServersOcoRefusalUnderTheField_AndKeepsNoFormatRuleOfItsOwn()
+    {
+        ChangePlanView plan = Plan("Previewed", true, false, permissions: new(false, false, true, null, true));
+        string refused = await RenderAsync<SaPlanApproveForm>(new() { ["Plan"] = plan, ["OcoError"] = ServiceAccountProblems.FieldText("ocoNumber") });
+        string clean = await RenderAsync<SaPlanApproveForm>(new() { ["Plan"] = plan });
+
+        refused.Should().Contain("OCO numarası kabul edilmedi").And.Contain("mud-input-error");
+        clean.Should().NotContain("OCO numarası kabul edilmedi");
+        clean.Should().Contain("BÜYÜK HARFE").And.NotContain("yazıldığı gibi");
+        File.ReadAllText(Path.Combine(Root(), "src", "SecureOps.Ui", "Shared", "Components", "ServiceAccounts", "SaPlanApproveForm.razor"))
+            .Should().NotContain("Regex", "the server decides whether an OCO number is valid");
+    }
+
+    [Fact]
     public async Task Page_ShowsAllFiveSteps_AndTheCurrentOneIsMarked()
     {
         string html = await RenderPageAsync(Plan("Previewed", true, false));

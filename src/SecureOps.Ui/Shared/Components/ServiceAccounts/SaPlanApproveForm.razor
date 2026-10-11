@@ -8,7 +8,8 @@
     <MudGrid Spacing="2">
         <MudItem xs="12" md="4">
             <MudTextField T="string" @bind-Value="_oco" Label="OCO numarası" MaxLength="64" Immediate="true" Variant="Variant.Outlined" Required="true"
-                          HelperText="ITSM'de sorgulanmaz; numara yazıldığı gibi (büyük harfle) kaydedilir." />
+                          Error="@(OcoError is not null)" ErrorText="@OcoError"
+                          HelperText="Sunucu doğrular ve BÜYÜK HARFE çevirip kaydeder (en çok 64 karakter; A–Z 0–9 - _ . /; harf veya rakamla başlar, en az bir rakam). ITSM'de sorgulanmaz." />
         </MudItem>
         <MudItem xs="12" md="4">
             <MudTextField T="string" @bind-Value="_start" Label="Bakım penceresi başlangıcı" InputType="InputType.DateTimeLocal" Variant="Variant.Outlined" Required="true" />
@@ -46,6 +47,9 @@
 
     /// <summary>A command is running.</summary>
     [Parameter] public bool Busy { get; set; }
+
+    /// <summary>The server's refusal of the OCO number (400 field <c>ocoNumber</c>), shown under the field; the client has no format rule of its own.</summary>
+    [Parameter] public string? OcoError { get; set; }
 
     /// <summary>Sends the approval; the form keeps its values until the page confirms the save.</summary>
     [Parameter, EditorRequired] public EventCallback<ApproveChangePlanRequest> OnApprove { get; set; }

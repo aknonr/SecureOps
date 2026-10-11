@@ -56,6 +56,9 @@ against the pinned contract; no backend, SQL or DTO change.
   closing the plan. Step 4 reads "Henüz sunulmuyor"; the page shows the approved rows as a read-only work list.
 - Focus: the module's four hand-written pagers now use one component, `SaPager`. Its buttons are never `disabled` (they use `aria-disabled` and
   ignore the click while busy or at an edge), so keyboard focus is not dropped to the page when a page changes or the last page is reached.
+- OCO number (F2, 2026-10-12): the server validates and upper-cases it (max 64, A-Z 0-9 - _ . /, starts with a letter or digit, at least one
+  digit; else 400 field `ocoNumber`). The form only describes the rule as a hint, has no client-side rule, and shows the server's refusal under the
+  field (the draft stays); after approval the text says the server validated and upper-cased it, and that ITSM was not queried.
 - Dates in the approval window are native `datetime-local` inputs plus an explicit UTC offset (default: the UI host's offset), sent as
   `DateTimeOffset`; every window is displayed with its offset.
 - Tests: `ServiceAccountChangePlanUiTests` (27 cases: step flow per status, flag wording, counters/rows, work list, pager focus, approval form
