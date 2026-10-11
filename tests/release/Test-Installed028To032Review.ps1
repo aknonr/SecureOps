@@ -5,6 +5,11 @@ param([Parameter(Mandatory)][string]$EvidenceDirectory,
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$branch=[string](& git -C $root branch --show-current)
+if ($LASTEXITCODE -ne 0) { throw 'Cannot determine the review source branch.' }
+if ([string]::IsNullOrWhiteSpace($branch)) {
+    throw 'Review requires a named Git branch; detached HEAD is not supported. Check out a branch before running this test.'
+}
 if (Test-Path -LiteralPath $EvidenceDirectory) { throw 'Refuse existing evidence.' }
 if ($VerifySqlCmd -and !$DatabaseSuffix) { throw 'Fresh synthetic database suffix required.' }
 New-Item -ItemType Directory -Path $EvidenceDirectory | Out-Null
