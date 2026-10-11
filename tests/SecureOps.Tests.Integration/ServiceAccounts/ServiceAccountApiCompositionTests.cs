@@ -173,8 +173,15 @@ public sealed class ServiceAccountApiCompositionTests
             ("PATCH", "api/v1/service-accounts/change-plans/{id:guid}"),
             ("POST", "api/v1/service-accounts/change-plans/{id:guid}/preview"),
             ("POST", "api/v1/service-accounts/change-plans/{id:guid}/approve"),
-            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/cancel")
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/cancel"),
+            ("GET", "api/v1/service-accounts/change-plans/{id:guid}/items/{itemId:guid}/checks"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/items/{itemId:guid}/checks"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/evidence"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/complete")
         });
+        endpoints.Single(e => e.RoutePattern.RawText!.EndsWith("/evidence", StringComparison.Ordinal))
+            .Metadata.GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize
+            .Should().Be(11L * 1024 * 1024, "plan evidence has the same bound as account evidence");
         foreach (RouteEndpoint endpoint in endpoints)
         {
             string route = endpoint.RoutePattern.RawText!;
@@ -197,7 +204,12 @@ public sealed class ServiceAccountApiCompositionTests
             (SaErrors.Forbidden, "approverIsPlanner", StatusCodes.Status403Forbidden),
             (SaErrors.Forbidden, "approverChangedPlan", StatusCodes.Status403Forbidden),
             (SaErrors.ChangePlanAccountsRefused, "accounts", StatusCodes.Status400BadRequest),
-            (SaErrors.ChangePlansNotInstalled, null, StatusCodes.Status503ServiceUnavailable)
+            (SaErrors.ChangePlansNotInstalled, null, StatusCodes.Status503ServiceUnavailable),
+            (SaErrors.ChangePlanState, "planNotApproved", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "checkStale", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "nothingToRollBack", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "checklistIncomplete", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanEvidenceNotInstalled, null, StatusCodes.Status503ServiceUnavailable)
         })
         {
             ObjectResult result = ServiceAccountReplies.Reply(controller, SaResult<ChangePlanView>.Fail(code, field)).Result.Should().BeOfType<ObjectResult>().Subject;

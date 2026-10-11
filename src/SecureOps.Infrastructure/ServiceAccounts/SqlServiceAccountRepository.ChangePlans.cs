@@ -587,7 +587,8 @@ public sealed partial class SqlServiceAccountRepository
                 return null;
             }
 
-            accounts = [.. await grid.ReadAsync<ChangePlanAccountView>()];
+            accounts = [.. (await grid.ReadAsync<CpAccountRow>()).Select(r => new ChangePlanAccountView(r.AccountId, r.AccountName, r.Domain, r.TargetGmsaName,
+                r.RequestId, r.ChangedAt))];
             preview = await grid.ReadSingleOrDefaultAsync<CpPreviewRow>();
             flags = (await grid.ReadAsync<(string Flag, int Count)>()).ToDictionary(f => f.Flag, f => f.Count, StringComparer.Ordinal);
             approval = await grid.ReadSingleOrDefaultAsync<ChangePlanApprovalView>();
@@ -686,6 +687,16 @@ public sealed partial class SqlServiceAccountRepository
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
         public byte[] RowVer { get; set; } = [];
+    }
+
+    private sealed class CpAccountRow
+    {
+        public Guid AccountId { get; set; }
+        public string AccountName { get; set; } = string.Empty;
+        public string? Domain { get; set; }
+        public string TargetGmsaName { get; set; } = string.Empty;
+        public Guid? RequestId { get; set; }
+        public DateTimeOffset ChangedAt { get; set; }
     }
 
     private sealed class CpPreviewRow

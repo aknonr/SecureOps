@@ -8,7 +8,8 @@ namespace SecureOps.Api.Controllers.ServiceAccounts;
 
 /// <summary>
 /// gMSA conversion change plans (docs/service-accounts/CHANGE-PLAN-DESIGN.md, migration 033): plan, preview from the accounts'
-/// latest Discovery scans, and approval bound to one preview version and its SHA-256. Nothing here connects to a server,
+/// latest Discovery scans, approval bound to one preview version and its SHA-256, the person's checklist, plan evidence
+/// (migration 034) and completion. Nothing here connects to a server,
 /// converts an account or carries a password; the change itself is made by people under their normal change record.
 /// A plan is visible only when every one of its accounts is inside the caller's scope (otherwise 404, same as missing).
 /// </summary>
@@ -22,6 +23,9 @@ namespace SecureOps.Api.Controllers.ServiceAccounts;
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
 public sealed class ServiceAccountChangePlansController(ServiceAccountService service) : ControllerBase
 {
+    // Same bound as account evidence (ServiceAccountsController).
+    private const long _maxEvidenceRequestBytes = 11L * 1024 * 1024;
+
     /// <summary>Server-paged plans whose every account is in the caller's scope, newest change first.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(ChangePlanPage), StatusCodes.Status200OK)]
@@ -74,6 +78,52 @@ public sealed class ServiceAccountChangePlansController(ServiceAccountService se
     [ProducesResponseType(typeof(ChangePlanView), StatusCodes.Status200OK)]
     public async Task<ActionResult<ChangePlanView>> CancelAsync(Guid id, CancelChangePlanRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.CancelChangePlanAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>Checklist marks of one row of the plan's current preview, newest first (the latest one counts).</summary>
+    [HttpGet("{id:guid}/items/{itemId:guid}/checks")]
+    [ProducesResponseType(typeof(IReadOnlyList<ChangePlanItemCheckView>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ChangePlanItemCheckView>>> ChecksAsync(Guid id, Guid itemId, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.ChangePlanItemChecksAsync(User, Context(), id, itemId, cancellationToken));
+
+    /// <summary>
+    /// Records the person's own statement for one row of the approved preview (Done, Skipped, Failed, RolledBack). Nothing
+    /// connects to a server; a mark outside the maintenance window is accepted and labelled.
+    /// </summary>
+    [HttpPost("{id:guid}/items/{itemId:guid}/checks")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(ChangePlanView), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ChangePlanView>> CheckAsync(Guid id, Guid itemId, CheckChangePlanItemRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.CheckChangePlanItemAsync(User, Context(), id, itemId, request, cancellationToken));
+
+    /// <summary>Attaches evidence to an approved plan (same type, signature and size checks as account evidence; migration 034).</summary>
+    [HttpPost("{id:guid}/evidence")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [RequestSizeLimit(_maxEvidenceRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = _maxEvidenceRequestBytes)]
+    [ProducesResponseType(typeof(ChangePlanView), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ChangePlanView>> EvidenceUploadAsync(Guid id, [FromForm] IFormFile file, [FromForm] string? label,
+        CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length is 0 or > _maxEvidenceRequestBytes)
+        {
+            return ServiceAccountReplies.Reply(this, SaResult<ChangePlanView>.Fail(SaErrors.Invalid, "file"));
+        }
+
+        using MemoryStream buffer = new();
+        await file.CopyToAsync(buffer, cancellationToken);
+        return ServiceAccountReplies.Reply(this, await service.AddChangePlanEvidenceAsync(User, Context(), id, file.FileName, file.ContentType, buffer.ToArray(),
+            label, cancellationToken));
+    }
+
+    /// <summary>
+    /// Closes an InProgress plan whose every row is marked: one unverified GmsaConversion Performed action per account whose
+    /// rows say so. Never verifies an account and never closes a linked request.
+    /// </summary>
+    [HttpPost("{id:guid}/complete")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(ChangePlanView), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ChangePlanView>> CompleteAsync(Guid id, CompleteChangePlanRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.CompleteChangePlanAsync(User, Context(), id, request, cancellationToken));
 
     private Infrastructure.Access.AccessOperationContext Context() => ServiceAccountReplies.Context(this);
 }
