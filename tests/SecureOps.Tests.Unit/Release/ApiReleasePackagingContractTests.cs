@@ -41,8 +41,9 @@ public sealed class ApiReleasePackagingContractTests
             .And.Contain("Test-ApiReleasePayload.ps1");
         // The sealed selector still rejects unreviewed successor migrations; the publisher consumes its result.
         string selector = File.ReadAllText(Path.Combine(root, "scripts", "release", "Get-ReleaseSqlPlan.ps1"));
-        selector.Should().Contain("$last = if ($current) { 32 } elseif ($UpgradeFromInstalled026) { 27 } elseif ($IncludeServiceAccounts) { 26 } else { 24 }")
-            .And.Contain("Expected the exact complete 001-$last SQL chain; later migrations must be explicitly reviewed.");
+        selector.Should().Contain("[switch]$UpgradeFromInstalled032")
+            .And.Contain("$last = if ($changePlans) { 33 } elseif ($current) { 32 } elseif ($UpgradeFromInstalled026) { 27 } elseif ($IncludeServiceAccounts) { 26 } else { 24 }")
+            .And.Contain("Expected the exact complete 001-$sourceLast SQL chain; later migrations must be explicitly reviewed.");
         paired.Should().Contain("@('Api','Ui','Worker')").And.Contain("requiredSchema=$sqlPlan.RequiredSchema")
             .And.Contain("Get-ReleaseSqlPlan.ps1").And.Contain("-IncludeServiceAccounts:$IncludeServiceAccounts")
             .And.Contain("upgradeFromVerified018='019-024'").And.Contain("database-delta")
