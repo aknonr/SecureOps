@@ -63,7 +63,8 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(32)
+            .And.HaveCount(33)
+            .And.ContainSingle(name => name == "033-service-account-change-plans.sql")
             .And.ContainSingle(name => name == "032-access-request-user-index.sql")
             .And.ContainSingle(name => name == "031-service-account-requested-gmsa-name.sql")
             .And.ContainSingle(name => name == "030-service-account-usage-scans.sql")
@@ -337,6 +338,44 @@ public sealed class SqlAssetContractTests
 
         candidate.Should().NotContainEquivalentOf("password").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("ALTER ROLE");
         grants.Should().NotContain("UPDATE").And.NotContain("DELETE").And.NotContain("ALTER ROLE");
+    }
+
+    [Fact]
+    public void ChangePlanMigration_IsAdditive_AppendOnly_RefusesReplay_AndGrantsNoDelete()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "033-service-account-change-plans.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "033-service-account-change-plans.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-006-change-plans.sql"));
+        string grants = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-006-API-permissions.sql"));
+
+        migration.Should().Contain(":r ../schema/033-service-account-change-plans.sql");
+        schema.Should().Contain("requires reviewed 025, 030 and 031").And.Contain(":r ../pending/service-accounts/SA-006-change-plans.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay");
+        foreach (string table in new[] { "ChangePlanAccounts", "ChangePlanPreviews", "ChangePlanItems", "ChangePlanApprovals", "ChangeItemChecks", "ChangePlanEvents" })
+        {
+            candidate.Should().Contain($"CREATE TABLE svcacct.{table}(");
+            candidate.Should().MatchRegex($@"CREATE TRIGGER svcacct\.TR_Sa\w+_AppendOnly ON svcacct\.{table} AFTER UPDATE, DELETE");
+            grants.Should().Contain($"GRANT SELECT, INSERT ON OBJECT::svcacct.{table} TO svcacct_api_runtime;");
+        }
+
+        candidate.Should().Contain("CREATE TRIGGER svcacct.TR_SaChangePlans_Fixed ON svcacct.ChangePlans AFTER UPDATE, DELETE")
+            .And.Contain("CREATE TRIGGER svcacct.TR_SaChangePlanApprovals_Separation ON svcacct.ChangePlanApprovals AFTER INSERT")
+            .And.Contain("CONSTRAINT UQ_SaChangePlanApprovals_Preview UNIQUE (PreviewId)");
+        // T8: UPDATE only on the status columns; the trigger compares fixed columns exactly (the database collation is CI_AS).
+        grants.Should().Contain("GRANT SELECT, INSERT ON OBJECT::svcacct.ChangePlans TO svcacct_api_runtime;")
+            .And.Contain("GRANT UPDATE ON OBJECT::svcacct.ChangePlans (Status, CurrentPreviewVersion, UpdatedBy, UpdatedAt) TO svcacct_api_runtime;")
+            .And.NotContain("INSERT, UPDATE ON");
+        candidate.Should().Contain("i.Title COLLATE Latin1_General_BIN2 <> d.Title COLLATE Latin1_General_BIN2 OR DATALENGTH(i.Title) <> DATALENGTH(d.Title)")
+            .And.Contain("i.Kind COLLATE Latin1_General_BIN2 <> d.Kind COLLATE Latin1_General_BIN2 OR DATALENGTH(i.Kind) <> DATALENGTH(d.Kind)")
+            .And.Contain("DATEPART(TZOFFSET, i.CreatedAt) <> DATEPART(TZOFFSET, d.CreatedAt)");
+        foreach (string column in new[] { "Kind", "Status", "Action", "ComponentType", "Flag", "State", "Event" })
+        {
+            candidate.Should().MatchRegex($@"CHECK \({column} COLLATE Latin1_General_BIN2 IN \([^)]*\)\s+AND DATALENGTH\({column}\) = LEN\({column}\)\)");
+        }
+        // Additive only: no existing object is altered or dropped, no secret column, no role or delete grant.
+        candidate.Should().NotContainEquivalentOf("password").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("ALTER ROLE");
+        grants.Should().NotContain("DELETE").And.NotContain("ALTER ROLE").And.NotContain("svcacct_worker");
     }
 
     [Fact]

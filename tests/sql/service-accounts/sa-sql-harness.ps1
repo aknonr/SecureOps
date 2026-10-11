@@ -3,14 +3,15 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix,
-    [ValidateRange(26, 31)]
-    [int]$ThroughMigration = 31,
+    [ValidateRange(26, 33)]
+    [int]$ThroughMigration = 33,
     [switch]$SkipRoleScripts
 )
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-031; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005), verifies module replay refusal, and
+# numbered migrations in order (now 001-033; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005, 032 is Access,
+# 033 numbers SA-006), verifies module replay refusal, the 033 database guards (sa-033-guards.sql) and
 # (unless -SkipRoleScripts) the module role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
@@ -82,12 +83,35 @@ try {
         if ($LASTEXITCODE -eq 0) { throw 'Candidate 5 replay was not refused.' }
         Write-Host 'candidate 5 replay refused as expected'
     }
+    # -ThroughMigration 32 leaves the database like an installed 032 system (no change-plan tables).
+    $hasPlans = if ($ThroughMigration -ge 33) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN OBJECT_ID(N'svcacct.ChangePlans', N'U') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasPlans -eq 'skip') { Write-Host 'Change plans (033) left out: -ThroughMigration below 33' }
+    elseif ($hasPlans -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-006-change-plans.sql'
+        Write-Host 'applied SA-006-change-plans.sql (candidate 6)'
+    } else { Write-Host 'Change plans installed through numbered 033' }
+    if ($hasPlans -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-006-change-plans.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 6 replay was not refused.' }
+        Write-Host 'candidate 6 replay refused as expected'
+    }
     if (-not $SkipRoleScripts) {
         Invoke-SaSql -Database $database -File 'SA-API-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-Worker-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-002-API-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-004-API-permissions.sql'
         Write-Host 'applied SA-API-permissions.sql, SA-Worker-permissions.sql, SA-002-API-permissions.sql and SA-004-API-permissions.sql (no role member assigned)'
+        if ($hasPlans -ne 'skip') {
+            Invoke-SaSql -Database $database -File 'SA-006-API-permissions.sql'
+            Write-Host 'applied SA-006-API-permissions.sql (no role member assigned)'
+        }
+    }
+    if ($hasPlans -ne 'skip') {
+        # Database guards for the change plan (design T2, T3, T8); the runtime-role part needs the role scripts. The temporary
+        # role member it creates is removed again, so the role stays without members.
+        $withRole = if ($SkipRoleScripts) { '0' } else { '1' }
+        & $sqlcmd -S $server -d $database -E -I -b -v WithRole=$withRole -i (Join-Path $PSScriptRoot 'sa-033-guards.sql')
+        if ($LASTEXITCODE -ne 0) { throw "Service Accounts 033 guard check failed; database $database retained for inspection." }
     }
 } finally { Pop-Location }
 

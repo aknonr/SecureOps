@@ -152,6 +152,66 @@ public sealed class ServiceAccountApiCompositionTests
     }
 
     [Fact]
+    public void ChangePlanRoutes_PoliciesAndMethods()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient _ = factory.CreateApiClient();
+        RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText?.StartsWith("api/v1/service-accounts/change-plans", StringComparison.Ordinal) == true)];
+        static string Method(RouteEndpoint e) => e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods.Single();
+        static string[] Policies(RouteEndpoint e) => [.. e.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).OfType<string>()];
+
+        // T6: every route reads its resource under the plan route; writes are POST/PATCH only; there is no DELETE and no
+        // route that runs anything on a server. Cancel is View at the route because the planner (Work) or a verifier
+        // (Verify) may cancel; the service decides which applies.
+        endpoints.Select(e => (Method(e), e.RoutePattern.RawText!)).Should().BeEquivalentTo(new[]
+        {
+            ("GET", "api/v1/service-accounts/change-plans"),
+            ("GET", "api/v1/service-accounts/change-plans/{id:guid}"),
+            ("GET", "api/v1/service-accounts/change-plans/{id:guid}/items"),
+            ("POST", "api/v1/service-accounts/change-plans"),
+            ("PATCH", "api/v1/service-accounts/change-plans/{id:guid}"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/preview"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/approve"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/cancel")
+        });
+        foreach (RouteEndpoint endpoint in endpoints)
+        {
+            string route = endpoint.RoutePattern.RawText!;
+            string[] policies = Policies(endpoint);
+            policies.Should().Contain(ServiceAccountPolicies.View, route);
+            string[] expected = Method(endpoint) == "GET" || route.EndsWith("/cancel", StringComparison.Ordinal) ? []
+                : route.EndsWith("/approve", StringComparison.Ordinal) ? [ServiceAccountPolicies.Verify] : [ServiceAccountPolicies.Work];
+            policies.Except([ServiceAccountPolicies.View]).Should().BeEquivalentTo(expected, route);
+        }
+    }
+
+    [Fact]
+    public void ChangePlanRefusals_MapToStableStatuses()
+    {
+        ControllerBase controller = new Probe { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+        foreach ((string code, string? field, int status) in new[]
+        {
+            (SaErrors.ChangePlanState, (string?)"previewStale", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "planNotPreviewed", StatusCodes.Status409Conflict),
+            (SaErrors.Forbidden, "approverIsPlanner", StatusCodes.Status403Forbidden),
+            (SaErrors.Forbidden, "approverChangedPlan", StatusCodes.Status403Forbidden),
+            (SaErrors.ChangePlanAccountsRefused, "accounts", StatusCodes.Status400BadRequest),
+            (SaErrors.ChangePlansNotInstalled, null, StatusCodes.Status503ServiceUnavailable)
+        })
+        {
+            ObjectResult result = ServiceAccountReplies.Reply(controller, SaResult<ChangePlanView>.Fail(code, field)).Result.Should().BeOfType<ObjectResult>().Subject;
+            result.StatusCode.Should().Be(status, code + " " + field);
+            ProblemDetails problem = result.Value.Should().BeAssignableTo<ProblemDetails>().Subject;
+            problem.Extensions["code"].Should().Be(code);
+            if (field is not null)
+            {
+                problem.Extensions["field"].Should().Be(field);
+            }
+        }
+    }
+
+    [Fact]
     public void SecondScanDecision_IsA409Conflict_NamingTheRule()
     {
         ControllerBase controller = new Probe { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
