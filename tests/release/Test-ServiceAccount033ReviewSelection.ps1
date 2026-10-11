@@ -165,7 +165,9 @@ Reject '033 role cannot replay installed include' { Select-Plan } 'replay an ins
 $roleEntry.Sha256 = (Get-FileHash -LiteralPath (Join-Path $fixture $role)).Hash; Save-Review
 $asset = Join-Path $fixture $paths033[2]
 Move-Item -LiteralPath $asset -Destination "$asset.absent"
-Reject '033 missing physical include' { Select-Plan } 'does not exist'
+$failure = $null
+try { Select-Plan | Out-Null } catch { $failure = $_ }
+Check '033 missing physical include' ($null -ne $failure -and $failure.TargetObject -ieq $asset)
 Move-Item -LiteralPath "$asset.absent" -Destination $asset
 $asset = Join-Path $fixture $wrapper
 Move-Item -LiteralPath $asset -Destination (Join-Path (Split-Path $asset -Parent) '033-unknown.sql')
