@@ -13,7 +13,10 @@ public sealed record ChangePlanAccountState(ChangePlanAccountView View, AccountS
 public sealed record ChangePlanSnapshot(Guid Id, string Kind, string Title, ChangePlanStatus Status, int? CurrentPreviewVersion, Guid CreatedById,
     string CreatedBy, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string Version, IReadOnlyList<ChangePlanAccountState> Accounts,
     ChangePlanPreviewView? Preview, Guid? PreviewCreatedById, ChangePlanApprovalView? Approval, IReadOnlyList<ChangePlanEventView> Events,
-    IReadOnlySet<Guid> Editors);
+    IReadOnlySet<Guid> Editors, IReadOnlyList<ChangePlanItemState> Items, IReadOnlyList<EvidenceView> Evidence);
+
+/// <summary>One row of the plan's current preview with its latest checklist mark (all null while unmarked).</summary>
+public sealed record ChangePlanItemState(Guid ItemId, Guid AccountId, ChangePlanCheckState? State, long? CheckId, bool OutsideWindow, DateTimeOffset? CheckedAt);
 
 /// <summary>Who runs a plan command and which module capabilities they hold; scope is re-read inside the transaction.</summary>
 public sealed record ChangePlanCaller(SaActor Actor, bool Work, bool Verify);
@@ -111,11 +114,14 @@ public sealed partial class SqlServiceAccountRepository
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         return await RetryReadOnDeadlockAsync(async () =>
         {
-            using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
+            using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd($"""
                 SELECT COUNT(*) FROM svcacct.ChangePlanItems i JOIN svcacct.ChangePlanPreviews v ON v.Id = i.PreviewId
                 WHERE v.PlanId = @planId AND v.Version = @previewVersion;
-                SELECT i.Id, i.AccountId, a.AccountName, i.ServerName, i.ComponentType, i.ComponentName, i.CurrentIdentity, i.TargetIdentity, i.Flag, i.ScanAt
+                SELECT i.Id, i.AccountId, a.AccountName, i.ServerName, i.ComponentType, i.ComponentName, i.CurrentIdentity, i.TargetIdentity, i.Flag, i.ScanAt,
+                    lc.Id AS CheckId, lc.State AS CheckState, lc.Note AS CheckNote, lc.OutsideWindow AS CheckOutsideWindow, lc.CheckedBy, lc.CheckedAt
                 FROM svcacct.ChangePlanItems i JOIN svcacct.ChangePlanPreviews v ON v.Id = i.PreviewId JOIN svcacct.Accounts a ON a.Id = i.AccountId
+                OUTER APPLY (SELECT TOP (1) c.Id, c.State, c.Note, c.OutsideWindow, {_actorName} AS CheckedBy, c.CheckedAt
+                    FROM svcacct.ChangeItemChecks c LEFT JOIN security.Users u ON u.UserId = c.CheckedBy WHERE c.ItemId = i.Id ORDER BY c.Id DESC) lc
                 WHERE v.PlanId = @planId AND v.Version = @previewVersion
                 ORDER BY a.AccountName, i.AccountId, i.ServerName, i.ComponentType, i.ComponentName, i.Id
                 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
@@ -125,7 +131,9 @@ public sealed partial class SqlServiceAccountRepository
             {
                 ChangePlanFlag flag = Enum.Parse<ChangePlanFlag>(r.Flag);
                 return new ChangePlanItemView(r.Id, r.AccountId, r.AccountName, r.ServerName, r.ComponentType, r.ComponentName, r.CurrentIdentity, r.TargetIdentity,
-                    r.Flag, ChangePlanRules.FlagLabel(flag), r.ScanAt);
+                    r.Flag, ChangePlanRules.FlagLabel(flag), r.ScanAt, r.CheckId is { } checkId
+                        ? CheckView(checkId, r.CheckState!, r.CheckNote, r.CheckOutsideWindow == true, r.CheckedBy!, r.CheckedAt!.Value)
+                        : null);
             })];
             return new ChangePlanItemPage(previewVersion, items, total, page, pageSize);
         });
@@ -562,6 +570,9 @@ public sealed partial class SqlServiceAccountRepository
         Dictionary<string, int> flags;
         ChangePlanApprovalView? approval;
         CpEventRow[] events;
+        ChangePlanItemState[] items;
+        EvidenceView[] evidence;
+        Dictionary<Guid, (ChangePlanAccountOutcome Outcome, Guid? ActionId)> outcomes;
         using (SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd($"""
             SELECT p.Id, p.Kind, p.Title, p.Status, p.CurrentPreviewVersion, p.CreatedBy AS CreatedById, {_actorName} AS CreatedBy, p.CreatedAt, p.UpdatedAt, p.RowVer
             FROM svcacct.ChangePlans p {hint} LEFT JOIN security.Users u ON u.UserId = p.CreatedBy WHERE p.Id = @planId;
@@ -579,6 +590,15 @@ public sealed partial class SqlServiceAccountRepository
             LEFT JOIN security.Users u ON u.UserId = ap.ApprovedBy WHERE ap.PlanId = @planId;
             SELECT e.Event, e.FromStatus, e.ToStatus, e.PreviewVersion, e.Reason, {_actorName} AS Actor, e.At, e.Actor AS ActorId
             FROM svcacct.ChangePlanEvents e LEFT JOIN security.Users u ON u.UserId = e.Actor WHERE e.PlanId = @planId ORDER BY e.Id;
+            SELECT i.Id AS ItemId, i.AccountId, lc.State, lc.Id AS CheckId, CAST(ISNULL(lc.OutsideWindow, 0) AS bit) AS OutsideWindow, lc.CheckedAt
+            FROM svcacct.ChangePlanItems i JOIN svcacct.ChangePlanPreviews v ON v.Id = i.PreviewId
+            JOIN svcacct.ChangePlans p ON p.Id = v.PlanId AND p.CurrentPreviewVersion = v.Version
+            OUTER APPLY (SELECT TOP (1) c.Id, c.State, c.OutsideWindow, c.CheckedAt FROM svcacct.ChangeItemChecks c WHERE c.ItemId = i.Id ORDER BY c.Id DESC) lc
+            WHERE v.PlanId = @planId;
+            SELECT e.Id, e.OwnerEntityType, e.OwnerEntityId, e.FileName, e.ContentType, e.SizeBytes, e.Sha256, e.Label, e.CreatedAt
+            FROM svcacct.Evidence e WHERE e.OwnerEntityType = 'ChangePlan' AND e.OwnerEntityId = @planId ORDER BY e.CreatedAt DESC, e.Id;
+            SELECT h.AccountId, JSON_VALUE(h.ChangesJson, '$.Outcome') AS Outcome, TRY_CONVERT(uniqueidentifier, JSON_VALUE(h.ChangesJson, '$.ActionId')) AS ActionId
+            FROM svcacct.History h WHERE h.EntityType = 'ChangePlan' AND h.EntityId = @planId AND h.Action = 'ChangePlanCompleted';
             """, new { planId }, transaction, cancellationToken)))
         {
             plan = await grid.ReadSingleOrDefaultAsync<CpPlanRow>();
@@ -593,6 +613,12 @@ public sealed partial class SqlServiceAccountRepository
             flags = (await grid.ReadAsync<(string Flag, int Count)>()).ToDictionary(f => f.Flag, f => f.Count, StringComparer.Ordinal);
             approval = await grid.ReadSingleOrDefaultAsync<ChangePlanApprovalView>();
             events = [.. await grid.ReadAsync<CpEventRow>()];
+            items = [.. (await grid.ReadAsync<CpItemStateRow>()).Select(r => new ChangePlanItemState(r.ItemId, r.AccountId,
+                r.State is null ? null : Enum.Parse<ChangePlanCheckState>(r.State), r.CheckId, r.OutsideWindow, r.CheckedAt))];
+            evidence = [.. await grid.ReadAsync<EvidenceView>()];
+            outcomes = (await grid.ReadAsync<(Guid AccountId, string? Outcome, Guid? ActionId)>())
+                .Where(o => Enum.TryParse(o.Outcome, false, out ChangePlanAccountOutcome _))
+                .ToDictionary(o => o.AccountId, o => (Enum.Parse<ChangePlanAccountOutcome>(o.Outcome!), o.ActionId));
         }
 
         Dictionary<Guid, (AccountScopeAnchor Anchor, string Name, string? Domain)> anchors =
@@ -600,14 +626,16 @@ public sealed partial class SqlServiceAccountRepository
         int Count(ChangePlanFlag flag) => flags.GetValueOrDefault(flag.ToString());
         return new ChangePlanSnapshot(plan.Id, plan.Kind, plan.Title, Enum.Parse<ChangePlanStatus>(plan.Status), plan.CurrentPreviewVersion, plan.CreatedById,
             plan.CreatedBy, plan.CreatedAt, plan.UpdatedAt, Version(plan.RowVer),
-            [.. accounts.Select(a => new ChangePlanAccountState(a, anchors[a.AccountId].Anchor))],
+            [.. accounts.Select(a => new ChangePlanAccountState(outcomes.TryGetValue(a.AccountId, out (ChangePlanAccountOutcome Outcome, Guid? ActionId) done)
+                ? a with { Outcome = done.Outcome.ToString(), OutcomeLabel = ChangePlanRules.OutcomeLabel(done.Outcome), ActionId = done.ActionId }
+                : a, anchors[a.AccountId].Anchor))],
             preview is null ? null : new ChangePlanPreviewView(preview.Version, preview.Sha256, preview.ScanFreshDays, preview.ItemCount,
                 new ChangePlanFlagCounts(Count(ChangePlanFlag.Ok), Count(ChangePlanFlag.StaleScan), Count(ChangePlanFlag.NoScan), Count(ChangePlanFlag.NotCovered),
                     Count(ChangePlanFlag.ManualOnly), Count(ChangePlanFlag.NameTooLong), Count(ChangePlanFlag.NothingFound)),
                 preview.CreatedBy, preview.CreatedAt),
             preview?.CreatedById, approval,
             [.. events.Select(e => new ChangePlanEventView(e.Event, e.FromStatus, e.ToStatus, e.PreviewVersion, e.Reason, e.Actor, e.At))],
-            events.Where(e => e.Event == "Updated").Select(e => e.ActorId).ToHashSet());
+            events.Where(e => e.Event == "Updated").Select(e => e.ActorId).ToHashSet(), items, evidence);
     }
 
     /// <summary>Each account's latest Discovery scan (by scan time, then link time) with its planned servers and its own matched components.</summary>
@@ -750,6 +778,22 @@ public sealed partial class SqlServiceAccountRepository
         public string TargetIdentity { get; set; } = string.Empty;
         public string Flag { get; set; } = string.Empty;
         public DateTimeOffset? ScanAt { get; set; }
+        public long? CheckId { get; set; }
+        public string? CheckState { get; set; }
+        public string? CheckNote { get; set; }
+        public bool? CheckOutsideWindow { get; set; }
+        public string? CheckedBy { get; set; }
+        public DateTimeOffset? CheckedAt { get; set; }
+    }
+
+    private sealed class CpItemStateRow
+    {
+        public Guid ItemId { get; set; }
+        public Guid AccountId { get; set; }
+        public string? State { get; set; }
+        public long? CheckId { get; set; }
+        public bool OutsideWindow { get; set; }
+        public DateTimeOffset? CheckedAt { get; set; }
     }
 
     private sealed class CpStoredItemRow

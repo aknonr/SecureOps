@@ -7,7 +7,8 @@ using SecureOps.Shared.Contracts.ServiceAccounts;
 namespace SecureOps.Infrastructure.ServiceAccounts;
 
 /// <summary>Stored evidence file with its scope anchors.</summary>
-public sealed record EvidenceFile(Guid Id, Guid? AccountId, Guid? ScopeTeamId, string FileName, string ContentType, byte[] Content, string Sha256);
+public sealed record EvidenceFile(Guid Id, Guid? AccountId, Guid? ScopeTeamId, string FileName, string ContentType, byte[] Content, string Sha256,
+    string OwnerEntityType, Guid OwnerEntityId);
 
 public sealed partial class SqlServiceAccountRepository
 {
@@ -227,19 +228,26 @@ public sealed partial class SqlServiceAccountRepository
     {
         var id = Guid.NewGuid();
         return MutateAsync(accountId, "Evidence", id, "EvidenceAdded", new { ownerType, ownerId, fileName, Size = content.Length }, label, actor,
-            (connection, transaction, now) => connection.ExecuteAsync(Cmd("""
-                INSERT INTO svcacct.Evidence(Id, OwnerEntityType, OwnerEntityId, AccountId, ScopeTeamId, FileName, ContentType, Sha256, SizeBytes, Content, Label, CreatedAt, CreatedBy)
-                VALUES(@id, @ownerType, @ownerId, @accountId, @scopeTeamId, @fileName, @contentType, @sha256, @Size, @content, @label, @now, @UserId);
-                """, new { id, ownerType, ownerId, accountId, scopeTeamId, fileName, contentType, sha256, Size = content.Length, content, label, now, actor.UserId },
-                transaction, cancellationToken)), cancellationToken);
+            (connection, transaction, now) => InsertEvidenceAsync(connection, transaction, id, ownerType, ownerId, accountId, scopeTeamId, fileName, contentType, content,
+                sha256, label, actor, now, cancellationToken), cancellationToken);
     }
+
+    /// <summary>Inserts one immutable evidence row (account evidence and, since 034, plan evidence).</summary>
+    private static Task<int> InsertEvidenceAsync(SqlConnection connection, SqlTransaction transaction, Guid id, string ownerType, Guid ownerId, Guid? accountId,
+        Guid? scopeTeamId, string fileName, string contentType, byte[] content, string sha256, string? label, SaActor actor, DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(Cmd("""
+            INSERT INTO svcacct.Evidence(Id, OwnerEntityType, OwnerEntityId, AccountId, ScopeTeamId, FileName, ContentType, Sha256, SizeBytes, Content, Label, CreatedAt, CreatedBy)
+            VALUES(@id, @ownerType, @ownerId, @accountId, @scopeTeamId, @fileName, @contentType, @sha256, @Size, @content, @label, @now, @UserId);
+            """, new { id, ownerType, ownerId, accountId, scopeTeamId, fileName, contentType, sha256, Size = content.Length, content, label, now, actor.UserId },
+            transaction, cancellationToken));
 
     /// <summary>Reads evidence bytes and anchors (scope checked by the service before returning).</summary>
     public async Task<EvidenceFile?> EvidenceAsync(Guid id, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         return await connection.QuerySingleOrDefaultAsync<EvidenceFile>(Cmd(
-            "SELECT Id, AccountId, ScopeTeamId, FileName, ContentType, Content, Sha256 FROM svcacct.Evidence WHERE Id = @id;", new { id }, null, cancellationToken));
+            "SELECT Id, AccountId, ScopeTeamId, FileName, ContentType, Content, Sha256, OwnerEntityType, OwnerEntityId FROM svcacct.Evidence WHERE Id = @id;", new { id }, null, cancellationToken));
     }
 
     /// <summary>Records an audit event for a privileged read (evidence download, export).</summary>

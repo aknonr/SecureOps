@@ -65,7 +65,7 @@ public sealed partial class SqlServiceAccountRepository
             SELECT i.Id, i.HandoverId, i.Target, i.Suitability, i.DecisionNote, i.PlannedOn, i.CompletedActionId, i.RowVer, {GmsaNameColumn("i", names)}
             FROM svcacct.IdentityTransitions i WHERE i.AccountId = @id;
             SELECT e.Id, e.OwnerEntityType, e.OwnerEntityId, e.FileName, e.ContentType, e.SizeBytes, e.Sha256, e.Label, e.CreatedAt
-            FROM svcacct.Evidence e WHERE e.AccountId = @id ORDER BY e.CreatedAt DESC, e.Id;
+            FROM svcacct.Evidence e WHERE e.AccountId = @id AND e.OwnerEntityType <> 'ChangePlan' ORDER BY e.CreatedAt DESC, e.Id;
             SELECT TOP ({_sourceRowLimit}) r.BatchId, b.Profile, b.FileName, b.SourceReportDate, r.Sheet, r.RowNumber, r.EntityKind, r.Classification, r.OriginalJson
             FROM svcacct.ImportRows r JOIN svcacct.ImportBatches b ON b.Id = r.BatchId
             WHERE r.MatchAccountId = @id AND b.Status = 'Committed' ORDER BY b.CommittedAt DESC, r.RowKey;

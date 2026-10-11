@@ -154,10 +154,13 @@ public sealed partial class ServiceAccountService
         bool verifier = caller.Can(ServiceAccountCapabilities.Verify) && responsible && plan.Status == ChangePlanStatus.Previewed;
         string? separation = ChangePlanRules.ApproverRefusal(caller.User.Id, plan.CreatedById, plan.PreviewCreatedById ?? Guid.Empty, plan.Editors);
         bool work = caller.Can(ServiceAccountCapabilities.Work) && responsible;
+        bool checking = plan.Status is ChangePlanStatus.Approved or ChangePlanStatus.InProgress;
         ChangePlanPermissions permissions = new(work && editable, work && editable, verifier && separation is null, verifier ? separation : null,
-            responsible && ChangePlanRules.IsOpen(plan.Status) && SqlServiceAccountRepository.MayCancel(plan, PlanCaller(caller)));
+            responsible && ChangePlanRules.IsOpen(plan.Status) && SqlServiceAccountRepository.MayCancel(plan, PlanCaller(caller)), work && checking,
+            work && plan.Status == ChangePlanStatus.InProgress && plan.Items.All(i => i.State is not null),
+            work && (checking || plan.Status == ChangePlanStatus.Completed));
         return new ChangePlanView(plan.Id, plan.Kind, plan.Title, plan.Status.ToString(), ChangePlanRules.StatusLabel(plan.Status), plan.CreatedBy, plan.CreatedAt,
-            plan.UpdatedAt, plan.Version, [.. plan.Accounts.Select(a => a.View)], plan.Preview, plan.Approval, plan.Events, permissions);
+            plan.UpdatedAt, plan.Version, [.. plan.Accounts.Select(a => a.View)], plan.Preview, plan.Approval, plan.Events, permissions, Checklist(plan), plan.Evidence);
     }
 
     /// <summary>The plan when every one of its accounts is in the caller's scope; otherwise null (same as missing).</summary>

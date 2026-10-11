@@ -209,7 +209,7 @@ PR 2 satırları (aynı kural: önce başarısız test; T5/T6 ekleri yukarıdaki
 | T10 | **Onaysız veya eksik iş:** onaydan önce işaret, işaretsiz kalemle kapanış, olmayan değişikliği geri alma | 409 `planNotApproved` / `checklistIncomplete` / `nothingToRollBack`, hiçbir şey yazılmaz | SQL `Check_BeforeApproval_Is409_WritesNothing`; SQL `Complete_WithUncheckedItem_Is409_WritesNothing`; SQL `RolledBack_WithoutChange_Is409` |
 | T11 | **Pencere dışı işaretin gizlenmesi** | Kabul edilir, `OutsideWindow = 1` satırda, görünümde ve sayımda | SQL `Check_OutsideWindow_IsAccepted_AndFlagged` |
 | T12 | **Yarım kalan kapanış** | Eylemler, olay, geçmiş, audit tek işlem | SQL `Complete_FailureBeforeCommit_LeavesNoActionNoEvent` (enjekte audit hatası) |
-| T13 | **034'ün kısıtı gevşetmesi / tekrar** | Kısıt aynı adla, `WITH CHECK`, yalnız `'ChangePlan'` eklenir; tekrar 51396 | Harness `sa-034-guards.sql` (`ChangePlan` kabul, `ChangePlanItem`/bilinmeyen 547, kısıt güvenilir, 034 tekrarı reddedilir); Birim `PlanEvidenceMigration_OnlyWidensOwnerCheck_RefusesReplay` |
+| T13 | **034'ün kısıtı gevşetmesi / tekrar** | Kısıt aynı adla, `WITH CHECK`, yalnız `'ChangePlan'` eklenir; tekrar 51396 | Harness `sa-034-guards.sql` (`ChangePlan` kabul, `ChangePlanItem`/bilinmeyen 547, kısıt güvenilir, 034 tekrarı reddedilir); Birim `PlanEvidenceMigration_OnlyWidensOwnerCheck_RefusesReplay`; SQL `PlanEvidence_FollowsMigration034_503WhenMissing` (034'lü ve `-ThroughMigration 33` kopyada ayrı koşulur) |
 
 Notlar:
 - Tüm 409/403/404 yanıtları planın veya kapsam dışı hesabın içeriğini taşımaz; 409 yalnız çağıranın zaten görebildiği
