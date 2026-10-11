@@ -1,8 +1,10 @@
 /*
   DISPOSABLE HARNESS DATABASE ONLY (sa-sql-harness.ps1). Proves the 033 database guards without the API (design T2, T3, T8):
   every append-only change-plan table refuses UPDATE and DELETE (51392); ChangePlans refuses DELETE and changes to fixed
-  columns (51394); one approval per preview (2627); the approval trigger refuses the planner, the previewer, an editor of
-  the plan and a digest or plan that does not match the preview (51393); and the API runtime role cannot DELETE (229).
+  columns, also case-only, trailing-space and offset-only ones (51394); coded text columns take only their exact spelling
+  (547); one approval per preview (2627); the approval trigger refuses the planner, the previewer, an editor of the plan
+  and a digest or plan that does not match the preview (51393); and the API runtime role cannot DELETE (229) and may UPDATE
+  only the four ChangePlans status columns (230).
   Seeds synthetic rows (never removed: the tables are append-only) with fixed synthetic identifiers.
   Run with SQLCMD -I -b; -v WithRole=1 also runs the runtime-role checks (needs SA-API and SA-006 permission scripts).
 */
@@ -67,11 +69,37 @@ BEGIN TRY UPDATE svcacct.ChangePlans SET CreatedBy = @approver WHERE Id = @bare;
 BEGIN CATCH IF ERROR_NUMBER() <> 51394 THROW; END CATCH;
 BEGIN TRY UPDATE svcacct.ChangePlans SET Title = N'Değişti' WHERE Id = @bare; THROW 51000, 'ChangePlans.Title UPDATE was not refused.', 1; END TRY
 BEGIN CATCH IF ERROR_NUMBER() <> 51394 THROW; END CATCH;
+-- The database collation is case-insensitive and ignores trailing spaces; datetimeoffset equality ignores the offset.
+BEGIN TRY UPDATE svcacct.ChangePlans SET Title = LOWER(Title) WHERE Id = @bare; THROW 51000, 'ChangePlans.Title case-only UPDATE was not refused.', 1; END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 51394 THROW; END CATCH;
+BEGIN TRY UPDATE svcacct.ChangePlans SET Title = Title + N' ' WHERE Id = @bare; THROW 51000, 'ChangePlans.Title trailing-space UPDATE was not refused.', 1; END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 51394 THROW; END CATCH;
+BEGIN TRY UPDATE svcacct.ChangePlans SET Kind = 'gmsaconversion' WHERE Id = @bare; THROW 51000, 'ChangePlans.Kind case-only UPDATE was not refused.', 1; END TRY
+BEGIN CATCH IF ERROR_NUMBER() NOT IN (51394, 547) THROW; END CATCH;
+BEGIN TRY UPDATE svcacct.ChangePlans SET CreatedAt = SWITCHOFFSET(CreatedAt, '+03:00') WHERE Id = @bare; THROW 51000, 'ChangePlans.CreatedAt offset-only UPDATE was not refused.', 1; END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 51394 THROW; END CATCH;
+-- Coded text columns accept only their exact spelling (547), so a reader parsing them never meets 'draft' or 'Added '.
+BEGIN TRY UPDATE svcacct.ChangePlans SET Status = 'draft' WHERE Id = @bare; THROW 51000, 'ChangePlans.Status accepted a lower-case code.', 1; END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 547 THROW; END CATCH;
+BEGIN TRY UPDATE svcacct.ChangePlans SET Status = 'Draft ' WHERE Id = @bare; THROW 51000, 'ChangePlans.Status accepted a trailing space.', 1; END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 547 THROW; END CATCH;
+BEGIN TRY INSERT INTO svcacct.ChangePlanAccounts(PlanId, AccountId, Action, TargetGmsaName, ChangedBy, ChangedAt) VALUES (@bare, @account, 'removed', N'gmsaSynGuard', @planner, @now);
+    THROW 51000, 'ChangePlanAccounts.Action accepted a lower-case code.', 1; END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 547 THROW; END CATCH;
+BEGIN TRY INSERT INTO svcacct.ChangePlanEvents(PlanId, Event, FromStatus, ToStatus, Actor, At) VALUES (@bare, 'Updated ', 'Draft', 'Draft', @editor, @now);
+    THROW 51000, 'ChangePlanEvents.Event accepted a trailing space.', 1; END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 547 THROW; END CATCH;
+IF (SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id IN (OBJECT_ID(N'svcacct.ChangePlans'), OBJECT_ID(N'svcacct.ChangePlanAccounts'),
+        OBJECT_ID(N'svcacct.ChangePlanItems'), OBJECT_ID(N'svcacct.ChangeItemChecks'), OBJECT_ID(N'svcacct.ChangePlanEvents'))
+        AND name IN (N'CK_SaChangePlans_Kind', N'CK_SaChangePlans_Status', N'CK_SaChangePlanAccounts_Action', N'CK_SaChangePlanItems_Type',
+            N'CK_SaChangePlanItems_Flag', N'CK_SaChangeItemChecks_State', N'CK_SaChangePlanEvents_Event')
+        AND definition LIKE N'%Latin1_General_BIN2%' AND definition LIKE N'%datalength%') <> 7
+    THROW 51000, 'A coded change-plan column check is not exact (binary collation and no trailing space).', 1;
 BEGIN TRY DELETE FROM svcacct.ChangePlans WHERE Id = @bare; THROW 51000, 'ChangePlans DELETE was not refused.', 1; END TRY
 BEGIN CATCH IF ERROR_NUMBER() <> 51394 THROW; END CATCH;
 UPDATE svcacct.ChangePlans SET Status = 'Cancelled', UpdatedBy = @planner, UpdatedAt = SYSUTCDATETIME() WHERE Id = @bare;
 IF @@ROWCOUNT <> 1 THROW 51000, 'ChangePlans status UPDATE was refused.', 1;
-PRINT 'ChangePlans fixed columns and delete refused (51394); status update allowed';
+PRINT 'ChangePlans fixed columns (also case, trailing space, offset) and delete refused (51394); coded columns exact (547); status update allowed';
 
 -- T2: at most one approval per preview (2627), even for a different approver.
 BEGIN TRY
@@ -114,14 +142,24 @@ BEGIN
         BEGIN TRY DELETE FROM svcacct.ChangePlans WHERE Id = @bare; SET @failure = N'API role DELETE on ChangePlans was not refused.'; END TRY
         BEGIN CATCH IF ERROR_NUMBER() <> 229 SET @failure = N'API role plan DELETE failed with ' + CONVERT(nvarchar(12), ERROR_NUMBER()); END CATCH;
     END;
+    -- The role may UPDATE only the four status columns: a fixed column is refused by permission (230) before the trigger.
     IF @failure IS NULL
     BEGIN
         BEGIN TRY UPDATE svcacct.ChangePlans SET CreatedBy = @approver WHERE Id = @bare; SET @failure = N'API role CreatedBy UPDATE was not refused.'; END TRY
-        BEGIN CATCH IF ERROR_NUMBER() <> 51394 SET @failure = N'API role CreatedBy UPDATE failed with ' + CONVERT(nvarchar(12), ERROR_NUMBER()); END CATCH;
+        BEGIN CATCH IF ERROR_NUMBER() <> 230 SET @failure = N'API role CreatedBy UPDATE failed with ' + CONVERT(nvarchar(12), ERROR_NUMBER()); END CATCH;
     END;
+    IF @failure IS NULL
+    BEGIN
+        BEGIN TRY UPDATE svcacct.ChangePlans SET Title = LOWER(Title) WHERE Id = @bare; SET @failure = N'API role case-only Title UPDATE was not refused.'; END TRY
+        BEGIN CATCH IF ERROR_NUMBER() <> 230 SET @failure = N'API role Title UPDATE failed with ' + CONVERT(nvarchar(12), ERROR_NUMBER()); END CATCH;
+    END;
+    IF @failure IS NULL AND EXISTS (SELECT 1 FROM (VALUES (N'Status', 1), (N'CurrentPreviewVersion', 1), (N'UpdatedBy', 1), (N'UpdatedAt', 1),
+        (N'Id', 0), (N'Kind', 0), (N'Title', 0), (N'CreatedBy', 0), (N'CreatedAt', 0)) c(ColumnName, Expected)
+        WHERE HAS_PERMS_BY_NAME(N'svcacct.ChangePlans', N'OBJECT', N'UPDATE', c.ColumnName, N'COLUMN') <> c.Expected)
+        SET @failure = N'API role UPDATE on ChangePlans is not limited to the four status columns.';
     -- Everything the change-plan repository issues is granted (it reads scans, accounts, scope and users; writes history and audit).
     IF @failure IS NULL AND EXISTS (SELECT 1 FROM (VALUES
-        (N'svcacct.ChangePlans', N'SELECT'), (N'svcacct.ChangePlans', N'INSERT'), (N'svcacct.ChangePlans', N'UPDATE'),
+        (N'svcacct.ChangePlans', N'SELECT'), (N'svcacct.ChangePlans', N'INSERT'),
         (N'svcacct.ChangePlanAccounts', N'INSERT'), (N'svcacct.ChangePlanPreviews', N'INSERT'), (N'svcacct.ChangePlanItems', N'INSERT'),
         (N'svcacct.ChangePlanApprovals', N'INSERT'), (N'svcacct.ChangeItemChecks', N'INSERT'), (N'svcacct.ChangePlanEvents', N'INSERT'),
         (N'svcacct.ChangePlanAccounts', N'SELECT'), (N'svcacct.ChangePlanPreviews', N'SELECT'), (N'svcacct.ChangePlanItems', N'SELECT'),
@@ -140,5 +178,5 @@ BEGIN
     ALTER ROLE svcacct_api_runtime DROP MEMBER sa_guard_runtime;
     DROP USER sa_guard_runtime;
     IF @failure IS NOT NULL THROW 51000, @failure, 1;
-    PRINT 'API runtime role holds every verb the repository uses, cannot DELETE (229) and cannot change fixed plan columns (51394)';
+    PRINT 'API runtime role holds every verb the repository uses, cannot DELETE (229) and may UPDATE only the plan status columns (230)';
 END;
