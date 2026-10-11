@@ -56,7 +56,7 @@ These are business and security constraints, not style preferences. They hold ev
 
 Other decided areas (identity lookup, operational records/Jira, sessions, OIDC, SDM evaluation, resources, In Use, announcements, reporting) each have their own ADR in `docs/adr/`; read the one for the area you touch.
 
-**Open decisions — do not assume an answer:** Turuncuhat inbound/outbound method and read/write scope; Worker privileged access (BeyondTrust brokering vs. direct WinRM + Kerberos + JEA). See `docs/15-system-landscape.md` and `docs/06-integrations.md`.
+**Open decisions — do not assume an answer:** Turuncuhat inbound/outbound method and read/write scope (ADR-0031 proposed, not accepted); Worker privileged access (BeyondTrust brokering vs. direct WinRM + Kerberos + JEA). See `docs/15-system-landscape.md` and `docs/06-integrations.md`.
 
 ## Where to look
 
