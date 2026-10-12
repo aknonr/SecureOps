@@ -29,7 +29,7 @@
         <MudTable Items="Page.Items" Dense="true" Breakpoint="Breakpoint.Sm" T="ImportRowView">
             <HeaderContent><MudTh>Kaynak</MudTh><MudTh>Hesap / tür</MudTh><MudTh>Sınıf</MudTh><MudTh>Değişiklik</MudTh><MudTh>Karar</MudTh></HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Kaynak">@context.Sheet<div class="so-panel-text--sm">satır @context.RowNumber</div></MudTd>
+                <MudTd DataLabel="Kaynak">@context.Sheet<div class="so-panel-text--sm">Excel satırı @context.RowNumber</div></MudTd>
                 <MudTd DataLabel="Hesap / tür">@(context.AccountLabel ?? "Hesap adı yok")<div class="so-panel-text--sm">@KindLabel(context.EntityKind)</div></MudTd>
                 <MudTd DataLabel="Sınıf">
                     <SoStatusBadge Label="@ClassLabel(context.Classification)" Tone="@Tone(context.Classification)" />
@@ -40,7 +40,9 @@
                     {
                         <div class="so-panel-text--sm"><strong>@diff.Field</strong>: @(diff.Current ?? "—") → @(diff.Proposed ?? "—") <span>(@diff.Effect)</span></div>
                     }
-                    @foreach (string error in context.Errors) { <div class="so-panel-text--sm" role="note">Hata: @error</div> }
+                    @if (RowExplanation(context) is { } why) { <div class="so-panel-text--sm" role="note"><strong>Neden:</strong> @why</div> }
+                    @foreach (string error in context.Errors) { <div class="so-panel-text--sm" role="note">Hata (@context.Sheet, satır @context.RowNumber): @error</div> }
+                    @if (context.Classification == "Invalid" && context.Errors.Count == 0) { <div class="so-panel-text--sm" role="note">Sunucu bu satır için ayrıntılı bir hata metni göndermedi.</div> }
                     @foreach (string warning in context.Warnings) { <div class="so-panel-text--sm">Uyarı: @warning</div> }
                     @if (context.Candidates.Count > 0)
                     {
@@ -168,6 +170,15 @@
     private Task BulkAsync() => OnDecide.InvokeAsync(new ImportDecisionsRequest(0, [], _bulkClass, _bulkKind, _bulkDecision));
 
     private static string ClassLabel(string value) => Classes.FirstOrDefault(c => c.Value == value).Label ?? value;
+
+    /// <summary>Short reason a row needs attention (class meaning only; the row's own errors and candidates follow it).</summary>
+    private static string? RowExplanation(ImportRowView row) => row.Classification switch
+    {
+        "Conflict" => "Bu satır sistemdeki kayıtla çelişiyor veya birden çok kayıtla eşleşebiliyor; hangisinin geçerli olacağına siz karar verirsiniz. Karar verilmeden aktarım yapılmaz.",
+        "Invalid" => "Satır doğrulamadan geçmedi ve aktarılmaz. Nedeni aşağıdaki hata satırlarındadır; Excel'de düzeltip dosyayı yeniden yükleyin.",
+        "OutOfScope" => "Hesap kapsamınızın dışında olduğu için bu satır işlenmez.",
+        _ => null
+    };
 
     private static string KindLabel(string value) => Kinds.FirstOrDefault(k => k.Value == value).Label ?? value;
 
