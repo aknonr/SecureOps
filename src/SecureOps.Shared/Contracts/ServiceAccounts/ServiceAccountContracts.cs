@@ -278,6 +278,26 @@ public sealed record UpdateWorkRequest(
 /// <summary>Explicitly close one request.</summary>
 public sealed record CloseWorkRequest(string ExpectedVersion, string Outcome, string? Reason = null);
 
+/// <summary>
+/// Why a request can or cannot be closed with an outcome, computed by the same server rule the close command uses
+/// (EVENT-GUIDANCE-DESIGN §6). Information only: it can go stale and the close command always revalidates. A close
+/// reason is typed at close time, so a non-Completed outcome always lists <c>CloseReasonRequired</c>.
+/// </summary>
+/// <param name="CanClose">True when nothing is missing.</param>
+/// <param name="Status">Request status: Open or Closed.</param>
+/// <param name="Outcome">The evaluated outcome: Completed, NotNeeded or Cancelled.</param>
+/// <param name="Missing">Every missing condition; the first one is the code the close command would return.</param>
+public sealed record CloseReadiness(bool CanClose, string Status, string Outcome, IReadOnlyList<CloseMissing> Missing);
+
+/// <summary>One missing close condition.</summary>
+/// <param name="Code">Stable rule code: NoMatchingPerformedAction, VerifiedClosureRequired, OwnershipNotConfirmed, CloseReasonRequired or RequestAlreadyClosed.</param>
+/// <param name="Remedy">The step that clears it: ReportAction, VerifyAction, ConfirmOwnership, GiveReason or None.</param>
+/// <param name="SubCodes">VerifiedClosureRequired only: unmet conditions of the closest candidate action (NotVerified, NotClosureKind, ActualDateRequired,
+/// VerificationBeforeAction, VerifierRequired, EvidenceRequired, OrRequiredForDeletion); null when there is no candidate or no breakdown.</param>
+/// <param name="ExpectedActionType">NoMatchingPerformedAction only: the request's action type (a gMSA handover also accepts a gMSA conversion; an evaluation accepts any type).</param>
+/// <param name="RelatedActionId">VerifiedClosureRequired only: the candidate action the sub-codes describe.</param>
+public sealed record CloseMissing(string Code, string Remedy, IReadOnlyList<string>? SubCodes = null, string? ExpectedActionType = null, Guid? RelatedActionId = null);
+
 /// <summary>Report a planned or performed action. Adding an action never closes a request.</summary>
 public sealed record ReportActionRequest(
     string ActionType,

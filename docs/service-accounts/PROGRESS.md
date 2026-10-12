@@ -17,6 +17,15 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Close readiness OLAY-2a (branch `feature/service-accounts-close-readiness-20261013`, from master `633eed9` + OLAY-1 design merged in, not merged)
+
+- `ServiceAccountRules.EvaluateClose` lists every missing close condition (`CloseGap`: code, remedy, sub-codes of the closest deletion
+  candidate, expected action type, related action); `ValidateClose` returns its first code (equivalence to the previous implementation
+  is a unit test). New read-only `GET requests/{id}/close-readiness?outcome=` (View, account-detail scope, 404 out of scope, strict
+  outcome names, no write/audit); OpenAPI snapshot additive only (one path, `CloseReadiness`, `CloseMissing`). No migration, no UI.
+- Not in this PR: `RequestView.closeReadiness` (detail lacks the verifier/evidence facts; see EVENT-GUIDANCE-DESIGN §6 note) and
+  `EvaluateVerification`.
+
 ## Event guidance design OLAY-1 (branch `docs/service-accounts-event-guidance-design-20261013`, from master `633eed9`, not merged)
 
 - Design only, no code: [EVENT-GUIDANCE-DESIGN.md](EVENT-GUIDANCE-DESIGN.md) ("Ne oldu?" flow, event-to-record table, preview/commit contract,

@@ -181,6 +181,19 @@ CloseMissing   { code: string,            // mevcut Errors.* kodları: NoMatchin
   doğrulama diyaloğu, yoksa "doğrulama yetkisi olan birine" metni). Düğme `disabled` yapılmaz, `aria-disabled` + `aria-describedby` ile açıklama okunur (klavye odağı kaybolmaz).
 - Sunucu yine de her komutu yeniden doğrular; `canClose=true` bir söz değil, bilgidir (bayatlamış olabilir).
 
+**OLAY-2a uygulama notu (2026-10-13, dal `feature/service-accounts-close-readiness-20261013`).** Uygulanan: `ServiceAccountRules.EvaluateClose`
+(`CloseGap` listesi; `ValidateClose` artık bunun ilk kodunu döndürür, eski uygulamayla eşdeğerliği birim testinde tüm dallar + tek eylem + 4000 rastgele
+eylem çifti üzerinde kanıtlı) ve `GET requests/{id}/close-readiness?outcome=` (View; hesap detayıyla aynı kapsam, kapsam dışı/bilinmeyen = 404;
+`outcome` yalnız tam üye adı, aksi 400 `field=outcome`; yazma ve audit yok). Kararlar ve sapmalar:
+- `subCodes` listesine `VerificationBeforeAction` da girer (`IsVerifiedClosure` bunu da şart koşar). Aday yoksa `subCodes` ve `relatedActionId` boştur;
+  "en yakın aday" = en az eksik koşulu olan, eşitlikte en yeni (sorgu `CreatedAt DESC`). Sonuç `Verified` olup `VerifiedOn` boşsa `NotVerified` sayılır.
+- Silme talebinde hiç eylem yoksa liste iki maddedir: `NoMatchingPerformedAction` + `VerifiedClosureRequired` (alt kod yok).
+- Kapatma gerekçesi kapatma anında yazıldığından `NotNeeded`/`Cancelled` için liste her zaman `CloseReasonRequired` (`GiveReason`) içerir.
+- **`RequestView.closeReadiness` bu PR'da YOK.** Belgedeki "ek sorgu gerekmez" varsayımı koddan doğrulanamadı: `ActionView` doğrulayanı yalnız kişi olarak
+  taşır (`VerifiedByUserId` yok), doğrulama kanıt dosyası kimliğini taşımaz; detaydan hesaplamak kapatma komutundan farklı sonuç verebilir (iki kaynak).
+  Ya detay sorgusuna talep başına kapanış gerçekleri eklenir ya da UI talep başına bu ucu çağırır; karar OLAY-3 öncesi.
+- `EvaluateVerification` (doğrulama için aynı yapı) bu PR'da yok; OLAY-3 "Doğrula neden kapalı" ipucu için gerekirse ayrı küçük iş.
+
 ## 7. Mail yapıştır — deterministik öneri (B)
 
 `POST accounts/{id}/events/mail-hints` gövde: `{ text: string }` (en çok 20 000 karakter; fazlası 400). Yanıt **yalnız öneri**:

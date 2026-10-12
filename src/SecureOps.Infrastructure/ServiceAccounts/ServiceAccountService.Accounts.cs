@@ -243,6 +243,34 @@ public sealed partial class ServiceAccountService
                 : await repository.CloseRequestAsync(accountId, requestId, request.ExpectedVersion, outcome, request.Reason?.Trim(), caller.Actor, cancellationToken);
         }, cancellationToken);
 
+    /// <summary>
+    /// Read-only close readiness of one request: every missing condition from the same rule the close command uses
+    /// (<see cref="ServiceAccountRules.EvaluateClose"/>). Anyone who can read the account detail can read it; out-of-scope
+    /// and missing requests are indistinguishable (404). Nothing is written or audited.
+    /// </summary>
+    public Task<SaResult<CloseReadiness>> CloseReadinessAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid requestId, string? outcome,
+        CancellationToken cancellationToken) =>
+        RunAsync(principal, context, ServiceAccountCapabilities.View, async caller =>
+        {
+            ServiceAccountCloseOutcome parsed = ServiceAccountCloseOutcome.Completed;
+            // Exact member names only: no numbers, case variants or comma-joined combinations.
+            if (outcome is not null && (!Enum.TryParse(outcome, false, out parsed) || parsed.ToString() != outcome))
+            {
+                return SaResult<CloseReadiness>.Fail(SaErrors.Invalid, "outcome");
+            }
+
+            if (await repository!.AccountOfAsync("Request", requestId, cancellationToken) is not { } accountId || !await AccountVisibleAsync(caller, accountId, cancellationToken)
+                || await repository.RequestCloseFactsAsync(requestId, cancellationToken) is not { } facts)
+            {
+                return SaResult<CloseReadiness>.Fail(SaErrors.NotFound);
+            }
+
+            IReadOnlyList<CloseGap> gaps = ServiceAccountRules.EvaluateClose(facts.Status, facts.Type, parsed, null, facts.Actions, facts.OwnershipConfirmed);
+            return new SaResult<CloseReadiness>(new CloseReadiness(gaps.Count == 0, facts.Status.ToString(), parsed.ToString(),
+                [.. gaps.Select(g => new CloseMissing(g.Code, g.Remedy.ToString(), g.SubCodes.Count == 0 ? null : g.SubCodes,
+                    g.ExpectedActionType?.ToString(), g.RelatedActionId))]));
+        }, cancellationToken);
+
     /// <summary>Resolves an entity's account, checks scope/permissions and runs the mutation.</summary>
     private Task<SaResult<AccountDetail>> EntityAsync(ClaimsPrincipal principal, AccessOperationContext context, string entityType, Guid entityId, string capability,
         Func<AccountPermissions, bool> allowed, Func<SaCaller, AccountDetail, Guid, Task<SaResult<Guid>>> mutation, CancellationToken cancellationToken) =>
