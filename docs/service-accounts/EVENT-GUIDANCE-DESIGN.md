@@ -25,6 +25,9 @@ Sistem sorular sorar; kullanıcı hangi ekrana gideceğini düşünmez.
 - **Sunucu yetkiyi ve kuralı belirler** (CLAUDE.md). UI kapatma/doğrulama kuralını **tekrar yazmaz**; sunucudan gelen eksik listesini gösterir (§6).
 - **Kural 9**: eylem eklemek talebi kendiliğinden kapatmaz. Olay akışında talep kapatma **ayrı, varsayılanı kapalı, açık bir seçimdir** (§5.4).
 - Hepsi mevcut `ServiceAccounts.Work` yeteneği ve kapsam kuralları içinde; yeni yetenek yok. Katılımcı (Participant) yalnız kendi açık talebine yazar.
+- **OR/OCO onayı ürünün işi değildir** (sahip kararı 2026-10-13): OR'un onayı Turuncuhat'ta zaten takım liderine düşer. Bu akış OR/OCO'yu yalnız **referans** (numara) olarak kaydeder
+  ve durumu (ileride TH-4 `IItsmRecordTracking` ile) **izleme** amaçlı gösterir; onay isteği, onay ekranı, onay takibi veya onay kaydı **tasarlanmaz**. Önizlemede "OR onaylandı" gibi bir iddia yoktur;
+  durum bilinmiyorsa "bilinmiyor" denir. S1–S8 varsayılanları bu kararla uyumludur (hiçbiri onay içermez).
 - Gerçek ad / hesap / mail içeriği hiçbir örneğe, testte, belgeye girmez; yer tutucu kullanılır (`svc-örnek-01`, `OCO-00000`).
 
 ## 3. Olay → kayıt eşlemesi (normatif tablo)
