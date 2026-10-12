@@ -1,0 +1,110 @@
+@* One row of the approved preview with the person's latest mark and, when the server allows marking, a small form. A mark is the
+   person's own statement (Yapıldı is never a verification); the system never connects to a server. The mark carries the latest
+   mark id the person saw, so a mark made by someone else in between is refused (409 checkStale) and the draft stays in the form.
+   The form is a native details element, so the open state survives re-renders and the summary is a keyboard tab stop. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<li class="sa-plan-check-item" id="@RowId">
+    <div class="sa-plan-check-main">
+        <div>
+            @if (Item.ComponentName is null)
+            {
+                <strong>Bileşen bilgisi yok</strong>
+                <div class="so-panel-text--sm">@Item.FlagLabel</div>
+            }
+            else
+            {
+                <strong>@Item.ComponentName</strong> <span class="so-panel-text--sm">· @(Item.ComponentType ?? "tür bilgisi yok")</span>
+                <div class="so-panel-text--sm">@(Item.CurrentIdentity ?? "şimdiki kimlik bilgisi yok") → @Item.TargetIdentity</div>
+            }
+        </div>
+        <div class="sa-plan-check-flags">
+            @if (Item.Flag == "ManualOnly")
+            {
+                <SoStatusBadge Label="Elle yapılacak" Tone="SoStatusBadge.BadgeTone.Info" Icon="@Icons.Material.Filled.PanTool" Title="@Item.FlagLabel" />
+            }
+            else if (Item.Flag != "Ok")
+            {
+                <SoStatusBadge Label="@ChangePlanPresentation.FlagShortLabel(Item.Flag)" Tone="@ChangePlanPresentation.FlagTone(Item.Flag)"
+                               Icon="@ChangePlanPresentation.FlagIcon(Item.Flag)" Title="@Item.FlagLabel" />
+            }
+            @if (Item.Check is { } mark)
+            {
+                <SoStatusBadge Label="@mark.StateLabel" Tone="@ChangePlanPresentation.CheckTone(mark.State)" Icon="@ChangePlanPresentation.CheckIcon(mark.State)" />
+                @if (mark.OutsideWindow)
+                {
+                    <SoStatusBadge Label="Pencere dışında" Tone="SoStatusBadge.BadgeTone.Caution" Icon="@Icons.Material.Filled.EventBusy"
+                                   Title="Bu işaret onaylanan bakım penceresinin dışında kaydedildi; engellenmez, etiketlenir." />
+                }
+            }
+            else
+            {
+                <SoStatusBadge Label="İşaretlenmedi" Tone="SoStatusBadge.BadgeTone.Neutral" Icon="@ChangePlanPresentation.CheckIcon(string.Empty)" />
+            }
+        </div>
+    </div>
+
+    @if (Item.Check is { } latest)
+    {
+        <div class="so-panel-text--sm sa-plan-check-last">
+            @latest.StateLabel · @latest.CheckedBy · @ChangePlanPresentation.Instant(latest.CheckedAt)@(latest.Note is null ? "" : " · Not: " + latest.Note)
+        </div>
+    }
+
+    @if (CanCheck)
+    {
+        <SaDisclosure Title="@((Item.Check is null ? "İşaretle" : "İşareti değiştir") + ": " + RowName)" Class="sa-plan-check-form mt-1">
+                <fieldset class="sa-plan-check-states">
+                    <legend class="so-panel-text--sm">Durum</legend>
+                    @foreach ((string stateCode, string label) in ChangePlanPresentation.OfferedStates(Item.Check?.State))
+                    {
+                        <label class="sa-plan-check-state">
+                            <input type="radio" name="@(RowId + "-state")" value="@stateCode" checked="@(_state == stateCode)" @onchange="@(() => _state = stateCode)" />
+                            <span>@label</span>
+                        </label>
+                    }
+                </fieldset>
+                <MudTextField T="string" @bind-Value="_note" Label="@(_state is { Length: > 0 } s && ChangePlanPresentation.NoteRequired(s) ? "Not (zorunlu)" : "Not (isteğe bağlı)")"
+                              MaxLength="1000" Lines="2" Immediate="true" Variant="Variant.Outlined" Class="mt-2" />
+                <p class="so-panel-text--sm mt-1">Yapıldı, sunucuda değişikliği sizin yaptığınız beyanıdır; sistem doğrulamaz. @(Item.Check is null ? "" : "Şu anki işaret: " + Item.Check.StateLabel + ".")</p>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="SaveAsync"
+                           Disabled="@(Busy || _state is null || (ChangePlanPresentation.NoteRequired(_state) && string.IsNullOrWhiteSpace(_note)))">Kaydet</MudButton>
+        </SaDisclosure>
+    }
+</li>
+
+@code {
+    private string? _state;
+    private string _note = string.Empty;
+
+    /// <summary>The preview row with its latest mark.</summary>
+    [Parameter, EditorRequired] public ChangePlanItemView Item { get; set; } = default!;
+
+    /// <summary>The server allows the caller to mark rows (plan permission <c>check</c>).</summary>
+    [Parameter] public bool CanCheck { get; set; }
+
+    /// <summary>A call is running.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Sends the mark; true when the server saved it (the form then clears). The draft stays after any refusal.</summary>
+    [Parameter, EditorRequired] public Func<PlanCheckCommand, Task<bool>> OnMark { get; set; } = default!;
+
+    private string RowId => "sa-plan-row-" + Item.Id.ToString("N");
+
+    private string RowName => Item.ComponentName ?? "bileşen bilgisi yok";
+
+    private async Task SaveAsync()
+    {
+        if (_state is null)
+        {
+            return;
+        }
+
+        string? note = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim();
+        if (await OnMark(new PlanCheckCommand(Item.Id, new CheckChangePlanItemRequest(_state, note, Item.Check?.Id))))
+        {
+            (_state, _note) = (null, string.Empty);
+        }
+    }
+}

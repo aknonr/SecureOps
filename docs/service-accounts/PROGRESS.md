@@ -40,6 +40,22 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Open: release tool `Get-ReleaseSqlPlan.ps1` refuses a 001–033 chain (by design, needs a reviewed update before merge);
   `Evidence.OwnerEntityType` cannot hold plan evidence without changing an existing CHECK (PR 2 question).
 
+## Change plan d, PR 4 — UI checklist, plan evidence, closing (F3; branch `feature/service-accounts-change-plan-checklist-ui-20261012`, from master `d3eed21`, not merged)
+
+- Replaces the "Henüz sunulmuyor" states with the real flow against the routes merged in #36: per-row marks (`expectedCheckId`; 409 `checkStale`
+  adopts the server's plan, re-reads rows, keeps the draft), "pencere dışında" label, counters, plan evidence upload/download (503 without 034 shown as
+  "kurulu değil"), closing form with the "Yapıldı is a statement, not a verification" confirmation, per-account closing outcome. Buttons follow
+  `permissions` only. UI/docs/tests only; [G-36](../26-ui-backend-contract-gaps.md) item 1 closed. Details: `src/SecureOps.Ui/README.md` ("F3").
+- Verified 2026-10-12 on the local Demo (API :5430, UI :5431, synthetic DB `SecureOps_SaF31012` on LocalDB `SecureOpsResourcesV1`, migrations 001–034 by the
+  harness, no role scripts; the second demo actor got the Admin role by a direct insert into the synthetic DB): mark Yapıldı / Atlandı (note required,
+  button waits); a mark made by another actor in between → 409 `checkStale`, row refreshed to the other mark, nothing saved, "Geri alındı" now offered;
+  evidence listed (uploaded through the API with curl; the browser file picker was NOT driven); close with the confirmation → outcome per account
+  ("eylem kaydedilmedi" for Failed/Skipped, "gMSA geçiş eylemi 'yapıldı' olarak kaydedildi, doğrulama ayrı" for an all-Done plan); 390 px and 320 px
+  without horizontal overflow. Not verified: light appearance and 200 % zoom by eye, the outside-window label against a real window (unit-tested only),
+  Windows/IIS, corporate TEST (034 is not installed there), a Playwright journey (none written).
+- Found by that run and fixed: the child forms call back through plain delegates, so the page was not re-rendered after a save (marks reached the server
+  but the screen stayed stale); the page now renders after each command.
+
 ## Change plan d, PR 3 — UI (branch `feature/service-accounts-change-plan-ui-20261012`, from the API branch `db56856`, not merged)
 
 - `/service-accounts/plans` (scoped list, status and `?accountId=` filter, create a Draft plan from searched accounts) and

@@ -46,6 +46,9 @@ public static class ServiceAccountProblems
         "ServiceAccountChangePlansNotInstalled" => Build(UiProblemKind.NotConfigured, code, "Değişiklik planı bu ortamda kurulu değil",
             "Plan tabloları için veritabanı güncellemesi (033) uygulanmamış. Plan oluşturulamaz ve okunamaz; hiçbir şey değiştirilmedi.",
             ["Veritabanı sorumlusu 033'ün uygulanma sırasını DBA kılavuzundan kontrol etmelidir."], false, false),
+        "ServiceAccountChangePlanEvidenceNotInstalled" => Build(UiProblemKind.NotConfigured, code, "Plan kanıtı bu ortamda kurulu değil",
+            "Plan kanıtı için veritabanı güncellemesi (034) uygulanmamış. Dosya kaydedilmedi; işaretleme ve kapanış etkilenmez.",
+            ["Veritabanı sorumlusu 034'ün uygulanma sırasını DBA kılavuzundan kontrol etmelidir."], false, false),
         _ => null
     };
 
@@ -123,6 +126,13 @@ public static class ServiceAccountProblems
         "planNotPreviewed" => "Plan şu an onaylanabilir durumda değil (önizlenmemiş, zaten onaylanmış veya kapanmış). Onay verilmedi.",
         "planNotEditable" => "Plan bu durumda değiştirilemez veya önizlenemez. Hiçbir şey kaydedilmedi.",
         "planClosed" => "Plan kapanmış (tamamlandı veya iptal edildi); değiştirilemez.",
+        "planNotApproved" => "Plan henüz onaylanmamış; işaretleme, kanıt ve kapanış onaydan sonra yapılır. Hiçbir şey kaydedilmedi.",
+        "checkStale" => "Satırı siz işaretlerken başka biri de işaretledi. Hiçbir şey kaydedilmedi; satır güncel işaretiyle yenilendi. İnceleyip gerekiyorsa yeniden işaretleyin; yazdığınız not formda duruyor.",
+        "nothingToRollBack" => "Geri alındı yalnız son durumu Yapıldı veya Başarısız olan satır için işaretlenebilir. Hiçbir şey kaydedilmedi.",
+        "checklistIncomplete" => "Plan kapatılamadı: işaretlenmemiş satır var. Hiçbir şey kaydedilmedi; güncel plan yüklendi.",
+        "state" => "İşaret durumunu listeden seçin (Yapıldı, Atlandı, Başarısız, Geri alındı).",
+        "note" => "Yapıldı dışındaki her işaret için not gerekir; not en çok 1000 karakter olabilir.",
+        "file" => "Dosya kabul edilmedi: tür, boyut veya içerik imzası uygun değil (PDF, PNG, JPEG, TXT, EML, XLSX, DOCX; en çok 10 MB).",
         "approverIsPlanner" => "Planı hazırlayan kişi kendi planını onaylayamaz; başka bir doğrulama yetkilisi onaylamalıdır.",
         "approverChangedPlan" => "Önizlemeyi üreten veya planı değiştiren kişi onaylayamaz; başka bir doğrulama yetkilisi onaylamalıdır.",
         "ocoNumber" => "OCO numarası kabul edilmedi: en çok 64 karakter; yalnız A–Z, 0–9 ve - _ . / kullanılabilir (küçük harf büyüğe çevrilir); harf veya rakamla başlamalı ve en az bir rakam içermeli. Numara ITSM'de sorgulanmaz.",

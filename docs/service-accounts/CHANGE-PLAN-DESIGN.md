@@ -172,10 +172,10 @@ ve `ActionId` (kapanıştan sonra), `ChangePlanPermissions.Check/Complete/Upload
 
 ## Arayüz
 
-**Durum (2026-10-12, PR 3 dalda `feature/service-accounts-change-plan-ui-20261012`, merge edilmedi):** liste ve adım adım plan sayfası
-sabitlenen sözleşmeye karşı yazıldı (`src/SecureOps.Ui/README.md` → "gMSA change plan UI"). Kontrol listesi işaretleme, kanıt ve kapanış
-sunucuda henüz yok (PR 2); ekran bunları sunmaz, onaylanan satırları salt okunur yapılacaklar listesi olarak gösterir (G-36). Hesap sayfasındaki
-"açık plan" bağlantısı ve "Sıradaki adım"a "Onay bekleyen plan" henüz yapılmadı (`GET change-plans?accountId=` yeterli, API değişikliği gerekmez).
+**Durum (2026-10-12):** liste ve adım adım plan sayfası master'da (#35). Kontrol listesi işaretleme, plan kanıtı ve kapanış ekranı (F3) dalda
+`feature/service-accounts-change-plan-checklist-ui-20261012`, merge edilmedi (`src/SecureOps.Ui/README.md` → "gMSA change plan UI (d, PR 4 = F3)");
+G-36 madde 1 kapandı. Hesap sayfasındaki "açık plan" bağlantısı ve "Sıradaki adım"a "Onay bekleyen plan" henüz yapılmadı
+(`GET change-plans?accountId=` yeterli, API değişikliği gerekmez).
 
 - `/service-accounts/plans`: liste (durum, hesap sayısı, OCO, pencere); hesap listesinde seçili hesaplardan "gMSA geçiş
   planı oluştur".
