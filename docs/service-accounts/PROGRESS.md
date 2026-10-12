@@ -17,6 +17,12 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Event guidance design OLAY-1 (branch `docs/service-accounts-event-guidance-design-20261013`, from master `633eed9`, not merged)
+
+- Design only, no code: [EVENT-GUIDANCE-DESIGN.md](EVENT-GUIDANCE-DESIGN.md) ("Ne oldu?" flow, event-to-record table, preview/commit contract,
+  close-readiness, deterministic mail hints, migration 036 reserved, threat table E1-E14, split OLAY-2a/2b/2c/3). Owner questions S1-S8 open.
+  Reported is not verified: the flow never writes Verified. OLAY-3 (UI) waits for F4.
+
 ## Change plan d, PR 2 (branch `feature/service-accounts-change-plan-checklist-20261012`, from the PR 1 branch `db56856`, not merged)
 
 - Contract first (`a737d2b`, pushed for F and G): `GET/POST change-plans/{id}/items/{itemId}/checks`, `POST .../evidence`,
