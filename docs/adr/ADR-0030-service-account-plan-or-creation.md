@@ -29,6 +29,9 @@ Owner decisions (2026-10-12):
   from a template and edited in the preview with a simple plain-text editor; what is sent is exactly what was previewed.
 - The OR's progress is visible in the panel (stage, last update, new comment/return marker), read-only, with a
   "Refresh" button first and a periodic Worker refresh later. No commenting or closing from the panel.
+- (2026-10-13) The OR's approval already happens **inside Turuncu Hat** (its start approval and fulfilment approval steps
+  reach the team lead). The product builds **no second OR approval and no approval tracking of its own**; the Turuncu
+  Hat approval stays where it is and is only observed as part of the OR's status.
 
 Evidence and its limits. The owner's Postman OR collection (kept outside the repository) shows OR creation as **at least
 three separate remote writes/reads, not atomic**: insert `SMSS_oRFF` → `InsertResult.InsertedId`; query `DCM_DynamicCase`
@@ -58,6 +61,10 @@ planned as TH-4).
 - The server decides; the UI only reflects `AccessSnapshot.Can(...)` and the preview's `canSubmit` with its reason.
 
 ### 2. Preview first, separate confirmation
+
+The preview and its separate click are only the person's decision **"open this OR"**. They are not an approval of the
+OR's content and do not replace the Turuncu Hat approval flow; no approver, approval state or approval rule for the OR
+exists in the product.
 
 - `POST change-plans/{id}/accounts/{accountId}/operational-record/preview` returns every field that will be sent, with
   its value and source (plan, server configuration, requester mapping), the requester resolution result, the environment
@@ -167,7 +174,9 @@ new comment/return" with the time of the last successful refresh. First version:
 refresh is a later step. If Turuncu Hat cannot answer: "unknown", with the last known value and its time. Stage codes are
 shown raw until a code list is approved (ADR-0031 §4). **Dependency:** TH-2 returns only id, code, title and group for an
 OR; stage/activity (`BPM_Actvty`), last update and comment count/time come with **TH-4**. Until then the panel shows only
-existence and title. No comment text or person names are read.
+existence and title. No comment text or person names are read. TH-4 is expected to come with its own decision
+(ADR-0032 or an ADR-0031 amendment, TH coordinator). The Turuncu Hat approval steps appear here only as stage values;
+the product never derives a decision, a gate or a plan state change from them.
 
 ### 9. Migration 035 (reserved in the shared merge-order file)
 
@@ -214,6 +223,8 @@ sides at once; the shared merge-order file records who is working.
 ## Rejected alternatives
 
 - Opening an OCO for the gMSA conversion: rejected by the owner.
+- A product-side OR approval or approval tracking: rejected by the owner (2026-10-13); Turuncu Hat already routes the
+  OR's approval to the team lead.
 - Automatic retry or idempotent-looking resubmission: no remote idempotency exists.
 - Requester = integration account or a display-name match: ADR-0012.
 - One OR per plan: the owner chose one per account (separate tracking and outcome).
