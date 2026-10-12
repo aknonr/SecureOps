@@ -311,6 +311,7 @@ public static class DependencyInjection
             services.AddSingleton<IManagementReportingRepository, UnavailableManagementReportingRepository>();
         }
 
+        ItsmRecords.ItsmRecordLookupRegistration.AddItsmRecordLookup(services, configuration, environmentName);
         return services;
     }
 

@@ -103,6 +103,8 @@ Until those questions are answered:
 - Do not assume direct SolarWinds → SecureOps delivery is the final production path.
 - Keep Turuncuhat as the organization-facing ticket/EVT system of record.
 
+Proposed answer (ADR-0031, not yet accepted): outbound REST `/query`, read-only; the only write exception is ADR-0030 (Service Accounts OR creation); no inbound method.
+
 ## PAM Integration (BeyondTrust-style, Phase 4+)
 
 Read-only correlation only.
@@ -299,6 +301,10 @@ Every integration has a config section:
 ## Operational Record and Jira Backend Foundation
 
 The backend replacement for the legacy operator-driven workflow is documented in `docs/22-operational-record-jira-workflow.md`. It uses `IOperationalRecordClient`, `IRequesterResolver`, and `IJiraClient` boundaries. Defaults remain disabled, Fake is synthetic-only, and typed Turuncu Hat/Jira adapters require explicit validated runtime selection. No PowerShell is launched and no browser credential is collected. Real external TEST remains blocked by the sanitized fixture gate in `docs/integrations/turuncu-hat-jira-contract-gaps.md`; Jira create keeps durable SQL idempotency and unknown-outcome reconciliation.
+
+## ITSM Record Lookup (OR / OCO, read-only)
+
+`IItsmRecordLookup` checks one OR or OCO number and returns Found, NotFound, Ambiguous or Unknown (ADR-0031, Proposed). Turuncu Hat is the first adapter; Disabled is the default, Fake is synthetic-only, and any failure or incomplete response is Unknown, never "not found". There is no API endpoint; modules (first: Service Accounts) call it from their service layer. Contract and open items: `docs/integrations/turuncu-hat-itsm-record-lookup.md`.
 
 ## Reference
 
