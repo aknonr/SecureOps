@@ -49,6 +49,18 @@ Jira-only pilot and not authorization to change any external-write fence.
 - Existing Jira issue presence for assignee, reporter, `customfield_11500`, `customfield_12700`, and `SunucuTalep`; observed assignee/reporter identity equality is not treated as create policy.
 - String `LoginResult` with two observed pipe segments; exact `SMSS_oRFF` active/group/DCC request; successful nested-array `QueryResult.Items`; independently optional empty/null query error fields; exact seven-cell source keys (`SET.id`, `SET.p_code`, `SET.p_name`, `SET.p_description`, `KEY.p_rel_requester`, `SET.p_rel_requester`, and `num`); and exactly one controlled BPM query match. Observed segment lengths are not invariants.
 
+## Vendor Insert Example: Success With Error Text (2026-10-12, ADR-0032 / ADR-0030 warning)
+
+The vendor API document's insert example returns `Success=true` and a filled `InsertedId` while
+`ErrorDescription` and `ErrorDetails` are also filled; the document says to disregard them. ADR-0012 states
+that update success must not override contradictory error metadata, and applying the same rule to an insert can misjudge
+an insert as failed. A retry after a misjudged insert would create a duplicate record, and Turuncu Hat has no
+remote idempotency. ADR-0030 (Service Accounts OR creation) must decide insert success from `Success` plus a
+filled `InsertedId` and reconcile uncertain outcomes, not from the error text alone. Evidence only: no code in
+this repository changed for this note. The same document also fixes read-side facts used by ADR-0032
+(`NoEncode`, `QueryPermissions`, page numbering, `RecordCount` as total); they are recorded in
+`turuncu-hat-itsm-record-lookup.md`. A real sanitized insert response from TEST is still required before any write.
+
 ## SDM Aktivasyon Kanıtı: Operatör Rehberi, 2026-09-07
 
 Bu bölüm yalnızca kalan kanıtları toplar; çağrı yürütme veya yazma izni değildir.

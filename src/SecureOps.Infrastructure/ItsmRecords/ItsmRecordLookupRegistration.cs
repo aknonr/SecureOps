@@ -38,14 +38,31 @@ public static class ItsmRecordLookupRegistration
                 serviceProvider.GetRequiredService<IOptions<ItsmRecordLookupOptions>>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
                 serviceProvider.GetRequiredService<ILogger<TuruncuHatItsmRecordLookup>>()));
+            services.AddSingleton<IItsmRecordTracking>(serviceProvider => new TuruncuHatItsmRecordTracking(
+                serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),
+                serviceProvider.GetRequiredService<ITuruncuHatSessionManager>(),
+                serviceProvider.GetRequiredService<IOptions<TuruncuHatOptions>>(),
+                serviceProvider.GetRequiredService<IOptions<ItsmRecordLookupOptions>>(),
+                serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
+                serviceProvider.GetRequiredService<ILogger<TuruncuHatItsmRecordTracking>>()));
+            services.AddSingleton<IItsmUserMapping>(serviceProvider => new TuruncuHatItsmUserMapping(
+                serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),
+                serviceProvider.GetRequiredService<ITuruncuHatSessionManager>(),
+                serviceProvider.GetRequiredService<IOptions<TuruncuHatOptions>>(),
+                serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
+                serviceProvider.GetRequiredService<ILogger<TuruncuHatItsmUserMapping>>()));
         }
         else if (string.Equals(provider, FakeItsmRecordLookup.ProviderName, StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IItsmRecordLookup, FakeItsmRecordLookup>();
+            services.AddSingleton<IItsmRecordTracking, FakeItsmRecordTracking>();
+            services.AddSingleton<IItsmUserMapping, FakeItsmUserMapping>();
         }
         else
         {
             services.AddSingleton<IItsmRecordLookup, DisabledItsmRecordLookup>();
+            services.AddSingleton<IItsmRecordTracking, DisabledItsmRecordTracking>();
+            services.AddSingleton<IItsmUserMapping, DisabledItsmUserMapping>();
         }
 
         return services;
@@ -79,6 +96,14 @@ public static class ItsmRecordLookupRegistration
         if (!IsSafeIdentifier(options.OrBaseObject) || !IsSafeIdentifier(options.OcoBaseObject))
         {
             throw new InvalidOperationException("ItsmRecordLookup:OrBaseObject and ItsmRecordLookup:OcoBaseObject are required identifiers for TuruncuHat.");
+        }
+
+        if (!IsOptionalIdentifier(options.OrStatusField) || !IsOptionalIdentifier(options.OrStageField)
+            || !IsOptionalIdentifier(options.CommentMainObject) || !IsOptionalIdentifier(options.ActivityMainObject)
+            || !IsSafeIdentifier(options.CommentTimeField))
+        {
+            throw new InvalidOperationException(
+                "ItsmRecordLookup:OrStatusField, OrStageField, CommentMainObject, ActivityMainObject must be empty or identifiers, and CommentTimeField an identifier.");
         }
 
         ValidateTuruncuHatWire(configuration.GetSection(TuruncuHatOptions.SectionName).Get<TuruncuHatOptions>() ?? new());
@@ -116,6 +141,8 @@ public static class ItsmRecordLookupRegistration
 
     private static bool IsRuntimeSecret(string? value) =>
         !string.IsNullOrWhiteSpace(value) && value.Length <= 4096 && !value.Contains('\r') && !value.Contains('\n');
+
+    private static bool IsOptionalIdentifier(string? value) => string.IsNullOrEmpty(value) || IsSafeIdentifier(value);
 
     private static bool IsSafeIdentifier(string? value) =>
         value is { Length: > 0 and <= 128 } && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '_');

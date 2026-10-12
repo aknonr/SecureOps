@@ -20,16 +20,24 @@ internal static class TuruncuHatItsmRecordRowReader
     private const int _maxValueLength = 4000;
     private const string _rowNumberKey = "num";
 
-    public static TuruncuHatItsmRecordRows Read(JsonElement root, IReadOnlyList<string> selects)
+    public static TuruncuHatItsmRecordRows Read(
+        JsonElement root, IReadOnlyList<string> selects, IReadOnlyCollection<string>? optionalSelects = null)
     {
         JsonElement items = TuruncuHatQueryParser.GetItems(root);
-        string[] expected = [.. selects.Select(select => "SET." + select)];
+        HashSet<string> optional = [.. (optionalSelects ?? []).Select(select => "SET." + select)];
+        string[] expected = [.. selects.Select(select => "SET." + select).Where(key => !optional.Contains(key))];
         List<IReadOnlyDictionary<string, string?>> rows = [];
         int malformed = 0;
         foreach (JsonElement item in items.EnumerateArray())
         {
             if (TryRow(item, expected, out Dictionary<string, string?> row))
             {
+                // An optional select the source left out (an empty value) reads as null, never as a shifted cell.
+                foreach (string key in optional)
+                {
+                    row.TryAdd(key, null);
+                }
+
                 rows.Add(row);
             }
             else
