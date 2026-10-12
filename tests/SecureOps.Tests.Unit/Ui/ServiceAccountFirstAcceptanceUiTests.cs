@@ -29,23 +29,23 @@ namespace SecureOps.Tests.Unit.Ui;
 /// </summary>
 public sealed class ServiceAccountFirstAcceptanceUiTests
 {
-    private const int AllInScope = 399;
-    private const int Proposed = 321;
+    private const int _allInScope = 399;
+    private const int _proposed = 321;
 
     [Fact]
     public async Task ShortcutLink_WhileTheListIsOpen_ReReadsTheListAndTheListShowsTheCardNumber()
     {
         await using Fixture fixture = await Fixture.StartAsync();
         fixture.Calls.Should().ContainSingle(c => c.StartsWith("/accounts?", StringComparison.Ordinal), "the first load reads the list once");
-        fixture.Html().Should().Contain($"{AllInScope} hesap").And.Contain("kapsamınızdaki tüm servis hesaplarıdır");
+        fixture.Html().Should().Contain($"{_allInScope} hesap").And.Contain("kapsamınızdaki tüm servis hesaplarıdır");
 
         await fixture.NavigateAsync("proposed", false);
 
         fixture.Calls.Last(c => c.StartsWith("/accounts?", StringComparison.Ordinal)).Should().Contain("status=proposed").And.Contain("page=1");
         string html = fixture.Html();
-        html.Should().Contain($"{Proposed} hesap").And.NotContain($"{AllInScope} hesap · sayfa");
+        html.Should().Contain($"{_proposed} hesap").And.NotContain($"{_allInScope} hesap · sayfa");
         html.Should().Contain("Özet kartıyla aynı sayıdır");
-        Regex.Match(html, @"Sahiplik kararı bekleyenler \((\d+)\)").Groups[1].Value.Should().Be(Proposed.ToString(), "the shortcut shows the card's number");
+        Regex.Match(html, @"Sahiplik kararı bekleyenler \((\d+)\)").Groups[1].Value.Should().Be(_proposed.ToString(), "the shortcut shows the card's number");
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
         await fixture.NavigateAsync(null, false);
         string plain = fixture.Calls.Last(c => c.StartsWith("/accounts?", StringComparison.Ordinal));
         plain.Should().NotContain("status=").And.NotContain("myTeam=true");
-        fixture.Html().Should().Contain($"{AllInScope} hesap");
+        fixture.Html().Should().Contain($"{_allInScope} hesap");
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
         html.Should().Contain("Kapsamınızdaki farklı hesap; tüm hesap sayısı değil");
         html.Should().Contain("kapsamınızdaki hesap sayısı değildir").And.Contain("sahiplik önerisi");
         html.Should().Contain("Açık talep sayısı (hesap değil)");
-        html.Should().Contain("Sahiplik kararı bekleyenler (" + Proposed + ")");
+        html.Should().Contain("Sahiplik kararı bekleyenler (" + _proposed + ")");
     }
 
     [Fact]
@@ -317,7 +317,7 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
             object body = path switch
             {
                 "/me" => new ServiceAccountMe(true, [ServiceAccountCapabilities.View], "All", [], [], true),
-                "/work-summary" => new ServiceAccountWorkSummary(new DateOnly(2026, 10, 13), true, 7, 1, 0, 0, 0, true, 2, 0, Proposed, 0, []),
+                "/work-summary" => new ServiceAccountWorkSummary(new DateOnly(2026, 10, 13), true, 7, 1, 0, 0, 0, true, 2, 0, _proposed, 0, []),
                 "/organizations" => Array.Empty<OrganizationView>(),
                 "/teams" => Array.Empty<TeamView>(),
                 _ when path.StartsWith("/accounts?", StringComparison.Ordinal) => Accounts(path),
@@ -328,7 +328,7 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
 
         private static AccountPage Accounts(string path)
         {
-            int total = path.Contains("status=proposed", StringComparison.Ordinal) ? Proposed : path.Contains("myTeam=true", StringComparison.Ordinal) ? 7 : AllInScope;
+            int total = path.Contains("status=proposed", StringComparison.Ordinal) ? _proposed : path.Contains("myTeam=true", StringComparison.Ordinal) ? 7 : _allInScope;
             AccountListItem item = new(Guid.Parse("5a1e0000-0000-4000-8000-0000000000a1"), "SYN_SVC_ONE", "SYN", "Resolved", null, null, null, null, false, 0, null,
                 "Açık işi yok", null, null, "v1");
             return new AccountPage([item], total, 1, 25);
