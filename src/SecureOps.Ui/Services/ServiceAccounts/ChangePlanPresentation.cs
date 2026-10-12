@@ -17,10 +17,7 @@ public enum PlanStepState
     Upcoming,
 
     /// <summary>The plan was cancelled before this step.</summary>
-    Stopped,
-
-    /// <summary>The server offers no way to record this step yet (checklist and closing arrive with PR 2); shown honestly.</summary>
-    NotAvailable
+    Stopped
 }
 
 /// <summary>One step of the Plan → Önizleme → Onay → Kontrol listesi → Doğrulama flow.</summary>
@@ -151,9 +148,9 @@ public static class ChangePlanPresentation
                 previewed ? $"Önizleme sürüm {plan.Preview!.Version} hazır." : "Her hesabın son keşif taramasından bileşen satırları üretilir; henüz önizleme yok."),
             new("approval", "Onay", Open(approved, plan.Status == "Previewed"),
                 approved ? "Onaylandı." : plan.Status == "Previewed" ? "Planı hazırlamayan bir doğrulama yetkilisi bu önizlemeyi onaylamalı." : "Önizleme olmadan onay verilemez."),
-            new("checklist", "Kontrol listesi", completed ? PlanStepState.Done : reachedChecklist ? PlanStepState.NotAvailable : cancelled ? PlanStepState.Stopped : PlanStepState.Upcoming,
-                reachedChecklist
-                    ? "Bileşenleri kendi yetkinizle, kendi değişiklik kaydınızla sunucuda yaparsınız. Burada işaretleme henüz sunulmuyor."
+            new("checklist", "Kontrol listesi", completed ? PlanStepState.Done : reachedChecklist ? PlanStepState.Current : cancelled ? PlanStepState.Stopped : PlanStepState.Upcoming,
+                completed ? "Plan kapatıldı; işaretler ve kanıtlar saklanır."
+                    : reachedChecklist ? ChecklistProgress(plan.Checklist)
                     : "Onaydan sonra açılır. Sistem sunucuda hiçbir şey değiştirmez."),
             new("verification", "Doğrulama", completed ? PlanStepState.Current : cancelled ? PlanStepState.Stopped : PlanStepState.Upcoming,
                 completed ? "Kapanış doğrulama sayılmaz: gMSA kontrol taraması ve hesap sayfasındaki doğrulama ayrıca yapılır."
@@ -167,9 +164,57 @@ public static class ChangePlanPresentation
         PlanStepState.Done => "Tamamlandı",
         PlanStepState.Current => "Sırada",
         PlanStepState.Upcoming => "Sonra",
-        PlanStepState.Stopped => "Durduruldu",
-        _ => "Henüz sunulmuyor"
+        _ => "Durduruldu"
     };
+
+    /// <summary>The check states a person can record, in display order, as (code, label).</summary>
+    public static readonly IReadOnlyList<(string Code, string Label)> CheckStates =
+        [("Done", "Yapıldı"), ("Skipped", "Atlandı"), ("Failed", "Başarısız"), ("RolledBack", "Geri alındı")];
+
+    /// <summary>Tone of a check badge ("Done" is the person's statement, not a verification).</summary>
+    public static SoStatusBadge.BadgeTone CheckTone(string state) => state switch
+    {
+        "Done" => SoStatusBadge.BadgeTone.Positive,
+        "Failed" => SoStatusBadge.BadgeTone.Critical,
+        "RolledBack" => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    /// <summary>Icon of a check badge (a second signal beside the text).</summary>
+    public static string CheckIcon(string state) => state switch
+    {
+        "Done" => MudBlazor.Icons.Material.Filled.TaskAlt,
+        "Skipped" => MudBlazor.Icons.Material.Filled.SkipNext,
+        "Failed" => MudBlazor.Icons.Material.Filled.ErrorOutline,
+        "RolledBack" => MudBlazor.Icons.Material.Filled.Undo,
+        _ => MudBlazor.Icons.Material.Filled.RadioButtonUnchecked
+    };
+
+    /// <summary>States offered for a row whose latest mark is <paramref name="latest"/>: "RolledBack" only after Done or Failed (the server decides again).</summary>
+    public static IReadOnlyList<(string Code, string Label)> OfferedStates(string? latest) =>
+        [.. CheckStates.Where(s => s.Code != "RolledBack" || latest is "Done" or "Failed")];
+
+    /// <summary>A note is required for every state except Done (a hint for the form; the server decides).</summary>
+    public static bool NoteRequired(string state) => state != "Done";
+
+    /// <summary>Progress sentence of the checklist from the server's counters.</summary>
+    public static string ChecklistProgress(ChangePlanChecklistView? checklist) => checklist switch
+    {
+        null => "Bileşenleri kendi yetkinizle, kendi değişiklik kaydınızla sunucuda yaparsınız; yaptığınızı satır satır işaretleyin. İşaret sizin beyanınızdır.",
+        { Total: 0 } => "İşaretlenecek satır yok.",
+        { Unchecked: 0 } => $"{checklist.Total} satırın hepsi işaretli; plan kapatılabilir.",
+        _ => $"{checklist.Total} satırdan {checklist.Total - checklist.Unchecked} tanesi işaretli, {checklist.Unchecked} tanesi bekliyor."
+    };
+
+    /// <summary>Counters shown above the rows; zero counters are kept so an absence is visible.</summary>
+    public static IReadOnlyList<(string Label, int Count, SoStatusBadge.BadgeTone Tone, string Icon)> ChecklistCounters(ChangePlanChecklistView c) =>
+    [
+        ("Yapıldı (beyan)", c.Done, CheckTone("Done"), CheckIcon("Done")),
+        ("Atlandı", c.Skipped, CheckTone("Skipped"), CheckIcon("Skipped")),
+        ("Başarısız", c.Failed, CheckTone("Failed"), CheckIcon("Failed")),
+        ("Geri alındı", c.RolledBack, CheckTone("RolledBack"), CheckIcon("RolledBack")),
+        ("İşaretlenmedi", c.Unchecked, SoStatusBadge.BadgeTone.Neutral, CheckIcon(string.Empty))
+    ];
 
     /// <summary>Label of a plan event (operational record, not a performance view).</summary>
     public static string EventLabel(string name) => name switch
@@ -178,6 +223,8 @@ public static class ChangePlanPresentation
         "Updated" => "Hesap listesi değişti",
         "Previewed" => "Önizleme üretildi",
         "Approved" => "Önizleme onaylandı",
+        "Started" => "İlk işaret kaydedildi (uygulama başladı)",
+        "Completed" => "Plan kapatıldı",
         "Cancelled" => "Plan iptal edildi",
         _ => name
     };

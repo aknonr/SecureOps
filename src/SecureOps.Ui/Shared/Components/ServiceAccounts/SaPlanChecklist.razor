@@ -1,14 +1,29 @@
-@* Work list of an approved plan: the approved preview's rows grouped by account and server. The team makes the change on the server
-   under its own change record; this system never connects to a server. Marking rows (Yapıldı / Atlandı / Başarısız / Geri alındı) needs
-   an API the server does not offer yet (PR 2), so nothing can be marked here and the page says so instead of showing a button that
-   would not save. Whatever is marked later is the person's statement, not a verification. *@
+@* Checklist of an approved plan: the approved preview's rows grouped by account and server, with the person's own marks (Yapıldı /
+   Atlandı / Başarısız / Geri alındı). The team makes the change on the server under its own change record; this system never
+   connects to a server, and "Yapıldı" is the person's statement, not a verification. Mark buttons exist only when the server's
+   plan permissions say the caller may check; the server decides again on every mark. *@
 @using SecureOps.Shared.Contracts.ServiceAccounts
 @using SecureOps.Ui.Services.ServiceAccounts
 
 <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" role="note">
-    Yapıldı işareti kişinin beyanıdır, doğrulama değildir. İşaretleme için sunucu tarafında henüz bir özellik yok (sonraki sürümle gelecek);
-    bu liste yalnız yapılacakları gösterir ve burada hiçbir şey kaydedilmez. Değişikliği kendi yetkinizle, kendi değişiklik kaydınızla sunucuda siz yaparsınız.
+    Yapıldı işareti kişinin beyanıdır, doğrulama değildir. Sistem sunucuya bağlanmaz ve değişikliği yapmaz; değişikliği kendi yetkinizle,
+    kendi değişiklik kaydınızla sunucuda siz yaparsınız, burada yaptığınızı kayda geçirirsiniz.
+    @(Plan.Permissions.Check ? "" : "İşaretleme yetkiniz görünmüyor (Çalışma yetkisi ve planın tüm hesaplarında sorumlu dayanak gerekir); liste yalnız okunur.")
 </MudAlert>
+
+@if (Plan.Checklist is { } checklist)
+{
+    <div class="sa-plan-check-counters" role="group" aria-label="Kontrol listesi özeti">
+        @foreach ((string label, int count, SoStatusBadge.BadgeTone tone, string icon) in ChangePlanPresentation.ChecklistCounters(checklist))
+        {
+            <SoStatusBadge Label="@($"{label}: {count}")" Tone="tone" Icon="@icon" />
+        }
+        @if (checklist.OutsideWindow > 0)
+        {
+            <SoStatusBadge Label="@($"Pencere dışında: {checklist.OutsideWindow}")" Tone="SoStatusBadge.BadgeTone.Caution" Icon="@Icons.Material.Filled.EventBusy" />
+        }
+    </div>
+}
 
 @if (Failed)
 {
@@ -34,31 +49,7 @@ else
                 <ul class="sa-plan-check-list">
                     @foreach (ChangePlanItemView item in server)
                     {
-                        <li class="sa-plan-check-item">
-                            <div>
-                                @if (item.ComponentName is null)
-                                {
-                                    <strong>Bileşen bilgisi yok</strong>
-                                    <div class="so-panel-text--sm">@item.FlagLabel</div>
-                                }
-                                else
-                                {
-                                    <strong>@item.ComponentName</strong> <span class="so-panel-text--sm">· @(item.ComponentType ?? "tür bilgisi yok")</span>
-                                    <div class="so-panel-text--sm">@(item.CurrentIdentity ?? "şimdiki kimlik bilgisi yok") → @item.TargetIdentity</div>
-                                }
-                            </div>
-                            <div class="sa-plan-check-flags">
-                                @if (item.Flag == "ManualOnly")
-                                {
-                                    <SoStatusBadge Label="Elle yapılacak" Tone="SoStatusBadge.BadgeTone.Info" Icon="@Icons.Material.Filled.PanTool" Title="@item.FlagLabel" />
-                                }
-                                else if (item.Flag != "Ok")
-                                {
-                                    <SoStatusBadge Label="@ChangePlanPresentation.FlagShortLabel(item.Flag)" Tone="@ChangePlanPresentation.FlagTone(item.Flag)"
-                                                   Icon="@ChangePlanPresentation.FlagIcon(item.Flag)" Title="@item.FlagLabel" />
-                                }
-                            </div>
-                        </li>
+                        <SaPlanCheckRow @key="item.Id" Item="item" CanCheck="Plan.Permissions.Check" Busy="Busy" OnMark="OnMark" />
                     }
                 </ul>
             }
@@ -69,6 +60,9 @@ else
 }
 
 @code {
+    /// <summary>The plan (permissions and checklist counters come from the server).</summary>
+    [Parameter, EditorRequired] public ChangePlanView Plan { get; set; } = default!;
+
     /// <summary>The loaded page of the approved preview's rows (null while loading).</summary>
     [Parameter] public ChangePlanItemPage? Items { get; set; }
 
@@ -80,4 +74,7 @@ else
 
     /// <summary>Another page of rows was requested (1-based).</summary>
     [Parameter] public EventCallback<int> OnPage { get; set; }
+
+    /// <summary>Sends one mark; true when the server saved it.</summary>
+    [Parameter, EditorRequired] public Func<PlanCheckCommand, Task<bool>> OnMark { get; set; } = default!;
 }

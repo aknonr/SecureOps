@@ -1,0 +1,55 @@
+@* Closing an in-progress plan whose every row is marked. Closing records, per account whose rows say so, one UNVERIFIED gMSA conversion
+   action; it never verifies an account and never closes a linked request. The person confirms exactly that before the button
+   works. The page shows the form only when the server says the caller may close now; otherwise it says what is missing. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<div class="sa-plan-complete">
+    <h3 class="sa-plan-complete-title">Planı kapat</h3>
+    @if (Plan.Permissions.Complete)
+    {
+        <p class="so-panel-text--sm">
+            Her satır işaretli. Kapatınca, satırları Yapıldı olup hiçbiri Başarısız ya da Geri alındı olmayan her hesap için doğrulanmamış bir
+            gMSA geçişi işlem kaydı oluşur; diğer hesaplar için kayıt oluşmaz. Hiçbir hesap doğrulanmış sayılmaz ve bağlı talep kapanmaz.
+        </p>
+        <MudTextField T="string" @bind-Value="_note" Label="Kapanış notu (isteğe bağlı)" MaxLength="1000" Lines="2" Immediate="true" Variant="Variant.Outlined" />
+        <SoConfirmStatement Text="Yapıldı işaretlerinin kişi beyanı olduğunu, kapanışın hiçbir hesabı doğrulamadığını ve bağlı talebi kapatmadığını anlıyorum; planı kapatıyorum."
+                            Checked="_acknowledged" CheckedChanged="@(v => _acknowledged = v)" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="SubmitAsync" Disabled="@(Busy || !_acknowledged)">Planı kapat</MudButton>
+    }
+    else if (Plan.Status == "InProgress" && Plan.Checklist is { Unchecked: > 0 } open)
+    {
+        <p class="so-panel-text--sm" role="note">@open.Unchecked satır henüz işaretlenmedi; hepsi işaretlenince plan kapatılabilir.</p>
+    }
+    else if (Plan.Status == "Approved")
+    {
+        <p class="so-panel-text--sm" role="note">Plan, ilk satır işaretlendiğinde "uygulanıyor" olur; kapatma bundan sonra, tüm satırlar işaretlenince yapılır.</p>
+    }
+    else
+    {
+        <p class="so-panel-text--sm" role="note">Planı kapatma yetkiniz görünmüyor (Çalışma yetkisi ve planın tüm hesaplarında sorumlu dayanak gerekir). Sunucu her işlemde yeniden karar verir.</p>
+    }
+</div>
+
+@code {
+    private string _note = string.Empty;
+    private bool _acknowledged;
+
+    /// <summary>The plan (permissions and checklist counters come from the server).</summary>
+    [Parameter, EditorRequired] public ChangePlanView Plan { get; set; } = default!;
+
+    /// <summary>A call is running.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Sends the closing request; true when the server closed the plan.</summary>
+    [Parameter, EditorRequired] public Func<CompleteChangePlanRequest, Task<bool>> OnComplete { get; set; } = default!;
+
+    private async Task SubmitAsync()
+    {
+        string? note = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim();
+        if (await OnComplete(new CompleteChangePlanRequest(Plan.Version, note)))
+        {
+            (_note, _acknowledged) = (string.Empty, false);
+        }
+    }
+}

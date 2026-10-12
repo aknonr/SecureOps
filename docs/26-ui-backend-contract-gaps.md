@@ -42,7 +42,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-33 — Usage-scan comparison cannot be computed correctly in the UI once items are paged | Implemented on `feature/service-accounts-scan-diff-20261006` (not merged); local Demo verified 2026-10-07 (WINDOWS-ACCEPTANCE row 88) |
 | G-34 — Concurrent first registrations can deadlock in the access store | Fixed in source and synthetic LocalDB — 032 index / one registration retry; installed TEST unchanged; module tests remain serialised |
 | G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
-| G-36 — Change-plan checklist and closing have no API yet (plus two smaller plan-contract gaps) | Open — UI shows honest "not available" states |
+| G-36 — Change-plan checklist and closing have no API yet (plus two smaller plan-contract gaps) | Item 1 closed 2026-10-12 (API in #36, UI in F3); items 2 and 3 remain open |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1199,11 +1199,14 @@ corporate systems, provider writes, merge and deployment remain outside scope.
 **Raised:** 2026-10-12, UI for the gMSA change plan (d, PR 3) built against contract `0400d58` / `db56856`.
 **Owner:** Service Accounts module (owner-approved scoped exception); the UI never invents these.
 
-1. **Checklist marking and closing (PR 2).** `POST change-plans/{id}/items/{itemId}/checks` (`Done / Skipped / Failed / RolledBack`, note,
-   `outsideWindow` in the answer) and `POST change-plans/{id}/complete` are in `CHANGE-PLAN-DESIGN.md` but not in the controller or OpenAPI
-   snapshot. Until they exist the plan page shows the approved rows as a work list, says plainly that nothing can be marked, and offers no button
-   (steps 4 "Henüz sunulmuyor"; step 5 points to the existing account-page verification). The per-row "pencere dışında" label, evidence upload
-   and the closing note are waiting for the same contract. The rule "Yapıldı is the person's statement, not a verification" is already in the text.
+1. **Checklist marking and closing (PR 2) — ✅ CLOSED 2026-10-12.** The routes `GET/POST change-plans/{id}/items/{itemId}/checks`,
+   `POST {id}/evidence` (migration 034) and `POST {id}/complete` merged with #36; the plan view carries `permissions.check/complete/uploadEvidence`,
+   `checklist` counters, `evidence`, the rows' latest `check` and the per-account `outcome`. The UI (F3, branch
+   `feature/service-accounts-change-plan-checklist-ui-20261012`) replaced the "Henüz sunulmuyor" states with the real flow: per-row marks with
+   `expectedCheckId` (409 `checkStale` → server's current plan adopted, rows re-read, draft kept), the "pencere dışında" label from `outsideWindow`,
+   evidence upload/download (503 without 034 shown as "kurulu değil"), and the closing form with the rule "Yapıldı is the person's statement, not a
+   verification; no account is verified and no request is closed". Buttons follow `permissions` only. No new gap was found; what stays unverified is
+   listed in the F3 report (no corporate TEST, no installed 034 there).
 2. **Linking an open gMSA request when planning.** `ChangePlanAccountInput.RequestId` exists, but no read tells the UI which open gMSA requests
    an account has without opening each account. The editor keeps an existing `RequestId` unchanged on rename and sends none for new accounts.
    Needed (if the owner wants the link chosen in the plan screen): an open-gMSA-request list per account in a plan-friendly read.

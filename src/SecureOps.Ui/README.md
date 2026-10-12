@@ -52,8 +52,7 @@ against the pinned contract; no backend, SQL or DTO change.
   editor (`approveBlockedReason` is explained instead). Approval carries the preview version and SHA-256 and a confirmation that names them.
 - Wording: `NothingFound` is "Taramada bulunamadı" and never "kullanılmıyor"; "Bilgi yok" for no scan; IIS site/application/virtual-directory
   rows are "Elle yapılacak" in the work list; "Yapıldı kişinin beyanıdır, doğrulama değildir".
-- Not offered because the API does not exist yet (PR 2, [G-36](../../docs/26-ui-backend-contract-gaps.md)): marking checklist rows, evidence,
-  closing the plan. Step 4 reads "Henüz sunulmuyor"; the page shows the approved rows as a read-only work list.
+- (Superseded by the F3 section below: checklist marking, plan evidence and closing are now in the UI.)
 - Focus: the module's four hand-written pagers now use one component, `SaPager`. Its buttons are never `disabled` (they use `aria-disabled` and
   ignore the click while busy or at an edge), so keyboard focus is not dropped to the page when a page changes or the last page is reached.
 - OCO number (F2, 2026-10-12): the server validates and upper-cases it (max 64, A-Z 0-9 - _ . /, starts with a letter or digit, at least one
@@ -63,6 +62,31 @@ against the pinned contract; no backend, SQL or DTO change.
   `DateTimeOffset`; every window is displayed with its offset.
 - Tests: `ServiceAccountChangePlanUiTests` (27 cases: step flow per status, flag wording, counters/rows, work list, pager focus, approval form
   gating through the real page against a canned API, 404 state, no password field, focus-ring CSS, every pager uses `SaPager`).
+
+## gMSA change plan UI (d, PR 4 = F3): checklist, plan evidence, closing, 2026-10-12
+
+Branch `feature/service-accounts-change-plan-checklist-ui-20261012`, cut from master `d3eed21` (PR 2 routes merged in #36); UI/docs/tests only,
+no backend, SQL or DTO change. Closes [G-36](../../docs/26-ui-backend-contract-gaps.md) item 1.
+
+- Checklist (step 4): per preview row the latest mark (text + icon: Yapıldı / Atlandı / Başarısız / Geri alındı / İşaretlenmedi), author, time and
+  note, a "Pencere dışında" label when the server says so, and counters from `checklist`. Marking is a native `details` form per row
+  (`SaPlanCheckRow`) with radio states and a note; it exists only when `permissions.check` is true. Not-Done states need a note (hint, the button
+  waits for it; the server decides); "Geri alındı" is offered only when the latest state is Done or Failed (hint; the server answers 409
+  `nothingToRollBack`). Each mark sends `expectedCheckId`; 409 `checkStale` (or any 409) adopts the plan the server returned, re-reads the rows and
+  keeps the typed note, and says nothing was saved. A saved mark clears only its own form.
+- "Yapıldı kişinin beyanıdır, doğrulama değildir" stays on the checklist, the closing form and the closed plan; no text says a server was changed or an
+  account verified. The pre-approval step and the expired-window note are unchanged (the label itself comes from the server).
+- Plan evidence (`SaPlanEvidence`): list (name, size, time, download through the existing `GET evidence/{id}` route) and upload (multipart
+  `POST change-plans/{id}/evidence`) only with `permissions.uploadEvidence`. File type/size hints are shared with account evidence
+  (`SaEvidenceFileRules`; the server checks the signature). 503 without migration 034 is shown as "Plan kanıtı bu ortamda kurulu değil", file not saved.
+- Closing (`SaPlanComplete`): form only with `permissions.complete`; a confirmation names that Yapıldı is a statement, that no account is verified and
+  no request is closed, then `POST complete` with `expectedVersion`. Otherwise the page says what is missing (N rows unmarked, or no right). After
+  closing, the account table shows the server's `outcomeLabel` per account; "Performed" says an unverified action record exists and verification is
+  done separately on the account page.
+- `PlanStepState.NotAvailable` is gone (nothing produces it any more); step 4 is "Sırada" from Approved on, "Tamamlandı" when closed.
+- Verified live on the local Demo (see PROGRESS.md "PR 4"); the server's own `stateLabel` ("Yapıldı (kişinin beyanı, doğrulama değil)") is shown as sent.
+- Tests: `ServiceAccountChangePlanUiTests` grew to 49 cases (checklist read-only vs. with form, radio counts, window label/counters, offered states,
+  field wording, evidence list/upload gating and file hints, closing gating, completed page outcome).
 
 ## PR #4 Windows Verification, 2026-10-02
 

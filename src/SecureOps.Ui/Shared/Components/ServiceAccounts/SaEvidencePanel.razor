@@ -31,8 +31,8 @@
                 </MudItem>
                 <MudItem xs="12" md="4"><MudTextField @bind-Value="_label" Label="Açıklama" MaxLength="200" Variant="Variant.Outlined" /></MudItem>
                 <MudItem xs="12" md="4">
-                    <label class="so-panel-text" for="sa-evidence-file">Dosya (PDF, PNG, JPEG, TXT, EML, XLSX, DOCX; en çok 10 MB)</label>
-                    <InputFile id="sa-evidence-file" OnChange="ChooseAsync" accept=".pdf,.png,.jpg,.jpeg,.txt,.eml,.xlsx,.docx" />
+                    <label class="so-panel-text" for="sa-evidence-file">@SaEvidenceFileRules.Hint</label>
+                    <InputFile id="sa-evidence-file" OnChange="ChooseAsync" accept="@SaEvidenceFileRules.Accept" />
                 </MudItem>
             </MudGrid>
             @if (_fileError is not null) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@_fileError</MudAlert> }
@@ -42,14 +42,6 @@
 </section>
 
 @code {
-    private const long MaxBytes = 10L * 1024 * 1024;
-    private static readonly Dictionary<string, string> _types = new(StringComparer.OrdinalIgnoreCase)
-    {
-        [".pdf"] = "application/pdf", [".png"] = "image/png", [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".txt"] = "text/plain",
-        [".eml"] = "message/rfc822", [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    };
-
     private (string Name, string Type, byte[] Content)? _file;
     private string _owner = "Account";
     private string? _label, _fileError;
@@ -99,20 +91,16 @@
     {
         (_file, _fileError) = (null, null);
         IBrowserFile file = args.File;
-        if (!_types.TryGetValue(Path.GetExtension(file.Name), out string? type))
+        if (SaEvidenceFileRules.Refusal(file.Name, file.Size) is { } refusal)
         {
-            _fileError = "Bu dosya türü kabul edilmiyor.";
+            _fileError = refusal;
             return;
         }
 
-        if (file.Size is 0 or > MaxBytes)
-        {
-            _fileError = "Dosya boş veya 10 MB sınırını aşıyor.";
-            return;
-        }
+        SaEvidenceFileRules.TryGetContentType(file.Name, out string type);
 
         using MemoryStream buffer = new();
-        await using Stream stream = file.OpenReadStream(MaxBytes);
+        await using Stream stream = file.OpenReadStream(SaEvidenceFileRules.MaxBytes);
         await stream.CopyToAsync(buffer);
         _file = (file.Name, type, buffer.ToArray());
     }

@@ -34,11 +34,12 @@ public sealed class ServiceAccountChangePlanUiTests
     [Theory]
     [InlineData("Draft", "Done", "Current", "Upcoming", "Upcoming", "Upcoming")]
     [InlineData("Previewed", "Done", "Done", "Current", "Upcoming", "Upcoming")]
-    [InlineData("Approved", "Done", "Done", "Done", "NotAvailable", "Upcoming")]
+    [InlineData("Approved", "Done", "Done", "Done", "Current", "Upcoming")]
+    [InlineData("InProgress", "Done", "Done", "Done", "Current", "Upcoming")]
     [InlineData("Completed", "Done", "Done", "Done", "Done", "Current")]
     public void Steps_FollowTheServerStatus(string status, params string[] expected)
     {
-        ChangePlanView plan = Plan(status, preview: status != "Draft", approval: status is "Approved" or "Completed");
+        ChangePlanView plan = Plan(status, preview: status != "Draft", approval: status is "Approved" or "InProgress" or "Completed");
 
         ChangePlanPresentation.Steps(plan).Select(s => s.State.ToString()).Should().Equal(expected);
         ChangePlanPresentation.Steps(plan).Select(s => s.Key).Should().Equal("plan", "preview", "approval", "checklist", "verification");
@@ -139,7 +140,7 @@ public sealed class ServiceAccountChangePlanUiTests
     }
 
     [Fact]
-    public async Task Checklist_MarksManualOnlyRows_AndStatesNothingCanBeMarkedYet()
+    public async Task Checklist_WithoutTheCheckPermission_IsReadOnly_AndSaysWhy()
     {
         ChangePlanItemPage items = new(2,
         [
@@ -147,12 +148,145 @@ public sealed class ServiceAccountChangePlanUiTests
             Item("Ok", "SYN-APP01", "AppPool", "SynPool", "SYN\\svc", "SYN\\gmsa$", "Taramada bulundu")
         ], 2, 1, 50);
 
-        string text = Regex.Replace(Regex.Replace(await RenderAsync<SaPlanChecklist>(new() { ["Items"] = items }), "<[^>]+>", " "), @"\s+", " ");
+        string html = await RenderAsync<SaPlanChecklist>(new() { ["Plan"] = Plan("Approved", true, true), ["Items"] = items, ["OnMark"] = (Func<PlanCheckCommand, Task<bool>>)NoMark });
+        string text = Regex.Replace(Regex.Replace(html, "<[^>]+>", " "), @"\s+", " ");
 
         text.Should().Contain("Elle yapılacak").And.Contain("SynSite").And.Contain("SynPool");
-        text.Should().Contain("Yapıldı işareti kişinin beyanıdır, doğrulama değildir").And.Contain("burada hiçbir şey kaydedilmez");
-        text.Should().NotContain("Yapıldı olarak işaretle");
+        text.Should().Contain("Yapıldı işareti kişinin beyanıdır, doğrulama değildir").And.Contain("İşaretleme yetkiniz görünmüyor");
+        html.Should().NotContain("Kaydet").And.NotContain("type=\"radio\"");
+        text.Should().Contain("İşaretlenmedi");
     }
+
+    [Fact]
+    public async Task Checklist_WithTheCheckPermission_OffersTheFormPerRow_AndShowsMarksCountersAndTheWindowLabel()
+    {
+        ChangePlanItemView marked = Item("Ok", "SYN-APP01", "AppPool", "SynPool", "SYN\\svc", "SYN\\gmsa$", "Taramada bulundu") with
+        {
+            Check = new ChangePlanItemCheckView(7, "Done", "Yapıldı (kişinin beyanı, doğrulama değil)", "Synthetic note", true, "Synthetic Operator", _at)
+        };
+        ChangePlanItemView open = Item("ManualOnly", "SYN-WEB01", "IisSiteConnectAs", "SynSite", "SYN\\svc", "SYN\\gmsa$", "Elle: IIS connect as");
+        ChangePlanItemPage items = new(2, [marked, open], 2, 1, 50);
+        ChangePlanView plan = Plan("InProgress", true, true, permissions: new(false, false, false, null, false, Check: true)) with
+        {
+            Checklist = new ChangePlanChecklistView(2, 1, 0, 0, 0, 1, 1)
+        };
+
+        string html = await RenderAsync<SaPlanChecklist>(new() { ["Plan"] = plan, ["Items"] = items, ["OnMark"] = (Func<PlanCheckCommand, Task<bool>>)NoMark });
+        string text = Regex.Replace(Regex.Replace(html, "<[^>]+>", " "), @"\s+", " ");
+
+        Regex.Matches(html, "type=\"radio\"").Count.Should().Be(3 + 4, "the unmarked row offers three states (no Geri alındı), the Done row all four");
+        text.Should().Contain("Yapıldı (beyan): 1").And.Contain("İşaretlenmedi: 1").And.Contain("Pencere dışında: 1");
+        text.Should().Contain("Pencere dışında").And.Contain("Synthetic Operator").And.Contain("kişinin beyanı, doğrulama değil").And.Contain("Not: Synthetic note");
+        text.Should().Contain("İşareti değiştir").And.Contain("İşaretle:");
+    }
+
+    [Theory]
+    [InlineData(null, "Done,Skipped,Failed")]
+    [InlineData("Skipped", "Done,Skipped,Failed")]
+    [InlineData("RolledBack", "Done,Skipped,Failed")]
+    [InlineData("Done", "Done,Skipped,Failed,RolledBack")]
+    [InlineData("Failed", "Done,Skipped,Failed,RolledBack")]
+    public void OfferedStates_OfferRolledBack_OnlyAfterDoneOrFailed(string? latest, string expected) =>
+        ChangePlanPresentation.OfferedStates(latest).Select(s => s.Code).Should().Equal(expected.Split(','));
+
+    [Fact]
+    public void CheckStates_HaveTextToneAndIcon_AndOnlyDoneNeedsNoNote()
+    {
+        foreach ((string code, string label) in ChangePlanPresentation.CheckStates)
+        {
+            label.Should().NotBeNullOrWhiteSpace();
+            ChangePlanPresentation.CheckIcon(code).Should().NotBeNullOrWhiteSpace();
+            ChangePlanPresentation.NoteRequired(code).Should().Be(code != "Done");
+        }
+
+        ChangePlanPresentation.ChecklistProgress(new ChangePlanChecklistView(4, 1, 1, 0, 0, 2, 0)).Should().Contain("2 tanesi işaretli").And.Contain("2 tanesi bekliyor");
+        ChangePlanPresentation.ChecklistProgress(new ChangePlanChecklistView(2, 2, 0, 0, 0, 0, 0)).Should().Contain("hepsi işaretli");
+    }
+
+    [Theory]
+    [InlineData("checkStale", "başka biri de işaretledi")]
+    [InlineData("nothingToRollBack", "Yapıldı veya Başarısız")]
+    [InlineData("checklistIncomplete", "işaretlenmemiş satır var")]
+    [InlineData("planNotApproved", "onaydan sonra")]
+    [InlineData("note", "not gerekir")]
+    public void ChecklistFields_HaveOperatorWording(string field, string fragment) =>
+        ServiceAccountProblems.FieldText(field).Should().Contain(fragment);
+
+    [Fact]
+    public void EvidenceNotInstalled_IsAHonestNotConfiguredState()
+    {
+        UiProblem? problem = ServiceAccountProblems.FromCode("ServiceAccountChangePlanEvidenceNotInstalled");
+
+        problem.Should().NotBeNull();
+        problem!.Kind.Should().Be(UiProblemKind.NotConfigured);
+        problem.Explanation.Should().Contain("034").And.Contain("Dosya kaydedilmedi");
+    }
+
+    [Fact]
+    public async Task Complete_ShowsTheFormOnlyWhenTheServerAllows_AndNeverClaimsAVerification()
+    {
+        ChangePlanView allowed = Plan("InProgress", true, true, permissions: new(false, false, false, null, false, Check: true, Complete: true));
+        ChangePlanView open = Plan("InProgress", true, true, permissions: new(false, false, false, null, false, Check: true)) with
+        {
+            Checklist = new ChangePlanChecklistView(3, 1, 0, 0, 0, 2, 0)
+        };
+        ChangePlanView nobody = Plan("InProgress", true, true);
+
+        string allowedText = Text(await RenderAsync<SaPlanComplete>(new() { ["Plan"] = allowed, ["OnComplete"] = (Func<CompleteChangePlanRequest, Task<bool>>)NoComplete }));
+        string openText = Text(await RenderAsync<SaPlanComplete>(new() { ["Plan"] = open, ["OnComplete"] = (Func<CompleteChangePlanRequest, Task<bool>>)NoComplete }));
+        string nobodyHtml = await RenderAsync<SaPlanComplete>(new() { ["Plan"] = nobody, ["OnComplete"] = (Func<CompleteChangePlanRequest, Task<bool>>)NoComplete });
+
+        allowedText.Should().Contain("hiçbir hesabı doğrulamadığını").And.Contain("bağlı talebi kapatmadığını").And.Contain("Planı kapat");
+        allowedText.Should().Contain("doğrulanmamış bir gMSA geçişi işlem kaydı").And.Contain("Hiçbir hesap doğrulanmış sayılmaz");
+        openText.Should().Contain("2 satır henüz işaretlenmedi").And.NotContain("hiçbir hesabı doğrulamadığını");
+        nobodyHtml.Should().Contain("kapatma yetkiniz görünmüyor").And.NotContain("Kapanış notu");
+    }
+
+    [Fact]
+    public async Task Evidence_ListsFiles_OffersUploadOnlyWhenAllowed_AndRepeatsTheAccountFileHints()
+    {
+        EvidenceView file = new(Guid.NewGuid(), "ChangePlan", _planId, "synthetic-change.pdf", "application/pdf", 2048, _sha, "Synthetic label", _at);
+        ChangePlanView allowed = Plan("Approved", true, true, permissions: new(false, false, false, null, false, UploadEvidence: true)) with { Evidence = [file] };
+        ChangePlanView denied = Plan("Approved", true, true);
+
+        string allowedHtml = await RenderAsync<SaPlanEvidence>(new() { ["Plan"] = allowed, ["OnUpload"] = (Func<SaEvidenceUpload, Task<bool>>)NoUpload });
+        string deniedHtml = await RenderAsync<SaPlanEvidence>(new() { ["Plan"] = denied, ["OnUpload"] = (Func<SaEvidenceUpload, Task<bool>>)NoUpload });
+
+        Text(allowedHtml).Should().Contain("synthetic-change.pdf").And.Contain("2 KB").And.Contain("Synthetic label");
+        allowedHtml.Should().Contain("Dosyayı yükle").And.Contain(SaEvidenceFileRules.Hint).And.Contain("accept=\".pdf,.png,.jpg,.jpeg,.txt,.eml,.xlsx,.docx\"");
+        deniedHtml.Should().NotContain("Dosyayı yükle").And.Contain("Kanıt ekleme yetkiniz görünmüyor").And.Contain("kanıt dosyası yok");
+    }
+
+    [Theory]
+    [InlineData("evidence.PDF", 10, null)]
+    [InlineData("evidence.exe", 10, "Bu dosya türü kabul edilmiyor.")]
+    [InlineData("evidence.pdf", 0, "Dosya boş veya 10 MB sınırını aşıyor.")]
+    [InlineData("evidence.pdf", 10L * 1024 * 1024 + 1, "Dosya boş veya 10 MB sınırını aşıyor.")]
+    public void EvidenceFileHints_RefuseWhatTheServerWouldRefuse(string name, long size, string? expected) =>
+        SaEvidenceFileRules.Refusal(name, size).Should().Be(expected);
+
+    [Fact]
+    public async Task Page_OfACompletedPlan_ShowsTheOutcomePerAccount_AndNoCloseForm()
+    {
+        ChangePlanView plan = Plan("Completed", true, true) with
+        {
+            Accounts = [new ChangePlanAccountView(Guid.NewGuid(), "svc-syn-01", "SYN", "gmsa-syn-01", null, _at, "Performed", "İşlem kaydı oluştu", Guid.NewGuid())]
+        };
+
+        string text = Text(await RenderPageAsync(plan));
+
+        text.Should().Contain("Kapanış sonucu").And.Contain("İşlem kaydı oluştu").And.Contain("Doğrulanmamış işlem kaydı oluştu");
+        text.Should().Contain("Plan kapatıldı. Yapıldı işaretleri kişi beyanıdır");
+        text.Should().NotContain("Planı kapat Her satır").And.NotContain("henüz bu özellik yok").And.NotContain("Henüz sunulmuyor");
+    }
+
+    private static Task<bool> NoMark(PlanCheckCommand command) => Task.FromResult(false);
+
+    private static Task<bool> NoComplete(CompleteChangePlanRequest request) => Task.FromResult(false);
+
+    private static Task<bool> NoUpload(SaEvidenceUpload upload) => Task.FromResult(false);
+
+    private static string Text(string html) => Regex.Replace(Regex.Replace(html, "<[^>]+>", " "), @"\s+", " ");
 
     [Fact]
     public async Task Pager_KeepsButtonsFocusable_AtTheEdgesAndWhileBusy()
@@ -269,6 +403,9 @@ public sealed class ServiceAccountChangePlanUiTests
             Path.Combine("Shared", "Components", "ServiceAccounts", "SaPlanAccountsEditor.razor"),
             Path.Combine("Shared", "Components", "ServiceAccounts", "SaPlanApproveForm.razor"),
             Path.Combine("Shared", "Components", "ServiceAccounts", "SaPlanChecklist.razor"),
+            Path.Combine("Shared", "Components", "ServiceAccounts", "SaPlanCheckRow.razor"),
+            Path.Combine("Shared", "Components", "ServiceAccounts", "SaPlanEvidence.razor"),
+            Path.Combine("Shared", "Components", "ServiceAccounts", "SaPlanComplete.razor"),
             Path.Combine("Shared", "Components", "ServiceAccounts", "SaPlanPreview.razor")
         ];
         foreach (string file in files)
