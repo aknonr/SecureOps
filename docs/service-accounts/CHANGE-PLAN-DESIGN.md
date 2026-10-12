@@ -7,9 +7,11 @@ kontrol listesi, plan kanıtı (034), kapanış.** Sahip kararları 1–7 (2026-
 
 ## Sınırlar (değişmez)
 
-- **Sunucuya yazma yok.** AGENTS.md kural 1 ve 3 değişmez; ADR-0028 *Proposed* kalır. Değişikliği kişi kendi yetkisiyle,
-  normal değişiklik kaydıyla (OCO) yapar. Sistem yalnız **plan, önizleme, onay, kişinin işaretlediği kontrol listesi ve
-  kanıt** tutar.
+- **Sunucuya yazma yok.** AGENTS.md kural 1 ve 3 değişmez; ADR-0028 *Proposed* kalır. Değişikliği kişi kendi yetkisiyle
+  yapar. Sistem yalnız **plan, önizleme, onay, kişinin işaretlediği kontrol listesi ve kanıt** tutar.
+- **Turuncu Hat kaydı OR'dur, OCO değil (sahip kararı 2026-10-12).** gMSA'nın AD ekibince oluşturulması için hesap başına
+  bir OR açılır; onaylı plandan düğmeyle açılması ADR-0030'da (*Proposed*, uygulama OR-2 + 035). Kabul edilene kadar OR elle
+  açılır ve aşağıdaki OCO alanı mevcut kodda onayda zorunlu kalır (bkz. "OR bağı").
 - **Parola alanı hiçbir yerde yok** (istek, yanıt, tablo, günlük). Parola değişimi PAM'ın işi; parola planı türü yok.
 - "Yapıldı" işareti kişinin beyanıdır, doğrulama değildir. Doğrulama: gMSA kontrol taraması (ADR-0027) + mevcut `Verify`
   eylem doğrulaması.
@@ -22,7 +24,7 @@ kontrol listesi, plan kanıtı (034), kapanış.** Sahip kararları 1–7 (2026-
    rol paketleri değişmez.
 2. Tek plan türü: **gMSA'ya geçiş** (`GmsaConversion`). Parola planı yok.
 3. Tarama tazeliği **7 gün**: daha eski taramadan gelen satır "eski bilgi" işaretlenir; plan **engellenmez**.
-4. OCO numarası **yalnız biçim** olarak doğrulanır; ITSM'e sorgu yok. Biçim (2026-10-12, sunucuda): baştaki/sondaki boşluk atılır, büyük harfe çevrilir (mevcut dış kayıt kuralı); en çok 64 karakter, yalnız `A–Z`, `0–9` ve `- _ . /`, harf veya rakamla başlar, en az bir rakam içerir (örn. `OCO-12345`, `CHG0012345`). Boşluklu, Türkçe harfli veya serbest metin 400 `ocoNumber`. Kurumun gerçek OCO deseni doğrulanmadı; daha dar bir desen gerekirse bu kural değişir.
+4. OCO numarası **yalnız biçim** olarak doğrulanır; ITSM'e sorgu yok. Biçim (2026-10-12, sunucuda): baştaki/sondaki boşluk atılır, büyük harfe çevrilir (mevcut dış kayıt kuralı); en çok 64 karakter, yalnız `A–Z`, `0–9` ve `- _ . /`, harf veya rakamla başlar, en az bir rakam içerir (örn. `OCO-12345`, `CHG0012345`). Boşluklu, Türkçe harfli veya serbest metin 400 `ocoNumber`. Kurumun gerçek OCO deseni doğrulanmadı; daha dar bir desen gerekirse bu kural değişir. **2026-10-12 düzeltmesi:** gMSA geçişi için TH'de OCO değil OR açılır; ADR-0030 bu alanın 035'te isteğe bağlı olmasını önerir (bkz. "OR bağı"). Kabul edilene kadar kod bu kararı uygular.
 5. Bakım penceresi geçtikten sonra da kontrol listesi **işaretlenebilir**; pencere dışında yapılan işaret kayıtta ve
    arayüzde **"pencere dışında"** etiketini taşır (engellenmez).
 6. Bir hesap aynı anda **yalnız bir açık planda** olabilir (açık = `Completed`/`Cancelled` dışı); ikinci plan o hesabı
@@ -39,6 +41,7 @@ kontrol listesi, plan kanıtı (034), kapanış.** Sahip kararları 1–7 (2026-
 | 4. Rehberli uygulama | Bileşen başına `Done / Skipped / Failed / RolledBack` + not; kanıt dosyası | `Work` (onaydan sonra) | Ekleme-yalnız; son işaret geçerli; pencere dışındaki işaret `OutsideWindow` ile kaydedilir, engellenmez; sistem hiçbir sunucuya bağlanmaz |
 | 5. Doğrulama ve kapanış | gMSA kontrol taraması yüklenir (mevcut yol); plan kapatılır; hesap başına `GmsaConversion` **Performed** eylemi açık kullanıcı komutuyla kaydedilir | `Work`; doğrulama `Verify` (mevcut akış) | Kapanış hesabı doğrulanmış saymaz; doğrulama ayrı; bağlı talep açık kalır (kişi kapatır) |
 | İptal | Gerekçeyle, onaydan önce veya sonra | `Work` (planlayan) veya `Verify` | Kayıtlar kalır |
+| (ADR-0030, önerilen) gMSA OR'u | `Approved`/`InProgress` planda hesap başına önizleme → ayrı onay tıklaması → TH'de OR; durum panelde izlenir | `ServiceAccounts.CreateOperationalRecord` (yeni, önerilen) + planın tüm hesaplarına kapsam | Hesap başına en çok bir etkin gönderim; otomatik yeniden deneme yok; sonuç bilinmiyorsa mutabakat |
 
 **Önizleme satır işaretleri:** `Ok` · `StaleScan` (tarama 7 günden eski) · `NoScan` (hesapta Discovery taraması yok;
 hesap için tek "bilgi yok" satırı) · `NotCovered` (sunucu taranamadı/kısmi: bileşen listesi eksik olabilir) ·
@@ -241,9 +244,21 @@ Notlar:
 
 Her PR ayrı dal, küçük commit'ler, build/test/format/SQL harness; push edilir, merge sahibe sorulur.
 
+## OR bağı (sahip kararı 2026-10-12, ADR-0030 *Proposed*)
+
+- gMSA geçişi için TH'de **OR** açılır (AD ekibine gMSA oluşturma talebi), OCO değil. Akıştaki yeri: plan onaylandı → hesap
+  başına OR → AD ekibi gMSA'yı oluşturur → ekip değişikliği yapar (kontrol listesi) → kapanış.
+- Bugünkü kod (033/034): onay `ocoNumber` ister (zorunlu, yalnız biçim); OR alanı yoktur. OR elle açılır, numarası istenirse
+  plan kanıtına ya da kontrol listesi notuna yazılır.
+- ADR-0030 önerisi (kabul + OR-2 sonrası): `ChangePlanApprovals.OcoNumber` **kalır ama 035'te isteğe bağlı olur** (sunucu
+  tarafındaki değişiklik için ekip süreci OCO isterse girilir); OR bağı yeni, hesap başına tabloda (gönderim durumu, parmak izi,
+  OR numarası). Kapanışta OR numarası/numaraları `GmsaConversion` eylemine dış kayıt olarak bağlanır, OCO varsa o da.
+- Bildiren = düğmeye basan kişi; panel kullanıcısı → TH kullanıcı id'si birebir eşleme TH-4'e bağlı, kanıtlanana kadar OR
+  açma kapalı kalır. OR durumunun izlenmesi ADR-0031 aramasına (TH-2) ve TH-4 alanlarına bağlıdır.
+
 ## Açık sorular
 
-Yok. Tehdit tablosundan çıkan iki soru 2026-10-06 sahip kararıyla kapandı:
+OR bağı soruları ADR-0030 "Open questions" bölümündedir. Tehdit tablosundan çıkan iki soru 2026-10-06 sahip kararıyla kapandı:
 
 1. **Onaylayanın kapsamı (T3):** Evet. Onaylayan, planı oluşturan kişi olmadığı gibi, onaylanan önizlemeyi üreten veya planı sonradan `PATCH` ile değiştiren kişi de olamaz (`ChangePlanEvents.Actor` üzerinden, 403 `approverChangedPlan`).
 2. **`ChangePlanAccounts` ekleme-yalnız (T8):** Evet. Her ekleme, çıkarma ve ad değişikliği yeni satırdır; hiçbir satır güncellenmez veya silinmez. Şema tablosu ve T8 testleri buna göre okunur.
