@@ -83,7 +83,7 @@ foreach ($baseline in @(27,28)) {
         Reject 'include cannot escape source' { Select-Plan } 'escapes repository'
         [IO.File]::WriteAllText((Join-Path $fixtureRoot $wrapper), $original)
         $entry.Sha256=(Get-FileHash (Join-Path $root $wrapper)).Hash; Save-Review
-        [IO.File]::WriteAllText((Join-Path $fixtureRoot 'sql/migrations/034-unreviewed.sql'), 'SELECT 1;')
+        [IO.File]::WriteAllText((Join-Path $fixtureRoot 'sql/migrations/035-unreviewed.sql'), 'SELECT 1;')
         Reject 'future migration cannot be silently accepted' { Select-Plan } 'exact complete'
         $selection.RepositoryRoot=$root
     }
