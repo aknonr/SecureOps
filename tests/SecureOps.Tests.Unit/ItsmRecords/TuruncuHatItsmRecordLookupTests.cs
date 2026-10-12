@@ -52,7 +52,8 @@ public sealed class TuruncuHatItsmRecordLookupTests
             "p_proposed_start_date_time", "p_proposed_finish_date_time");
         req.GetProperty("SessionID").GetString().Should().Be(_session);
         req.GetProperty("TenantId").GetInt32().Should().Be(7);
-        req.TryGetProperty("NoEncode", out _).Should().BeFalse();
+        req.GetProperty("NoEncode").GetBoolean().Should().BeTrue();
+        req.TryGetProperty("QueryPermissions", out _).Should().BeFalse();
         handler.Requests[0].Body.Should().NotContainAny("requester", "affected_end_user", "Password", "Username");
     }
 
@@ -159,6 +160,54 @@ public sealed class TuruncuHatItsmRecordLookupTests
     public async Task MorePagesOrRecordsThanReturned_IsUnknownIncomplete_EvenWithZeroItems(int maxPages, int recordCount)
     {
         ItsmRecordLookupResult result = await Lookup(new ScriptedHandler(Ok(Envelope([], maxPages, recordCount))))
+            .LookupAsync(ItsmRecordKind.Oco, OcoNumber, CancellationToken.None);
+
+        result.Status.Should().Be(ItsmRecordLookupStatus.Unknown);
+        result.Reason.Should().Be(ItsmRecordLookupReason.IncompleteResponse);
+    }
+
+    [Fact]
+    public async Task VendorSinglePageEnvelope_ZeroBasedPageNoAndMaxPagesZero_IsComplete()
+    {
+        string body = TuruncuHatItsmTrackingFixtures.VendorEnvelope(0, 0, 1, OcoRow);
+
+        ItsmRecordLookupResult result = await Lookup(new ScriptedHandler(Ok(body)))
+            .LookupAsync(ItsmRecordKind.Oco, OcoNumber, CancellationToken.None);
+
+        result.Status.Should().Be(ItsmRecordLookupStatus.Found);
+    }
+
+    [Fact]
+    public async Task VendorEmptySinglePage_ZeroBasedPageNoAndMaxPagesZero_IsNotFound()
+    {
+        string body = TuruncuHatItsmTrackingFixtures.VendorEnvelope(0, 0, 0);
+
+        ItsmRecordLookupResult result = await Lookup(new ScriptedHandler(Ok(body)))
+            .LookupAsync(ItsmRecordKind.Oco, OcoNumber, CancellationToken.None);
+
+        result.Status.Should().Be(ItsmRecordLookupStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task VendorMultiPageEnvelope_RecordCountIsTheTotal_SoOnePageOfTenIsUnknown()
+    {
+        // Vendor example shape: 690 records in total, 10 per page, 69 pages. The first page alone proves nothing.
+        (string Key, string? Value)[][] page = [.. Enumerable.Range(0, 10).Select(_ => OcoRow)];
+        string body = TuruncuHatItsmTrackingFixtures.VendorEnvelope(0, 69, 690, page);
+
+        ItsmRecordLookupResult result = await Lookup(new ScriptedHandler(Ok(body)))
+            .LookupAsync(ItsmRecordKind.Oco, OcoNumber, CancellationToken.None);
+
+        result.Status.Should().Be(ItsmRecordLookupStatus.Unknown);
+        result.Reason.Should().Be(ItsmRecordLookupReason.IncompleteResponse);
+    }
+
+    [Fact]
+    public async Task RecordCountAboveReturnedRows_OnASingleReportedPage_IsUnknownIncomplete()
+    {
+        string body = TuruncuHatItsmTrackingFixtures.VendorEnvelope(0, 0, 690, OcoRow);
+
+        ItsmRecordLookupResult result = await Lookup(new ScriptedHandler(Ok(body)))
             .LookupAsync(ItsmRecordKind.Oco, OcoNumber, CancellationToken.None);
 
         result.Status.Should().Be(ItsmRecordLookupStatus.Unknown);

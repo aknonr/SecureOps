@@ -57,7 +57,9 @@ public enum ItsmRecordLookupReason
     /// <summary>More pages, malformed rows or rows for another number: the answer is not complete.</summary>
     IncompleteResponse,
     /// <summary>The response was oversized, not JSON, or outside the reviewed envelope.</summary>
-    InvalidResponse
+    InvalidResponse,
+    /// <summary>A source record id or user name failed the strict allow-list; nothing was sent (ADR-0032).</summary>
+    InvalidIdentifier
 }
 
 /// <summary>

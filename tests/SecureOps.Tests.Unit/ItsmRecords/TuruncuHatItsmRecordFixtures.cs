@@ -64,3 +64,60 @@ internal static class TuruncuHatItsmRecordFixtures
     public const string PositionalRow =
         """{"QueryResult":{"ErrorNo":0,"Items":[[[{"Value":"700123"}],[{"Value":"OCO-000123"}],[{"Value":"title"}]]],"MaxPages":1,"PageNo":1,"RecordCount":1}}""";
 }
+
+/// <summary>Synthetic rows for the ADR-0032 tracking and user-match reads; every value is a placeholder.</summary>
+internal static class TuruncuHatItsmTrackingFixtures
+{
+    public const string OrSourceId = "700456";
+    public const string UserName = "synthetic.user";
+
+    public static readonly (string Key, string? Value)[] OrHeaderRow =
+    [
+        ("SET.id", OrSourceId),
+        ("SET.m_last_mod_dt", "2026-01-05T02:30:00"),
+        ("num", "1")
+    ];
+
+    public static (string Key, string? Value)[] Activity(string id, string? created = "2026-01-05T01:00:00", string? completed = null) =>
+    [
+        ("SET.id", id),
+        ("SET.m_group", "8301"),
+        ("SET.m_status", "8501"),
+        ("SET.m_created_dt", created),
+        ("SET.m_completion_date", completed),
+        ("num", "1")
+    ];
+
+    public static (string Key, string? Value)[] Comment(string id, string? created) =>
+    [
+        ("SET.id", id),
+        ("SET.m_created_dt", created),
+        ("num", "1")
+    ];
+
+    public static readonly (string Key, string? Value)[] UserRow =
+    [
+        ("SET.id", "880001"),
+        ("SET.m_username", UserName),
+        ("SET.p_obs_id", "8601"),
+        ("SET.m_rel_home_lbs_id", "8701"),
+        ("num", "1")
+    ];
+
+    /// <summary>Vendor-style envelope: 0-based PageNo, MaxPages 0 on a single page, RecordCount the total.</summary>
+    public static string VendorEnvelope(int pageNo, int maxPages, int recordCount, params (string Key, string? Value)[][] rows) =>
+        JsonSerializer.Serialize(new
+        {
+            QueryResult = new
+            {
+                ErrorDescription = "",
+                ErrorDetails = "",
+                ErrorNo = 0,
+                TenantId = 1,
+                Items = rows.Select(row => row.Select(cell => new { cell.Key, cell.Value }).ToArray()).ToArray(),
+                MaxPages = maxPages,
+                PageNo = pageNo,
+                RecordCount = recordCount
+            }
+        });
+}

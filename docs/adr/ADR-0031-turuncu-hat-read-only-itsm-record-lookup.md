@@ -81,3 +81,12 @@ It does not cover write paths, API endpoints, OpenAPI, SQL or UI, and it does no
 - ADR-0004, ADR-0009, ADR-0012, ADR-0030 (reserved, Service Accounts OR creation)
 - `docs/integrations/turuncu-hat-itsm-record-lookup.md`
 - `docs/26-enterprise-turuncu-hat-jira-adapters.md`, `docs/integrations/turuncu-hat-jira-contract-gaps.md`
+
+## Amendment 2026-10-12 (TH-4, ADR-0032)
+
+The Turuncu Hat team and the vendor document answered part of the activation gate: `NoEncode=true` returns Turkish
+characters unencoded, `QueryPermissions` defaults to SELECT, and `RecordCount` is a total across pages with a
+0-based `PageNo`. The adapter now sends `NoEncode=true`, never sends `QueryPermissions`, and its page rule is pinned
+by tests with the vendor shapes. Decision 3 ("no `NoEncode`" in the contract document) is superseded accordingly.
+OR status/stage field names, status code meanings and time zones remain open. Tracking and exact user match are
+decided in ADR-0032, not here.

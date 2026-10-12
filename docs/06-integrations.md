@@ -304,7 +304,7 @@ The backend replacement for the legacy operator-driven workflow is documented in
 
 ## ITSM Record Lookup (OR / OCO, read-only)
 
-`IItsmRecordLookup` checks one OR or OCO number and returns Found, NotFound, Ambiguous or Unknown (ADR-0031, Proposed). Turuncu Hat is the first adapter; Disabled is the default, Fake is synthetic-only, and any failure or incomplete response is Unknown, never "not found". There is no API endpoint; modules (first: Service Accounts) call it from their service layer. Contract and open items: `docs/integrations/turuncu-hat-itsm-record-lookup.md`.
+`IItsmRecordLookup` checks one OR or OCO number and returns Found, NotFound, Ambiguous or Unknown (ADR-0031, Proposed). Turuncu Hat is the first adapter; Disabled is the default, Fake is synthetic-only, and any failure or incomplete response is Unknown, never "not found". There is no API endpoint; modules (first: Service Accounts) call it from their service layer. ADR-0032 (Proposed) adds read-only `IItsmRecordTracking` (OR last update, activities, comment count and newest comment time; each part Known or Unknown) and `IItsmUserMapping` (exact `cmn_user` user-name match from the server-verified identity; no match, several matches or any failure means no mapping and the flow stops). Contract and open items: `docs/integrations/turuncu-hat-itsm-record-lookup.md`.
 
 ## Reference
 
