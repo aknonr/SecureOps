@@ -1,11 +1,16 @@
 # TEST 028–032 operatör kontrol listesi
 
-Tarih: 2026-10-07. Tek güncel operatör girişi. Bu belge ve paket **gözden geçirme adayıdır**;
+Tarih: 2026-10-12 (D2, sahip kararı A). Tek güncel operatör girişi. Bu belge ve paket **gözden geçirme adayıdır**;
 `readyForInstallation=false`. Kurulu TEST'e uygulanmamıştır. Sentetik LocalDB kanıtı hedef kabulü değildir.
 
 Bu teslimin tabanı **028**: sahibin 2026-10-07 tarihinde çalıştırdığı envantere göre 025–028 uygulanmış,
 029–032 uygulanmamıştır. Paket hazırlayan oturum TEST'e veya kurumsal SQL'e bağlanmaz; bu beyan bağımsız
 hedef doğrulaması değildir. Bu aday 028'i içermez; aşağıdaki 027 seçeneği yalnız farklı bir aday içindir.
+
+Yeni adayın API/UI ürün kaynağı güncel `origin/master` (en az `b64068a`) olmalıdır. Eski
+`review-029-032-20261007-master-78a94b1-from028` adayı artık yayın için kullanılmaz; yalnız SQL
+bayt karşılaştırması referansıdır. 029–032 wrapper/schema/include/SA-004 izin dosyalarının tamamı
+eski adayla baytı baytına aynı olmalıdır. Güncel kaynak 033/034 içerse de ana pakete eklenmez.
 
 ## 1. Salt okunur envanter ve durma noktası
 
@@ -21,6 +26,17 @@ hedef doğrulaması değildir. Bu aday 028'i içermez; aşağıdaki 027 seçene�
 - `svcacct_api_runtime` rolü ve önceki onaylı runtime izinleri mevcut olmalı. Bu paket eski rol/grant dosyalarını,
   rol üyeliğini, 001–027'yi veya Hangfire kurulumunu tekrar çalıştırmaz.
 - Envanter sonucu ve DBA incelemesi özel kanıt dosyasına kaydedilir. Kurulu taban bilinmiyorsa paket kuruluma geçemez.
+- **Kurulumdan önce API SQL kimliği ve izin kontrolü:** sunucu sahibi gerçek API havuzunun SQL'e
+  hangi kimlikle bağlandığını doğrular. Onaylı salt okunur `Get-ApiSqlPermissions028To032.sql`
+  dosyasının özel kopyasında `@ApiLogin` doldurulur; repo için beklenen yol
+  `scripts/diagnostics/Get-ApiSqlPermissions028To032.sql` henüz master'da yoktur. Mevcut incelenmiş
+  kaynak `C:\SecureOpsBuild\api-permissions-028-032-20261007\scripts\diagnostics\Get-ApiSqlPermissions028To032.sql`;
+  D2 özel handoff'unda doldurulmamış, hash'li kopyası verilir. Dolu kopya/gerçek kimlik repoya girmez.
+  DBA kendi `db_owner` oturumunu API hesabının etkin izin kanıtı saymaz. Etkin izin satırları için
+  current/original login `@ApiLogin` ile eşleşmelidir; bu da API sürecinin gerçek bağlantı kimliğini
+  tek başına kanıtlamaz. Eksik metadata/belirsiz eşleme/fazla yetkide durulur; izinler değiştirilmez.
+  030 henüz kurulu olmadığından beş yeni tablonun yokluğu beklenir; DDL + SA-004 sonrasında izin
+  kontrolü ayrıca tekrarlanır. İlk kontrolün çıktısı kurulum onayı değildir.
 
 ## 2. Kaynağa bağlı aday ve onaylar
 
@@ -38,6 +54,8 @@ hedef doğrulaması değildir. Bu aday 028'i içermez; aşağıdaki 027 seçene�
 - Proje sahibi ve DBA: gerçek taban, 028 yetki değişikliği (gerekirse), 029 ilk kapsam, 030/izinler,
   031 istenen gMSA adı ve 032 indeks için ayrı uygulama onayı/change kaydı gerekir.
   DBA yedek/geri yükleme kanıtını, kapasite ve geri dönüş noktasını kendi sürecinde hazırlar.
+  Change kaydına yedek referansı, geri yükleme doğrulaması, önceki API/UI çiftinin kimliği ve
+  geri dönüş kararını verecek kişi yazılmadan kurulum başlamaz.
 
 ## 3. DBA sırası
 
@@ -54,6 +72,13 @@ API/UI yayınından önce, yalnız onaylı change kapsamında:
 SQLCMD `-I -b` ile çalışır; `:r` include'ları bu dizine göre çözülür. SA-004 izin dosyası kendi dizininden çalışır.
 Include/schema dosyaları bağımlılıktır: wrapper'a ek olarak çalıştırılmaz. Her adımda sıfır olmayan çıkışta durun.
 Kurulu migration tekrar çalıştırılmaz; replay reddi yalnız sentetik harness'te denenir.
+
+**033/034 bu sıraya eklenmez.** Her biri `SONRA-KURULACAK` adlı ayrı klasörde, kendi
+manifest/hash'i ve `readyForInstallation=false` ile tutulur; bu teslimde **KURULMAZ**.
+029–032 hedef kabulünden ve ayrı d kabul/onayından sonra önce 033 → `SA-006-API-permissions.sql`
+ayrı change kapsamında değerlendirilir; 033 doğrulanmadan 034 değerlendirilmez. 034 yalnız kendi
+wrapper'ını çalıştırır; 033 veya eski grant'ler tekrar oynatılmaz. Ayrı selector incelemeleri
+sentetik/offline olabilir; typed-true seçim bayrakları hedefin gözlendiğini veya onaylandığını göstermez.
 
 DBA ayrıntıları: [029–031 notu](../service-accounts/DBA-029-030-TR.md),
 [032 notu](../access-registration-dba-032.md). Eski DBA notundaki toplu komut sırası yerine bu listenin
@@ -119,6 +144,12 @@ DBA ayrıntıları: [029–031 notu](../service-accounts/DBA-029-030-TR.md),
   - [ ] **Ek iş akışları:** talep/gMSA adı, tarama yükleme ve karar; başarılı unsafe UI çağrısı,
     başlıksız yetkili istemci için 403, cross-site red ve denial audit kontrol edilir.
     Reddedilen istekte business/provider işlemi yoktur; güvenlik session/identity/audit yazıları ayrı tutulur.
+  - [ ] **Değişiklik planları kurulu değil:** 033/034 uygulanmadığından `/service-accounts/plans`
+    ekranı dürüstçe "kurulu değil" göstermelidir. Yetkili plan çağrısı 503, `change-plan-schema`
+    kategorisi ve `ServiceAccountChangePlansNotInstalled` kodu döndürür; plan kanıtı da kaydedilmez.
+    033 mevcut fakat 034 yoksa plan kanıtı 503 `ServiceAccountChangePlanEvidenceNotInstalled` olur.
+    Normal hesap/kapsam/içe aktarma/rapor akışları yukarıdaki hedef kabulünde ayrıca doğrulanır;
+    fake/controller testleri şema-032 üzerinde tüm modülün çalıştığı kanıtı değildir.
 - SQL sonrası envanter, 030 izinleri, 031 sütun tipleri, 032 plan/indeks ve hedef deadlock kanıtı kontrol edilir.
   Gerçek AD/JEA, kurumsal SQL/OIDC/Negotiate/IIS/F5, e-posta/Jira ve kurulu TEST kabulü yerel kanıtla kapanmaz.
   Herhangi bir kurumsal bağlantı veya uygulama için ayrı yetki gerekir. Bu aday `readyForInstallation=false` kalır.
