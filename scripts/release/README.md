@@ -12,14 +12,15 @@ from the tested master with identical product inputs. Existing master/numbered
 release guards remain unchanged; no numbered release promotion is added.
 
 The selector requires a complete 001-032 source inventory (optionally followed
-by the exact migration/schema pair `033-service-account-change-plans.sql`) and source-bound typed
+by the exact migration/schema pairs `033-service-account-change-plans.sql` and
+`034-service-account-plan-evidence.sql`, in that order) and source-bound typed
 review gates described in `docs/release/TEST-028-032-OPERATOR-TR.md`. A 027 baseline
 selects separately reviewed, unapplied 028 first; 028 baseline never exports 028.
 Both select 029, 030, SA-004 API permissions, 031, 032 in that order with the three
 SQLCMD includes. No installed migrations, legacy grants, Worker or Hangfire are
 delivered. Missing/ambiguous target inventory blocks installation. Future source
-migrations beyond recognized 033 still fail closed. Recognizing 033 does not
-add it, its include, or its API grants to the installed-027/028 plan. The plan
+migrations beyond recognized 034 still fail closed. Recognizing 033/034 does not
+add them, their includes, or API grants to the installed-027/028 plan. The plan
 still reports `RequiredSchema=001-032`. SQL selection never connects to a database.
 
 DBA inventory: `scripts/diagnostics/Get-InstalledMigrationInventory025To032.sql`.
@@ -34,7 +35,8 @@ one current Turkish operator checklist, all hashed. API/UI remain paired and
 selects only migration/schema 033, `SA-006-change-plans.sql`, and the separate
 `SA-006-API-permissions.sql`. Execution order is migration 033 then SA-006 API
 permissions; the SQLCMD working directory remains `sql/migrations`. The complete
-source must be exactly 001-033 with the recognized 033 filenames in both folders.
+source must be exactly 001-033 or 001-034 with the recognized filenames in both folders.
+Recognized 034 does not extend this selection or its dependency/grant files.
 Combining this switch with any other baseline is refused.
 
 The review uses `wasas.sql-upgrade-review.v1` and the exact `Source`. It requires
@@ -55,6 +57,32 @@ the separate 033 selection and refusal cases. It needs no SQL connection.
 Optional `-ExistingCandidateDirectory <retained-candidate>` also verifies the
 retained candidate's exact DBA SQL file set, manifest identities, actual bytes,
 execution order and false readiness flag without changing that candidate.
+
+## Separate 034 SQL Review Selection
+
+`Get-ReleaseSqlPlan.ps1 -RepositoryRoot <source-root> -UpgradeFromInstalled033
+-IncludeServiceAccounts -ExpectedSource <full-SHA> -SqlUpgradeReview <private-review.json>`
+selects only migration/schema `034-service-account-plan-evidence.sql` and
+`SA-007-plan-evidence.sql`. Only migration 034 is executed, from `sql/migrations`;
+there are no role scripts or installed 033 grants to replay. The complete source
+must be exactly 001-034 with the recognized 033/034 filenames in both folders.
+Combining this switch with any other baseline is refused. Install and verify
+033 separately before reviewing 034; the selector never observes target SQL.
+
+The source-bound `wasas.sql-upgrade-review.v1` record requires typed-true
+`Baseline033Verified`, `Inventory025To034Verified`, `Unapplied034Verified`,
+`RuntimeApiRoleVerified`, `Delta034Reviewed`, nonempty string
+`InstalledInventoryEvidenceReference` and `Delta034ReviewReference`, and exact
+Path/Sha256 entries for the three selected files. Missing, false, string-valued,
+stale, extra, duplicate or changed inputs fail closed. Installed SQLCMD includes
+cannot enter the delta. This adds no paired release mode or installation approval;
+`readyForInstallation=false` remains in synthetic evidence and review candidates.
+
+Offline regression: `tests/release/Test-ServiceAccount034ReviewSelection.ps1
+-EvidenceDirectory <fresh-directory> -BaselineRepositoryRoot <unchanged-001-033-root>`.
+Use the preserved pre-034 master `e15089a` as that baseline. It compares complete
+028-based and separate 033 plans, exact exported SQL file sets, metadata and bytes,
+then tests explicit 034 selection and refusals. It needs no database connection.
 
 ## Admin / Lookup 027 API/UI Review
 

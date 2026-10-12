@@ -177,10 +177,10 @@ $asset = Join-Path $fixture $paths033[0]
 Move-Item -LiteralPath $asset -Destination "$asset.absent"
 Reject '033 incomplete numbered chain' { Select-Plan } 'exact complete'
 Move-Item -LiteralPath "$asset.absent" -Destination $asset
-[IO.File]::WriteAllText((Join-Path $fixture 'sql/migrations/034-unreviewed.sql'), 'SELECT 1;')
-Reject '033 rejects future 034' { Select-Plan } 'exact complete'
+[IO.File]::WriteAllText((Join-Path $fixture 'sql/migrations/035-unreviewed.sql'), 'SELECT 1;')
+Reject '033 rejects future 035' { Select-Plan } 'exact complete'
 $selection.Remove('UpgradeFromInstalled032'); $selection.UpgradeFromInstalled028 = $true
-Reject '028 rejects future 034' { Select-Plan } 'exact complete'
+Reject '028 rejects future 035' { Select-Plan } 'exact complete'
 [ordered]@{checks=$checks;count=$checks.Count;baselineSource=$baselineSource;combinedSource=$source;
     sqlCandidateBytesIdentical=$true;readyForInstallation=$false;databaseConnections=$false;corporateActions=$false;
     retainedCandidateSqlCompared=[bool]$ExistingCandidateDirectory;
