@@ -23,7 +23,7 @@
         <div class="d-flex flex-wrap gap-2" role="list" aria-label="Takip özeti">
             @if (Summary.HasTeams)
             {
-                <SoMetric Label="Ekibinize atanmış açık iş" Value="@Summary.TeamOpenRequests.ToString()" />
+                <SoMetric Label="Ekibinize atanmış açık iş" Value="@Summary.TeamOpenRequests.ToString()" Hint="Açık talep sayısı (hesap değil)" />
                 <SoMetric Label="Plan bitişi geçen (ekibiniz)" Value="@Summary.TeamOverdue.ToString()" />
                 <SoMetric Label="Takip günü gelen (ekibiniz)" Value="@Summary.TeamFollowupDue.ToString()" />
                 <SoMetric Label="Tarih bekleyen (ekibiniz)" Value="@Summary.TeamAwaitingDate.ToString()" />
@@ -33,10 +33,17 @@
             {
                 <SoMetric Label="Kapsamda plan bitişi geçen" Value="@Summary.ScopeOverdue.ToString()" />
                 <SoMetric Label="Kapsamda takip günü gelen" Value="@Summary.ScopeFollowupDue.ToString()" />
-                <SoMetric Label="Sahiplik kararı bekleyen hesap" Value="@Summary.ProposedOwnership.ToString()" />
-                <SoMetric Label="Doğrulama bekleyen işlem bildirimi" Value="@Summary.AwaitingVerification.ToString()" />
+                <SoMetric Label="Sahiplik kararı bekleyen hesap" Value="@Summary.ProposedOwnership.ToString()" Hint="Kapsamınızdaki farklı hesap; tüm hesap sayısı değil" />
+                <SoMetric Label="Doğrulama bekleyen işlem bildirimi" Value="@Summary.AwaitingVerification.ToString()" Hint="Bildirim sayısı (hesap değil)" />
             }
         </div>
+        @if (Summary.Coordinator)
+        {
+            <p class="so-panel-text--sm mt-2">
+                "Sahiplik kararı bekleyen hesap", kapsamınızdaki hesap sayısı değildir: yalnız sahiplik önerisi (örneğin içe aktarılan Sorumlu
+                Ekip bilgisi) henüz teyit edilmemiş farklı hesapları sayar. Düğme aynı süzgeçle listeyi açar; liste aynı sayıyı göstermelidir.
+            </p>
+        }
         <div class="d-flex flex-wrap gap-1 mt-2">
             @if (Summary.HasTeams)
             {
@@ -46,7 +53,7 @@
             @if (Summary.Coordinator)
             {
                 <MudButton Href="service-accounts?status=overdue" Size="Size.Small" Variant="Variant.Outlined">Kapsamdaki geciken işler</MudButton>
-                <MudButton Href="service-accounts?status=proposed" Size="Size.Small" Variant="Variant.Outlined">Sahiplik kararı bekleyenler</MudButton>
+                <MudButton Href="service-accounts?status=proposed" Size="Size.Small" Variant="Variant.Outlined">Sahiplik kararı bekleyenler (@Summary.ProposedOwnership)</MudButton>
             }
         </div>
         @if (Summary.Items.Count > 0)

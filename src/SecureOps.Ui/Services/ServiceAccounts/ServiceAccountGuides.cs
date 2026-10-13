@@ -19,7 +19,7 @@ public static class ServiceAccountGuides
     public static Guide List { get; } = new("Servis Hesapları",
         "Kapsamınızdaki bütün servis hesaplarını bulduğunuz ve açtığınız ana sayfa. Üstte size ve ekibinize düşen işler, altta filtrelenebilir liste vardır.",
         [
-            ("Bul", "Hesap adı/SID, durum, kurum, ekip, domain veya vade ile filtreleyin; \"Yalnız ekibimin işleri\" ile kendi işlerinizi süzün. Yetkiniz varsa dizinde ada göre arama ile kişiden hesaba gidebilirsiniz."),
+            ("Bul", "Hesap adı (bir parçası yeter; SID aranmaz), durum, kurum, ekip, domain veya vade ile süzün ve Listele'ye basın; \"Yalnız ekibimin işleri\" ile kendi işlerinizi ayırın. Üstteki özet düğmeleri kendi süzgeciyle listeyi hemen açar. Yetkiniz varsa dizinde ada göre arama kişiyi bulur; bu, hesap listesi aramasından ayrıdır."),
             ("Aç", "Hesaba tıklayın: sahibi, kullanım yerleri, açık talepler ve geçmişi tek sayfada görünür."),
             ("İşle", "Hesap sayfasında talep açın veya yapılan işlemi bildirin."),
             ("Takip et", "Geciken ve tarih bekleyen işler listede ve \"Ekibimin işleri\"nde öne çıkar; raporlara otomatik yansır.")
