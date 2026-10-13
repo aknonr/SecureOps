@@ -1,10 +1,11 @@
 namespace SecureOps.Infrastructure.ItsmRecords;
 
 /// <summary>
-/// Exact, read-only mapping of one product user to the ITSM user id (ADR-0032). The caller passes the user name
-/// derived from the server-verified session identity only; there is no free-text or person search, and the lookup
-/// is a single exact equality on the source user-name column. Zero or several matches, or any failure, is not a
-/// mapping, and the consuming flow must stop.
+/// Exact, read-only mapping of one product user to the ITSM user id (ADR-0032 and its 2026-10-13 amendment). The
+/// caller passes only values the server holds for the signed-in user: the registration number of the product user
+/// record and the user name derived from the server-verified session identity. There is no free-text or person
+/// search; each lookup is a single exact equality on one source column. Zero or several matches, a conflict between
+/// the two keys, or any failure is not a mapping, and the consuming flow must stop.
 /// </summary>
 public interface IItsmUserMapping
 {
@@ -13,6 +14,22 @@ public interface IItsmUserMapping
     /// Caller cancellation propagates as <see cref="OperationCanceledException"/>; a dependency timeout is Unknown.
     /// </summary>
     public Task<ItsmUserMatchResult> MatchByUserNameAsync(string? userName, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Maps an exact registration number (leading zeros dropped, see <see cref="ItsmRegistrationNumber"/>). An invalid
+    /// number returns Unknown/InvalidIdentifier without a remote call. The number is a query key only: it is never
+    /// returned, logged or recorded in telemetry. Cancellation and timeouts behave as for the user name.
+    /// </summary>
+    public Task<ItsmUserMatchResult> MatchByRegistrationNumberAsync(string? registrationNumber, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Maps a product user by registration number first and user name second (ADR-0032 amendment 2026-10-13): when
+    /// both are given they must not point at different users (a conflict is Ambiguous), an Unknown registration result
+    /// never falls back to the user name, and only a NotMatched registration result tries the user name alone. Null or
+    /// blank values count as not given; when neither is given the result is Unknown/InvalidIdentifier without a remote
+    /// call.
+    /// </summary>
+    public Task<ItsmUserMatchResult> MatchAsync(string? registrationNumber, string? userName, CancellationToken cancellationToken);
 }
 
 /// <summary>What the source proved about the requested user name.</summary>
@@ -37,7 +54,7 @@ public enum ItsmUserMatchStatus
 /// <param name="HomeLocationId">Raw home location id; null when the source left it empty.</param>
 public sealed record ItsmUserReference(string UserId, string? OrganizationId, string? HomeLocationId);
 
-/// <summary>Outcome of one user mapping. The requested user name is deliberately not echoed.</summary>
+/// <summary>Outcome of one user mapping. The requested user name and registration number are deliberately not echoed.</summary>
 /// <param name="Status">What the source proved.</param>
 /// <param name="Reason">Why the result is Unknown; None otherwise.</param>
 /// <param name="User">The single matching user when Matched.</param>
@@ -99,5 +116,86 @@ public static class ItsmUserName
         }
 
         return trimmed;
+    }
+}
+
+/// <summary>
+/// Strict allow-list for the registration number sent to the source (ADR-0032 amendment 2026-10-13): after trimming
+/// outer whitespace, 1-20 ASCII digits. Leading zeros are dropped because the source searches the number without
+/// them; a value of only zeros is rejected. Letters, signs, inner spaces, quotes, wildcards, filter markers and
+/// non-ASCII digits are rejected, so the value is placed in the filter verbatim and cannot widen the match. The
+/// number is personal data used only as a query key; the mapping never returns, logs or stores it.
+/// </summary>
+public static class ItsmRegistrationNumber
+{
+    /// <summary>Maximum accepted digit count, leading zeros included.</summary>
+    public const int MaxDigits = 20;
+
+    /// <summary>Returns the digits without leading zeros, or null when the value is not an acceptable registration number.</summary>
+    public static string? Normalize(string? value)
+    {
+        if (value is null || value.Length > MaxDigits + 16)
+        {
+            return null;
+        }
+
+        string trimmed = value.Trim();
+        if (trimmed.Length is 0 or > MaxDigits || !trimmed.All(char.IsAsciiDigit))
+        {
+            return null;
+        }
+
+        string significant = trimmed.TrimStart('0');
+        return significant.Length == 0 ? null : significant;
+    }
+}
+
+/// <summary>
+/// The combined match rule shared by every provider (ADR-0032 amendment 2026-10-13). The registration number is
+/// tried first. An Unknown or Ambiguous registration result is returned as it is: Unknown is not "absent", so it
+/// never falls back to the user name. A NotMatched registration result tries the user name. A Matched registration
+/// result is cross-checked with the user name: the same user id is Matched; another user id is a conflict and
+/// returns Ambiguous (no guess); a NotMatched user name keeps the registration match; an Ambiguous or Unknown user
+/// name is returned as it is, because the absence of a conflict is not proven.
+/// </summary>
+internal static class ItsmUserMatchRules
+{
+    /// <summary>Applies the rule. <c>Conflict</c> is true only when the two keys matched different users.</summary>
+    public static async Task<(ItsmUserMatchResult Result, bool Conflict)> MatchAsync(
+        IItsmUserMapping mapping,
+        string? registrationNumber,
+        string? userName,
+        string provider,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        bool hasUserName = !string.IsNullOrWhiteSpace(userName);
+        if (string.IsNullOrWhiteSpace(registrationNumber))
+        {
+            return (hasUserName
+                ? await mapping.MatchByUserNameAsync(userName, cancellationToken)
+                : ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidIdentifier, provider), false);
+        }
+
+        ItsmUserMatchResult byRegistration = await mapping.MatchByRegistrationNumberAsync(registrationNumber, cancellationToken);
+        if (!hasUserName || byRegistration.Status is ItsmUserMatchStatus.Unknown or ItsmUserMatchStatus.Ambiguous)
+        {
+            return (byRegistration, false);
+        }
+
+        ItsmUserMatchResult byUserName = await mapping.MatchByUserNameAsync(userName, cancellationToken);
+        if (byRegistration.Status == ItsmUserMatchStatus.NotMatched)
+        {
+            return (byUserName, false);
+        }
+
+        return byUserName.Status switch
+        {
+            ItsmUserMatchStatus.Matched when string.Equals(
+                byUserName.User!.UserId, byRegistration.User!.UserId, StringComparison.Ordinal) => (byRegistration, false),
+            ItsmUserMatchStatus.Matched => (ItsmUserMatchResult.Ambiguous(byRegistration.Provider), true),
+            ItsmUserMatchStatus.NotMatched => (byRegistration, false),
+            _ => (byUserName, false)
+        };
     }
 }

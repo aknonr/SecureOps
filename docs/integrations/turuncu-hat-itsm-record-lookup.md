@@ -3,8 +3,8 @@
 Decision: ADR-0031 (Proposed) for the record lookup; ADR-0032 (Proposed) for OR tracking and exact user match
 (sections "OR tracking" and "User match" below). Code: `src/SecureOps.Infrastructure/ItsmRecords/`. Tests:
 `tests/SecureOps.Tests.Unit/ItsmRecords/`. No API endpoint, no OpenAPI entry, no SQL, no UI: modules call the
-interfaces from their service layer. Status 2026-10-12: implemented and unit-tested with synthetic responses only;
-no real Turuncu Hat call has been made.
+interfaces from their service layer. Status 2026-10-12 (registration-number match added 2026-10-13): implemented and
+unit-tested with synthetic responses only; no real Turuncu Hat call has been made.
 
 ## Contract
 
@@ -123,29 +123,63 @@ key must be present or the row is malformed (`Unknown/IncompleteResponse`). The 
 exclusion come from the Turuncu Hat team's description and are unexecuted. Telemetry operations:
 `itsm-tracking-or|itsm-tracking-activities|itsm-tracking-comments`.
 
-## User match (ADR-0032)
+## User match (ADR-0032, amendment 2026-10-13)
 
-`IItsmUserMapping.MatchByUserNameAsync(string? userName, CancellationToken)` returns
-`ItsmUserMatchResult(Status, Reason, User, Provider)` with `Matched | NotMatched | Ambiguous | Unknown` and
-`ItsmUserReference(UserId, OrganizationId, HomeLocationId)`. The requested name is not echoed.
+`IItsmUserMapping` has three methods, all returning `ItsmUserMatchResult(Status, Reason, User, Provider)` with
+`Matched | NotMatched | Ambiguous | Unknown` and `ItsmUserReference(UserId, OrganizationId, HomeLocationId)`. Neither
+the requested user name nor the registration number is echoed.
 
-- Call it only with a user name derived from the server-verified session identity. There is no search: the name must
-  pass `ItsmUserName.Normalize` (1-64 ASCII letters, digits, `.`, `_`, `-`, starting with a letter or digit; domain
-  prefix, UPN suffix, spaces, quotes and wildcards are rejected as `Unknown/InvalidIdentifier` without a remote call).
-- Wire: `cmn_user`, filter `#%m_username%#='<name>'`, selects `id, m_username, p_obs_id, m_rel_home_lbs_id`
-  (`m_username` only proves the filter was honoured, case-insensitively; a row for another name is
-  `Unknown/InvalidResponse`). `p_obs_id` and `m_rel_home_lbs_id` may be empty and read as null.
-- **`NotMatched`, `Ambiguous` and `Unknown` are all "no mapping": the consuming flow stops.** The registration
-  number (`c_registration_number`, leading zeros dropped) is deliberately not implemented because the product user
-  record holds no trusted registration number. The phone number (`m_phone_number`) is not selectable.
-- Telemetry operation: `itsm-user-match`.
+| Method | Key | Use |
+|---|---|---|
+| `MatchAsync(registrationNumber, userName, ct)` | registration number first, user name second | **Consumers call this one** |
+| `MatchByRegistrationNumberAsync(registrationNumber, ct)` | `cmn_user.c_registration_number` | one key only |
+| `MatchByUserNameAsync(userName, ct)` | `cmn_user.m_username` | one key only |
+
+- Call it only with values the server holds for the signed-in user: the registration number from the product user
+  record (`security.Users.Uid`, written from the validated OIDC `uid` claim) and the user name derived from the
+  server-verified session identity (`security.Users.LoginName`). Reading them is the consumer's job; there is no
+  search for anyone else.
+- User name allow-list: `ItsmUserName.Normalize` (1-64 ASCII letters, digits, `.`, `_`, `-`, starting with a letter or
+  digit; domain prefix, UPN suffix, spaces, quotes and wildcards are rejected as `Unknown/InvalidIdentifier` without a
+  remote call).
+- Registration allow-list: `ItsmRegistrationNumber.Normalize` (outer whitespace trimmed, then 1-20 ASCII digits;
+  leading zeros dropped; only zeros, letters, signs, inner whitespace, quotes, `%`, `*`, `#` and non-ASCII digits are
+  rejected as `Unknown/InvalidIdentifier` without a remote call). `0770123` is searched as `770123`.
+- Wire, user name: `cmn_user`, filter `#%m_username%#='<name>'`, selects `id, m_username, p_obs_id, m_rel_home_lbs_id`
+  (`m_username` only proves the filter was honoured, case-insensitively).
+- Wire, registration number: `cmn_user`, filter `#%c_registration_number%#='<digits without leading zeros>'`, selects
+  `id, c_registration_number, p_obs_id, m_rel_home_lbs_id` (`c_registration_number` only proves the filter was
+  honoured: the returned text or number is normalized the same way and must be equal).
+- Both paths: a row for another key value is `Unknown/InvalidResponse`; `p_obs_id` and `m_rel_home_lbs_id` may be empty
+  and read as null; completeness and failure rules are the same as for the record lookup.
+- Combined rule (`MatchAsync`; null or blank counts as not given):
+
+  | Registration result | User name not given | User name given |
+  |---|---|---|
+  | (not given) | `Unknown/InvalidIdentifier`, no call | user-name result |
+  | `Unknown` (also an invalid number) | returned | returned, **no fallback** to the user name |
+  | `Ambiguous` | returned | returned, user name not tried |
+  | `NotMatched` | returned | user-name result |
+  | `Matched` | returned | user name on the same user id → `Matched`; on another user id → `Ambiguous` (conflict); `NotMatched` → registration match stands; `Ambiguous`/`Unknown` → that result |
+
+- **`NotMatched`, `Ambiguous` and `Unknown` are all "no mapping": the consuming flow stops.** The phone number
+  (`m_phone_number`) is not selectable.
+- Personal data: the registration number is only a query key. It is never returned, stored, logged, put in a
+  telemetry tag or in error text; logs carry only the key kind and the reason.
+- Known gap: a NotMatched registration followed by a Matched user name is accepted; a Turuncu Hat user whose
+  registration number differs from the product's is not detected on that path (ADR-0032 amendment, known risk).
+- Telemetry operations: `itsm-user-match` (user name), `itsm-user-match-registration` (registration number),
+  `itsm-user-match-combined` (outcome as usual, or `conflict` when the two keys matched different users).
 
 ## Fake providers
 
 `FakeItsmRecordTracking`: source id `900001` Found (two activities, two comments), `900002` Ambiguous, `900003`
 Unknown/Unavailable, `900004` Found with the activity part `Unknown/IncompleteResponse` and zero comments, any other
 valid id NotFound. `FakeItsmUserMapping`: `synthetic.user` Matched, `synthetic.dup` Ambiguous, `synthetic.down`
-Unknown/Unavailable, any other valid name NotMatched. Source id `900001` matches the Fake OR record of the lookup.
+Unknown/Unavailable, any other valid name NotMatched; registration number `990001` (also `0990001`) is the same Fake
+user as `synthetic.user`, `990004` another Fake user (conflicts with `synthetic.user` in `MatchAsync`), `990002`
+Ambiguous, `990003` Unknown/Unavailable, any other valid number NotMatched. Source id `900001` matches the Fake OR
+record of the lookup.
 
 ## Vendor and team evidence (2026-10-12, sanitized)
 
@@ -177,3 +211,5 @@ registration value is recorded here).
 5. Exact OR/OCO number formats; the `m_mob` value for OR in `cmn_comment`, whether `cmn_comment` has a creation-time
    column (default `m_created_dt` is unproven), and the `m_process.m_main_object` value for OR.
 6. Whether the `!=` filter operator with the system-action exclusion works as described.
+7. Whether `c_registration_number` matches with the equality filter and no leading zeros, and whether the value comes
+   back as text or number, with or without leading zeros (one TEST query, recorded without the real value).
