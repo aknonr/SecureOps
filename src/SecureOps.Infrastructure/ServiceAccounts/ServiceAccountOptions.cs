@@ -27,6 +27,9 @@ public sealed class ServiceAccountOptions
     /// <summary>Risk list: password unchanged for at least this many calendar days (measured from the source report date).</summary>
     public int RiskPasswordDays { get; set; } = SecureOps.Domain.ServiceAccounts.RiskThresholds.DefaultPasswordDays;
 
+    /// <summary>OR opening from an approved gMSA plan (ADR-0030, PROPOSED); the provider itself is <c>ItsmRequestCreation:Provider</c>.</summary>
+    public ServiceAccountOperationalRecordOptions OperationalRecords { get; set; } = new();
+
     /// <summary>True when SQL persistence is configured.</summary>
     public bool Enabled => string.Equals(Provider, "SqlServer", StringComparison.OrdinalIgnoreCase);
 }
@@ -54,4 +57,17 @@ public sealed class ServiceAccountReminderOptions
 
     /// <summary>Approved holiday calendar identifier; empty keeps business-day rules unconfigured.</summary>
     public string? HolidayCalendar { get; set; }
+}
+
+/// <summary>
+/// Module-side OR settings. Placeholder environment values until the Turuncu Hat team confirms the template property values
+/// (ADR-0030 open question 4); the short description limit until its real maximum is known (open question 7).
+/// </summary>
+public sealed class ServiceAccountOperationalRecordOptions
+{
+    /// <summary>Environment values the person may choose (an array, so configuration replaces rather than appends).</summary>
+    public string[] Environments { get; set; } = ["Test", "Prod"];
+
+    /// <summary>Short description limit (at most the 400-character column).</summary>
+    public int ShortDescriptionMax { get; set; } = 200;
 }

@@ -68,6 +68,10 @@ public static class SaErrors
     public const string IdempotencyKeyReused = "ServiceAccountEventIdempotencyKeyReused";
     /// <summary>The request cannot be closed after these records (missing conditions in <c>current</c>); nothing was written.</summary>
     public const string CloseNotAllowed = "ServiceAccountEventCloseNotAllowed";
+    /// <summary>Plan OR submission tables (migration 035) are not installed on this database.</summary>
+    public const string OperationalRecordsNotInstalled = "ServiceAccountOperationalRecordsNotInstalled";
+    /// <summary>OR creation is off on this host (provider Disabled, the default); nothing was written.</summary>
+    public const string OperationalRecordCreationDisabled = "ServiceAccountOperationalRecordCreationDisabled";
 }
 
 /// <summary>Scope inputs loaded for one caller.</summary>
