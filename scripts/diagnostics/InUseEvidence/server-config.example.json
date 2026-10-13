@@ -5,6 +5,9 @@
     "ControlledTestWritesEnabled": false,
     "SourceCloseEnabled": false
   },
+  "InUseCompletion": {
+    "SourceWritesEnabled": false
+  },
   "TuruncuHat": {
     "BaseUrl": "",
     "Authorization": "",

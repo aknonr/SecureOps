@@ -7,6 +7,8 @@ public sealed class InUseCompletionOptions
     public bool Enabled { get; set; }
     /// <summary>Disabled, Fixture (isolated local only), or TuruncuHat (contract-blocked until authoritative evidence is implemented).</summary>
     public string Provider { get; set; } = "Disabled";
+    /// <summary>Independent default-off source-write gate below the global fences; unrelated to OperationalRecords:SourceCloseEnabled.</summary>
+    public bool SourceWritesEnabled { get; set; }
     /// <summary>Bounded per-step timeout, shorter than the durable lease.</summary>
     public int TimeoutSeconds { get; set; } = 30;
     /// <summary>Private absolute directory for synthetic remote fixture state; never corporate data.</summary>

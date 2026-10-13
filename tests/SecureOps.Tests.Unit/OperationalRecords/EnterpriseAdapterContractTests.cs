@@ -76,7 +76,7 @@ public sealed class EnterpriseAdapterContractTests
             httpClient, Options.Create(options), TimeProvider.System, health, telemetry,
             NullLogger<TuruncuHatSessionManager>.Instance);
         TuruncuHatOperationalRecordClient client = new(
-            httpClient, manager, Options.Create(options), Options.Create(new OperationalRecordsOptions()), health, telemetry,
+            httpClient, manager, Options.Create(options), Options.Create(new OperationalRecordsOptions()), Options.Create(new InUseCompletionOptions()), health, telemetry,
             NullLogger<TuruncuHatOperationalRecordClient>.Instance);
 
         IReadOnlyList<OperationalRecordSourceItem> records = await client.GetActiveAsync(10, CancellationToken.None);
@@ -367,7 +367,7 @@ public sealed class EnterpriseAdapterContractTests
             httpClient, Options.Create(options), TimeProvider.System, health, telemetry,
             NullLogger<TuruncuHatSessionManager>.Instance);
         TuruncuHatOperationalRecordClient client = new(
-            httpClient, manager, Options.Create(options), Options.Create(new OperationalRecordsOptions()), health, telemetry,
+            httpClient, manager, Options.Create(options), Options.Create(new OperationalRecordsOptions()), Options.Create(new InUseCompletionOptions()), health, telemetry,
             NullLogger<TuruncuHatOperationalRecordClient>.Instance);
 
         _ = await client.GetActiveAsync(10, CancellationToken.None);
@@ -1187,6 +1187,7 @@ public sealed class EnterpriseAdapterContractTests
             new FixedSessionManager(session),
             Options.Create(options),
             Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnlyIntegrationMode, SourceCloseEnabled = true }),
+            Options.Create(new InUseCompletionOptions()),
             new EnterpriseIntegrationHealthState(),
             new EnterpriseIntegrationTelemetry(),
             logger ?? NullLogger<TuruncuHatOperationalRecordClient>.Instance);

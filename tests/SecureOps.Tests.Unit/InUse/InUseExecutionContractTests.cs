@@ -38,10 +38,10 @@ public sealed class InUseExecutionContractTests
         var handler = new MutationHandler(status);
         IHttpClientFactory factory = Substitute.For<IHttpClientFactory>();
         factory.CreateClient("TuruncuHat").Returns(_ => new HttpClient(handler, false));
-        IOptions<OperationalRecordsOptions> writes = Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = false, ControlledTestWritesEnabled = true, SourceCloseEnabled = true });
+        IOptions<OperationalRecordsOptions> writes = Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = false, ControlledTestWritesEnabled = true });
         var client = new TuruncuHatInUseMutationClient(factory, sessions, Options.Create(new TuruncuHatOptions
         { BaseUrl = "https://source.example.invalid/ws/DataRest.svc/json", Authorization = "Basic synthetic", TenantId = 218 }),
-            writes, Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat" }));
+            writes, Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat", SourceWritesEnabled = true }));
         (await client.SendAsync(step, lease, null, "789", null, default)).Outcome.Should().Be(expected);
         handler.Count.Should().Be(1);
         using var body = JsonDocument.Parse(handler.Body!);
@@ -124,10 +124,9 @@ public sealed class InUseExecutionContractTests
             Options.Create(new OperationalRecordsOptions
             {
                 ReadOnlyIntegrationMode = false,
-                ControlledTestWritesEnabled = true,
-                SourceCloseEnabled = true
+                ControlledTestWritesEnabled = true
             }),
-            Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat" }));
+            Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat", SourceWritesEnabled = true }));
 
         InUseRemoteResult result = await client.SendAsync("Property4464", lease, "500", null, proposed, default);
         result.Outcome.Should().Be(expected);
@@ -216,13 +215,78 @@ public sealed class InUseExecutionContractTests
     public async Task CompletionPolicy_FlagsDoNotEnableUnknownCorporateContracts_OrSyntheticProviderInProduction()
     {
         InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(CancellationToken.None)).Records[0];
-        IOptions<OperationalRecordsOptions> writes = Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = false, ControlledTestWritesEnabled = true, SourceCloseEnabled = true });
-        IOptions<InUseCompletionOptions> options = Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat" });
+        IOptions<OperationalRecordsOptions> writes = Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = false, ControlledTestWritesEnabled = true });
+        IOptions<InUseCompletionOptions> options = Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat", SourceWritesEnabled = true });
         new InUseCompletionPolicy(options, writes, "Test").Readiness(source with { Synthetic = false }).Code.Should().Be("SourceContractsMissing");
         options.Value.Provider = "Fixture";
         options.Value.FixtureDirectory = Path.GetTempPath();
         new InUseCompletionPolicy(options, writes, "Production").Readiness(source).Available.Should().BeFalse();
         new InUseCompletionPolicy(options, writes, "Test").Readiness(source with { Synthetic = false }).Available.Should().BeFalse();
         new InUseCompletionPolicy(options, writes, "Test").Readiness(source).Available.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false, true, true, "Test", false, "WriteFence")]
+    [InlineData(true, true, true, "Test", true, "WriteFence")]
+    [InlineData(false, false, true, "Test", true, "WriteFence")]
+    [InlineData(false, true, true, "Production", true, "WriteFence")]
+    [InlineData(false, true, true, "Test", true, "SourceContractsMissing")]
+    [InlineData(false, true, false, "Test", true, "SourceContractsMissing")]
+    public async Task CompletionPolicy_UsesOwnSourceWriteGate_IndependentOfOrSourceClose(bool readOnly, bool controlled,
+        bool sourceClose, string environment, bool sourceWrites, string expected)
+    {
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(CancellationToken.None)).Records[0] with { Synthetic = false };
+        IOptions<OperationalRecordsOptions> writes = Options.Create(new OperationalRecordsOptions
+        { ReadOnlyIntegrationMode = readOnly, ControlledTestWritesEnabled = controlled, SourceCloseEnabled = sourceClose });
+        IOptions<InUseCompletionOptions> options = Options.Create(new InUseCompletionOptions
+        { Enabled = true, Provider = "TuruncuHat", SourceWritesEnabled = sourceWrites });
+        InUseExecutionReadiness readiness = new InUseCompletionPolicy(options, writes, environment).Readiness(source);
+        readiness.Code.Should().Be(expected);
+        readiness.Available.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CompletionPolicy_Fingerprint_BindsInUseGate_NotOrSourceClose()
+    {
+        var writes = new OperationalRecordsOptions { ReadOnlyIntegrationMode = false, ControlledTestWritesEnabled = true };
+        var options = new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat" };
+        string Fingerprint() => new InUseCompletionPolicy(Options.Create(options), Options.Create(writes), "Test").Fingerprint;
+        string baseline = Fingerprint();
+        writes.SourceCloseEnabled = true;
+        Fingerprint().Should().Be(baseline);
+        options.SourceWritesEnabled = true;
+        Fingerprint().Should().NotBe(baseline);
+    }
+
+    [Theory]
+    [InlineData(true, false, "Acknowledged")]
+    [InlineData(false, true, "Rejected")]
+    public async Task MutationAdapter_RequiresInUseSourceWriteGate_NotOrSourceClose(bool sourceWrites, bool sourceClose, string expected)
+    {
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(CancellationToken.None)).Records[0]
+            with
+        { Id = "000123", Code = "OR-000123", Synthetic = false };
+        byte[] bytes = [2, 7, 1, 8];
+        InUseExecutionIntent intent = new(Guid.NewGuid(), Guid.NewGuid(), 4, 2, "source", Convert.ToHexString(SHA256.HashData(bytes)),
+            "archive.xlsx", Guid.NewGuid(), "Synthetic", DateTimeOffset.UtcNow, "configuration", "review", source);
+        InUseExecutionLease lease = new(intent, bytes, Guid.NewGuid(), 2, 3,
+            [new("Validate", "Verified", "synthetic-task", "test-only-target", DateTimeOffset.UtcNow, "test")]);
+        ITuruncuHatSessionManager sessions = Substitute.For<ITuruncuHatSessionManager>();
+        sessions.GetSessionAsync(Arg.Any<CancellationToken>()).Returns("synthetic-session");
+        var handler = new MutationHandler(200);
+        IHttpClientFactory factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient("TuruncuHat").Returns(_ => new HttpClient(handler, false));
+        var client = new TuruncuHatInUseMutationClient(factory, sessions, Options.Create(new TuruncuHatOptions
+        { BaseUrl = "https://source.example.invalid/ws/DataRest.svc/json", Authorization = "Basic synthetic", TenantId = 218 }),
+            Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = false, ControlledTestWritesEnabled = true, SourceCloseEnabled = sourceClose }),
+            Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat", SourceWritesEnabled = sourceWrites }));
+        InUseRemoteResult result = await client.SendAsync("Upload", lease, null, null, null, default);
+        result.Outcome.Should().Be(expected);
+        handler.Count.Should().Be(sourceWrites ? 1 : 0);
+        if (!sourceWrites)
+        {
+            result.Code.Should().Be("WriteFence");
+            await sessions.DidNotReceive().GetSessionAsync(Arg.Any<CancellationToken>());
+        }
     }
 }

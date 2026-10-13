@@ -1,5 +1,28 @@
 # ADR-0020: In Use Local Review Workspace
 
+## Amendment 2026-10-13: Independent In Use Source-Write Gate
+
+Owner decision 2026-10-13 (TH-5 question 3): the corporate In Use completion
+path no longer depends on `OperationalRecords:SourceCloseEnabled`. That flag is
+the ADR-0009 OR transfer-and-close gate; reusing it coupled two independent
+workflows and made In Use writes impossible without also arming OR close.
+
+- New `InUseCompletion:SourceWritesEnabled`, default false. Corporate readiness
+  and the standalone mutation client require the global fence
+  (`ReadOnlyIntegrationMode=false`, `ControlledTestWritesEnabled=true`, Test
+  only), `InUseCompletion:Enabled=true`, `Provider=TuruncuHat` and this flag.
+- Startup validation rejects the flag unless all of those hold (exact provider
+  spelling). `SourceCloseEnabled` validation and OR behaviour are unchanged.
+- The execution fingerprint binds the new flag instead of `SourceCloseEnabled`;
+  intents queued under the old fingerprint block as `ConfigurationChanged`.
+- Read-only operator probes (`DiagnoseAsync`, `DiagnoseCompletionAsync`) keep
+  their intent of running only in a strictly read-only composition: global fence
+  closed and every independent write gate off, now including the new flag.
+- Fixture-only synthetic acceptance is unchanged. Readiness still ends at
+  `SourceContractsMissing` for TuruncuHat, no corporate transport is registered
+  (IU-05 / E11), and no flag is enabled anywhere. Opening In Use writes needs a
+  separate owner approval.
+
 ## Archive Catalogue
 
 Reporter suggestion uses the already persisted provider/tenant IdentityScope and

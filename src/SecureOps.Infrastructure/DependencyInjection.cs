@@ -233,6 +233,7 @@ public static class DependencyInjection
                 serviceProvider.GetRequiredService<ITuruncuHatSessionManager>(),
                 serviceProvider.GetRequiredService<IOptions<TuruncuHatOptions>>(),
                 serviceProvider.GetRequiredService<IOptions<OperationalRecordsOptions>>(),
+                serviceProvider.GetRequiredService<IOptions<InUseCompletionOptions>>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationHealthState>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
                 serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<TuruncuHatOperationalRecordClient>>()));
