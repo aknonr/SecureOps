@@ -1,0 +1,192 @@
+/* Step indicator: number, name and weight mark the current step; aria-current="step" says it to assistive technology. No animation. */
+.sa-event-steps {
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.sa-event-steps li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--so-border);
+    border-radius: 999px;
+    color: var(--so-text-muted);
+}
+
+.sa-event-steps .sa-event-step--current {
+    color: var(--so-text);
+    font-weight: 600;
+    border-width: 2px;
+    border-color: var(--so-text);
+}
+
+.sa-event-steps .sa-event-step--done {
+    color: var(--so-text);
+}
+
+.sa-event-step-num {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 1.25rem;
+}
+
+.sa-event-heading {
+    margin: 0.25rem 0 0.5rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.sa-event-heading:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
+
+.sa-event-sub {
+    margin: 1rem 0 0.35rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Event cards are native radios: arrow keys move between them, Space selects; the chosen card also gets a thicker edge. */
+.sa-event-kinds {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.sa-event-kinds legend {
+    margin-bottom: 0.5rem;
+    padding: 0;
+}
+
+.sa-event-card {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--so-border);
+    border-radius: 6px;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+.sa-event-card--chosen {
+    border-width: 1px 1px 1px 4px;
+    border-left-color: var(--so-text);
+}
+
+.sa-event-card input {
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+}
+
+.sa-event-card input:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
+
+.sa-event-card-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.sa-event-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.sa-event-items,
+.sa-event-not {
+    margin: 0;
+    padding-left: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    overflow-wrap: anywhere;
+}
+
+.sa-event-fields {
+    display: grid;
+    grid-template-columns: minmax(7rem, max-content) minmax(0, 1fr);
+    gap: 0.1rem 0.75rem;
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+}
+
+.sa-event-fields dt {
+    color: var(--so-text-muted);
+}
+
+.sa-event-fields dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.sa-event-ref {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.sa-event-ref ::deep .sa-event-ref-type {
+    max-width: 8rem;
+}
+
+.sa-event-ref ::deep .mud-input-control {
+    flex: 1 1 10rem;
+    min-width: 0;
+}
+
+.sa-event-hints ul {
+    margin: 0;
+    padding-left: 1.25rem;
+    overflow-wrap: anywhere;
+}
+
+/* Problems and warnings carry a heading or an icon with text; the edge is a second signal, not the only one. */
+.sa-event-problem {
+    border-left: 4px solid var(--so-text);
+    padding: 0.5rem 0.75rem;
+    background: var(--so-bg-sunken);
+}
+
+.sa-event-warn {
+    display: flex;
+    gap: 0.35rem;
+    align-items: flex-start;
+}
+
+.sa-event-off {
+    display: flex;
+    gap: 0.4rem;
+    align-items: flex-start;
+}
+
+/* aria-disabled buttons stay focusable on purpose; the dimmed look is a second signal beside the visible reason under them. */
+.sa-event ::deep .mud-button-root[aria-disabled="true"] {
+    opacity: 0.6;
+}
+
+.sa-event ::deep .mud-button-root:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}

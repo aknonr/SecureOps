@@ -45,6 +45,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-36 — Change-plan checklist and closing have no API yet (plus two smaller plan-contract gaps) | Item 1 closed 2026-10-12 (API in #36, UI in F3); items 2 and 3 remain open |
 | G-37 — First TEST acceptance: no SID search, directory "not configured" vs "unreachable", free-text import row errors | Open (2026-10-13); the UI shows honest wording meanwhile |
 | G-38 — OR → Jira: no issue link, no persisted transfer key/time, no replay indicator, no reviewed draft for retry | Open (2026-10-13); planned as TH-8 (ADR-0033); the UI shows none of these meanwhile |
+| G-39 — Service Accounts event flow: close readiness read per request, no verification readiness, preview ids without names | Open (2026-10-13); OLAY-3 UI works around each honestly |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1263,6 +1264,27 @@ Checked against `OperationalRecordResponse` and `JiraTransferResponse` on master
 **UI meanwhile:** the Jira key is shown as text without a link; after a reload only the persisted state is shown
 (an in-flight "sent, no answer" survives only as `CreatingJira`); the retry dialog states its effect but cannot
 list the reviewed fields. Nothing above is read or assumed.
+
+## G-39 — Service Accounts event flow (OLAY-3): close readiness per request, no verification readiness, ids without names
+
+**Raised:** 2026-10-13, OLAY-3 UI (branch `feature/service-accounts-event-guidance-ui-20261013`), against the OLAY-2a/2b/2c API on master.
+**Owner:** Service Accounts module (owner-approved scoped exception); the UI never invents these.
+
+1. **`RequestView.closeReadiness` is not in the account detail** (deferred in OLAY-2a, EVENT-GUIDANCE-DESIGN §6). The account page reads
+   `GET requests/{id}/close-readiness?outcome=Completed` once per open request after each load or save (at most 20), and the chosen
+   other outcome on demand. A request whose read fails shows "could not read; the server decides" and its close button stays usable.
+   Needed (performance only): readiness on each open `RequestView`, computed from the same close facts the close command uses.
+2. **No verification readiness (`EvaluateVerification`).** "Doğrula" hints come only from the closure sub-codes the close readiness
+   reports for the closest candidate action (`RelatedActionId`) and from the verify form's own missing date; a refused verification still
+   shows the server's code. Needed if the owner wants "why can this not be verified" before submitting: a read with the verify rule's
+   missing list for one action.
+3. **Preview fields carry directory ids, not names.** `EventPreview.items[].fields` sends `contactPersonId`, `performerPersonId`,
+   `personId` (and team ids) as GUIDs. The UI resolves team ids from the team list it already has and shows people as "Seçilen kişi".
+   Needed: the label next to the id (as `SaRef`), so the person sees exactly which person will be written.
+4. **Commit result carries no follow-ups.** `EventCommitResult` has `created` but not `followUps`; the UI shows the follow-ups of the
+   preview the person confirmed (same draft, so same list). Needed only if follow-ups ever depend on the written state.
+5. **No `DateAssumed` warning from the server.** A year-less mail date is marked `AssumedYear` by mail-hints; the preview does not
+   know a date came from a hint, so the UI keeps its own "year assumed" note under the date field until the person changes the date.
 
 ## Note: enums cross the wire as numbers
 

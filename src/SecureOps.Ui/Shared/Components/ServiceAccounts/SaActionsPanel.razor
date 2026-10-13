@@ -30,11 +30,19 @@
                     @if (context.VerifiedOn is { } verified) { @($"{verified:dd.MM.yyyy} · {context.VerifiedByPerson?.Label ?? "doğrulayan bilinmiyor"}") }
                     else { <span>Doğrulanmadı</span> }
                     @if (context.EvidenceNote is not null) { <div class="so-panel-text--sm">Kanıt: @context.EvidenceNote</div> }
+                    @if (!context.Voided && ClosureGaps(context) is { Count: > 0 } gaps)
+                    {
+                        <div class="so-panel-text--sm">Talebin kapanması için bu kayıtta eksik: @string.Join(" ", gaps.Select(ServiceAccountEventText.SubCode))</div>
+                    }
                 </MudTd>
                 <MudTd DataLabel="Komut">
                     @if (!context.Voided && context.Result == "Performed" && Detail.Permissions.Verify)
                     {
                         <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Open(context, "verify"))">Doğrula</MudButton>
+                    }
+                    else if (!context.Voided && context.Result == "Performed")
+                    {
+                        <span class="so-panel-text--sm">Doğrulamayı doğrulama yetkisi olan kişi yapar.</span>
                     }
                     @if (!context.Voided && Detail.Permissions.Verify)
                     {
@@ -59,8 +67,14 @@
                 </MudItem>
                 <MudItem xs="12"><MudTextField @bind-Value="_note" Label="Doğrulama notu / kanıt açıklaması" MaxLength="2000" Lines="2" Variant="Variant.Outlined" /></MudItem>
             </MudGrid>
-            <MudButton OnClick="VerifyAsync" Disabled="@(Busy || _verifiedOn is null)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Doğrulamayı kaydet</MudButton>
+            @if (ClosureGaps(target) is { Count: > 0 } targetGaps)
+            {
+                <p class="so-panel-text--sm mt-1">Talebin kapanması için sunucunun bu kayıtta eksik bulduğu: @string.Join(" ", targetGaps.Select(ServiceAccountEventText.SubCode)) Doğrulamada tarih, doğrulayan ve kanıtı birlikte girin.</p>
+            }
+            <MudButton OnClick="VerifyAsync" Disabled="Busy" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2"
+                       aria-disabled="@(_verifiedOn is null ? "true" : "false")" aria-describedby="@(_verifiedOn is null ? "sa-verify-why" : null)">Doğrulamayı kaydet</MudButton>
             <MudButton OnClick="Close" Variant="Variant.Text" Class="mt-2">Vazgeç</MudButton>
+            @if (_verifiedOn is null) { <p id="sa-verify-why" class="so-panel-text--sm">Doğrulama tarihini seçin; tarih olmadan doğrulama kaydedilmez.</p> }
         </section>
     }
     else if (_target is { } voidTarget && _mode == "void")
@@ -166,7 +180,14 @@
 
     private void Close() => (_target, _mode) = (null, string.Empty);
 
-    private Task VerifyAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/actions/{_target!.Id}/verify",
+    /// <summary>Server close readiness (Completed) per open request; used only to say what the closest candidate action still lacks.</summary>
+    [Parameter] public IReadOnlyDictionary<Guid, CloseReadiness> Readiness { get; set; } = new Dictionary<Guid, CloseReadiness>();
+
+    /// <summary>Sub-codes the server's close rule reports for this action as the closest closure candidate (empty when none).</summary>
+    private IReadOnlyList<string> ClosureGaps(ActionView action) =>
+        [.. Readiness.Values.SelectMany(r => r.Missing).Where(m => m.RelatedActionId == action.Id).SelectMany(m => m.SubCodes ?? []).Distinct()];
+
+    private Task VerifyAsync() => _verifiedOn is null ? Task.CompletedTask : OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/actions/{_target!.Id}/verify",
         new VerifyActionRequest(_target.Version, ServiceAccountUiText.ToDate(_verifiedOn)!.Value, _verifier, string.IsNullOrWhiteSpace(_note) ? null : _note.Trim(), _evidenceId)));
 
     private Task VoidAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/actions/{_target!.Id}/void", new VoidActionRequest(_target.Version, _note!.Trim())));

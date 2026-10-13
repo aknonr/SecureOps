@@ -39,6 +39,29 @@ public static class ServiceAccountGuides
         ],
         _noServerChange + " gMSA dönüşümünü sunucuda ekip yapar; sistem planı, kanıtı ve doğrulamayı tutar.");
 
+    /// <summary>
+    /// "Sizin için" line of the account guide (EVENT-GUIDANCE-DESIGN.md §9), from the server's permissions on this account. Short, in
+    /// the owner's words; the event sentence changes when the event flow is not installed (migration 036).
+    /// </summary>
+    public static string DetailRole(SecureOps.Shared.Contracts.ServiceAccounts.AccountPermissions permissions, bool eventsAvailable)
+    {
+        const string verify = "Bildirilen işlemler doğrulama bekler; doğrulamak için tarih, doğrulayan ve kanıt gerekir. \"Bir gelişme mi oldu?\" bildirim kaydeder, doğrulamaz.";
+        if (permissions.Work)
+        {
+            string work = eventsAvailable
+                ? "Hesapta bir şey olduysa \"Bir gelişme mi oldu?\"ya basın, ne olduğunu seçin. Ürün hangi kayıtların yapılacağını gösterir; siz onaylayınca hepsi birlikte kaydedilir. Kaydedilen şey \"kişi bildirdi\"dir; doğrulama ayrıdır."
+                : "Hesapta bir şey olduysa yazışmayı, işlem bildirimini ve talebi İşler ve Yazışmalar sekmelerinden kaydedin; \"Bir gelişme mi oldu?\" bu ortamda henüz açık değil. Kaydedilen şey \"kişi bildirdi\"dir; doğrulama ayrıdır.";
+            return permissions.Verify ? work + " " + verify : work;
+        }
+
+        if (permissions.CanWorkAnyRequest)
+        {
+            return "Size atanmış talep için gelişmeyi bildirebilirsiniz. Hesabın sahipliğini ve diğer talepleri değiştiremezsiniz.";
+        }
+
+        return permissions.Verify ? verify : "Bu hesapta kayıt yapamazsınız; gelişmeleri sorumlu ekibe iletin.";
+    }
+
     /// <summary>Team work.</summary>
     public static Guide Work { get; } = new("Ekibimin işleri",
         "Size veya ekibinize atanmış açık talepler, yaklaşan ve geciken planlar ile hatırlatmalar.",
