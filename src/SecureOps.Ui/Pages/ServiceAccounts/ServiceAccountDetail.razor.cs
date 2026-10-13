@@ -142,6 +142,7 @@ public partial class ServiceAccountDetail
             _detail = result.Detail;
             _revision++;
             await LoadAllReadinessAsync(Token);
+            StateHasChanged();
         }
 
         return answer;
@@ -176,6 +177,9 @@ public partial class ServiceAccountDetail
             await RefreshAsync();
         }
 
+        // The flow calls through plain delegates, so the page would not re-render on its own: sections and the flow's Detail must
+        // follow the account the server just returned (otherwise a refreshed preview would reuse the stale version).
+        StateHasChanged();
         return new SaCallResult<T>(value, problem, current, started);
     }
 

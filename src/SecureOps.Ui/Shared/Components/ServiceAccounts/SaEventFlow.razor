@@ -272,7 +272,7 @@
             {
                 <div role="alert" class="sa-event-problem mt-2">
                     <strong>@(_previewUnknown ? "Önizleme alınamadı: sunucudan cevap gelmedi." : previewProblem.Title)</strong>
-                    <p class="so-panel-text--sm">@(_previewUnknown ? "Önizleme hiçbir şey kaydetmez; tekrar deneyebilirsiniz." : previewProblem.Explanation) @ServiceAccountProblems.FieldMessage(previewProblem)</p>
+                    <p class="so-panel-text--sm">@(_previewUnknown ? "Önizleme hiçbir şey kaydetmez; tekrar deneyebilirsiniz." : previewProblem.Explanation) @(previewProblem.Code == "ServiceAccountEventStale" ? null : ServiceAccountProblems.FieldMessage(previewProblem))</p>
                 </div>
             }
             string? incomplete = _m.Incomplete(Detail.Permissions);

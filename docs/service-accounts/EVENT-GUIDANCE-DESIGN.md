@@ -72,6 +72,22 @@ açık/koyu tema. Yeni genel CSS yok; kapsamlı `.razor.css` ve mevcut `SoPageHe
 Sunucu hatasında dürüst durum: "Kaydedilemedi, hiçbir kayıt oluşmadı" (işlem tek transaction olduğu için doğru) — yalnız **sunucu cevabı hiç gelmediyse**
 (zaman aşımı) "sonuç bilinmiyor; hesabı yenileyip kontrol edin" denir ve yeniden gönderme aynı idempotency anahtarıyla güvenle yapılır (§8).
 
+**OLAY-3 uygulama notu (2026-10-13, dal `feature/service-accounts-event-guidance-ui-20261013`).** Uygulanan: `SaEventFlow` (hesap sayfasının üstü),
+`SaCloseMissingList`, `SaEventDraftModel`, `ServiceAccountEventText`; talep panelinde neden-kapalı listesi ve satır başına "Gelişme bildir", işlem panelinde
+kapanış adayı alt kodları, "Sıradaki adım"da "Bildir", `SaPageGuide`'da "Sizin için" satırı (§9). Kararlar ve sapmalar:
+- Kart seçimi native radyo grubu (ok tuşları); adım göstergesi `ol` + `aria-current="step"`; her adımda odak adım başlığına (`tabindex=-1`). Hazır olmayan
+  "İleri"/"Kaydet"/"Talebi kapat" `disabled` değil, `aria-disabled` + `aria-describedby` + görünür neden.
+- Taslak yalnız olay tablosunun izin verdiği blokları gönderir (`ServiceAccountEventRules.Shape` yalnız alan göstermek için okunur); sonuç, kayıt türü,
+  işlem türü, doğrulama alanı hiç gönderilmez. Katılımcı yalnız talebe bağlanan dört olayı görür, kapatma/yeni talep göndermez.
+- Idempotency anahtarı akış her açıldığında bir kez üretilir; yeniden gönderme aynı taslak + aynı anahtar + aynı digest. "Sonuç bilinmiyor" yalnız cevap
+  yoksa (zaman aşımı/ağ); 409 `eventStale` hesabı yeniden okur ve "önizlemeyi yenile" der; 422 sunucunun `current` listesini gösterir ve "kapatmadan
+  önizlemeyi yenile" sunar; 409 anahtar yeniden kullanımı "ilk gönderim kaydedilmiş olabilir, yenileyip kontrol edin" der.
+- Yapıştırılan mail metni yalnız `mail-hints` çağrısına gider ve öneri gelince kutudan silinir; taslağa, günlüğe, tarayıcı depolamasına girmez. Yılsız tarih
+  önerisi seçilirse UI "yıl varsayıldı" notunu kendi gösterir (önizleme bunu bilmez; G-39 madde 5).
+- `RequestView.closeReadiness` olmadığından sayfa her yükleme/kayıttan sonra açık talepler için (en çok 20) `close-readiness?outcome=Completed` okur; diğer
+  sonuç seçilince o sonucu okur. `CloseReasonRequired` yalnız gerekçe yazılınca listeden düşer (gerekçe kapatma anında yazılır). Okunamazsa ipucu yok,
+  düğme sunucuya gider. "Bildir" kartı yalnız `requests-overdue` adımında (en eski gecikmiş, çalışılabilir talep); kurallar değişmedi. Eksikler: G-39.
+
 ## 5. Sözleşme (OLAY-2 uygular; hepsi yalnız ekleme, `/api/v1/service-accounts`)
 
 Yetenek: `ServiceAccounts.Work` (+ hesapta sorumlu dayanak; katılımcı yalnız kendi `ParticipantRequestIds` taleplerine, §5.5). Tüm POST'lar mevcut CSRF başlığını
