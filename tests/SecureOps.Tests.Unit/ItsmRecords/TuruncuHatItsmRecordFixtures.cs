@@ -104,6 +104,19 @@ internal static class TuruncuHatItsmTrackingFixtures
         ("num", "1")
     ];
 
+    /// <summary>Synthetic registration number as the product stores it (leading zero) and as the source searches it.</summary>
+    public const string RegistrationNumber = "0770123";
+    public const string SearchedRegistrationNumber = "770123";
+
+    public static readonly (string Key, string? Value)[] RegistrationRow =
+    [
+        ("SET.id", "880001"),
+        ("SET.c_registration_number", SearchedRegistrationNumber),
+        ("SET.p_obs_id", "8601"),
+        ("SET.m_rel_home_lbs_id", "8701"),
+        ("num", "1")
+    ];
+
     /// <summary>Vendor-style envelope: 0-based PageNo, MaxPages 0 on a single page, RecordCount the total.</summary>
     public static string VendorEnvelope(int pageNo, int maxPages, int recordCount, params (string Key, string? Value)[][] rows) =>
         JsonSerializer.Serialize(new

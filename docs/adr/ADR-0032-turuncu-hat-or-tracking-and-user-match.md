@@ -1,7 +1,7 @@
 # ADR-0032: Turuncu Hat OR Tracking and Exact User Match (read-only)
 
-**Status:** Proposed (owner acceptance pending); implemented behind the Disabled default, no real Turuncu Hat call made
-**Date:** 2026-10-12
+**Status:** Accepted (owner, 2026-10-13; includes the 2026-10-13 amendment); implemented behind the Disabled default, no real Turuncu Hat call made
+**Date:** 2026-10-12 (amended 2026-10-13: registration-number match, see the amendment at the end)
 
 ## Context
 
@@ -38,7 +38,8 @@ contract is product-owned and only the adapter is Turuncu Hat specific.
    - No free-text, prefix, partial or person search exists. This is an exact equality on an identity that the
      server already authenticated; it is not people-search (AGENTS rule 5).
    - The registration number (`c_registration_number`, leading zeros dropped) is **not implemented**: the product
-     user record holds no trusted registration number, and no second path is written without one.
+     user record holds no trusted registration number, and no second path is written without one. *(Superseded by
+     the 2026-10-13 amendment: the product user record does hold one.)*
    - The phone number (`m_phone_number`) is not selectable. It needs an explicit request from an accepted ADR-0030
      consumer and its own field permission; until then it stays out of the contract and the code.
    - Person name, e-mail and the completing person (`m_done_by`) are never selected, returned or logged.
@@ -103,5 +104,64 @@ announcement files, which this work does not modify.
 
 ## References
 
-- ADR-0004, ADR-0009, ADR-0012, ADR-0030 (reserved, Service Accounts), ADR-0031
+- ADR-0004, ADR-0009, ADR-0012, ADR-0016 (OIDC profile metadata), ADR-0030 (reserved, Service Accounts), ADR-0031
 - `docs/integrations/turuncu-hat-itsm-record-lookup.md`, `docs/integrations/turuncu-hat-jira-contract-gaps.md`
+
+## Amendment 2026-10-13 (TH-4b): registration-number match
+
+**Context.** Decision 2 left the registration number out because the product user record was thought to hold no
+trusted value. It does: product users sign in through OIDC, and the server writes the validated `uid` claim to
+`security.Users.Uid` (ADR-0016 profile metadata, written only from the validated claim at sign-in; a later
+sign-in without the claim keeps the previous value). The owner reports, for corporate TEST, that all
+12 users have it, each 6 ASCII digits, no duplicates, four with a leading zero; `LoginName` is a plain user name.
+The Turuncu Hat team states that `cmn_user.c_registration_number` is filled and unique and is searched without
+leading zeros. Owner decision 2026-10-13: add the registration path now, ahead of the user name.
+
+**Decision.**
+
+1. **Registration path** (`IItsmUserMapping.MatchByRegistrationNumberAsync`): input is 1-20 ASCII digits after
+   trimming outer whitespace (leading zeros count toward the 20); leading zeros are dropped; a value of only zeros,
+   letters, signs, inner whitespace, quotes, wildcards, filter markers and non-ASCII digits are rejected as
+   `Unknown/InvalidIdentifier` without a remote call (`ItsmRegistrationNumber.Normalize`). One query on `cmn_user`
+   with the single equality `#%c_registration_number%#='<digits>'`, selecting only `id`, `c_registration_number`,
+   `p_obs_id`, `m_rel_home_lbs_id`. The returned number is normalized the same way and must equal the searched one;
+   otherwise the filter was not honoured and the result is `Unknown/InvalidResponse`. The outcome is again
+   `Matched | NotMatched | Ambiguous | Unknown` with the same completeness and failure rules as the user name.
+2. **Combined match and priority** (`IItsmUserMapping.MatchAsync(registrationNumber, userName)`); null or blank
+   values count as not given:
+
+   | Registration result | User name not given | User name given |
+   |---|---|---|
+   | (not given) | `Unknown/InvalidIdentifier`, no call | user-name result |
+   | `Unknown` (any reason, also an invalid number) | returned | returned; the user name is **not** tried |
+   | `Ambiguous` | returned | returned; the user name is not tried |
+   | `NotMatched` | returned | user-name result (the user name may be tried) |
+   | `Matched` | returned | user name `Matched` with the same user id → `Matched`; with another user id → **`Ambiguous` (conflict)**; `NotMatched` → the registration match stands; `Ambiguous` or `Unknown` → that result (no conflict-free answer is proven) |
+
+   Unknown is never read as "absent", so an unproven registration answer never falls back to the user name. A
+   conflict is never resolved by preference; both users are withheld and the flow stops. Every non-`Matched`
+   outcome still stops the consuming flow (decision 2).
+3. **Personal-data boundary.** The registration number is a query key only. It is not returned (the result echoes
+   neither key), not stored by the mapping, not written to logs, telemetry tags or error text; logs carry only the
+   key kind ("registration number" or "user name") and the reason. The caller passes the value the server holds for
+   the signed-in user (`security.Users.Uid`); reading it is the consumer's job, and this amendment changes no
+   Access or OIDC code. There is still no search by registration number for anyone else, no prefix or partial
+   match (AGENTS rule 5).
+4. **Telemetry:** operations `itsm-user-match-registration` (registration path) and `itsm-user-match-combined`
+   (combined; outcome `conflict` when the keys matched different users), next to `itsm-user-match`.
+5. **Fake:** `990001` (also `0990001`) is the Fake user of `synthetic.user`; `990004` is another Fake user, so it
+   conflicts with `synthetic.user`; `990002` Ambiguous; `990003` Unknown/Unavailable; any other valid number
+   NotMatched. All synthetic.
+
+**Known risk, accepted by the rule above.** A NotMatched registration followed by a Matched user name is accepted
+as a match by user name. If the Turuncu Hat user found by name carries a different registration number, the two
+systems disagree and the user-name match hides it. The registration column is not selected on the user-name path
+(decision 2 keeps that path's selects); closing this needs an owner decision and evidence from corporate TEST.
+
+**Ownership.** Owner decision 2026-10-13: Claude implements TH-4b under this ADR's exception, with the same scope
+and exclusions (no write, API endpoint, OpenAPI, SQL, UI; no Access/OIDC, Service Accounts or existing `TuruncuHat*`
+operational-record, In Use or announcement files).
+
+**Activation gate addition.** One read-only run in corporate TEST that confirms the `c_registration_number`
+equality filter without leading zeros and the returned value's shape (text or number, with or without leading
+zeros), recorded without real numbers, names or ids in the repository.
