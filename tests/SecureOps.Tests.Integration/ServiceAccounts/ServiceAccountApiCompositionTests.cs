@@ -198,8 +198,17 @@ public sealed class ServiceAccountApiCompositionTests
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient _ = factory.CreateApiClient();
-        RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
+        RouteEndpoint[] prefixed = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
             .Where(e => e.RoutePattern.RawText?.StartsWith("api/v1/service-accounts/accounts/{id:guid}/events", StringComparison.Ordinal) == true)];
+        // Mail hints (OLAY-2b, its own controller and 128 KB bound) share the prefix; any other route under it must be reviewed here.
+        static Type? Controller(RouteEndpoint e) => e.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>()?.ControllerTypeInfo.AsType();
+        prefixed.Select(e => (Controller(e), e.RoutePattern.RawText!)).Should().BeEquivalentTo(new[]
+        {
+            (typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountEventsController), "api/v1/service-accounts/accounts/{id:guid}/events/preview"),
+            (typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountEventsController), "api/v1/service-accounts/accounts/{id:guid}/events"),
+            (typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountMailHintsController), "api/v1/service-accounts/accounts/{id:guid}/events/mail-hints")
+        });
+        RouteEndpoint[] endpoints = [.. prefixed.Where(e => Controller(e) == typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountEventsController))];
         endpoints.Select(e => (e.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods.Single(), e.RoutePattern.RawText!)).Should().BeEquivalentTo(new[]
         {
             ("POST", "api/v1/service-accounts/accounts/{id:guid}/events/preview"),
