@@ -63,8 +63,9 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(35)
+            .And.HaveCount(36)
             .And.ContainSingle(name => name == "036-service-account-events.sql")
+            .And.ContainSingle(name => name == "035-service-account-plan-operational-records.sql")
             .And.ContainSingle(name => name == "034-service-account-plan-evidence.sql")
             .And.ContainSingle(name => name == "033-service-account-change-plans.sql")
             .And.ContainSingle(name => name == "032-access-request-user-index.sql")
@@ -430,6 +431,41 @@ public sealed class SqlAssetContractTests
                 || c.Contains("Subject", StringComparison.OrdinalIgnoreCase) || c.Contains("Sender", StringComparison.OrdinalIgnoreCase));
         Regex.Matches(ddl, @"CREATE TABLE").Should().HaveCount(2, "036 adds only the event header and item tables");
         grants.Should().NotContain("UPDATE").And.NotContain("DELETE").And.NotContain("ALTER ROLE").And.NotContain("svcacct_worker");
+    }
+
+    [Fact]
+    public void PlanOperationalRecordMigration_IsAdditive_GuardsContentAndTransitions_AndGrantsNoDelete()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "035-service-account-plan-operational-records.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "035-service-account-plan-operational-records.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-008-plan-operational-records.sql"));
+        string grants = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-008-API-permissions.sql"));
+
+        migration.Should().Contain(":r ../schema/035-service-account-plan-operational-records.sql");
+        schema.Should().Contain("requires reviewed 033 and 034").And.Contain(":r ../pending/service-accounts/SA-008-plan-operational-records.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay").And.Contain("THROW 51400")
+            .And.Contain("CREATE TABLE svcacct.ChangePlanRecordSubmissions(").And.Contain("CREATE TABLE svcacct.ChangePlanRecordSubmissionEvents(")
+            .And.MatchRegex(@"CREATE TRIGGER svcacct\.TR_SaRecordSubmissionEvents_AppendOnly ON svcacct\.ChangePlanRecordSubmissionEvents AFTER UPDATE, DELETE AS\s+BEGIN THROW 51402")
+            .And.Contain("CREATE TRIGGER svcacct.TR_SaRecordSubmissions_Guard ON svcacct.ChangePlanRecordSubmissions AFTER UPDATE, DELETE AS")
+            .And.Contain("THROW 51403").And.Contain("THROW 51404")
+            .And.Contain("CONSTRAINT UQ_SaRecordSubmissions_Key UNIQUE (AccountId, IdempotencyKey)")
+            .And.Contain("CREATE UNIQUE INDEX UX_SaRecordSubmissions_Active ON svcacct.ChangePlanRecordSubmissions(PlanId, AccountId)")
+            .And.Contain("WHERE State IN ('Sending','Created','PartiallyCreated','OutcomeUnknown','Linked');");
+
+        // Additive: no existing object changes (OcoNumber stays required, ADR-0030 §10 is open); no secret or remote-body column.
+        string ddl = string.Join('\n', candidate.Split('\n').Where(l => !l.TrimStart().StartsWith("--", StringComparison.Ordinal))).Split("*/", 2)[1];
+        ddl.Should().NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("GRANT").And.NotContain("ALTER ROLE").And.NotContain("OcoNumber");
+        Regex.Matches(ddl, @"CREATE TABLE").Should().HaveCount(2, "035 adds only the submission and its event table");
+        Regex.Matches(ddl, @"^\s+(\w+) [a-z]+", RegexOptions.Multiline).Select(m => m.Groups[1].Value)
+            .Should().NotContain(c => c.Contains("Password", StringComparison.OrdinalIgnoreCase) || c.Contains("Secret", StringComparison.OrdinalIgnoreCase)
+                || c.Contains("Session", StringComparison.OrdinalIgnoreCase) || c.Contains("Url", StringComparison.OrdinalIgnoreCase)
+                || c.Contains("Body", StringComparison.OrdinalIgnoreCase) || c.Contains("Exception", StringComparison.OrdinalIgnoreCase));
+
+        grants.Should().Contain("GRANT SELECT, INSERT ON OBJECT::svcacct.ChangePlanRecordSubmissions TO svcacct_api_runtime;")
+            .And.Contain("GRANT UPDATE ON OBJECT::svcacct.ChangePlanRecordSubmissions (State, ExternalId, ExternalNumber, LinkVerification, OutcomeReason, UpdatedBy, UpdatedAt)")
+            .And.Contain("GRANT SELECT, INSERT ON OBJECT::svcacct.ChangePlanRecordSubmissionEvents TO svcacct_api_runtime;")
+            .And.NotContain("DELETE").And.NotContain("ALTER ROLE").And.NotContain("svcacct_worker");
     }
 
     [Fact]
