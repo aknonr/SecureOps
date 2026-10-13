@@ -6,7 +6,7 @@ Single-page reference for the real systems SecureOps touches or must account for
 |---|---|---|---|---|
 | **SolarWinds** | Alarm source for CPU, disk, service, and similar events | Read later / indirect now | Monitoring platform team | Should SecureOps ever consume SolarWinds directly in production, or rely on Turuncuhat as the operational entry point? |
 | **monthly.thy.com / HPE OpsBridge** | Event-detail viewer layer between SolarWinds and Turuncuhat | None yet | Monitoring platform team | Confirm product role and whether any SecureOps integration is needed. |
-| **Turuncuhat** | Central ITSM + IVR system; creates `EVT-XXXXX`, opens PR/OR/OCO, sends mail/IVR, owns acknowledge/close workflow | Both likely, exact contract pending | Turuncuhat team | Webhook vs. API? Read-only vs. read-write? |
+| **Turuncuhat** | Central ITSM + IVR system; creates `EVT-XXXXX`, opens PR/OR/OCO, sends mail/IVR, owns acknowledge/close workflow | Both likely, exact contract pending | Turuncuhat team | Inbound: webhook vs. API? Outbound: read-only REST query (ADR-0031/0032); writes only through their own gated ADRs (0012, 0020, 0030) |
 | **BeyondTrust** | PAM used by humans with LDAP credentials for privileged RDP/PowerShell access | Read later / Worker path pending | PAM / BeyondTrust team | Should Worker use BeyondTrust brokering, direct WinRM + JEA, or direct JEA with explicit acceptance? |
 | **Dynatrace** | Existing APM platform | None yet | Application / observability stakeholders | Current WASAS use and relevance to SecureOps are unclear. |
 | **vSphere** | VM management and future snapshot visibility | Read later | Virtualization / infrastructure team | Exact API path and pilot availability to be confirmed before Phase 5+/8. |
