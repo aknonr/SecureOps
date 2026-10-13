@@ -97,8 +97,11 @@ public sealed record EventPreview(
 public sealed record EventPreviewItem(string Kind, string Operation, Guid? TargetId, string Label, IReadOnlyList<EventField> Fields, bool Allowed,
     string? DeniedReason = null);
 
-/// <summary>One value of a preview item.</summary>
-public sealed record EventField(string Name, string? Value);
+/// <summary>
+/// One value of a preview item. <c>Label</c> is set only on person id fields (contactPersonId, performerPersonId, personId) and only when that
+/// person already appears in the account detail the caller can read (G-39); otherwise null. No directory lookup is made for it.
+/// </summary>
+public sealed record EventField(string Name, string? Value, string? Label = null);
 
 /// <summary>A warning that does not stop the commit.</summary>
 public sealed record EventWarning(string Code, string? Field = null);
