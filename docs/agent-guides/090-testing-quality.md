@@ -17,7 +17,7 @@ dotnet format --verify-no-changes                            # repository-wide: 
 
 `global.json` pins the SDK with roll-forward disabled; if that SDK is unavailable, say so. A run with a substituted SDK or language version is diagnostic evidence only and must be labelled as such.
 
-The repository-wide format check is a required gate. A run scoped with `--include` (or limited to `style`/`analyzers`) is partial evidence: report it as such and never as passing the gate. As of 2026-10-01 the repository-wide check fails on pre-existing baseline debt (313 diagnostics in 13 files); PR #4 (Resources) records a merge NO-GO against it in its own branch documentation. Do not describe that debt as resolved until the full command passes.
+The repository-wide format check is a required gate and passes on master (verified 2026-10-13, `633eed9`); the 2026-10-01 baseline debt is gone. A run scoped with `--include` (or limited to `style`/`analyzers`) is partial evidence: report it as such and never as passing the gate. Before a branch is declared mergeable, run the full unit suite, not a filtered subset.
 
 ## Expectations
 
