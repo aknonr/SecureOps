@@ -39,6 +39,17 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## gMSA OR panel (OR-2, ADR-0030 Proposed, Fake only), 2026-10-13
+
+`SaPlanOperationalRecords` on `/service-accounts/plans/{id}` once the plan has an approval: one card per account (list, not table, for 390 px),
+the server's `canOpen/canLink/canConfirmNotCreated` only. "OR aç" opens a preview (requester mapping badge, environment radios, plain-text short
+description and description with counters, fixed plan reference line, every field with its source); the separate "Bu içerikle OR aç" is active only
+for a sendable preview of exactly the current text (edits need "Önizlemeyi güncelle") and sends the preview's fingerprint with an idempotency key
+made when that preview arrived; an unknown answer offers "Aynı anahtarla yeniden dene" (the server replays, no second OR). Belirsiz/Kısmen stay
+caution-toned with the line to search and a reconciliation form; tracking is a live read where every unproven value says "bilinmiyor" and codes are
+raw. Fake results say "sentetik". Tests: `ServiceAccountOperationalRecordUiTests` (19). Not verified: browser journey, 200 % zoom by eye, screen
+reader, dark theme by eye (CSS uses theme tokens only).
+
 ## gMSA change plan UI (d, PR 3), 2026-10-12
 
 Branch `feature/service-accounts-change-plan-ui-20261012`, cut from the API branch `feature/service-accounts-change-plan-api-20261007`

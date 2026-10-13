@@ -112,6 +112,10 @@ Candidate 4 (`SA-004`, numbered 030, ADR-0027): UsageScans (uploaded file ≤ 4 
 expected gMSA, times, run statement), UsageScanServers (one row per planned server, result and per-source status),
 UsageScanItems (matched components, role Former/Expected), UsageScanLinks (scan → account, optional participant request)
 and UsageScanDecisions (usage recorded / dismissed with reason). All append-only by trigger; runtime SELECT/INSERT only.
+Candidate 8 (`SA-008`, numbered 035, ADR-0030 *Proposed*, OR-2 with a Fake adapter only): ChangePlanRecordSubmissions (one row per "open OR"
+attempt for a plan account, written as Sending before any remote call with the exact sent content, idempotency key and fingerprint; only outcome
+columns change, along allowed transitions; one live submission per plan account and per OR number) and ChangePlanRecordSubmissionEvents
+(append-only). Runtime SELECT/INSERT plus column-level UPDATE on the outcome columns.
 
 Dates: plan/business dates are `date`; events carry `datetimeoffset` only when a real instant is
 known; `TimePrecision` records DateOnly/Instant/Unknown. Source timestamps without a timezone

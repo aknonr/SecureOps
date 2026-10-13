@@ -255,6 +255,11 @@ Her PR ayrı dal, küçük commit'ler, build/test/format/SQL harness; push edili
   OR numarası). Kapanışta OR numarası/numaraları `GmsaConversion` eylemine dış kayıt olarak bağlanır, OCO varsa o da.
 - Bildiren = düğmeye basan kişi; panel kullanıcısı → TH kullanıcı id'si birebir eşleme TH-4'e bağlı, kanıtlanana kadar OR
   açma kapalı kalır. OR durumunun izlenmesi ADR-0031 aramasına (TH-2) ve TH-4 alanlarına bağlıdır.
+- **OR-2 (2026-10-13, dal `feature/service-accounts-or-creation-20261013`, merge edilmedi; ADR-0030 hâlâ *Proposed*):** sahip isteğiyle
+  yalnız **sahte adaptörle** uygulandı. 035 (SA-008) gönderim tablosu + olaylar; `IItsmRequestCreator` (Fake/Disabled, varsayılan kapalı, gerçek TH
+  adaptörü yok); önizleme → ayrı onay → tek gönderim (parmak izi + işlem anahtarı), belirsiz sonuç mutabakatla çözülür; Bildiren `IItsmUserMapping`
+  (Matched + konum dışında durur); izleme ADR-0032. `OcoNumber` 035'te **değişmedi** (ADR-0030 §10 / açık soru 2 karara bağlı). Yetki ADR-0030'un
+  önerdiği yeni `CreateOperationalRecord` değil, sahip talimatıyla mevcut `Work` + planın tüm hesaplarında sorumlu dayanak. Ayrıntı: `OR-2-RAPOR.md`.
 
 ## Açık sorular
 
