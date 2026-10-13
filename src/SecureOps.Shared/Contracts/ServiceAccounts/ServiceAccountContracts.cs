@@ -70,6 +70,7 @@ public sealed record OwnershipView(Guid Id, SaRef? Team, SaRef? Person, string S
 /// <summary>
 /// Request (expected work) row; each open request is shown separately. <c>RequestedGmsaName</c> is the gMSA name the
 /// conversion will use (gMSA work types only; null when none is recorded or migration 031 is not applied).
+/// <c>CloseReadiness</c> is an open request's Completed close readiness from the close rule's single source (G-39); null on closed requests.
 /// </summary>
 public sealed record RequestView(
     Guid Id,
@@ -95,7 +96,8 @@ public sealed record RequestView(
     string? LegacyDisplayId,
     string? CloseReason,
     string Version,
-    string? RequestedGmsaName = null);
+    string? RequestedGmsaName = null,
+    CloseReadiness? CloseReadiness = null);
 
 /// <summary>Action row: plan, reported action and verification on one identity.</summary>
 public sealed record ActionView(
