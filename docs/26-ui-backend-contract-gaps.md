@@ -44,6 +44,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
 | G-36 — Change-plan checklist and closing have no API yet (plus two smaller plan-contract gaps) | Item 1 closed 2026-10-12 (API in #36, UI in F3); items 2 and 3 remain open |
 | G-37 — First TEST acceptance: no SID search, directory "not configured" vs "unreachable", free-text import row errors | Open (2026-10-13); the UI shows honest wording meanwhile |
+| G-38 — OR → Jira: no issue link, no persisted transfer key/time, no replay indicator, no reviewed draft for retry | Open (2026-10-13); planned as TH-8 (ADR-0033); the UI shows none of these meanwhile |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -621,18 +622,22 @@ advanced a record to `Previewed`; create produced a real Jira key through the fa
 rejected with `OperationalRecordChanged` and the closed and missing fixtures with
 `OperationalRecordNoLongerOpen`, none of them creating a Jira issue.
 
-What it does **not** establish:
+What it does **not** establish (updated 2026-10-13; the original note predates the real providers):
 
-- **No real source.** There is still no Turuncu Hat provider. `Fake` is a fixture set, not a
-  connector, and it is refused outside Development, Demo, and Test.
-- **No real Jira.** `FakeJiraClient` always succeeds and is idempotent by key. Genuine Jira failure
-  modes — timeouts, auth rejection, field validation, and above all an *unknown* outcome — cannot
-  occur against it. Reconciliation and retry-blocked were verified by rendering, not by a real
-  provider producing them.
+- **Real source: read-only only.** The `TuruncuHat` source provider now exists and its read-only
+  query was verified in TEST on 2026-09-04 (`docs/26-enterprise-turuncu-hat-jira-adapters.md`).
+  Synthetic runs use paired `Simulation` (or legacy `Fake`), refused outside Development, Demo, and
+  Test; they say nothing about real source data.
+- **No real Jira create.** The `Corporate` Jira adapter exists, but no issue has been created against
+  corporate Jira. Synthetic clients cannot produce genuine failure modes — timeouts, auth rejection,
+  field validation, and above all an *unknown* outcome. Reconciliation and retry-blocked were verified
+  by rendering and by test-host doubles, not by corporate Jira. The Jira-only rollout steps are in
+  ADR-0033.
 - **No live claim contention.** With fast fake providers, commands complete before a read can observe
   a live claim, so "claimed by another operator" was verified from authoritative fields and unit
   tests rather than by two operators colliding in practice.
-- **No SQL repository.** Verification ran on the in-memory repository; migration 004 was not executed.
+- **SQL only in isolated tests.** The SQL repository and migrations now exist and are exercised on
+  test-owned LocalDB; this original synthetic run used the in-memory repository.
 
 ---
 
@@ -1236,6 +1241,28 @@ corporate systems, provider writes, merge and deployment remain outside scope.
 
 Counts: no gap. "Sahiplik kararı bekleyen hesap" (work summary) and `status=proposed` (list) both count distinct accounts with a `Proposed`
 ownership inside the caller's scope; the list now says what its total counts and whether it equals the card.
+
+## G-38 — OR → Jira: four read-contract gaps and one behaviour to keep
+
+**Raised:** OR → Jira submission UI (2026-09-28, `src/SecureOps.Ui/README.md`, "Backend contract needs");
+registered here 2026-10-13 (TH-6). **Owner:** In Use / OR → SDM work under ADR-0033 (planned as TH-8, UI as TH-9).
+Checked against `OperationalRecordResponse` and `JiraTransferResponse` on master `dc2060a`: none of items 1-4 exists.
+
+1. **No issue link.** Needed: nullable `jiraIssueUrl` (absolute https, derived by the server from configuration,
+   never composed from the key in the UI) on `OperationalRecordResponse` and `JiraTransferResponse`.
+2. **Duplicate protection is not visible after a reload.** `JiraTransferResponse` carries `idempotencyKey`, but
+   `OperationalRecordResponse` carries neither the transfer key nor the UTC time the Jira key was persisted.
+   Needed: both on `OperationalRecordResponse`.
+3. **"Created now" and "already existed" look the same.** Needed: a replay indicator on `JiraTransferResponse`
+   (for example `replayed: true` when an existing key was returned without a new Jira call).
+4. **Retry confirmation cannot show what Jira will receive.** For a `JiraCreateFailed` record no preview exists.
+   Needed: a read-only view of the persisted reviewed draft (fields and mapping version).
+5. **Keep (not a gap):** the deterministic actor/command/target fallback command key for create and retry. The UI
+   sends no `Idempotency-Key` and relies on it to absorb transport resends.
+
+**UI meanwhile:** the Jira key is shown as text without a link; after a reload only the persisted state is shown
+(an in-flight "sent, no answer" survives only as `CreatingJira`); the retry dialog states its effect but cannot
+list the reviewed fields. Nothing above is read or assumed.
 
 ## Note: enums cross the wire as numbers
 

@@ -2,12 +2,20 @@
 
 ## Provider Selection
 
-- `OperationalRecords:SourceProvider=Disabled|Fake|TuruncuHat`
-- `Jira:Provider=Disabled|Fake|Corporate`
+- `OperationalRecords:SourceProvider=Disabled|Simulation|Fake|TuruncuHat`
+- `Jira:Provider=Disabled|Simulation|Fake|Corporate`
 - `OperationalRecords:ReadOnlyIntegrationMode=true` for the TEST real-data/no-write gate
 - `OperationalRecords:ControlledTestWritesEnabled=true` only for a separately approved TEST write smoke
+- `OperationalRecords:SourceCloseEnabled` (default `false`) independent BPM closure gate (ADR-0009)
 
-`Fake` is permitted only in Development, Demo, or Test. Real provider selection is explicit and never falls back to synthetic behavior. Application defaults remain `Disabled`.
+`Simulation` and legacy `Fake` are permitted only in Development, Demo, or Test, and `Simulation` must be selected for both providers together. Real provider selection is explicit and never falls back to synthetic behavior. Application defaults remain `Disabled`.
+
+Related Turuncu Hat providers, selected separately:
+
+- `ItsmRecordLookup:Provider=Disabled|Fake|TuruncuHat` — read-only record lookup, tracking and exact user match (ADR-0031, ADR-0032; `docs/integrations/turuncu-hat-itsm-record-lookup.md`).
+- `InUseCompletion:Enabled` (default `false`) and `InUseCompletion:Provider=Disabled|Fixture|TuruncuHat` — In Use completion (ADR-0020). `Fixture` serves synthetic `simulation:` sources only (Development, Demo, Test); for `TuruncuHat` no Turuncu Hat transport is registered and readiness reports `SourceContractsMissing`. Known defect: In Use writes also require `SourceCloseEnabled=true`; TH-7 separates the gates (ADR-0033).
+
+Rollout (owner decision 2026-10-13, ADR-0033): OR → Jira goes into Jira-only operational use; no gate in this document is opened by that decision, and Turuncu Hat closure stays off.
 
 In `Test`, selecting either corporate provider without `ReadOnlyIntegrationMode=true` fails startup unless the separate disabled-by-default `ControlledTestWritesEnabled=true` gate is explicitly approved. Both modes require the complete `TuruncuHat` + `Corporate` pair. Read-only mode requires the complete future Jira field mapping so preview is exact, permits source authentication/query and exact Jira requester/operator-resolution reads, but rejects API create/retry before local workflow mutation and rejects Jira create/Turuncu Hat completion again inside the adapters before HTTP dispatch. The controlled-write gate is rejected outside `Test`, while read-only mode is active, or with an incomplete provider pair.
 
